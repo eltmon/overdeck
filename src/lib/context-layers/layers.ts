@@ -81,6 +81,11 @@ export function piGlobalContextFile(): string {
   return join(getPanopticonHome(), 'context', 'pi-global.md');
 }
 
+/** `~/.panopticon/context/codex-global.md` — the rendered global layer for Codex. */
+export function codexGlobalContextFile(): string {
+  return join(getPanopticonHome(), 'context', 'codex-global.md');
+}
+
 // ─── Starter templates ────────────────────────────────────────────────────
 
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */
@@ -90,10 +95,12 @@ This file is **per-machine** — it lives at \`~/.panopticon/context/global.md\`
 on the disk in front of you. Nothing syncs it to your other machines.
 
 For content you want on **every** machine — engineering rules, coding
-standards, behavioral guidelines — add it to \`sync-sources/rules/<name>.md\`
-in the panopticon-cli repo with \`scope: universal\` (or \`scope: dev\` for
-Panopticon-developer-only rules). It will ship with every \`pan install\` /
-\`pan sync\`.
+standards, behavioral guidelines — add a **bundled rule**:
+\`sync-sources/rules/<name>.md\` in the panopticon-cli repo with
+\`scope: universal\` (or \`scope: dev\` for Panopticon-developer-only rules).
+It will ship with every \`pan install\` / \`pan sync\`. "Bundled rule",
+"global layer" (this file), "project layer", and "workspace layer" are the
+canonical placement terms — see the context-nomenclature bundled rule.
 
 This file should be empty unless you have **genuinely machine-specific**
 quirks to record (e.g. "this laptop's GPU is an RTX 3090", "/data is

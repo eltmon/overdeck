@@ -12,11 +12,26 @@
 
 import { getDatabase, DatabaseError } from './index.js';
 import type { ConversationFilter } from './discovered-sessions-db.js';
+import type { RuntimeName } from '../runtimes/types.js';
 export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type TitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
+
+export interface ForkRequest {
+  parentConversationName: string;
+  sessionId: string;
+  forkMode: 'summary' | 'plain' | 'handoff';
+  summaryModel?: string;
+  localSummaryOnly: boolean;
+  includeThinkingInSummary?: boolean;
+  summaryHarness?: RuntimeName;
+  handoffFocus?: string;
+  handoffAuthor: 'source' | 'external';
+  handoffAuthorModel?: string;
+  handoffAuthorHarness?: RuntimeName;
+}
 
 export interface Conversation {
   id: number;
@@ -51,7 +66,7 @@ export interface Conversation {
   /** Error message when forkStatus='failed'. */
   forkError: string | null;
   /** Coding harness used to spawn this conversation. */
-  harness: 'claude-code' | 'pi' | null;
+  harness: RuntimeName | null;
   /** Delivery method for messages: 'auto' tries channels then tmux, 'channels' is strict, 'tmux' bypasses channels. */
   deliveryMethod: 'auto' | 'channels' | 'tmux' | null;
   /** Error message when background spawn failed (e.g. quota exhausted, auth error). Null = spawned OK or not yet known. */
@@ -64,6 +79,10 @@ export interface Conversation {
   forkFallbackReason: string | null;
   /** If this conv was cleared via Claude Code's /clear, the sibling conv that continues it (PAN-1458). */
   clearedToConvId: number | null;
+  /** Serialized ForkRequest used to resume an in-flight fork after a restart. */
+  forkRequest: string | null;
+  /** Number of restart recovery attempts already made for this fork. */
+  forkRetryCount: number;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -120,7 +139,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     effort: (row['effort'] as string | null) ?? null,
     forkStatus: (row['fork_status'] as string | null) ?? null,
     forkError: (row['fork_error'] as string | null) ?? null,
-    harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code') ? row['harness'] : null,
+    harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code' || row['harness'] === 'codex') ? row['harness'] as RuntimeName : null,
     deliveryMethod: (row['delivery_method'] === 'auto' || row['delivery_method'] === 'channels' || row['delivery_method'] === 'tmux')
       ? row['delivery_method'] as 'auto' | 'channels' | 'tmux'
       : null,
@@ -129,6 +148,8 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     handoffTargetConvId: (row['handoff_target_conv_id'] as number | null) ?? null,
     forkFallbackReason: (row['fork_fallback_reason'] as string | null) ?? null,
     clearedToConvId: (row['cleared_to_conv_id'] as number | null) ?? null,
+    forkRequest: (row['fork_request'] as string | null) ?? null,
+    forkRetryCount: (row['fork_retry_count'] as number) ?? 0,
   };
 }
 
@@ -148,7 +169,8 @@ export function listConversations(options?: { limit?: number; offset?: number })
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE archived_at IS NULL
          AND name NOT LIKE 'agent-%'
@@ -176,7 +198,8 @@ export function listActiveConversations(): Conversation[] {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE archived_at IS NULL AND status = 'active'
        ORDER BY created_at DESC`,
@@ -193,7 +216,8 @@ export function getConversationByName(name: string): Conversation | null {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE name = ?`,
     )
@@ -209,7 +233,8 @@ export function getConversationById(id: number): Conversation | null {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE id = ?`,
     )
@@ -225,7 +250,8 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Conve
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE claude_session_id = ?`,
     )
@@ -250,7 +276,8 @@ export function getConversationByTmuxSession(tmuxSession: string): Conversation 
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE tmux_session = ?
          AND archived_at IS NULL
@@ -269,7 +296,8 @@ export function listArchivedConversations(): Conversation[] {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations
        WHERE archived_at IS NOT NULL
        ORDER BY archived_at DESC, created_at DESC`,
@@ -446,7 +474,7 @@ export function createConversation(opts: {
   model?: string;
   effort?: string;
   forkStatus?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
 }): Conversation {
   const db = getDatabase();
@@ -508,7 +536,8 @@ export function createConversation(opts: {
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
               fork_status, fork_error, harness, delivery_method, spawn_error,
-              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -536,7 +565,7 @@ export function reactivateConversationForSpawn(opts: {
   issueId?: string;
   claudeSessionId?: string;
   model?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: RuntimeName;
 }): void {
   const db = getDatabase();
   db.prepare(
@@ -623,7 +652,7 @@ export function setConversationModel(name: string, model: string): void {
   ).run(model, name);
 }
 
-export function setConversationHarness(name: string, harness: 'claude-code' | 'pi'): void {
+export function setConversationHarness(name: string, harness: RuntimeName): void {
   const db = getDatabase();
   db.prepare(
     `UPDATE conversations SET harness = ? WHERE name = ?`,
@@ -662,6 +691,42 @@ export function updateForkStatus(name: string, status: string | null, error?: st
   db.prepare(
     `UPDATE conversations SET fork_status = ?, fork_error = ? WHERE name = ?`,
   ).run(status, error ?? null, name);
+}
+
+export function getStuckForks(): Conversation[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT id, name, tmux_session, status, cwd, issue_id,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
+              title_source, title_seed, total_cost, total_tokens, archived_at, model, effort,
+              fork_status, fork_error, harness, delivery_method, spawn_error,
+              handoff_doc_path, handoff_target_conv_id, fork_fallback_reason, cleared_to_conv_id,
+              fork_request, fork_retry_count
+       FROM conversations
+       WHERE fork_status IS NOT NULL AND fork_status != 'failed'
+       ORDER BY created_at ASC`,
+    )
+    .all() as Record<string, unknown>[];
+  return rows.map(rowToConversation);
+}
+
+export function setForkRequest(name: string, json: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET fork_request = ? WHERE name = ?`,
+  ).run(json, name);
+}
+
+export function incrementForkRetryCount(name: string): number {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET fork_retry_count = COALESCE(fork_retry_count, 0) + 1 WHERE name = ?`,
+  ).run(name);
+  const row = db.prepare(
+    `SELECT fork_retry_count FROM conversations WHERE name = ?`,
+  ).get(name) as { fork_retry_count: number } | undefined;
+  return row?.fork_retry_count ?? 0;
 }
 
 export function updateConversationForkFallbackReason(name: string, reason: string | null): void {

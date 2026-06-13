@@ -1321,4 +1321,248 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
   const isThinking = entry.tone === 'thinking';
-  const hasResult = !!entry.result
+  const hasResult = !!entry.result;
+  const hasToolBody = !!entry.toolInput && entry.tone === 'tool';
+  const isExpandable = hasResult || hasToolBody || (isThinking && !!entry.detail);
+
+  return (
+    <div>
+      <div
+        className={styles.workLogEntry}
+        style={isExpandable ? { cursor: 'pointer' } : undefined}
+        onClick={isExpandable ? () => setShowResult(prev => !prev) : undefined}
+      >
+        {isTerminal ? (
+          <span
+            className={styles.workLogTerminalIcon}
+            style={{ color: toneColor[entry.tone] }}
+          >
+            {'>_'}
+          </span>
+        ) : (
+          <Circle
+            size={6}
+            style={{
+              fill: toneColor[entry.tone],
+              color: toneColor[entry.tone],
+              flexShrink: 0,
+              marginTop: 2,
+            }}
+          />
+        )}
+        <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
+        {entry.detail && (
+          <span className={styles.workLogDetail} title={entry.detail}>
+            {entry.detail.slice(0, 80)}
+            {entry.detail.length > 80 ? '…' : ''}
+          </span>
+        )}
+        {isExpandable && (
+          <ChevronRight
+            size={10}
+            style={{
+              flexShrink: 0,
+              marginLeft: 'auto',
+              transition: 'transform 0.15s',
+              transform: showResult ? 'rotate(90deg)' : 'none',
+              color: 'var(--muted-foreground)',
+            }}
+          />
+        )}
+      </div>
+      {showResult && (
+        <>
+          {hasToolBody && <ToolUseExpanded entry={entry} cwd={cwd} issueId={issueId} />}
+          {isThinking && entry.detail && (
+            <div className={styles.workLogResult}>
+              <ChatMarkdown text={entry.detail} cwd={cwd} issueId={issueId} />
+            </div>
+          )}
+          {entry.result && (
+            isTerminal ? (
+              <pre className={styles.workLogResult}>{entry.result}</pre>
+            ) : (
+              <div className={styles.workLogResult}>
+                <ChatMarkdown text={entry.result} cwd={cwd} issueId={issueId} />
+              </div>
+            )
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Working indicator ────────────────────────────────────────────────────────
+
+function WorkingIndicator({ startedAt, phase }: { startedAt: string | null; phase?: WorkingPhase }) {
+  const [elapsed, setElapsed] = useState(0);
+  const startMs = startedAt ? new Date(startedAt).getTime() : Date.now();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startMs) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startMs]);
+
+  const isToolPhase = phase === 'tool';
+
+  return (
+    <div className={styles.workingIndicator}>
+      {isToolPhase ? (
+        <Wrench size={14} className={styles.pulseIcon} aria-label="Using tool" />
+      ) : (
+        <span className={styles.workingDots}>
+          <span />
+          <span />
+          <span />
+        </span>
+      )}
+      <span className={styles.workingLabel}>
+        Working{elapsed > 0 ? ` for ${elapsed}s` : '…'}
+      </span>
+    </div>
+  );
+}
+
+// ─── Round divider ────────────────────────────────────────────────────────────
+
+const ROUND_VERDICT_COLOR: Record<RoundVerdict, string> = {
+  pending: 'var(--muted-foreground)',
+  passed: 'var(--success)',
+  failed: 'var(--destructive)',
+  running: 'var(--primary)',
+};
+
+const ROUND_VERDICT_LABEL: Record<RoundVerdict, string> = {
+  pending: 'Pending',
+  passed: 'Passed',
+  failed: 'Failed',
+  running: 'Running',
+};
+
+function RoundDivider({ marker }: { marker: RoundMarker }) {
+  const color = ROUND_VERDICT_COLOR[marker.verdict];
+  const verdictLabel = ROUND_VERDICT_LABEL[marker.verdict];
+  return (
+    <div
+      data-testid={`round-divider-${marker.round}`}
+      data-round={marker.round}
+      data-verdict={marker.verdict}
+      role="separator"
+      aria-label={`Round ${marker.round} — ${verdictLabel}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        margin: '12px 0',
+        width: '100%',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          height: 1,
+          background: 'var(--border)',
+        }}
+      />
+      <span
+        style={{
+          padding: '2px 10px',
+          borderRadius: 999,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color,
+          border: `1px solid ${color}`,
+          background: 'var(--card, var(--background))',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Round {marker.round} · {verdictLabel}
+        {marker.label ? ` · ${marker.label}` : ''}
+      </span>
+      <div
+        style={{
+          flex: 1,
+          height: 1,
+          background: 'var(--border)',
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Session permissions banner ──────────────────────────────────────────────
+
+function SessionPermissionsRow({ message }: { message: ChatMessage }) {
+  return (
+    <div className={styles.sessionPermissionsRow}>
+      <ShieldCheck size={11} className={styles.sessionPermissionsIcon} />
+      <span className={styles.sessionPermissionsLabel}>Permissions:</span>
+      <span className={styles.sessionPermissionsTools}>{message.text}</span>
+    </div>
+  );
+}
+
+// ─── Slash-command divider (PAN-1458) ────────────────────────────────────────
+
+/**
+ * Renders a Claude Code slash command (the kind Claude Code emits as a user
+ * message wrapped in `<command-name>X</command-name>`) as a horizontal divider
+ * instead of a regular message bubble. Most relevant for `/clear`, which
+ * signals the JSONL boundary — see PAN-1458 — but applies to any slash command
+ * Claude Code happens to record this way.
+ */
+function SlashCommandDivider({ command, createdAt }: { command: string; createdAt: string }) {
+  const isClear = command === '/clear';
+  const label = isClear ? 'Conversation cleared' : `Slash command: ${command}`;
+  return (
+    <div className={styles.compactBoundaryDivider}>
+      <div className={styles.compactBoundaryLine} />
+      <div className={styles.compactBoundaryLabel}>
+        <RotateCcw size={12} />
+        <span>{label}</span>
+        <span className={styles.compactBoundaryDetail}>{formatTimestamp(createdAt)}</span>
+      </div>
+      <div className={styles.compactBoundaryLine} />
+    </div>
+  );
+}
+
+// ─── Compact boundary divider ────────────────────────────────────────────────
+
+function CompactBoundaryDivider({ boundary }: { boundary: CompactBoundary }) {
+  const label = boundary.preTokens
+    ? `Compacted (${Math.round(boundary.preTokens / 1000)}k tokens)`
+    : 'Conversation compacted';
+  const detail = [
+    boundary.trigger && boundary.trigger !== 'panopticon-native' ? boundary.trigger : null,
+    boundary.model,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className={styles.compactBoundaryDivider}>
+      <div className={styles.compactBoundaryLine} />
+      <div className={styles.compactBoundaryLabel}>
+        <Scissors size={12} />
+        <span>{label}</span>
+        {detail && <span className={styles.compactBoundaryDetail}>{detail}</span>}
+      </div>
+      <div className={styles.compactBoundaryLine} />
+    </div>
+  );
+}
+
+// ─── Compacting indicator ────────────────────────────────────────────────────
+
+function CompactingIndicator() {
+  return (
+    <div className={styles.compactingIndicator}>
+      <Scissors size={14} className={styles.compactingIcon} />
+      <span>Compacting conversation...</span>
+    </div>
+  );
+}

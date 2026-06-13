@@ -646,4 +646,31 @@ function stuckReason(reviewStatus: ReviewStatusSnapshot | undefined): string {
   if (reviewStatus?.testStatus === 'dispatch_failed') return 'Test dispatch failed';
   if (reviewStatus?.testStatus === 'failed') return 'Tests failed';
   if (reviewStatus?.mergeStatus === 'failed') return 'Merge failed';
-  if (reviewStatus?.verificationStatus === 'failed'
+  if (reviewStatus?.verificationStatus === 'failed') return 'Verification failed';
+  return 'Needs attention';
+}
+
+function subStatus(entry: BucketedFeature): string | undefined {
+  const { reviewStatus, phase } = entry;
+
+  if (isBlockedFeature(entry.feature, reviewStatus)) {
+    return stuckReason(reviewStatus);
+  }
+
+  if (phase === 'review' && reviewStatus?.reviewSubStatuses) {
+    return Object.entries(reviewStatus.reviewSubStatuses)
+      .map(([role, status]) => `${role}: ${status}`)
+      .join(', ');
+  }
+
+  if (phase === 'ship' && reviewStatus?.mergeStep) {
+    return reviewStatus.mergeStep;
+  }
+
+  if (phase === 'review' && reviewStatus?.verificationCycleCount && reviewStatus.verificationCycleCount > 1) {
+    return `Cycle ${reviewStatus.verificationCycleCount}`;
+  }
+
+  return undefined;
+}
+

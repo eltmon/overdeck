@@ -102,6 +102,8 @@ export const bodyToEvent = (
           agentId,
           model: source['model'],
           claudeSessionId: source['claudeSessionId'] as string | undefined,
+          sessionModel: source['sessionModel'] as string | undefined,
+          sessionHarness: source['sessionHarness'] as string | undefined,
         },
       };
     case 'cost-event': {
@@ -137,6 +139,15 @@ export const bodyToEvent = (
         payload: {
           agentId,
           currentIssue: source['currentIssue'] as string | undefined,
+        },
+      };
+    case 'context_saturation_changed':
+      return {
+        type: 'agent.context_saturation_changed',
+        timestamp,
+        payload: {
+          agentId,
+          contextSaturatedAt: source['contextSaturatedAt'] as string | undefined,
         },
       };
     default:

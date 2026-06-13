@@ -23,13 +23,15 @@ import {
   createSession,
   killSession,
   setOption,
+  exactPaneTarget,
   buildTmuxCommandString,
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
-import { canUseHarnessSync } from '../harness-policy.js';
+import { resolveHarness } from '../harness-resolve.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -115,12 +117,16 @@ export interface SpawnPlanningOptions {
   shadowMode?: boolean;
   /** Optional model override — if omitted, roles.plan.model is used. */
   model?: string;
-  /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
-  harness?: 'claude-code' | 'pi';
+  /** Optional harness override (PAN-636). */
+  harness?: RuntimeName;
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
   auto?: boolean;
+  /** Add the adversarial pre-finalize probe pass to the planning prompt. */
+  probe?: boolean;
+  /** Automatically start the work agent after finalize; stamped by trusted callers only. */
+  autoSpawnOnFinalize?: boolean;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -128,6 +134,32 @@ export interface SpawnPlanningOptions {
 export interface SpawnPlanningResult {
   success: boolean;
   error?: string;
+}
+
+export interface PlanningAgentStateInput {
+  sessionName: string;
+  issueId: string;
+  workspacePath: string;
+  model: string;
+  harness: RuntimeName;
+  workspaceLocation: 'local' | 'remote';
+  autoSpawnOnFinalize?: boolean;
+  startedAt?: string;
+}
+
+export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<string, unknown> {
+  return {
+    id: input.sessionName,
+    issueId: input.issueId,
+    workspace: input.workspacePath,
+    model: input.model,
+    status: 'running',
+    startedAt: input.startedAt ?? new Date().toISOString(),
+    role: 'plan',
+    harness: input.harness,
+    location: input.workspaceLocation,
+    autoSpawnOnFinalize: input.autoSpawnOnFinalize === true,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -150,6 +182,8 @@ async function ensureTmuxRunning(): Promise<void> {
     'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
     'OPENAI_API_KEY', 'LINEAR_API_KEY', 'GITHUB_TOKEN',
     'HUME_API_KEY', 'KIMI_API_KEY', 'KIMI_CODING_API_KEY', 'GOOGLE_API_KEY',
+    'MINIMAX_API_KEY', 'ZAI_API_KEY', 'MIMO_API_KEY',
+    'OPENROUTER_API_KEY', 'NOUS_API_KEY', 'DASHSCOPE_API_KEY',
   ];
   for (const envVar of varsToStrip) {
     try {
@@ -162,7 +196,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, memoryContext = ''): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, probe = false, memoryContext = ''): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -280,6 +314,20 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
+  const probeSection = probe || effort === 'high' ? `
+## Probe Pass (required before finalize)
+
+After drafting the vBRIEF and BEFORE running \`pan plan finalize\`, attack your own plan:
+- For each item: what hidden assumption would make this item wrong? Name it or clear it.
+- Which item could produce two very different diffs that both look "done"? Tighten its
+  ACs or set requiresInspection: true.
+- What input, state, or failure mode does no item handle? Add an item or a NonGoals line.
+- Which edge is missing (output→input you assumed implicitly)? Add it.
+
+Record every probe finding you acted on in continue.json decisions[] (prefix "PROBE:").
+If the probe pass changes nothing at all, record one decision: "PROBE: no findings".
+` : '';
+
   return await Effect.runPromise(renderPrompt({
     name: 'planning',
     vars: {
@@ -296,6 +344,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
       AUTO_SECTION: autoSection,
+      PROBE_SECTION: probeSection,
       PRD_REFERENCES: prdReferences,
       MEMORY_CONTEXT: memoryContext,
       TLDR_AVAILABLE: existsSync(join(workspacePath, '.venv')),
@@ -307,7 +356,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'pi' | 'codex'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -322,6 +371,16 @@ async function claudePlanningSystemPromptFiles(workspacePath: string, harness: '
   if (harness === 'pi') {
     const { piGlobalContextFile } = await import('../context-layers/index.js');
     const globalFile = piGlobalContextFile();
+    if (existsSync(globalFile)) {
+      files.unshift(globalFile);
+    }
+  }
+  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
+  // The per-agent CODEX_HOME/AGENTS.md is set up by initCodexHome at spawn time;
+  // this file provides context for the planning session before spawn.
+  if (harness === 'codex') {
+    const { codexGlobalContextFile } = await import('../context-layers/index.js');
+    const globalFile = codexGlobalContextFile();
     if (existsSync(globalFile)) {
       files.unshift(globalFile);
     }
@@ -353,6 +412,10 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
   ));
 }
 
+export async function resolvePlanningSessionHarness(planningModel: string, explicit?: RuntimeName): Promise<RuntimeName> {
+  return resolveHarness({ explicit, role: 'plan', model: planningModel });
+}
+
 // ─── Main spawn function ─────────────────────────────────────────────────────
 
 /**
@@ -366,7 +429,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -495,9 +558,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
     const planningModel = modelOverride || settingsModel;
-    const requestedHarness = opts.harness ?? 'claude-code';
-    const harnessDecision = canUseHarnessSync(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
-    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+    const effectiveHarness = await resolvePlanningSessionHarness(planningModel, opts.harness);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace
@@ -520,7 +581,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
+    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true);
     const memoryContext = await retrieveSpawnTimeMemoryContext({
       prompt: planningPrompt,
       issueId: issue.identifier,
@@ -530,7 +591,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       harness: effectiveHarness,
     });
     if (memoryContext) {
-      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, memoryContext);
+      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext);
     }
 
     // Capture planning prompt in workspace .pan/continue.json.
@@ -607,7 +668,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // When the dashboard's WebSocket terminal attaches and then detaches,
     // tmux can destroy the session if destroy-unattached is on.
     await Effect.runPromise(setOption(sessionName, 'destroy-unattached', 'off'));
-    await Effect.runPromise(setOption(sessionName, 'remain-on-exit', 'on'));
+    await Effect.runPromise(setOption(exactPaneTarget(sessionName), 'remain-on-exit', 'on'));
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the
@@ -617,17 +678,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Update agent state to running ──────────────────────────────────────
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
-    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
-      id: sessionName,
+    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify(buildPlanningAgentState({
+      sessionName,
       issueId: issue.identifier,
-      workspace: workspacePath,
+      workspacePath,
       model: planningModel,
-      status: 'running',
-      startedAt: new Date().toISOString(),
-      role: 'plan',
       harness: effectiveHarness,
-      location: workspaceLocation,
-    }, null, 2));
+      workspaceLocation,
+      autoSpawnOnFinalize,
+    }), null, 2));
 
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 

@@ -1,5 +1,26 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
+
+// Pin PANOPTICON_HOME to an empty temp dir so the COLORFGBG export (derived
+// from ~/.panopticon/ui-theme.json) deterministically uses the dark default
+// regardless of the developer machine's synced dashboard theme.
+let tempHome: string;
+let prevHome: string | undefined;
+
+beforeEach(() => {
+  tempHome = mkdtempSync(join(tmpdir(), 'pan-launcher-test-'));
+  prevHome = process.env.PANOPTICON_HOME;
+  process.env.PANOPTICON_HOME = tempHome;
+});
+
+afterEach(() => {
+  if (prevHome === undefined) delete process.env.PANOPTICON_HOME;
+  else process.env.PANOPTICON_HOME = prevHome;
+  rmSync(tempHome, { recursive: true, force: true });
+});
 
 const DEFAULT_CONFIG: LauncherConfig = {
   role: 'work',
@@ -17,6 +38,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
       "
@@ -35,6 +57,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
@@ -58,6 +81,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       exec claude --agent pan-work-agent --resume 'sess-123' --model 'gpt-5.4'
@@ -83,10 +107,12 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
+      export COLORFGBG='15;0'
       export PANOPTICON_AGENT_ID='plan-abc'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export PANOPTICON_SESSION_TYPE='planning'
@@ -128,6 +154,7 @@ describe('generateLauncherScript', () => {
       unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export PANOPTICON_AGENT_ID='spec-123'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export PANOPTICON_SESSION_TYPE='correctness-review'
@@ -216,6 +243,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -246,6 +274,7 @@ describe('generateLauncherScript', () => {
       unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE
@@ -273,10 +302,12 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
+      export COLORFGBG='15;0'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
       cd -- '/workspace/project'
@@ -305,10 +336,12 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
+      export COLORFGBG='15;0'
       cd -- '/workspace/project'
       trap '' HUP
       claude --resume 'sess-resume'
@@ -334,6 +367,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       export PATH="/usr/local/bin:$PATH"
       prompt=$(cat '/workspace/.pan/prompts/agent.md')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
@@ -353,6 +387,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
@@ -372,6 +407,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
       "
@@ -409,6 +445,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       exec claude --model claude-sonnet-4-6
       "
     `);
@@ -686,6 +723,7 @@ describe('generateLauncherWrapper', () => {
           '#!/bin/bash',
           'unset TMUX TMUX_PANE STY',
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
+          'export SKIP_DOCS_INDEX=1',
           "cd -- '/workspace/project'",
           "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'",
           '',
@@ -762,6 +800,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/prompt.txt')
       exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
@@ -800,7 +839,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       resumeSessionId: 'sess-pi-123',
     });
     expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model 'gpt-5.4-mini'/);
+    expect(script).toMatch(/exec pi --mode rpc --model 'openai-codex\/gpt-5.4-mini'/);
   });
 
   it('throws when pi launcher is missing required path config', () => {
@@ -858,6 +897,103 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
   });
 
+  // ─── Codex harness tests (PAN-1574) ───────────────────────────────────────────
+
+  it('codex exec mode emits approval_policy=never and workspace sandbox', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'exec',
+    });
+    expect(script).toMatch(/codex exec/);
+    expect(script).toMatch(/-m 'codex-4o'/);
+    expect(script).toMatch(/-c approval_policy=never/);
+    expect(script).toMatch(/-s workspace/);
+    expect(script).toMatch(/--skip-git-repo-check/);
+  });
+
+  it('codex work-tui mode emits interactive codex with only -m (approval/sandbox from config.toml)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'work-tui',
+    });
+    // PAN-1803: approval_policy/sandbox_mode come from the seeded config.toml
+    // (Settings-driven), NOT CLI flags that would override the user's choice.
+    expect(script).toMatch(/^exec codex -m 'codex-4o'$/m);
+    expect(script).not.toMatch(/codex exec/);
+    expect(script).not.toMatch(/approval_policy=never/);
+    expect(script).not.toMatch(/-s workspace-write/);
+  });
+
+  it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'work-tui',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o'$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+    });
+    expect(script).toMatch(/^codex -c project_doc_max_bytes=0$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex conversation (tui) mode can be wrapped by the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex -c project_doc_max_bytes=0$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
+  it('codex exec mode stays off the PTY supervisor', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).not.toMatch(/pty-supervisor/);
+    expect(script).toMatch(/codex exec/);
+  });
+
+  it('codex exports CODEX_HOME env var when codexHome is set', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexHome: '/home/user/.panopticon/agents/agent-1/codex-home',
+    });
+    expect(script).toMatch(/export CODEX_HOME='\/home\/user\/.panopticon\/agents\/agent-1\/codex-home'/);
+  });
+
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {
     const a = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
@@ -871,5 +1007,19 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
     expect(a).toBe(b);
+  });
+});
+
+describe('pi model provider qualification (PAN-1799)', () => {
+  it('qualifies kimi models with the kimi-coding pi provider', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('kimi-k2.6')).toBe('kimi-coding/kimi-k2.6');
+  });
+  it('qualifies openai models with openai-codex; unknown ids inherit the anthropic default (parity with conversations)', async () => {
+    const { qualifyPiModel } = await import('../providers.js');
+    expect(qualifyPiModel('gpt-5.5')).toBe('openai-codex/gpt-5.5');
+    // getProviderForModelSync falls back to anthropic for unknown ids — the
+    // same behavior conversations.ts has always had for pi model resolution.
+    expect(qualifyPiModel('totally-unknown-model')).toBe('anthropic/totally-unknown-model');
   });
 });

@@ -10,12 +10,16 @@ describe('getHarness', () => {
     expect(getHarness({ runtime: 'pi' })).toBe('pi')
   })
 
+  it('returns codex when runtime is the canonical literal', () => {
+    expect(getHarness({ runtime: 'codex' })).toBe('codex')
+  })
+
   it('falls back to claude-code for the legacy "claude" wire value', () => {
     expect(getHarness({ runtime: 'claude' })).toBe('claude-code')
   })
 
   it('falls back to claude-code for unknown runtime values', () => {
-    expect(getHarness({ runtime: 'codex' })).toBe('claude-code')
+    expect(getHarness({ runtime: 'cursor' })).toBe('claude-code')
     expect(getHarness({ runtime: 'gemini' })).toBe('claude-code')
     expect(getHarness({ runtime: '' })).toBe('claude-code')
   })

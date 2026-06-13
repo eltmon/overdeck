@@ -41,17 +41,27 @@ vi.mock('child_process', () => ({
 vi.mock('../../vbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
   findPlanSync: vi.fn(() => null),
+  readPlan: (...args: unknown[]) => mockReadPlan(...args),
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({
   findVBriefByIssue: vi.fn(() => null),
+  findVBriefByIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../config.js', () => ({
   getDevrootPath: vi.fn(() => null),
+  getDevrootPathSync: vi.fn(() => null),
+}));
+
+// ── stub-ui scanner mock ───────────────────────────────────────────────────
+vi.mock('../lint-stub-ui.js', () => ({
+  scanStubUi: vi.fn(),
 }));
 
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext } from '../review-context.js';
+import { findPlanSync } from '../../vbrief/io.js';
+import { scanStubUi } from '../lint-stub-ui.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function mockGitOutput(map: Record<string, { stdout: string; stderr?: string }>) {
@@ -72,6 +82,7 @@ describe('buildReviewContext', () => {
     vi.clearAllMocks();
     mockReadPlan.mockReturnValue(Effect.fail(new Error('no plan')));
     mockExistsSync.mockImplementation((p: string) => p === workspace);
+    vi.mocked(scanStubUi).mockResolvedValue([]);
   });
 
   it('throws when workspace does not exist', async () => {
@@ -109,7 +120,80 @@ describe('buildReviewContext', () => {
     expect(manifest.issueId).toBe(issueId);
     expect(manifest.headSha).toBe('abc12345def67890');
     expect(manifest.changedFiles).toHaveLength(2);
+    expect(manifest.nonGoals).toEqual([]);
+    expect(manifest.traces).toEqual([]);
     expect(manifest.manifestPath).toBe(join(workspace, '.pan', 'review', runId, 'context.json'));
+  });
+
+  it('includes plan NonGoals in the manifest', async () => {
+    vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
+    mockReadPlan.mockReturnValue(Effect.succeed({
+      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      plan: {
+        id: issueId.toLowerCase(),
+        title: 'Plan',
+        status: 'proposed',
+        narratives: {
+          NonGoals: '- Do not add a new dashboard route\n- Do not change issue lifecycle statuses',
+        },
+        items: [],
+        edges: [],
+      },
+    }));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1059\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.nonGoals).toEqual([
+      'Do not add a new dashboard route',
+      'Do not change issue lifecycle statuses',
+    ]);
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.nonGoals).toEqual(manifest.nonGoals);
+  });
+
+  it("includes plan item traces in the manifest", async () => {
+    vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
+    mockReadPlan.mockReturnValue(Effect.succeed({
+      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      plan: {
+        id: issueId.toLowerCase(),
+        title: 'Plan',
+        status: 'proposed',
+        items: [
+          {
+            id: 'wire-command',
+            title: 'Wire command',
+            status: 'pending',
+            metadata: { traces: ['FR-1', 'NFR-2'] },
+          },
+        ],
+        edges: [],
+      },
+    }));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1059\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.traces).toEqual([
+      { itemId: 'wire-command', title: 'Wire command', traces: ['FR-1', 'NFR-2'] },
+    ]);
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.traces).toEqual(manifest.traces);
   });
 
   it('sorts changed files by risk score descending', async () => {
@@ -161,6 +245,52 @@ describe('buildReviewContext', () => {
     expect(manifest.changedFiles).toEqual([]);
     expect(manifest.headSha).toBe('unknown');
     expect(manifest.diff.stat).toContain('Unable');
+  });
+
+  it('includes stubUiFindings on the manifest', async () => {
+    vi.mocked(scanStubUi).mockResolvedValue([
+      {
+        patternId: 'empty-array-return',
+        patternLabel: 'Hook/function returns an empty array',
+        filePath: 'src/dashboard/frontend/src/components/Inspector/FilesTab.tsx',
+        lineNumber: 42,
+        addedLine: '  return [];',
+        severity: 'block',
+      },
+    ]);
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1500\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.stubUiFindings).toHaveLength(1);
+    expect(manifest.stubUiFindings[0]?.patternId).toBe('empty-array-return');
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.stubUiFindings).toEqual(manifest.stubUiFindings);
+  });
+
+  it('survives a throwing scanStubUi with stubUiFindings: []', async () => {
+    vi.mocked(scanStubUi).mockRejectedValue(new Error('scanner boom'));
+    mockGitOutput({
+      'rev-parse HEAD': { stdout: 'abc12345\n' },
+      'branch --show-current': { stdout: 'feature-pan-1500\n' },
+      'merge-base origin/main HEAD': { stdout: 'base\n' },
+      '--name-status': { stdout: '' },
+      '--numstat': { stdout: '' },
+      'diff --stat': { stdout: '' },
+    });
+
+    const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId, workspace }));
+
+    expect(manifest.stubUiFindings).toEqual([]);
+    const written = JSON.parse(String(mockWriteFile.mock.calls.at(-1)?.[1]));
+    expect(written.stubUiFindings).toEqual([]);
   });
 });
 

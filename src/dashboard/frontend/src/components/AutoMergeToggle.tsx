@@ -109,4 +109,57 @@ export function AutoMergeToggle({
       ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/40'
       : autoMerge === false
         ? 'text-amber-400 bg-amber-500/10 border-amber-500/40'
-        : 'text-muted-foreground bg
+        : 'text-muted-foreground bg-transparent border-border';
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        onClick={(e) => { e.stopPropagation(); void set(next); }}
+        title={
+          isAuto ? 'Auto-merge ON — click to hold for UAT'
+            : autoMerge === false ? 'Holding for UAT — click to auto-merge'
+              : `Follows the global default (currently: ${defaultResolvesTo}) — click to set Auto`
+        }
+        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition disabled:opacity-50 hover:brightness-110 ${tone} ${className}`}
+      >
+        {isAuto ? <Zap className={iconSize} /> : <Lock className={iconSize} />}
+        {label}
+      </button>
+    );
+  }
+
+  // segmented
+  const seg = (active: boolean, tone: string) =>
+    `inline-flex items-center gap-1.5 ${compact ? 'px-2 py-1' : 'px-2.5 py-1.5'} text-xs font-semibold transition disabled:opacity-50 ` +
+    (active ? tone : 'text-muted-foreground hover:text-foreground hover:bg-accent/40');
+
+  return (
+    <div
+      role="group"
+      aria-label="Auto-merge policy"
+      title={autoMerge === undefined ? `Default follows the global setting (currently: ${defaultResolvesTo})` : undefined}
+      className={`inline-flex overflow-hidden rounded-lg border border-border bg-background ${className}`}
+    >
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={autoMerge === true}
+        onClick={(e) => { e.stopPropagation(); void set(true); }}
+        className={seg(autoMerge === true, 'text-emerald-400 bg-emerald-500/10')}
+        title="Auto-merge — ride the train, ship when green"
+      >
+        <Zap className={iconSize} /> Auto
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={autoMerge === false}
+        onClick={(e) => { e.stopPropagation(); void set(false); }}
+        className={`border-l border-border ${seg(autoMerge === false, 'text-amber-400 bg-amber-500/10')}`}
+        title="Hold for UAT — wait for human batch review"
+      >
+        <Lock className={iconSize} /> Hold
+      </button>
+    </div>
+  );
+}

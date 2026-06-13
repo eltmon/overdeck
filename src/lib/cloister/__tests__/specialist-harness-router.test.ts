@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const rolesConfig = vi.hoisted(() => ({
+  roles: {} as Record<string, { model: string; harness?: 'claude-code' | 'pi' | 'codex' }>,
+}))
 
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({
@@ -27,10 +31,27 @@ vi.mock('../config.js', () => ({
   })),
 }))
 
+vi.mock('../../config-yaml.js', () => ({
+  loadConfigSync: vi.fn(() => ({
+    config: {
+      roles: rolesConfig.roles,
+    },
+  })),
+}))
+
 import { ModelRouter, getSpecialistHarness, resetGlobalRouter } from '../router.js'
 
 describe('ModelRouter.getSpecialistHarness (PAN-636)', () => {
-  it('returns the configured harness for a known specialist (AC1)', () => {
+  beforeEach(() => {
+    rolesConfig.roles = {}
+    resetGlobalRouter()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('applies the legacy specialist_harnesses alias when roles.<role>.harness is absent', () => {
     const router = new ModelRouter()
     expect(router.getSpecialistHarness('review-agent')).toBe('pi')
     expect(router.getSpecialistHarness('merge-agent')).toBe('claude-code')
@@ -41,6 +62,29 @@ describe('ModelRouter.getSpecialistHarness (PAN-636)', () => {
     // 'merge-agent' must hit merge_agent.
     expect(router.getSpecialistHarness('merge-agent')).toBe('claude-code')
     expect(router.getSpecialistHarness('merge_agent')).toBe('claude-code')
+  })
+
+  it('prefers roles.<role>.harness over the legacy specialist_harnesses alias', () => {
+    rolesConfig.roles = {
+      review: { model: 'workhorse:expensive', harness: 'codex' },
+      ship: { model: 'workhorse:mid', harness: 'pi' },
+    }
+    const router = new ModelRouter()
+    expect(router.getSpecialistHarness('review-agent')).toBe('codex')
+    expect(router.getSpecialistHarness('merge-agent')).toBe('pi')
+  })
+
+  it('logs the legacy alias deprecation warning once when the alias applies', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const router = new ModelRouter()
+
+    expect(router.getSpecialistHarness('review-agent')).toBe('pi')
+    expect(router.getSpecialistHarness('review-agent')).toBe('pi')
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith(
+      'model_selection.specialist_harnesses.review_agent is deprecated; use roles.review.harness instead.'
+    )
   })
 
   it('falls back to claude-code for unknown specialist names (AC2)', () => {
@@ -54,7 +98,6 @@ describe('ModelRouter.getSpecialistHarness (PAN-636)', () => {
   })
 
   it('exposes a global convenience function', () => {
-    resetGlobalRouter()
     expect(getSpecialistHarness('review-agent')).toBe('pi')
   })
 })

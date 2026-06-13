@@ -9,6 +9,7 @@ const mockListActiveConversations = vi.fn();
 const mockMarkConversationEnded = vi.fn();
 const mockCleanupUnreferencedConversationAttachments = vi.fn();
 const mockListSessionNames = vi.fn();
+const mockIsHarnessProcessAlive = vi.fn();
 const mockCreateConversation = vi.fn();
 const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
@@ -38,6 +39,12 @@ vi.mock('../conversation-attachments.js', () => ({
 
 vi.mock('../../../../lib/tmux.js', () => ({
   listSessionNames: mockListSessionNames,
+  isHarnessProcessAlive: mockIsHarnessProcessAlive,
+}));
+
+const mockIsRespawnPending = vi.fn();
+vi.mock('../pending-respawn.js', () => ({
+  isRespawnPending: mockIsRespawnPending,
 }));
 
 // Mock node:child_process so no real tmux processes are spawned
@@ -47,6 +54,9 @@ vi.mock('node:util', () => ({ promisify: vi.fn((fn: unknown) => fn) }));
 describe('ConversationLifecycleService — pollConversations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: harness alive in sessions that exist (corpse cases set false explicitly).
+    mockIsHarnessProcessAlive.mockResolvedValue(true);
+    mockIsRespawnPending.mockReturnValue(false);
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -127,6 +137,86 @@ describe('ConversationLifecycleService — pollConversations', () => {
     );
   });
 
+  it('marks a session that is alive but whose harness process has exited (keep-alive corpse)', async () => {
+    mockListActiveConversations.mockReturnValue([
+      { name: 'corpse', tmuxSession: 'conv-corpse', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    // tmux session IS in the alive list, but the harness process is dead — only
+    // the launcher keep-alive `sleep` loop remains. PAN-1638.
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-corpse']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledTimes(1);
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('corpse');
+  });
+
+  it('does NOT mark a corpse ended while a respawn is in flight for its session', async () => {
+    mockListActiveConversations.mockReturnValue([
+      { name: 'reviving', tmuxSession: 'conv-reviving', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-reviving']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+    // Resume endpoint is mid kill→spawn→ready for this session.
+    mockIsRespawnPending.mockReturnValue(true);
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('does NOT mark ended when a re-read shows a fresh spawn/attach signal (resume raced the poll)', async () => {
+    // Poll-start snapshot: old conversation, harness looks dead (launcher shell
+    // still foreground mid-respawn). By mark time, the resume has bumped
+    // last_attached_at — the conversation was just revived.
+    mockListActiveConversations.mockReturnValue([
+      {
+        name: 'resumed', tmuxSession: 'conv-resumed', status: 'active', cwd: '/tmp/work',
+        claudeSessionId: null, createdAt: '2026-06-09T04:04:38.330Z', lastAttachedAt: null,
+      },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-resumed']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+    mockGetConversationByName.mockReturnValue({
+      name: 'resumed', tmuxSession: 'conv-resumed', status: 'active', cwd: '/tmp/work',
+      claudeSessionId: null, createdAt: '2026-06-09T04:04:38.330Z',
+      lastAttachedAt: new Date().toISOString(),
+    });
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  it('still marks a corpse ended when the re-read shows no recent spawn/attach signal', async () => {
+    const stale = '2026-06-09T04:04:38.330Z';
+    mockListActiveConversations.mockReturnValue([
+      {
+        name: 'true-corpse', tmuxSession: 'conv-true-corpse', status: 'active', cwd: '/tmp/work',
+        claudeSessionId: null, createdAt: stale, lastAttachedAt: stale,
+      },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed(['conv-true-corpse']));
+    mockIsHarnessProcessAlive.mockResolvedValue(false);
+    mockGetConversationByName.mockReturnValue({
+      name: 'true-corpse', tmuxSession: 'conv-true-corpse', status: 'active', cwd: '/tmp/work',
+      claudeSessionId: null, createdAt: stale, lastAttachedAt: stale,
+    });
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('true-corpse');
+  });
+
   it('does not throw when listActiveConversations errors', async () => {
     mockListActiveConversations.mockImplementation(() => { throw new Error('DB error'); });
 
@@ -143,6 +233,8 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: harness alive in sessions that exist (corpse cases set false explicitly).
+    mockIsHarnessProcessAlive.mockResolvedValue(true);
     fakeHome = mkdtempSync(join(tmpdir(), 'pan-clear-orphan-'));
     cwd = '/work/myproj';
     // encodeClaudeProjectDir(/work/myproj) → -work-myproj (slashes/dots collapse to dashes)

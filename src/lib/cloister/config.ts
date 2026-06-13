@@ -53,6 +53,33 @@ export interface MonitoringConfig {
 }
 
 /**
+ * Concurrency limits for deacon auto-resume / auto-dispatch (PAN-1665).
+ *
+ * These are *gates on starting new work* — the deacon never kills a running agent
+ * to satisfy them. If the system is already over a limit (e.g. after a forced
+ * `pan start`, or a backlog at unfreeze), the deacon simply stops resuming/
+ * dispatching until natural attrition brings the count down. To forcibly trim an
+ * over-limit system back to the cap, the operator uses the explicit emergency
+ * brake — it is never automatic.
+ */
+export interface ConcurrencyConfig {
+  /** Max concurrently-running *work* agents the deacon will resume/spawn up to. */
+  max_work_agents: number;
+  /**
+   * Slots kept free above `max_work_agents` for advancing roles (review/test/ship)
+   * so the pipeline can always drain even when work is at its cap. The overall
+   * ceiling for any auto-dispatch is `max_work_agents + reserved_advancing_slots`.
+   */
+  reserved_advancing_slots: number;
+  /**
+   * When true, operator-started work agents (no flywheelRunId) are exempt from
+   * the emergency brake/governor reaping so the operator's deliberate spawns are
+   * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
+   */
+  exempt_operator_started?: boolean;
+}
+
+/**
  * Startup configuration
  */
 export interface StartupConfig {
@@ -129,9 +156,9 @@ export interface ModelSelectionConfig {
     uat_agent?: 'opus' | 'sonnet' | 'haiku';
   };
   /**
-   * PAN-636 — per-role coding-agent harness override. Defaults to
-   * 'claude-code' for every role when unset. Absent keys are normal
-   * (forward compat with config files written before harness existed).
+   * PAN-636 legacy coding-agent harness override. PAN-1787 treats this as a
+   * deprecated alias for roles.<role>.harness; roles.<role>.harness wins when
+   * both are set. Absent keys are normal for older config files.
    */
   specialist_harnesses?: {
     merge_agent?: 'claude-code' | 'pi';
@@ -238,6 +265,7 @@ export interface CloisterConfig {
   auto_actions: AutoActions;
   stuck_remediation?: StuckRemediationConfig;
   monitoring: MonitoringConfig;
+  concurrency?: ConcurrencyConfig;
   notifications?: NotificationConfig;
   specialists?: SpecialistsConfig;
   model_selection?: ModelSelectionConfig;
@@ -279,6 +307,11 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     check_interval: 60, // 1 minute
     heartbeat_sources: ['jsonl_mtime', 'tmux_activity', 'git_activity'],
   },
+  concurrency: {
+    max_work_agents: 6,
+    reserved_advancing_slots: 3,
+    exempt_operator_started: true,
+  },
   notifications: {
     slack_webhook: undefined,
     email: undefined,
@@ -319,9 +352,8 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // Resolution falls through to role model config, then to the global fallback model.
     },
     specialist_harnesses: {
-      // PAN-636: every role defaults to 'claude-code' when not overridden in
-      // config.yaml. Reads through ModelRouter.getSpecialistHarness which
-      // returns 'claude-code' for missing keys.
+      // PAN-1787: deprecated alias only. Prefer roles.<role>.harness in
+      // config.yaml; ModelRouter.getSpecialistHarness reads roles first.
     },
   },
   handoffs: {

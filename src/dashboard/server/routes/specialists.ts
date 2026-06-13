@@ -75,6 +75,7 @@ import { queryBeadById } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
+import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { killSession } from '../../../lib/tmux.js';
@@ -173,35 +174,53 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
-// ─── Track in-flight postMergeLifecycle to prevent concurrent execution ───────
-
-const _postMergeInFlight = new Set<string>();
+// ─── Idempotency guard: prevent concurrent postMergeLifecycle re-entry ────────
+// PAN-328: the loop specialists/done → onMergeComplete → postMergeLifecycle →
+// (re-trigger) → specialists/done once burned 24,626 tracker API calls. The
+// in-flight guard makes a second *concurrent* call for the same issue a no-op.
+// The invariant is enforced by tests/unit/lib/cloister/in-flight-guard.test.ts
+// — delete the guard and that suite goes red.
+const postMergeGuard = createInFlightGuard();
 
 // Track issues where the server is managing the merge lifecycle (polyrepo).
 // Exported so the workspaces route can register/unregister server-managed merges.
 export const _serverManagedMerges = new Set<string>();
 
-function firePostMergeLifecycle(issueId: string): void {
-  if (_postMergeInFlight.has(issueId)) {
-    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
-    return;
-  }
-
-  const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-  const projectPath = getProjectPathForIssue(issuePrefix);
-
-  _postMergeInFlight.add(issueId);
-  (async () => {
-    try {
+/**
+ * Exported for the UAT batch-promote route (PAN-1737): batch promotion fans
+ * out the per-member post-merge through THIS guard instance so an issue's
+ * lifecycle still runs at most once regardless of which path merged it.
+ * Returns false when a run for the issue is already in flight.
+ */
+export function firePostMergeLifecycle(issueId: string): boolean {
+  const started = postMergeGuard.run(
+    issueId,
+    async () => {
+      const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+      const projectPath = getProjectPathForIssue(issuePrefix);
       const { postMergeLifecycle } = await import('../../../lib/cloister/merge-agent.js');
       await postMergeLifecycle(issueId, projectPath);
       console.log(`[merge] post-merge lifecycle completed for ${issueId}`);
-    } catch (err) {
-      console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err);
-    } finally {
-      _postMergeInFlight.delete(issueId);
-    }
-  })();
+
+      // PAN-1691: roll the merge train — rebase ready siblings onto the new main,
+      // re-verify the clean ones, agent-resolve conflicts. No-op unless the
+      // flywheel.merge_train_enabled flag is on. Runs inside the in-flight guard,
+      // so it cannot re-enter postMergeLifecycle for this issue.
+      const { runMergeTrainReconcile } = await import('../../../lib/cloister/merge-train.js');
+      const outcomes = await runMergeTrainReconcile(issueId);
+      if (outcomes.length > 0) {
+        console.log(
+          `[merge-train] reconciled ${outcomes.length} sibling(s) after ${issueId}: ` +
+            outcomes.map((o) => `${o.issueId}=${o.result}`).join(', '),
+        );
+      }
+    },
+    (err) => console.error(`[merge] post-merge lifecycle failed for ${issueId}:`, err),
+  );
+  if (!started) {
+    console.log(`[merge] firePostMergeLifecycle: skipping ${issueId} — already in flight`);
+  }
+  return started;
 }
 
 function getProjectPathForIssue(issuePrefix: string): string {
@@ -543,9 +562,10 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
-    // When test specialist reports success, emit test.passed so reactive Cloister
-    // dispatches the ship role (which sets readyForMerge: true).  PAN-1048 invariant:
-    // ONLY the ship role sets readyForMerge: true — no direct assignment here.
+    // When the test specialist reports success, persist testStatus and emit
+    // test.passed so reactive Cloister records the shipping lifecycle phase.
+    // PAN-1650 derives readyForMerge from review/test gate state server-side;
+    // no ship role is spawned.
     if (specialist === 'test' && status === 'passed') {
       yield* Effect.promise(async () => {
         try {
@@ -565,7 +585,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
                 timestamp: new Date().toISOString(),
                 payload: { issueId: normalizedIssueId },
               } as any);
-              console.log(`[specialists/done] ${normalizedIssueId} emitted test.passed; ship role dispatched`);
+              console.log(`[specialists/done] ${normalizedIssueId} emitted test.passed; shipping lifecycle recorded`);
             }
           }
         } catch (err) {
@@ -578,8 +598,9 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // Use firePostMergeLifecycle directly rather than onMergeComplete: onMergeComplete
     // has a guard that checks mergeStatus !== 'merged', but setReviewStatusBase above
     // already set mergeStatus='merged' — that guard would always fire and the lifecycle
-    // would never run. firePostMergeLifecycle skips that guard and uses _postMergeInFlight
-    // (concurrency) + postMergeLifecycle's _completedPostMerge (defense-in-depth).
+    // would never run. firePostMergeLifecycle skips that guard and uses the
+    // in-flight guard (postMergeGuard, concurrency) + postMergeLifecycle's
+    // _completedPostMerge (defense-in-depth).
     if (specialist === 'merge' && status === 'passed') {
       firePostMergeLifecycle(normalizedIssueId);
     }
@@ -954,8 +975,8 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           testNotes: `Auto-detected: ${status}`,
         });
         if (testPassed) {
-          // Emit test.passed so reactive Cloister dispatches the ship role
-          // (ship sets readyForMerge: true per the PAN-1048 invariant).
+          // Emit test.passed so reactive Cloister records the shipping
+          // lifecycle phase; readyForMerge is derived server-side.
           yield* eventStore.append({
             type: 'test.passed',
             timestamp: new Date().toISOString(),
@@ -1059,11 +1080,12 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
 //
 // PAN-1048 R1: removed. The legacy /spawn endpoint dispatched arbitrary
 // "specialist types" (review-agent, test-agent, merge-agent) by issuing a
-// generic spawnEphemeralSpecialist call. Under the role primitive this is
-// expressed as spawnRun(issueId, role, opts) — review/test/ship are first-
-// class roles, not opaque specialist names. The endpoint had no remaining
-// in-tree caller and is replaced by reactive Cloister scheduling on issue
-// state transitions plus the role spawn primitive.
+// generic spawnEphemeralSpecialist call. Under the role primitive, review/test
+// dispatch through lifecycle-aware role paths. Shipping is now server-side;
+// `ship` remains only as the merge-specialist identity for model routing and
+// historical activity attribution. The endpoint had no remaining in-tree caller
+// and is replaced by reactive Cloister scheduling on issue state transitions
+// plus the role spawn primitive.
 //
 // Old shape (removed):
 //   POST /api/specialists/:project/:type/spawn { issueId, branch, ... }
@@ -1526,7 +1548,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const project = params['project'] as string;
     const issueId = params['issueId'] as string;
     const body = yield* readJsonBody;
-    const { model } = body as { model?: string };
+    const { model, harness } = body as { model?: string; harness?: 'claude-code' | 'pi' | 'codex' };
 
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../lib/cloister/review-agent.js'),
@@ -1564,6 +1586,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       branch,
       prUrl,
       model,
+      harness,
     });
 
     return jsonResponse({
@@ -1571,6 +1594,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       message: result.message,
       killed: killResult.killed,
       model: model ?? undefined,
+      harness: harness ?? undefined,
     });
   })),
 );

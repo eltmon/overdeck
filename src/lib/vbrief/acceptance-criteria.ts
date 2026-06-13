@@ -8,7 +8,7 @@
 
 import { Effect } from 'effect';
 import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from './io.js';
-import type { VBriefDocument, VBriefItem, VBriefItemStatus, VBriefSubItem } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus, type VBriefSubItem } from './types.js';
 
 /** A single acceptance criterion with its parent task context. */
 export interface AcceptanceCriterion {
@@ -33,7 +33,7 @@ export interface ACCompletionResult {
 /**
  * Extract all acceptance criteria from a vBRIEF plan.
  *
- * Reads plan.vbrief.json from the workspace and returns all subItems
+ * Reads plan.vbrief.json from the workspace and returns all child items
  * where metadata.kind === 'acceptance_criterion', enriched with parent
  * task context.
  *
@@ -61,8 +61,7 @@ export function extractACFromDocument(doc: VBriefDocument): AcceptanceCriterion[
 
   for (const item of doc.plan.items) {
     if (isDeferredOrCancelledItem(item)) continue;
-    if (!item.subItems) continue;
-    for (const sub of item.subItems) {
+    for (const sub of subItemsOf(item)) {
       if (sub.metadata?.kind === 'acceptance_criterion') {
         criteria.push({
           itemId: item.id,
@@ -84,7 +83,7 @@ export function extractACFromDocument(doc: VBriefDocument): AcceptanceCriterion[
  * Output example:
  * ```
  * ### Create vBRIEF acceptance criteria extraction module
- * - [x] extractAcceptanceCriteria reads plan.vbrief.json and returns AC subItems
+ * - [x] extractAcceptanceCriteria reads plan.vbrief.json and returns AC child items
  * - [ ] formatAcceptanceCriteria produces markdown checklist grouped by parent task
  * ```
  *

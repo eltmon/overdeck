@@ -1,7 +1,8 @@
 import { MessageCircle } from 'lucide-react';
-import { ProviderIcon } from '../chat/ProviderIcons';
+import { HarnessLogo } from '../shared/branding';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { ConversationSessionFeedEntry } from './types';
+import type { Harness } from '../Settings/types';
 
 interface ConversationFeedCardProps {
   entry: ConversationSessionFeedEntry;
@@ -23,16 +24,10 @@ const AGENT_LABELS: Record<string, string> = {
   unknown: 'Unknown',
 };
 
-const AGENT_ICON_PROVIDER: Record<string, string> = {
-  claude_code: 'anthropic',
-  pi: 'pi',
-  unknown: 'unknown',
-};
-
 export function ConversationFeedCard({ entry, onSelect, now = new Date() }: ConversationFeedCardProps) {
   const agentState = readAgentState(entry);
   const agentLabel = AGENT_LABELS[entry.agent] ?? entry.agent;
-  const iconProvider = AGENT_ICON_PROVIDER[entry.agent] ?? entry.agent;
+  const harness = harnessForFeedAgent(entry.agent);
 
   return (
     <button
@@ -42,7 +37,7 @@ export function ConversationFeedCard({ entry, onSelect, now = new Date() }: Conv
     >
       <div className="flex items-start gap-2">
         <span data-testid="conversation-feed-agent-icon" className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-          <ProviderIcon provider={iconProvider} label={agentLabel} className="h-4 w-4" />
+          <HarnessLogo harness={harness} className="h-4 w-4" />
         </span>
         <span className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT_COLORS[agentState]}`} />
         <div className="min-w-0 flex-1">
@@ -72,6 +67,12 @@ export function ConversationFeedCard({ entry, onSelect, now = new Date() }: Conv
       </div>
     </button>
   );
+}
+
+function harnessForFeedAgent(agent: string): Harness {
+  if (agent === 'pi') return 'pi';
+  if (agent === 'codex') return 'codex';
+  return 'claude-code';
 }
 
 function readAgentState(entry: ConversationSessionFeedEntry): AgentState {

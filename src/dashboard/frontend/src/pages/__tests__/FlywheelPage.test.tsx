@@ -416,4 +416,13 @@ describe('FlywheelPage', () => {
     fireEvent.click(stateTab);
 
     expect(stateTab).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tabpanel', { name: '
+    expect(screen.getByRole('tabpanel', { name: 'Flywheel state' })).toBeInTheDocument();
+    expect(screen.getByTestId('state-pane')).toBeInTheDocument();
+
+    fireEvent.click(statusTab);
+
+    expect(statusTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Flywheel status' })).toBeInTheDocument();
+    expect(screen.getByTestId('status-details')).toHaveTextContent('RUN-7');
+  });
+});

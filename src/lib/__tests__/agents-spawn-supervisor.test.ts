@@ -10,6 +10,8 @@ let workspace: string;
 let packageRootDir: string;
 let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
+let resolveHarnessMock: ReturnType<typeof vi.fn>;
+let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -38,6 +40,39 @@ function writeSupervisorArtifact(): string {
 function mockSpawnDependencies(): void {
   createSessionMock = vi.fn(() => undefined);
   sendRawKeystrokeMock = vi.fn(() => Effect.void);
+  emitAgentEventMock = vi.fn(() => Effect.succeed(true));
+  resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
+    if (explicit) return explicit;
+    if (model === 'gpt-5.5') return 'codex';
+    if (model === 'kimi-k2.6') return 'pi';
+    return 'claude-code';
+  });
+
+  vi.doMock('../harness-resolve.js', () => ({
+    resolveHarness: resolveHarnessMock,
+  }));
+  vi.doMock('../agent-runtime.js', () => ({
+    emitAgentEvent: emitAgentEventMock,
+  }));
+  vi.doMock('../agent-runtime-mirror.js', () => ({
+    getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
+    isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
+  }));
+  vi.doMock('../runtimes/codex.js', () => ({
+    initCodexHome: vi.fn(),
+  }));
+  vi.doMock('../runtimes/pi-fifo.js', () => ({
+    PiNotReady: class PiNotReady extends Error {
+      readonly code = 'PI_NOT_READY';
+    },
+    createPiFifo: vi.fn((agentId: string) => Effect.succeed(join(tmpHome, 'agents', agentId, 'rpc.in'))),
+    piFifoPaths: vi.fn((agentId: string) => ({
+      agentDir: join(tmpHome, 'agents', agentId),
+      readyPath: join(tmpHome, 'agents', agentId, 'ready.json'),
+      fifoPath: join(tmpHome, 'agents', agentId, 'rpc.in'),
+    })),
+    writePiCommandSync: vi.fn(),
+  }));
 
   vi.doMock('../paths.js', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../paths.js')>();
@@ -65,6 +100,7 @@ function mockSpawnDependencies(): void {
     listPaneValues: vi.fn(() => Effect.succeed([])),
     waitForClaudePrompt: vi.fn(async () => true),
     setOption: vi.fn(() => Effect.void),
+    exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   }));
 
   vi.doMock('../workspace/stack-health.js', () => ({
@@ -87,6 +123,9 @@ function mockSpawnDependencies(): void {
         config: {
           workhorses: actual.DEFAULT_WORKHORSES,
           roles: actual.DEFAULT_ROLES,
+          providerHarnesses: {},
+          providerAuth: {},
+          apiKeys: { kimi: 'test-kimi-key' },
           caveman: { enabled: false },
         },
       }),
@@ -94,6 +133,19 @@ function mockSpawnDependencies(): void {
   });
   vi.doMock('../claude-auth.js', () => ({
     getClaudeAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasAnthropicApiKey: true })),
+  }));
+  vi.doMock('../openai-auth.js', () => ({
+    getOpenAIAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasOpenAIApiKey: false })),
+    getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: true, hasOpenAIApiKey: false })),
+  }));
+  vi.doMock('../cliproxy.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../cliproxy.js')),
+    bridgeGeminiAuthToCliproxy: vi.fn(() => Effect.succeed(true)),
+    getCliproxyClientEnv: vi.fn(() => ({ ANTHROPIC_BASE_URL: 'http://127.0.0.1:4141' })),
+    isCliproxyRunning: vi.fn(() => Effect.succeed(true)),
+  }));
+  vi.doMock('../provider-health.js', () => ({
+    validateProviderHealth: vi.fn(() => Effect.succeed(undefined)),
   }));
   vi.doMock('../database/app-settings.js', () => ({
     getFlywheelActiveRunId: () => activeFlywheelRunId,
@@ -119,6 +171,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.doUnmock('../harness-resolve.js');
+  vi.doUnmock('../agent-runtime.js');
+  vi.doUnmock('../agent-runtime-mirror.js');
+  vi.doUnmock('../runtimes/codex.js');
+  vi.doUnmock('../runtimes/pi-fifo.js');
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
@@ -127,6 +184,9 @@ afterEach(() => {
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
   vi.doUnmock('../claude-auth.js');
+  vi.doUnmock('../openai-auth.js');
+  vi.doUnmock('../cliproxy.js');
+  vi.doUnmock('../provider-health.js');
   vi.doUnmock('../database/app-settings.js');
   vi.doUnmock('../projects.js');
   delete process.env.PANOPTICON_HOME;
@@ -238,6 +298,58 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
+    writeSupervisorArtifact();
+    process.env.KIMI_API_KEY = 'test-kimi-key';
+    try {
+      const { spawnAgent } = await import('../agents.js');
+
+      const openaiState = await spawnAgent({
+        issueId: 'PAN-1406',
+        workspace,
+        role: 'work',
+        model: 'gpt-5.5',
+      });
+      const kimiState = await spawnAgent({
+        issueId: 'PAN-1407',
+        workspace,
+        role: 'work',
+        model: 'kimi-k2.6',
+      });
+
+      expect(openaiState.harness).toBe('codex');
+      expect(openaiState.codexMode).toBe('work-tui');
+      expect(kimiState.harness).toBe('pi');
+      expect(kimiState.codexMode).toBeUndefined();
+      expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
+      expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
+    } finally {
+      delete process.env.KIMI_API_KEY;
+    }
+  });
+
+  it('persists fresh work-agent session origin when the tmux session is created', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+
+    await spawnAgent({
+      issueId: 'PAN-1408',
+      workspace,
+      role: 'work',
+      model: 'gpt-5.5',
+    });
+
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1408',
+      expect.objectContaining({
+        kind: 'model_set',
+        model: 'unknown',
+        sessionModel: 'gpt-5.5',
+        sessionHarness: 'codex',
+      }),
+    );
+  });
+
   it('threads active flywheel provenance env into spawnRun work agents', async () => {
     const supervisorScriptPath = writeSupervisorArtifact();
     activeFlywheelRunId = 'RUN-777';
@@ -264,6 +376,48 @@ describe('spawnAgent PTY supervisor wiring', () => {
         }),
       }),
     );
+  });
+
+  it('persists fresh role-run session origin beside the Claude session id', async () => {
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'gpt-5.5',
+    });
+
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1405-review',
+      expect.objectContaining({
+        kind: 'model_set',
+        model: 'unknown',
+        claudeSessionId: expect.any(String),
+        sessionModel: 'gpt-5.5',
+        sessionHarness: 'codex',
+      }),
+    );
+  });
+
+  it('preserves role-run session origin on resume by not rewriting origin fields', async () => {
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'review', {
+      workspace,
+      model: 'kimi-k2.6',
+      resumeSessionId: 'existing-session',
+    });
+
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      'agent-pan-1405-review',
+      expect.objectContaining({
+        kind: 'model_set',
+        model: 'unknown',
+        claudeSessionId: 'existing-session',
+      }),
+    );
+    const modelSetCall = emitAgentEventMock.mock.calls.find(([, event]) => event.kind === 'model_set');
+    expect(modelSetCall?.[1]).not.toHaveProperty('sessionModel');
+    expect(modelSetCall?.[1]).not.toHaveProperty('sessionHarness');
   });
 
   it('threads flywheel orchestrator provenance env into launcher and tmux session', async () => {

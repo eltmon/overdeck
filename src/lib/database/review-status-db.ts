@@ -39,6 +39,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
     db.prepare(`
       INSERT INTO review_status (
         issue_id, review_status, test_status, merge_status,
+        inspect_status, inspect_notes, inspect_started_at, inspect_bead_id,
         verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes,
@@ -55,14 +56,19 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         deacon_ignored_reason,
         blocker_reasons,
         last_verified_commit,
-        merge_step
+        merge_step,
+        auto_merge
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
         test_status           = excluded.test_status,
         merge_status          = excluded.merge_status,
+        inspect_status        = excluded.inspect_status,
+        inspect_notes         = excluded.inspect_notes,
+        inspect_started_at    = excluded.inspect_started_at,
+        inspect_bead_id       = excluded.inspect_bead_id,
         verification_status   = excluded.verification_status,
         verification_notes    = excluded.verification_notes,
         verification_cycle_count = excluded.verification_cycle_count,
@@ -91,12 +97,17 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         deacon_ignored_reason = excluded.deacon_ignored_reason,
         blocker_reasons       = excluded.blocker_reasons,
         last_verified_commit  = excluded.last_verified_commit,
-        merge_step            = excluded.merge_step
+        merge_step            = excluded.merge_step,
+        auto_merge            = excluded.auto_merge
     `).run(
       s.issueId,
       s.reviewStatus,
       s.testStatus,
       s.mergeStatus ?? null,
+      s.inspectStatus ?? null,
+      s.inspectNotes ?? null,
+      s.inspectStartedAt ?? null,
+      s.inspectBeadId ?? null,
       s.verificationStatus ?? null,
       s.verificationNotes ?? null,
       s.verificationCycleCount ?? null,
@@ -126,6 +137,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.blockerReasons ? JSON.stringify(s.blockerReasons) : null,
       s.lastVerifiedCommit ?? null,
       s.mergeStep ?? null,
+      s.autoMerge === undefined ? null : (s.autoMerge ? 1 : 0),
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -152,7 +164,7 @@ export function deleteReviewStatus(issueId: string): void {
 }
 
 // ============== Async wrappers (dashboard-reachable code) ==============
-// better-sqlite3 is synchronous. These wrappers defer execution via
+// The SQLite driver is synchronous. These wrappers defer execution via
 // setImmediate so the Node event loop can process other I/O (HTTP,
 // WebSocket, terminal) between SQLite operations. This satisfies the
 // "No Blocking Calls" dashboard rule (PAN-70 / PAN-446) for the
@@ -321,6 +333,10 @@ interface DbReviewStatusRow {
   review_status: string;
   test_status: string;
   merge_status: string | null;
+  inspect_status: string | null;
+  inspect_notes: string | null;
+  inspect_started_at: string | null;
+  inspect_bead_id: string | null;
   verification_status: string | null;
   verification_notes: string | null;
   verification_cycle_count: number | null;
@@ -361,6 +377,8 @@ interface DbReviewStatusRow {
   last_verified_commit: string | null;
   // Current merge pipeline step
   merge_step: string | null;
+  // PAN-1691: per-issue auto-merge routing key (null=project default, 1=auto, 0=hold-for-UAT)
+  auto_merge: number | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -369,6 +387,10 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     reviewStatus: row.review_status as ReviewStatus['reviewStatus'],
     testStatus: row.test_status as ReviewStatus['testStatus'],
     mergeStatus: row.merge_status as ReviewStatus['mergeStatus'] ?? undefined,
+    inspectStatus: row.inspect_status as ReviewStatus['inspectStatus'] ?? undefined,
+    inspectNotes: row.inspect_notes ?? undefined,
+    inspectStartedAt: row.inspect_started_at ?? undefined,
+    inspectBeadId: row.inspect_bead_id ?? undefined,
     verificationStatus: row.verification_status as ReviewStatus['verificationStatus'] ?? undefined,
     verificationNotes: row.verification_notes ?? undefined,
     verificationCycleCount: row.verification_cycle_count ?? undefined,
@@ -398,6 +420,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
     lastVerifiedCommit: row.last_verified_commit ?? undefined,
     mergeStep: row.merge_step ?? undefined,
+    autoMerge: row.auto_merge === null || row.auto_merge === undefined ? undefined : row.auto_merge === 1,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -474,6 +497,31 @@ export function setDeaconIgnored(
     now,
     issueId,
   );
+}
+
+/**
+ * PAN-1691: set (or clear) the per-issue auto-merge routing key.
+ * `autoMerge === null` clears it back to the project default (NULL column);
+ * `true` = auto-merge (fast lane); `false` = hold for UAT (manual lane).
+ * Mirrors setDeaconIgnored so the flag can be set on an issue that has no
+ * prior review_status row.
+ */
+export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const value = autoMerge === null ? null : autoMerge ? 1 : 0;
+
+  db.prepare(`
+    INSERT OR IGNORE INTO review_status (
+      issue_id, review_status, test_status, updated_at, ready_for_merge, auto_merge
+    ) VALUES (?, 'pending', 'pending', ?, 0, ?)
+  `).run(issueId, now, value);
+
+  db.prepare(`
+    UPDATE review_status
+    SET auto_merge = ?, updated_at = ?
+    WHERE issue_id = ?
+  `).run(value, now, issueId);
 }
 
 /**

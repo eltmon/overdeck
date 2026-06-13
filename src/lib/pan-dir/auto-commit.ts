@@ -40,6 +40,38 @@ interface QueuedCommit {
   timer: NodeJS.Timeout;
 }
 
+/**
+ * Paths that must never enter a pipeline auto-commit, regardless of gitignore
+ * state. Mirrors the exclusion list in src/lib/cloister/merge-agent.ts.
+ */
+const AUTO_COMMIT_EXCLUDED_PATHS = [
+  '.pan/kickoff.md',
+  '.pan/continue.json',
+  '.pan/handoff-*.md',
+  '.pan/spec.vbrief.json',
+  '.claude/rules/',
+  '.claude/skills/',
+];
+
+function isAutoCommitExcludedPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
+    if (pattern.endsWith('/')) {
+      if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) {
+        return true;
+      }
+    } else if (pattern.includes('*')) {
+      const regex = new RegExp(
+        '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*') + '$'
+      );
+      if (regex.test(normalized)) return true;
+    } else if (normalized === pattern) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface FlushResult {
   committed: boolean;
   reason?: string;
@@ -211,8 +243,26 @@ function doCommit(
     }
 
     const branch = branchResult;
+
+    // PAN-1395 root-cause: fetch origin/main before committing so we can
+    // rebase after the commit, preventing local main from diverging when
+    // a PR merges between beads sync cycles. Fetch is safe with a dirty
+    // working tree (unlike pull --rebase).
+    yield* runGit(['fetch', 'origin', 'main'], projectRoot).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.void,
+        onFailure: () => Effect.void, // best-effort; network may be down
+      }),
+    );
+
     const paths = Array.from(batch.paths);
-    const relativePaths = paths.map((p) => relativizeToRoot(p, projectRoot));
+    const relativePaths = paths
+      .map((p) => relativizeToRoot(p, projectRoot))
+      .filter((p) => !isAutoCommitExcludedPath(p));
+
+    if (relativePaths.length === 0) {
+      return { committed: false, reason: 'all paths excluded from auto-commit' };
+    }
 
     // git add
     const addOk: boolean | FlushResult = yield* runGit(
@@ -268,6 +318,21 @@ function doCommit(
       }),
     );
     if (typeof commitOk !== 'boolean') return commitOk;
+
+    // Rebase onto origin/main so the auto-commit sits on top of any PR
+    // merges that landed on the remote between sync cycles.
+    yield* runGit(['rebase', 'origin/main'], projectRoot).pipe(
+      Effect.matchEffect({
+        onSuccess: () => Effect.void,
+        onFailure: (err) => {
+          console.warn(`[pan-dir/auto-commit] rebase failed for ${branch}: ${err.stderr || err._tag}`);
+          // Abort the rebase so the repo isn't left in a conflicted state.
+          return runGit(['rebase', '--abort'], projectRoot).pipe(
+            Effect.matchEffect({ onSuccess: () => Effect.void, onFailure: () => Effect.void }),
+          );
+        },
+      }),
+    );
 
     return { committed: true };
   });

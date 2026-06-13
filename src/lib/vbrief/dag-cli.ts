@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join as pathJoin } from 'path';
 
-import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus } from './types.js';
 import {
   activePlanWriters,
   applyTaskOperation,
@@ -122,12 +122,12 @@ function mirrorTaskOperationToContinueFile(
   const overrides = { ...continueState.statusOverrides };
   overrides[itemId] = status;
 
-  // Derive affected subItems from the plan for canonical overlay
+  // Derive affected child items from the plan for canonical overlay
   const doc = readWorkspacePlanSync(workspacePath);
   if (doc) {
     const item = doc.plan.items.find(i => i.id === itemId);
-    if (item?.subItems) {
-      const allSubIds = item.subItems.map(s => s.id);
+    if (item) {
+      const allSubIds = subItemsOf(item).map(s => s.id);
       const affectedSubIds = subItemIds?.length
         ? subItemIds.filter(id => allSubIds.includes(id))
         : (status === 'completed' ? allSubIds : []);

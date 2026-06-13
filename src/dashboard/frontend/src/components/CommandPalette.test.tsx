@@ -232,4 +232,35 @@ describe('CommandPalette navigation actions', () => {
 
   it('shows /pan-flywheel action when searching for flywheel and navigates to the Flywheel page', async () => {
     const user = userEvent.setup();
-    c
+    const { onNavigate } = renderPalette();
+
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'flywheel');
+
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    const flywheelOption = getOptionByValue('pan-flywheel');
+    expect(flywheelOption).toBeInTheDocument();
+
+    await user.click(flywheelOption);
+
+    await waitFor(() => {
+      expect(onNavigate).toHaveBeenCalledWith('flywheel');
+    });
+  });
+
+  it('shows Context navigation and opens the Context page', async () => {
+    const user = userEvent.setup();
+    const { onNavigate } = renderPalette();
+
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'context');
+
+    expect(screen.getByText('Navigation')).toBeInTheDocument();
+    const contextOption = getOptionByValue('open-context');
+    expect(contextOption).toBeInTheDocument();
+
+    await user.click(contextOption);
+
+    await waitFor(() => {
+      expect(onNavigate).toHaveBeenCalledWith('context');
+    });
+  });
+});

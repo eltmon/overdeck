@@ -14,6 +14,96 @@ import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync 
 
 const execAsync = promisify(exec);
 
+/**
+ * Paths that must never enter a pipeline auto-commit, regardless of gitignore
+ * state. These are workspace-local or machine-local state files and sync-target
+ * directories; committing them pollutes feature branches and main.
+ */
+export const AUTO_COMMIT_EXCLUDED_PATHS = [
+  '.pan/kickoff.md',
+  '.pan/continue.json',
+  '.pan/handoff-*.md',
+  '.pan/spec.vbrief.json',
+  '.claude/rules/',
+  '.claude/skills/',
+];
+
+function isAutoCommitExcludedPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
+    if (pattern.endsWith('/')) {
+      if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) {
+        return true;
+      }
+    } else if (pattern.includes('*')) {
+      const regex = new RegExp(
+        '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*') + '$'
+      );
+      if (regex.test(normalized)) return true;
+    } else if (normalized === pattern) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function parseStatusPath(line: string): string {
+  // git status --porcelain lines are "XY PATH" or "XY ORIG -> DEST" for renames.
+  const body = line.slice(3);
+  if (line[0] === 'R' || line[1] === 'R') {
+    const parts = body.split(' -> ');
+    return parts[parts.length - 1];
+  }
+  return body;
+}
+
+/**
+ * Auto-commit non-excluded workspace changes before a sync-main merge.
+ * Respects .gitignore (no -f), unstages excluded paths, and leaves excluded
+ * paths dirty so the sync can proceed. Returns success=false on git errors.
+ */
+export async function autoCommitWorkspaceChangesBeforeSync(
+  projectPath: string,
+): Promise<{ success: boolean; committed: boolean; reason?: string }> {
+  try {
+    const { stdout: statusOut } = await execAsync('git status --porcelain', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (!statusOut.trim()) {
+      return { success: true, committed: false, reason: 'no uncommitted changes' };
+    }
+
+    // PAN-1819: plain `git add -A` respects .gitignore; never use -f.
+    await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8' });
+
+    // Belt-and-suspenders: unstage excluded paths regardless of ignore state.
+    const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS.map((p) =>
+      p.endsWith('/') ? p.slice(0, -1) : p
+    ).join(' ');
+    await execAsync(`git reset HEAD -- ${resetPaths}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+
+    const { stdout: diffStat } = await execAsync('git diff --cached --stat', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (!diffStat.trim()) {
+      return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
+    }
+
+    await execAsync('git commit -m "chore: auto-commit before sync with main"', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    return { success: true, committed: true };
+  } catch (error: any) {
+    return { success: false, committed: false, reason: `Failed to auto-commit: ${error.message}` };
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import {
@@ -218,6 +308,24 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   }
 
   const run = (async () => {
+    // Guard 2: closed-out is TERMINAL. Close-out flips the spec on main to
+    // completed/cancelled, clears review status, and closes the tracker issue.
+    // Re-running the handoff after that resurrects the review row and REOPENS
+    // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
+    // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after
+    // close-out and the handoff reopened it into verifying-on-main forever.
+    try {
+      const { findSpecByIssue } = await import('../pan-dir/specs.js');
+      const spec = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
+      if (spec && (spec.status === 'completed' || spec.status === 'cancelled')) {
+        console.log(`[merge-agent] ${issueId} is closed out (spec ${spec.status}) — skipping post-merge lifecycle`);
+        _completedPostMerge.add(issueId);
+        return;
+      }
+    } catch {
+      // Spec unreadable — proceed; the guard is best-effort.
+    }
+
     const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
     if (!mergeVerification.merged) {
       console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
@@ -342,14 +450,36 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
-      const { setAgentPaused } = await import('../agents.js');
+      const { setAgentPaused, getAgentState } = await import('../agents.js');
       const { killSession, sessionExists } = await import('../tmux.js');
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
       for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
-        const paused = await Effect.runPromise(setAgentPaused(agentId, reason, true));
-        if (paused) {
+        // Pause, then VERIFY the gate actually persisted to state.json. A server
+        // restart mid-lifecycle (the PAN-1723 deploy re-runs this from
+        // pending-post-merge.json) or a concurrent deacon read-modify-write on
+        // state.json can silently drop the pause. An unpaused merged work agent
+        // sits idle at its prompt yet still counts against the PAN-1665 work
+        // ceiling, throttling dispatch for every live issue (PAN-1726). Assert
+        // paused=true after the write; retry once, then fail loudly.
+        const initial = await Effect.runPromise(setAgentPaused(agentId, reason, true));
+        if (initial === null) {
+          // No state.json for this agent — nothing to pause (e.g. planning never ran).
+          continue;
+        }
+        let verify = await Effect.runPromise(getAgentState(agentId));
+        if (verify?.paused !== true) {
+          await Effect.runPromise(setAgentPaused(agentId, reason, true));
+          verify = await Effect.runPromise(getAgentState(agentId));
+        }
+        if (verify?.paused === true) {
           console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
+        } else {
+          console.error(
+            `[merge-agent] ✗ FAILED to persist pause for ${agentId} after merge — state.json paused=${verify?.paused}. ` +
+            `Idle merged work agent may hold a PAN-1665 work slot and throttle dispatch (PAN-1726).`,
+          );
+          logActivity('agent_pause_failed', `Could not persist pause for ${agentId} after merge — may throttle dispatch (PAN-1726)`);
         }
         if (await Effect.runPromise(sessionExists(agentId))) {
           await Effect.runPromise(killSession(agentId));
@@ -977,8 +1107,9 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
  * Sync the latest main branch into a workspace's feature branch.
  *
  * This performs a `git merge origin/main` in the workspace. If the merge is clean
- * it returns immediately. If conflicts arise, the ship role is started to resolve
- * them. The merge is never pushed — this is a local workspace operation.
+ * it returns immediately. If conflicts arise, the conflict details are surfaced
+ * for manual workspace resolution. The merge is never pushed — this is a local
+ * workspace operation.
  *
  * Auto-commits any uncommitted changes before merging (with safety verification).
  */
@@ -997,33 +1128,31 @@ export async function syncMainIntoWorkspace(
   await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
 
   // Pre-flight: auto-commit uncommitted changes before merge
+  console.log(`[sync-main] Checking for uncommitted changes...`);
+  logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
+  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath);
+  if (!autoCommit.success) {
+    const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
+    console.error(`[sync-main] ${message}`);
+    logActivity('sync_main_blocked', message);
+    return { success: false, reason: message };
+  }
+  if (autoCommit.committed) {
+    console.log(`[sync-main] Auto-commit successful`);
+  }
+
+  // Verify no non-excluded uncommitted changes remain.
   try {
-    const { stdout: statusOut } = await execAsync('git status --porcelain', {
+    const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
     });
-    if (statusOut.trim()) {
-      console.log(`[sync-main] Uncommitted changes detected, auto-committing...`);
-      logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-      try {
-        await execAsync('git add -A && git commit -m "chore: auto-commit before sync with main"', {
-          cwd: projectPath,
-          encoding: 'utf-8',
-        });
-        console.log(`[sync-main] Auto-commit successful`);
-      } catch (commitErr: any) {
-        const message = `Failed to auto-commit uncommitted changes: ${commitErr.message}`;
-        console.error(`[sync-main] ${message}`);
-        logActivity('sync_main_blocked', message);
-        return { success: false, reason: message };
-      }
-
-      // Verify commit succeeded — abort if uncommitted changes still exist
-      const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
-      if (postCommitStatus.trim()) {
+    if (postCommitStatus.trim()) {
+      const remainingNonExcluded = postCommitStatus
+        .trim()
+        .split('\n')
+        .filter((line) => !isAutoCommitExcludedPath(parseStatusPath(line)));
+      if (remainingNonExcluded.length > 0) {
         const message = 'Uncommitted changes remain after auto-commit — aborting sync';
         console.error(`[sync-main] ${message}`);
         logActivity('sync_main_blocked', message);

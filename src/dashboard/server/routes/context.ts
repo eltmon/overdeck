@@ -28,6 +28,7 @@ import {
   globalContextFile as defaultGlobalContextFile,
   projectContextFile,
   workspaceContextFile,
+  codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
 import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
 import { CLAUDE_DIR, getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
@@ -65,7 +66,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'pi', 'codex'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -259,6 +260,7 @@ async function describeSyncTarget(
 async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTarget[]> {
   const targets: ContextSyncTarget[] = [
     await describeSyncTarget('claude-code', 'global', undefined, 'Claude Code · global', join(CLAUDE_DIR, 'CLAUDE.md')),
+    await describeSyncTarget('codex', 'global', undefined, 'Codex · global (codex-global.md)', codexGlobalContextFile()),
   ];
 
   for (const { key, config } of projects) {
@@ -387,7 +389,7 @@ function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyM
 }
 
 async function previewForHarness(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): Promise<string> {
-  const title = harness === 'claude-code' ? 'Claude Code' : 'Pi';
+  const title = harness === 'claude-code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : 'Pi';
   return [
     `# Panopticon injected context preview (${title})`,
     renderLayerSections(layers, drafts, harness),
@@ -408,6 +410,10 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '## Panopticon-controlled Pi bundle',
     '',
     previews.pi || '(no rendered context)',
+    '',
+    '## Panopticon-controlled Codex bundle',
+    '',
+    previews.codex || '(no rendered context)',
     '',
     '## Runtime-only sections',
     '',
@@ -472,6 +478,7 @@ export async function previewContextLayers(
     previews: {
       'claude-code': previews['claude-code'],
       pi: previews.pi,
+      codex: previews.codex,
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

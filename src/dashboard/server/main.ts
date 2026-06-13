@@ -7,14 +7,16 @@
 
 import { Effect } from 'effect';
 import { initDashboardLogFile } from './server-log-file.js';
-import { ensureNativeSqliteAbi } from '../../lib/native-sqlite-guard.js';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
+import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
 import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
@@ -24,8 +26,9 @@ import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
+import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
-import { clearStuckForks } from '../../lib/database/conversations-db.js';
+import { recoverStuckForks, waitForInFlightForkPipelines } from './routes/conversations.js';
 import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
@@ -44,6 +47,8 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import { clearQueryExpansionCache } from '../../lib/memory/query-expansion.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
+import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
+import { closeConversationSearchService } from './services/conversation-search-service.js';
 
 declare const Bun: unknown;
 
@@ -52,10 +57,6 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
-
-// Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
-// under Node 22 then loaded under Node 24) before any database is opened.
-ensureNativeSqliteAbi();
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
@@ -80,33 +81,46 @@ await initTrackerConfigCache().catch(err => {
 // Start the shared IssueDataService — fire and forget.
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
 // then fetches fresh data from APIs in the background.
-void startSharedIssueService().then(() => {
-  console.log('[panopticon] IssueDataService background fetch complete');
-  // Once the issue cache is warm, prune review-status rows for issues that
-  // are CLOSED on the tracker. Without this, manually-closed issues
-  // (`gh issue close` instead of `pan close`) leave stale review-state
-  // behind, and the deacon keeps auto-resuming agents and re-dispatching
-  // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
-  // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
-  // already calls clearReviewStatus on its own path.
-  void pruneClosedIssueReviewStatuses().catch((err) => {
-    console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+//
+// PAN-1817: peer dashboards inside workspace containers (PANOPTICON_DISABLE_DEACON=1)
+// load the SQLite cache and serve READ-ONLY without polling the trackers. The host
+// `pan up` dashboard is the single tracker poller. Without this gate, every workspace
+// container ran its own Linear/GitHub poller against the shared API key — ~17 of them
+// at once exhausted Linear's 2500/hr quota. This mirrors the single-deacon invariant:
+// a peer dashboard is a read/UI peer, never a second orchestrator.
+const isPeerDashboard = process.env.PANOPTICON_DISABLE_DEACON === '1';
+if (isPeerDashboard) {
+  void startSharedIssueService({ skipPolling: true });
+  console.log('[panopticon] IssueDataService started in CACHE-ONLY mode — peer dashboard (PANOPTICON_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
+} else {
+  void startSharedIssueService().then(() => {
+    console.log('[panopticon] IssueDataService background fetch complete');
+    // Once the issue cache is warm, prune review-status rows for issues that
+    // are CLOSED on the tracker. Without this, manually-closed issues
+    // (`gh issue close` instead of `pan close`) leave stale review-state
+    // behind, and the deacon keeps auto-resuming agents and re-dispatching
+    // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
+    // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
+    // already calls clearReviewStatus on its own path.
+    void pruneClosedIssueReviewStatuses().catch((err) => {
+      console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+    });
+    void Effect.runPromise(cleanupClosedIssueAgentDirectories({
+      issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
+      force: true,
+    })).then((result) => {
+      if (result.removed.length > 0) {
+        console.log(`[panopticon] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+      }
+      if (result.protected.length > 0) {
+        console.warn(`[panopticon] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
+      }
+    }).catch((err) => {
+      console.warn('[panopticon] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
+    });
   });
-  void Effect.runPromise(cleanupClosedIssueAgentDirectories({
-    issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
-    force: true,
-  })).then((result) => {
-    if (result.removed.length > 0) {
-      console.log(`[panopticon] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
-    }
-    if (result.protected.length > 0) {
-      console.warn(`[panopticon] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
-    }
-  }).catch((err) => {
-    console.warn('[panopticon] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
-  });
-});
-console.log('[panopticon] IssueDataService started (non-blocking)');
+  console.log('[panopticon] IssueDataService started (non-blocking)');
+}
 
 // Start background enrichment poller — emits agent.enrichment_changed events
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
@@ -117,6 +131,12 @@ console.log('[panopticon] AgentEnrichmentService started');
 // so DrawerActiveAgent and other consumers receive live stream excerpts.
 startAgentOutputService();
 console.log('[panopticon] AgentOutputService started');
+
+// Start merge-blocker reconcile poller (PAN-1620) — proactively refreshes GitHub
+// mergeability for readyForMerge PRs so a stale/conflicting one drops out of the
+// Awaiting-Merge queue (and its live MERGE button) before any click.
+startMergeBlockerReconcileService();
+console.log('[panopticon] MergeBlockerReconcileService started');
 
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
@@ -372,6 +392,12 @@ console.log('[panopticon] ConversationLifecycleService started');
 
 startSubstrateBugPoller();
 
+// PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
+// times (gated per-tick on flywheel.merge_train_enabled; no-op without an
+// active flywheel run).
+startUatTrainReconciler();
+console.log('[panopticon] UAT batch-train reconciler started');
+
 // Start cleanup for orphaned conversation attachments (1 min interval)
 const attachmentCleanupTimer = setInterval(() => {
   void cleanupOrphanedConversationAttachments();
@@ -389,6 +415,11 @@ void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message
   .catch(err => console.warn('[memory-reconciliation] startup sweep failed:', err?.message ?? err));
 startTranscriptPoller();
 console.log('[panopticon] Memory transcript poller started');
+
+const conversationSearchWatcher = startConversationSearchWatcher();
+console.log(conversationSearchWatcher
+  ? '[panopticon] Conversation search watcher started'
+  : '[panopticon] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
 void (async () => {
   const store = await initEventStore();
@@ -431,37 +462,77 @@ const emitShutdownActivity = () => {
     });
   } catch { /* non-fatal */ }
 };
-const handleShutdownSignal = (signal: NodeJS.Signals) => {
+let shuttingDown = false;
+const handleShutdownSignal = async (signal: NodeJS.Signals) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`[panopticon] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   emitShutdownActivity();
+  const forkGrace = await waitForInFlightForkPipelines(10_000);
+  if (forkGrace.count > 0) {
+    if (forkGrace.completed) {
+      console.log(`[panopticon] Waited for ${forkGrace.count} in-flight fork pipeline(s) before shutdown`);
+    } else {
+      console.warn(`[panopticon] ${forkGrace.count} in-flight fork pipeline(s) still running after shutdown grace window`);
+    }
+  }
   clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
   stopSubstrateBugPoller();
+  stopUatTrainReconciler();
   stopTtsSummarizer();
   stopTtsPlayback();
   stopAutoMergeExecutor();
   stopTranscriptPoller();
+  stopRestartAnnouncer();
+  await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
+  closeConversationSearchService();
   closeMemoryFtsDatabases();
   process.exit(0);
 };
-process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
-process.once('SIGINT', () => handleShutdownSignal('SIGINT'));
-process.once('SIGHUP', () => handleShutdownSignal('SIGHUP'));
+process.once('SIGTERM', () => void handleShutdownSignal('SIGTERM'));
+process.once('SIGINT', () => void handleShutdownSignal('SIGINT'));
+process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
+
+// Announce dashboard restarts (supervisor watchdog / pan reload / pan restart)
+// in the Awareness activity feed. Polls restart-status.json because the writer
+// processes can't reach this server's event store — see restart-announcer.ts.
+startRestartAnnouncer();
+console.log('[panopticon] Restart announcer started');
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
 emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
-// Mark any in-progress forks as failed — they were interrupted by the restart.
-{ const n = clearStuckForks(); if (n) {
-  console.log(`[panopticon] Marked ${n} stuck fork(s) as failed`);
-  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Marked ${n} stuck fork(s) as failed on startup` });
-} }
+// Resume recoverable in-progress forks after boot services settle (PAN-1744).
+setTimeout(() => {
+  void recoverStuckForks()
+    .then((n) => {
+      if (n > 0) {
+        console.log(`[panopticon] Recovered ${n} stuck fork(s)`);
+        emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
+      }
+    })
+    .catch((err) => {
+      console.warn('[panopticon] Failed to recover stuck forks:', err);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
+    });
+}, 1000);
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
 // PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
 fixStuckCommentedReviews();
+// PAN-1771: re-derive GitHub-native blockers from live PR state. Webhooks missed
+// while the server was down otherwise leave stale blockers pinning readyForMerge=false.
+void reconcileStaleGitHubBlockers()
+  .then((n) => {
+    if (n > 0) {
+      console.log(`[panopticon] Reconciled GitHub-native blockers for ${n} issue(s) on startup`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Reconciled GitHub-native blockers for ${n} issue(s) on startup` });
+    }
+  })
+  .catch((err: any) => console.warn(`[panopticon] Startup blocker reconciliation failed: ${err.message}`));
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.

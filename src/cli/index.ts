@@ -49,6 +49,7 @@ import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
 import type { RoleEffort } from '../lib/config-yaml.js';
+import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
@@ -106,7 +107,6 @@ import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
-import { ensureNativeSqliteAbi } from '../lib/native-sqlite-guard.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
@@ -373,7 +373,7 @@ const planCmd = program
   .option('--auto-start', 'After planning completes, automatically start the work agent — used by autonomous orchestrators')
   .option('--probe', 'Add an adversarial pre-finalize probe pass to the planning prompt')
   .option('--model <model>', 'Model to use for the planning role')
-  .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Planning effort: low | medium | high')
   .option('--remote', 'Use remote planning workspace (Fly.io)')
   .option('--local', 'Use local planning workspace')
@@ -512,7 +512,7 @@ program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
@@ -530,10 +530,10 @@ program
   .command('strike <ids...>')
   .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
   .option('--dry-run', 'Print what would happen without spawning')
-  .action((ids: string[], options: { model?: string; harness?: 'claude-code' | 'pi'; effort?: RoleEffort; dryRun?: boolean }) =>
+  .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) =>
     strikeCommand(ids, options),
   );
 
@@ -1413,23 +1413,6 @@ program
 if (process.argv.length === 2) {
   // npx panopticon with no args → act as serve
   process.argv.push('serve');
-}
-
-const isHelpOrVersionInvocation = (argv: string[]): boolean => {
-  const args = argv.slice(2);
-  return args[0] === 'help'
-    || args.includes('--help')
-    || args.includes('-h')
-    || args.includes('--version')
-    || args.includes('-V');
-};
-
-// Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
-// under one Node major, loaded under another) before any command opens the DB.
-// Help/version rendering must stay side-effect-free: lint-skills shells out to
-// many `pan ... --help` forms, and those commands do not need SQLite.
-if (!isHelpOrVersionInvocation(process.argv)) {
-  ensureNativeSqliteAbi();
 }
 
 // Parse and execute

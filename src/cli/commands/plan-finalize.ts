@@ -284,4 +284,104 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     } else {
       console.log(chalk.yellow('⚠ Planning finalized but auto-promotion failed.'));
       if (promoteError) console.log(chalk.dim('  ' + promoteError));
-      console.log(chalk.dim('Run `pan plan done ' + issueId + '` to retry, or click Done 
+      console.log(chalk.dim('Run `pan plan done ' + issueId + '` to retry, or click Done in the dashboard.'));
+    }
+  }
+}
+
+/**
+ * Chain plan-finalize into the dashboard's complete-planning endpoint so the
+ * canonical spec is promoted to main and the issue transitions to Planned
+ * without requiring a human Done click. The route defers its session kill
+ * until after the response is flushed so callers running inside the planning
+ * tmux session still see this response.
+ */
+export async function promotePlanning(issueId: string, autoSpawn = false): Promise<PromotePlanningResult> {
+  try {
+    const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90_000);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
+        body: JSON.stringify(autoSpawn ? { autoSpawn: true } : {}),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    const text = await response.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
+    if (!response.ok) {
+      const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
+      return {
+        success: false,
+        message: null,
+        error: String(err),
+        workAgentSpawned: false,
+        workAgentMessage: null,
+        workAgentError: null,
+        workAgentSkipReason: null,
+      };
+    }
+    const workAgentSpawned = parsed?.workAgentSpawned === true;
+    const workAgentSkipReason = typeof parsed?.workAgentSkipReason === 'string' ? parsed.workAgentSkipReason : null;
+    const workAgentSession = typeof parsed?.workAgentSession === 'string' ? parsed.workAgentSession : null;
+    const workAgentError = typeof parsed?.workAgentError === 'string' ? parsed.workAgentError : null;
+    return {
+      success: true,
+      message: parsed?.message ?? null,
+      error: null,
+      workAgentSpawned,
+      workAgentMessage: workAgentSession ? `Session: ${workAgentSession}` : (workAgentSkipReason ? `Skip reason: ${workAgentSkipReason}` : null),
+      workAgentError,
+      workAgentSkipReason,
+    };
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : String(err);
+    return {
+      success: false,
+      message: null,
+      error: `Dashboard unreachable: ${message}`,
+      workAgentSpawned: false,
+      workAgentMessage: null,
+      workAgentError: null,
+      workAgentSkipReason: null,
+    };
+  }
+}
+
+/**
+ * Set plan.status to 'proposed' and stamp the canonical filename on the plan.
+ * Atomically writes back via temp+rename. Returns the canonical filename.
+ *
+ * Preserves an existing canonicalFilename on the plan (date stays immutable
+ * once it's been set during a previous finalization).
+ *
+ * Exported for tests.
+ */
+export function stampPlanForFinalization(planPath: string, issueId: string): string {
+  const doc: VBriefDocument = readPlanSync(planPath);
+  const slugSource = doc.plan.title || doc.plan.id || issueId;
+  const slug = slugify(slugSource);
+
+  const existingFilename = doc.plan.metadata?.canonicalFilename ?? null;
+  const canonicalFilename = existingFilename ?? generateVBriefFilename(issueId, slug);
+
+  doc.plan.metadata = { ...(doc.plan.metadata ?? {}), canonicalFilename };
+
+  const now = new Date().toISOString();
+  doc.plan.status = 'proposed';
+  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+  doc.plan.updated = now;
+  doc.vBRIEFInfo.updated = now;
+
+  const tmp = planPath + '.tmp';
+  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  renameSync(tmp, planPath);
+
+  return canonicalFilename;
+}

@@ -80,6 +80,10 @@ export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
 export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
+// PAN-1691: gate for the rolling merge-train reconciler (rebase ready siblings
+// after a merge, agent-resolve conflicts). Default OFF — it mutates git, so it
+// stays inert until an operator deliberately enables it.
+export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
 
 export function isFlywheelGloballyPaused(): boolean {
   return Effect.runSync(
@@ -127,6 +131,22 @@ export function isFlywheelRequireUatBeforeMerge(): boolean {
 
 export function setFlywheelRequireUatBeforeMerge(required: boolean): void {
   setSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY, required ? 'true' : 'false');
+}
+
+export function isMergeTrainEnabled(): boolean {
+  return Effect.runSync(
+    getSettingProgram(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY).pipe(
+      Effect.map((v) => v === 'true'),
+      Effect.catchTag('DatabaseError', (err) => {
+        console.warn('[app-settings] Failed to read merge-train flag:', err.cause);
+        return Effect.succeed(false);
+      }),
+    ),
+  );
+}
+
+export function setMergeTrainEnabled(enabled: boolean): void {
+  setSetting(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
 }
 
 export function getFlywheelActiveRunId(): string | null {

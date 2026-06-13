@@ -44,8 +44,8 @@ const PI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
 const GPT_5_5_API_KEY_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
-    'GPT-5.5 requires ChatGPT subscription auth (Codex sign-in). ' +
-    'It is not available via the standard OpenAI API-key endpoint. Sign in via Codex, or pick a different model.',
+    'GPT-5.5 needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. ' +
+    'Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model.',
 }
 
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
@@ -76,6 +76,10 @@ export function canUseHarnessSync(
   if (!modelAuth.allowed) return modelAuth
 
   if (harness === 'claude-code') {
+    return ALLOWED
+  }
+
+  if (harness === 'codex') {
     return ALLOWED
   }
 

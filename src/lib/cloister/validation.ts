@@ -27,7 +27,15 @@ function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJ
       delete env[key];
     }
   }
-  return { ...env, ...gateEnv };
+  // PAN-1678: verification and ship builds run `npm run build` as a quality
+  // gate, which by default includes the heavy ~10-core build:docs-index job
+  // (a docs *search* index, irrelevant to whether the issue's code
+  // compiles/tests). Run concurrently across agents it stampedes the host to
+  // OOM. Default it off for every gate command so gate builds stay cheap; a
+  // gate may still opt back in via gate.env. The skip mechanism lives in
+  // scripts/build-post-cli.mjs (PAN-1659). Release/publish builds the index
+  // through a separate path (build-for-publish.mjs) that never sets this.
+  return { SKIP_DOCS_INDEX: '1', ...env, ...gateEnv };
 }
 
 /**

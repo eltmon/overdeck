@@ -821,4 +821,153 @@ function PipelineOverrideSection({
                 />
               );
             })}
-          </u
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function OpenMergeRequestRow({
+  issueId,
+  identifier,
+  title,
+  trackerUrl,
+  prUrl,
+  reviewStatus,
+  testStatus,
+  verificationStatus,
+  updatedAt,
+}: OpenMrRowProps) {
+  const confirm = useConfirm();
+  const forgeName = prUrl?.includes('gitlab') ? 'GitLab' : 'GitHub';
+
+  const approveMutation = useMutation({
+    mutationFn: () => forgeApprove(issueId),
+    onSuccess: () => {
+      toast.success(`Approved ${identifier}`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Approve failed for ${identifier}`, { description: err.message });
+    },
+  });
+
+  const mergeMutation = useMutation({
+    mutationFn: () => forgeMerge(issueId),
+    onSuccess: () => {
+      toast.success(`Force merge started for ${identifier}`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Force merge failed for ${identifier}`, { description: err.message });
+    },
+  });
+
+  const handleApprove = async () => {
+    const confirmed = await confirm({
+      title: `Force Approve ${identifier}`,
+      message: `This bypasses Panopticon's review pipeline and submits an approving review directly on ${forgeName}.\n\nThe automated review/test pipeline will continue running independently.`,
+      confirmLabel: 'Force Approve',
+    });
+    if (confirmed) {
+      approveMutation.mutate();
+    }
+  };
+
+  const handleMerge = async () => {
+    const confirmed = await confirm({
+      title: `Force Merge ${identifier} (Skip Pipeline)`,
+      message: `This will squash-merge directly via ${forgeName}, bypassing:\n\n• Rebasing onto main\n• Post-rebase verification (typecheck/lint/test)\n• Post-merge cleanup (labels, issue close, Docker teardown)\n\nYou'll need to handle cleanup manually. Use this only when the issue was handled outside the automated pipeline.`,
+      confirmLabel: 'Force Merge',
+      variant: 'destructive',
+    });
+    if (confirmed) {
+      mergeMutation.mutate();
+    }
+  };
+
+  return (
+    <li className="border border-amber-500/20 rounded-lg bg-card p-4 flex items-start gap-4">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          {trackerUrl ? (
+            <a
+              href={trackerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+            >
+              {identifier}
+            </a>
+          ) : (
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
+              {identifier}
+            </span>
+          )}
+          {updatedAt && (
+            <span className="text-[11px] text-muted-foreground">
+              opened {formatRelative(updatedAt)}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-foreground truncate" title={title}>
+          {title}
+        </p>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {pipelineStepBadge('review', reviewStatus)}
+          {pipelineStepBadge('test', testStatus)}
+          {pipelineStepBadge('verify', verificationStatus)}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {prUrl && (
+          <a
+            href={prUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-foreground hover:bg-accent transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View PR
+          </a>
+        )}
+        <button
+          onClick={handleApprove}
+          disabled={approveMutation.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {approveMutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <ThumbsUp className="w-3.5 h-3.5" />
+          )}
+          Force Approve
+        </button>
+        <button
+          onClick={handleMerge}
+          disabled={mergeMutation.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {mergeMutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <GitMerge className="w-3.5 h-3.5" />
+          )}
+          Force Merge
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return iso;
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  return `${diffDay}d ago`;
+}

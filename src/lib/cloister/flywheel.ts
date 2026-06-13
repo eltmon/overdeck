@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Effect, Schema } from 'effect';
-import { FlywheelRunId } from '@panctl/contracts';
+import type { FlywheelRunId } from '@panctl/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
@@ -17,7 +17,8 @@ import { resolveLiveFlywheelRunId } from '../../dashboard/server/services/flywhe
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
-const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
+const FlywheelRunIdSchema = Schema.String.check(Schema.isPattern(/^RUN-\d+$/));
+const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunIdSchema);
 
 export interface FlywheelLifecycleOptions {
   runId?: FlywheelRunId;
@@ -25,7 +26,7 @@ export interface FlywheelLifecycleOptions {
   briefPath?: string;
   prompt?: string;
   model?: string;
-  harness?: 'claude-code' | 'pi';
+  harness?: 'claude-code' | 'pi' | 'codex';
   effort?: RoleEffort;
   minAgents?: number;
   maxAgents?: number;

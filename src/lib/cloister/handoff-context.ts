@@ -9,7 +9,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Data, Effect } from 'effect';
-import type { TokenUsage } from '../runtimes/types.js';
+import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
@@ -45,7 +45,7 @@ export interface HandoffContext {
 
   // Source info
   previousModel: string;
-  previousRuntime: 'claude-code';
+  previousRuntime: RuntimeName;
   previousSessionId?: string;
 
   // Files
@@ -87,7 +87,7 @@ export interface HandoffContext {
     agentId: agentState.id,
     workspace: agentState.workspace,
     previousModel: agentState.model,
-    previousRuntime: 'claude-code',
+    previousRuntime: agentState.harness ?? 'claude-code',
     previousSessionId: agentState.sessionId,
     targetModel,
     reason,

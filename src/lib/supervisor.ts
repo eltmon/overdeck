@@ -13,11 +13,10 @@
 
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 
-import { LOGS_DIR, PANOPTICON_HOME } from './paths.js';
+import { LOGS_DIR, PANOPTICON_HOME, packageRoot } from './paths.js';
 import { readPlatformConfigSync } from './platform-lifecycle.js';
 import { ProcessSpawnError } from './errors.js';
 
@@ -59,20 +58,18 @@ export function isSupervisorRunningSync(): boolean {
 }
 
 function resolveSupervisorBundle(): string {
-  // From src/lib in dev → src/supervisor/server.ts is the source.
-  // From dist/lib in prod → dist/supervisor/server.js is the bundle.
-  // We always run the built bundle so import resolution works under Node 22.
-  const here = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    join(here, '..', 'supervisor', 'server.js'),         // dist/lib → dist/supervisor
-    join(here, '..', '..', 'dist', 'supervisor', 'server.js'),  // src/lib → dist/supervisor
-  ];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
-  }
-  throw new Error(
-    `Supervisor bundle not found. Run \`npm run build\`. Searched:\n  - ${candidates.join('\n  - ')}`,
-  );
+  // Always the built bundle (dist/supervisor/server.js) so import resolution
+  // works under Node 22. Resolve from packageRoot — robust across every
+  // invocation context (CLI bundle in dist/, dashboard server in
+  // dist/dashboard/, dev src/lib). The prior import.meta.url-relative candidates
+  // only handled dist/lib + src/lib, so when this code was bundled into the
+  // `pan` CLI (here=dist/) they pointed at `<repo>/../dist/...` and never found
+  // the bundle — leaving the supervisor sidecar silently un-started so agent
+  // delivery fell back to legacy tmux paste. packageRoot is the same primitive
+  // agents.ts uses to locate dist/pty-supervisor.js.
+  const bundle = join(packageRoot, 'dist', 'supervisor', 'server.js');
+  if (existsSync(bundle)) return bundle;
+  throw new Error(`Supervisor bundle not found at ${bundle}. Run \`npm run build\`.`);
 }
 
 /** Idempotent start. No-op if the supervisor is already running. */

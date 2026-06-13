@@ -311,4 +311,29 @@ describe('SessionFeedSidebar', () => {
   it('navigates restart entries to their initiator conversation via the link field', () => {
     const onPopState = vi.fn();
     window.addEventListener('popstate', onPopState);
-    useDashboardStore.setSta
+    useDashboardStore.setState({
+      observationsByIssueId: {},
+      recentActivity: [
+        {
+          id: 'restart-entry-2',
+          timestamp: '2026-05-23T01:04:00.000Z',
+          source: 'dashboard',
+          level: 'info',
+          message: 'Dashboard restarted via pan reload by conversation 2762 ("Some title") (31.0s)',
+          details: null,
+          issueId: 'RUN-23',
+          link: '/conv/2762',
+        },
+      ],
+    });
+
+    render(<SessionFeedSidebar onClose={vi.fn()} now={now} />);
+    fireEvent.click(
+      screen.getByText(/Dashboard restarted via pan reload/).closest('button') as HTMLButtonElement,
+    );
+
+    expect(window.location.pathname).toBe('/conv/2762');
+    expect(onPopState).toHaveBeenCalledOnce();
+    window.removeEventListener('popstate', onPopState);
+  });
+});

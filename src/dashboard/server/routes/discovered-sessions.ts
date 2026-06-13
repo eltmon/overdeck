@@ -13,7 +13,7 @@
  *   POST /api/discovered-sessions/embed      — bulk embed
  *   GET  /api/discovered-sessions/stats      — discovery stats
  *
- * Zero sync FS calls — all lib functions use fs/promises or better-sqlite3 (sync only in CLI context).
+ * Zero sync FS calls — lib functions use fs/promises; SQLite work stays in the existing sync DB layer.
  */
 
 import { Effect, Layer, Schema } from 'effect';
@@ -704,10 +704,10 @@ const postEmbedRoute = HttpRouter.add(
 const getConvConfigRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/config',
+  // Read-only, non-secret embedding settings. Public so the Settings panel loads even when
+  // the dashboard session cookie isn't minted (Traefik/pan.localhost). The PUT/test-connection
+  // routes below stay auth-gated. Proper session-bootstrap fix tracked in PAN-1166.
   httpHandler(Effect.gen(function* () {
-    const req = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnauthorizedDashboardRequest(req);
-    if (authError) return authError;
     const config = yield* getConversationsConfig();
     return validatedJsonResponse(ConfigResponseSchema, {
       embeddings: config.embeddings,

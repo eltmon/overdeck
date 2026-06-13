@@ -215,4 +215,9 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     // hangs after printing "complete". The failure path below already exits;
     // this makes success symmetric. (PAN-1621)
     process.exit(0);
-  } els
+  } else {
+    const failedStep = result.steps.find(s => !s.success && !s.skipped);
+    console.log(chalk.red(`Close-out failed: ${failedStep?.error || 'Unknown error'}`));
+    process.exit(1);
+  }
+}

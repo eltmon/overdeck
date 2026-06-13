@@ -59,6 +59,13 @@ export interface ParseResult {
   pendingAssistantId?: string;
   /** Orphaned tool_use entry UUIDs awaiting re-keying (carried across incremental parses). */
   orphanToolUseIds?: Set<string>;
+  /**
+   * Request/message IDs whose usage has already been counted into totalCost/totalTokens.
+   * Claude Code writes one API response across several JSONL lines (text block, tool_use
+   * block, …) that each repeat the same `usage`; counting every line double-counts cost.
+   * Carried across incremental parses so a response split across read boundaries is counted once.
+   */
+  countedUsageIds?: Set<string>;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -76,6 +83,8 @@ export interface ParseState {
   pendingAssistantId?: string;
   /** Orphaned tool_use entry UUIDs awaiting re-keying (carried across incremental parses). */
   orphanToolUseIds?: Set<string>;
+  /** Request/message IDs already counted into cost/tokens (see ParseResult.countedUsageIds). */
+  countedUsageIds?: Set<string>;
 }
 
 export interface ConversationActivitySummary {
@@ -184,6 +193,8 @@ interface JsonlEntry {
   timestamp?: string;
   sessionId?: string;
   uuid?: string;
+  /** Claude Code per-API-request id. Stable across the multiple JSONL lines of one response. */
+  requestId?: string;
 }
 
 interface ContentBlock {
@@ -339,6 +350,9 @@ export async function parseConversationMessages(
   const orphanToolUseIds = priorState?.orphanToolUseIds
     ? new Set(priorState.orphanToolUseIds)
     : new Set<string>();
+  // Request/message IDs whose usage has already been counted, so a response spread across
+  // multiple JSONL lines (or across incremental read boundaries) is counted exactly once.
+  const countedUsageIds = priorState?.countedUsageIds ?? new Set<string>();
   // Restore pendingAssistant ID from prior incremental parse for correct file-edit tracking
   if (priorState?.pendingAssistantId && !pendingAssistant) {
     pendingAssistant = { id: priorState.pendingAssistantId } as ChatMessage;
@@ -446,8 +460,13 @@ export async function parseConversationMessages(
       const msg = entry.message;
       const content = Array.isArray(msg.content) ? msg.content : [];
 
-      // Accumulate cost and token throughput from usage data
-      if (msg.usage) {
+      // Accumulate cost and token throughput from usage data.
+      // Claude Code repeats the same `usage` on every JSONL line of one API response
+      // (the text line, each tool_use line, …); dedup on requestId/message.id so each
+      // response is counted once, otherwise multi-block turns inflate cost ~2-3×.
+      const usageId = entry.requestId ?? msg.id;
+      if (msg.usage && (usageId === undefined || !countedUsageIds.has(usageId))) {
+        if (usageId !== undefined) countedUsageIds.add(usageId);
         totalTokens +=
           (msg.usage.input_tokens ?? 0) +
           (msg.usage.output_tokens ?? 0) +
@@ -797,8 +816,18 @@ export async function parseConversationMessages(
     fileEditsByAssistantId,
     pendingAssistantId: pendingAssistant?.id,
     orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,
+    countedUsageIds,
   };
 }
+
+/**
+ * PAN-1635: a conversation whose JSONL hasn't been written in this long is no
+ * longer "working" — even if its last entry is a trailing user/meta line (e.g. a
+ * post-compaction summary whose follow-up prompt was eaten by the compaction).
+ * Generous enough not to flap a slow-but-live turn; finite so a stranded session
+ * can't spin forever.
+ */
+const WORKING_STALENESS_MS = 180_000;
 
 /** In-memory cache mapping sessionFile path → { mtimeMs, size, summary } */
 const ACTIVITY_SUMMARY_CACHE_MAX = 100;
@@ -826,9 +855,20 @@ export async function summarizeConversationActivity(
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
   // — empty history, last message is user (tool result or prompt), or last message is
   // an assistant still streaming / waiting on tool_use — means the agent is working.
-  const isWorking = messages.length === 0 ||
+  //
+  // PAN-1635: guard on file recency. After a compaction the only post-boundary
+  // entries are user-role meta lines (compact summary, /compact echoes) with no
+  // following assistant turn, so the raw heuristic below pegs isWorking true
+  // forever. A session whose JSONL has been idle for WORKING_STALENESS_MS is not
+  // working — mirrors the `fileRecent` guards on `streaming` and `currentTool`.
+  // The window is generous (covers a long compaction / deep think that writes
+  // nothing for a while); during a real in-progress compaction the PreCompact
+  // hook's activity event keeps the card "working" independently.
+  const workingFileRecent = Date.now() - mtimeMs < WORKING_STALENESS_MS;
+  const isWorking = workingFileRecent && (
+    messages.length === 0 ||
     lastMsg?.role === 'user' ||
-    (lastMsg?.role === 'assistant' && !lastMsg.completedAt);
+    (lastMsg?.role === 'assistant' && !lastMsg.completedAt));
 
   // Find the most recent pending tool (tool_use sent but tool_result not yet received).
   // pendingToolUse holds the actual unpaired tool_uses, so this works correctly for
@@ -1246,6 +1286,7 @@ export function watchConversation(
             planToolUseIds: fullResult.planToolUseIds,
             proposedPlan: fullResult.proposedPlan,
             permissionMode: fullResult.permissionMode,
+            countedUsageIds: fullResult.countedUsageIds,
           };
           // Include in-flight tools so the live view shows pending work
           const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];
@@ -1259,6 +1300,7 @@ export function watchConversation(
           lastSequence: result.lastSequence,
           planToolUseIds: result.planToolUseIds,
           proposedPlan: result.proposedPlan,
+          countedUsageIds: result.countedUsageIds,
         };
         // Include in-flight tools so the live view shows pending work
         const workLog = [...result.workLog, ...result.pendingToolUse.values()];

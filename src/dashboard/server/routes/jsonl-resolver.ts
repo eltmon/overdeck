@@ -2,11 +2,14 @@
  * JSONL transcript resolver for the Command Deck (PAN-830).
  *
  * Maps an agent ID (e.g. `agent-pan-830`, `planning-pan-830`, or a canonical
- * specialist tmux session name) to the Claude Code JSONL transcript file on
- * disk. The JSONL filename is the *Claude session ID* (a UUID written by
- * Claude Code itself), NOT the agent/tmux name.
+ * specialist tmux session name) to the agent's JSONL transcript file on disk.
  *
- * Lookup order:
+ * Codex agents (PAN-1805) write rollout JSONLs under the per-agent
+ * `codex-home/sessions/` tree — resolution dispatches on the harness recorded
+ * in state.json (thread-id fast path, then latest-rollout fallback).
+ *
+ * For claude-code agents the JSONL filename is the *Claude session ID* (a UUID
+ * written by Claude Code itself), NOT the agent/tmux name. Lookup order:
  *   1. session.id     — single UUID written by auto-suspend
  *   2. sessions.json  — array of UUIDs the agent has used; the heartbeat hook
  *                       APPENDS new IDs and dedupes, so once a session has been
@@ -147,17 +150,68 @@ export async function resolveClaudeSessionId(
   return null;
 }
 
+/** Read the harness recorded in the agent's state.json, or null when absent. */
+export async function resolveAgentHarness(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const stateRaw = await readOptional(join(agentsRoot, agentId, 'state.json'));
+  if (!stateRaw) return null;
+  try {
+    const state = JSON.parse(stateRaw) as { harness?: unknown };
+    return typeof state.harness === 'string' ? state.harness : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Resolve the Claude Code JSONL transcript for an agent.
+ * Resolve the Codex rollout JSONL for a codex-harness agent (PAN-1805).
  *
- * Returns the absolute path if both the claudeSessionId is known AND the
- * corresponding JSONL file exists; otherwise null.
+ * Fast path: the persisted codex-thread-id maps directly to its rollout file.
+ * Lazy fallback (same shape as the conversation panel's PAN-1690 fix): codex
+ * writes the rollout only on the first turn, so a spawn-time thread-id capture
+ * can miss it — the per-agent CODEX_HOME holds only this agent's rollouts, so
+ * the newest one is its current thread.
+ */
+export async function resolveCodexRolloutPath(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const agentDir = join(agentsRoot, agentId);
+  const codexHome = join(agentDir, 'codex-home');
+  if (!(await pathExists(codexHome))) return null;
+
+  const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
+
+  const threadId = (await readOptional(join(agentDir, 'codex-thread-id')))?.trim();
+  if (threadId) {
+    const rollout = findRolloutPath(codexHome, threadId);
+    if (rollout) return rollout;
+  }
+  return findLatestRollout(codexHome);
+}
+
+/**
+ * Resolve the JSONL transcript for an agent.
+ *
+ * Codex agents resolve to their rollout JSONL (PAN-1805). For claude-code
+ * agents, returns the absolute path if both the claudeSessionId is known AND
+ * the corresponding JSONL file exists; otherwise null.
  */
 export async function resolveJsonlPath(
   agentId: string,
   workspacePath: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  // Dispatch on the recorded harness so a stale session.id from an earlier
+  // claude-code run of the same agent id can't shadow the codex transcript.
+  if (await resolveAgentHarness(agentId, opts) === 'codex') {
+    return resolveCodexRolloutPath(agentId, opts);
+  }
+
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
   if (!claudeSessionId) return null;
 

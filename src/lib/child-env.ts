@@ -31,6 +31,14 @@ const PROVIDER_ENV_KEYS = new Set([
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+  // Pi-native provider env vars (bridged from Panopticon settings)
+  'KIMI_API_KEY',
+  'MINIMAX_API_KEY',
+  'ZAI_API_KEY',
+  'MIMO_API_KEY',
+  'OPENROUTER_API_KEY',
+  'NOUS_API_KEY',
+  'DASHSCOPE_API_KEY',
 ]);
 
 /** All keys that should be stripped by default. */

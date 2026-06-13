@@ -581,4 +581,111 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     }, delayMs);
   };
 
-  // ── Initial startup (fail-fast until `supervising` flips on) ──────────────
+  // ── Initial startup (fail-fast until `supervising` flips on) ──────────────────
+  console.log(chalk.dim('Starting API server (Node 22)...'));
+  apiChild = startApi();
+  try {
+    await waitForHealth(config.dashboardApiPort, '/api/health', 15000);
+    console.log(chalk.green('✓ API server ready'));
+  } catch (err: any) {
+    console.error(chalk.red('API server health check failed:'), err.message);
+    apiChild.kill('SIGTERM');
+    process.exit(1);
+  }
+
+  console.log(chalk.dim('Starting Vite dev server...'));
+  viteChild = startVite();
+  try {
+    await waitForHttp200(config.dashboardPort, 10000);
+    console.log(chalk.green('✓ Vite dev server ready'));
+  } catch (err: any) {
+    console.error(chalk.red('Vite frontend did not start:'), err.message);
+    apiChild.kill('SIGTERM');
+    viteChild.kill('SIGTERM');
+    process.exit(1);
+  }
+
+  // Both children are healthy: enable self-healing and publish the marker so the
+  // rest of the platform knows an interactive dev session owns these ports.
+  supervising = true;
+  writeDevSupervisorMarker({
+    pid: process.pid,
+    dashboardPort: config.dashboardPort,
+    apiPort: config.dashboardApiPort,
+  });
+
+  // ── Sidecars ───────────────────────────────────────────────────────────────
+  await startSidecars();
+
+  // ── URLs ───────────────────────────────────────────────────────────────────
+  // The dashboard mints its session from a one-time #panopticon_token=<internal
+  // token> in the URL hash (consumeDashboardBootstrapToken). Without it the
+  // browser can't authenticate and every gated API call 401s, so surface the
+  // Frontend URL WITH the token (PAN-1607).
+  const internalToken = getInternalTokenSync();
+  const authFragment = internalToken ? `#panopticon_token=${encodeURIComponent(internalToken)}` : '';
+  const frontendBase = config.traefikEnabled
+    ? `https://${config.traefikDomain}`
+    : `http://localhost:${config.dashboardPort}`;
+  const apiBase = config.traefikEnabled
+    ? `https://${config.traefikDomain}/api`
+    : `http://localhost:${config.dashboardApiPort}`;
+  console.log('');
+  console.log(`  Frontend: ${chalk.cyan(`${frontendBase}${authFragment}`)}`);
+  console.log(`  API:      ${chalk.cyan(apiBase)}`);
+  if (authFragment) {
+    console.log(chalk.dim('  ↑ open the Frontend link — it carries a one-time auth token that signs the dashboard in.'));
+  }
+  console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
+
+  // ── Graceful shutdown ──────────────────────────────────────────────────────
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    supervising = false;
+    clearDevSupervisorMarker();
+    console.log(chalk.dim(`\n${signal} received by pan dev (pid=${process.pid} ppid=${process.ppid}), shutting down...`));
+
+    viteChild.kill('SIGTERM');
+    apiChild.kill('SIGTERM');
+
+    // Give them a moment to exit gracefully
+    await sleep(2000);
+
+    if (!apiChild.killed) apiChild.kill('SIGKILL');
+    if (!viteChild.killed) viteChild.kill('SIGKILL');
+
+    // Stop sidecars
+    try {
+      const { stopSmeeProcessSync } = await import('../../lib/smee.js');
+      stopSmeeProcessSync();
+    } catch {
+      // ignore
+    }
+    try {
+      const { stopSupervisorProcessSync } = await import('../../lib/supervisor.js');
+      stopSupervisorProcessSync();
+    } catch {
+      // ignore
+    }
+    try {
+      const { stopCliproxySync } = await import('../../lib/cliproxy.js');
+      stopCliproxySync();
+    } catch {
+      // ignore
+    }
+
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGHUP', () => shutdown('SIGHUP'));
+  // PAN-1662: reload-in-place signal. `pan reload` (and the flywheel) send
+  // SIGUSR2 to this supervisor to rebuild the server bundle and hot-restart the
+  // API child without dropping the dev session.
+  process.on('SIGUSR2', () => { void reloadApi('reload signal (SIGUSR2)'); });
+
+  // Keep the process alive
+  await new Promise(() => {});
+}

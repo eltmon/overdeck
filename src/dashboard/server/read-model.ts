@@ -326,6 +326,8 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     deaconIgnored: !!status.deaconIgnored ? true : undefined,
     deaconIgnoredAt: status.deaconIgnoredAt || undefined,
     deaconIgnoredReason: status.deaconIgnoredReason || undefined,
+    // PAN-1691: tri-state routing key — preserve true/false/undefined as-is.
+    autoMerge: status.autoMerge,
     reviewCoordinatorSessionName: status.reviewCoordinatorSessionName || undefined,
     reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
     reviewSubStatuses: status.reviewSubStatuses,

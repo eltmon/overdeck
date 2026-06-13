@@ -1,6 +1,11 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockSpawnReviewSubRole = vi.hoisted(() => vi.fn());
+vi.mock('../review-agent.js', () => ({
+  spawnReviewSubRoleForIssue: mockSpawnReviewSubRole,
+}));
+
 vi.mock('../../../lib/agents.js', () => ({
   messageAgent: vi.fn(async () => {}),
   listRunningAgents: vi.fn(),
@@ -120,23 +125,27 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock, execFile: vi.fn() };
 });
 
-import { cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
-import { listRunningAgentsSync, getAgentStateSync, saveAgentStateSync } from '../../../lib/agents.js';
+import { checkInspectAgentTimeouts, cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
+import { spawnReviewSubRoleForIssue } from '../review-agent.js';
+import { listRunningAgentsSync, getAgentStateSync, getAgentRuntimeStateSync, messageAgent, saveAgentStateSync } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../../projects.js';
 import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
 import { loadCloisterConfigSync } from '../config.js';
-import { listSessionNames, killSession, sessionExistsSync, sessionExists } from '../../../lib/tmux.js';
+import { listSessionNames, killSession, sessionExistsSync, sessionExists, isPaneDead } from '../../../lib/tmux.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetAgentState = vi.mocked(getAgentStateSync);
+const mockGetAgentRuntimeState = vi.mocked(getAgentRuntimeStateSync);
+const mockMessageAgent = vi.mocked(messageAgent);
 const mockSaveAgentState = vi.mocked(saveAgentStateSync);
 const mockListSessionNamesAsync = vi.mocked(listSessionNames);
 const mockKillSessionAsync = vi.mocked(killSession);
 const mockSessionExists = vi.mocked(sessionExistsSync);
 const mockSessionExistsAsync = vi.mocked(sessionExists);
+const mockIsPaneDead = vi.mocked(isPaneDead);
 const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);
@@ -395,6 +404,7 @@ describe('monitorReviewConvoySignals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSessionExistsAsync.mockImplementation((name: string) => Effect.succeed(name === 'agent-pan-879-review') as any);
+    mockSpawnReviewSubRole.mockReturnValue(Effect.succeed({ success: true, message: 'respawned', sessionId: 'agent-pan-879-review-security' }) as any);
   });
 
   it('signals synthesis when a reviewer disappears before writing output', async () => {
@@ -498,5 +508,241 @@ describe('monitorReviewConvoySignals', () => {
     expect(actions).toEqual([
       `Signaled REVIEWER_READY security ${outputPath} to agent-pan-879-review`,
     ]);
+  });
+
+  it('respawns an idle reviewer with no output once before the hard deadline (PAN-1806)', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentStateSync)
+      .mockReturnValueOnce({
+        id: 'agent-pan-879-review-security',
+        issueId: 'PAN-879',
+        workspace: '/workspace',
+        role: 'review',
+        model: 'model',
+        harness: 'claude-code',
+        status: 'running',
+        startedAt: '2026-05-13T00:00:00.000Z',
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-879-review-abcdef12',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-879-review',
+        reviewRetryAttempt: 0,
+      } as any)
+      .mockReturnValueOnce({
+        id: 'agent-pan-879-review-security',
+        issueId: 'PAN-879',
+        workspace: '/workspace',
+        role: 'review',
+        model: 'model',
+        harness: 'claude-code',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-879-review-abcdef12',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-879-review',
+      } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    } as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-879-review-security');
+    expect(mockSpawnReviewSubRole).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      subRole: 'security',
+      runId: 'agent-pan-879-review-abcdef12',
+      outputPath,
+      contextManifestPath: '/tmp/test-agents/agent-pan-879-review-security/context.json',
+      synthesisAgentId: 'agent-pan-879-review',
+      model: 'model',
+      harness: 'claude-code',
+      allowHost: false,
+    }));
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewRetryAttempt: 1,
+    }));
+    expect(actions).toEqual([]);
+  });
+
+  it('signals REVIEWER_FAILED when an idle reviewer has already been retried (PAN-1806)', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-879-review-security',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'running',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: outputPath,
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+      reviewRetryAttempt: 1,
+    } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'idle',
+      lastActivity: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    } as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(mockSpawnReviewSubRole).not.toHaveBeenCalled();
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      'REVIEWER_FAILED security reviewer idle with no output after terminal API error (retry exhausted)',
+    );
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'failed',
+    }));
+    expect(actions).toEqual([
+      'Signaled REVIEWER_FAILED security reviewer idle with no output after terminal API error (retry exhausted) to agent-pan-879-review',
+    ]);
+  });
+
+  it('does not treat a fresh active reviewer as idle (PAN-1806)', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-879-review-security',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'running',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: '/tmp/test-agents/agent-pan-879-review-security/review-security.md',
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    } as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+    expect(mockSpawnReviewSubRole).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
+  });
+});
+
+describe('checkInspectAgentTimeouts', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-05T12:12:01.000Z'));
+    mockMessageAgent.mockResolvedValue(undefined);
+    mockKillSessionAsync.mockReturnValue(Effect.succeed(undefined) as any);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('marks a timed-out inspecting bead as error, kills the inspect session, and tells the parent exactly once', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses)
+      .mockReturnValueOnce({
+        'PAN-1616': {
+          issueId: 'PAN-1616',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          inspectStatus: 'inspecting',
+          inspectStartedAt: '2026-06-05T12:00:00.000Z',
+          inspectBeadId: 'workspace-sposy',
+          updatedAt: '2026-06-05T12:00:00.000Z',
+          readyForMerge: false,
+        },
+      } as any)
+      .mockReturnValue({
+        'PAN-1616': {
+          issueId: 'PAN-1616',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          inspectStatus: 'error',
+          inspectStartedAt: '2026-06-05T12:00:00.000Z',
+          inspectBeadId: 'workspace-sposy',
+          updatedAt: '2026-06-05T12:12:01.000Z',
+          readyForMerge: false,
+        },
+      } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(true) as any);
+
+    const first = await checkInspectAgentTimeouts();
+    const second = await checkInspectAgentTimeouts();
+
+    expect(first).toEqual([
+      'Inspection watchdog tripped for PAN-1616 bead workspace-sposy: timed out after 12m (limit 12m)',
+    ]);
+    expect(second).toEqual([]);
+    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1616', expect.objectContaining({
+      inspectStatus: 'error',
+      inspectNotes: expect.stringContaining('timed out'),
+    }));
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(1);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('inspect-pan-1616-workspace-sposy');
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1616',
+      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
+      'deacon:inspect-watchdog',
+    );
+  });
+
+  it('marks an inspecting bead as error when its inspect session has disappeared', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
+      'PAN-1616': {
+        issueId: 'PAN-1616',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        inspectStatus: 'inspecting',
+        inspectStartedAt: '2026-06-05T12:11:30.000Z',
+        inspectBeadId: 'workspace-sposy',
+        updatedAt: '2026-06-05T12:11:30.000Z',
+        readyForMerge: false,
+      },
+    } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
+
+    const actions = await checkInspectAgentTimeouts();
+
+    expect(actions[0]).toContain('tmux session inspect-pan-1616-workspace-sposy exited before producing a verdict');
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1616', expect.objectContaining({ inspectStatus: 'error' }));
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1616',
+      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
+      'deacon:inspect-watchdog',
+    );
   });
 });

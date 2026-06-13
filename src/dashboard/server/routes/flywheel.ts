@@ -17,7 +17,7 @@ import {
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
-import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { hasDashboardInternalToken, rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { sessionExists } from '../../../lib/tmux.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import {
@@ -37,10 +37,14 @@ import {
   isFlywheelRequireUatBeforeMerge,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
+  isMergeTrainEnabled,
+  setMergeTrainEnabled,
 } from '../../../lib/database/app-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
+import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
   cancelPending,
@@ -69,11 +73,13 @@ interface StartRequestBody {
 interface FlywheelConfigRequestBody {
   auto_pickup_backlog?: unknown;
   require_uat_before_merge?: unknown;
+  merge_train_enabled?: unknown;
 }
 
 interface FlywheelConfigResponseBody {
   auto_pickup_backlog: boolean;
   require_uat_before_merge: boolean;
+  merge_train_enabled: boolean;
 }
 
 interface AutoMergeScheduleRequestBody {
@@ -216,6 +222,7 @@ export function getFlywheelConfigPayload(): FlywheelConfigResponseBody {
   return {
     auto_pickup_backlog: isFlywheelAutoPickupBacklog(),
     require_uat_before_merge: isFlywheelRequireUatBeforeMerge(),
+    merge_train_enabled: isMergeTrainEnabled(),
   };
 }
 
@@ -231,9 +238,13 @@ export async function postFlywheelConfigPayload(payload: unknown) {
   if (body.require_uat_before_merge !== undefined && typeof body.require_uat_before_merge !== 'boolean') {
     return { status: 400, body: { error: 'require_uat_before_merge must be a boolean' } };
   }
+  if (body.merge_train_enabled !== undefined && typeof body.merge_train_enabled !== 'boolean') {
+    return { status: 400, body: { error: 'merge_train_enabled must be a boolean' } };
+  }
 
   if (body.auto_pickup_backlog !== undefined) setFlywheelAutoPickupBacklog(body.auto_pickup_backlog);
   if (body.require_uat_before_merge !== undefined) setFlywheelRequireUatBeforeMerge(body.require_uat_before_merge);
+  if (body.merge_train_enabled !== undefined) setMergeTrainEnabled(body.merge_train_enabled);
 
   return { status: 200, body: getFlywheelConfigPayload() };
 }
@@ -248,6 +259,7 @@ interface AutoMergeScheduleDeps {
   resolveProject?: (issueId: string) => ResolvedProject | null;
   schedule?: (input: ScheduleAutoMergeInput) => ScheduleAutoMergeResult;
   announce?: (issueId: string, entry: PendingAutoMerge) => void;
+  getProjectAutoMergeDefault?: (issueId: string) => ProjectAutoMergeDefault;
 }
 
 interface AutoMergeCancelDeps {
@@ -293,7 +305,14 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   }
   const issueId = body.issueId.trim().toUpperCase();
 
-  if ((deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)()) {
+  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
+
+  // PAN-1691/1695: resolve the hold-for-UAT decision across three tiers —
+  // per-issue autoMerge (true=auto / false=hold) → per-project default →
+  // global require-UAT. Auto is the only state that overrides a hold default.
+  const projectDefault = (deps.getProjectAutoMergeDefault ?? getProjectAutoMergeDefault)(issueId);
+  const globalRequireUat = (deps.isRequireUatBeforeMerge ?? isFlywheelRequireUatBeforeMerge)();
+  if (shouldHoldForUat(reviewStatus?.autoMerge, projectDefault, globalRequireUat)) {
     return { status: 412, body: { error: 'UAT is still required before merge' } };
   }
   if ((deps.isFlywheelPaused ?? isFlywheelGloballyPaused)()) {
@@ -308,7 +327,6 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
     return { status: 422, body: { error: eligibility.reason } };
   }
 
-  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
   if (!reviewStatus?.prUrl) {
     return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
   }
@@ -564,6 +582,77 @@ const getAutoMergeProblemsRoute = HttpRouter.add(
   })),
 );
 
+/**
+ * Issues that passed review but are blocked from merging by a GitHub-native
+ * reason (conflict, failing CI, not mergeable). PAN-1620: the flywheel polls
+ * this per tick and dispatches a rebase fix so a blocked PR does not sit forever
+ * waiting on a webhook that may never fire — distinct from auto-merge *scheduling*
+ * problems, which live in /auto-merge/problems.
+ */
+const MERGE_BLOCKER_TYPES = new Set(['merge_conflict', 'failing_checks', 'not_mergeable']);
+
+export function getMergeBlockersPayload(): Array<{
+  issueId: string;
+  prUrl?: string;
+  reasons: Array<{ type: string; summary: string }>;
+}> {
+  const statuses = getAllReviewStatusesFromDb();
+  const out: Array<{ issueId: string; prUrl?: string; reasons: Array<{ type: string; summary: string }> }> = [];
+  for (const [issueId, status] of Object.entries(statuses)) {
+    if (status.reviewStatus !== 'passed') continue;
+    if (status.mergeStatus === 'merged') continue;
+    const reasons = (status.blockerReasons ?? []).filter((b) => MERGE_BLOCKER_TYPES.has(b.type));
+    if (reasons.length === 0) continue;
+    out.push({ issueId, prUrl: status.prUrl, reasons: reasons.map((b) => ({ type: b.type, summary: b.summary })) });
+  }
+  return out;
+}
+
+const getMergeBlockersRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/merge-blockers',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(getMergeBlockersPayload());
+  })),
+);
+
+interface MergeNextDeps {
+  getOrderedIssueIds?: () => Promise<string[]>;
+  merge?: (issueId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
+}
+
+async function defaultGetOrderedIssueIds(): Promise<string[]> {
+  const status = await readCurrentFlywheelStatusForDashboard();
+  if (!status) return [];
+  const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
+  const queue = await Effect.runPromise(
+    computeMergeQueue(status.activePipeline, process.cwd()).pipe(Effect.provide(nodeServicesLayer)),
+  );
+  return queue.map((i) => i.issueId);
+}
+
+async function defaultMergeOne(issueId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const { triggerMerge } = await import('./workspaces.js');
+  const r = await triggerMerge(issueId);
+  return r.success ? { ok: true } : { ok: false, reason: r.error ?? r.message ?? 'merge failed' };
+}
+
+/**
+ * PAN-1691 "merge next N" / "ship the UAT candidate": merge the first N issues
+ * of the conflict-aware merge order, one at a time, stopping at the first
+ * failure (the rest would need re-rebasing). Pure-ish + DI for testing.
+ */
+export async function postFlywheelMergeNextPayload(payload: unknown, deps: MergeNextDeps = {}) {
+  const body = (payload ?? {}) as { n?: unknown };
+  const n = typeof body.n === 'number' && Number.isFinite(body.n) ? Math.floor(body.n) : 0;
+  if (n <= 0) return { status: 400, body: { error: 'n must be a positive integer' } };
+
+  const issueIds = (await (deps.getOrderedIssueIds ?? defaultGetOrderedIssueIds)()).slice(0, n);
+  const { shipMergeBatch } = await import('../../../lib/cloister/merge-batch.js');
+  const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
+  return { status: 200, body: { outcomes } };
+}
+
 const postAutoMergeScheduleRoute = HttpRouter.add(
   'POST',
   '/api/flywheel/auto-merge/schedule',
@@ -576,6 +665,20 @@ const postAutoMergeScheduleRoute = HttpRouter.add(
     if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
 
     const result = yield* Effect.promise(() => postAutoMergeSchedulePayload(parsed.body));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
+const postFlywheelMergeNextRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/merge-next',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    const result = yield* Effect.promise(() => postFlywheelMergeNextPayload(parsed.body));
     return jsonResponse(result.body, { status: result.status });
   })),
 );
@@ -790,14 +893,88 @@ const getFlywheelMergeQueueRoute = HttpRouter.add(
     return yield* Effect.promise(async () => {
       const status = await readCurrentFlywheelStatusForDashboard();
       if (!status) return jsonResponse([]);
-      const { computeMergeQueue } = await import('../../../lib/flywheel-merge-order.js');
+      const { computeMergeQueue, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
       const queue = await Effect.runPromise(
-        computeMergeQueue(status.activePipeline, process.cwd()).pipe(
+        computeMergeQueue(status.activePipeline, process.cwd(), { getPrUrl: resolveMergeQueuePrUrl }).pipe(
           Effect.provide(nodeServicesLayer),
         ),
       );
       return jsonResponse(queue);
     });
+  })),
+);
+
+/**
+ * PAN-1737 UAT batch trains. Generation names contain a slash
+ * (`uat/pan-otter-0610`); URL params carry the name WITHOUT the `uat/`
+ * prefix and handlers reconstitute it.
+ */
+function uatGenerationNameFromParam(param: string): string {
+  const decoded = decodeURIComponent(param);
+  return decoded.startsWith('uat/') ? decoded : `uat/${decoded}`;
+}
+
+const getUatGenerationsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/uat-generations',
+  httpHandler(Effect.gen(function* () {
+    const { getUatGenerationsPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const payload = yield* Effect.promise(() => getUatGenerationsPayload());
+    return jsonResponse(payload);
+  })),
+);
+
+const postUatGenerationStackRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/uat-generations/:name/stack',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const { postUatGenerationStackPayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const result = yield* Effect.promise(() => postUatGenerationStackPayload(name));
+    if (!result.ok) return jsonResponse({ error: result.error }, { status: result.status });
+    return jsonResponse({ frontendUrl: result.frontendUrl, evicted: result.evicted });
+  })),
+);
+
+const postUatGenerationPromoteRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/uat-generations/:name/promote',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const { postUatGenerationPromotePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const { firePostMergeLifecycle } = yield* Effect.promise(() => import('./specialists.js'));
+    const result = yield* Effect.promise(() => postUatGenerationPromotePayload(name, firePostMergeLifecycle));
+    if (!result.success) {
+      const status = result.reason === 'not-found' ? 404 : result.reason === 'merge-failed' ? 500 : 409;
+      return jsonResponse(result, { status });
+    }
+    return jsonResponse(result);
+  })),
+);
+
+/**
+ * PAN-1737: repurposed from the PAN-1691 one-shot candidate assembly. Now a
+ * FORCED reconcile — rebuild the current generation even when the chain
+ * already answers the ready set (operator suspects staleness).
+ */
+const postFlywheelAssembleUatRoute = HttpRouter.add(
+  'POST',
+  '/api/flywheel/assemble-uat',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const { runUatTrainReconcile } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const result = yield* Effect.promise(() => runUatTrainReconcile({ force: true }));
+    return jsonResponse(result);
   })),
 );
 
@@ -819,9 +996,15 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,
   getAutoMergeProblemsRoute,
+  getMergeBlockersRoute,
   postAutoMergeScheduleRoute,
+  postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
+  getUatGenerationsRoute,
+  postUatGenerationStackRoute,
+  postUatGenerationPromoteRoute,
+  postFlywheelAssembleUatRoute,
   getFlywheelStateRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,

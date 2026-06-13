@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../driver.js';
 import { resetDatabase, getDatabase } from '../index.js';
 import { runMigrations, SCHEMA_VERSION } from '../schema.js';
 
@@ -26,9 +26,9 @@ describe('pending auto-merges schema', () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
-    expect(SCHEMA_VERSION).toBe(48);
+    expect(SCHEMA_VERSION).toBe(53);
     const db = getDatabase();
-    expect(db.pragma('user_version', { simple: true })).toBe(48);
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
 
     const columns = db.prepare('PRAGMA table_info(pending_auto_merges)').all() as Array<{ name: string }>;
     expect(columns.map((column) => column.name)).toEqual([
@@ -78,7 +78,7 @@ describe('pending auto-merges schema', () => {
 
   it('migrates an existing v46 database by adding flywheel stats event indexes', () => {
     const home = makeTestHome('pan-events-stats-indexes-migrate');
-    const db = new Database(join(home, 'panopticon.db'));
+    const db = openDatabase(join(home, 'panopticon.db'));
     try {
       db.exec(`
         CREATE TABLE events (
@@ -94,7 +94,7 @@ describe('pending auto-merges schema', () => {
 
       runMigrations(db);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(48);
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'events'").all() as Array<{ name: string }>;
       expect(indexes).toEqual(expect.arrayContaining([
         { name: 'idx_events_issue_type_timestamp_sequence' },
@@ -107,7 +107,7 @@ describe('pending auto-merges schema', () => {
 
   it('migrates an existing v44 database by adding auto-merge hot-path indexes', () => {
     const home = makeTestHome('pan-pending-auto-merges-v44-indexes');
-    const db = new Database(join(home, 'panopticon.db'));
+    const db = openDatabase(join(home, 'panopticon.db'));
     try {
       db.exec(`
         CREATE TABLE pending_auto_merges (
@@ -131,7 +131,7 @@ describe('pending auto-merges schema', () => {
 
       runMigrations(db);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(48);
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'pending_auto_merges'").all() as Array<{ name: string }>;
       expect(indexes).toEqual(expect.arrayContaining([
         { name: 'idx_pending_auto_merges_due_pending' },
@@ -145,7 +145,7 @@ describe('pending auto-merges schema', () => {
 
   it('migrates an existing v43 database without dropping existing data', () => {
     const home = makeTestHome('pan-pending-auto-merges-migrate');
-    const db = new Database(join(home, 'panopticon.db'));
+    const db = openDatabase(join(home, 'panopticon.db'));
     try {
       db.exec(`
         CREATE TABLE app_settings (
@@ -160,7 +160,7 @@ describe('pending auto-merges schema', () => {
 
       runMigrations(db);
 
-      expect(db.pragma('user_version', { simple: true })).toBe(48);
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       expect(db.prepare("SELECT value FROM app_settings WHERE key = 'sentinel'").get()).toEqual({ value: 'kept' });
       const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pending_auto_merges'").get();
       expect(table).toEqual({ name: 'pending_auto_merges' });

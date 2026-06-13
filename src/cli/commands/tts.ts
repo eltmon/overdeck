@@ -500,4 +500,71 @@ export function registerTtsCommands(program: Command): void {
       const result = await runTtsDaemonRestart({
         detach: true,
         waitForHealth: options.waitForHealth,
-        timeoutMs: 
+        timeoutMs: parseTimeoutMs(options.timeoutMs),
+      });
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  tts
+    .command('install-systemd')
+    .description('Install a user systemd unit for the local Qwen TTS daemon')
+    .action(async () => {
+      await runTtsInstallSystemd();
+    });
+
+  tts
+    .command('test [text]')
+    .description('Speak a test phrase using the configured system (priority) voice')
+    .option('--status', 'Use the status voice instead of the system (priority) voice')
+    .action(async (text: string | undefined, options: { status?: boolean }) => {
+      const result = await runTtsTest(text, { voiceKind: options.status ? 'status' : 'system' as TtsTestVoiceKind });
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  voices
+    .command('list')
+    .description('List saved TTS voices')
+    .action(async () => {
+      await listTtsVoices();
+    });
+
+  voices
+    .command('show <name>')
+    .description('Show saved TTS voice details')
+    .action(async (name: string) => {
+      const voice = await showTtsVoice(name);
+      if (!voice) process.exitCode = 1;
+    });
+
+  voices
+    .command('play <name> [text]')
+    .description('Speak with a saved TTS voice')
+    .action(async (name: string, text: string | undefined) => {
+      const result = await playTtsVoice(name, text);
+      if (!result?.ok) process.exitCode = 1;
+    });
+
+  voices
+    .command('delete <name>')
+    .description('Delete a saved TTS voice')
+    .action(async (name: string) => {
+      const deleted = await deleteTtsVoiceByName(name);
+      if (!deleted) process.exitCode = 1;
+    });
+
+  voices
+    .command('set-default <name>')
+    .description('Set the system TTS voice')
+    .action(async (name: string) => {
+      const voice = await setDefaultTtsVoice(name);
+      if (!voice) process.exitCode = 1;
+    });
+
+  voices
+    .command('map <event> <name>')
+    .description('Map a TTS event key to a saved voice')
+    .action(async (event: string, name: string) => {
+      const voice = await mapTtsVoice(event, name);
+      if (!voice) process.exitCode = 1;
+    });
+}

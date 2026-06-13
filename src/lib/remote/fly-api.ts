@@ -6,6 +6,9 @@
  * Auth: FLY_API_TOKEN environment variable
  */
 
+import { existsSync, readFileSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError } from '../errors.js';
 
@@ -104,13 +107,18 @@ export class FlyApiClient {
     name: string,
     config: FlyMachineConfig
   ): Promise<FlyMachine> {
+    // Derive vCPU count from the size string ("shared-cpu-4x" → 4) — it was
+    // hardcoded to 2, silently ignoring the configured vm_size.
+    const cpus = config.size
+      ? parseInt(config.size.match(/-(\d+)x$/)?.[1] ?? '2', 10)
+      : 2;
     return this.request<FlyMachine>('POST', `/apps/${appName}/machines`, {
       name,
       config: {
         image: config.image,
         env: config.env,
         guest: config.size
-          ? { cpu_kind: 'shared', cpus: 2, memory_mb: config.memory ?? 1024 }
+          ? { cpu_kind: 'shared', cpus, memory_mb: config.memory ?? 1024 }
           : undefined,
         restart: config.restart ?? { policy: 'no' },
         auto_destroy: config.auto_destroy,
@@ -188,10 +196,32 @@ export class FlyApiClient {
     state: string,
     timeout: number = 60
   ): Promise<void> {
-    await this.request<void>(
-      'GET',
-      `/apps/${appName}/machines/${machineId}/wait?state=${state}&timeout=${timeout}`
-    );
+    // Fly's /wait endpoint rejects timeout > 60s ("value must be inside range
+    // [1s, 1m0s]"), so longer waits poll in 60s slices. A 408 from a slice
+    // means that slice elapsed without reaching the state — keep polling
+    // until our own deadline.
+    const deadline = Date.now() + timeout * 1000;
+    for (;;) {
+      const remainingSec = Math.ceil((deadline - Date.now()) / 1000);
+      if (remainingSec <= 0) {
+        throw new FlyApiError(
+          `Timed out after ${timeout}s waiting for machine ${machineId} to reach '${state}'`,
+          408,
+          ''
+        );
+      }
+      const slice = Math.min(remainingSec, 60);
+      try {
+        await this.request<void>(
+          'GET',
+          `/apps/${appName}/machines/${machineId}/wait?state=${state}&timeout=${slice}`
+        );
+        return;
+      } catch (err) {
+        if (err instanceof FlyApiError && err.statusCode === 408) continue;
+        throw err;
+      }
+    }
   }
 
   /** Create a Fly app if it doesn't exist */
@@ -212,12 +242,28 @@ export class FlyApiClient {
   }
 }
 
-/** Create a FlyApiClient from env or explicit token */
+/**
+ * Read the flyctl CLI's stored access token from ~/.fly/config.yml.
+ * Lets every pan surface (CLI, dashboard server) work after `fly auth login`
+ * without separately exporting FLY_API_TOKEN.
+ */
+function readFlyctlConfigToken(): string | undefined {
+  try {
+    const configPath = join(homedir(), '.fly', 'config.yml');
+    if (!existsSync(configPath)) return undefined;
+    const match = readFileSync(configPath, 'utf-8').match(/^access_token:\s*(\S+)/m);
+    return match?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+/** Create a FlyApiClient from an explicit token, env, or flyctl's stored auth */
 export function createFlyApiClientSync(token?: string): FlyApiClient {
-  const tok = token ?? process.env.FLY_API_TOKEN;
+  const tok = token ?? process.env.FLY_API_TOKEN ?? readFlyctlConfigToken();
   if (!tok) {
     throw new Error(
-      'Fly API token not found. Set FLY_API_TOKEN environment variable or run: fly auth login'
+      'Fly API token not found. Run `fly auth login`, or set FLY_API_TOKEN.'
     );
   }
   return new FlyApiClient(tok);

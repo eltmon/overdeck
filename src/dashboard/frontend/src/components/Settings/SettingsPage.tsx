@@ -10,14 +10,12 @@ import {
   Eye,
   Zap,
   CheckCircle,
-  Globe,
   Terminal,
   Brain,
   SplitSquareVertical,
   BarChart3,
   Route,
   MessageCircle,
-  Lightbulb,
   AlertTriangle,
   Key,
   GitBranch,
@@ -32,7 +30,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type Harness, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -52,6 +50,7 @@ import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
+import { HarnessLogo, ProviderLogo } from '../shared/branding';
 import {
   SettingsLayout,
   SettingsHeader,
@@ -77,6 +76,16 @@ interface OpenRouterModelCatalog {
 interface OpenRouterCatalogResponse {
   models: OpenRouterModelCatalog[];
   favorites: string[];
+}
+
+const HARNESS_LABELS: Record<Harness, string> = {
+  'claude-code': 'Claude Code',
+  pi: 'Pi',
+  codex: 'Codex',
+};
+
+function harnessLabel(harness: Harness): string {
+  return HARNESS_LABELS[harness];
 }
 
 async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | null> {
@@ -420,16 +429,16 @@ function formatCodexExpiry(expiresAt?: string): string | null {
 }
 
 // Provider definitions
-const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[] = [
-  { id: 'anthropic', name: 'Anthropic', icon: Code, placeholder: 'sk-ant-...' },
-  { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
-  { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
-  { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
-  { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
-  { id: 'mimo', name: 'Xiaomi MiMo', icon: Zap, placeholder: 'sk-... or tp-...' },
-  { id: 'nous', name: 'Nous Portal', icon: Globe, placeholder: 'ns-...' },
-  { id: 'dashscope', name: 'Alibaba DashScope', icon: Globe, placeholder: 'sk-...' },
+const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
+  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
+  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
+  { id: 'google', name: 'Google', placeholder: 'AIza...' },
+  { id: 'kimi', name: 'Kimi (Moonshot)', placeholder: 'sk-kimi-...' },
+  { id: 'zai', name: 'Zhipu (GLM)', placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', placeholder: 'eyJ...' },
+  { id: 'mimo', name: 'Xiaomi MiMo', placeholder: 'sk-... or tp-...' },
+  { id: 'nous', name: 'Nous Portal', placeholder: 'ns-...' },
+  { id: 'dashscope', name: 'Alibaba DashScope', placeholder: 'sk-...' },
 ];
 
 const TTS_EVENT_KEYS = [
@@ -1079,15 +1088,19 @@ export function SettingsPage() {
     }, { debounce: true });
   };
 
-  const handleProviderHarnessChange = (provider: Provider, harness: Harness) => {
+  const handleProviderHarnessChange = (provider: Provider, harness: HarnessOverride) => {
+    const nextProviderHarnesses = { ...formData.models.provider_harnesses };
+    if (harness === '') {
+      delete nextProviderHarnesses[provider];
+    } else {
+      nextProviderHarnesses[provider] = harness;
+    }
+
     applySettings({
       ...formData,
       models: {
         ...formData.models,
-        provider_harnesses: {
-          ...formData.models.provider_harnesses,
-          [provider]: harness,
-        },
+        provider_harnesses: nextProviderHarnesses,
       },
     });
   };
@@ -1606,7 +1619,8 @@ export function SettingsPage() {
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
-            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? 'claude-code';
+            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? '';
+            const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
               if (isDefault) {
@@ -1629,7 +1643,7 @@ export function SettingsPage() {
               <div key={provider.id} className="border border-transparent rounded-lg hover:border-border transition-colors">
                 {/* Summary row */}
                 <div className="flex items-center gap-3 px-3 py-2.5">
-                  <provider.icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ProviderLogo provider={provider.id} label={provider.name} className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium text-foreground flex-1 min-w-0">{provider.name}</span>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -1820,15 +1834,19 @@ export function SettingsPage() {
                     )}
                     <label className="block space-y-1.5">
                       <span className="text-xs font-medium text-foreground">Default harness</span>
-                      <select
-                        value={providerHarness}
-                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as Harness)}
-                        className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                      >
-                        <option value="claude-code">Claude Code</option>
-                        <option value="pi">Pi</option>
-                        <option value="codex">Codex</option>
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <HarnessLogo harness={(providerHarness || builtInHarness) as Harness} className="w-4 h-4 shrink-0" />
+                        <select
+                          value={providerHarness}
+                          onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as HarnessOverride)}
+                          className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">Default ({harnessLabel(builtInHarness)})</option>
+                          <option value="claude-code">Claude Code</option>
+                          <option value="pi">Pi</option>
+                          <option value="codex">Codex</option>
+                        </select>
+                      </div>
                     </label>
                     {/* Action buttons for non-default providers */}
                     {!isDefault && apiKey && !apiKey.startsWith('$') && (
@@ -1866,7 +1884,7 @@ export function SettingsPage() {
           {/* OpenRouter as part of providers */}
           <div className="border border-transparent rounded-lg hover:border-border transition-colors">
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+              <ProviderLogo provider="openrouter" label="OpenRouter" className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground flex-1">OpenRouter</span>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -1903,15 +1921,22 @@ export function SettingsPage() {
               <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Default harness</span>
-                  <select
-                    value={formData.models.provider_harnesses?.openrouter ?? 'claude-code'}
-                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as Harness)}
-                    className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="claude-code">Claude Code</option>
-                    <option value="pi">Pi</option>
-                    <option value="codex">Codex</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <HarnessLogo
+                      harness={(formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter || 'claude-code') as Harness}
+                      className="w-4 h-4 shrink-0"
+                    />
+                    <select
+                      value={formData.models.provider_harnesses?.openrouter ?? ''}
+                      onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as HarnessOverride)}
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
+                      <option value="claude-code">Claude Code</option>
+                      <option value="pi">Pi</option>
+                      <option value="codex">Codex</option>
+                    </select>
+                  </div>
                 </label>
                 <OpenRouterPage
                   apiKey={formData.api_keys.openrouter}
@@ -2858,4 +2883,982 @@ export function SettingsPage() {
             >
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
                 (formData.background_ai?.cheap_mode ?? false) ? 'translate-x-[18px]' : 'translate-x-[3px]'
-         
+              }`} />
+            </button>
+          </div>
+
+          {BACKGROUND_AI_FEATURE_META.map((feature) => {
+            const cheapMode = formData.background_ai?.cheap_mode ?? false;
+            const featureOn = formData.background_ai?.features?.[feature.key] ?? true;
+            const effectiveOn = !cheapMode && featureOn;
+            const cost24h = backgroundCost?.bySource?.[BG_FEATURE_COST_SOURCE[feature.key]];
+            return (
+              <div
+                key={feature.key}
+                className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg transition-colors hover:bg-muted/30"
+              >
+                <div className="min-w-0">
+                  <span className={`text-sm font-medium ${effectiveOn ? 'text-foreground' : 'text-muted-foreground'}`}>{feature.label}</span>
+                  {!effectiveOn && (
+                    <span
+                      className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                      title="This feature is off, so it isn't running — but you can still change its model below; the new model takes effect when you enable it (or turn off low-cost mode)."
+                    >
+                      not active
+                    </span>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {backgroundModelControl(feature.key)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span
+                    className="font-mono tabular-nums text-[11px] text-muted-foreground w-16 text-right"
+                    title="Spend over the last 24 hours"
+                  >
+                    {typeof cost24h === 'number' ? `$${cost24h.toFixed(2)}` : '—'}
+                    <span className="block text-[9px] uppercase tracking-wide text-muted-foreground/60">24h</span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={effectiveOn}
+                    aria-label={`Toggle ${feature.label}`}
+                    disabled={cheapMode}
+                    onClick={() => updateBackgroundAi({ features: { [feature.key]: !featureOn } })}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed ${
+                      effectiveOn ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                      effectiveOn ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3 px-4">
+          You can change any feature's model even while it's off (e.g. to pick a cheaper one) — the
+          choice is saved and takes effect when the feature runs, but a model shown under a
+          <span className="mx-1 rounded bg-muted px-1 py-0.5 font-medium">not active</span>
+          feature isn't being used yet. 24h figures are actual recorded spend. Models shared between
+          rows (titles + refinement, memory extraction + query expansion) edit the same setting.
+        </p>
+      </section>
+
+      {/* Terminal */}
+      <section id="terminal" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
+          Terminal
+        </h2>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">tmux configuration</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {(formData.tmux?.config_mode || 'managed') === 'managed'
+                  ? 'Using Panopticon-managed tmux socket and config'
+                  : 'Inheriting your user tmux configuration'}
+              </p>
+            </div>
+            <select
+              value={formData.tmux?.config_mode || 'managed'}
+              onChange={(e) => handleTmuxConfigModeChange(e.target.value as 'managed' | 'inherit-user')}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            >
+              <option value="managed">Managed</option>
+              <option value="inherit-user">Inherit user</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <SettingsSection
+        id="tts"
+        title="TTS"
+        description="Built-in voice playback"
+        actions={
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs ${
+            ttsHealth === undefined
+              ? 'bg-muted/50 text-muted-foreground'
+              : ttsDaemonOnline
+                ? 'bg-success/10 text-success'
+                : ttsDaemonStarting
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-destructive/10 text-destructive'
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${ttsDaemonOnline ? 'bg-success' : 'bg-current'}`} />
+            Daemon status: {ttsDaemonStatus}
+          </span>
+        }
+      >
+        <SettingsRow
+          label="Enable TTS"
+          description="Speak activity events through the local Qwen3-TTS daemon"
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!ttsConfig.enabled}
+            aria-label="Toggle TTS"
+            onClick={() => handleTtsConfigChange({ enabled: !ttsConfig.enabled })}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+              ttsConfig.enabled ? 'bg-primary' : 'bg-muted'
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              ttsConfig.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+            }`} />
+          </button>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Daemon"
+          description={ttsDaemonDetails || ttsHealth?.error || 'Live Qwen TTS daemon status'}
+        >
+          <div className="flex flex-col items-end gap-1.5 text-right">
+            <span className={`text-sm font-medium ${ttsDaemonOnline ? 'text-success' : ttsDaemonStarting ? 'text-warning' : 'text-muted-foreground'}`}>
+              {ttsDaemonOnline ? 'running' : ttsDaemonStatus}
+            </span>
+            {ttsDaemonModel && (
+              <span className="max-w-xs truncate text-xs text-muted-foreground">{ttsDaemonModel}</span>
+            )}
+            {!ttsDaemonOnline && !ttsDaemonStarting && (
+              <button
+                type="button"
+                onClick={() => ttsStartMutation.mutate()}
+                disabled={ttsStartMutation.isPending}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                {ttsStartMutation.isPending ? 'Starting…' : 'Start daemon'}
+              </button>
+            )}
+          </div>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Volume"
+          description={`${Math.round(ttsVolume * 100)}% output volume`}
+        >
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={ttsVolume}
+            onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })}
+            className="w-40 accent-primary disabled:opacity-50"
+          />
+          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+            {Math.round(ttsVolume * 100)}%
+          </span>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Rate"
+          description="Speech speed multiplier"
+        >
+          <input
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={ttsRate}
+            onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })}
+            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label="Max chars"
+          description="Maximum text length per spoken utterance"
+        >
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={ttsMaxChars}
+            onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })}
+            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label="Drop info when queue full"
+          description="Skip low-priority speech when the daemon queue is saturated"
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={ttsConfig.dropInfoWhenFull ?? true}
+            aria-label="Toggle dropping low-priority TTS when queue is full"
+            onClick={() => handleTtsConfigChange({ dropInfoWhenFull: !(ttsConfig.dropInfoWhenFull ?? true) })}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+              (ttsConfig.dropInfoWhenFull ?? true) ? 'bg-primary' : 'bg-muted'
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              (ttsConfig.dropInfoWhenFull ?? true) ? 'translate-x-[18px]' : 'translate-x-[3px]'
+            }`} />
+          </button>
+        </SettingsRow>
+
+        <TtsSystemVoicePicker
+          voices={ttsVoices}
+          isLoading={ttsVoicesQuery.isLoading}
+          systemVoiceId={ttsConfig.voice}
+          statusVoiceId={ttsConfig.statusVoice}
+          onSetSystemVoice={(voiceId) => handleTtsConfigChange({ voice: voiceId })}
+          onSetStatusVoice={(voiceId) => handleTtsConfigChange({ statusVoice: voiceId })}
+        />
+
+        <div className="mt-6" data-testid="tts-voice-library-tabs">
+          <div className="rounded-t-xl border border-border/70 bg-card/40 p-2">
+            <div className="inline-flex rounded-lg bg-background/60 p-1">
+              {([
+                ['presets', 'CustomVoice Presets'],
+                ['design', 'VoiceDesign'],
+              ] as const).map(([tabId, label]) => (
+                <button
+                  key={tabId}
+                  type="button"
+                  onClick={() => setActiveTtsVoiceTab(tabId)}
+                  aria-pressed={activeTtsVoiceTab === tabId}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    activeTtsVoiceTab === tabId
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-popover'
+                  }`}
+                  data-testid={`tts-voice-library-tab-${tabId}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {activeTtsVoiceTab === 'presets' ? <VoicePresetsTab /> : <VoiceDesignTab />}
+        </div>
+
+        <SavedVoicesTab />
+
+        <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-advanced-settings">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Route event types to specific voices, silence noisy activity sources, and override spoken text.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Voice Map</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Use default falls back to the configured TTS voice.</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground">{ttsVoices.length} saved voices</span>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] bg-muted/30 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  <span>Event key</span>
+                  <span>Voice</span>
+                </div>
+                {TTS_EVENT_KEYS.map((eventKey) => (
+                  <div key={eventKey} className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] items-center gap-3 border-t border-border px-3 py-2">
+                    <code className="truncate text-xs text-foreground">{eventKey}</code>
+                    <select
+                      value={ttsConfig.voiceMap?.[eventKey] ?? ''}
+                      onChange={(e) => handleTtsVoiceMapChange(eventKey, e.target.value)}
+                      aria-label={`Voice for ${eventKey}`}
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    >
+                      <option value="">Use default</option>
+                      {ttsVoices.map((voice) => (
+                        <option key={voice.id} value={voice.id}>{voice.name} ({voice.kind})</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Muted Sources</h4>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {ACTIVITY_SOURCE_OPTIONS.map((source) => (
+                  <label key={source} className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={ttsConfig.mutedSources?.includes(source) ?? false}
+                      onChange={(e) => handleTtsMutedSourceChange(source, e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                    />
+                    <span>{source}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Utterance Templates</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Templates may include {'{issueId}'}.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddTtsTemplate}
+                  disabled={!canAddTtsTemplate}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-popover disabled:opacity-50"
+                >
+                  Add template
+                </button>
+              </div>
+              <div className="space-y-2">
+                {ttsTemplateEntries.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                    No utterance templates configured.
+                  </p>
+                )}
+                {ttsTemplateEntries.map(([eventKey, template]) => (
+                  <div key={eventKey} className="grid gap-2 rounded-lg border border-border bg-background/60 p-2 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto]">
+                    <select
+                      value={eventKey}
+                      onChange={(e) => handleTtsTemplateKeyChange(eventKey, e.target.value)}
+                      aria-label="Template event key"
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    >
+                      {TTS_EVENT_KEYS.map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={template}
+                      onChange={(e) => handleTtsTemplateChange(eventKey, e.target.value)}
+                      placeholder="e.g. {issueId} passed review"
+                      aria-label={`Template text for ${eventKey}`}
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTtsTemplate(eventKey)}
+                      className="inline-flex items-center justify-center rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      aria-label={`Remove template for ${eventKey}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </SettingsSection>
+
+      {/* Tracker Keys */}
+      <section id="tracker-keys" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
+          Tracker Keys
+        </h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          Override environment variables ({TRACKERS.map(t => t.envVar).join(', ')}).
+        </p>
+        <div className="space-y-1">
+          {TRACKERS.map((tracker) => {
+            const trackerKey = formData.tracker_keys?.[tracker.id] || '';
+
+            return (
+              <div key={tracker.id} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                <tracker.icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{tracker.name}</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">{tracker.envVar}</span>
+                  </div>
+                  {trackerKey.startsWith('$') && (
+                    <p className="text-[10px] text-warning mt-0.5">
+                      Configured via env: <code className="font-mono">{trackerKey}</code>
+                    </p>
+                  )}
+                </div>
+                <div className="relative w-[200px] shrink-0">
+                  <input
+                    type={showTrackerKey[tracker.id] ? 'text' : 'password'}
+                    value={trackerKey.startsWith('$') ? '' : trackerKey}
+                    onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
+                    placeholder={trackerKey.startsWith('$') ? 'Override env value...' : tracker.placeholder}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
+                    className="w-full bg-background border border-border rounded-md px-2.5 py-1.5 pr-8 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
+                  />
+                  {(trackerKey && !trackerKey.startsWith('$')) && (
+                    <button
+                      onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showTrackerKey[tracker.id] ? 'Hide key' : 'Show key'}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Appearance */}
+      <section id="appearance" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
+          Appearance
+        </h2>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Ready to Merge shimmer</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Animate the badge with a subtle shimmer for cards awaiting merge approval
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={uiPrefs.readyToMergeShimmer}
+              aria-label="Toggle Ready to Merge shimmer"
+              onClick={() => updateUIPrefs({ readyToMergeShimmer: !uiPrefs.readyToMergeShimmer })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                uiPrefs.readyToMergeShimmer ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                uiPrefs.readyToMergeShimmer ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Diff */}
+      <section id="diff" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">Diff</h2>
+        <div className="space-y-1">
+          {/* diffRenderMode */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Diff style</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Unified (stacked) or split (side-by-side)</p>
+            </div>
+            <select
+              value={diffPrefs.diffRenderMode}
+              onChange={(e) => updateDiffPrefs({ diffRenderMode: e.target.value as 'stacked' | 'split' })}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
+            >
+              <option value="stacked">Stacked (unified)</option>
+              <option value="split">Split (side-by-side)</option>
+            </select>
+          </div>
+
+          {/* diffWordWrap */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Line wrapping</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Wrap long lines instead of scrolling horizontally</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={diffPrefs.diffWordWrap}
+              aria-label="Toggle line wrapping"
+              onClick={() => updateDiffPrefs({ diffWordWrap: !diffPrefs.diffWordWrap })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                diffPrefs.diffWordWrap ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                diffPrefs.diffWordWrap ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+
+          {/* lineDiffType */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Intra-line diff granularity</span>
+              <p className="text-xs text-muted-foreground mt-0.5">How finely to highlight changes within a single line</p>
+            </div>
+            <select
+              value={diffPrefs.lineDiffType}
+              onChange={(e) => updateDiffPrefs({ lineDiffType: e.target.value as 'word-alt' | 'word' | 'char' | 'none' })}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
+            >
+              <option value="word-alt">Word-alt (join adjacent)</option>
+              <option value="word">Word</option>
+              <option value="char">Character</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+
+          {/* diffIndicators */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Change indicators</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Classic +/- prefixes, colored bars, or none</p>
+            </div>
+            <select
+              value={diffPrefs.diffIndicators}
+              onChange={(e) => updateDiffPrefs({ diffIndicators: e.target.value as 'classic' | 'bars' | 'none' })}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
+            >
+              <option value="bars">Bars</option>
+              <option value="classic">Classic (+/-)</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+
+          {/* hunkSeparators */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Hunk separators</span>
+              <p className="text-xs text-muted-foreground mt-0.5">How collapsed hunks are displayed between change groups</p>
+            </div>
+            <select
+              value={diffPrefs.hunkSeparators}
+              onChange={(e) => updateDiffPrefs({ hunkSeparators: e.target.value as 'simple' | 'metadata' | 'line-info' | 'line-info-basic' })}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
+            >
+              <option value="line-info">Line info</option>
+              <option value="line-info-basic">Line info (basic)</option>
+              <option value="simple">Simple</option>
+              <option value="metadata">Metadata</option>
+            </select>
+          </div>
+
+          {/* expandUnchanged */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Expand unchanged</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Auto-expand all unchanged context lines</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={diffPrefs.expandUnchanged}
+              aria-label="Toggle expand unchanged"
+              onClick={() => updateDiffPrefs({ expandUnchanged: !diffPrefs.expandUnchanged })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                diffPrefs.expandUnchanged ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                diffPrefs.expandUnchanged ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+
+          {/* collapsedContextThreshold */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Collapsed context threshold</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Lines of context before collapsing unchanged blocks</p>
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={20}
+              value={diffPrefs.collapsedContextThreshold}
+              onChange={(e) => updateDiffPrefs({ collapsedContextThreshold: Math.max(0, Math.min(20, Number(e.target.value))) })}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary w-[80px]"
+            />
+          </div>
+
+          {/* lineHoverHighlight */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Line hover highlight</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Highlight lines on mouse hover</p>
+            </div>
+            <select
+              value={diffPrefs.lineHoverHighlight}
+              onChange={(e) => updateDiffPrefs({ lineHoverHighlight: e.target.value as 'disabled' | 'both' | 'number' | 'line' })}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
+            >
+              <option value="disabled">Disabled</option>
+              <option value="both">Both (number + line)</option>
+              <option value="number">Number only</option>
+              <option value="line">Line only</option>
+            </select>
+          </div>
+
+          {/* disableLineNumbers */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Hide line numbers</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Remove line number columns from diff view</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={diffPrefs.disableLineNumbers}
+              aria-label="Toggle hide line numbers"
+              onClick={() => updateDiffPrefs({ disableLineNumbers: !diffPrefs.disableLineNumbers })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                diffPrefs.disableLineNumbers ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                diffPrefs.disableLineNumbers ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+
+          {/* enableLineSelection */}
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Enable line selection</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Multi-line selection with shift-click</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={diffPrefs.enableLineSelection}
+              aria-label="Toggle enable line selection"
+              onClick={() => updateDiffPrefs({ enableLineSelection: !diffPrefs.enableLineSelection })}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                diffPrefs.enableLineSelection ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                diffPrefs.enableLineSelection ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Maintenance */}
+      <section id="maintenance" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">Maintenance</h2>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Issue cache</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Clear cached issue data and re-fetch from all trackers
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                setClearingCache(true);
+                try {
+                  const res = await fetch('/api/cache/clear', { method: 'POST' });
+                  if (!res.ok) throw new Error(await res.text());
+                  toast.success('Issue cache cleared and re-fetched');
+                  queryClient.invalidateQueries({ queryKey: ['issues'] });
+                } catch (err: any) {
+                  toast.error(`Failed to clear cache: ${err.message}`);
+                } finally {
+                  setClearingCache(false);
+                }
+              }}
+              disabled={clearingCache}
+              className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:border-warning/50 hover:bg-warning/10 text-muted-foreground hover:text-warning transition-all flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {clearingCache ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Desktop App settings — shown only inside Electron */}
+      <div id="desktop" className="py-6 scroll-mt-4">
+        <DesktopSettingsSection />
+      </div>
+
+      {/* Provider Models Modal */}
+      {modelsModalProvider && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <ProviderLogo
+                  provider={modelsModalProvider}
+                  label={PROVIDERS.find(p => p.id === modelsModalProvider)?.name}
+                  className="w-5 h-5 shrink-0"
+                />
+                <h3 className="text-foreground text-lg font-bold">
+                  {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
+                </h3>
+              </div>
+              <button
+                onClick={() => setModelsModalProvider(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {(() => {
+                const providerApiKey = formData?.api_keys[modelsModalProvider as keyof typeof formData.api_keys] || '';
+                const isEnvVarRef = providerApiKey.startsWith('$');
+
+                if (!providerApiKey) {
+                  return (
+                    <div className="text-center py-8">
+                      <Key className="w-10 h-10 text-muted-foreground mb-2 mx-auto" />
+                      <p className="text-muted-foreground">Enter an API key to test models</p>
+                    </div>
+                  );
+                }
+
+                if (isEnvVarRef) {
+                  return (
+                    <div className="text-center py-8">
+                      <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
+                      <p className="text-warning">API key configured via environment variable</p>
+                      <p className="text-muted-foreground text-sm mt-1">
+                        <code className="font-mono bg-popover px-1 rounded">{providerApiKey}</code> is not set
+                      </p>
+                      <p className="text-muted-foreground text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                  {(MODELS_BY_PROVIDER[modelsModalProvider]?.models || []).map((model) => {
+                    const testKey = `${modelsModalProvider}:${model.id}`;
+                    const testResult = modelTestResults[testKey];
+                    const isTesting = testingModel === testKey;
+
+                    return (
+                      <div
+                        key={model.id}
+                        className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              {/* Model icons are strings (Material Symbols names) - render as text fallback */}
+                              <div className="w-4 h-4 flex items-center justify-center text-muted-foreground text-[10px]">
+                                {typeof model.icon === 'string' ? model.icon[0] : '◆'}
+                              </div>
+                              <h4 className="text-foreground font-semibold">{model.name}</h4>
+                              {model.tier && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                                  model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
+                                  model.tier === 'balanced' ? 'badge-bg-primary text-primary' :
+                                  'badge-bg-success text-success-foreground'
+                                }`}>
+                                  {model.tier}
+                                </span>
+                              )}
+                            </div>
+                            {model.description && (
+                              <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
+                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {model.capabilities.map((cap) => (
+                                <span
+                                  key={cap}
+                                  className="text-[9px] px-1.5 py-0.5 bg-card text-muted-foreground rounded border border-border"
+                                >
+                                  {cap}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <button
+                              onClick={() => handleTestModel(modelsModalProvider, model.id)}
+                              disabled={isTesting}
+                              className="flex items-center gap-1.5 px-3 py-1.5 badge-bg-success hover:bg-success/20 border badge-border-success rounded-lg text-xs text-success-foreground transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isTesting ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Zap className="w-3.5 h-3.5" />
+                              )}
+                              Test 2+3
+                            </button>
+                            {testResult && (
+                              <div className={`flex items-center gap-1 text-xs ${testResult.success ? 'text-success' : 'text-destructive'}`}>
+                                {testResult.success ? (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                ) : (
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                )}
+                                {testResult.success
+                                  ? `${testResult.latencyMs}ms`
+                                  : (testResult.error?.slice(0, 30) || 'Failed')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-border bg-card">
+              <p className="text-xs text-muted-foreground text-center">
+                Test verifies API key and model availability by asking "What is 2+3?"
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Experimental — research-preview features, must remain the LAST section on the page */}
+      <section
+        id="experimental"
+        data-testid="experimental-section"
+        aria-label="Experimental"
+        className="py-6 scroll-mt-4 border-t border-warning/30 mt-4"
+      >
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Beaker className="w-4 h-4 text-warning" />
+          Experimental
+        </h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          Research-preview features that may change or be removed without notice.
+        </p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">RTK Bash compression</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Filters Bash command outputs through rtk-ai/rtk to reduce token consumption. Opt-in.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.agents?.rtk?.enabled)}
+              aria-label="Enable RTK Bash compression"
+              data-testid="experimental-rtk-toggle"
+              onClick={() => handleRtkToggle(!formData.agents?.rtk?.enabled)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                formData.agents?.rtk?.enabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                formData.agents?.rtk?.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">TLDR code-aware reads</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Replaces large code-file reads with structured TLDR summaries to save 90–95% of context tokens.
+                Defaults on. Takes effect immediately for new reads — no agent restart needed.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                data-testid="tldr-reload-daemons"
+                title="Restart the TLDR index daemons so the daemon layer matches the toggle. Read-interception already updates live on the next read."
+                onClick={async () => {
+                  setReloadingTldr(true);
+                  try {
+                    const res = await fetch('/api/services/tldr/reload', { method: 'POST' });
+                    if (!res.ok) throw new Error(await res.text());
+                    const body = await res.json();
+                    const verb = body.enabled ? `restarted ${body.restarted}` : `stopped ${body.stopped}`;
+                    toast.success(`TLDR daemons reloaded (${verb})`);
+                    queryClient.invalidateQueries({ queryKey: ['tldr-status'] });
+                  } catch (err: any) {
+                    toast.error(`Failed to reload TLDR daemons: ${err.message}`);
+                  } finally {
+                    setReloadingTldr(false);
+                  }
+                }}
+                disabled={reloadingTldr}
+                className="px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:border-primary/50 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {reloadingTldr ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                {reloadingTldr ? 'Reloading…' : 'Reload daemons'}
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.agents?.tldr?.enabled ?? true}
+                aria-label="Enable TLDR code-aware reads"
+                data-testid="experimental-tldr-toggle"
+                onClick={() => handleTldrToggle(!(formData.agents?.tldr?.enabled ?? true))}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                  (formData.agents?.tldr?.enabled ?? true) ? 'bg-primary' : 'bg-muted'
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  (formData.agents?.tldr?.enabled ?? true) ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`} />
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Claude Code Channels</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Use Channels transport for conversation delivery; work-agent MCP wiring is YAML-only
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.experimental?.claudeCodeChannels)}
+              aria-label="Use Claude Code Channels for prompt delivery (work agents only)"
+              data-testid="experimental-claude-code-channels-toggle"
+              onClick={() => handleClaudeCodeChannelsToggle(!formData.experimental?.claudeCodeChannels)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                formData.experimental?.claudeCodeChannels ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                formData.experimental?.claudeCodeChannels ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <ReindexConfirmDialog
+        open={reindexConfirm !== null}
+        title={reindexConfirm?.kind === 'model' ? 'Switch embedding model?' : 'Reindex all conversations?'}
+        intro={reindexConfirm?.kind === 'model' ? (
+          <>
+            Switching to <span className="text-foreground font-medium">{reindexConfirm?.newModel}</span> invalidates
+            every cached embedding — vectors can&apos;t be reused across models — and runs a full reindex with the new
+            model. This is a one-time embedding-API cost:
+          </>
+        ) : (
+          <>This re-embeds every conversation transcript from scratch and replaces the existing index, calling the OpenAI embeddings API once for your whole history:</>
+        )}
+        estimate={reindexConfirm?.estimate ?? null}
+        estimating={estimatingConversationSearch && !reindexConfirm?.estimate}
+        confirmLabel={reindexConfirm?.kind === 'model' ? 'Switch & reindex' : 'Reindex now'}
+        busy={reindexConfirmBusy}
+        onConfirm={() => void confirmReindex()}
+        onCancel={cancelReindexConfirm}
+      />
+
+    </SettingsLayout>
+  );
+}

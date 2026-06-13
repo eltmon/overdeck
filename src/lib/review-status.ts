@@ -1,12 +1,8 @@
-import { access, readFile } from 'fs/promises';
-import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Data, Effect } from 'effect';
-import { findPlan } from './vbrief/io.js';
 import { notifyPipelineSync } from './pipeline-notifier.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
-import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile } from './vbrief/dag.js';
 import {
   upsertReviewStatusSync as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -16,6 +12,7 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
+  setAutoMerge as dbSetAutoMerge,
   getReviewStatusFromDb,
 } from './database/review-status-db.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
@@ -47,8 +44,10 @@ export interface ReviewStatus {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
+  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
+  inspectStartedAt?: string;
+  inspectBeadId?: string;
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
@@ -60,6 +59,14 @@ export interface ReviewStatus {
   mergeNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  /**
+   * PAN-1691: per-issue merge-train routing key.
+   * `undefined` = follow the project default; `true` = auto-merge (fast lane,
+   * rides the train and ships when green); `false` = hold for UAT (manual lane,
+   * waits for human batch review). The merge-train engine reads this to decide
+   * whether a ready issue auto-advances or is held for the UAT candidate.
+   */
+  autoMerge?: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;
   queuePosition?: number | null;
@@ -114,6 +121,33 @@ export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationSt
   // but subsequent review+test passing should still yield readyForMerge=true.
   // The post-rebase gate in triggerMerge() is the authoritative quality gate (PAN-XXX).
   return status.verificationStatus !== 'failed';
+}
+
+export interface MergeGateEligibility {
+  eligible: boolean;
+  reason?: string;
+}
+
+/**
+ * Authoritative "allowed to merge" predicate (PAN-1759). The flywheel
+ * orchestrator's pipeline verb says it INTENDS to merge an issue; this record
+ * says the pipeline ALLOWS it. Both must hold before an issue enters the merge
+ * queue or a UAT batch — RUN-20 tagged a mid-review issue with a merge verb
+ * and it rode into a promotable batch. Same criteria as the
+ * fixStuckReadyForMerge repair sweep: review passed, test passed/skipped,
+ * verification not failed, not already merged.
+ */
+export function mergeGateEligibility(
+  status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
+): MergeGateEligibility {
+  if (!status) return { eligible: false, reason: 'no review record' };
+  if (status.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  if (status.testStatus !== 'passed' && status.testStatus !== 'skipped') {
+    return { eligible: false, reason: `test is ${status.testStatus}` };
+  }
+  if (!verificationSatisfied(status)) return { eligible: false, reason: 'verification failed' };
+  if (status.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
+  return { eligible: true };
 }
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -231,16 +265,34 @@ export function setReviewStatusSync(
   }
   while (history.length > 10) history.shift();
 
-  // PAN-1048: readyForMerge is only set explicitly by the ship role after
-  // rebase/verify/push. Auto-derivation from review+test gate status is removed —
-  // the ship role is the single authority.
+  // PAN-1650: readyForMerge is EVENT-DRIVEN — derived from the gate state on every
+  // write, so it flips the instant review+test+verification pass instead of waiting
+  // for a deacon patrol or a startup `fixStuckReadyForMerge` reconcile (those become
+  // redundant safety nets). This supersedes the PAN-1048 explicit-only model.
+  //
+  // Deriving from gates here does NOT bypass the "rebased onto main + verified"
+  // guarantee: `triggerMerge()` performs the authoritative post-rebase quality gate
+  // before it actually merges (see verificationSatisfied's note). The gate predicate
+  // mirrors `fixStuckReadyForMerge` so behaviour is identical — just immediate.
+  //
+  // Explicit caller intent still wins (the merge flow sets readyForMerge=false when a
+  // merge starts; mergeStatus then leaves pending/queued so the derive agrees).
   // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  const gatesPassed =
+    merged.reviewStatus === 'passed' &&
+    (merged.testStatus === 'passed' || merged.testStatus === 'skipped') &&
+    verificationSatisfied(merged) &&
+    (merged.uatStatus === undefined || merged.uatStatus === 'passed') &&
+    (merged.mergeStatus === 'pending' ||
+      merged.mergeStatus === 'queued' ||
+      merged.mergeStatus === undefined ||
+      merged.mergeStatus === null);
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
-        : merged.readyForMerge ?? false);
+        : gatesPassed);
 
   const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,
@@ -283,11 +335,9 @@ export function setReviewStatusSync(
   }
 
   // Single-row upsert — atomic, no TOCTOU risk. SQLite remains authoritative
-  // for Phase 1 live runtime state; the vBRIEF pipeline mirror below is a
-  // corroborating durable task-graph view for pan-oversee/dashboard readers.
+  // for live runtime pipeline state. Do not mirror this into canonical vBRIEF
+  // specs: PAN-1124 makes .pan/specs immutable after planning except plan.status.
   dbUpsert(updated);
-
-  mirrorPipelineStatusToVBrief(issueId, updated);
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 
@@ -598,32 +648,20 @@ export function setDeaconIgnored(
   }
 }
 
-
-function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): void {
-  void (async () => {
-    try {
-      const agentId = `agent-${issueId.toLowerCase()}`;
-      const workStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
-      if (!existsSync(workStateFile)) return;
-      const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
-      if (!workState.workspace) return;
-      const planPath = await Effect.runPromise(findPlan(workState.workspace));
-      if (!planPath) {
-        console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
-        return;
-      }
-      const result = await Effect.runPromise(writePipelineMirrorToPlanFile(
-        planPath,
-        buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
-        `review-status-${process.pid}`,
-      ));
-      if (!result) {
-        console.warn(`[review-status] Failed to write pipeline mirror to ${planPath} for ${issueId}`);
-      }
-    } catch (err: any) {
-      console.warn(`[review-status] Failed to mirror pipeline state to vBRIEF for ${issueId}: ${err.message}`);
-    }
-  })();
+/**
+ * PAN-1691: set the per-issue auto-merge routing key and broadcast the change.
+ * `autoMerge === null` clears it back to the project default. Emits a
+ * status_changed pipeline event so open dashboards reflect the toggle live.
+ */
+export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
+  try {
+    dbSetAutoMerge(issueId, autoMerge);
+    console.log(`[review-status] autoMerge=${autoMerge === null ? 'default' : autoMerge} for ${issueId}`);
+    const updated = getReviewStatusSync(issueId);
+    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
+  } catch (err) {
+    console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
+  }
 }
 
 

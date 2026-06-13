@@ -23,12 +23,15 @@ import {
   type WorkhorsesConfig,
   type WorkhorseSlot,
   type TtsDaemonConfig,
+  type ConversationSearchConfig,
   type RoleEffort,
+  type ProviderConfig,
   ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
+import { getBuiltInDefaultHarness } from './providers.js';
 import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './background-ai/registry.js';
 import { MODEL_CAPABILITIES, hasModelCapabilitySync, MODEL_DEPRECATIONS, resolveModelIdSync, getModelEffortLevelsSync } from './model-capabilities.js';
 
@@ -132,9 +135,12 @@ export interface ApiSettingsConfig {
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
+    provider_harnesses?: ProviderHarnessesConfig;
+    provider_default_harnesses?: BuiltInProviderHarnessesConfig;
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
+  conversationSearch?: ConversationSearchConfig;
   conversations?: {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
@@ -187,6 +193,9 @@ export interface ApiSettingsConfig {
     rtk?: {
       enabled?: boolean;
     };
+    tldr?: {
+      enabled?: boolean;
+    };
   };
   tts?: ApiTtsConfig;
   /** TTS activity-summarizer model/enabled, surfaced for the Background AI section (PAN-1589). */
@@ -216,13 +225,26 @@ export interface ApiSettingsConfig {
    * Permission mode for spawned Claude Code agents.
    *
    * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
-   * 'bypass'         → --dangerously-skip-permissions --permission-mode bypassPermissions
+   * 'bypass'         → --permission-mode bypassPermissions (DSP flag removed)
    *
    * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
    * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
    */
   claude?: {
     permissionMode?: 'auto' | 'bypass';
+  };
+  /**
+   * Permission mode for Codex TUI conversation sessions.
+   *
+   * 'read-only'   → approval_policy=on-request + sandbox_mode=read-only
+   * 'workspace'   → approval_policy=on-request + sandbox_mode=workspace-write (default)
+   * 'auto-review' → approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write
+   * 'full-access' → approval_policy=never + sandbox_mode=danger-full-access
+   *
+   * Persisted under `codex.permissionMode` in `~/.panopticon/config.yaml`.
+   */
+  codex?: {
+    permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
@@ -252,8 +274,20 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelIdSync('claude-sonnet-4-6');
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
+type ApiModelProvider = typeof MODEL_PROVIDERS[number];
+type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
+type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
+type RoleConfigInput = Omit<RoleConfig, 'harness'> & { harness?: RuntimeName | null | '' };
+
+function builtInProviderHarnesses(): BuiltInProviderHarnessesConfig {
+  return Object.fromEntries(
+    MODEL_PROVIDERS.map((provider) => [provider, getBuiltInDefaultHarness(provider)]),
+  ) as BuiltInProviderHarnessesConfig;
+}
+
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
   review: ['security', 'performance', 'correctness', 'requirements', 'synthesis'],
@@ -323,7 +357,8 @@ function workhorseSlotFromRef(ref: string): string {
 function mergeRoles(current?: RolesConfig, updates?: RolesConfig): RolesConfig | undefined {
   if (!current && !updates) return undefined;
   const merged: RolesConfig = { ...(current ?? {}) };
-  for (const [role, roleConfig] of Object.entries(updates ?? {}) as Array<[Role, RoleConfig]>) {
+  for (const [role, rawRoleConfig] of Object.entries(updates ?? {}) as Array<[Role, RoleConfigInput]>) {
+    const roleConfig = normalizeRoleConfig(rawRoleConfig);
     merged[role] = {
       ...(merged[role] ?? {}),
       ...roleConfig,
@@ -334,8 +369,33 @@ function mergeRoles(current?: RolesConfig, updates?: RolesConfig): RolesConfig |
           }
         : merged[role]?.sub,
     };
+    if (hasHarnessClearSentinel(rawRoleConfig)) {
+      delete merged[role]?.harness;
+    }
   }
   return merged;
+}
+
+function hasHarnessClearSentinel(roleConfig: RoleConfigInput): boolean {
+  return Object.prototype.hasOwnProperty.call(roleConfig, 'harness')
+    && (roleConfig.harness === null || roleConfig.harness === '');
+}
+
+function normalizeRoleConfig(roleConfig: RoleConfigInput): RoleConfig {
+  const normalized = { ...roleConfig } as RoleConfig;
+  if (hasHarnessClearSentinel(roleConfig)) {
+    delete normalized.harness;
+  }
+  return normalized;
+}
+
+function normalizeRolesConfig(roles?: RolesConfig): RolesConfig | undefined {
+  if (!roles) return undefined;
+  const normalized: RolesConfig = {};
+  for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfigInput]>) {
+    normalized[role] = normalizeRoleConfig(roleConfig);
+  }
+  return normalized;
 }
 
 function validateModelRef(
@@ -388,8 +448,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi') {
-    errors.push(`${fieldPath}.harness must be claude-code or pi`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+    errors.push(`${fieldPath}.harness must be claude-code, pi, codex, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -569,6 +629,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
       },
+      provider_harnesses: config.providerHarnesses,
+      provider_default_harnesses: builtInProviderHarnesses(),
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },
@@ -576,6 +638,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
     agents: {
       rtk: {
         enabled: config.rtk?.enabled ?? false,
+      },
+      tldr: {
+        enabled: config.tldr?.enabled ?? true,
       },
     },
     tts: toApiTtsConfig(config.tts),
@@ -589,6 +654,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
+    conversationSearch: config.conversationSearch,
     conversations: conversationSettings,
     memory: {
       provider: memory.extraction.provider,
@@ -618,6 +684,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       // Defensive — older test mocks of loadConfig may not include `claude`;
       // production loader always populates it via DEFAULT_CONFIG.
       permissionMode: config.claude?.permissionMode ?? 'auto',
+    },
+    codex: {
+      permissionMode: (config.codex?.permissionMode ?? 'auto-review') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
     },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
@@ -662,11 +731,14 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['api_keys', config.api_keys],
     ['openrouter', config.openrouter],
     ['tmux', config.tmux],
+    ['conversationSearch', config.conversationSearch],
     ['conversations', config.conversations],
     ['memory', config.memory],
+    ['background_ai', config.background_ai],
     ['tracker_keys', config.tracker_keys],
     ['experimental', config.experimental],
     ['claude', config.claude],
+    ['codex', config.codex],
   ];
 
   for (const [key, value] of topLevelSections) {
@@ -681,6 +753,10 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.setIn(['agents', 'rtk'], config.agents.rtk);
   }
 
+  if (config.agents?.tldr !== undefined) {
+    doc.setIn(['agents', 'tldr'], config.agents.tldr);
+  }
+
   if (config.tts !== undefined) {
     for (const [key, value] of Object.entries(config.tts)) {
       doc.setIn(['tts', key], value);
@@ -690,39 +766,39 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
 
+function providerConfigForSave(
+  provider: ApiModelProvider,
+  enabled: boolean,
+  settings: ApiSettingsConfig,
+  currentConfig: ReturnType<typeof loadConfigSync>['config'],
+): boolean | ProviderConfig {
+  const auth = currentConfig.providerAuth?.[provider];
+  const plan = currentConfig.providerPlan?.[provider];
+  const harnessValue = settings.models.provider_harnesses?.[provider];
+  const harness = harnessValue === '' ? undefined : harnessValue;
+  if (!auth && !plan && harness === undefined) return enabled;
+  return pruneUndefined({ enabled, auth, plan, harness });
+}
+
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
-  const providerAuth = currentConfig.providerAuth ?? {};
-  const providerPlan = currentConfig.providerPlan ?? {};
 
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
     workhorses: settings.workhorses,
-    roles: settings.roles,
+    roles: normalizeRolesConfig(settings.roles),
     models: {
       providers: {
-        anthropic: settings.models.providers.anthropic,
-        openai: providerAuth.openai || providerPlan.openai
-          ? {
-              enabled: settings.models.providers.openai,
-              auth: providerAuth.openai,
-              plan: providerPlan.openai,
-            }
-          : settings.models.providers.openai,
-        google: providerAuth.google || providerPlan.google
-          ? {
-              enabled: settings.models.providers.google,
-              auth: providerAuth.google,
-              plan: providerPlan.google,
-            }
-          : settings.models.providers.google,
-        minimax: settings.models.providers.minimax,
-        zai: settings.models.providers.zai,
-        kimi: settings.models.providers.kimi,
-        mimo: settings.models.providers.mimo,
-        openrouter: settings.models.providers.openrouter,
-        nous: settings.models.providers.nous,
-        dashscope: settings.models.providers.dashscope,
+        anthropic: providerConfigForSave('anthropic', settings.models.providers.anthropic, settings, currentConfig),
+        openai: providerConfigForSave('openai', settings.models.providers.openai, settings, currentConfig),
+        google: providerConfigForSave('google', settings.models.providers.google, settings, currentConfig),
+        minimax: providerConfigForSave('minimax', settings.models.providers.minimax, settings, currentConfig),
+        zai: providerConfigForSave('zai', settings.models.providers.zai, settings, currentConfig),
+        kimi: providerConfigForSave('kimi', settings.models.providers.kimi, settings, currentConfig),
+        mimo: providerConfigForSave('mimo', settings.models.providers.mimo, settings, currentConfig),
+        openrouter: providerConfigForSave('openrouter', settings.models.providers.openrouter, settings, currentConfig),
+        nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
+        dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -739,8 +815,11 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       nous: settings.api_keys.nous,
       dashscope: settings.api_keys.dashscope,
     },
-    agents: settings.agents?.rtk !== undefined
-      ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } }
+    agents: (settings.agents?.rtk !== undefined || settings.agents?.tldr !== undefined)
+      ? {
+          ...(settings.agents?.rtk !== undefined ? { rtk: { enabled: settings.agents.rtk.enabled ?? false } } : {}),
+          ...(settings.agents?.tldr !== undefined ? { tldr: { enabled: settings.agents.tldr.enabled ?? true } } : {}),
+        }
       : undefined,
     tts: settings.tts_summarizer
       ? { ...(sanitizeApiTtsConfig(settings.tts) ?? {}), summarizer: {
@@ -750,6 +829,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
+    conversationSearch: settings.conversationSearch,
     conversations: settings.conversations,
     memory: settings.memory
       ? {
@@ -786,6 +866,9 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     claude: settings.claude?.permissionMode
       ? { permissionMode: settings.claude.permissionMode }
       : undefined,
+    codex: settings.codex?.permissionMode
+      ? { permissionMode: settings.codex.permissionMode }
+      : undefined,
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -812,6 +895,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
         ...current.models.providers,
         ...updates.models?.providers,
       },
+      provider_harnesses: {
+        ...current.models.provider_harnesses,
+        ...updates.models?.provider_harnesses,
+      },
       overrides: undefined,
     },
     api_keys: {
@@ -824,6 +911,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
       rtk: {
         ...current.agents?.rtk,
         ...updates.agents?.rtk,
+      },
+      tldr: {
+        ...current.agents?.tldr,
+        ...updates.agents?.tldr,
       },
     },
     tts: {
@@ -841,6 +932,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tmux: {
       ...current.tmux,
       ...updates.tmux,
+    },
+    conversationSearch: {
+      ...current.conversationSearch,
+      ...updates.conversationSearch,
     },
     conversations: {
       ...current.conversations,
@@ -868,6 +963,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     claude: {
       ...current.claude,
       ...updates.claude,
+    },
+    codex: {
+      ...current.codex,
+      ...updates.codex,
     },
   };
 
@@ -924,6 +1023,22 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
   }
 
+  if (settings.models?.provider_harnesses !== undefined) {
+    if (!isRecord(settings.models.provider_harnesses)) {
+      errors.push('models.provider_harnesses must be an object');
+    } else {
+      for (const [provider, harness] of Object.entries(settings.models.provider_harnesses)) {
+        if (!MODEL_PROVIDERS.includes(provider as ApiModelProvider)) {
+          errors.push(`Unknown provider harness entry "${provider}"`);
+          continue;
+        }
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, pi, codex, or empty string`);
+        }
+      }
+    }
+  }
+
   // Validate overrides - check that model IDs are valid (including deprecated ones)
   if (settings.models?.overrides) {
     const validModelIds = Object.keys(MODEL_CAPABILITIES);
@@ -956,11 +1071,20 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   if (settings.agents !== undefined) {
     if (!isRecord(settings.agents)) {
       errors.push('agents must be an object');
-    } else if (settings.agents.rtk !== undefined) {
-      if (!isRecord(settings.agents.rtk)) {
-        errors.push('agents.rtk must be an object');
-      } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
-        errors.push('agents.rtk.enabled must be a boolean');
+    } else {
+      if (settings.agents.rtk !== undefined) {
+        if (!isRecord(settings.agents.rtk)) {
+          errors.push('agents.rtk must be an object');
+        } else if (settings.agents.rtk.enabled !== undefined && typeof settings.agents.rtk.enabled !== 'boolean') {
+          errors.push('agents.rtk.enabled must be a boolean');
+        }
+      }
+      if (settings.agents.tldr !== undefined) {
+        if (!isRecord(settings.agents.tldr)) {
+          errors.push('agents.tldr must be an object');
+        } else if (settings.agents.tldr.enabled !== undefined && typeof settings.agents.tldr.enabled !== 'boolean') {
+          errors.push('agents.tldr.enabled must be a boolean');
+        }
       }
     }
   }

@@ -52,9 +52,9 @@ describe('stuck state schema (PAN-653)', () => {
   });
 
   it('workspace discovered-session schema initializer creates all PAN-457 tables', async () => {
-    const { default: Database } = await import('better-sqlite3');
+    const { openDatabase } = await import('../driver.js');
     const { initWorkspaceDiscoveredSessionsSchema } = await import('../schema.js');
-    const db = new Database(join(TEST_HOME, 'workspace.db'));
+    const db = openDatabase(join(TEST_HOME, 'workspace.db'));
     try {
       initWorkspaceDiscoveredSessionsSchema(db);
       const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')`).all() as Array<{ name: string }>;
@@ -77,6 +77,38 @@ describe('stuck state schema (PAN-653)', () => {
     expect(names).toContain('discovered_sessions');
     expect(names).toContain('sessions_fts');
     expect(names).toContain('session_embeddings');
+  });
+
+  it('inspect status metadata persists across a read', async () => {
+    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../review-status-db.js');
+    const { getDatabase } = await import('../index.js');
+    const db = getDatabase();
+    const columns = db
+      .prepare(`PRAGMA table_info(review_status)`)
+      .all() as Array<{ name: string }>;
+    const colNames = columns.map((c) => c.name);
+    expect(colNames).toContain('inspect_status');
+    expect(colNames).toContain('inspect_notes');
+    expect(colNames).toContain('inspect_started_at');
+    expect(colNames).toContain('inspect_bead_id');
+
+    upsertReviewStatusSync({
+      issueId: 'PAN-1616',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      inspectStatus: 'error',
+      inspectNotes: 'Inspection timed out',
+      inspectStartedAt: '2026-06-05T19:00:00.000Z',
+      inspectBeadId: 'workspace-sposy',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    const row = getReviewStatusFromDbSync('pan-1616');
+    expect(row?.inspectStatus).toBe('error');
+    expect(row?.inspectNotes).toBe('Inspection timed out');
+    expect(row?.inspectStartedAt).toBe('2026-06-05T19:00:00.000Z');
+    expect(row?.inspectBeadId).toBe('workspace-sposy');
   });
 
   it('markWorkspaceStuck persists across a read', async () => {

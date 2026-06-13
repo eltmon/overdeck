@@ -903,6 +903,7 @@ export function ConversationPanel({
                 <ModelPicker
                   value={selectedModel}
                   harness={selectedHarness}
+                  liveConversation={conversation.sessionAlive}
                   onHarnessChange={(harness) => {
                     setSelectedHarness(harness);
                     switchModelMutation.mutate({ model: selectedModel, harness });
@@ -1324,4 +1325,34 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           className={styles.conversationClearedBanner}
           onClick={() => { window.location.href = `/conv/${conversation.clearedToConvId}`; }}
           title={`Open conv/${conversation.clearedToConvId}`}
-          aria-label={`Open conversation that cont
+          aria-label={`Open conversation that continues after /clear (conv/${conversation.clearedToConvId})`}
+        >
+          <RotateCcw size={14} />
+          <span className={styles.conversationClearedBannerText}>
+            Conversation cleared — continued in <strong>conv/{conversation.clearedToConvId}</strong>
+          </span>
+          <ArrowRight size={14} />
+        </button>
+      ) : isForking ? null : onResume ? (
+        <div className={styles.conversationResumeBar}>
+          {modelPicker}
+          <button
+            className={styles.conversationResumeBtn}
+            onClick={onResume}
+            disabled={resumePending}
+          >
+            {resumePending ? 'Resuming…' : 'Resume Session'}
+          </button>
+        </div>
+      ) : (
+        <ComposerFooter
+          conversation={conversation}
+          onSend={handleMessageSent}
+          onSendFailed={handleSendFailed}
+          agentId={agentId}
+          contextWindowUsage={contextWindowUsage}
+        />
+      )}
+    </div>
+  );
+}

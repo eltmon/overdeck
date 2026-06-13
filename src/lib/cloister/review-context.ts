@@ -15,6 +15,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { findPlanSync, readPlan } from '../vbrief/io.js';
+import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { findVBriefByIssueSync } from '../vbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
@@ -57,6 +58,12 @@ export interface ChangedFile {
   riskScore: number;
 }
 
+export interface ReviewItemTrace {
+  itemId: string;
+  title: string;
+  traces: string[];
+}
+
 export interface ReviewContextManifest {
   runId: string;
   issueId: string;
@@ -69,7 +76,10 @@ export interface ReviewContextManifest {
   };
   changedFiles: ChangedFile[];
   acceptanceCriteria: string[];
+  nonGoals: string[];
+  traces: ReviewItemTrace[];
   policyNotes: string[];
+  stubUiFindings: StubUiFinding[];
   manifestPath: string;
 }
 
@@ -98,7 +108,7 @@ async function getCurrentBranch(cwd: string): Promise<string> {
   }
 }
 
-async function getDiffBase(cwd: string): Promise<string> {
+export async function getDiffBase(cwd: string): Promise<string> {
   try {
     const { stdout } = await execAsync('git merge-base origin/main HEAD', { cwd, encoding: 'utf-8' });
     return stdout.trim();
@@ -112,7 +122,7 @@ async function getDiffBase(cwd: string): Promise<string> {
   }
 }
 
-async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]> {
+export async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]> {
   // --name-status gives us the status letter + path
   let nameStatus = '';
   try {
@@ -168,7 +178,7 @@ async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]
   return files.sort((a, b) => b.riskScore - a.riskScore);
 }
 
-async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; truncated: boolean }> {
+export async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; truncated: boolean }> {
   let stat = '';
 
   try {
@@ -186,13 +196,23 @@ async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; t
   return { stat, truncated: true };
 }
 
-async function extractAcceptanceCriteria(workspace: string, issueId: string): Promise<string[]> {
+interface PlanReviewRequirements {
+  acceptanceCriteria: string[];
+  nonGoals: string[];
+  traces: ReviewItemTrace[];
+}
+
+async function extractPlanReviewRequirements(workspace: string, issueId: string): Promise<PlanReviewRequirements> {
   // Try workspace-local spec first
   const planPath = findPlanSync(workspace);
   if (planPath) {
     try {
       const doc = await Effect.runPromise(readPlan(planPath));
-      return flattenAC(doc);
+      return {
+        acceptanceCriteria: flattenAC(doc),
+        nonGoals: flattenNonGoals(doc),
+        traces: flattenTraces(doc),
+      };
     } catch {
       // Fall through to lifecycle lookup
     }
@@ -201,21 +221,28 @@ async function extractAcceptanceCriteria(workspace: string, issueId: string): Pr
   // Try project-root lifecycle directories
   try {
     const projectRoot = getDevrootPathSync();
-    if (!projectRoot) return [];
+    if (!projectRoot) return { acceptanceCriteria: [], nonGoals: [], traces: [] };
     const found = findVBriefByIssueSync(projectRoot, issueId);
     if (found) {
-      return flattenAC(found.document);
+      return {
+        acceptanceCriteria: flattenAC(found.document),
+        nonGoals: flattenNonGoals(found.document),
+        traces: flattenTraces(found.document),
+      };
     }
   } catch {
     // Non-fatal
   }
 
-  return [];
+  return { acceptanceCriteria: [], nonGoals: [], traces: [] };
 }
 
 interface PanItem {
+  id?: string;
+  title?: string;
   acceptanceCriteria?: string[];
   subItems?: Array<{ title?: string; description?: string }>;
+  metadata?: Record<string, unknown>;
 }
 
 function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
@@ -232,6 +259,31 @@ function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
     }
   }
   return acs;
+}
+
+function flattenNonGoals(doc: { plan?: { narratives?: Record<string, string | undefined> } }): string[] {
+  const raw = doc.plan?.narratives?.NonGoals?.trim();
+  if (!raw || raw.toLowerCase() === 'none') return [];
+  return raw
+    .split('\n')
+    .map(line => line.trim().replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function flattenTraces(doc: { plan?: { items?: PanItem[] } }): ReviewItemTrace[] {
+  const traces: ReviewItemTrace[] = [];
+  for (const item of doc.plan?.items ?? []) {
+    const raw = item.metadata?.traces;
+    if (!Array.isArray(raw)) continue;
+    const itemTraces = raw.filter((trace): trace is string => typeof trace === 'string' && trace.trim().length > 0);
+    if (itemTraces.length === 0) continue;
+    traces.push({
+      itemId: item.id ?? '<unknown>',
+      title: item.title ?? '',
+      traces: itemTraces,
+    });
+  }
+  return traces;
 }
 
 async function readPolicyNotes(workspace: string): Promise<string[]> {
@@ -279,7 +331,7 @@ export interface BuildReviewContextOpts {
 export function formatTier1Summary(
   manifest: Pick<
     ReviewContextManifest,
-    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'policyNotes' | 'diff'
+    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'nonGoals' | 'traces' | 'policyNotes' | 'stubUiFindings' | 'diff'
   >,
 ): string {
   const lines: string[] = [];
@@ -318,6 +370,28 @@ export function formatTier1Summary(
     }
   }
 
+  if (manifest.nonGoals.length > 0) {
+    lines.push('');
+    lines.push('NonGoals / must-not constraints:');
+    for (const [i, nonGoal] of manifest.nonGoals.slice(0, 7).entries()) {
+      lines.push(`  ${i + 1}. ${nonGoal}`);
+    }
+    if (manifest.nonGoals.length > 7) {
+      lines.push(`  ... and ${manifest.nonGoals.length - 7} more (see manifest)`);
+    }
+  }
+
+  if (manifest.traces.length > 0) {
+    lines.push('');
+    lines.push('Requirement traces:');
+    for (const trace of manifest.traces.slice(0, 7)) {
+      lines.push(`  ${trace.itemId}: ${trace.traces.join(', ')}`);
+    }
+    if (manifest.traces.length > 7) {
+      lines.push(`  ... and ${manifest.traces.length - 7} more (see manifest)`);
+    }
+  }
+
   if (manifest.policyNotes.length > 0) {
     lines.push('');
     lines.push('Policy notes:');
@@ -329,11 +403,22 @@ export function formatTier1Summary(
     }
   }
 
+  if (manifest.stubUiFindings.length > 0) {
+    lines.push('');
+    lines.push('Stub UI findings (BLOCKING if unmitigated):');
+    for (const finding of manifest.stubUiFindings.slice(0, 10)) {
+      lines.push(`  - ${finding.patternLabel} @ ${finding.filePath}:${finding.lineNumber}`);
+    }
+    if (manifest.stubUiFindings.length > 10) {
+      lines.push(`  ... and ${manifest.stubUiFindings.length - 10} more (see manifest)`);
+    }
+  }
+
   lines.push('');
   lines.push(`Diff stat: ${manifest.diff.stat}`);
 
   return lines.join('\n');
-}async function buildReviewContextPromise(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
+}export async function buildReviewContextPromise(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
   const { runId, issueId, workspace } = opts;
 
   if (!existsSync(workspace)) {
@@ -351,9 +436,13 @@ export function formatTier1Summary(
     getDiffStat(workspace, diffBase),
   ]);
 
-  const [acceptanceCriteria, policyNotes] = await Promise.all([
-    extractAcceptanceCriteria(workspace, issueId),
+  const [planRequirements, policyNotes, stubUiFindings] = await Promise.all([
+    extractPlanReviewRequirements(workspace, issueId),
     readPolicyNotes(workspace),
+    scanStubUi(workspace, diffBase).catch((err) => {
+      console.warn(`[buildReviewContext] scanStubUi failed: ${err instanceof Error ? err.message : String(err)}`);
+      return [] as StubUiFinding[];
+    }),
   ]);
 
   const manifestDir = join(workspace, PAN_DIRNAME, 'review', runId);
@@ -368,8 +457,11 @@ export function formatTier1Summary(
     headSha,
     diff,
     changedFiles,
-    acceptanceCriteria,
+    acceptanceCriteria: planRequirements.acceptanceCriteria,
+    nonGoals: planRequirements.nonGoals,
+    traces: planRequirements.traces,
     policyNotes,
+    stubUiFindings,
     manifestPath,
   };
 

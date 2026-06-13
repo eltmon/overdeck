@@ -9,6 +9,7 @@ import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } fro
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiFifo } from '../pi-fifo.js'
 import { PiNotReady } from '../pi-fifo.js'
+import { sessionExists } from '../../tmux.js'
 
 const FIXTURE_LINEAR = join(__dirname, '..', '..', 'cost-parsers', '__tests__', 'fixtures', 'pi', 'linear.jsonl')
 
@@ -159,6 +160,39 @@ describe('PiRuntime.getSessionCost (AC5)', () => {
   })
 })
 
+const execMock = vi.hoisted(() => vi.fn((_cmd: string, _options?: unknown) => ''))
+vi.mock('child_process', async () => {
+  const actual = await vi.importActual<typeof import('child_process')>('child_process')
+  const kCustom = Symbol.for('nodejs.util.promisify.custom')
+
+  // Mirror Node's exec custom promisify so promisify(exec) returns
+  // { stdout, stderr } and killAgent can destructure stdout.
+  function exec(cmd: string, optionsOrCb: unknown, maybeCallback?: unknown) {
+    const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCallback
+    const options = typeof optionsOrCb === 'function' ? undefined : optionsOrCb
+    try {
+      const result = execMock(cmd, options)
+      ;(callback as (err: Error | null, stdout?: string, stderr?: string) => void)(null, result ?? '', '')
+    } catch (err) {
+      ;(callback as (err: Error | null, stdout?: string, stderr?: string) => void)(err as Error, '', '')
+    }
+  }
+  ;(exec as any)[kCustom] = (cmd: string, options?: unknown) =>
+    new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+      try {
+        const result = execMock(cmd, options)
+        resolve({ stdout: result ?? '', stderr: '' })
+      } catch (err) {
+        reject(err)
+      }
+    })
+
+  return {
+    ...actual,
+    exec,
+  }
+})
+
 // ── PiRuntime resume behavior (PAN-636 workspace-3119) ──────────────────────
 // The pi-extension persists ~/.panopticon/agents/<id>/session.id on every
 // session_start with a non-null sessionId; PiRuntime.spawnAgent reads that
@@ -294,5 +328,42 @@ describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', 
     const start = Date.now()
     await r.killAgent('agent-K2')
     expect(Date.now() - start).toBeLessThan(3_500)
+  })
+})
+
+describe('PiRuntime.killAgent PAN-1798 server-kill guard', () => {
+  let h: ReturnType<typeof withFakeHome>
+  const mockedSessionExists = vi.mocked(sessionExists)
+
+  beforeEach(() => {
+    h = withFakeHome()
+    execMock.mockClear()
+    mockedSessionExists.mockClear()
+  })
+  afterEach(() => h.cleanup())
+
+  it('kills the pane process group by PID and never uses pkill -f', async () => {
+    // Keep the session "alive" long enough to get past the first 2s poll and
+    // into the SIGTERM step, then report gone so killAgent exits cleanly.
+    const sessionAliveStart = Date.now()
+    mockedSessionExists.mockImplementation(() => {
+      const alive = Date.now() - sessionAliveStart < 2_500
+      return Effect.succeed(alive) as ReturnType<typeof sessionExists>
+    })
+
+    execMock.mockImplementation((cmd: string) => {
+      if (cmd.includes('list-panes') && cmd.includes('agent-PAN1798')) {
+        return '4242\n'
+      }
+      return ''
+    })
+
+    const r = new PiRuntimeSync()
+    await Effect.runPromise(createPiFifo('agent-PAN1798'))
+    await r.killAgent('agent-PAN1798')
+
+    const commands = execMock.mock.calls.map((c) => String(c[0]))
+    expect(commands.some((c) => c.includes('pkill -f'))).toBe(false)
+    expect(commands.some((c) => c.includes('kill -TERM -- -4242'))).toBe(true)
   })
 })

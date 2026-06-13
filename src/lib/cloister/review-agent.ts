@@ -52,6 +52,7 @@ import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } fr
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
+import type { RuntimeName } from '../runtimes/types.js';
 
 /**
  * Read a convoy sub-role prompt template from the panopticon-cli install.
@@ -224,6 +225,7 @@ function buildReviewRolePrompt(opts: {
   contextManifestPath?: string;
   synthesisAgentId?: string;
   model?: string;
+  harness?: RuntimeName;
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
@@ -264,6 +266,7 @@ function buildReviewRolePrompt(opts: {
       subRole: opts.subRole,
       prompt,
       model,
+      harness: opts.harness,
       // PAN-977: thread the synthesis wiring up front so the generated launcher
       // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
       reviewSynthesisAgentId: synthesisAgentId,
@@ -291,7 +294,7 @@ function buildReviewRolePrompt(opts: {
     };
   }
 }async function spawnReviewRoleForIssuePromise(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean; allowHost?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
@@ -441,6 +444,7 @@ function buildReviewRolePrompt(opts: {
       workspace: opts.workspace,
       prompt,
       ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.harness ? { harness: opts.harness } : {}),
       ...(allowHost ? { allowHost: true } : {}),
     });
     // Persist the runId on the synthesis agent's own state so the idempotency
@@ -466,6 +470,8 @@ function buildReviewRolePrompt(opts: {
         outputPath,
         contextManifestPath,
         synthesisAgentId: run.id,
+        ...(opts.model ? { model: opts.model } : {}),
+        ...(opts.harness ? { harness: opts.harness } : {}),
         allowHost,
       }));
       if (!result.success) {
@@ -631,6 +637,7 @@ export const spawnReviewSubRoleForIssue = (opts: {
   contextManifestPath?: string;
   synthesisAgentId?: string;
   model?: string;
+  harness?: RuntimeName;
   allowHost?: boolean;
 }): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
   Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
@@ -641,7 +648,7 @@ export const spawnReviewSubRoleForIssue = (opts: {
  * via `Effect.promise`.
  */
 export const spawnReviewRoleForIssue = (
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean; allowHost?: boolean },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string }> =>
   Effect.promise(() => spawnReviewRoleForIssuePromise(opts));
 

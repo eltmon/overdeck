@@ -5,6 +5,7 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { readContinueState, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
+import { isTldrEnabledSync } from '../config-yaml.js';
 import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
@@ -75,7 +76,9 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       POLYREPO_CONTEXT: polyrepoContextStr,
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
-      TLDR_AVAILABLE: existsSync(join(ctx.workspacePath, '.venv')),
+      // TLDR is advertised to the agent only when the operator toggle is on AND
+      // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
+      TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
     },
   }));

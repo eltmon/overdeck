@@ -9,6 +9,43 @@ import type { ComplexityLevel, BeadsTask, WorkspaceMetadata, ComplexityDetection
 import type { CloisterConfig, ModelSelectionConfig } from './config.js';
 import { detectComplexity, complexityToModel } from './complexity.js';
 import { loadCloisterConfigSync } from './config.js';
+import { loadConfigSync as loadYamlConfigSync } from '../config-yaml.js';
+import type { Role } from '../agents.js';
+import type { RuntimeName } from '../runtimes/types.js';
+
+type SpecialistHarnessKey = 'merge_agent' | 'review_agent' | 'test_agent' | 'inspect_agent' | 'uat_agent';
+
+const SPECIALIST_ROLE_BY_KEY: Record<SpecialistHarnessKey, Role> = {
+  merge_agent: 'ship',
+  review_agent: 'review',
+  test_agent: 'test',
+  inspect_agent: 'work',
+  uat_agent: 'test',
+};
+
+const warnedSpecialistHarnessAliases = new Set<SpecialistHarnessKey>();
+
+function normalizeSpecialistHarnessKey(specialistName: string): SpecialistHarnessKey | null {
+  const normalizedName = specialistName.replace(/-/g, '_');
+  if (
+    normalizedName === 'merge_agent' ||
+    normalizedName === 'review_agent' ||
+    normalizedName === 'test_agent' ||
+    normalizedName === 'inspect_agent' ||
+    normalizedName === 'uat_agent'
+  ) {
+    return normalizedName;
+  }
+  return null;
+}
+
+function warnDeprecatedSpecialistHarnessAlias(key: SpecialistHarnessKey, role: Role): void {
+  if (warnedSpecialistHarnessAliases.has(key)) return;
+  warnedSpecialistHarnessAliases.add(key);
+  console.warn(
+    `model_selection.specialist_harnesses.${key} is deprecated; use roles.${role}.harness instead.`
+  );
+}
 
 /**
  * Model routing result
@@ -87,18 +124,27 @@ export class ModelRouter {
   }
 
   /**
-   * Get the configured harness for a specialist (PAN-636).
+   * Get the configured harness for a specialist.
    *
-   * Mirrors getSpecialistModel: normalizes dash-form names ('merge-agent')
-   * to underscore-form ('merge_agent'), reads
-   * model_selection.specialist_harnesses, and falls back to 'claude-code'
-   * for unknown specialists or absent overrides.
+   * PAN-1787: model_selection.specialist_harnesses is a deprecated alias at
+   * role-tier precedence. The modern roles.<role>.harness value wins when set;
+   * the legacy key applies only when the role value is absent.
    */
-  getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' {
-    const harnesses = this.config.model_selection?.specialist_harnesses;
-    if (!harnesses) return 'claude-code';
-    const normalizedName = specialistName.replace(/-/g, '_') as keyof typeof harnesses;
-    return harnesses[normalizedName] ?? 'claude-code';
+  getSpecialistHarness(specialistName: string): RuntimeName {
+    const key = normalizeSpecialistHarnessKey(specialistName);
+    if (!key) return 'claude-code';
+
+    const role = SPECIALIST_ROLE_BY_KEY[key];
+    const roleHarness = loadYamlConfigSync().config.roles?.[role]?.harness;
+    if (roleHarness) return roleHarness;
+
+    const legacyHarness = this.config.model_selection?.specialist_harnesses?.[key];
+    if (legacyHarness) {
+      warnDeprecatedSpecialistHarnessAlias(key, role);
+      return legacyHarness;
+    }
+
+    return 'claude-code';
   }
 
   /**
@@ -157,6 +203,7 @@ export function getGlobalRouter(): ModelRouter {
  */
 export function resetGlobalRouter(): void {
   globalRouter = null;
+  warnedSpecialistHarnessAliases.clear();
 }
 
 /**
@@ -184,7 +231,7 @@ export function getSpecialistModel(specialistName: string): 'opus' | 'sonnet' | 
  * Convenience function to get the configured specialist harness via the
  * global router (PAN-636).
  */
-export function getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' {
+export function getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' | 'codex' {
   return getGlobalRouter().getSpecialistHarness(specialistName);
 }
 

@@ -216,6 +216,7 @@ export async function summarizeFirstMessageTitle(
 export async function summarizeTranscriptTitle(
   transcript: string,
   model = CONVERSATION_TITLE_MODEL,
+  timeoutMs = 30_000,
 ): Promise<string> {
   const prompt = [
     'You write concise thread titles for coding conversations.',
@@ -226,7 +227,7 @@ export async function summarizeTranscriptTitle(
     'Conversation:',
     transcript,
   ].join('\n');
-  const result = await invokeClaudeStructured(model, prompt, TITLE_SCHEMA, 30_000, 'titleRefinement');
+  const result = await invokeClaudeStructured(model, prompt, TITLE_SCHEMA, timeoutMs, 'titleRefinement');
   return sanitizeTitle(typeof result['title'] === 'string' ? (result['title'] as string) : '');
 }
 

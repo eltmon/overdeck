@@ -124,9 +124,13 @@ function checkpointIdentity(checkpoint: TranscriptCheckpoint): MemoryIdentity {
 }
 
 function inferCheckpointHarness(transcriptPath: string): string {
-  return transcriptPath.includes('/.panopticon/agents/') && transcriptPath.includes('/sessions/')
-    ? 'pi'
-    : 'claude-code';
+  if (transcriptPath.includes('/.panopticon/agents/') && transcriptPath.includes('/sessions/')) {
+    return 'pi';
+  }
+  if (transcriptPath.includes('/codex-home/sessions/') && transcriptPath.includes('rollout-')) {
+    return 'codex';
+  }
+  return 'claude-code';
 }
 
 async function getTranscriptStat(path: string): Promise<{ size: number; mtimeMs: number }> {
