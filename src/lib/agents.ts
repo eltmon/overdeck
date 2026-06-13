@@ -4652,11 +4652,17 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
     }
+    const storedHarness: RuntimeName = agentState.harness ?? 'claude-code';
+    const isLegacySessionOrigin = !runtimeState?.sessionModel || !runtimeState?.sessionHarness;
+    const migrateLegacyHarness = opts?.harness === undefined && isLegacySessionOrigin;
     const effectiveHarness = await resolveHarness({
-      explicit: opts?.harness ?? agentState.harness,
+      ...(migrateLegacyHarness ? {} : { explicit: opts?.harness ?? agentState.harness }),
       role: agentState.role,
       model,
     });
+    const legacyMigrationReason = migrateLegacyHarness && effectiveHarness !== storedHarness
+      ? `legacy harness migration ${storedHarness}→${effectiveHarness}`
+      : undefined;
     agentState.harness = effectiveHarness;
     if (effectiveHarness === 'codex') {
       agentState.codexMode = 'work-tui';
@@ -4666,12 +4672,24 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
     const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
+    if (legacyMigrationReason) {
+      resumeDriftReasons.push(legacyMigrationReason);
+      const migrationLogLine = `resumeAgent: ${legacyMigrationReason} for model ${model}`;
+      console.log(`[agents] ${normalizedId}: ${migrationLogLine}`);
+      logAgentLifecycleSync(normalizedId, migrationLogLine);
+    }
     const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
     const freshSessionId = !shouldResumeSavedSession && effectiveHarness === 'claude-code'
       ? randomUUID()
       : undefined;
     if (resumeDriftReasons.length > 0) {
-      logAgentLifecycleSync(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${resumeDriftReasons.join(', ')})`);
+      const genericDriftReasons = legacyMigrationReason
+        ? resumeDriftReasons.filter((reason) => reason !== legacyMigrationReason)
+        : resumeDriftReasons;
+      const driftSummary = genericDriftReasons.length > 0
+        ? genericDriftReasons.join(', ')
+        : 'legacy session-origin metadata missing';
+      logAgentLifecycleSync(normalizedId, `resumeAgent: starting fresh session instead of --resume because session origin drifted (${driftSummary})`);
     }
     if (freshSessionId) {
       saveSessionId(normalizedId, freshSessionId);
