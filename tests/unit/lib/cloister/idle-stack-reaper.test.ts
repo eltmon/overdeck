@@ -29,8 +29,8 @@ function makeDeps(over: Partial<IdleStackReaperDeps> & {
 }
 
 describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
-  beforeEach(() => { __resetIdleStackReaperState(); delete process.env.PANOPTICON_DISABLE_STACK_REAPER; });
-  afterEach(() => { vi.restoreAllMocks(); delete process.env.PANOPTICON_DISABLE_STACK_REAPER; });
+  beforeEach(() => { __resetIdleStackReaperState(); delete process.env.PANOPTICON_DISABLE_STACK_REAPER; delete process.env.PANOPTICON_NO_RESUME; });
+  afterEach(() => { vi.restoreAllMocks(); delete process.env.PANOPTICON_DISABLE_STACK_REAPER; delete process.env.PANOPTICON_NO_RESUME; });
 
   it('does NOT reap on the first observation — it starts the grace clock', async () => {
     const { deps, stopped } = makeDeps({
