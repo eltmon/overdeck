@@ -581,19 +581,25 @@ export class IssueDataService {
     const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
     if (!intervals) return;
 
-    const backoffMs = this.cache.getBackoffMs(tracker, intervals.default);
-    const effectiveInterval = Math.min(
-      Math.max(intervals.default + backoffMs, intervals.min),
-      intervals.max
-    );
+    let delayMs: number;
+    try {
+      const backoffMs = this.cache.getBackoffMs(tracker, intervals.default);
+      const effectiveInterval = Math.min(
+        Math.max(intervals.default + backoffMs, intervals.min),
+        intervals.max
+      );
 
-    // If the tracker is exhausted, suspend polling until the rate-limit window resets.
-    // This bypasses intervals.max so we don't wake up before the quota resets.
-    const suspendMs = this.cache.getSuspensionMs(tracker);
-    let delayMs = effectiveInterval;
-    if (suspendMs > 0) {
-      delayMs = Math.min(suspendMs, 3_600_000);
-      console.warn(`[IssueDataService] ${tracker} tracker suspended until rate-limit reset; next poll in ${delayMs}ms`);
+      // If the tracker is exhausted, suspend polling until the rate-limit window resets.
+      // This bypasses intervals.max so we don't wake up before the quota resets.
+      const suspendMs = this.cache.getSuspensionMs(tracker);
+      delayMs = effectiveInterval;
+      if (suspendMs > 0) {
+        delayMs = Math.min(suspendMs, 3_600_000);
+        console.warn(`[IssueDataService] ${tracker} tracker suspended until rate-limit reset; next poll in ${delayMs}ms`);
+      }
+    } catch (err: any) {
+      console.error(`[IssueDataService] Cache read failed for ${tracker}; falling back to default interval:`, err.message);
+      delayMs = intervals.default;
     }
     state.currentInterval = delayMs;
 

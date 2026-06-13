@@ -570,6 +570,17 @@ describe('IssueDataService - scheduleNext suspension', () => {
 
     expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
   });
+
+  it('falls back to the default interval when cache reads throw', () => {
+    mockCache.getBackoffMs.mockImplementation(() => {
+      throw new Error('db locked');
+    });
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(30_000);
+  });
 });
 
 describe('IssueDataService - getDiagnostics', () => {

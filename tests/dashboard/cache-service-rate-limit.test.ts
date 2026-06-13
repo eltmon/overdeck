@@ -2,18 +2,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { CacheService } from '../../src/dashboard/server/services/cache-service.js';
+import type { CacheService } from '../../src/dashboard/server/services/cache-service.js';
 
 describe('CacheService - getSuspensionMs', () => {
   let testDir: string;
   let panopticonHome: string;
   let cache: CacheService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     testDir = mkdtempSync(join(tmpdir(), 'cache-suspension-test-'));
     panopticonHome = join(testDir, '.panopticon');
     mkdirSync(panopticonHome, { recursive: true });
     vi.stubEnv('PANOPTICON_HOME', panopticonHome);
+    vi.resetModules();
+    const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
     cache = new CacheService();
   });
 
