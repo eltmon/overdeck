@@ -31,6 +31,13 @@ export const TEST_REQUIREMENT_KEYWORDS: ReadonlyArray<{ readonly keyword: string
 ];
 
 /**
+ * File-path pattern for test files considered by the test-requirement gate.
+ *
+ * Matches `.test.ts`, `.spec.ts`, `.test.tsx`, and `.spec.tsx` suffixes.
+ */
+export const TEST_FILE_PATTERN = /\.(test|spec)\.(ts|tsx)$/i;
+
+/**
  * Scan freeform issue text for test-shaped keywords.
  *
  * @returns One entry per match per line; empty/null input returns an empty array.
@@ -54,4 +61,37 @@ export function detectTestRequirements(text: string | null | undefined): TestReq
   }
 
   return results;
+}
+
+/**
+ * Sum new lines added to test files from `git diff --numstat` output.
+ *
+ * `numstatOutput` lines are tab-separated: `<additions>\t<deletions>\t<path>`.
+ * Binary entries (`-\t-\t<path>`) are skipped. Malformed lines are tolerated.
+ */
+export function countTestDeltaInDiff(numstatOutput: string): number {
+  if (!numstatOutput) return 0;
+
+  let total = 0;
+  const lines = numstatOutput.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+
+    const parts = trimmed.split('\t');
+    if (parts.length < 3) continue;
+
+    const [additionsRaw, , path] = parts;
+    if (additionsRaw === '-') continue; // binary entry
+
+    const additions = Number.parseInt(additionsRaw, 10);
+    if (!Number.isFinite(additions) || additions < 0) continue;
+
+    if (TEST_FILE_PATTERN.test(path ?? '')) {
+      total += additions;
+    }
+  }
+
+  return total;
 }
