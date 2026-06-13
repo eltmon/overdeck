@@ -115,12 +115,14 @@ function beadIdsFromList(beads: any[]): string[] {
 }
 
 async function listBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number): Promise<any[]> {
-  const { stdout } = await execFileAsync(
-    'bd',
-    ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-    { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs }
-  );
-  return parseBdList(stdout);
+  return retryBd(async () => {
+    const { stdout } = await execFileAsync(
+      'bd',
+      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
+      { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs }
+    );
+    return parseBdList(stdout);
+  });
 }
 
 /**
@@ -158,6 +160,38 @@ async function recoverBeadIdByTitle(
   return { id: null, ambiguity: false };
 }
 
+interface RetryBdOptions {
+  attempts?: number;
+  baseDelayMs?: number;
+}
+
+/**
+ * Bounded exponential-backoff retry for idempotent bd operations.
+ *
+ * Retries `fn` up to `attempts` times (default 3), waiting
+ * `baseDelayMs * 2^(attempt-1)` milliseconds between attempts. Surfaces the
+ * last error once attempts are exhausted. Used only for reads/deletes — never
+ * for bd create, which is not idempotent.
+ */
+export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions = {}): Promise<T> {
+  const attempts = options.attempts ?? 3;
+  const baseDelayMs = options.baseDelayMs ?? 500;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        const delay = baseDelayMs * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
   let existingBeads: any[];
   try {
@@ -170,9 +204,9 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   let cleared = 0;
   for (const id of beadIdsFromList(existingBeads)) {
     try {
-      await execFileAsync('bd', ['delete', id, '--force'], {
+      await retryBd(() => execFileAsync('bd', ['delete', id, '--force'], {
         encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-      });
+      }));
       cleared++;
     } catch (error: any) {
       errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
@@ -282,9 +316,9 @@ async function createBeadsFromVBriefPromise(
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
   try {
-    await execFileAsync('bd', ['ping', '--json'], {
+    await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-    });
+    }));
   } catch (connectErr: any) {
     const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
     const firstLine = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
@@ -306,9 +340,9 @@ async function createBeadsFromVBriefPromise(
     }
 
     try {
-      await execFileAsync('bd', ['ping', '--json'], {
+      await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
         encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-      });
+      }));
     } catch (retryErr: any) {
       if (!redirectExists && !existsSync(mainBeadsDir)) {
         const prefix = deriveProjectPrefix(workspacePath);
