@@ -48,6 +48,7 @@ export type PendingInputKind =
   | 'exitPlanMode'
   | 'enterPlanMode'
   | 'sessionResume'
+  | 'rateLimit'
 
 export interface PendingAskUserQuestionSnapshot {
   toolUseId: string
@@ -72,6 +73,17 @@ export interface AgentEnrichment {
   pendingAskUserQuestion?: PendingAskUserQuestionSnapshot
   resolution: string
   resolutionCount: number
+}
+
+// PAN-1520 / PAN-1834 — promote pane-detected blocking surfaces into the
+// unified pending-input set so the indicator / needs-you list fires.
+export function appendPaneDetectionKind(detection: AwaitingInputDetection | null, kinds: PendingInputKind[]): void {
+  if (detection?.reason === 'session_resume' && !kinds.includes('sessionResume')) {
+    kinds.push('sessionResume')
+  }
+  if (detection?.reason === 'rate_limit' && !kinds.includes('rateLimit')) {
+    kinds.push('rateLimit')
+  }
 }
 
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
@@ -499,9 +511,8 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     if (enterPlanModeOpen && !exitPlanModePending) pendingInputKinds.push('enterPlanMode')
     // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
     // into the unified pending-input set so the indicator fires.
-    if (detection?.reason === 'session_resume' && !pendingInputKinds.includes('sessionResume')) {
-      pendingInputKinds.push('sessionResume')
-    }
+    // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
+    appendPaneDetectionKind(detection, pendingInputKinds)
   }
 
   return {
