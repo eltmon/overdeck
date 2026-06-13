@@ -123,6 +123,41 @@ async function listBeadsForIssue(workspacePath: string, issueLabel: string, time
   return parseBdList(stdout);
 }
 
+/**
+ * After a bd create timeout or empty-stdout, recover the bead ID by exact-title
+ * re-query. A client-side timeout usually means the create succeeded on the
+ * server, so the only missing piece is the ID.
+ *
+ * Returns the recovered id, or null if no unique match is found. ambiguity=true
+ * means more than one bead matched the full title and the caller must NOT pick
+ * one silently.
+ */
+async function recoverBeadIdByTitle(
+  workspacePath: string,
+  issueLabel: string,
+  fullTitle: string,
+  timeoutMs: number,
+): Promise<{ id: string | null; ambiguity: boolean }> {
+  let beads: any[];
+  try {
+    beads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+  } catch {
+    return { id: null, ambiguity: false };
+  }
+
+  const matches = beads.filter(bead => bead?.title === fullTitle);
+  if (matches.length === 1) {
+    const id = matches[0]?.id;
+    if (id !== undefined && id !== null && String(id).length > 0) {
+      return { id: String(id), ambiguity: false };
+    }
+  } else if (matches.length > 1) {
+    return { id: null, ambiguity: true };
+  }
+
+  return { id: null, ambiguity: false };
+}
+
 export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
   let existingBeads: any[];
   try {
@@ -420,20 +455,18 @@ async function createBeadsFromVBriefPromise(
 
     console.log(`[beads] (${i + 1}/${orderedIds.length}) creating "${item.title}"`);
 
+    let capturedBeadId: string | null = null;
+    let createFailureMessage: string | null = null;
+
     try {
       const { stdout } = await execFileAsync('bd', args, {
         encoding: 'utf-8',
         cwd: workspacePath,
         timeout: bdTimeoutMs,
       });
-      const beadId = stdout.trim();
-
-      if (beadId) {
-        beadIds.set(itemId, beadId);
-        created.push(fullTitle);
-      } else {
-        errors.push(`Created "${item.title}" but could not capture bead ID`);
-        created.push(fullTitle);
+      capturedBeadId = stdout.trim() || null;
+      if (!capturedBeadId) {
+        createFailureMessage = `Created "${item.title}" but could not capture bead ID`;
       }
     } catch (error: any) {
       // killed === true means execFile hit the timeout — surface that specifically
@@ -441,8 +474,26 @@ async function createBeadsFromVBriefPromise(
       const timedOut = error?.killed === true || /ETIMEDOUT/i.test(String(error?.code ?? ''));
       const errMsg = error?.stderr?.toString() || error?.message || String(error);
       const prefix = timedOut ? `timed out after ${Math.round(bdTimeoutMs / 1000)}s` : errMsg.split('\n')[0];
-      errors.push(`Failed to create "${item.title}": ${prefix}`);
-      console.warn(`[beads] (${i + 1}/${orderedIds.length}) FAILED "${item.title}": ${prefix}`);
+      createFailureMessage = `Failed to create "${item.title}": ${prefix}`;
+    }
+
+    if (capturedBeadId) {
+      beadIds.set(itemId, capturedBeadId);
+      created.push(fullTitle);
+    } else {
+      // A timeout or empty stdout usually means the bead was created server-side
+      // but we lost the ID. Re-query by exact title before giving up.
+      console.warn(`[beads] (${i + 1}/${orderedIds.length}) FAILED/EMPTY "${item.title}"; attempting title-based recovery`);
+      const recovered = await recoverBeadIdByTitle(workspacePath, issueLabel, fullTitle, bdTimeoutMs);
+      if (recovered.ambiguity) {
+        errors.push(`${createFailureMessage}; recovery found multiple beads titled "${fullTitle}"`);
+      } else if (recovered.id) {
+        beadIds.set(itemId, recovered.id);
+        created.push(fullTitle);
+        console.log(`[beads] (${i + 1}/${orderedIds.length}) RECOVERED "${item.title}" as ${recovered.id}`);
+      } else {
+        errors.push(createFailureMessage ?? `Failed to create "${item.title}"`);
+      }
     }
   }
 

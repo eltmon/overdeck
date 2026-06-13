@@ -574,6 +574,140 @@ describe('createBeadsFromVBrief', () => {
     });
   });
 
+  describe('recover bead ID by exact title after create timeout', () => {
+    function makeDocWithDeps(planId: string): VBriefDocument {
+      return {
+        vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+        plan: {
+          id: planId,
+          title: `${planId} Dep Plan`,
+          status: 'active',
+          items: [
+            { id: 'item-a', title: 'Alpha task', status: 'pending', metadata: { difficulty: 'simple', issueLabel: planId.toLowerCase() } },
+            { id: 'item-b', title: 'Beta task', status: 'pending', metadata: { difficulty: 'simple', issueLabel: planId.toLowerCase() } },
+          ],
+          edges: [{ type: 'blocks' as const, from: 'item-a', to: 'item-b' }],
+        },
+      };
+    }
+
+    it('recovers the bead ID from a matching title and uses it for later deps (AC1)', async () => {
+      const ws = createWorkspace('PAN-511');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-511', makeDocWithDeps('PAN-511'));
+
+      const timeoutError = Object.assign(new Error('timed out'), { killed: true, code: 'ETIMEDOUT' });
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })              // which bd
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })                          // bd ping --json
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })                        // dedup list
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })                        // post-delete list
+        .mockRejectedValueOnce(timeoutError)                                        // bd create item-a times out
+        .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: 'bead-a', title: 'PAN-511: Alpha task' }]), stderr: '' }) // recovery list
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' });                 // bd create item-b
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.beadIds.get('item-a')).toBe('bead-a');
+      expect(result.beadIds.get('item-b')).toBe('bead-b');
+
+      const createCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
+      );
+      expect(createCalls).toHaveLength(2);
+      const betaCreateArgs = createCalls[1][1];
+      const depsIndex = betaCreateArgs.indexOf('--deps');
+      expect(depsIndex).toBeGreaterThan(-1);
+      expect(betaCreateArgs[depsIndex + 1]).toBe('bead-a');
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('records failure when recovery finds no matching title (AC2)', async () => {
+      const ws = createWorkspace('PAN-512');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-512', makeDocWithDeps('PAN-512'));
+
+      const timeoutError = Object.assign(new Error('timed out'), { killed: true, code: 'ETIMEDOUT' });
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockRejectedValueOnce(timeoutError)                                // bd create item-a times out
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })                 // recovery list: no match
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' });          // bd create item-b (no dep, since item-a missing)
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some(error => error.includes('Alpha task'))).toBe(true);
+      expect(result.beadIds.get('item-a')).toBeUndefined();
+      expect(result.beadIds.get('item-b')).toBe('bead-b');
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('records ambiguity error when recovery finds multiple matching titles (AC3)', async () => {
+      const ws = createWorkspace('PAN-513');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-513', makeDocWithDeps('PAN-513'));
+
+      const timeoutError = Object.assign(new Error('timed out'), { killed: true, code: 'ETIMEDOUT' });
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockRejectedValueOnce(timeoutError)
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([
+            { id: 'bead-a1', title: 'PAN-513: Alpha task' },
+            { id: 'bead-a2', title: 'PAN-513: Alpha task' },
+          ]),
+          stderr: '',
+        })
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' });
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(false);
+      expect(result.errors.some(error =>
+        error.includes('Alpha task') && error.includes('multiple beads'),
+      )).toBe(true);
+      expect(result.beadIds.get('item-a')).toBeUndefined();
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('does not issue a recovery list call after a successful create (AC4)', async () => {
+      const ws = createWorkspace('PAN-514');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-514', makeDoc('PAN-514', [{ id: 'item-1', title: 'Clean task' }]));
+
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-clean\n', stderr: '' });
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(true);
+      expect(result.beadIds.get('item-1')).toBe('bead-clean');
+
+      const listCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'list',
+      );
+      expect(listCalls).toHaveLength(2); // dedup + post-delete only
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+  });
+
   describe('resolveBdTimeout', () => {
     it('returns PANOPTICON_BD_TIMEOUT_MS verbatim and does not probe bd (AC1)', async () => {
       delete process.env.PANOPTICON_BD_TIMEOUT_MS;
