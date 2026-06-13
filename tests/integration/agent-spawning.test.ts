@@ -14,7 +14,7 @@
 
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { chmodSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
@@ -32,6 +32,7 @@ import { closeFeatureRegistryStorage } from '../../src/lib/registry/feature-regi
 import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
+import { resetHarnessResolveCachesForTests } from '../../src/lib/harness-resolve.js';
 
 const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
@@ -46,6 +47,10 @@ const transcriptLandingMocks = vi.hoisted(() => ({
 
 const runtimeMirrorMocks = vi.hoisted(() => ({
   snapshots: new Map<string, any>(),
+}));
+
+const configMocks = vi.hoisted(() => ({
+  roleOverrides: {} as Record<string, any>,
 }));
 
 vi.mock('../../src/lib/transcript-landing.js', () => ({
@@ -171,7 +176,7 @@ vi.mock('../../src/lib/github-app.js', async (importOriginal) => {
 // resolveModel() and the role harness lookup find consistent values.
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
-  const loadedConfig = {
+  const buildLoadedConfig = () => ({
     config: {
       preset: 'balanced',
       enabledProviders: new Set(['anthropic']),
@@ -180,7 +185,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
       providerPlan: {},
       openrouterFavorites: [],
       workhorses: { ...actual.DEFAULT_WORKHORSES },
-      roles: { ...actual.DEFAULT_ROLES },
+      roles: { ...actual.DEFAULT_ROLES, ...configMocks.roleOverrides },
       overrides: {},
       geminiThinkingLevel: 3,
       trackerKeys: {},
@@ -195,12 +200,12 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
       experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
       caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
     } as NormalizedConfig,
-  };
+  });
   return {
     ...actual,
     isClaudeCodeChannelsMcpEnabled: vi.fn().mockReturnValue(false),
-    loadConfig: vi.fn().mockReturnValue(loadedConfig),
-    loadConfigSync: vi.fn().mockReturnValue(loadedConfig),
+    loadConfig: vi.fn().mockImplementation(buildLoadedConfig),
+    loadConfigSync: vi.fn().mockImplementation(buildLoadedConfig),
   };
 });
 
@@ -230,6 +235,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let testWorkspace: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
   const originalPromptReadyTimeout = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  const originalPath = process.env.PATH;
   const supervisorScriptPath = join(process.cwd(), 'dist', 'pty-supervisor.js');
   let createdSupervisorStub = false;
 
@@ -264,6 +270,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     transcriptLandingMocks.useLandedFlag = false;
     transcriptLandingMocks.snapshotCounts = undefined;
     runtimeMirrorMocks.snapshots.clear();
+    configMocks.roleOverrides = {};
+    resetHarnessResolveCachesForTests();
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
     vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.void);
@@ -300,6 +308,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = originalPromptReadyTimeout;
     } else {
       delete process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+    }
+    if (originalPath) {
+      process.env.PATH = originalPath;
+    } else {
+      delete process.env.PATH;
     }
     if (existsSync(testPanopticonHome)) {
       rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
@@ -571,14 +584,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('resumeAgent drops --resume when the requested harness differs from session origin', async () => {
       const agentId = 'agent-pan-resume-harness-drift';
       writeResumableWorkAgent(agentId, true);
-      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
 
-      const result = await resumeAgent(agentId, undefined, { harness: 'pi' });
+      const result = await resumeAgent(agentId, undefined, { harness: 'claude-code' });
 
       expect(result).toEqual({ success: true, messageDelivered: true });
       const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
       expect(launcher).not.toContain('--resume');
-      expect(existsSync(join(getAgentDir(agentId), 'session.id'))).toBe(false);
+      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
+      expect(freshSessionId).not.toBe(`${agentId}-session`);
+      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
     });
 
     it('resumeAgent keeps --resume for legacy sessions with no origin metadata', async () => {
@@ -875,6 +890,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
+      const binDir = join(testPanopticonHome, 'bin');
+      mkdirSync(binDir, { recursive: true });
+      const fakePi = join(binDir, 'pi');
+      writeFileSync(fakePi, '#!/bin/sh\nexit 0\n');
+      chmodSync(fakePi, 0o755);
+      process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+      resetHarnessResolveCachesForTests();
+      configMocks.roleOverrides = {
+        test: { ...DEFAULT_ROLES.test, harness: 'pi' },
+      };
       vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
@@ -884,7 +909,6 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
         workspace: testWorkspace,
-        harness: 'pi',
         prompt: 'run the tests',
       });
 

@@ -14,6 +14,12 @@ const BINARY_BY_HARNESS: Partial<Record<RuntimeName, string>> = {
 const harnessAvailabilityCache = new Map<RuntimeName, Promise<boolean>>();
 const builtInDefaultNoticeProviders = new Set<string>();
 
+export function resetHarnessResolveCachesForTests(): void {
+  if (process.env.NODE_ENV !== 'test') return;
+  harnessAvailabilityCache.clear();
+  builtInDefaultNoticeProviders.clear();
+}
+
 export type ResolveHarnessInput = {
   explicit?: RuntimeName;
   role?: Role;
