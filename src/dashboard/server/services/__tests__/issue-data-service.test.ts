@@ -143,6 +143,18 @@ describe('IssueDataService poll-outcome recording (PAN-1817)', () => {
     });
   });
 
+  it('records quota_exhausted for a plain HTTP 429 error message', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('Linear API error: HTTP 429'));
+
+    await (svc as any).pollLinear();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('linear', {
+      status: 'quota_exhausted',
+      message: 'Linear API error: HTTP 429',
+    });
+  });
+
   it('records error for a non-rate-limit Linear poll error', async () => {
     const { svc } = makeServiceWithRecording();
     vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('network timeout'));

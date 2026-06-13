@@ -287,15 +287,24 @@ export function checkTrackerQuota(): CheckResult {
     const nowMs = Date.now();
     for (const tracker of trackers) {
       const health = cache.getPollHealth(tracker);
-      if (health?.status !== 'quota_exhausted') continue;
+      const suspendedMs = cache.getSuspensionMs(tracker, nowMs);
 
-      const observedMs = new Date(health.observedAt).getTime();
-      if (!Number.isFinite(observedMs)) continue;
-
+      const observedMs = health ? new Date(health.observedAt).getTime() : NaN;
       const staleMs = (DEFAULT_TTLS[tracker] ?? 60) * 2 * 1000;
-      if (nowMs - observedMs > staleMs) continue; // stale signal, ignore
+      const recentQuotaExhausted =
+        health?.status === 'quota_exhausted' &&
+        Number.isFinite(observedMs) &&
+        nowMs - observedMs <= staleMs;
 
-      warnings.push(`${tracker} quota exhausted${health.message ? `: ${health.message}` : ''}`);
+      // Keep the warning alive while the tracker is suspended, even if the
+      // poll-health record has gone stale because polling was paused.
+      if (!recentQuotaExhausted && suspendedMs <= 0) continue;
+
+      // GitHub exhaustion is already reported from the rate_limits row below.
+      if (tracker === 'github') continue;
+
+      const message = recentQuotaExhausted && health?.message ? `: ${health.message}` : '';
+      warnings.push(`${tracker} quota exhausted${message}`);
     }
 
     const ghLimit = cache.getRateLimit('github');

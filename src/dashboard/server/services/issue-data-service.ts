@@ -795,7 +795,7 @@ export class IssueDataService {
       typeof error === 'object' && error !== null && 'message' in error
         ? String(error.message)
         : String(error ?? '');
-    const isRateLimit = /rate.?limit/i.test(msg);
+    const isRateLimit = /rate.?limit|\b429\b/i.test(msg);
     const status: PollHealthStatus = error ? (isRateLimit ? 'quota_exhausted' : 'error') : 'ok';
     this.cache.recordPollHealth(tracker, { status, message: msg || 'ok' });
   }

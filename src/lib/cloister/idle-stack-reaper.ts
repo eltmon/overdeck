@@ -122,11 +122,20 @@ export async function reconcileIdleWorkspaceStacks(
   const sessions = await d.listSessions().catch(() => [] as readonly string[]);
   // Any tmux session for the issue (agent / review / test / inspect / strike)
   // means the workspace is in use — its name embeds the lowercased issue id.
-  const sessionBlob = sessions.join('\n').toLowerCase();
+  // Use a word-boundary check so overlapping IDs (e.g. pan-181 vs pan-1817)
+  // do not false-positive.
+  const activeIssues = new Set<string>();
+  for (const session of sessions) {
+    const lower = session.toLowerCase();
+    for (const issueLower of byIssue.keys()) {
+      const re = new RegExp(`\\b${issueLower.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`);
+      if (re.test(lower)) activeIssues.add(issueLower);
+    }
+  }
   const nowMs = d.now();
 
   for (const [issueLower, names] of byIssue) {
-    if (sessionBlob.includes(issueLower)) {
+    if (activeIssues.has(issueLower)) {
       firstIdleAt.delete(issueLower); // active — reset the clock
       continue;
     }

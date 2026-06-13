@@ -123,6 +123,14 @@ describe.sequential('system-health quota signal (PAN-1817)', () => {
         resetAt: 'invalid',
       });
       expect(readTrackerQuota(cache).githubRemaining).toBe(0);
+
+      // 6. A stale quota_exhausted record still surfaces when the tracker is suspended.
+      cache.updateRateLimit('linear', {
+        remaining: 0,
+        total: 2500,
+        resetAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      });
+      expect(readTrackerQuota(cache).exhaustedTrackers).toContain('linear');
     });
   });
 });

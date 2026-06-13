@@ -602,16 +602,24 @@ export function readTrackerQuota(cache: CacheService): { exhaustedTrackers: stri
 
   for (const tracker of trackers) {
     const health = cache.getPollHealth(tracker);
-    if (!health) continue;
+    const suspendedMs = cache.getSuspensionMs(tracker, nowMs);
 
-    const observedMs = new Date(health.observedAt).getTime();
-    if (!Number.isFinite(observedMs)) continue;
-
+    const observedMs = health ? new Date(health.observedAt).getTime() : NaN;
     const staleMs = (DEFAULT_TTLS[tracker] ?? 60) * 2 * 1000;
-    if (nowMs - observedMs > staleMs) continue; // signal is stale, ignore
+    const recentQuotaExhausted =
+      health?.status === 'quota_exhausted' &&
+      Number.isFinite(observedMs) &&
+      nowMs - observedMs <= staleMs;
 
-    if (health.status === 'quota_exhausted') {
-      exhaustedTrackers.push(tracker);
+    // A recent quota_exhausted poll-health record is live, but so is an ongoing
+    // suspension (e.g. Linear recordLinearExhaustion) even if the stale window
+    // has elapsed and no new poll has been attempted yet.
+    if (recentQuotaExhausted || suspendedMs > 0) {
+      // GitHub suspension is already surfaced via githubRemaining; avoid a
+      // duplicate reason here.
+      if (tracker !== 'github') {
+        exhaustedTrackers.push(tracker);
+      }
     }
   }
 

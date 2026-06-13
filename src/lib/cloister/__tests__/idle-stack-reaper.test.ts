@@ -72,6 +72,23 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     expect(deps.stopContainers).not.toHaveBeenCalled();
   });
 
+  it('does not treat an overlapping issue id substring as a live session', async () => {
+    const firstDeps = makeDeps({ now: () => 0, listSessions: async () => [] });
+    await reconcileIdleWorkspaceStacks(firstDeps);
+    expect(firstDeps.stopContainers).not.toHaveBeenCalled();
+
+    const secondDeps = makeDeps({
+      now: () => 20 * 60 * 1000,
+      listSessions: async () => ['agent-pan-18170'],
+      stopContainers: firstDeps.stopContainers,
+    });
+    const actions = await reconcileIdleWorkspaceStacks(secondDeps);
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/reaped idle workspace UI stack for PAN-1817/i);
+    expect(firstDeps.stopContainers).toHaveBeenCalledTimes(1);
+  });
+
   it('resets the grace clock when UI containers disappear', async () => {
     const deps = makeDeps({
       now: () => 15 * 60 * 1000,

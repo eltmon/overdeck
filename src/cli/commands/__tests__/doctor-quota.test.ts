@@ -25,6 +25,13 @@ vi.mock('../../../dashboard/server/services/cache-service.js', () => ({
       return mockRateLimits.get(tracker) ?? null;
     }
 
+    getSuspensionMs(tracker: string): number {
+      const limit = mockRateLimits.get(tracker);
+      if (!limit || limit.remaining > 0) return 0;
+      const resetMs = new Date(limit.resetAt).getTime();
+      return Number.isFinite(resetMs) && resetMs > Date.now() ? resetMs - Date.now() : 0;
+    }
+
     close(): void {}
   },
 }));
@@ -97,5 +104,19 @@ describe('doctor checkTrackerQuota (PAN-1817)', () => {
     const result = checkTrackerQuota();
     expect(result.status).toBe('ok');
     expect(result.message).toMatch(/no tracker quota/i);
+  });
+
+  it('warns for a stale quota record when the tracker is still suspended', () => {
+    const staleObservedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    mockPollHealth.set('linear', { status: 'quota_exhausted', message: 'old rate limit', observedAt: staleObservedAt });
+    mockRateLimits.set('linear', {
+      remaining: 0,
+      total: 2500,
+      resetAt: new Date(Date.now() + 60 * 1000).toISOString(),
+    });
+
+    const result = checkTrackerQuota();
+    expect(result.status).toBe('warn');
+    expect(result.message).toMatch(/linear quota exhausted/i);
   });
 });
