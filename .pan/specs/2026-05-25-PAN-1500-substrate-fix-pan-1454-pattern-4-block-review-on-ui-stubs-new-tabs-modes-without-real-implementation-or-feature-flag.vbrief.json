@@ -4,17 +4,17 @@
     "created": "2026-05-25T14:55:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1500: Substrate fix (PAN-1454 pattern 4): block review on UI stubs (new tabs/modes without real implementation or feature flag)",
-    "updated": "2026-05-25T14:51:32.336Z"
+    "updated": "2026-06-13T01:29:54.676Z"
   },
   "plan": {
     "id": "pan-1500",
     "title": "Substrate fix (PAN-1454 pattern 4): block review on UI stubs (new tabs/modes without real implementation or feature flag)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "af8a0c59-6246-4fa7-8a2f-0f270673b2ef",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T14:55:00.000Z",
-    "updated": "2026-05-25T14:51:32.336Z",
+    "updated": "2026-06-13T01:29:54.676Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1500",
@@ -461,5 +461,5 @@
       "canonicalFilename": "2026-05-25-PAN-1500-substrate-fix-pan-1454-pattern-4-block-review-on-ui-stubs-new-tabs-modes-without-real-implementation-or-feature-flag.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
