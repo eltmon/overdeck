@@ -2241,3 +2241,40 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
   commits to resume vs. a fresh launch.
 - **Used `pan plan --auto`, not `pan start --auto`** — RUN-28 confirmed the `pan start
   --auto` beads-recovery path is broken for fresh issues (PAN-1647/PAN-1799 class).
+
+## RUN-32 tick 2 (2026-06-13 ~14:11Z) — PAN-1818 proposed→working; PAN-1507 triaged as non-bug; +2 launches
+
+- **PAN-1818 finalized → proposed (4 items) → started work.** `planning-pan-1818`
+  auto-promoted and `pan start PAN-1818` spawned `agent-pan-1818` (work, model
+  `kimi-k2.7-code`, 4 beads, in_progress). NOTE the irony/risk: PAN-1818 is the
+  reviewer-context-overflow fix, and Cloister routed the work agent onto the SAME
+  kimi/CLIProxy 200k-window model that overflows — it hit ctx 39% (77k/200k) just
+  loading context. Watch next tick for the work agent hitting the very overflow it's
+  meant to fix; PAN-1675 compact brake is the net.
+- **PAN-1507 correctly triaged as a NON-BUG and closed COMPLETED (13:54Z).** The
+  planning agent investigated and concluded the Activity tab "empty" state is correct
+  scoped behavior for a quiet project (Awareness rail carve-out), not a bug — "no
+  further action needed, session ends without finalizing." Good autonomous triage:
+  declined to manufacture a fix. Left an idle-at-prompt session (`planning-pan-1507`)
+  on the now-closed issue; harmless, deacon/operator reaps it. Lesson: `pan plan --auto`
+  on a suspected bug can legitimately end in "not a bug, close it" — that's a success,
+  not a stall.
+- **New operator-launched planning: `planning-pan-1849`** ("feat(flywheel): prioritize
+  fixing a red main as the flywheel's first duty", eltmon, created 12:42Z). Not flywheel-
+  launched; left running.
+- **Launched 2 more plans** (clean, no-branch, eltmon-authored bugs, both pipeline-health):
+  `pan plan PAN-1834 --auto` (reviewer/sub-agent blocked on interactive modal → no
+  needs-you surfaced — same family as the PAN-1803 wedge) and `pan plan PAN-1817 --auto`
+  (Linear API quota exhausted by IssueDataService polling — tracker-sync substrate).
+  Held at 2 new launches to avoid the concurrent-bd-lock contention PAN-1629/PAN-1813
+  warn about while 3 planning agents nucleate.
+- **Half-started follow-through branches — VERDICT: mostly empty cruft.** `strike/pan-1506`,
+  `strike/pan-1508`, `feature/pan-1510` are ALL **0 commits ahead of main** (no resumable
+  work — leftover from prior strike/work attempts that never produced commits, likely
+  reboot casualties). Only `feature/pan-1456` has 4 stale (3-week-old) planning commits.
+  The frontend-store cluster (PAN-1506 "strike agents missing from store" + PAN-1510
+  "newly-filed issues missing from store", both critical) is blocked by orphaned
+  workspaces — a clean re-launch needs `pan workspace discard` first, which the
+  orchestrator cannot do. Surfaced as an openQuestion for the operator.
+- **PAN-1803 convoy STILL wedged** (>40min). Unchanged. Main advanced to `b59ac3207`
+  (a parallel merge landed during the tick). RAM 24/64 GB, swap 1.4/8.2.
