@@ -506,6 +506,7 @@ export type SessionNodePresence = typeof SessionNodePresence.Type
 export const SessionNodeType = Schema.Literals([
   "planning",
   "work",
+  "strike",
   "review",
   "reviewer",
   "test",

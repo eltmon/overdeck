@@ -12,6 +12,7 @@ import {
   getAvailableModelsSync,
 } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
+import { hasModelCapabilitySync } from '../../src/lib/model-capabilities.js';
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -382,7 +383,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModelsSync(enabled);
 
-      expect(models.length).toBe(30); // 7 Anthropic + 13 OpenAI + 6 Google + 4 Kimi
+      expect(models.length).toBe(31); // 7 Anthropic + 13 OpenAI + 6 Google + 5 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -481,6 +482,19 @@ describe('model-fallback', () => {
     it('kimi-k2 falls back to Sonnet when kimi is disabled', () => {
       const anthropicOnly = new Set<ModelProvider>(['anthropic']);
       expect(applyFallbackSync('kimi-k2' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('kimi-k2.7-code is recognized as kimi provider', () => {
+      expect(getModelProviderSync('kimi-k2.7-code' as ModelId)).toBe('kimi');
+    });
+
+    it('kimi-k2.7-code falls back to Sonnet when kimi is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallbackSync('kimi-k2.7-code' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('kimi-k2.7-code is a known model capability', () => {
+      expect(hasModelCapabilitySync('kimi-k2.7-code')).toBe(true);
     });
 
     it('claude-opus-4-7 is recognized as anthropic provider', () => {

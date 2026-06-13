@@ -69,4 +69,10 @@ describe('RoleBadge', () => {
     const { getByTestId } = render(<RoleBadge role="work" className="custom-y" />);
     expect(getByTestId('role-badge').classList.contains('custom-y')).toBe(true);
   });
+
+  it('renders with strike role data attribute and warning color', () => {
+    const { getByTestId } = render(<RoleBadge role="strike" />);
+    expect(getByTestId('role-badge').getAttribute('data-role')).toBe('strike');
+    expect(getByTestId('role-badge').style.color).toContain('warning');
+  });
 });
