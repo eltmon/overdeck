@@ -3015,8 +3015,9 @@ const getConversationMessagesRoute = HttpRouter.add(
             // Codex agents (PAN-1805) and pi agents (PAN-1827) have no Claude
             // session — resolve their transcript JSONLs directly from the
             // per-agent runtime directory.
+            let harness: string | null = null;
             try {
-              const harness = await resolveAgentHarness(name);
+              harness = await resolveAgentHarness(name);
               if (harness === 'codex') {
                 const rollout = await resolveCodexRolloutPath(name);
                 if (rollout) {
@@ -3035,7 +3036,9 @@ const getConversationMessagesRoute = HttpRouter.add(
             // (session.id file → sessions.json → runtime state) in
             // ~/.panopticon/agents/<name>/. Covers work agents, planning
             // agents, and all specialist types (reviewers, test, merge).
-            if (!sessionFile) {
+            // Skip this fallback when the recorded harness is explicitly pi or
+            // codex, so a stale claude session.id cannot shadow the new harness.
+            if (!sessionFile && harness !== 'pi' && harness !== 'codex') {
               try {
                 const claudeSessionId = await resolveClaudeSessionId(name);
                 if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {

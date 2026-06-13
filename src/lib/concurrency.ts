@@ -1,4 +1,13 @@
-import { Effect } from 'effect';function withConcurrencyLimitPromise<T>(
+import { Effect } from 'effect';
+
+/**
+ * Promise-based bounded-concurrency helper.
+ *
+ * Runs an array of promise factories with at most `max` concurrent tasks,
+ * preserving result order. Rejects on the first failure and cancels remaining
+ * scheduling.
+ */
+export function withConcurrencyLimitPromise<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {

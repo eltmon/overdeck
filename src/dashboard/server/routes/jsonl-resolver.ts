@@ -26,9 +26,14 @@
  * Async-only (fs/promises) because this code path runs inside the dashboard
  * server's event loop.
  */
-import { access, readFile, stat, readdir } from 'node:fs/promises';
+import { access, readFile, stat, lstat, readdir, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, normalize } from 'node:path';
+
+import { Effect } from 'effect';
+import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 
 /** Valid agent / tmux session identifier. */
 export const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
@@ -44,10 +49,20 @@ function safeAgentDir(agentsRoot: string, agentId: string): string | null {
   return resolved;
 }
 
-import { Effect } from 'effect';
-import { getAgentRuntimeState } from '../../../lib/agents.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
-import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
+/**
+ * Resolve `p` and verify it is contained within `root`. Returns the resolved
+ * path if contained, otherwise null. Uses realpath to defeat symlinks.
+ */
+async function containedPath(p: string, root: string): Promise<string | null> {
+  try {
+    const resolved = await realpath(p);
+    const normalizedRoot = normalize(root);
+    if (!resolved.startsWith(`${normalizedRoot}/`) && resolved !== normalizedRoot) return null;
+    return resolved;
+  } catch {
+    return null;
+  }
+}
 
 export interface ResolveJsonlPathOptions {
   /** Override the ~/.panopticon/agents directory (test hook). */
@@ -219,14 +234,6 @@ export async function resolveCodexRolloutPath(
   return findLatestRolloutAsync(codexHome);
 }
 
-/**
- * Resolve the Pi session JSONL for a pi-harness agent (PAN-1827).
- *
- * Pi nests session files under `<agentDir>/sessions/` at arbitrary depth (e.g.
- * `<encoded-cwd>/<timestamp>_<id>.jsonl`). The per-agent sessions dir holds
- * only this agent's sessions, so the freshest `.jsonl` by mtime is the live
- * transcript.
- */
 /** Cache for resolvePiSessionPath to avoid repeated recursive walks. */
 const piSessionPathCache = new Map<string, { path: string; mtimeMs: number; cachedAt: number }>();
 const PI_SESSION_CACHE_TTL_MS = 10_000;
@@ -250,6 +257,25 @@ function setCachedPiSessionPath(sessionsDir: string, result: { path: string; mti
   }
 }
 
+/** Max files to stat per resolvePiSessionPath scan to keep latency bounded. */
+const PI_SESSION_SCAN_MAX_FILES = 256;
+/** Max directory depth under sessions/ to recurse. */
+const PI_SESSION_SCAN_MAX_DEPTH = 8;
+
+/**
+ * Resolve the Pi session JSONL for a pi-harness agent (PAN-1827).
+ *
+ * Pi nests session files under `<agentDir>/sessions/` at arbitrary depth (e.g.
+ * `<encoded-cwd>/<timestamp>_<id>.jsonl`). The per-agent sessions dir holds
+ * only this agent's sessions, so the freshest `.jsonl` by mtime is the live
+ * transcript.
+ *
+ * Security: the walk uses `lstat` to avoid following symlinks, resolves each
+ * candidate with `realpath`, and verifies containment under `sessionsDir`.
+ * It also caps the total number of files examined and the recursion depth so
+ * long-lived agents with unbounded historical JSONLs do not cause latency
+ * cliffs.
+ */
 export async function resolvePiSessionPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
@@ -259,35 +285,54 @@ export async function resolvePiSessionPath(
   const agentDir = safeAgentDir(agentsRoot, agentId);
   if (!agentDir) return null;
   const sessionsDir = join(agentDir, 'sessions');
-  if (!(await pathExists(sessionsDir))) return null;
+  const resolvedRoot = await containedPath(sessionsDir, agentsRoot);
+  if (!resolvedRoot) return null;
 
-  const cached = getCachedPiSessionPath(sessionsDir);
+  const cached = getCachedPiSessionPath(resolvedRoot);
   if (cached) {
     try {
-      const s = await stat(cached.path);
-      if (s.isFile() && s.mtimeMs === cached.mtimeMs) return cached.path;
+      const s = await lstat(cached.path);
+      if (s.isFile() && !s.isSymbolicLink() && s.mtimeMs === cached.mtimeMs) return cached.path;
     } catch { /* stale cache — fall through to re-scan */ }
   }
 
-  let relativeNames: string[];
-  try {
-    relativeNames = await readdir(sessionsDir, { recursive: true });
-  } catch {
-    return null;
-  }
   let best: { path: string; mtimeMs: number } | null = null;
-  for (const relative of relativeNames) {
-    if (!relative.endsWith('.jsonl')) continue;
-    const p = join(sessionsDir, relative);
+  let scanned = 0;
+
+  async function scan(dir: string, depth: number): Promise<void> {
+    if (depth > PI_SESSION_SCAN_MAX_DEPTH) return;
+    let entries: string[];
     try {
-      const s = await stat(p);
-      if (!s.isFile()) continue;
-      if (!best || s.mtimeMs > best.mtimeMs) {
-        best = { path: p, mtimeMs: s.mtimeMs };
+      entries = await readdir(dir);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      let info;
+      try {
+        info = await lstat(full);
+      } catch {
+        continue;
       }
-    } catch { /* missing or unreadable — skip */ }
+      if (info.isSymbolicLink()) continue;
+      if (info.isDirectory()) {
+        await scan(full, depth + 1);
+        continue;
+      }
+      if (!info.isFile() || !entry.endsWith('.jsonl')) continue;
+      if (scanned >= PI_SESSION_SCAN_MAX_FILES) continue;
+      scanned++;
+      const contained = await containedPath(full, resolvedRoot);
+      if (!contained) continue;
+      if (!best || info.mtimeMs > best.mtimeMs) {
+        best = { path: contained, mtimeMs: info.mtimeMs };
+      }
+    }
   }
-  if (best) setCachedPiSessionPath(sessionsDir, best);
+
+  await scan(resolvedRoot, 0);
+  if (best) setCachedPiSessionPath(resolvedRoot, best);
   return best?.path ?? null;
 }
 

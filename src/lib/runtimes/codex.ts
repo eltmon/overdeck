@@ -14,12 +14,13 @@
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
-import { open, readdir as readdirAsync, stat as statAsync, access } from 'node:fs/promises'
-import { join, basename } from 'node:path'
+import { open, readdir as readdirAsync, stat as statAsync, lstat as lstatAsync, access, realpath } from 'node:fs/promises'
+import { join, basename, normalize } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { Effect } from 'effect'
+import { withConcurrencyLimitPromise } from '../concurrency.js'
 import type {
   AgentRuntime,
   AgentRuntimeSync,
@@ -130,6 +131,28 @@ function walkForThread(dir: string, threadId: string): string | null {
   return null
 }
 
+/** Max concurrent filesystem operations in async codex walks. */
+const CODEX_WALK_CONCURRENCY = 16
+/** Max files to examine in findLatestRolloutAsync to bound latency. */
+const CODEX_LATEST_SCAN_MAX_FILES = 256
+/** Max recursion depth under codex-home/sessions. */
+const CODEX_WALK_MAX_DEPTH = 8
+
+/**
+ * Resolve `p` and verify it is contained within `root`. Uses realpath to
+ * defeat symlinks.
+ */
+async function containedPath(p: string, root: string): Promise<string | null> {
+  try {
+    const resolved = await realpath(p)
+    const normalizedRoot = normalize(root)
+    if (!resolved.startsWith(`${normalizedRoot}/`) && resolved !== normalizedRoot) return null
+    return resolved
+  } catch {
+    return null
+  }
+}
+
 /** Async equivalent of {@link findRolloutPath}. */
 export async function findRolloutPathAsync(codexHomeDir: string, threadId: string): Promise<string | null> {
   const cacheKey = `${codexHomeDir}:${threadId}`
@@ -143,37 +166,44 @@ export async function findRolloutPathAsync(codexHomeDir: string, threadId: strin
     }
   }
   const sessionsRoot = join(codexHomeDir, 'sessions')
-  try {
-    await access(sessionsRoot)
-  } catch {
-    return null
-  }
-  const result = await walkForThreadAsync(sessionsRoot, threadId)
+  const resolvedRoot = await containedPath(sessionsRoot, codexHomeDir).catch(() => null)
+  if (!resolvedRoot) return null
+  const result = await walkForThreadAsync(resolvedRoot, threadId, resolvedRoot)
   if (result) rolloutPathCache.set(cacheKey, result)
   return result
 }
 
-async function walkForThreadAsync(dir: string, threadId: string): Promise<string | null> {
+async function walkForThreadAsync(
+  dir: string,
+  threadId: string,
+  root: string,
+  depth = 0,
+): Promise<string | null> {
+  if (depth > CODEX_WALK_MAX_DEPTH) return null
   let entries: string[]
   try {
     entries = await readdirAsync(dir)
   } catch {
     return null
   }
-  for (const entry of entries) {
+  const tasks = entries.map((entry) => async (): Promise<string | null> => {
     const full = join(dir, entry)
-    let isDir = false
+    let info
     try {
-      isDir = (await statAsync(full)).isDirectory()
+      info = await lstatAsync(full)
     } catch {
-      continue
+      return null
     }
-    if (isDir) {
-      const hit = await walkForThreadAsync(full, threadId)
-      if (hit) return hit
-    } else if (entry.endsWith(`-${threadId}.jsonl`)) {
-      return full
+    if (info.isSymbolicLink()) return null
+    if (info.isDirectory()) {
+      return walkForThreadAsync(full, threadId, root, depth + 1)
     }
+    if (!info.isFile() || !entry.endsWith(`-${threadId}.jsonl`)) return null
+    return containedPath(full, root)
+  })
+  const results = await withConcurrencyLimitPromise(tasks, CODEX_WALK_CONCURRENCY)
+  for (const hit of results) {
+    if (hit) return hit
   }
   return null
 }
@@ -452,26 +482,35 @@ export function findLatestRollout(codexHomeDir: string): string | null {
 /** Async equivalent of {@link findLatestRollout}. */
 export async function findLatestRolloutAsync(codexHomeDir: string): Promise<string | null> {
   const sessionsRoot = join(codexHomeDir, 'sessions')
-  const paths: string[] = []
-  const walk = async (dir: string): Promise<void> => {
+  const resolvedRoot = await containedPath(sessionsRoot, codexHomeDir).catch(() => null)
+  if (!resolvedRoot) return null
+  const paths: { p: string; mtimeMs: number }[] = []
+  let scanned = 0
+
+  const walk = async (dir: string, depth = 0): Promise<void> => {
+    if (depth > CODEX_WALK_MAX_DEPTH) return
     let entries: string[]
     try { entries = await readdirAsync(dir) } catch { return }
-    await Promise.all(entries.map(async (entry) => {
+    const tasks = entries.map((entry) => async (): Promise<void> => {
+      if (scanned >= CODEX_LATEST_SCAN_MAX_FILES) return
       const full = join(dir, entry)
-      let isDir = false
-      try { isDir = (await statAsync(full)).isDirectory() } catch { return }
-      if (isDir) await walk(full)
-      else if (entry.startsWith('rollout-') && entry.endsWith('.jsonl')) paths.push(full)
-    }))
-  }
-  await walk(sessionsRoot)
-  const byMtimeDesc = (await Promise.all(
-    paths.map(async (p) => {
-      try { return { p, mtimeMs: (await statAsync(p)).mtimeMs } } catch { return null }
+      let info
+      try { info = await lstatAsync(full) } catch { return }
+      if (info.isSymbolicLink()) return
+      if (info.isDirectory()) {
+        await walk(full, depth + 1)
+        return
+      }
+      if (!info.isFile() || !entry.startsWith('rollout-') || !entry.endsWith('.jsonl')) return
+      const contained = await containedPath(full, resolvedRoot)
+      if (!contained) return
+      scanned++
+      paths.push({ p: contained, mtimeMs: info.mtimeMs })
     })
-  ))
-    .filter((e): e is { p: string; mtimeMs: number } => e !== null)
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    await withConcurrencyLimitPromise(tasks, CODEX_WALK_CONCURRENCY)
+  }
+  await walk(resolvedRoot)
+  const byMtimeDesc = paths.sort((a, b) => b.mtimeMs - a.mtimeMs)
   for (const { p } of byMtimeDesc) {
     if (!(await isSubagentRolloutAsync(p))) return p
   }
