@@ -221,7 +221,15 @@ function wrapDatabase(raw: RawDatabase): SqliteDatabase {
             committed = true;
             return result;
           } catch (error) {
-            if (!committed) raw.exec('ROLLBACK');
+            // A failed COMMIT can auto-rollback, and a concurrent writer can end
+            // the transaction out from under us — either leaves no active
+            // transaction, so this cleanup ROLLBACK throws "no transaction is
+            // active" and masks (crashes on) the real error. It crashed
+            // `pan flywheel start` via the event-store compaction timer. Roll
+            // back best-effort; never let cleanup crash the process.
+            if (!committed) {
+              try { raw.exec('ROLLBACK'); } catch { /* already resolved — nothing to roll back */ }
+            }
             throw error;
           } finally {
             transactionDepth = 0;
