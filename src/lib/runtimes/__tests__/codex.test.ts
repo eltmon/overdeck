@@ -1,9 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Effect } from 'effect'
 
 import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
+import * as tmuxForCodexTest from '../../tmux.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiRuntimeSync } from '../pi.js'
@@ -256,8 +258,16 @@ describe('findLatestRollout', () => {
 describe('CodexRuntimeSync.killAgent — JSONL-is-sacred', () => {
   let ctx: ReturnType<typeof withFakeCodexHome>
 
-  beforeEach(() => { ctx = withFakeCodexHome() })
-  afterEach(() => ctx.cleanup())
+  beforeEach(() => {
+    ctx = withFakeCodexHome()
+    vi.useFakeTimers()
+    vi.spyOn(tmuxForCodexTest, 'sessionExists').mockReturnValue(Effect.succeed(false))
+    vi.spyOn(tmuxForCodexTest, 'killSession').mockReturnValue(Effect.succeed(undefined))
+  })
+  afterEach(() => {
+    ctx.cleanup()
+    vi.useRealTimers()
+  })
 
   it('does not delete the rollout JSONL during a kill (JSONL-is-sacred)', async () => {
     const threadId = 'killtest123'
