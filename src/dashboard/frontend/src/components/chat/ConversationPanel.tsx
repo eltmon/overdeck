@@ -31,6 +31,7 @@ import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
+import { conversationMessagesQueryKey, useConversationMessagesStream } from './useConversationMessagesStream';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -152,6 +153,12 @@ export function ConversationPanel({
   const draftTitleRef = useRef('');
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
+  const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
+  const streamMessagesEnabled = useConversationMessagesStream(conversation);
+  // Ref mirrors the latest streaming state so the HTTP queryFn can discard
+  // responses that were already in flight when streaming became active.
+  const streamActiveRef = useRef(streamMessagesEnabled);
+  streamActiveRef.current = streamMessagesEnabled;
   const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
   const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -184,11 +191,32 @@ export function ConversationPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.deliveryMethod]);
 
-  // Query messages at this level so we can drive the header working-spinner
-  const { data: messagesData } = useQuery({
-    queryKey: ['conversation-messages', conversation.name],
-    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
-    refetchInterval: conversation.sessionAlive ? 2000 : false,
+  useEffect(() => {
+    if (streamMessagesEnabled) {
+      void queryClient.cancelQueries({ queryKey: messagesQueryKey });
+    }
+  }, [messagesQueryKey, queryClient, streamMessagesEnabled]);
+
+  // Query messages at this level so we can drive the header working-spinner.
+  // Live claude-code conversations are pushed through useConversationMessagesStream;
+  // keep the existing polling path for non-claude harnesses and historical views.
+  const { data: messagesData, isLoading: messagesLoading } = useQuery({
+    queryKey: messagesQueryKey,
+    queryFn: async ({ signal }) => {
+      const fetched = await fetchMessages(conversation.name, signal);
+      // If the WS subscription became active while this HTTP request was in
+      // flight, the subscription (not this older HTTP response) is the
+      // authoritative cache writer for live Claude conversations. Return the
+      // existing cache value instead so newer streamed state is never
+      // overwritten by stale HTTP data.
+      if (streamActiveRef.current) {
+        const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
+        return cached ?? { messages: [], workLog: [], streaming: false };
+      }
+      return fetched;
+    },
+    enabled: !streamMessagesEnabled,
+    refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
   });
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
@@ -318,7 +346,7 @@ export function ConversationPanel({
     mutationFn: () => resumeConversation(conversation.name, selectedModel, conversation.effort ?? undefined, selectedHarness),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
+      queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
       setResumed(true);
     },
   });
@@ -338,7 +366,7 @@ export function ConversationPanel({
       saveStoredModel(model);
       saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
+      queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
     },
   });
 
@@ -895,6 +923,9 @@ export function ConversationPanel({
               agentId={agentId}
               hideToolCalls={hideToolCalls}
               workingPhase={isWorking ? workingPhase : undefined}
+              streamMessagesEnabled={streamMessagesEnabled}
+              messagesData={messagesData}
+              messagesLoading={messagesLoading}
               targetMessageId={targetMessageId}
               targetMessageIndex={targetMessageIndex}
               targetMessageNonce={targetMessageNonce}
@@ -1062,6 +1093,10 @@ interface ConversationViewProps {
   hideToolCalls?: boolean;
   /** Current working phase — drives the working indicator icon. */
   workingPhase?: WorkingPhase;
+  /** True when the shared conversation-messages cache is fed by the WS stream. */
+  streamMessagesEnabled?: boolean;
+  messagesData?: MessagesResponse;
+  messagesLoading?: boolean;
   targetMessageId?: string;
   targetMessageIndex?: number;
   targetMessageNonce?: number;
@@ -1070,7 +1105,7 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, streamMessagesEnabled, messagesData, messagesLoading, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Optimistic sent messages and the failed-send retry outbox live in the
   // module-level composerStore, keyed by conversation name. ConversationView is
@@ -1095,17 +1130,12 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     const prev = prevForkStatusRef.current;
     prevForkStatusRef.current = conversation.forkStatus;
     if (prev && !conversation.forkStatus) {
-      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
+      queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
     }
   }, [conversation.forkStatus, conversation.name, queryClient]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['conversation-messages', conversation.name],
-    queryFn: ({ signal }) => fetchMessages(conversation.name, signal),
-    // Poll every 2s while session is active for live updates.
-    // Since we don't have WebSocket push (unlike T3Code), polling is our streaming mechanism.
-    refetchInterval: conversation.sessionAlive ? 2000 : false,
-  });
+  const data = messagesData;
+  const isLoading = messagesLoading ?? false;
 
   const serverMessages = data?.messages ?? [];
   const workLog = data?.workLog ?? [];
@@ -1206,8 +1236,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   // Conversation was created but the tmux session has not started yet — the spawn is running
   // in the background. Show a "Starting..." placeholder instead of the orphaned empty state.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
-  const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
+  const isFirstMessage = !isLoading && !isDiscovering && messages.length === 0 && conversation.sessionAlive;
+  const isOrphaned = !isLoading && !isDiscovering && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -1235,9 +1266,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   return (
     <div className={styles.conversationView}>
-      {isLoading ? (
+      {isLoading || isDiscovering ? (
         <div className={styles.conversationConnecting}>
-          <span>Loading…</span>
+          <span>{isDiscovering ? 'Discovering conversation…' : 'Loading…'}</span>
         </div>
       ) : isSpawning ? (
         <div className={styles.conversationEmptyState}>

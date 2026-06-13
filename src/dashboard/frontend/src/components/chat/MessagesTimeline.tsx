@@ -25,7 +25,7 @@ import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCirc
 import type { WorkingPhase } from '../../lib/workingPhase';
 import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
-import { ChatMarkdown } from './ChatMarkdown';
+import { ChatMarkdown, ChatMarkdownSettingsProvider } from './ChatMarkdown';
 import { ChangedFilesTree } from './ChangedFilesTree';
 import { DiffStatLabel } from './DiffStatLabel';
 import { summarizeTurnDiffStats } from '../../lib/turnDiffTree';
@@ -604,7 +604,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   })();
 
   return (
-    <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <ChatMarkdownSettingsProvider>
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div
         ref={scrollContainerRef}
         className={styles.messagesTimeline}
@@ -843,7 +844,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         Bottom
       </button>
     )}
-    </div>
+      </div>
+    </ChatMarkdownSettingsProvider>
   );
 });
 

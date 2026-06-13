@@ -123,7 +123,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         rollupPendingThreshold: 4,
         sidebarRefreshIntervalMs: 10000,
       },
-      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: false },
       rtk: { enabled: false },
       claude: { permissionMode: 'auto' },
       tts: {
@@ -202,6 +202,18 @@ describe('loadSettingsApi', () => {
       rich_compaction: true,
       title_model: 'claude-haiku-4-5',
     });
+  });
+
+  it('loads streamdown renderer experimental flag with default false', async () => {
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(false);
+
+    mockLoadConfig.mockReturnValue(baseConfig({
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: true },
+    }));
+
+    expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(true);
   });
 
   it('returns seeded workhorses and roles without legacy overrides', async () => {
@@ -546,6 +558,23 @@ describe('saveSettingsApi', () => {
     expect(loadSettingsApi().roles?.review?.sub?.security?.model).toBe('parent');
   });
 
+  it('round-trips streamdown renderer experimental flag', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      experimental: {
+        ...settings.experimental,
+        streamdownRenderer: true,
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('experimental:');
+    expect(written).toContain('streamdownRenderer: true');
+  });
+
   it('persists conversation search settings', async () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -827,12 +856,14 @@ describe('validateSettingsApi', () => {
       experimental: {
         claudeCodeChannels: 'yes',
         claudeCodeChannelsMcp: 'yes',
+        streamdownRenderer: 'yes',
       } as never,
     });
 
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('experimental.claudeCodeChannels must be a boolean');
     expect(result.errors).toContain('experimental.claudeCodeChannelsMcp must be a boolean');
+    expect(result.errors).toContain('experimental.streamdownRenderer must be a boolean');
   });
 
   it('rejects invalid tts field types', async () => {

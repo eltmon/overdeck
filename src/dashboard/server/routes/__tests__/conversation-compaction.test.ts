@@ -23,6 +23,11 @@ vi.mock('../../../../lib/conversations/smart-compaction.js', async () => {
   };
 });
 
+vi.mock('../../../../lib/agents.js', () => ({
+  getAgentRuntimeBaseCommand: vi.fn(async () => 'claude'),
+  getProviderExportsForModel: vi.fn(async () => ''),
+}));
+
 let TEST_HOME: string;
 let CONFIG_HOME: string;
 
