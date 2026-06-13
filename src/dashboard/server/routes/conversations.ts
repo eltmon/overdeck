@@ -24,7 +24,7 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
+import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath, SAFE_AGENT_ID_PATTERN } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
@@ -3011,7 +3011,7 @@ const getConversationMessagesRoute = HttpRouter.add(
           const cached = getSpecialistSessionCache(name);
           if (cached) {
             sessionFile = cached;
-          } else if (/^(specialist-|agent-|planning-|strike-|inspect-)/.test(name)) {
+          } else if (SAFE_AGENT_ID_PATTERN.test(name) && /^(specialist-|agent-|planning-|strike-|inspect-)/.test(name)) {
             // Codex agents (PAN-1805) and pi agents (PAN-1827) have no Claude
             // session — resolve their transcript JSONLs directly from the
             // per-agent runtime directory.

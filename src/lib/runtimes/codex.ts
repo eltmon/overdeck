@@ -14,7 +14,7 @@
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
-import { readdir as readdirAsync, stat as statAsync, access } from 'node:fs/promises'
+import { open, readdir as readdirAsync, stat as statAsync, access } from 'node:fs/promises'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -363,6 +363,23 @@ function readRolloutMetaLine(path: string, maxBytes = 131072): string | null {
   }
 }
 
+/** Async equivalent of {@link readRolloutMetaLine}. */
+async function readRolloutMetaLineAsync(path: string, maxBytes = 131072): Promise<string | null> {
+  const handle = await open(path, 'r').catch(() => null)
+  if (!handle) return null
+  try {
+    const buf = Buffer.alloc(maxBytes)
+    const { bytesRead } = await handle.read(buf, 0, maxBytes, 0)
+    const text = buf.subarray(0, bytesRead).toString('utf-8')
+    const nl = text.indexOf('\n')
+    return nl === -1 ? text : text.slice(0, nl)
+  } catch {
+    return null
+  } finally {
+    await handle.close().catch(() => {})
+  }
+}
+
 /**
  * True when a rollout belongs to a Codex-internal subagent thread (e.g. the
  * guardian approval supervisor), per the session_meta `thread_source` field.
@@ -373,6 +390,18 @@ function readRolloutMetaLine(path: string, maxBytes = 131072): string | null {
  */
 function isSubagentRollout(path: string): boolean {
   const line = readRolloutMetaLine(path)
+  if (!line) return false
+  try {
+    const meta = JSON.parse(line) as { payload?: { thread_source?: unknown } }
+    return meta.payload?.thread_source === 'subagent'
+  } catch {
+    return false
+  }
+}
+
+/** Async equivalent of {@link isSubagentRollout}. */
+async function isSubagentRolloutAsync(path: string): Promise<boolean> {
+  const line = await readRolloutMetaLineAsync(path)
   if (!line) return false
   try {
     const meta = JSON.parse(line) as { payload?: { thread_source?: unknown } }
@@ -444,7 +473,7 @@ export async function findLatestRolloutAsync(codexHomeDir: string): Promise<stri
     .filter((e): e is { p: string; mtimeMs: number } => e !== null)
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
   for (const { p } of byMtimeDesc) {
-    if (!isSubagentRollout(p)) return p
+    if (!(await isSubagentRolloutAsync(p))) return p
   }
   // All rollouts are subagent threads — better to show one than nothing.
   return byMtimeDesc[0]?.p ?? null

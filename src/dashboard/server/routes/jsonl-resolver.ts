@@ -28,7 +28,21 @@
  */
 import { access, readFile, stat, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, normalize } from 'node:path';
+
+/** Valid agent / tmux session identifier. */
+const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+
+function isSafeAgentId(agentId: string): boolean {
+  return SAFE_AGENT_ID_PATTERN.test(agentId);
+}
+
+function safeAgentDir(agentsRoot: string, agentId: string): string | null {
+  if (!isSafeAgentId(agentId)) return null;
+  const resolved = normalize(join(agentsRoot, agentId));
+  if (!resolved.startsWith(`${normalize(agentsRoot)}/`) && resolved !== normalize(agentsRoot)) return null;
+  return resolved;
+}
 
 import { Effect } from 'effect';
 import { getAgentRuntimeState } from '../../../lib/agents.js';
@@ -121,8 +135,10 @@ export async function resolveClaudeSessionId(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  if (!isSafeAgentId(agentId)) return null;
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
-  const agentDir = join(agentsRoot, agentId);
+  const agentDir = safeAgentDir(agentsRoot, agentId);
+  if (!agentDir) return null;
 
   // 1. session.id — single UUID written by auto-suspend. Authoritative when
   //    present (only one session is alive when suspend writes this file).
@@ -159,8 +175,11 @@ export async function resolveAgentHarness(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  if (!isSafeAgentId(agentId)) return null;
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
-  const stateRaw = await readOptional(join(agentsRoot, agentId, 'state.json'));
+  const agentDir = safeAgentDir(agentsRoot, agentId);
+  if (!agentDir) return null;
+  const stateRaw = await readOptional(join(agentDir, 'state.json'));
   if (!stateRaw) return null;
   try {
     const state = JSON.parse(stateRaw) as { harness?: unknown };
@@ -183,8 +202,10 @@ export async function resolveCodexRolloutPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  if (!isSafeAgentId(agentId)) return null;
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
-  const agentDir = join(agentsRoot, agentId);
+  const agentDir = safeAgentDir(agentsRoot, agentId);
+  if (!agentDir) return null;
   const codexHome = join(agentDir, 'codex-home');
   if (!(await pathExists(codexHome))) return null;
 
@@ -206,15 +227,54 @@ export async function resolveCodexRolloutPath(
  * only this agent's sessions, so the freshest `.jsonl` by mtime is the live
  * transcript.
  */
+/** Cache for resolvePiSessionPath to avoid repeated recursive walks. */
+const piSessionPathCache = new Map<string, { path: string; mtimeMs: number; cachedAt: number }>();
+const PI_SESSION_CACHE_TTL_MS = 10_000;
+const PI_SESSION_CACHE_MAX = 50;
+
+function getCachedPiSessionPath(sessionsDir: string): { path: string; mtimeMs: number } | null {
+  const entry = piSessionPathCache.get(sessionsDir);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > PI_SESSION_CACHE_TTL_MS) {
+    piSessionPathCache.delete(sessionsDir);
+    return null;
+  }
+  return entry;
+}
+
+function setCachedPiSessionPath(sessionsDir: string, result: { path: string; mtimeMs: number }): void {
+  piSessionPathCache.set(sessionsDir, { ...result, cachedAt: Date.now() });
+  while (piSessionPathCache.size > PI_SESSION_CACHE_MAX) {
+    const firstKey = piSessionPathCache.keys().next().value;
+    if (firstKey !== undefined) piSessionPathCache.delete(firstKey);
+  }
+}
+
 export async function resolvePiSessionPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  if (!isSafeAgentId(agentId)) return null;
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
-  const sessionsDir = join(agentsRoot, agentId, 'sessions');
+  const agentDir = safeAgentDir(agentsRoot, agentId);
+  if (!agentDir) return null;
+  const sessionsDir = join(agentDir, 'sessions');
   if (!(await pathExists(sessionsDir))) return null;
 
-  const relativeNames = await readdir(sessionsDir, { recursive: true });
+  const cached = getCachedPiSessionPath(sessionsDir);
+  if (cached) {
+    try {
+      const s = await stat(cached.path);
+      if (s.isFile() && s.mtimeMs === cached.mtimeMs) return cached.path;
+    } catch { /* stale cache — fall through to re-scan */ }
+  }
+
+  let relativeNames: string[];
+  try {
+    relativeNames = await readdir(sessionsDir, { recursive: true });
+  } catch {
+    return null;
+  }
   let best: { path: string; mtimeMs: number } | null = null;
   for (const relative of relativeNames) {
     if (!relative.endsWith('.jsonl')) continue;
@@ -227,6 +287,7 @@ export async function resolvePiSessionPath(
       }
     } catch { /* missing or unreadable — skip */ }
   }
+  if (best) setCachedPiSessionPath(sessionsDir, best);
   return best?.path ?? null;
 }
 
@@ -243,6 +304,7 @@ export async function resolveJsonlPath(
   workspacePath: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  if (!isSafeAgentId(agentId)) return null;
   // Dispatch on the recorded harness so a stale session.id from an earlier
   // claude-code run of the same agent id can't shadow the codex or pi
   // transcript.
