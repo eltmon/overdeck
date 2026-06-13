@@ -407,6 +407,112 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.issueId).toBe('PAN-539');
   });
 
+  it('includes strike agent sessions in the session tree', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['strike-pan-539']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    mockAccess(new Set([
+      '/tmp/panopticon-cli/workspaces',
+      '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan',
+      '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan/continue.json',
+      join(homedir(), '.panopticon', 'agents', 'strike-pan-539'),
+      join(homedir(), '.panopticon', 'agents', 'strike-pan-539', 'state.json'),
+    ]));
+    (readdir as any).mockResolvedValue([
+      { name: 'feature-pan-539', isDirectory: () => true },
+    ]);
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(homedir(), '.panopticon', 'agents', 'strike-pan-539', 'state.json')) {
+        return Promise.resolve(JSON.stringify({
+          model: 'gpt-4',
+          startedAt: '2026-01-01T00:00:00Z',
+          status: 'running',
+        }));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-539');
+    const strikeSession = tree.features[0]?.sessions.find((s) => s.sessionId === 'strike-pan-539');
+    expect(strikeSession).toEqual(expect.objectContaining({
+      type: 'strike',
+      sessionId: 'strike-pan-539',
+      tmuxSession: 'strike-pan-539',
+    }));
+  });
+
+  it('computes endedAt and duration for ended slot work sessions from state.json mtime', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'completed' }));
+    const startedAt = '2026-01-01T00:00:00Z';
+    const endedAt = '2026-01-01T01:30:00Z';
+    const slotAgentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-539-1');
+    mockAccess(new Set([
+      '/tmp/panopticon-cli/workspaces',
+      '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan',
+      '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan/continue.json',
+      slotAgentDir,
+      join(slotAgentDir, 'state.json'),
+    ]));
+    (readdir as any).mockImplementation((p: string) => {
+      if (p === '/tmp/panopticon-cli/workspaces') {
+        return Promise.resolve([{ name: 'feature-pan-539', isDirectory: () => true }]);
+      }
+      if (p === join(homedir(), '.panopticon', 'agents')) {
+        return Promise.resolve([{ name: 'agent-pan-539-1', isDirectory: () => true }]);
+      }
+      return Promise.resolve([]);
+    });
+    (stat as any).mockImplementation((p: string) => {
+      if (p === join(slotAgentDir, 'state.json')) {
+        return Promise.resolve({ mtime: new Date(endedAt) });
+      }
+      return Promise.resolve({ mtime: RECENT_PLANNING_MTIME });
+    });
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(slotAgentDir, 'state.json')) {
+        return Promise.resolve(JSON.stringify({
+          model: 'gpt-4',
+          startedAt,
+          status: 'completed',
+        }));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-539');
+    expect(tree.features[0]?.sessions).toHaveLength(2);
+    const slotSession = tree.features[0]?.sessions.find((s) => s.sessionId === 'agent-pan-539-1');
+    expect(slotSession).toEqual(expect.objectContaining({
+      type: 'work',
+      sessionId: 'agent-pan-539-1',
+      endedAt: new Date(endedAt).toISOString(),
+      duration: 5400,
+      tmuxSession: 'agent-pan-539-1',
+    }));
+  });
+
   it('synthesizes an active work session for a remote fly.io agent with no local tmux', async () => {
     (listProjectsSync as any).mockReturnValue([
       {

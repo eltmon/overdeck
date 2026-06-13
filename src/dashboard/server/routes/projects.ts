@@ -17,7 +17,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveProjectFromIssue, resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
-import { withConcurrencyLimit } from '../../../lib/concurrency.js';
+import { withConcurrencyLimit, withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
@@ -55,7 +55,7 @@ async function readOptional(p: string): Promise<string | null> {
 
 function mapSessionType(type: string): SessionNodeType {
   const validTypes: SessionNodeType[] = [
-    'planning', 'work', 'review', 'reviewer', 'test', 'merge', 'legacy',
+    'planning', 'work', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
@@ -186,11 +186,12 @@ async function collectSessionTreeNodes(
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const strikeAgentId = `strike-${issueLower}`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId]);
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -209,8 +210,10 @@ async function collectSessionTreeNodes(
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
-    const stateText = await readOptional(join(agentDir, 'state.json'));
-    const remoteStateText = await readOptional(join(agentDir, 'remote-state.json'));
+    const [stateText, remoteStateText] = await Promise.all([
+      readOptional(join(agentDir, 'state.json')),
+      readOptional(join(agentDir, 'remote-state.json')),
+    ]);
     if (!stateText && !remoteStateText) continue;
 
     try {
@@ -223,7 +226,8 @@ async function collectSessionTreeNodes(
       const isRemoteAgent = remoteState?.location === 'remote' && !!remoteState.vmName;
       const isRemoteActive = isRemoteAgent && (remoteState.status === 'running' || remoteState.status === 'starting');
       const isPlanning = checkId.startsWith('planning-');
-      const sectionType = isPlanning ? 'planning' : 'work';
+      const isStrike = checkId.startsWith('strike-');
+      const sectionType: SessionNodeType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = isRemoteActive ? null : await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = isRemoteActive
@@ -241,7 +245,7 @@ async function collectSessionTreeNodes(
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning') ? checkId : undefined,
+        tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike') ? checkId : undefined,
         model: remoteState?.model || state.model || 'unknown',
         startedAt,
         endedAt: undefined,
@@ -530,7 +534,7 @@ export async function fetchProjectSessionTree(
     const remoteStates = await listActiveRemoteAgentStatesAsync();
     const remoteCandidates = await Effect.runPromise(withConcurrencyLimit(
       remoteStates
-        .filter((state) => !seenIssueLower.has(state.issueId.toLowerCase()))
+        .filter((state) => typeof state.issueId === 'string' && !seenIssueLower.has(state.issueId.toLowerCase()))
         .map((state) => Effect.promise(async () => {
           const issueLower = state.issueId.toLowerCase();
           const resolved = await Effect.runPromise(resolveProjectFromIssue(state.issueId)).catch(() => null);
@@ -582,18 +586,26 @@ export async function fetchProjectSessionTree(
   // not grow after the session ends. This is done outside collectSessionTreeNodes
   // so the already-reviewed session-row synthesis remains untouched.
   const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
+  const sessionIdsNeedingMtime = new Set<string>();
+  for (const feature of features) {
+    for (const session of feature.sessions) {
+      if (session.presence === 'ended' && !session.endedAt) {
+        sessionIdsNeedingMtime.add(session.sessionId);
+      }
+    }
+  }
   const agentDirMtimes = new Map<string, number>();
-  try {
-    const agentDirs = await readdir(AGENTS_DIR).catch(() => [] as string[]);
-    await Promise.all(
-      agentDirs
-        .filter((name) => /^agent-[a-z]+-\d+$/.test(name))
-        .map(async (name) => {
-          const s = await stat(join(AGENTS_DIR, name, 'state.json')).catch(() => null);
-          if (s) agentDirMtimes.set(name, s.mtime.getTime());
+  if (sessionIdsNeedingMtime.size > 0) {
+    try {
+      await withConcurrencyLimitPromise(
+        [...sessionIdsNeedingMtime].map((sessionId) => async () => {
+          const s = await stat(join(AGENTS_DIR, sessionId, 'state.json')).catch(() => null);
+          if (s) agentDirMtimes.set(sessionId, s.mtime.getTime());
         }),
-    );
-  } catch { /* non-fatal: post-processing best-effort */ }
+        15,
+      );
+    } catch { /* non-fatal: post-processing best-effort */ }
+  }
   for (const feature of features) {
     for (const session of feature.sessions) {
       if (session.presence !== 'ended' || session.endedAt) continue;
