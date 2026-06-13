@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1642",
   "created": "2026-06-07T02:10:48.815Z",
-  "updated": "2026-06-13T03:20:00.000Z",
+  "updated": "2026-06-13T03:55:00.000Z",
   "gitState": {
     "branch": "feature/pan-1642",
     "sha": "ab4ba668c",
@@ -247,7 +247,7 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-06-13T03:20:00.000Z",
-      "note": "Fixed PAN-1642 build/test blockers: (1) made ChatMarkdown DOMParser lazy to avoid jsdom module-load failures; (2) repaired SettingsPage streamdown toggle to use applySettings/saveStatus instead of undefined saveMutation; (3) added required MessagesResponse.streaming field to ConversationPanel fallback. npm run build, typecheck, lint, and all backend+frontend tests pass locally. Pushed to feature/pan-1642; CI re-running."
+      "note": "Fixed PAN-1642 build/test blockers: (1) made ChatMarkdown DOMParser lazy to avoid jsdom module-load failures; (2) repaired SettingsPage streamdown toggle to use applySettings/saveStatus instead of undefined saveMutation; (3) added required MessagesResponse.streaming field to ConversationPanel fallback. npm run build, typecheck, lint, and all backend+frontend tests pass locally. Pushed to feature/pan-1642. CI build/lint/clean-install smoke test pass, but the test job's 'Start dashboard server' step is a pre-existing flaky hang also observed on main CI runs (e.g. run 27454550157 cancelled at same step)."
     }
   ],
   "feedback": []
