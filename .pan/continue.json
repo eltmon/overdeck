@@ -1,0 +1,32 @@
+{
+  "version": "1",
+  "issueId": "PAN-1845",
+  "created": "2026-06-13T15:03:11.152Z",
+  "updated": "2026-06-13T15:10:25.000Z",
+  "gitState": { "branch": "feature/pan-1845", "sha": "69040f19c", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Scope = the operator-agreed required set: #1 continuous push (both tiers), #2 persistent volume (durable tier), 3a restart:on-failure+bounded max_retries (durable tier), resiliency-tier user setting, spend guardrail, and a durability preflight gate. 3c supervisor-as-PID-1 and #4 machine-health monitoring are deferred to follow-ups (NonGoals).", "recordedAt": "2026-06-13T15:10:25.000Z" },
+    { "id": "D2", "summary": "Continuous push is a VM-side detached tmux heartbeat daemon installed at spawn (commit+push every N min), because only a VM-side daemon survives the durable tier's laptop-closed promise AND is independent of agent diligence. A per-bead push instruction in work.md complements it. No host-side push patrol (redundant with the daemon + existing salvageRemoteWork). WIP commits use the wip(remote): prefix, squashed at merge.", "recordedAt": "2026-06-13T15:10:25.000Z" },
+    { "id": "D3", "summary": "Volume = one Fly volume per machine, region-pinned, mounted at /workspace, named per-issue, created via new FlyApiClient volume CRUD, mounted via createMachine `mounts`. Durable tier only. Destroyed when the machine is destroyed (deleteVm + reap) to avoid orphan/cost leak.", "recordedAt": "2026-06-13T15:10:25.000Z" },
+    { "id": "D4", "summary": "Tier is threaded into the provider via FlyProviderConfig.resiliencyTier (mapped from RemoteConfig + an explicit --tier flag in createFlyProviderFromConfig); createVm branches on this.config.resiliencyTier. Default tier = ephemeral (cheapest, safest cost posture).", "recordedAt": "2026-06-13T15:10:25.000Z" },
+    { "id": "D5", "summary": "Ephemeral-tier wind-down = host-heartbeat + VM-side watchdog. The deacon patrol touches a freshness file on each ephemeral VM; a VM-side watchdog self-stops the machine (kills PID 1; restart:no keeps it down) when the heartbeat is stale beyond a threshold. Idle-stop alone is insufficient (an autonomous agent stays busy when the laptop closes). Durable tier installs no watchdog.", "recordedAt": "2026-06-13T15:10:25.000Z" },
+    { "id": "D6", "summary": "3a delivers durability (work survives abnormal death via volume + continuous push), NOT host-independent agent auto-relaunch. Re-launching the agent after a restart and restoring the Claude conversation JSONL (which lives on the wiped rootfs, not the volume) require the 3c supervisor and are out of scope. Restart+volume is verified by the volume-survives-stop→start test.", "recordedAt": "2026-06-13T15:10:25.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "Fly machine rootfs resets from the image on EVERY start — including restart:on-failure. The volume is the ONLY thing that survives. restart without #2 is useless for durability; the volume bead MUST land before/with the restart bead.", "mitigation": "Edges: restart bead depends on the tier-threading bead; durability gate refuses durable-tier spawn without a volume mounted." },
+    { "id": "H2", "summary": "VM image must NOT run sshd (port 22 = Fly hallpass collision → PID-1 exit → kernel panic). The push daemon and watchdog must run as detached tmux/background children of the existing keep-alive, never as a new listening service or a replacement PID 1.", "mitigation": "Install the heartbeat daemon as a second `tmux new-session -d` (like the agent), not via sshd or an entrypoint change." },
+    { "id": "H3", "summary": "Machines exec API: HOME=/, ~16KB payload cap (writeRemoteFile chunks at 8KB), per-machine 429 rate limit, /wait max 60s. Writing the daemon script and any heartbeat files must go through writeRemoteFile (chunked) and tolerate 429s.", "mitigation": "Reuse writeRemoteFile for the daemon script; keep heartbeat exec calls small and paced." },
+    { "id": "H4", "summary": "git push from the VM relies on the synced gh token credential helper (syncAllCredentials). A stale OAuth/gh token (observed on PAN-1762) makes the push daemon fail silently.", "mitigation": "Daemon logs push failures to a VM file the reap/forensics path captures; existing credential-refresh patrol (refreshClaudeCredentialsForActiveRemoteAgents) keeps creds fresh." },
+    { "id": "H5", "summary": "Volumes are region-pinned and one-machine-at-a-time. A volume created in a different region than the machine fails to mount; an orphaned volume blocks reuse and costs money (cf. the Docker-network leak class).", "mitigation": "Create the volume in the machine's configured region; bead 'volume-teardown-on-destroy' destroys it on deleteVm/reap." },
+    { "id": "H6", "summary": "Continuous `git add -A && commit && push` can push uncompilable intermediate states and noisy WIP history.", "mitigation": "Accepted by design (durability > tidiness); wip(remote): prefix + pipeline squash-merge. Acceptance criteria assert the branch is current, not that every checkpoint builds." },
+    { "id": "H7", "summary": "get-or-create createVm adopts a leftover same-name machine (fly-provider.ts:171-185). An adopted machine created before this change has no volume; branching on tier alone won't retrofit a volume onto it.", "mitigation": "On adopt in durable tier, verify the expected volume is mounted; if absent, treat as a fresh create (or surface a clear error) rather than running durable work on a volumeless machine." },
+    { "id": "H8", "summary": "Auto-mode contradiction watch: the issue body lists #4 (operator visibility) as required, but the operator comment marks #4 future/out-of-immediate-scope. Resolved in favor of the operator comment (later, authoritative, explicit). Not a blocking contradiction.", "mitigation": "Recorded as NonGoal; basic visibility (tier surfaced in settings/chip) is still delivered via FR-4." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    { "timestamp": "2026-06-13T15:03:11.152Z", "reason": "planning", "note": "Planning session started for PAN-1845: remote Fly work-agent durability & resiliency tiers", "agentModel": "agent:claude-opus-4-8" }
+  ],
+  "feedback": []
+}
