@@ -8,6 +8,10 @@
  * `codex-home/sessions/` tree — resolution dispatches on the harness recorded
  * in state.json (thread-id fast path, then latest-rollout fallback).
  *
+ * Pi agents (PAN-1827) write session JSONLs under the per-agent `sessions/`
+ * tree — resolution dispatches on the harness recorded in state.json and
+ * returns the freshest `.jsonl` by mtime at any nesting depth.
+ *
  * For claude-code agents the JSONL filename is the *Claude session ID* (a UUID
  * written by Claude Code itself), NOT the agent/tmux name. Lookup order:
  *   1. session.id     — single UUID written by auto-suspend
@@ -195,11 +199,43 @@ export async function resolveCodexRolloutPath(
 }
 
 /**
+ * Resolve the Pi session JSONL for a pi-harness agent (PAN-1827).
+ *
+ * Pi nests session files under `<agentDir>/sessions/` at arbitrary depth (e.g.
+ * `<encoded-cwd>/<timestamp>_<id>.jsonl`). The per-agent sessions dir holds
+ * only this agent's sessions, so the freshest `.jsonl` by mtime is the live
+ * transcript.
+ */
+export async function resolvePiSessionPath(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const sessionsDir = join(agentsRoot, agentId, 'sessions');
+  if (!(await pathExists(sessionsDir))) return null;
+
+  const relativeNames = await readdir(sessionsDir, { recursive: true });
+  let best: { path: string; mtimeMs: number } | null = null;
+  for (const relative of relativeNames) {
+    if (!relative.endsWith('.jsonl')) continue;
+    const p = join(sessionsDir, relative);
+    try {
+      const s = await stat(p);
+      if (!best || s.mtimeMs > best.mtimeMs) {
+        best = { path: p, mtimeMs: s.mtimeMs };
+      }
+    } catch { /* missing or unreadable — skip */ }
+  }
+  return best?.path ?? null;
+}
+
+/**
  * Resolve the JSONL transcript for an agent.
  *
- * Codex agents resolve to their rollout JSONL (PAN-1805). For claude-code
- * agents, returns the absolute path if both the claudeSessionId is known AND
- * the corresponding JSONL file exists; otherwise null.
+ * Codex agents resolve to their rollout JSONL (PAN-1805). Pi agents resolve to
+ * their session JSONL (PAN-1827). For claude-code agents, returns the absolute
+ * path if both the claudeSessionId is known AND the corresponding JSONL file
+ * exists; otherwise null.
  */
 export async function resolveJsonlPath(
   agentId: string,
@@ -207,9 +243,14 @@ export async function resolveJsonlPath(
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
   // Dispatch on the recorded harness so a stale session.id from an earlier
-  // claude-code run of the same agent id can't shadow the codex transcript.
-  if (await resolveAgentHarness(agentId, opts) === 'codex') {
+  // claude-code run of the same agent id can't shadow the codex or pi
+  // transcript.
+  const harness = await resolveAgentHarness(agentId, opts);
+  if (harness === 'codex') {
     return resolveCodexRolloutPath(agentId, opts);
+  }
+  if (harness === 'pi') {
+    return resolvePiSessionPath(agentId, opts);
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
