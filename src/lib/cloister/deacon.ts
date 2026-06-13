@@ -161,6 +161,7 @@ import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
+import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
@@ -3227,6 +3228,8 @@ const mergedReviewingReconciled = new Set<string>();
  */
 const closedPrReadyReconcileCooldowns = new Map<string, number>();
 const CLOSED_PR_RECONCILE_COOLDOWN_MS = 10 * 60 * 1000;
+const testStatusGreenCiReconcileCooldowns = new Map<string, number>();
+const TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS = 5 * 60 * 1000;
 
 /**
  * Reconciler: issues with readyForMerge=true whose PR is no longer OPEN.
@@ -3301,6 +3304,22 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
     console.warn(`[deacon] Error in reconcileClosedPrReadyForMerge: ${err.message}`);
   }
   return actions;
+}
+
+export async function reconcileTestStatusFromGreenCi(): Promise<string[]> {
+  const { getCiCheckRunsState, getPullRequestHeadState, isGitHubAppConfigured } = await import('../github-app.js');
+  return reconcileTestStatusFromGreenCiWithDeps({
+    isGitHubAppConfigured,
+    loadReviewStatuses,
+    getPullRequestHeadState,
+    getCiCheckRunsState,
+    setReviewStatusSync,
+    cooldowns: testStatusGreenCiReconcileCooldowns,
+    cooldownMs: TEST_STATUS_GREEN_CI_RECONCILE_COOLDOWN_MS,
+    now: () => Date.now(),
+    log: (message) => console.log(`[deacon] ${message}`),
+    warn: (message) => console.warn(`[deacon] ${message}`),
+  });
 }
 
 export async function reconcileMergedButReviewing(): Promise<string[]> {
@@ -5040,6 +5059,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...inspectTimeoutActions);
   for (const a of inspectTimeoutActions) addLog('action', a, state.patrolCycle);
 
+  // Detect new commits pushed after review passed before any test/merge path can
+  // act on stale review approval.
+  const postReviewActions = await checkPostReviewCommits();
+  actions.push(...postReviewActions);
+  for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
+
   // Check for completed work with no review status entry at all (PAN-699)
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
@@ -5052,6 +5077,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const unsignaledTestActions = await checkCompletedButUnsignaledTests();
   actions.push(...unsignaledTestActions);
   for (const a of unsignaledTestActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1658: after a rebase, reviewStatus may already be passed while testStatus
+  // remains pending. Run before the dispatcher so green GitHub Actions CI on the
+  // current PR HEAD can clear stale pending state instead of spawning a new test.
+  const greenCiTestStatusActions = await reconcileTestStatusFromGreenCi();
+  actions.push(...greenCiTestStatusActions);
+  for (const a of greenCiTestStatusActions) addLog('action', a, state.patrolCycle);
 
   // Retry test-agent dispatch for issues where review passed but test never started (PAN-699)
   const pendingTestActions = await checkPendingTestDispatch();
@@ -5093,11 +5125,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reviewCleanupActions = await cleanupOrphanedReviewSessions();
   actions.push(...reviewCleanupActions);
   for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
-
-  // Detect new commits pushed after review passed — invalidate stale reviews
-  const postReviewActions = await checkPostReviewCommits();
-  actions.push(...postReviewActions);
-  for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
 
   // PAN-464: Check workspace Docker container health and auto-restart crashed containers
   const containerActions = await checkWorkspaceContainerHealth(state);
