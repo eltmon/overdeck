@@ -2305,3 +2305,22 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
   contention is NOT materializing; can keep scaling.
 - **PAN-1803 convoy frozen >60min** — surfaced as investigate + openQuestion; can't resume.
   Main advanced to `c0c26f955`. RAM 27/64 GB, swap 3.3/8.2.
+
+## RUN-32 tick 4 (2026-06-13 ~15:05Z) — OPERATOR FLIPPED UAT OFF; executed 3 decisions; merge gate is actually a CLOSE-OUT gate
+
+**Operator message mid-tick (standing authorization granted — act on items like these without parking back):**
+1. `flywheel.require_uat_before_merge` → **FALSE** (confirmed in config). Merge review+test-passed work without UAT; review+test gates still apply.
+2. Abort+restart the dead PAN-1803 convoy.
+3. Discard orphaned PAN-1506/1508/1510 workspaces.
+
+**Executed:**
+- **PAN-1803 review restarted** via `pan review restart PAN-1803` (the pipeline-native way, NOT raw `pan kill`) → fresh 4/4 reviewer convoy. The frozen one is replaced.
+- **Discarded orphan workspaces:** `pan workspace destroy PAN-1510 --force` ✓. PAN-1506's workspace was strike-suffixed (`feature-pan-1506-strike`) so `destroy` (which resolves the standard `feature-pan-<id>` path) couldn't find it — removed via `git worktree remove --force`. Deleted empty 0-ahead branches `strike/pan-1506`, `strike/pan-1508` (feature/pan-1510 branch was already gone with the workspace).
+- **PAN-1818 finished work → in_review** (6 fix commits). **PAN-1834 → 5 commits** (rate-limit/model-switch modal detection + rateLimit PendingInputKind). Started work on **PAN-1813** + **PAN-1802** (both proposed→`pan start`, 5 beads each). Launched planning on **PAN-1845** (Fly work-loss, operator-greenlit) + **PAN-1769**.
+
+**KEY FINDING — the "16 merge gate" is a CLOSE-OUT gate, not a merge gate:**
+- The 16 "awaiting UAT" issues are **already merged to main** (`verifying_on_main`, tracker still OPEN). Auto-merge **cannot** act on them — they have no open PR / are not readyForMerge.
+- The ACTUAL merge gate (in_review issues that are review+test-passed-and-not-merged) is **currently EMPTY**: probed `/api/flywheel/auto-merge/schedule {issueId}` for PAN-1491/1242/1629 → all `"review status is not readyForMerge"`. The endpoint self-gates on `isAutoMergeEligible` + `readyForMerge` + PR URL, so it's safe to probe — ineligible → 422/422, never a premature merge.
+- **Auto-merge mechanics (for future ticks):** `POST /api/flywheel/auto-merge/schedule` with header `Origin: http://localhost:3011` and body `{"issueId":"PAN-XXXX"}`. Checks: shouldHoldForUat (per-issue autoMerge → project default → global require-UAT; global now false) → not paused → flywheel running → isAutoMergeEligible → readyForMerge → PR URL → schedules merge. Single issue per call. Review-status store: `~/.panopticon/review-status.json` (sparse — live status is in the read model via `getReviewStatusSync`).
+- **Clearing the 16 needs CLOSE-OUT** (`pan close` / dashboard Close Out) — which is forbidden to the orchestrator AND semi-destructive (closes tracker + tears down workspace/branches per close_out config) AND was not one of the three named authorizations. **Surfaced as the single genuine blocker** with default recommendation YES. Also surfaced: should UAT-off imply auto-close-out (substrate gap)?
+- **0 bd-lock errors across 11 launches.** RAM 29-31/64 GB, swap 3.7/8.2. 9 productive agents + 2 review convoys active. Main `69040f19c`.
