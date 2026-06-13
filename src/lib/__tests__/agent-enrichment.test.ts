@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appendPaneDetectionKind, type PendingInputKind } from '../agent-enrichment.js'
+import { appendPaneDetectionKind, isOwnActiveSpecialist, type PendingInputKind } from '../agent-enrichment.js'
 
 describe('appendPaneDetectionKind', () => {
   it('adds rateLimit for a rate_limit pane detection', () => {
@@ -30,5 +30,20 @@ describe('appendPaneDetectionKind', () => {
     const kinds: PendingInputKind[] = []
     appendPaneDetectionKind(null, kinds)
     expect(kinds).toEqual([])
+  })
+})
+
+describe('isOwnActiveSpecialist', () => {
+  it('returns true for review, test, and ship roles', () => {
+    expect(isOwnActiveSpecialist('review')).toBe(true)
+    expect(isOwnActiveSpecialist('test')).toBe(true)
+    expect(isOwnActiveSpecialist('ship')).toBe(true)
+  })
+
+  it('returns false for work, plan, flywheel, and undefined roles', () => {
+    expect(isOwnActiveSpecialist('work')).toBe(false)
+    expect(isOwnActiveSpecialist('plan')).toBe(false)
+    expect(isOwnActiveSpecialist('flywheel')).toBe(false)
+    expect(isOwnActiveSpecialist(undefined)).toBe(false)
   })
 })

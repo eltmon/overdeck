@@ -86,6 +86,13 @@ export function appendPaneDetectionKind(detection: AwaitingInputDetection | null
   }
 }
 
+// PAN-1834 — an agent that IS the active specialist (review/test/ship) must
+// still surface its own pending-input. Only suppress the parked work/plan agent
+// when another specialist is active on the same issue.
+export function isOwnActiveSpecialist(role: AgentEnrichment['role']): boolean {
+  return role === 'review' || role === 'test' || role === 'ship'
+}
+
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
 
 export function getClaudeProjectDir(workspacePath: string): string {
@@ -484,7 +491,8 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     : null
 
   const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection
-  const hasPendingQuestion = !hasActiveSpecialist && detection !== null
+  const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
+  const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
   // PAN-1520 — fold every blocking surface into a uniform set.
   // PermissionRequest is tracked server-side in channelPermissionRequestsById and
@@ -492,7 +500,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // here owns the JSONL-derived kinds plus pane/runtime fallbacks.
   const pendingInputKinds: PendingInputKind[] = []
   let pendingAskUserQuestion: PendingAskUserQuestionSnapshot | undefined
-  if (!hasActiveSpecialist) {
+  if (!shouldSuppressPendingInput) {
     if (pendingQuestions.length > 0) {
       pendingInputKinds.push('askUserQuestion')
       const first = pendingQuestions[0]
