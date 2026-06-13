@@ -24,7 +24,7 @@ vi.mock('util', async (importOriginal) => {
 });
 
 // Import after mocks are registered
-import { createBeadsFromVBrief } from '../beads.js';
+import { createBeadsFromVBrief, resolveBdTimeout } from '../beads.js';
 import { writeAutoStartVBrief } from '../auto-synthesize.js';
 import { findPlanSync, readWorkspacePlanSync } from '../io.js';
 
@@ -98,12 +98,16 @@ describe('createBeadsFromVBrief', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Fix the operational timeout so resolveBdTimeout skips its probe; this keeps
+    // existing mock sequences stable. The probe behavior is tested separately below.
+    process.env.PANOPTICON_BD_TIMEOUT_MS = '30000';
     const ws = createWorkspace('PAN-500');
     projectRoot = ws.projectRoot;
     WORKSPACE_DIR = ws.workspacePath;
   });
 
   afterEach(() => {
+    delete process.env.PANOPTICON_BD_TIMEOUT_MS;
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
@@ -568,5 +572,104 @@ describe('createBeadsFromVBrief', () => {
 
       rmSync(ws8.projectRoot, { recursive: true, force: true });
     });
+  });
+
+  describe('resolveBdTimeout', () => {
+    it('returns PANOPTICON_BD_TIMEOUT_MS verbatim and does not probe bd (AC1)', async () => {
+      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+      process.env.PANOPTICON_BD_TIMEOUT_MS = '120000';
+
+      const ws = createWorkspace('PAN-520');
+      setupRedirect(ws.workspacePath);
+
+      const timeout = await resolveBdTimeout(ws.workspacePath);
+
+      expect(timeout).toBe(120000);
+      const pingCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'ping',
+      );
+      expect(pingCalls).toHaveLength(0);
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('clamps bd ping total_ms * 20 between floor and ceiling (AC2)', async () => {
+      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+
+      const cases = [
+        { totalMs: 5000, expected: 100000 },
+        { totalMs: 255, expected: 30000 },
+        { totalMs: 12000, expected: 180000 },
+      ];
+
+      for (const { totalMs, expected } of cases) {
+        vi.clearAllMocks();
+        const ws = createWorkspace(`PAN-${520 + totalMs}`);
+        setupRedirect(ws.workspacePath);
+
+        mockExecAsync.mockResolvedValueOnce({ stdout: JSON.stringify({ total_ms: totalMs }), stderr: '' });
+
+        const timeout = await resolveBdTimeout(ws.workspacePath);
+        expect(timeout).toBe(expected);
+
+        const pingCalls = mockExecAsync.mock.calls.filter(
+          ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'ping',
+        );
+        expect(pingCalls).toHaveLength(1);
+        expect(pingCalls[0][2]).toMatchObject({ timeout: 8000 });
+
+        rmSync(ws.projectRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('returns floor when bd ping throws or returns unparseable JSON (AC3)', async () => {
+      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+
+      const errorCases = [
+        { label: 'throws', result: () => Promise.reject(new Error('ping failed')) },
+        { label: 'unparseable', result: () => Promise.resolve({ stdout: 'not-json', stderr: '' }) },
+      ];
+
+      for (const { label, result } of errorCases) {
+        vi.clearAllMocks();
+        const ws = createWorkspace(`PAN-530-${label}`);
+        setupRedirect(ws.workspacePath);
+
+        mockExecAsync.mockImplementation(result);
+
+        const timeout = await resolveBdTimeout(ws.workspacePath);
+        expect(timeout).toBe(30000);
+
+        rmSync(ws.projectRoot, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('passes the resolved timeout to bd create (AC4)', async () => {
+    delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+    process.env.PANOPTICON_BD_TIMEOUT_MS = '95000';
+
+    const ws = createWorkspace('PAN-540');
+    setupRedirect(ws.workspacePath);
+    writePlan(ws.projectRoot, 'PAN-540', makeDoc('PAN-540', [{ id: 'item-1', title: 'Timeout task' }]));
+
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json (connectivity probe)
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list (dedup)
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // post-delete list
+      .mockResolvedValueOnce({ stdout: 'bead-timeout\n', stderr: '' }); // bd create
+
+    const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+    expect(result.success).toBe(true);
+
+    const createCall = mockExecAsync.mock.calls.find(
+      ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
+    );
+    expect(createCall).toBeDefined();
+    expect(createCall![2]).toMatchObject({ timeout: 95000 });
+
+    rmSync(ws.projectRoot, { recursive: true, force: true });
   });
 });

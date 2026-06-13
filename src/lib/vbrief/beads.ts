@@ -60,6 +60,47 @@ function execFileErrorMessage(error: any): string {
   return firstLine(error?.stderr?.toString() || error?.message || error);
 }
 
+/** Bootstrap timeout for the latency probe that derives the operational timeout. */
+const BD_PING_BOOTSTRAP_TIMEOUT_MS = 8000;
+/** Floor for the adaptive bd operational timeout. Preserves today's 30s default. */
+const BD_TIMEOUT_FLOOR_MS = 30000;
+/** Ceiling for the adaptive bd operational timeout. Prevents near-unbounded waits. */
+const BD_TIMEOUT_CEILING_MS = 180000;
+/** Multiplier applied to bd ping total_ms to derive the operational timeout. */
+const BD_TIMEOUT_MULTIPLIER = 20;
+
+/**
+ * Resolve the operational timeout for all bd calls in this finalize.
+ *
+ * - If PANOPTICON_BD_TIMEOUT_MS is a positive integer, return it verbatim and
+ *   do NOT probe bd.
+ * - Otherwise run `bd ping --json` once with a fixed bootstrap timeout, read
+ *   total_ms, and clamp(total_ms * 20, 30s, 180s).
+ * - If the probe fails or returns unparseable JSON, return the 30s floor.
+ *
+ * The caller (createBeadsFromVBriefPromise) caches the result for the lifetime
+ * of one finalize so the probe runs once.
+ */
+export async function resolveBdTimeout(workspacePath: string): Promise<number> {
+  const envValue = Number(process.env.PANOPTICON_BD_TIMEOUT_MS);
+  if (Number.isInteger(envValue) && envValue > 0) {
+    return envValue;
+  }
+
+  try {
+    const { stdout } = await execFileAsync('bd', ['ping', '--json'], {
+      encoding: 'utf-8',
+      cwd: workspacePath,
+      timeout: BD_PING_BOOTSTRAP_TIMEOUT_MS,
+    });
+    const parsed = JSON.parse(stdout);
+    const totalMs = typeof parsed?.total_ms === 'number' ? parsed.total_ms : 0;
+    return Math.min(BD_TIMEOUT_CEILING_MS, Math.max(BD_TIMEOUT_FLOOR_MS, totalMs * BD_TIMEOUT_MULTIPLIER));
+  } catch {
+    return BD_TIMEOUT_FLOOR_MS;
+  }
+}
+
 function parseBdList(stdout: unknown): any[] {
   const parsed = JSON.parse(String(stdout || '[]'));
   if (!Array.isArray(parsed)) throw new Error('bd list returned non-array JSON');
@@ -73,19 +114,19 @@ function beadIdsFromList(beads: any[]): string[] {
     .map(id => String(id));
 }
 
-async function listBeadsForIssue(workspacePath: string, issueLabel: string): Promise<any[]> {
+async function listBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number): Promise<any[]> {
   const { stdout } = await execFileAsync(
     'bd',
     ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-    { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
+    { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs }
   );
   return parseBdList(stdout);
 }
 
-export async function clearBeadsForIssue(workspacePath: string, issueLabel: string): Promise<ClearBeadsResult> {
+export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
   let existingBeads: any[];
   try {
-    existingBeads = await listBeadsForIssue(workspacePath, issueLabel);
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
   } catch (error: any) {
     return { cleared: 0, errors: [`list failed: ${execFileErrorMessage(error)}`] };
   }
@@ -95,7 +136,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   for (const id of beadIdsFromList(existingBeads)) {
     try {
       await execFileAsync('bd', ['delete', id, '--force'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
       });
       cleared++;
     } catch (error: any) {
@@ -105,7 +146,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
 
   let residualBeads: any[];
   try {
-    residualBeads = await listBeadsForIssue(workspacePath, issueLabel);
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
   } catch (error: any) {
     errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
     return { cleared, errors };
@@ -176,11 +217,11 @@ async function createBeadsFromVBriefPromise(
       // No main .beads/ and no local .beads/ — fall back to bd init
       const prefix = deriveProjectPrefix(workspacePath);
       try {
-        await execFileAsync('bd', ['init', '--prefix', prefix], { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        await execFileAsync('bd', ['init', '--prefix', prefix], { encoding: 'utf-8', cwd: workspacePath, timeout: BD_TIMEOUT_FLOOR_MS });
         await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
         // Disable beads' auto-export git-add to prevent "git add failed" warnings in worktrees
         await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-          encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+          encoding: 'utf-8', cwd: workspacePath, timeout: BD_TIMEOUT_FLOOR_MS,
         }).catch(() => {});
         console.log(`[beads] Initialized beads database in ${workspacePath} (prefix: ${prefix})`);
       } catch (initErr: any) {
@@ -199,11 +240,15 @@ async function createBeadsFromVBriefPromise(
   const planEdges = plan.edges ?? [];
   const inspectionPolicy = doc.vBRIEFInfo.inspectionPolicy ?? 'auto';
 
+  // Resolve the operational timeout once per finalize. The probe itself uses a
+  // fixed bootstrap timeout; every other bd call uses the resolved value.
+  const bdTimeoutMs = await resolveBdTimeout(workspacePath);
+
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
   try {
     await execFileAsync('bd', ['ping', '--json'], {
-      encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
+      encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
     });
   } catch (connectErr: any) {
     const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
@@ -217,7 +262,7 @@ async function createBeadsFromVBriefPromise(
     console.warn(`[beads] bd ping failed (${firstLine}); running bd doctor --fix before retry`);
     try {
       await execFileAsync('bd', ['doctor', '--fix'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 30000,
+        encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
       });
     } catch (doctorErr: any) {
       const doctorErrMsg = String(doctorErr?.message ?? doctorErr?.stderr ?? '');
@@ -227,7 +272,7 @@ async function createBeadsFromVBriefPromise(
 
     try {
       await execFileAsync('bd', ['ping', '--json'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
+        encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
       });
     } catch (retryErr: any) {
       if (!redirectExists && !existsSync(mainBeadsDir)) {
@@ -235,11 +280,11 @@ async function createBeadsFromVBriefPromise(
         console.log(`[beads] No redirect and no main beads — bd init --prefix ${prefix}`);
         try {
           await execFileAsync('bd', ['init', '--prefix', prefix], {
-            encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
+            encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
           });
           await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
           await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-            encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+            encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
           }).catch(() => {});
           console.log(`[beads] bd init succeeded for prefix ${prefix}`);
         } catch (initErr: any) {
@@ -259,7 +304,7 @@ async function createBeadsFromVBriefPromise(
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel);
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, bdTimeoutMs);
   if (clearResult.errors.length > 0) {
     return {
       success: false,
@@ -379,7 +424,7 @@ async function createBeadsFromVBriefPromise(
       const { stdout } = await execFileAsync('bd', args, {
         encoding: 'utf-8',
         cwd: workspacePath,
-        timeout: 30000,
+        timeout: bdTimeoutMs,
       });
       const beadId = stdout.trim();
 
@@ -395,7 +440,7 @@ async function createBeadsFromVBriefPromise(
       // so hangs don't look like generic failures.
       const timedOut = error?.killed === true || /ETIMEDOUT/i.test(String(error?.code ?? ''));
       const errMsg = error?.stderr?.toString() || error?.message || String(error);
-      const prefix = timedOut ? 'timed out after 30s' : errMsg.split('\n')[0];
+      const prefix = timedOut ? `timed out after ${Math.round(bdTimeoutMs / 1000)}s` : errMsg.split('\n')[0];
       errors.push(`Failed to create "${item.title}": ${prefix}`);
       console.warn(`[beads] (${i + 1}/${orderedIds.length}) FAILED "${item.title}": ${prefix}`);
     }
