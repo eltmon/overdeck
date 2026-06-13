@@ -275,12 +275,14 @@ describe('IssueDataService - fetchLinearIssues rate-limit headers', () => {
     vi.clearAllMocks();
   });
 
-  function makeLinearResponse(headers: Record<string, string>, body: any) {
+  function makeLinearResponse(headers: Record<string, string>, body: any, status: number = 200) {
+    const bodyText = typeof body === 'string' ? body : JSON.stringify(body);
     return {
-      ok: true,
-      status: 200,
+      ok: status >= 200 && status < 300,
+      status,
       headers: new Headers(headers),
       json: vi.fn().mockResolvedValue(body),
+      text: vi.fn().mockResolvedValue(bodyText),
     };
   }
 
@@ -419,6 +421,80 @@ describe('IssueDataService - fetchLinearIssues rate-limit headers', () => {
       remaining: 0,
       total: 2500,
       resetAt: new Date(resetMs).toISOString(),
+    }));
+  });
+
+  it('records exhaustion on HTTP 429 before throwing', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { errors: [{ message: 'Rate limit exceeded' }] },
+        429
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('Rate limit exceeded');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    }));
+  });
+
+  it('derives resetAt from Retry-After on 429 when rate-limit headers are absent', async () => {
+    const retryAfterSeconds = 120;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        { 'retry-after': String(retryAfterSeconds) },
+        'Too Many Requests',
+        429
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('HTTP 429');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      resetAt: new Date(Date.now() + retryAfterSeconds * 1000).toISOString(),
+    }));
+  });
+
+  it('defaults resetAt to one hour on 429 when no reset or Retry-After is present', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {},
+        'Too Many Requests',
+        429
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('HTTP 429');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      resetAt: new Date(Date.now() + 3_600_000).toISOString(),
+    }));
+  });
+
+  it('records exhaustion on GraphQL RATELIMITED error (HTTP 200) before throwing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {},
+        { errors: [{ message: 'RATELIMITED' }] }
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('RATELIMITED');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      resetAt: new Date(Date.now() + 3_600_000).toISOString(),
     }));
   });
 });

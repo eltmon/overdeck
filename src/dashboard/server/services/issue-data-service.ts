@@ -1015,6 +1015,30 @@ export class IssueDataService {
     return new Date(epochMs).toISOString();
   }
 
+  private recordLinearExhaustion(response: Response, nowMs: number): void {
+    const existing = this.cache.getRateLimit('linear');
+    const total =
+      parseIntegerHeader(response.headers, 'x-ratelimit-requests-limit') ??
+      parseIntegerHeader(response.headers, 'x-ratelimit-limit') ??
+      existing?.total ??
+      2500;
+
+    let resetAt = this.normalizeLinearResetAt(
+      parseIntegerHeader(response.headers, 'x-ratelimit-requests-reset') ??
+        parseIntegerHeader(response.headers, 'x-ratelimit-reset')
+    );
+    if (!resetAt) {
+      const retryAfter = parseIntegerHeader(response.headers, 'retry-after');
+      if (retryAfter !== null) {
+        resetAt = new Date(nowMs + retryAfter * 1000).toISOString();
+      } else {
+        resetAt = new Date(nowMs + 3_600_000).toISOString();
+      }
+    }
+
+    this.cache.updateRateLimit('linear', { remaining: 0, total, resetAt });
+  }
+
   private async fetchLinearIssues(apiKey: string, sinceUpdatedAt: string | null): Promise<any[]> {
     const allIssues: any[] = [];
     let hasMore = true;
@@ -1120,10 +1144,27 @@ export class IssueDataService {
         this.cache.updateRateLimit('linear', { remaining: rlRemaining, total: rlTotal, resetAt: rlReset });
       }
 
+      // Detect quota exhaustion on HTTP 429 before attempting to parse the body.
+      if (response.status === 429) {
+        this.recordLinearExhaustion(response, Date.now());
+        let bodyText = '';
+        try { bodyText = await response.text(); } catch { /* ignore unreadable body */ }
+        let message = `Linear API error: HTTP 429`;
+        try {
+          const body = JSON.parse(bodyText);
+          if (body?.errors?.[0]?.message) message = body.errors[0].message;
+        } catch { /* ignore non-JSON body */ }
+        throw new Error(message);
+      }
+
       const json = await response.json();
 
       if (json.errors) {
-        throw new Error(json.errors[0]?.message || 'Linear GraphQL error');
+        const message = json.errors[0]?.message || 'Linear GraphQL error';
+        if (/rate limit|ratelimited/i.test(message)) {
+          this.recordLinearExhaustion(response, Date.now());
+        }
+        throw new Error(message);
       }
 
       const issues = json.data?.issues;
