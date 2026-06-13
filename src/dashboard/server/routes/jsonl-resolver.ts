@@ -285,7 +285,7 @@ export async function resolvePiSessionPath(
   const agentDir = safeAgentDir(agentsRoot, agentId);
   if (!agentDir) return null;
   const sessionsDir = join(agentDir, 'sessions');
-  const resolvedRoot = await containedPath(sessionsDir, agentsRoot);
+  const resolvedRoot = await containedPath(sessionsDir, agentDir);
   if (!resolvedRoot) return null;
 
   const cached = getCachedPiSessionPath(resolvedRoot);
@@ -301,6 +301,7 @@ export async function resolvePiSessionPath(
 
   async function scan(dir: string, depth: number): Promise<void> {
     if (depth > PI_SESSION_SCAN_MAX_DEPTH) return;
+    if (scanned >= PI_SESSION_SCAN_MAX_FILES) return;
     let entries: string[];
     try {
       entries = await readdir(dir);
@@ -308,6 +309,7 @@ export async function resolvePiSessionPath(
       return;
     }
     for (const entry of entries) {
+      if (scanned >= PI_SESSION_SCAN_MAX_FILES) return;
       const full = join(dir, entry);
       let info;
       try {
@@ -321,7 +323,6 @@ export async function resolvePiSessionPath(
         continue;
       }
       if (!info.isFile() || !entry.endsWith('.jsonl')) continue;
-      if (scanned >= PI_SESSION_SCAN_MAX_FILES) continue;
       scanned++;
       const contained = await containedPath(full, resolvedRoot);
       if (!contained) continue;
