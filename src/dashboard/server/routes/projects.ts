@@ -14,7 +14,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
+import { resolveProjectFromIssue, resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -498,42 +498,71 @@ export async function fetchProjectSessionTree(
   }> = [];
   const issueTitles = sharedContext?.issueTitles ?? await buildIssueTitleMap();
 
+  const featureCandidates: Array<{
+    name: string;
+    issueLower: string;
+    issueId: string;
+  }> = [];
+  const seenIssueLower = new Set<string>();
+
   if (await pathExists(workspacesDir)) {
     const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
-    const featureCandidates = entries
-      .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
-      .map(e => ({
+    for (const e of entries.filter(e => e.isDirectory() && e.name.startsWith('feature-'))) {
+      const issueLower = e.name.replace('feature-', '');
+      if (!/^[a-z]+-\d+$/.test(issueLower)) continue;
+      featureCandidates.push({
         name: e.name,
-        issueLower: e.name.replace('feature-', ''),
-        issueId: e.name.replace('feature-', '').toUpperCase(),
-      }))
-      .filter(c => /^[a-z]+-\d+$/.test(c.issueLower));
-
-    const results = await Effect.runPromise(withConcurrencyLimit(
-      featureCandidates.map((c) => Effect.promise(async () => {
-        const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
-        const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
-        const [hasAgent, hasPlanning] = await Promise.all([
-          pathExists(agentDir),
-          pathExists(panDir),
-        ]);
-        if (!hasAgent && !hasPlanning) return null;
-        try {
-          const workspacePath = join(workspacesDir, c.name);
-          const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
-          if (sessions.length === 0) return null;
-          const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
-          return { issueId: c.issueId, title, sessions };
-        } catch (err) {
-          console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
-          return null;
-        }
-      })),
-      15,
-    ));
-
-    features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
+        issueLower,
+        issueId: issueLower.toUpperCase(),
+      });
+      seenIssueLower.add(issueLower);
+    }
   }
+
+  // Seed additional candidates from active remote (fly.io) agents so an issue
+  // with a remote-state.json but no local workspace still gets a session row.
+  try {
+    const { listActiveRemoteAgentStates } = await import('../../../lib/remote/remote-agents.js');
+    for (const state of listActiveRemoteAgentStates()) {
+      const issueLower = state.issueId.toLowerCase();
+      if (seenIssueLower.has(issueLower)) continue;
+      const resolved = await Effect.runPromise(resolveProjectFromIssue(state.issueId)).catch(() => null);
+      if (resolved?.projectKey !== project.key) continue;
+      featureCandidates.push({
+        name: `feature-${issueLower}`,
+        issueLower,
+        issueId: state.issueId,
+      });
+      seenIssueLower.add(issueLower);
+    }
+  } catch {
+    // Remote module unavailable — tree simply omits remote-only agents.
+  }
+
+  const results = await Effect.runPromise(withConcurrencyLimit(
+    featureCandidates.map((c) => Effect.promise(async () => {
+      const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
+      const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
+      const [hasAgent, hasPlanning] = await Promise.all([
+        pathExists(agentDir),
+        pathExists(panDir),
+      ]);
+      if (!hasAgent && !hasPlanning) return null;
+      try {
+        const workspacePath = join(workspacesDir, c.name);
+        const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
+        if (sessions.length === 0) return null;
+        const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
+        return { issueId: c.issueId, title, sessions };
+      } catch (err) {
+        console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
+        return null;
+      }
+    })),
+    15,
+  ));
+
+  features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
 
   // Sort features by issueId for stable ordering
   features.sort((a, b) => a.issueId.localeCompare(b.issueId));

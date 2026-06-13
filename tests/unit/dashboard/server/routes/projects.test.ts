@@ -6,7 +6,7 @@ import { join } from 'node:path';
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
   listProjectsSync: vi.fn(),
-  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  resolveProjectFromIssue: vi.fn(() => Effect.succeed({ projectKey: 'panopticon-cli' })),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
 }));
 
@@ -51,6 +51,11 @@ vi.mock('../../../../../src/lib/pan-dir/specs.js', () => ({
   findSpecByIssue: mockFindSpecByIssue,
 }));
 
+const mockListActiveRemoteAgentStates = vi.hoisted(() => vi.fn(() => []));
+vi.mock('../../../../../src/lib/remote/remote-agents.js', () => ({
+  listActiveRemoteAgentStates: mockListActiveRemoteAgentStates,
+}));
+
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual('node:fs/promises') as object;
   return {
@@ -63,7 +68,7 @@ vi.mock('node:fs/promises', async () => {
 });
 
 import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
-import { listProjectsSync } from '../../../../../src/lib/projects.js';
+import { listProjectsSync, resolveProjectFromIssue } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
@@ -84,6 +89,7 @@ describe('fetchProjectSessionTree', () => {
     vi.clearAllMocks();
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
+    mockListActiveRemoteAgentStates.mockReturnValue([]);
   });
 
   it('returns null for unknown project key', async () => {
@@ -224,6 +230,178 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features).toHaveLength(1);
     expect(tree.features[0]?.issueId).toBe('PAN-123');
     expect(tree.features[0]?.title).toBe('Implement Command Deck Session Tree');
+  });
+
+  it('synthesizes a remote session row when the remote agent has no local workspace directory', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    const agentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-1762');
+    mockAccess(new Set([agentDir]));
+    (readdir as any).mockImplementation((p: string) => {
+      if (p === join(homedir(), '.panopticon', 'agents')) {
+        return Promise.resolve([]);
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+    const remoteState = {
+      id: 'agent-pan-1762',
+      issueId: 'PAN-1762',
+      vmName: 'pan-pan-1762-ws',
+      model: 'claude-fable-5',
+      status: 'running',
+      startedAt: '2026-06-11T00:00:00Z',
+      location: 'remote',
+    };
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(agentDir, 'remote-state.json')) {
+        return Promise.resolve(JSON.stringify(remoteState));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+    mockListActiveRemoteAgentStates.mockReturnValue([remoteState]);
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-1762');
+    expect(tree.features[0]?.sessions).toEqual([
+      expect.objectContaining({
+        type: 'work',
+        sessionId: 'agent-pan-1762',
+        model: 'claude-fable-5',
+        status: 'running',
+        presence: 'active',
+        tmuxSession: undefined,
+        remote: { provider: 'fly.io', vmName: 'pan-pan-1762-ws' },
+      }),
+    ]);
+    expect(getAgentRuntimeState).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates remote candidates against workspace-scan candidates', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    const agentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-1762');
+    mockAccess(new Set([
+      '/tmp/panopticon-cli/workspaces',
+      agentDir,
+    ]));
+    const remoteState = {
+      id: 'agent-pan-1762',
+      issueId: 'PAN-1762',
+      vmName: 'pan-pan-1762-ws',
+      model: 'claude-fable-5',
+      status: 'running',
+      startedAt: '2026-06-11T00:00:00Z',
+      location: 'remote',
+    };
+    (readdir as any).mockImplementation((p: string) => {
+      if (p === '/tmp/panopticon-cli/workspaces') {
+        return Promise.resolve([{ name: 'feature-pan-1762', isDirectory: () => true }]);
+      }
+      if (p === join(homedir(), '.panopticon', 'agents')) {
+        return Promise.resolve([]);
+      }
+      return Promise.resolve([]);
+    });
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(agentDir, 'remote-state.json')) {
+        return Promise.resolve(JSON.stringify(remoteState));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+    mockListActiveRemoteAgentStates.mockReturnValue([remoteState]);
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-1762');
+  });
+
+  it('excludes remote agents whose issue resolves to a different project', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (resolveProjectFromIssue as any).mockReturnValue(Effect.succeed({ projectKey: 'mind-your-now' }));
+    mockAccess(new Set([]));
+    (readdir as any).mockResolvedValue([]);
+    (readFile as any).mockRejectedValue({ code: 'ENOENT' });
+    mockListActiveRemoteAgentStates.mockReturnValue([{
+      id: 'agent-min-123',
+      issueId: 'MIN-123',
+      vmName: 'min-min-123-ws',
+      model: 'claude-fable-5',
+      status: 'running',
+      startedAt: '2026-06-11T00:00:00Z',
+      location: 'remote',
+    }]);
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    const tree = result as { features: Array<unknown> };
+    expect(tree.features).toHaveLength(0);
+  });
+
+  it('falls back to workspace-derived features when remote seeding throws', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'panopticon-cli',
+        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
+    (resolveProjectFromIssue as any).mockReturnValue(Effect.succeed({ projectKey: 'panopticon-cli' }));
+    mockAccess(new Set([
+      '/tmp/panopticon-cli/workspaces',
+      '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan',
+      '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan/continue.json',
+      join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
+      join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
+    ]));
+    (readdir as any).mockResolvedValue([
+      { name: 'feature-pan-539', isDirectory: () => true },
+    ]);
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json')) {
+        return Promise.resolve(JSON.stringify({
+          model: 'gpt-4',
+          startedAt: '2026-01-01T00:00:00Z',
+          status: 'running',
+        }));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+    mockListActiveRemoteAgentStates.mockImplementation(() => {
+      throw new Error('remote-agents unavailable');
+    });
+
+    const result = await fetchProjectSessionTree('panopticon-cli');
+    expect(result).not.toBeNull();
+    const tree = result as { features: Array<{ issueId: string }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('PAN-539');
   });
 
   it('synthesizes an active work session for a remote fly.io agent with no local tmux', async () => {
