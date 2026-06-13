@@ -8,7 +8,8 @@ const readlineMocks = vi.hoisted(() => ({
 const agentMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
   getAgentStateSync: vi.fn(),
-  clearAgentPaused: vi.fn(),
+  clearAgentPausedSync: vi.fn(),
+  getProviderAuthMode: vi.fn(async () => 'subscription'),
 }))
 
 vi.mock('readline/promises', () => ({
@@ -26,8 +27,8 @@ vi.mock('../../../lib/agents.js', () => ({
   spawnAgent: vi.fn(async () => ({ id: 'agent-x', issueId: 'PAN-X', workspace: '/tmp', model: 'm', startedAt: new Date().toISOString() })),
   getAgentState: agentMocks.getAgentState,
   getAgentStateSync: agentMocks.getAgentState,
-  clearAgentPaused: agentMocks.clearAgentPaused,
-  getProviderAuthMode: vi.fn(async () => 'subscription'),
+  clearAgentPausedSync: agentMocks.clearAgentPausedSync,
+  getProviderAuthMode: agentMocks.getProviderAuthMode,
   getProviderEnvForModel: vi.fn(async () => ({})),
   getProviderExportsForModel: vi.fn(async () => ''),
   getAgentRuntimeBaseCommand: vi.fn(async () => 'claude'),
@@ -50,11 +51,41 @@ describe('pan start --harness flag (PAN-636)', () => {
     readlineMocks.question.mockReset()
     readlineMocks.close.mockReset()
     agentMocks.getAgentState.mockReset()
-    agentMocks.clearAgentPaused.mockReset()
+    agentMocks.clearAgentPausedSync.mockReset()
+    agentMocks.getProviderAuthMode.mockClear()
+    agentMocks.getProviderAuthMode.mockResolvedValue('subscription')
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`__exit__:${code}`)
     }) as never)
     stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true as any)
+  })
+
+  it('returns undefined for a missing --harness flag', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(__testInternals.resolveExplicitHarnessFlag(undefined, undefined)).resolves.toBeUndefined()
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(agentMocks.getProviderAuthMode).not.toHaveBeenCalled()
+  })
+
+  it('returns undefined for flagless OpenAI models without pre-gating', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(__testInternals.resolveExplicitHarnessFlag(undefined, 'gpt-5.5')).resolves.toBeUndefined()
+
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(agentMocks.getProviderAuthMode).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown explicit --harness value with non-zero exit', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('cursor', undefined),
+    ).rejects.toThrow(/__exit__:1/)
+
+    const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
+    expect(written).toMatch(/Invalid --harness value: cursor/)
   })
 
   afterEach(() => {
@@ -130,6 +161,6 @@ describe('pan start --harness flag (PAN-636)', () => {
     expect(written).toContain('agent-pan-x')
     expect(written).toContain('needs inspection')
     expect(written).toContain('pan unpause PAN-X')
-    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled()
+    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled()
   })
 })
