@@ -9,44 +9,6 @@ import type { ComplexityLevel, BeadsTask, WorkspaceMetadata, ComplexityDetection
 import type { CloisterConfig, ModelSelectionConfig } from './config.js';
 import { detectComplexity, complexityToModel } from './complexity.js';
 import { loadCloisterConfigSync } from './config.js';
-import { loadConfigSync as loadYamlConfigSync } from '../config-yaml.js';
-import type { Role } from '../agents.js';
-import type { RuntimeName } from '../runtimes/types.js';
-
-type SpecialistHarnessKey = 'merge_agent' | 'review_agent' | 'test_agent' | 'inspect_agent' | 'uat_agent';
-
-const SPECIALIST_ROLE_BY_KEY: Record<SpecialistHarnessKey, Role> = {
-  merge_agent: 'ship',
-  review_agent: 'review',
-  test_agent: 'test',
-  inspect_agent: 'work',
-  uat_agent: 'test',
-};
-
-const warnedSpecialistHarnessAliases = new Set<SpecialistHarnessKey>();
-
-function normalizeSpecialistHarnessKey(specialistName: string): SpecialistHarnessKey | null {
-  const normalizedName = specialistName.replace(/-/g, '_');
-  if (
-    normalizedName === 'merge_agent' ||
-    normalizedName === 'review_agent' ||
-    normalizedName === 'test_agent' ||
-    normalizedName === 'inspect_agent' ||
-    normalizedName === 'uat_agent'
-  ) {
-    return normalizedName;
-  }
-  return null;
-}
-
-function warnDeprecatedSpecialistHarnessAlias(key: SpecialistHarnessKey, role: Role): void {
-  if (warnedSpecialistHarnessAliases.has(key)) return;
-  warnedSpecialistHarnessAliases.add(key);
-  console.warn(
-    `model_selection.specialist_harnesses.${key} is deprecated; use roles.${role}.harness instead.`
-  );
-}
-
 /**
  * Model routing result
  */
@@ -124,30 +86,6 @@ export class ModelRouter {
   }
 
   /**
-   * Get the configured harness for a specialist.
-   *
-   * PAN-1787: model_selection.specialist_harnesses is a deprecated alias at
-   * role-tier precedence. The modern roles.<role>.harness value wins when set;
-   * the legacy key applies only when the role value is absent.
-   */
-  getSpecialistHarness(specialistName: string): RuntimeName {
-    const key = normalizeSpecialistHarnessKey(specialistName);
-    if (!key) return 'claude-code';
-
-    const role = SPECIALIST_ROLE_BY_KEY[key];
-    const roleHarness = loadYamlConfigSync().config.roles?.[role]?.harness;
-    if (roleHarness) return roleHarness;
-
-    const legacyHarness = this.config.model_selection?.specialist_harnesses?.[key];
-    if (legacyHarness) {
-      warnDeprecatedSpecialistHarnessAlias(key, role);
-      return legacyHarness;
-    }
-
-    return 'claude-code';
-  }
-
-  /**
    * Get the default model for general tasks
    *
    * @returns Default model name
@@ -203,7 +141,6 @@ export function getGlobalRouter(): ModelRouter {
  */
 export function resetGlobalRouter(): void {
   globalRouter = null;
-  warnedSpecialistHarnessAliases.clear();
 }
 
 /**
@@ -225,14 +162,6 @@ export function routeTask(task: BeadsTask, workspace?: WorkspaceMetadata): Model
  */
 export function getSpecialistModel(specialistName: string): 'opus' | 'sonnet' | 'haiku' {
   return getGlobalRouter().getSpecialistModel(specialistName);
-}
-
-/**
- * Convenience function to get the configured specialist harness via the
- * global router (PAN-636).
- */
-export function getSpecialistHarness(specialistName: string): 'claude-code' | 'pi' | 'codex' {
-  return getGlobalRouter().getSpecialistHarness(specialistName);
 }
 
 /**

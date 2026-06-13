@@ -352,8 +352,9 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // Resolution falls through to role model config, then to the global fallback model.
     },
     specialist_harnesses: {
-      // PAN-1787: deprecated alias only. Prefer roles.<role>.harness in
-      // config.yaml; ModelRouter.getSpecialistHarness reads roles first.
+      // PAN-1787/PAN-1842: removed. Harness resolution for all spawn paths
+      // now flows through resolveHarness(), which consults explicit, role,
+      // providerHarnesses, and built-in provider defaults in order.
     },
   },
   handoffs: {

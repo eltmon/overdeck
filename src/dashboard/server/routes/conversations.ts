@@ -120,6 +120,7 @@ function configuredTitleModel(): string {
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { resolveHarness } from '../../../lib/harness-resolve.js';
 import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -417,15 +418,19 @@ async function waitForModelStatusline(tmuxSession: string, targetModel: string):
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
-async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
-  const harness: RuntimeName = requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : 'claude-code';
+export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   // Conversation runtime only honors non-default harnesses when a concrete model is
   // passed through to getAgentRuntimeBaseCommand(). Without a model,
   // spawnConversationSession() intentionally launches the default Claude Code
   // command, so persist the matching default harness as the effective value.
   if (!model) return 'claude-code';
-  const decision = canUseHarnessSync(harness, model, await getProviderAuthMode(model));
-  return decision.allowed ? harness : 'claude-code';
+  const explicit: RuntimeName | undefined =
+    requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
+  try {
+    return await resolveHarness({ model, explicit });
+  } catch {
+    return 'claude-code';
+  }
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
