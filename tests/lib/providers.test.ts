@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, piProviderForModel, qualifyPiModel, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
@@ -46,6 +46,15 @@ describe('providers', () => {
       ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2',
       CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2',
     });
+  });
+
+  it('resolves the kimi provider for the kimi-k2.7-code coding model', () => {
+    expect(getProviderForModelSync('kimi-k2.7-code').name).toBe('kimi');
+  });
+
+  it('qualifies kimi-k2.7-code under the pi kimi-coding provider', () => {
+    expect(piProviderForModel('kimi-k2.7-code')).toBe('kimi-coding');
+    expect(qualifyPiModel('kimi-k2.7-code')).toBe('kimi-coding/kimi-k2.7-code');
   });
 
   it('routes MiniMax through its direct Anthropic-compatible endpoint', () => {
