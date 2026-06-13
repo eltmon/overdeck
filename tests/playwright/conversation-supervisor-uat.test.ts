@@ -398,7 +398,7 @@ afterEach(async () => {
   vi.doUnmock('../../src/lib/tmux.js');
 });
 
-describe('conversation supervisor Playwright UAT', { tags: ['@slow'] }, () => {
+describe('conversation supervisor Playwright UAT', () => {
   it('delivers through real conversation routes and keeps plain forks off Channels MCP', async () => {
     await page.goto(baseUrl);
     await page.locator('#create').click();

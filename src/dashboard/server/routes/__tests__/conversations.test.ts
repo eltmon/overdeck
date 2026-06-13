@@ -19,8 +19,6 @@ import {
   recoverStuckForks,
   registerInFlightForkPipeline,
   waitForInFlightForkPipelines,
-  __setForkPipelineRuntimeOverridesForTest,
-  __resetForkPipelineRuntimeOverridesForTest,
 } from '../conversations.js';
 
 vi.mock('../../../../lib/agents.js', async () => {
@@ -246,22 +244,9 @@ beforeEach(async () => {
   TEST_HOME = join(tmpdir(), `pan-416-route-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
   process.env.PANOPTICON_HOME = TEST_HOME;
-
-  // Fork recovery and spawn helpers normally hit real tmux/Effect timers.
-  // Pin them to deterministic no-ops so DB-only assertions stay fast and
-  // do not depend on a running tmux server.
-  __setForkPipelineRuntimeOverridesForTest({
-    sessionExists: async () => false,
-    isHarnessProcessAlive: async () => false,
-    spawnConversationSession: async () => { /* no-op */ },
-    waitForTmuxSession: async () => { /* no-op */ },
-    getAgentRuntimeStateSync: () => null,
-  });
 });
 
 afterEach(async () => {
-  __resetForkPipelineRuntimeOverridesForTest();
-  await waitForInFlightForkPipelines(0);
   await resetDb();
   delete process.env.PANOPTICON_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });

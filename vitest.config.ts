@@ -50,10 +50,5 @@ export default defineConfig({
     // Pre-PAN-1062: 10s blanket timeout masked slow tests.
     testTimeout: 5000,
     hookTimeout: 5000,
-    // Wall-clock integration tests are tagged `@slow` and excluded from the
-    // default run so a red CI always means a real regression, not a loaded-runner
-    // timeout on a browser/tmux integration test.
-    tags: [{ name: '@slow', description: 'Wall-clock integration tests' }],
-    tagsFilter: ['!@slow'],
   },
 });
