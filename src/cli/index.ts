@@ -431,7 +431,7 @@ program
 
 program
   .command('handoff [conv] [focus...]')
-  .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters (put longer briefs in a file and point the focus at it)')
+  .description('Conversation handoff that spawns a new conversation; omit <conv> (or pass "self") to hand off the conversation you are in; trailing text becomes the focus — MAX 500 characters. Very large source conversations are auto-degraded (truncated smart summary → heuristic → focus-only) and still hand off without aborting.')
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Harness for the handoff-forked (new) conversation: claude-code, pi, or codex')
   .option('--cwd <path>', 'Working directory for the new conversation')
