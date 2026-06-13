@@ -82,6 +82,8 @@
     .node.cond-stale { opacity: .5; filter: grayscale(.6); border-style: dashed; }
     .node.cond-stale .title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent); }
     .node.cond-stale:hover, .node.cond-stale.selected { opacity: 1; filter: none; }
+    /* a stale issue that is ALSO in the pipeline stays bright (active) — the ring + STALE flag carry the warning, not dimming */
+    .node.pipe.cond-stale { opacity: 1; filter: none; }
     .node .row1 { display: flex; align-items: center; gap: 7px; }
     .node .rank { font-family: "SF Mono", monospace; font-size: 11px; font-weight: 600; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 5px; line-height: 17px; }
     .node .iid { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
@@ -258,7 +260,7 @@
         </div>
 
         <div class="footnote">
-          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. <b>In-pipeline issues are pinned</b> — never re-ranked under you. Each issue also carries an <b>operator pickup gate</b> (Auto / <span style="color:var(--foreground)">📌 Ready</span> / <span style="color:var(--warning-foreground)">⛔ Block</span>, see the rationale panel): <b>Ready</b> promotes it for auto-pickup, <b>Block</b> holds it out and sets a parked label — and when <code>auto_pickup_backlog</code> is on, the <b>Flywheel pulls the highest-ranked eligible issue straight from this sequence</b> instead of oldest-first. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
+          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. <b>In-pipeline issues are pinned</b> — never re-ranked under you. A <code>⊘ STALE</code> issue the AI thinks is no longer relevant <b>sinks to Someday</b> and shows up under the <b>⊘ Stale candidates</b> filter for one-click closing — <i>unless</i> it is already in the pipeline (like PAN-1803 here at #14), in which case it stays pinned in place and flagged so you can abort dead work instead of finishing it. Each issue also carries an <b>operator pickup gate</b> (Auto / <span style="color:var(--foreground)">📌 Ready</span> / <span style="color:var(--warning-foreground)">⛔ Block</span>, see the rationale panel): <b>Ready</b> promotes it for auto-pickup, <b>Block</b> holds it out and sets a parked label — and when <code>auto_pickup_backlog</code> is on, the <b>Flywheel pulls the highest-ranked eligible issue straight from this sequence</b> instead of oldest-first. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
         </div>
       </div>
     </div>
@@ -306,9 +308,9 @@
       { id:'PAN-1861', rank:13, size:'s',  imp:'low',  score:28, deps:['PAN-1691'],  pipe:null,     ready:false, prd:false,
         title:'Nudge fires but never un-wedges a stuck agent',
         why:'Edge-case reliability nit downstream of the merge-train UI work. Low impact, small.' },
-      { id:'PAN-1803', rank:14, size:'s',  imp:'low',  score:18, deps:[],            pipe:null,     ready:false, prd:false, cond:'stale',
+      { id:'PAN-1803', rank:14, size:'s',  imp:'low',  score:18, deps:[],            pipe:'review', ready:false, prd:false, cond:'stale',
         title:'Revert and re-land the admin-merge change',
-        why:'The revert already landed and the re-land folded into PAN-1691. Likely describes work that no longer exists — candidate to close.' },
+        why:'In review right now — but the AI believes this work was superseded (the revert already landed; the re-land folded into PAN-1691). It surfaces here in Now precisely because it is already in the pipeline: a non-pipeline stale issue would sink to Someday under the Stale-candidates filter, but this one is active, so it stays pinned and flagged so you can abort the agent rather than finish dead work.' },
     ];
     const EDGES = [
       ['PAN-1665','PAN-1801','unblocks'],['PAN-1665','PAN-1666','unblocks'],['PAN-1801','PAN-1781','unblocks'],
