@@ -2086,12 +2086,14 @@ function assertAgentCanTransitionToRunning(state: AgentState): void {
   }
 }
 
-function markAgentRunning(state: AgentState): void {
+function markAgentRunning(state: AgentState, options?: { preserveFailureTracking?: boolean }): void {
   assertAgentCanTransitionToRunning(state);
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
-  clearFailureTrackingFields(state);
+  if (options?.preserveFailureTracking !== true) {
+    clearFailureTrackingFields(state);
+  }
   delete state.stoppedAt;
   // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
@@ -4849,7 +4851,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Update agent state
     if (agentState) {
       agentState.lastResumeAt = resumeStartedAt;
-      markAgentRunning(agentState);
+      markAgentRunning(agentState, { preserveFailureTracking: true });
       saveAgentStateSync(agentState);
     }
 

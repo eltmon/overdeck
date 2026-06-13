@@ -150,7 +150,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
@@ -5499,6 +5499,12 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
  * Start the deacon patrol loop
  */
 let recoverOrphanedAgentsInFlight: Promise<string[]> | null = null;
+const RAPID_POST_RESUME_DEATH_MS = 120_000;
+
+function isRapidPostResumeDeath(state: AgentState): boolean {
+  const lastResumeMs = Date.parse(state.lastResumeAt ?? '');
+  return Number.isFinite(lastResumeMs) && Date.now() - lastResumeMs <= RAPID_POST_RESUME_DEATH_MS;
+}
 
 /**
  * On startup, detect agents whose state.json claims 'running' or 'starting' but have
@@ -5612,7 +5618,14 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
       // with a retry that will never fire and confuses the dashboard.
       const isResumableRole = !dir.startsWith('planning-');
       if (state.stoppedByUser !== true && isResumableRole) {
-        const failedState = await Effect.runPromise(recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`));
+        const rapidPostResumeDeath = isRapidPostResumeDeath(state);
+        if (!rapidPostResumeDeath) {
+          resetAgentFailureCount(dir);
+        }
+        const failureReason = rapidPostResumeDeath
+          ? `rapid post-resume death: tmux session missing within ${RAPID_POST_RESUME_DEATH_MS / 1000}s (${context ?? 'patrol'})`
+          : `orphaned: tmux session missing (${context ?? 'patrol'})`;
+        const failedState = await Effect.runPromise(recordAgentFailure(dir, failureReason));
         if (failedState) {
           notifyAgentStatusChanged(failedState, oldStatus, false);
           orphanFailureRecordedForAutoResume.add(dir);

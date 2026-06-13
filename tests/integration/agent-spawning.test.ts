@@ -574,6 +574,56 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
+    it('resumeAgent delivers the continue prompt through the Pi FIFO for pi work agents', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-pi-continue';
+      writeResumableWorkAgent(agentId, true);
+      const statePath = join(getAgentDir(agentId), 'state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      state.harness = 'pi';
+      writeFileSync(statePath, JSON.stringify(state));
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
+      vi.mocked(tmux.createSession).mockImplementationOnce((createdAgentId: string) => Effect.sync(() => {
+        const agentDir = getAgentDir(createdAgentId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+      }));
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      expect(piFifoMocks.writePiCommand).toHaveBeenCalledWith(
+        agentId,
+        expect.objectContaining({
+          type: 'prompt',
+          message: expect.stringContaining('Read .pan/continue.json'),
+        }),
+      );
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+    });
+
+    it('resumeAgent preserves failure counters until deacon can classify rapid post-resume deaths', async () => {
+      const agentId = 'agent-pan-resume-preserve-failures';
+      writeResumableWorkAgent(agentId, true);
+      const statePath = join(getAgentDir(agentId), 'state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      state.consecutiveFailures = 2;
+      state.firstFailureInRunAt = '2026-06-13T00:00:00.000Z';
+      state.lastFailureAt = '2026-06-13T00:01:00.000Z';
+      state.lastFailureReason = 'rapid post-resume death: tmux session missing within 120s (patrol)';
+      state.lastFailureNextRetryAt = '2026-06-13T00:03:00.000Z';
+      writeFileSync(statePath, JSON.stringify(state));
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const reloaded = getAgentStateSync(agentId);
+      expect(reloaded?.status).toBe('running');
+      expect(reloaded?.consecutiveFailures).toBe(2);
+      expect(reloaded?.firstFailureInRunAt).toBe('2026-06-13T00:00:00.000Z');
+      expect(reloaded?.lastFailureReason).toContain('rapid post-resume death');
+    });
+
     it('resumeAgent keeps --resume when session origin model and harness are unchanged', async () => {
       const agentId = 'agent-pan-resume-same-origin';
       writeResumableWorkAgent(agentId, true);
