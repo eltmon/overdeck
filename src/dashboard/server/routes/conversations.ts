@@ -770,19 +770,12 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
  * Return the most-recently-written Pi JSONL session file for a conversation,
  * or null if Pi hasn't created one yet (TUI just started, or session reset).
  * The dashboard chat panel uses this to render Pi conversation history.
+ *
+ * Delegates to the shared async resolver so the dashboard event loop is never
+ * blocked by sync filesystem calls and the scan stays bounded.
  */
 async function resolvePiSessionFile(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(homedir(), '.panopticon', 'agents', tmuxSession, 'sessions');
-  if (!existsSync(sessionDir)) return null;
-  try {
-    const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
-    if (entries.length === 0) return null;
-    // Filenames are `<iso-timestamp>_<session-id>.jsonl` — newest sorts last.
-    entries.sort();
-    return join(sessionDir, entries[entries.length - 1]!);
-  } catch {
-    return null;
-  }
+  return resolvePiSessionPath(tmuxSession);
 }
 
 /**

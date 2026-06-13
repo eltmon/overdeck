@@ -47,7 +47,7 @@ import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 export const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 function isSafeAgentId(agentId: string): boolean {
-  return SAFE_AGENT_ID_PATTERN.test(agentId);
+  return SAFE_AGENT_ID_PATTERN.test(agentId) && agentId !== '.' && agentId !== '..';
 }
 
 function safeAgentDir(agentsRoot: string, agentId: string): string | null {
