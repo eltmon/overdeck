@@ -606,6 +606,40 @@ describe('createBeadsFromVBrief', () => {
       vi.useRealTimers();
       rmSync(ws8.projectRoot, { recursive: true, force: true });
     });
+
+    it('treats "not found" delete errors as success and clears cleanly', async () => {
+      vi.useFakeTimers();
+      const ws8 = createWorkspace('PAN-522');
+      setupRedirect(ws8.workspacePath);
+      writePlan(ws8.projectRoot, 'PAN-522', makeDoc('PAN-522', [{ id: 'item-1', title: 'Recovered task' }]));
+
+      let listCalls = 0;
+      mockExecAsync.mockImplementation(async (file: string, args: string[]) => {
+        if (file === 'which') return { stdout: '/usr/bin/bd', stderr: '' };
+        if (file === 'bd' && args[0] === 'ping') return { stdout: '', stderr: '' };
+        if (file === 'bd' && args[0] === 'list') {
+          listCalls++;
+          return { stdout: JSON.stringify(listCalls === 1 ? [{ id: 'stale-1' }] : []), stderr: '' };
+        }
+        if (file === 'bd' && args[0] === 'delete') {
+          throw Object.assign(new Error('issue stale-1 not found'), { stderr: 'issue stale-1 not found' });
+        }
+        if (file === 'bd' && args[0] === 'create') return { stdout: 'bead-fresh\n', stderr: '' };
+        return { stdout: 'unexpected\n', stderr: '' };
+      });
+
+      const resultPromise = Effect.runPromise(createBeadsFromVBrief(ws8.workspacePath));
+      await vi.advanceTimersByTimeAsync(10000);
+      const result = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.created).toContain('PAN-522: Recovered task');
+      expect(createCalls()).toHaveLength(1);
+
+      vi.useRealTimers();
+      rmSync(ws8.projectRoot, { recursive: true, force: true });
+    });
   });
 
   describe('recover bead ID by exact title after create timeout', () => {
@@ -639,7 +673,7 @@ describe('createBeadsFromVBrief', () => {
         .mockRejectedValueOnce(timeoutError)                                        // bd create item-a times out
         .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: 'bead-a', title: 'PAN-511: Alpha task' }]), stderr: '' }) // recovery list
         .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })                  // bd create item-b
-        .mockResolvedValueOnce({ stdout: JSON.stringify([{ issue_id: 'bead-b', id: 'bead-a', dependency_type: 'blocks' }]), stderr: '' }); // dep list verification
+        .mockResolvedValueOnce({ stdout: JSON.stringify([{ issue_id: 'bead-b', depends_on_id: 'bead-a', type: 'blocks' }]), stderr: '' }); // dep list verification
 
       const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
 
@@ -883,7 +917,10 @@ describe('createBeadsFromVBrief', () => {
         .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
         .mockResolvedValueOnce({ stdout: 'bead-a\n', stderr: '' })
         .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })
-        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })                  // dep list: edge missing
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([{ issue_id: 'bead-b', depends_on_id: 'bead-c', type: 'blocks' }]),
+          stderr: '',
+        })                                                                   // dep list: expected edge missing
         .mockResolvedValueOnce({ stdout: '', stderr: '' });                   // dep add repair
 
       const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
@@ -904,6 +941,36 @@ describe('createBeadsFromVBrief', () => {
       const ws = createWorkspace('PAN-519');
       setupRedirect(ws.workspacePath);
       writePlan(ws.projectRoot, 'PAN-519', makeDocWithDeps('PAN-519'));
+
+      mockExecAsync
+        .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-a\n', stderr: '' })
+        .mockResolvedValueOnce({ stdout: 'bead-b\n', stderr: '' })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([{ issue_id: 'bead-b', depends_on_id: 'bead-a', type: 'blocks' }]),
+          stderr: '',
+        });
+
+      const result = await Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
+
+      expect(result.success).toBe(true);
+      expect(result.errors).toHaveLength(0);
+
+      const depAddCalls = mockExecAsync.mock.calls.filter(
+        ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'dep' && args[1] === 'add',
+      );
+      expect(depAddCalls).toHaveLength(0);
+
+      rmSync(ws.projectRoot, { recursive: true, force: true });
+    });
+
+    it('falls back to dep.id when depends_on_id is absent (single-ID shape)', async () => {
+      const ws = createWorkspace('PAN-5199');
+      setupRedirect(ws.workspacePath);
+      writePlan(ws.projectRoot, 'PAN-5199', makeDocWithDeps('PAN-5199'));
 
       mockExecAsync
         .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
@@ -1050,6 +1117,33 @@ describe('createBeadsFromVBrief', () => {
         const timeout = await resolveBdTimeout(ws.workspacePath);
         expect(timeout).toBe(30000);
 
+        rmSync(ws.projectRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('clamps PANOPTICON_BD_TIMEOUT_MS to the hard floor and ceiling', async () => {
+      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+
+      const cases = [
+        { value: '5000', expected: 30000 },
+        { value: '999999999', expected: 180000 },
+      ];
+
+      for (const { value, expected } of cases) {
+        vi.clearAllMocks();
+        process.env.PANOPTICON_BD_TIMEOUT_MS = value;
+        const ws = createWorkspace(`PAN-540-${value}`);
+        setupRedirect(ws.workspacePath);
+
+        const timeout = await resolveBdTimeout(ws.workspacePath);
+        expect(timeout).toBe(expected);
+
+        const pingCalls = mockExecAsync.mock.calls.filter(
+          ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'ping',
+        );
+        expect(pingCalls).toHaveLength(0);
+
+        delete process.env.PANOPTICON_BD_TIMEOUT_MS;
         rmSync(ws.projectRoot, { recursive: true, force: true });
       }
     });

@@ -6,7 +6,7 @@
  * shell commands with a deterministic, programmatic conversion.
  */
 
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { readFile } from 'node:fs/promises';
@@ -18,7 +18,6 @@ import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
 import { subItemsOf, type VBriefDocument, type VBriefEdge, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 /**
@@ -84,7 +83,7 @@ const BD_TIMEOUT_MULTIPLIER = 20;
 export async function resolveBdTimeout(workspacePath: string): Promise<number> {
   const envValue = Number(process.env.PANOPTICON_BD_TIMEOUT_MS);
   if (Number.isInteger(envValue) && envValue > 0) {
-    return envValue;
+    return Math.min(BD_TIMEOUT_CEILING_MS, Math.max(BD_TIMEOUT_FLOOR_MS, envValue));
   }
 
   try {
@@ -230,7 +229,7 @@ async function verifyAndRepairDependencyEdges(
   const actualDepSet = new Set(
     actualDeps
       .filter(isBlocksDep)
-      .map(dep => `${dep.issue_id}|${dep.id}`),
+      .map(dep => `${dep.issue_id}|${dep.depends_on_id ?? dep.id}`),
   );
 
   const errors: string[] = [];
@@ -274,6 +273,27 @@ async function verifyAndRepairDependencyEdges(
   return { success: errors.length === 0, errors };
 }
 
+/**
+ * Delete a single bead, treating "issue not found" as success. Under contention
+ * a delete can time out client-side while committing server-side; a retry then
+ * sees the bead as already gone. Catching that case makes deletion idempotent.
+ */
+async function deleteBead(workspacePath: string, id: string, timeoutMs: number): Promise<void> {
+  try {
+    await execFileAsync('bd', ['delete', id, '--force'], {
+      encoding: 'utf-8',
+      cwd: workspacePath,
+      timeout: timeoutMs,
+    });
+  } catch (error: any) {
+    const message = execFileErrorMessage(error).toLowerCase();
+    if (message.includes('not found')) {
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
   let existingBeads: any[];
   try {
@@ -286,9 +306,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   let cleared = 0;
   for (const id of beadIdsFromList(existingBeads)) {
     try {
-      await retryBd(() => execFileAsync('bd', ['delete', id, '--force'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-      }));
+      await retryBd(() => deleteBead(workspacePath, id, timeoutMs));
       cleared++;
     } catch (error: any) {
       errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
