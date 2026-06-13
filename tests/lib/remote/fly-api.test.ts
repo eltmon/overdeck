@@ -53,6 +53,30 @@ describe('FlyApiClient', () => {
       );
       expect(result.id).toBe('m1');
     });
+
+    it('includes mounts and restart.max_retries in config body when provided', async () => {
+      const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
+      mockOk(machine);
+      await client.createMachine('my-app', 'ws-123', {
+        image: 'registry.fly.io/pan-workspace:latest',
+        restart: { policy: 'on-failure', max_retries: 3 },
+        mounts: [{ volume: 'vol_123', path: '/workspace' }],
+      });
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body as string);
+      expect(body.config.restart).toEqual({ policy: 'on-failure', max_retries: 3 });
+      expect(body.config.mounts).toEqual([{ volume: 'vol_123', path: '/workspace' }]);
+    });
+
+    it('omits mounts and max_retries when not provided, keeping policy:no', async () => {
+      const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
+      mockOk(machine);
+      await client.createMachine('my-app', 'ws-123', { image: 'registry.fly.io/pan-workspace:latest' });
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body as string);
+      expect(body.config.restart).toEqual({ policy: 'no' });
+      expect(body.config).not.toHaveProperty('mounts');
+    });
   });
 
   describe('destroyMachine', () => {

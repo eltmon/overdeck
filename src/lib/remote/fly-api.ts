@@ -19,8 +19,14 @@ export interface FlyMachineConfig {
   memory?: number;        // MB
   region?: string;        // e.g. "iad"
   auto_destroy?: boolean;
-  restart?: { policy: 'no' | 'always' | 'on-failure' };
+  restart?: { policy: 'no' | 'always' | 'on-failure'; max_retries?: number };
   metadata?: Record<string, string>;
+  mounts?: FlyMount[];
+}
+
+export interface FlyMount {
+  volume: string;
+  path: string;
 }
 
 export interface FlyMachine {
@@ -143,9 +149,15 @@ export class FlyApiClient {
         guest: config.size
           ? { cpu_kind: 'shared', cpus, memory_mb: config.memory ?? 1024 }
           : undefined,
-        restart: config.restart ?? { policy: 'no' },
+        restart: {
+          policy: config.restart?.policy ?? 'no',
+          ...(config.restart?.max_retries !== undefined
+            ? { max_retries: config.restart.max_retries }
+            : {}),
+        },
         auto_destroy: config.auto_destroy,
         metadata: config.metadata,
+        mounts: config.mounts,
       },
       region: config.region,
     });
