@@ -2305,3 +2305,32 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
   contention is NOT materializing; can keep scaling.
 - **PAN-1803 convoy frozen >60min** — surfaced as investigate + openQuestion; can't resume.
   Main advanced to `c0c26f955`. RAM 27/64 GB, swap 3.3/8.2.
+
+## RUN-32 tick 4 (2026-06-13 ~15:05Z) — OPERATOR FLIPPED UAT OFF; executed 3 decisions; merge gate is actually a CLOSE-OUT gate
+
+**Operator message mid-tick (standing authorization granted — act on items like these without parking back):**
+1. `flywheel.require_uat_before_merge` → **FALSE** (confirmed in config). Merge review+test-passed work without UAT; review+test gates still apply.
+2. Abort+restart the dead PAN-1803 convoy.
+3. Discard orphaned PAN-1506/1508/1510 workspaces.
+
+**Executed:**
+- **PAN-1803 review restarted** via `pan review restart PAN-1803` (the pipeline-native way, NOT raw `pan kill`) → fresh 4/4 reviewer convoy. The frozen one is replaced.
+- **Discarded orphan workspaces:** `pan workspace destroy PAN-1510 --force` ✓. PAN-1506's workspace was strike-suffixed (`feature-pan-1506-strike`) so `destroy` (which resolves the standard `feature-pan-<id>` path) couldn't find it — removed via `git worktree remove --force`. Deleted empty 0-ahead branches `strike/pan-1506`, `strike/pan-1508` (feature/pan-1510 branch was already gone with the workspace).
+- **PAN-1818 finished work → in_review** (6 fix commits). **PAN-1834 → 5 commits** (rate-limit/model-switch modal detection + rateLimit PendingInputKind). Started work on **PAN-1813** + **PAN-1802** (both proposed→`pan start`, 5 beads each). Launched planning on **PAN-1845** (Fly work-loss, operator-greenlit) + **PAN-1769**.
+
+**KEY FINDING — the "16 merge gate" is a CLOSE-OUT gate, not a merge gate:**
+- The 16 "awaiting UAT" issues are **already merged to main** (`verifying_on_main`, tracker still OPEN). Auto-merge **cannot** act on them — they have no open PR / are not readyForMerge.
+- The ACTUAL merge gate (in_review issues that are review+test-passed-and-not-merged) is **currently EMPTY**: probed `/api/flywheel/auto-merge/schedule {issueId}` for PAN-1491/1242/1629 → all `"review status is not readyForMerge"`. The endpoint self-gates on `isAutoMergeEligible` + `readyForMerge` + PR URL, so it's safe to probe — ineligible → 422/422, never a premature merge.
+- **Auto-merge mechanics (for future ticks):** `POST /api/flywheel/auto-merge/schedule` with header `Origin: http://localhost:3011` and body `{"issueId":"PAN-XXXX"}`. Checks: shouldHoldForUat (per-issue autoMerge → project default → global require-UAT; global now false) → not paused → flywheel running → isAutoMergeEligible → readyForMerge → PR URL → schedules merge. Single issue per call. Review-status store: `~/.panopticon/review-status.json` (sparse — live status is in the read model via `getReviewStatusSync`).
+- **Clearing the 16 needs CLOSE-OUT** (`pan close` / dashboard Close Out) — which is forbidden to the orchestrator AND semi-destructive (closes tracker + tears down workspace/branches per close_out config) AND was not one of the three named authorizations. **Surfaced as the single genuine blocker** with default recommendation YES. Also surfaced: should UAT-off imply auto-close-out (substrate gap)?
+- **0 bd-lock errors across 11 launches.** RAM 29-31/64 GB, swap 3.7/8.2. 9 productive agents + 2 review convoys active. Main `69040f19c`.
+
+## RUN-32 tick 5 (2026-06-13 ~15:23Z) — PAN-1818 review CATCH-22; work agents flying; held at 11 active (swap full)
+
+- **PAN-1818's review convoy WEDGED (42min) and I restarted it** (`pan review restart`, operator-authorized). Diagnosis: the parent (kimi) was stuck *"Still waiting on the four reviewer terminal signals... No signals received yet"* while all four sub-reviewers had `willRetry:false` (stopped WITHOUT delivering their REVIEWER_READY/FAILED/TIMEOUT signals). This is the **PAN-1614 root** (deacon doesn't recover a fully-stopped convoy) compounded by kimi reviewers overflowing on PAN-1818's own large diff.
+- **THE CATCH-22 (surfaced to operator):** PAN-1818 IS the reviewer-overflow fix, but it can't pass review because reviewing its large diff overflows the kimi reviewers — the exact bug. Restarting re-wedges on the same diff. **Recommended unblock: operator-override merge** (`gh pr merge --admin --squash --delete-branch`, always permitted per PAN-1486) to land PAN-1818 directly; once deployed, its overflow-recovery stops future review wedges. Surfaced in openQuestions; will re-confirm next tick if the restart re-wedges.
+- **PAN-1803 fresh convoy (restarted tick 4) also at early-wedge risk** — static responseId at ~25min, same signal-wait shape. Both review convoys are impaired by the unmerged fix. Review is the pipeline's only friction right now.
+- **Work agents are flying:** PAN-1834 (10 commits, modal detection + needs-you), PAN-1802 (8 commits, handoff degrade — committed 25s ago), PAN-1813 (5 commits, bd-timeout finalize). Started **PAN-1817** work (proposed→`pan start`, 5 beads; its spec = surface quota exhaustion + idle-stack-reaper test, does NOT subsume the 1821/1823 backoff fixes).
+- **Launched planning: PAN-1821** (Linear backoff — getBackoffMs('linear') always 0) + **PAN-1827** (conversation view blank for pi-harness).
+- **CLOSE-OUT decision STILL PENDING** (operator hasn't answered) — the 16 verifying_on_main need `pan close`; keeping it surfaced, not acting (forbidden + semi-destructive). Not blocking forward progress.
+- **Capacity: 11 productive agents** (4 work + 5 planning + 2 review convoys), **0 bd-lock errors across 15 launches**. RAM 30/64 used (34 GB avail), **swap FULL (8.2/8.2)** — per prior learning that's cold-page eviction with ample RAM, not OOM, but I'm **holding launches at 11** until it stabilizes. Main `30963a8b7`.
