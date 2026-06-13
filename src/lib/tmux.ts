@@ -1,6 +1,6 @@
 import { execSync, execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync } from 'fs';
+import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync, readFileSync } from 'fs';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -23,6 +23,9 @@ function validateSessionName(name: string): void {
 }
 
 const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
+const MANAGED_TMUX_SERVER_UNIT = 'panopticon-tmux-server';
+const SERVER_ALIVE_POLL_MS = 50;
+const SERVER_ALIVE_TIMEOUT_MS = 5000;
 const MANAGED_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
@@ -99,31 +102,147 @@ function isManagedServerAliveSync(): boolean {
 }
 
 /**
- * PAN-1798: found the shared tmux server with a CLEAN command line, detached
- * from any agent's process tree. Two reasons this must never happen implicitly
- * via an agent spawn's `new-session`:
- *  1. The founding command line would embed the agent's launcher path, so the
- *     per-agent `pgrep -f launcher.sh` kill sweep matches the SERVER and
- *     `pan kill <founder>` destroys every session on the socket.
- *  2. The server lands in the founding spawn's systemd scope, dying with it.
- * `systemd-run --user --scope` puts the daemonized server in its own scope
- * with cmdline `tmux -L panopticon -f <conf> start-server` — matchable by
- * nothing agent-specific. Falls back to a plain start-server (status quo)
- * when systemd-run is unavailable (macOS / non-systemd Linux).
+ * PAN-1798: locate the shared tmux server PID. Prefer the dedicated unit's
+ * MainPID when we manage it; fall back to pgrep so the founder guard still
+ * fires on pre-fix or manually-founded servers.
  */
-function foundManagedServerSync(cleanEnv: NodeJS.ProcessEnv): void {
-  const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
+export function findManagedServerPidSync(): number | undefined {
   try {
-    execFileSync(
-      'systemd-run',
-      ['--user', '--scope', '--collect', `--unit=panopticon-tmux-${Date.now()}`, '--quiet', 'tmux', ...args],
-      { stdio: 'ignore', env: cleanEnv },
-    );
-    return;
+    const mainPidOut = execFileSync(
+      'systemctl',
+      ['--user', 'show', '--property=MainPID', '--value', MANAGED_TMUX_SERVER_UNIT],
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+    const mainPid = Number.parseInt(mainPidOut, 10);
+    if (Number.isInteger(mainPid) && mainPid > 0) {
+      return mainPid;
+    }
   } catch {
-    // systemd-run unavailable or refused — fall through to direct founding.
+    // Unit not loaded or systemctl unavailable — fall through.
   }
-  execFileSync('tmux', args, { stdio: 'ignore', env: cleanEnv });
+
+  try {
+    const pgrepOut = execFileSync(
+      'pgrep',
+      ['-f', `tmux -L ${getManagedTmuxSocketName()}`],
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim();
+    for (const line of pgrepOut.split('\n')) {
+      const pid = Number.parseInt(line.trim(), 10);
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid;
+      }
+    }
+  } catch {
+    // pgrep unavailable or no match.
+  }
+
+  return undefined;
+}
+
+/**
+ * PAN-1798: read the cgroup of the given PID. Returns empty string on failure.
+ */
+function readServerCgroupSync(pid: number): string {
+  try {
+    return readFileSync(`/proc/${pid}/cgroup`, 'utf-8');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * PAN-1798: warn if the live shared server is still stuck inside a per-spawn
+ * scope (servers founded before this fix, or by manual tmux use). Never auto-
+ * restart — the operator must decide when to migrate off the live founder.
+ */
+function warnIfServerInTmuxSpawnScopeSync(): void {
+  const pid = findManagedServerPidSync();
+  if (pid === undefined) return;
+  const cgroup = readServerCgroupSync(pid);
+  if (!cgroup.includes('tmux-spawn-')) return;
+  console.warn(
+    `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} lives in a per-spawn scope. ` +
+      `Cgroup: ${cgroup.trim().replace(/\n/g, ' ')}. ` +
+      `Killing the founding session/agent may destroy the entire shared server. ` +
+      `Restart Panopticon to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
+  );
+}
+
+/**
+ * PAN-1798: ensure the shared tmux server is running in a dedicated, long-lived
+ * systemd user service — never inside an agent/conversation spawn scope. The
+ * service is created on demand; once running it outlives every client on the
+ * socket so `pan kill` of any agent cannot take down the fleet.
+ *
+ * Must be invoked before any `new-session` and at `pan up` time. Waits for the
+ * socket to answer before returning.
+ */
+export function ensurePanopticonTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void {
+  if (isManagedServerAliveSync()) {
+    warnIfServerInTmuxSpawnScopeSync();
+    return;
+  }
+
+  const args = ['-L', getManagedTmuxSocketName(), '-f', getManagedTmuxConfigPath(), 'start-server'];
+  const startedBySystemd = (() => {
+    try {
+      execFileSync(
+        'systemd-run',
+        ['--user', '--unit', MANAGED_TMUX_SERVER_UNIT, '--collect', '--quiet', 'tmux', ...args],
+        { stdio: 'ignore', env: cleanEnv },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+
+  if (!startedBySystemd) {
+    // No systemd (macOS / non-systemd Linux) — daemonize with setsid so the
+    // server is not a child of the spawning process tree. If setsid is absent,
+    // a plain start-server is still better than no server.
+    let daemonized = false;
+    try {
+      execFileSync('setsid', ['tmux', ...args], { stdio: 'ignore', env: cleanEnv });
+      daemonized = true;
+    } catch {
+      // setsid unavailable.
+    }
+    if (!daemonized) {
+      execFileSync('tmux', args, { stdio: 'ignore', env: cleanEnv });
+    }
+    console.warn(
+      `[tmux] WARNING (PAN-1798): could not start '${MANAGED_TMUX_SERVER_UNIT}' via systemd-run. ` +
+        `Shared tmux server is running without systemd scope isolation; ` +
+        `killing the founding process tree may still destroy the server.`,
+    );
+  }
+
+  const deadline = Date.now() + SERVER_ALIVE_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (isManagedServerAliveSync()) {
+      warnIfServerInTmuxSpawnScopeSync();
+      return;
+    }
+    try {
+      execFileSync('sleep', [String(SERVER_ALIVE_POLL_MS / 1000)], { stdio: 'ignore' });
+    } catch {
+      // sleep unavailable — busy-spin briefly.
+    }
+  }
+}
+
+/**
+ * Async variant of ensurePanopticonTmuxServerSync. Effect-spawn paths use this
+ * so server preflight does not block the event loop. Founding itself is still
+ * sync (it is rare, fast, and uses the same single path for both variants).
+ */
+export async function ensurePanopticonTmuxServerAsync(cleanEnv: NodeJS.ProcessEnv): Promise<void> {
+  // Delegate to the sync helper: it already waits for the socket and runs the
+  // founder guard. This keeps async tests that mock execFile but not
+  // execFileSync from accidentally looping on a never-started mocked server.
+  ensurePanopticonTmuxServerSync(cleanEnv);
 }
 
 function reloadManagedTmuxConfigSync(): void {
@@ -133,9 +252,7 @@ function reloadManagedTmuxConfigSync(): void {
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
     const cleanEnv = buildChildEnvSync();
-    if (!isManagedServerAliveSync()) {
-      foundManagedServerSync(cleanEnv);
-    }
+    ensurePanopticonTmuxServerSync(cleanEnv);
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
@@ -147,11 +264,7 @@ function reloadManagedTmuxConfigSync(): void {
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
     const cleanEnv = buildChildEnvSync();
-    if (!isManagedServerAliveSync()) {
-      // Founding is a rare, fast, one-shot event (server lifetime spans many
-      // sessions); the sync helper keeps one founding path for both variants.
-      foundManagedServerSync(cleanEnv);
-    }
+    await ensurePanopticonTmuxServerAsync(cleanEnv);
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
@@ -388,6 +501,9 @@ export function createSessionSync(
   initialCommand?: string,
   options?: { env?: Record<string, string> }
 ): void {
+  // PAN-1798: every spawn path must ensure the shared server lives in its
+  // dedicated unit before creating a session, so no client becomes the founder.
+  ensurePanopticonTmuxServerSync(buildChildEnvSync());
   if (initialCommand && (initialCommand.includes('`') || initialCommand.includes('\n') || initialCommand.length > 500)) {
     tmuxExecSync(buildNewSessionArgs(name, cwd, undefined, options));
     execSync('sleep 0.5');
@@ -811,6 +927,9 @@ export const createSession = (
 ): Effect.Effect<void, TmuxError> =>
   Effect.tryPromise({
     try: async () => {
+      // PAN-1798: every spawn path must ensure the shared server lives in its
+      // dedicated unit before creating a session, so no client becomes the founder.
+      await ensurePanopticonTmuxServerAsync(buildChildEnvSync());
       await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
       // Stamp the initial window's background with the dashboard theme so tmux
       // answers OSC 11 background queries even with no client attached. Claude
