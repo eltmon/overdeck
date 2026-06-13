@@ -8,6 +8,7 @@ export function normalizeAgentStatus(status: string): AgentStatus {
     case 'testing':
     case 'merging':
     case 'verifying':
+    case 'starting':
       return 'running';
     case 'completed':
     case 'passed':

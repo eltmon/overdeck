@@ -55,6 +55,13 @@ async function readOptional(p: string): Promise<string | null> {
 
 function mapSessionType(type: string): SessionNodeType {
   const validTypes: SessionNodeType[] = [
+    'planning', 'work', 'review', 'reviewer', 'test', 'merge', 'legacy',
+  ];
+  return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
+}
+
+function normalizeSessionType(type: string): SessionNodeType {
+  const validTypes: SessionNodeType[] = [
     'planning', 'work', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
@@ -186,12 +193,11 @@ async function collectSessionTreeNodes(
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
-  const strikeAgentId = `strike-${issueLower}`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId]);
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -205,6 +211,15 @@ async function collectSessionTreeNodes(
     if (slotWorkSessionPattern.test(sessionName)) {
       candidateSessionIds.add(sessionName);
     }
+  }
+
+  // Add any known strike agent directories so they appear in the tree even when
+  // no tmux session is currently live. PAN-1775: strike handling must stay
+  // outside collectSessionTreeNodes' row synthesis, so we only collect ids here
+  // and re-type them in a post-processing pass.
+  const strikeAgentId = `strike-${issueLower}`;
+  if (await pathExists(join(agentsDir, strikeAgentId))) {
+    candidateSessionIds.add(strikeAgentId);
   }
 
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
@@ -226,8 +241,7 @@ async function collectSessionTreeNodes(
       const isRemoteAgent = remoteState?.location === 'remote' && !!remoteState.vmName;
       const isRemoteActive = isRemoteAgent && (remoteState.status === 'running' || remoteState.status === 'starting');
       const isPlanning = checkId.startsWith('planning-');
-      const isStrike = checkId.startsWith('strike-');
-      const sectionType: SessionNodeType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
+      const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = isRemoteActive ? null : await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = isRemoteActive
@@ -245,7 +259,8 @@ async function collectSessionTreeNodes(
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike') ? checkId : undefined,
+        tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning') ? checkId : undefined,
+        // strike agents are re-typed in restoreStrikeSessionTypes below
         model: remoteState?.model || state.model || 'unknown',
         startedAt,
         endedAt: undefined,
@@ -582,9 +597,68 @@ export async function fetchProjectSessionTree(
 
   features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
 
+  // Post-process: recover strike-agent rows that were intentionally left as
+  // generic 'work' rows by collectSessionTreeNodes so the already-reviewed
+  // session-row synthesis block remains untouched.
+  await restoreStrikeSessionTypes(features);
+
   // Post-process: ended sessions need a stable endedAt and a duration that does
   // not grow after the session ends. This is done outside collectSessionTreeNodes
   // so the already-reviewed session-row synthesis remains untouched.
+  await finalizeEndedSessions(features);
+
+  // Sort features by issueId for stable ordering
+  features.sort((a, b) => a.issueId.localeCompare(b.issueId));
+
+  return { projectKey, features };
+}
+
+/** Re-label session nodes whose IDs are strike agents.
+ *
+ * PAN-1775: we must not modify the session-row synthesis inside
+ * collectSessionTreeNodes. Strike agents are discovered by their
+ * `strike-<issue>` directory/session id; after synthesis we patch the type
+ * and tmuxSession assignment here.
+ */
+async function restoreStrikeSessionTypes(
+  features: Array<{ issueId: string; title: string; sessions: SessionNode[] }>,
+): Promise<void> {
+  const agentsDir = join(homedir(), '.panopticon', 'agents');
+  const sessionIdsToPatch = new Set<string>();
+  for (const feature of features) {
+    for (const session of feature.sessions) {
+      if (session.sessionId.startsWith('strike-')) sessionIdsToPatch.add(session.sessionId);
+    }
+  }
+  if (sessionIdsToPatch.size === 0) return;
+
+  const existingSessionIds = await withConcurrencyLimitPromise(
+    [...sessionIdsToPatch].map((sessionId) => async () => {
+      const agentDir = join(agentsDir, sessionId);
+      return (await pathExists(agentDir)) ? sessionId : null;
+    }),
+    15,
+  );
+  const validStrikeIds = new Set(existingSessionIds.filter((id): id is string => id !== null));
+
+  for (const feature of features) {
+    for (const session of feature.sessions) {
+      if (!validStrikeIds.has(session.sessionId)) continue;
+      session.type = normalizeSessionType('strike');
+      if (!session.remote) session.tmuxSession = session.sessionId;
+    }
+  }
+}
+
+/** Populate endedAt/duration for ended sessions that lack them.
+ *
+ * This is a post-processing pass because collectSessionTreeNodes must not be
+ * changed. It stats state.json for the session IDs actually present in the tree
+ * and computes a bounded duration.
+ */
+async function finalizeEndedSessions(
+  features: Array<{ issueId: string; title: string; sessions: SessionNode[] }>,
+): Promise<void> {
   const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
   const sessionIdsNeedingMtime = new Set<string>();
   for (const feature of features) {
@@ -618,11 +692,6 @@ export async function fetchProjectSessionTree(
       }
     }
   }
-
-  // Sort features by issueId for stable ordering
-  features.sort((a, b) => a.issueId.localeCompare(b.issueId));
-
-  return { projectKey, features };
 }
 
 // ─── Route: GET /api/session-trees ────────────────────────────────────────────
