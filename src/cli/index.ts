@@ -471,6 +471,7 @@ program
   .description('Mark work complete, move to review')
   .option('-c, --comment <message>', 'Comment for the tracker')
   .option('--force', 'Skip pre-flight completion checks')
+  .option('--test-waived <reason>', 'Skip the test-requirement gate; reason must include rationale and SHA of an existing test that covers the requirement')
   .option('--strike', 'Strike-agent shape: skip review-pipeline dispatch (used by `pan strike` agents that merged directly to main)')
   .option('--json', 'Output as JSON')
   .action(doneCommand);

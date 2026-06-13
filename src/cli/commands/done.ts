@@ -24,6 +24,7 @@ import type { MergeSet } from '../../lib/merge-set.js';
 interface DoneOptions {
   comment?: string;
   force?: boolean;
+  testWaived?: string;
   /**
    * Strike-agent shape (PAN strike role). When true, `pan done` short-circuits
    * the review-pipeline dispatch: the strike has already merged to main and
