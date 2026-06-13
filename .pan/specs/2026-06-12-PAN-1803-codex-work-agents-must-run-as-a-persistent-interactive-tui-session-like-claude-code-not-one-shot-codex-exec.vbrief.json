@@ -1,0 +1,94 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-12T14:43:26.782Z",
+    "updated": "2026-06-12T14:43:26.782Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1803: Codex work agents must run as a persistent interactive TUI session (like claude-code), not one-shot 'codex exec'",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1803",
+    "title": "Codex work agents must run as a persistent interactive TUI session (like claude-code), not one-shot 'codex exec'",
+    "status": "proposed",
+    "uid": "53dc0e35-fa11-488e-b910-e234fdccbdae",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-06-12T14:43:26.782Z",
+    "updated": "2026-06-12T14:43:26.782Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1803",
+        "label": "PAN-1803",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-12-PAN-1803-codex-work-agents-must-run-as-a-persistent-interactive-tui-session-like-claude-code-not-one-shot-codex-exec.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "**Architecture bug (keystone).** Codex work agents are launched via `codex exec` (one-shot: runs one turn, writes its rollout only on the first turn, then exits). The work-agent lifecycle expects a **persistent** session — the same model claude-code (interactive `claude`) and pi (long-lived `--mode rpc`) use — so when a codex agent finishes its turn and exits, the lifecycle marks it `orphaned: tmux session missing at boot` and the deacon treats it as dead. Net: codex work agents boot (after PAN-1799), run once, vanish, and never complete the bead loop or accept `pan tell` feedback.\n\n**One-shot is a deliberately-rejected architecture** (it has cost hundreds of hours historically) — agents must be live interactive sessions. The fix is to make codex work agents follow the **claude-code work-agent pattern**, which Panopticon spent its lifetime getting right.\n\n**Reference pattern (claude-code, the template):**\n- `buildNonConversationCommand` in `src/lib/launcher-generator.ts` emits interactive `claude --permission-mode auto --model ...`, wrapped via `wrapWithSupervisor` (PTY supervisor). The session stays alive between turns.\n- Prompt delivery: `agents.ts` waits for a readiness signal (`waitForReadySignal` → SessionStart hook ready.json) then delivers the kickoff via tmux/supervisor. `pan tell` delivers subsequent messages to the same live session.\n- Lifecycle: a live tmux session IS the normal running state; completion = `pan done`, not process exit.\n- Codex **conversations** already run persistently as TUI (`buildCodexCommand` codexMode='tui' → `codex -c project_doc_max_bytes=0` under the supervisor) — proof codex can do this.\n\n**Required change (mirror claude-code):**\n1. `buildCodexCommand` — for WORK agents, emit interactive codex (NOT `exec`): `codex -m <model> -s <workspace-write> -c approval_policy=never --skip-git-repo-check` wrapped with the PTY supervisor; the kickoff prompt is delivered post-readiness, NOT embedded inline. Keep `getCodexLauncherFields` but drop the hardcoded one-shot `codexMode:'exec'` for work (add a work-tui mode or equivalent). Conversations keep their existing tui path; exec mode may remain only if some non-work caller still needs it (audit callers).\n2. `agents.ts` delivery — codex work agents must take the tmux/supervisor delivery path (today `prompt && resolvedHarness !== 'codex'` SKIPS codex because exec embedded the prompt). Add a codex-TUI readiness check (capture-pane for the codex prompt, analogous to `waitForPiTuiReady`) before delivering.\n3. Keep `waitForCodexRollout`/thread-id capture for resume; verify resume uses the interactive (not exec) path too.\n4. Lifecycle: confirm the orphan-at-boot path no longer fires once the session persists; if an explicit codex-readiness gate is needed, add it.\n\n**Acceptance:** a `pan start <id> --model gpt-5.5 --harness codex` work agent (a) survives >3 min idle after finishing its kickoff turn (tmux session stays alive), (b) processes a `pan tell <id> \"...\"` message delivered after it goes idle, (c) closes a bead and continues to the next without the process exiting, (d) is NOT marked orphaned by the deacon while alive. Test against a scratch issue; do not rely on unit tests alone — this is a live-session behavior. typecheck + lint green; existing codex conversation tests stay green.\n\nRefs: PAN-1799 (boot fixes — prerequisite, merged), PAN-1574 (codex first-class — introduced the exec mode), and the claude-code work-agent path as the reference implementation.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-12T14:43:26.782Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1803",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "**Architecture bug (keystone).** Codex work agents are launched via `codex exec` (one-shot: runs one turn, writes its rollout only on the first turn, then exits). The work-agent lifecycle expects a **persistent** session — the same model claude-code (interactive `claude`) and pi (long-lived `--mode rpc`) use — so when a codex agent finishes its turn and exits, the lifecycle marks it `orphaned: tmux session missing at boot` and the deacon treats it as dead. Net: codex work agents boot (after PAN-1799), run once, vanish, and never complete the bead loop or accept `pan tell` feedback.\n\n**One-shot is a deliberately-rejected architecture** (it has cost hundreds of hours historically) — agents must be live interactive sessions. The fix is to make codex work agents follow the **claude-code work-agent pattern**, which Panopticon spent its lifetime getting right.\n\n**Reference pattern (claude-code, the template):**\n- `buildNonConversationCommand` in `src/lib/launcher-generator.ts` emits interactive `claude --permission-mode auto --model ...`, wrapped via `wrapWithSupervisor` (PTY supervisor). The session stays alive between turns.\n- Prompt delivery: `agents.ts` waits for a readiness signal (`waitForReadySignal` → SessionStart hook ready.json) then delivers the kickoff via tmux/supervisor. `pan tell` delivers subsequent messages to the same live session.\n- Lifecycle: a live tmux session IS the normal running state; completion = `pan done`, not process exit.\n- Codex **conversations** already run persistently as TUI (`buildCodexCommand` codexMode='tui' → `codex -c project_doc_max_bytes=0` under the supervisor) — proof codex can do this.\n\n**Required change (mirror claude-code):**\n1. `buildCodexCommand` — for WORK agents, emit interactive codex (NOT `exec`): `codex -m <model> -s <workspace-write> -c approval_policy=never --skip-git-repo-check` wrapped with the PTY supervisor; the kickoff prompt is delivered post-readiness, NOT embedded inline. Keep `getCodexLauncherFields` but drop the hardcoded one-shot `codexMode:'exec'` for work (add a work-tui mode or equivalent). Conversations keep their existing tui path; exec mode may remain only if some non-work caller still needs it (audit callers).\n2. `agents.ts` delivery — codex work agents must take the tmux/supervisor delivery path (today `prompt && resolvedHarness !== 'codex'` SKIPS codex because exec embedded the prompt). Add a codex-TUI readiness check (capture-pane for the codex prompt, analogous to `waitForPiTuiReady`) before delivering.\n3. Keep `waitForCodexRollout`/thread-id capture for resume; verify resume uses the interactive (not exec) path too.\n4. Lifecycle: confirm the orphan-at-boot path no longer fires once the session persists; if an explicit codex-readiness gate is needed, add it.\n\n**Acceptance:** a `pan start <id> --model gpt-5.5 --harness codex` work agent (a) survives >3 min idle after finishing its kickoff turn (tmux session stays alive), (b) processes a `pan tell <id> \"...\"` message delivered after it goes idle, (c) closes a bead and continues to the next without the process exiting, (d) is NOT marked orphaned by the deacon while alive. Test against a scratch issue; do not rely on unit tests alone — this is a live-session behavior. typecheck + lint green; existing codex conversation tests stay green.\n\nRefs: PAN-1799 (boot fixes — prerequisite, merged), PAN-1574 (codex first-class — introduced the exec mode), and the claude-code work-agent path as the reference implementation.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\n---\nFlywheel-Run-Id: RUN-23\nFlywheel-Filed-By: agent"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "buildNonConversationCommand in src/lib/launcher-generator.ts emits interactive claude --permission-mode auto --model ..., wrapped via wrapWithSupervisor (PTY supervisor). The session stays alive between turns.",
+            "status": "pending",
+            "created": "2026-06-12T14:43:26.782Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Prompt delivery: agents.ts waits for a readiness signal (waitForReadySignal → SessionStart hook ready.json) then delivers the kickoff via tmux/supervisor. pan tell delivers subsequent messages to the same live session.",
+            "status": "pending",
+            "created": "2026-06-12T14:43:26.782Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Lifecycle: a live tmux session IS the normal running state; completion = pan done, not process exit.",
+            "status": "pending",
+            "created": "2026-06-12T14:43:26.782Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Codex **conversations** already run persistently as TUI (buildCodexCommand codexMode='tui' → codex -c project_doc_max_bytes=0 under the supervisor) — proof codex can do this.",
+            "status": "pending",
+            "created": "2026-06-12T14:43:26.782Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

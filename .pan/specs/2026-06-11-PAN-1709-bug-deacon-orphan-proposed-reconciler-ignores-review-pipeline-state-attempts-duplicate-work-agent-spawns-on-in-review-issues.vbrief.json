@@ -4,17 +4,17 @@
     "created": "2026-06-11T03:12:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1709: bug(deacon): orphan-proposed reconciler ignores review pipeline state — attempts duplicate work-agent spawns on in-review issues",
-    "updated": "2026-06-11T07:20:50.249Z"
+    "updated": "2026-06-12T20:21:34.755Z"
   },
   "plan": {
     "id": "pan-1709",
     "title": "bug(deacon): orphan-proposed reconciler ignores review pipeline state — attempts duplicate work-agent spawns on in-review issues",
-    "status": "proposed",
+    "status": "completed",
     "uid": "81362fd3-65af-4f86-8b31-132dde87c8b2",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-11T03:12:00.000Z",
-    "updated": "2026-06-11T07:20:50.249Z",
+    "updated": "2026-06-12T20:21:34.755Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1709",
@@ -225,5 +225,5 @@
       "canonicalFilename": "2026-06-11-PAN-1709-bug-deacon-orphan-proposed-reconciler-ignores-review-pipeline-state-attempts-duplicate-work-agent-spawns-on-in-review-issues.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
