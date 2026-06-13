@@ -6,6 +6,18 @@ vi.mock('../review-agent.js', () => ({
   spawnReviewSubRoleForIssue: mockSpawnReviewSubRole,
 }));
 
+const mockDeliverReviewVerdictFeedback = vi.hoisted(() => vi.fn());
+vi.mock('../review-verdict-feedback.js', async () => {
+  const { Effect } = await import('effect');
+  mockDeliverReviewVerdictFeedback.mockImplementation(() => Effect.succeed({
+    prCommentPosted: false,
+    agentMessageSent: false,
+  }));
+  return {
+    deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
+  };
+});
+
 vi.mock('../../../lib/agents.js', () => ({
   messageAgent: vi.fn(async () => {}),
   listRunningAgents: vi.fn(),
@@ -554,6 +566,86 @@ describe('monitorReviewConvoySignals', () => {
     );
     expect(actions).toEqual([
       'Nudged agent-pan-879-review to synthesize from 4 reviewer reports',
+    ]);
+  });
+
+  it('synthesizes directly from reviewer reports when the parent is unavailable', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const runId = 'agent-pan-880-review-abcdef12';
+    const reviewDir = `/workspace/.pan/review/${runId}`;
+    const reportBodies: Record<string, string> = {
+      [`${reviewDir}/security.md`]: [
+        '# Security Review',
+        '',
+        '## Findings',
+        'None',
+      ].join('\n'),
+      [`${reviewDir}/correctness.md`]: [
+        '# Correctness Review',
+        '',
+        '## Findings',
+        '',
+        '### ! Missing null check — `src/example.ts:42`',
+        '**Problem:** changed code can crash.',
+      ].join('\n'),
+      [`${reviewDir}/performance.md`]: [
+        '# Performance Review',
+        '',
+        '## Findings',
+        'None',
+      ].join('\n'),
+      [`${reviewDir}/requirements.md`]: [
+        '# Requirements Review',
+        '',
+        '## Findings',
+        'None',
+      ].join('\n'),
+    };
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-880-review'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+      const value = String(path);
+      return value === '/tmp/test-agents'
+        || Object.prototype.hasOwnProperty.call(reportBodies, value);
+    });
+    vi.mocked(fs.readFileSync).mockImplementation((path: any) => reportBodies[String(path)] ?? '{}');
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-13T00:00:01.000Z') } as any);
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-880-review',
+      issueId: 'PAN-880',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'stopped',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewRunId: runId,
+    } as any);
+    mockGetReviewStatus.mockReturnValue({ issueId: 'PAN-880', reviewStatus: 'reviewing', prUrl: 'https://github.com/eltmon/panopticon-cli/pull/880' } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).not.toHaveBeenCalledWith(
+      'agent-pan-880-review',
+      expect.stringContaining('REVIEWER_READY'),
+    );
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      `${reviewDir}/synthesis.md`,
+      expect.stringContaining('## Verdict: CHANGES REQUESTED — [correctness] Missing null check — `src/example.ts:42`'),
+    );
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-880', {
+      reviewStatus: 'blocked',
+      reviewNotes: '[correctness] Missing null check — `src/example.ts:42`',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-880',
+      verdict: 'blocked',
+      notes: '[correctness] Missing null check — `src/example.ts:42`',
+      workspacePath: '/workspace',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/880',
+    });
+    expect(actions).toEqual([
+      'Synthesized review for PAN-880 from 4 reviewer reports: blocked',
     ]);
   });
 
