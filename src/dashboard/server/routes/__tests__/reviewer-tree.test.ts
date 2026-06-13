@@ -1,8 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Effect } from 'effect';
 
 import {
   extractReviewerRole,
@@ -11,7 +10,6 @@ import {
   buildReviewerNodes,
 } from '../reviewer-tree.js';
 import { REVIEWER_ROLES, getReviewerSessionName } from '../../../../lib/cloister/specialists.js';
-import * as tmux from '../../../../lib/tmux.js';
 
 const PROJECT_KEY = 'panopticon';
 const ISSUE_ID = 'pan-830';
@@ -24,14 +22,9 @@ beforeEach(async () => {
   testDir = join(tmpdir(), `pan-reviewer-tree-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   agentsDir = join(testDir, 'panopticon', 'agents');
   await mkdir(agentsDir, { recursive: true });
-
-  // buildReviewerNodes calls capturePane for live sessions to detect API
-  // errors. Avoid real tmux I/O in unit tests — an empty pane means no error.
-  vi.spyOn(tmux, 'capturePane').mockReturnValue(Effect.succeed(''));
 });
 
 afterEach(async () => {
-  vi.restoreAllMocks();
   await rm(testDir, { recursive: true, force: true });
 });
 

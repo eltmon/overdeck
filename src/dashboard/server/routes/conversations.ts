@@ -94,6 +94,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
+  findManagedServerPidSync,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
@@ -275,14 +276,22 @@ async function terminatePids(pids: number[]): Promise<void> {
   }
 }
 
-function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
+export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
   const launcherScript = join(homedir(), '.panopticon', 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
+  // PAN-1798: never let conversation cmdline matching catch the shared tmux
+  // server. If the server was founded implicitly by a conversation, its
+  // cmdline embeds that conversation's session name and a pkill/pgrep-style
+  // match would destroy every session on the socket. Exclude the live server
+  // PID explicitly; teardown already starts with tmux kill-session on the
+  // target session, so this cleanup only mops up orphan runtime processes.
+  const serverPid = findManagedServerPidSync();
 
   return rows
     .filter((row) => {
       if (row.pid === process.pid) return false;
+      if (serverPid !== undefined && row.pid === serverPid) return false;
       if (row.args.includes(launcherScript)) return true;
       return sessionNeedles.some((needle) => row.args.includes(needle));
     })
