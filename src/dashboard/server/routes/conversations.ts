@@ -24,7 +24,7 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath } from './jsonl-resolver.js';
+import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
@@ -3010,15 +3010,23 @@ const getConversationMessagesRoute = HttpRouter.add(
           const cached = getSpecialistSessionCache(name);
           if (cached) {
             sessionFile = cached;
-          } else if (/^(specialist-|agent-|planning-)/.test(name)) {
-            // Codex agents (PAN-1805): no Claude session exists — the
-            // transcript is the rollout JSONL under the per-agent CODEX_HOME.
+          } else if (/^(specialist-|agent-|planning-|strike-|inspect-)/.test(name)) {
+            // Codex agents (PAN-1805) and pi agents (PAN-1827) have no Claude
+            // session — resolve their transcript JSONLs directly from the
+            // per-agent runtime directory.
             try {
-              if (await resolveAgentHarness(name) === 'codex') {
+              const harness = await resolveAgentHarness(name);
+              if (harness === 'codex') {
                 const rollout = await resolveCodexRolloutPath(name);
                 if (rollout) {
                   sessionFile = rollout;
                   setSpecialistSessionCache(name, rollout);
+                }
+              } else if (harness === 'pi') {
+                const piSession = await resolvePiSessionPath(name);
+                if (piSession) {
+                  sessionFile = piSession;
+                  setSpecialistSessionCache(name, piSession);
                 }
               }
             } catch { /* fall through to the Claude lookup */ }
