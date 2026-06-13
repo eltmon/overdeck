@@ -1,15 +1,17 @@
+import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  resolveHarness: vi.fn(),
-  getProviderAuthMode: vi.fn(),
+  loadConfigNoMigration: vi.fn(),
+  getClaudeAuthStatus: vi.fn(),
+  getOpenAIAuthStatus: vi.fn(),
 }));
 
-vi.mock('../../../../lib/harness-resolve.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../lib/harness-resolve.js')>();
+vi.mock('../../../../lib/config-yaml.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/config-yaml.js')>();
   return {
     ...actual,
-    resolveHarness: mocks.resolveHarness,
+    loadConfigNoMigration: mocks.loadConfigNoMigration,
   };
 });
 
@@ -17,7 +19,22 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/agents.js')>();
   return {
     ...actual,
-    getProviderAuthMode: mocks.getProviderAuthMode,
+  };
+});
+
+vi.mock('../../../../lib/claude-auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/claude-auth.js')>();
+  return {
+    ...actual,
+    getClaudeAuthStatus: mocks.getClaudeAuthStatus,
+  };
+});
+
+vi.mock('../../../../lib/openai-auth.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/openai-auth.js')>();
+  return {
+    ...actual,
+    getOpenAIAuthStatus: mocks.getOpenAIAuthStatus,
   };
 });
 
@@ -28,46 +45,58 @@ async function loadSubject() {
 describe('resolveInitialConversationHarness', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.resolveHarness.mockResolvedValue('codex');
-    mocks.getProviderAuthMode.mockResolvedValue(undefined);
+    mocks.loadConfigNoMigration.mockReturnValue(
+      Effect.succeed({
+        config: {
+          providerHarnesses: { openai: 'codex' },
+          providerAuth: { openai: 'subscription' },
+        },
+      }),
+    );
+    mocks.getClaudeAuthStatus.mockReturnValue(
+      Effect.succeed({ loggedIn: true, hasAnthropicApiKey: false }),
+    );
+    mocks.getOpenAIAuthStatus.mockReturnValue(
+      Effect.succeed({ loggedIn: true, hasOpenAIApiKey: false }),
+    );
   });
 
-  it('uses resolveHarness for flagless conversation creation with a model', async () => {
-    const { resolveInitialConversationHarness } = await loadSubject();
-
-    await expect(resolveInitialConversationHarness(undefined, 'gpt-5.5')).resolves.toBe('codex');
-
-    expect(mocks.resolveHarness).toHaveBeenCalledWith({ model: 'gpt-5.5' });
-  });
-
-  it('returns claude-code without consulting resolveHarness when no model is provided', async () => {
+  it('returns claude-code without consulting config when no model is provided', async () => {
     const { resolveInitialConversationHarness } = await loadSubject();
 
     await expect(resolveInitialConversationHarness(undefined, undefined)).resolves.toBe('claude-code');
 
-    expect(mocks.resolveHarness).not.toHaveBeenCalled();
-    expect(mocks.getProviderAuthMode).not.toHaveBeenCalled();
+    expect(mocks.loadConfigNoMigration).not.toHaveBeenCalled();
+    expect(mocks.getClaudeAuthStatus).not.toHaveBeenCalled();
+    expect(mocks.getOpenAIAuthStatus).not.toHaveBeenCalled();
+  });
+
+  it('uses async config loading for flagless conversation creation with a model', async () => {
+    const { resolveInitialConversationHarness } = await loadSubject();
+
+    await expect(resolveInitialConversationHarness(undefined, 'gpt-5.5')).resolves.toBe('codex');
+
+    expect(mocks.loadConfigNoMigration).toHaveBeenCalled();
+    expect(mocks.getOpenAIAuthStatus).toHaveBeenCalled();
   });
 
   it('preserves explicit requested harness behavior through the policy gate', async () => {
-    mocks.getProviderAuthMode.mockResolvedValue('subscription');
     const { resolveInitialConversationHarness } = await loadSubject();
 
     await expect(resolveInitialConversationHarness('pi', 'claude-sonnet-4-6')).resolves.toBe('claude-code');
     await expect(resolveInitialConversationHarness('codex', 'gpt-5.5')).resolves.toBe('codex');
 
-    expect(mocks.resolveHarness).not.toHaveBeenCalled();
-    expect(mocks.getProviderAuthMode).toHaveBeenCalledWith('claude-sonnet-4-6');
-    expect(mocks.getProviderAuthMode).toHaveBeenCalledWith('gpt-5.5');
+    expect(mocks.getClaudeAuthStatus).toHaveBeenCalled();
+    expect(mocks.getOpenAIAuthStatus).toHaveBeenCalled();
+    expect(mocks.loadConfigNoMigration).toHaveBeenCalled();
   });
 
-  it('falls back to claude-code when resolveHarness rejects with HarnessResolutionError', async () => {
-    const { HarnessResolutionError } = await import('../../../../lib/harness-resolve.js');
-    mocks.resolveHarness.mockRejectedValue(new HarnessResolutionError('blocked'));
+  it('falls back to claude-code when no explicit harness is requested for an anthropic model', async () => {
     const { resolveInitialConversationHarness } = await loadSubject();
 
-    await expect(resolveInitialConversationHarness(undefined, 'gpt-5.5')).resolves.toBe('claude-code');
+    await expect(resolveInitialConversationHarness(undefined, 'claude-sonnet-4-6')).resolves.toBe('claude-code');
 
-    expect(mocks.resolveHarness).toHaveBeenCalledWith({ model: 'gpt-5.5' });
+    expect(mocks.loadConfigNoMigration).toHaveBeenCalled();
+    expect(mocks.getClaudeAuthStatus).toHaveBeenCalled();
   });
 });

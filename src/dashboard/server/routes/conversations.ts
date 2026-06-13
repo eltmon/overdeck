@@ -105,8 +105,10 @@ import {
   getProviderAuthMode,
   getAgentRuntimeStateSync,
 } from '../../../lib/agents.js';
+import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { writeBridgeTokenSync } from '../../../lib/bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../../../lib/config-yaml.js';
+import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 
 /** The configured conversation-title model (PAN-1589) — falls back to the
  * module default when config is unavailable. */
@@ -119,9 +121,8 @@ function configuredTitleModel(): string {
 }
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
-import { canUseHarnessSync } from '../../../lib/harness-policy.js';
-import { HarnessResolutionError, resolveHarness } from '../../../lib/harness-resolve.js';
-import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
+import { canUseHarnessSync, canUseModelWithAuthSync } from '../../../lib/harness-policy.js';
+import { getBuiltInDefaultHarness, getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type PendingInputKind } from '../../../lib/agent-enrichment.js';
@@ -131,6 +132,7 @@ import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScriptSync } from '../../../lib/launcher-generator.js';
 import { workspaceContextFile, piGlobalContextFile } from '../../../lib/context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../../../lib/briefing-freshness.js';
+import { loadConfigNoMigration } from '../../../lib/config-yaml.js';
 import {
   computeContextUsage,
   parseConversationMessages,
@@ -429,20 +431,53 @@ async function resolveAllowedHarness(requested: unknown, model?: string | null):
   return decision.allowed ? harness : 'claude-code';
 }
 
+async function resolveConversationAuthMode(model: string): Promise<'api-key' | 'subscription' | undefined> {
+  const provider = getProviderForModelSync(model).name;
+
+  if (provider === 'anthropic') {
+    const authStatus = await Effect.runPromise(getClaudeAuthStatus());
+    if (authStatus.hasAnthropicApiKey) return 'api-key';
+    return authStatus.loggedIn ? 'subscription' : undefined;
+  }
+
+  if (provider === 'openai') {
+    const { config } = await Effect.runPromise(loadConfigNoMigration());
+    const authStatus = await Effect.runPromise(getOpenAIAuthStatus());
+    return authStatus.loggedIn
+      ? 'subscription'
+      : (config.providerAuth?.openai ?? 'api-key');
+  }
+
+  if (provider === 'google') {
+    const { config } = await Effect.runPromise(loadConfigNoMigration());
+    return config.providerAuth?.google;
+  }
+
+  return undefined;
+}
+
 export async function resolveInitialConversationHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
 
+  const authMode = await resolveConversationAuthMode(model);
+
   if (requested === 'pi' || requested === 'claude-code' || requested === 'codex') {
-    const decision = canUseHarnessSync(requested, model, await getProviderAuthMode(model));
+    const decision = canUseHarnessSync(requested, model, authMode);
     return decision.allowed ? requested : 'claude-code';
   }
 
-  try {
-    return await resolveHarness({ model });
-  } catch (err) {
-    if (err instanceof HarnessResolutionError) return 'claude-code';
-    throw err;
+  const { config } = await Effect.runPromise(loadConfigNoMigration());
+  const provider = getProviderForModelSync(model).name;
+  const providerHarness = config.providerHarnesses?.[provider];
+  const builtInHarness = getBuiltInDefaultHarness(provider);
+  const winner = providerHarness ?? builtInHarness ?? 'claude-code';
+
+  if (!canUseModelWithAuthSync(model, authMode).allowed) {
+    return 'claude-code';
   }
+
+  const decision = canUseHarnessSync(winner, model, authMode);
+  return decision.allowed ? winner : 'claude-code';
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
