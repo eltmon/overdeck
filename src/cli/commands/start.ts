@@ -864,6 +864,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Fetch and merge latest main before the agent starts working.
     if (workspaceExisted) {
       spinner.text = 'Syncing latest main into workspace...';
+      let syncConflictFiles: string[] | undefined;
       try {
         const syncResult = await syncMainIntoWorkspace(workspace, id);
         if (syncResult.success) {
@@ -873,10 +874,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             spinner.text = `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`;
           }
         } else {
-          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}`);
+          syncConflictFiles = syncResult.conflictFiles;
+          const conflictHint = syncConflictFiles?.length
+            ? ` Conflicts: ${syncConflictFiles.join(', ')}.`
+            : '';
+          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
         }
       } catch (syncErr: any) {
         spinner.warn(`Sync main failed: ${syncErr.message}`);
+      }
+
+      // PAN-1872: a sync-main conflict must not strand the issue. Continue
+      // spawning the work agent so it can resolve the conflicts and re-submit.
+      if (syncConflictFiles && syncConflictFiles.length > 0) {
+        spinner.text = `Preparing agent to resolve ${syncConflictFiles.length} sync-main conflict(s)...`;
       }
     }
 
