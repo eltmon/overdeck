@@ -41,6 +41,17 @@ export interface RateLimitInfo {
   resetAt: string;
 }
 
+/**
+ * Parse an integer value from a response header.
+ * Returns null when the header is missing or not a finite integer.
+ */
+export function parseIntegerHeader(headers: Headers, name: string): number | null {
+  const raw = headers.get(name);
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 // Cache entry returned from get()
 export interface CacheEntry {
   data: any;
@@ -347,6 +358,23 @@ export class CacheService {
     if (ratioRemaining > 0.25) return baseIntervalMs; // 25-50%: 2x interval
     if (ratioRemaining > 0.1) return baseIntervalMs * 4; // 10-25%: 5x interval
     return baseIntervalMs * 9;                        // <10%: 10x interval
+  }
+
+  /**
+   * Calculate suspension delay in ms for an exhausted tracker.
+   * Returns 0 when there is no rate limit row, remaining > 0, resetAt has
+   * passed, or resetAt is unparseable. Callers clamp to their own ceiling.
+   */
+  getSuspensionMs(tracker: string, now: number = Date.now()): number {
+    const limit = this.getRateLimit(tracker);
+    if (!limit) return 0;
+    if (limit.remaining > 0) return 0;
+
+    const resetMs = new Date(limit.resetAt).getTime();
+    if (!Number.isFinite(resetMs)) return 0;
+    if (resetMs <= now) return 0;
+
+    return resetMs - now;
   }
 
   /**
