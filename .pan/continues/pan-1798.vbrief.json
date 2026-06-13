@@ -1,0 +1,98 @@
+{
+  "version": "1",
+  "issueId": "PAN-1798",
+  "created": "2026-06-12T19:54:10.574Z",
+  "updated": "2026-06-12T20:06:07.000Z",
+  "gitState": { "branch": "feature/pan-1798", "sha": "40d2f5400", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Keep the already-landed timestamped `systemd-run --user --scope --collect --unit=panopticon-tmux-<Date.now()>` transient-scope founding (b7e4ab885) instead of the issue's literal stable `--unit=panopticon-tmux-server` service unit. Stable-named services need Type=forking/RemainAfterExit fiddliness and collide with stale units; timestamped transient scopes are collision-proof and equally outside any agent's scope.",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Preflight placement: inside tmuxExecAsync (src/lib/tmux.ts:239) and tmuxExecSync (:245), gated on mode === 'managed' && args[0] === 'new-session'. Audit verified every managed-socket new-session funnels through these two functions and only new-session/start-server can found a server; attach-session/list-sessions/display-message/set-environment (the only external buildTmuxArgs users) cannot found.",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Founder guard warns on tmux-spawn-* cgroups only (per issue comment spec), at most once per server PID per process, warn-only — never restart/signal/migrate. Empirically verified (throwaway-socket probe, tmux 3.4): the server stays in the founding client's cgroup; tmux-spawn-*.scope units are created for PANES only, so cleanly-founded servers never false-positive.",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Deacon auto-resume race (resuming a just-killed agent ~25s later, 'has a resumable Claude session' failure) is OUT of scope — the issue labels it a bonus race and its fix-shape targets only server founding.",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Post-founding verification is a single aliveness assert + console.error on failure — NO retry loops or timed waits (the founding exec blocks until the tmux client exits, by which time the socket answers; a failed founding surfaces via the subsequent tmux command's own error).",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Async-first: the tmuxExecAsync preflight founds via execFileAsync (foundManagedServerAsync, isManagedServerAliveAsync); sync founding remains only on the legacy tmuxExecSync path. No new blocking exec reachable from dashboard async flows (PAN-70 rule).",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "The once-per-process tmuxContextPrepared latch (tmux.ts:164,172) keeps governing CONFIG-FILE WRITING only; server founding moves out from behind it. This is the root-cause fix — the latch is why the 08:53 server was dirty-founded by conv-20260612-3871 after the b7e4ab885 fix had landed.",
+      "recordedAt": "2026-06-12T20:06:07.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "The LIVE tmux server (PID 1947249, operator-adopted into panopticon-tmux-adopted.scope) hosts ~20 agents and the operator's conversation. Restarting/killing/migrating it, or running `pan kill PAN-1579`, destroys live work.",
+      "mitigation": "Nothing in this change may touch a running server — the fix governs future foundings only. Tests must never target the live 'panopticon' socket: mock child_process or use a throwaway -L socket name."
+    },
+    {
+      "id": "H2",
+      "summary": "tmuxExec* runs constantly (capture-pane polling); an aliveness subprocess per call would double tmux exec load.",
+      "mitigation": "Gate the aliveness probe on args[0] === 'new-session' only (NFR-4); assert in tests that non-creating commands trigger no probe."
+    },
+    {
+      "id": "H3",
+      "summary": "Blocking exec in dashboard-reachable code freezes the event loop (PAN-70). The landed foundManagedServerSync is execFileSync and is reachable from tmuxExecAsync via the latched reload path.",
+      "mitigation": "New async preflight uses execFileAsync end-to-end (foundManagedServerAsync); sync variants remain only on the legacy sync path."
+    },
+    {
+      "id": "H4",
+      "summary": "Founding requires the managed config file to exist (-f <conf>); founding before the config write would start a server without exit-empty off.",
+      "mitigation": "Preserve existing order: ensureTmuxContextPrepared* (config write, latched) runs before the ensure-server preflight in tmuxExec*."
+    },
+    {
+      "id": "H5",
+      "summary": "Workspace containers and macOS lack systemd — systemd-run founding fails there.",
+      "mitigation": "Fallback to plain `tmux start-server` already exists; add the required warning log (FR-4) and keep the fallback non-throwing."
+    },
+    {
+      "id": "H6",
+      "summary": "Concurrent foundings (dashboard + CLI racing on a dead socket) could both attempt start-server.",
+      "mitigation": "Timestamped unit names cannot collide across processes; tmux itself serializes socket binding (the losing server exits). No extra locking needed — do not add it."
+    },
+    {
+      "id": "H7",
+      "summary": "Stale workspace artifacts: this recycled workspace contained a leftover PAN-1788 spec.vbrief.json (already promoted to main), and main's .pan/specs/ already holds a minimal auto-start stub spec for PAN-1798 (author panopticon-cli/auto-start, created 19:43, single 'Implement issue' item).",
+      "mitigation": "Workspace spec overwritten with the real PAN-1798 plan; `pan plan finalize` promotes it over the stub on main. If finalize refuses because a promoted spec already exists, surface to the operator rather than hand-editing main."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1798: Shared tmux server lives inside the founding agent's systemd scope — pan kill of that agent kills EVERY session (all conversations included)",
+      "timestamp": "2026-06-12T19:54:10.574Z"
+    },
+    {
+      "timestamp": "2026-06-12T20:06:07.000Z",
+      "reason": "planning",
+      "note": "Auto-mode discovery complete: found b7e4ab885 partial fix on main (exit-empty off, clean founding, kill-sweep tmux filter); identified remaining root cause (once-per-process tmuxContextPrepared latch lets a mid-lifetime server death dirty-found again — proven by live server PID 1947249 founded 08:53 by conv spawn); empirically verified tmux 3.4 cgroup behavior on a throwaway socket; wrote PRD draft (.pan/drafts/PAN-1798.md), vBRIEF with 3 beads, codebase-map concerns entry.",
+      "agentModel": "agent:claude-fable-5"
+    }
+  ],
+  "feedback": []
+}
