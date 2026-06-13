@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Backlog Sequencer · scaled view · 522 open (PAN-1866 mockup v2)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="_shared-opus.css" />
+  <style>
+    .app { display: flex; height: 100vh; overflow: hidden; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .rail .wordmark { font-family: "Space Grotesk", sans-serif; font-size: 9px; letter-spacing: .04em; color: var(--muted-foreground); writing-mode: vertical-rl; transform: rotate(180deg); margin-top: 4px; }
+    .page { flex: 1; overflow-y: auto; padding: 20px 26px 80px; }
+
+    .head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+    .head h1 { font-family: "Space Grotesk", sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 4px; }
+    .head .sub { font-size: 13px; color: var(--muted-foreground); max-width: 600px; line-height: 1.5; }
+    .head .controls { margin-left: auto; display: flex; align-items: flex-end; gap: 10px; flex-shrink: 0; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); }
+    .select { height: 32px; padding: 0 30px 0 12px; min-width: 174px; background: var(--card); border: 1px solid var(--input); border-radius: var(--radius-lg); color: var(--foreground); font: inherit; font-size: 12px; font-weight: 500; appearance: none; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
+
+    /* ── segments: the "522 broken down" bar ── */
+    .segbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .seg-pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--card); font-size: 12px; color: var(--muted-foreground); cursor: pointer; transition: border-color 160ms, background 160ms; }
+    .seg-pill:hover { border-color: rgb(255 255 255 / 16%); }
+    .seg-pill.active { background: var(--accent); border-color: rgb(255 255 255 / 18%); color: var(--foreground); }
+    .seg-pill b { color: var(--foreground); font-weight: 600; font-family: "SF Mono", monospace; font-size: 12px; }
+    .seg-pill .d { width: 8px; height: 8px; border-radius: 50%; }
+    .seg-pill .total b { font-size: 13px; }
+
+    /* ── view/filter bar ── */
+    .viewbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 9px 12px; margin-bottom: 14px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl); }
+    .viewbar .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); }
+    .toggle { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: var(--radius-md); border: 1px solid var(--input); background: transparent; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 500; cursor: pointer; }
+    .toggle.on { background: var(--accent); color: var(--foreground); border-color: rgb(255 255 255 / 16%); }
+    .toggle .d { width: 8px; height: 8px; border-radius: 2px; }
+    .vb-spacer { flex: 1; }
+    .search2 { display: flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border-radius: var(--radius-md); background: var(--card); border: 1px solid var(--input); color: var(--muted-foreground); font-size: 11px; min-width: 200px; }
+
+    /* ── tier ribbon ── */
+    .tierrib { display: flex; gap: 6px; margin-bottom: 14px; }
+    .tier { flex: 1; display: flex; flex-direction: column; gap: 3px; padding: 9px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--card); cursor: pointer; position: relative; overflow: hidden; }
+    .tier::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tc, var(--muted-foreground)); }
+    .tier.now    { --tc: var(--destructive); }
+    .tier.next   { --tc: var(--warning); }
+    .tier.later  { --tc: var(--info); }
+    .tier.someday{ --tc: var(--muted-foreground); }
+    .tier.active { border-color: var(--tc); background: color-mix(in srgb, var(--tc) 9%, var(--card)); }
+    .tier .t-name { font-size: 12px; font-weight: 500; color: var(--foreground); display: flex; align-items: center; gap: 7px; }
+    .tier .t-count { font-family: "SF Mono", monospace; font-size: 18px; font-weight: 600; color: var(--foreground); }
+    .tier .t-sub { font-size: 11px; color: var(--muted-foreground); }
+
+    /* ── DAG + rationale ── */
+    .focus-note { font-size: 12px; color: var(--muted-foreground); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .focus-note .pill { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: var(--radius-sm); color: var(--destructive-foreground); background: color-mix(in srgb, var(--destructive) 8%, transparent); border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent); }
+
+    .split { display: flex; gap: 18px; align-items: flex-start; }
+    .dag-wrap { flex: 1; min-width: 0; position: relative;
+      background: radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0); background-size: 22px 22px;
+      background-color: color-mix(in srgb, var(--background) 92%, var(--color-white));
+      border: 1px solid var(--border); border-radius: var(--radius-2xl); overflow: auto; height: calc(100vh - 420px); min-height: 440px; }
+    .dag-canvas { position: relative; width: 1000px; height: 1020px; }
+    .edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+
+    .node { position: absolute; z-index: 2; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--heat, var(--muted-foreground)); border-radius: var(--radius-lg); padding: 9px 11px 9px 12px; cursor: pointer; user-select: none; transition: transform 160ms, box-shadow 160ms, border-color 160ms; box-shadow: 0 1px 2px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 5px; }
+    .node:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+    .node.selected { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 60%, transparent), 0 8px 22px rgba(0,0,0,.5); }
+    .node.xs { width: 150px; } .node.s { width: 168px; } .node.m { width: 196px; } .node.l { width: 216px; } .node.xl { width: 236px; }
+    .node.crit { --heat: var(--destructive); border-left-width: 5px; }
+    .node.high { --heat: var(--warning); border-left-width: 5px; }
+    .node.med  { --heat: color-mix(in srgb, var(--color-neutral-400) 80%, transparent); }
+    .node.low  { --heat: color-mix(in srgb, var(--muted-foreground) 55%, transparent); }
+    .node.pipe { box-shadow: 0 0 0 1.5px var(--phase), 0 0 16px color-mix(in srgb, var(--phase) 45%, transparent), 0 2px 6px rgba(0,0,0,.35); animation: ringpulse 2.6s ease-in-out infinite; }
+    .node.pipe.selected { box-shadow: 0 0 0 2px var(--primary), 0 0 16px color-mix(in srgb, var(--phase) 45%, transparent); animation: none; }
+    .node.phase-work { --phase: var(--info); } .node.phase-review { --phase: var(--warning); } .node.phase-plan { --phase: var(--signal-review); }
+    @keyframes ringpulse { 0%,100% { box-shadow: 0 0 0 1.5px var(--phase), 0 0 12px color-mix(in srgb, var(--phase) 35%, transparent), 0 2px 6px rgba(0,0,0,.35); } 50% { box-shadow: 0 0 0 1.5px var(--phase), 0 0 22px color-mix(in srgb, var(--phase) 60%, transparent), 0 2px 6px rgba(0,0,0,.35); } }
+    .node.cond-refine { border-style: dashed; border-color: color-mix(in srgb, var(--warning) 55%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--warning) 30%, transparent), 0 2px 6px rgba(0,0,0,.35); }
+    .node.cond-stale { opacity: .5; filter: grayscale(.6); border-style: dashed; }
+    .node.cond-stale .title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent); }
+    .node.cond-stale:hover, .node.cond-stale.selected { opacity: 1; filter: none; }
+    .node .row1 { display: flex; align-items: center; gap: 7px; }
+    .node .rank { font-family: "SF Mono", monospace; font-size: 11px; font-weight: 600; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 5px; line-height: 17px; }
+    .node .iid { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+    .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 600; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 5px; line-height: 15px; }
+    .node .title { font-size: 12.5px; font-weight: 500; color: var(--foreground); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .node .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .chip { font-size: 9px; font-weight: 500; letter-spacing: .04em; padding: 1px 5px; border-radius: var(--radius-sm); border: 1px solid; line-height: 14px; }
+    .chip.prd { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+    .chip.ready { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
+    .chip.refine { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+    .chip.stale { color: var(--muted-foreground); border-color: var(--border); background: var(--accent); }
+    .chip.verb { display: inline-flex; align-items: center; gap: 3px; }
+    .chip.verb.work { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+    .chip.verb.review { color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 32%, transparent); background: color-mix(in srgb, var(--warning) 8%, transparent); }
+    .chip.verb.plan { color: var(--signal-review-foreground); border-color: color-mix(in srgb, var(--signal-review) 32%, transparent); background: color-mix(in srgb, var(--signal-review) 8%, transparent); }
+    .chip.verb .pulsedot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: blink 1.4s ease-in-out infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+    .node .score { font-family: "SF Mono", monospace; font-size: 9.5px; color: var(--muted-foreground); }
+
+    .rationale { width: 308px; flex-shrink: 0; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-2xl); padding: 18px; position: sticky; top: 0; }
+    .rationale .eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); margin-bottom: 8px; }
+    .rationale .r-id { font-family: "SF Mono", monospace; font-size: 12px; color: var(--muted-foreground); }
+    .rationale .r-title { font-size: 16px; font-weight: 500; line-height: 1.35; margin: 2px 0 14px; }
+    .rationale .r-meta { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; font-size: 12px; margin-bottom: 12px; }
+    .rationale .r-meta .k { color: var(--muted-foreground); }
+    .rationale .r-meta .v { color: var(--foreground); text-align: right; }
+    .rationale .r-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+    .rationale .r-body { font-size: 13px; line-height: 1.6; color: color-mix(in srgb, var(--foreground) 88%, transparent); border-top: 1px solid var(--border); padding-top: 13px; }
+    .rationale .r-body .why { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); margin-bottom: 6px; }
+    .scorebar { height: 5px; border-radius: 3px; background: var(--accent); overflow: hidden; margin-top: 3px; }
+    .scorebar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--warning), var(--destructive)); }
+    .heatpill { display: inline-flex; align-items: center; gap: 6px; }
+    .heatpill .sw { width: 10px; height: 10px; border-radius: 3px; }
+
+    /* ── collapsed long-tail ── */
+    .tail { margin-top: 18px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-2xl); overflow: hidden; }
+    .tail-head { display: flex; align-items: center; gap: 10px; padding: 13px 18px; border-bottom: 1px solid var(--border); }
+    .tail-head .tt { font-size: 13px; font-weight: 500; color: var(--foreground); }
+    .tail-head .ts { font-size: 12px; color: var(--muted-foreground); }
+    .tail-head .chev { margin-left: auto; color: var(--muted-foreground); }
+    .tail-rows { display: flex; flex-direction: column; }
+    .trow { display: grid; grid-template-columns: 44px 84px 16px 1fr auto; align-items: center; gap: 12px; padding: 7px 18px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); font-size: 12.5px; cursor: pointer; }
+    .trow:hover { background: var(--accent); }
+    .trow:last-child { border-bottom: none; }
+    .trow .trank { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+    .trow .tid { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+    .trow .theat { width: 9px; height: 9px; border-radius: 2px; }
+    .trow .ttitle { color: var(--foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .trow .tflags { display: flex; align-items: center; gap: 6px; }
+    .trow .tsize { font-size: 9px; font-weight: 600; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 5px; line-height: 15px; }
+    .micon { font-size: 11px; }
+    .micon.refine { color: var(--warning-foreground); }
+    .micon.stale { color: var(--muted-foreground); }
+    .micon.ready { color: var(--success-foreground); }
+    .micon.prd { color: var(--muted-foreground); }
+    .tail-more { padding: 12px 18px; text-align: center; font-size: 12px; color: var(--muted-foreground); cursor: pointer; }
+    .tail-more b { color: var(--foreground); font-weight: 600; font-family: "SF Mono", monospace; }
+    .tail-more:hover { background: var(--accent); color: var(--foreground); }
+
+    .footnote { margin-top: 22px; font-size: 11px; color: var(--muted-foreground); line-height: 1.6; max-width: 940px; }
+    .footnote b { color: var(--foreground); font-weight: 500; }
+    .footnote code { font-family: "SF Mono", monospace; background: var(--accent); padding: 1px 5px; border-radius: 4px; color: var(--foreground); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav class="rail">
+      <div class="mark" title="Panopticon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/></svg></div>
+      <div class="nav" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div class="nav" title="Flywheel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></div>
+      <div class="nav active" title="Backlog Sequencer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M8.5 6.5 15.5 11M8.5 17.5 15.5 13"/></svg></div>
+      <div class="nav" title="Board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10.5" y="3" width="6" height="12" rx="1"/><rect x="18" y="3" width="3" height="8" rx="1"/></svg></div>
+      <div class="nav" title="Pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+      <div class="spacer"></div>
+      <div class="wordmark">PANOPTICON</div>
+      <div class="avatar">EB</div>
+    </nav>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="crumbs"><span class="muted">panopticon-cli</span><span class="sep">/</span><span class="title">Backlog Sequencer</span><span class="meta">522 open</span></div>
+        <div class="tb-spacer"></div>
+        <div class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Search the sequence…</span></div>
+      </div>
+
+      <div class="page">
+        <div class="head">
+          <div>
+            <h1>Backlog Sequencer <span style="font-family:'SF Mono',monospace;font-size:14px;font-weight:400;color:var(--muted-foreground)">· 522 open</span></h1>
+            <div class="sub">The whole backlog is ranked into one sequence. You don't stare at 522 boxes — the graph shows the tier you're acting on now; everything else is summarized, filterable, and one click away.</div>
+          </div>
+          <div class="controls">
+            <div class="field">
+              <label>Pass</label>
+              <div class="seg" title="Creation builds the file once. Incremental reviews only changed issues. Full review re-evaluates all 522.">
+                <button class="active">Incremental</button><span class="div"></span><button>Full review</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Model</label>
+              <select class="select" title="roles.sequencer.model"><option>claude-opus-4-8</option><option>workhorse:expensive</option><option>claude-sonnet-4-6</option></select>
+            </div>
+            <button class="btn-primary" style="height:32px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Re-sequence</button>
+          </div>
+        </div>
+
+        <!-- ── 522 broken down (clickable filters) ── -->
+        <div class="segbar">
+          <span class="seg-pill total"><b>522</b> open issues</span>
+          <span class="seg-pill"><span class="d" style="background:var(--info)"></span>In pipeline <b>6</b></span>
+          <span class="seg-pill"><span class="d" style="background:var(--success)"></span>Ready <b>23</b></span>
+          <span class="seg-pill"><span class="d" style="background:var(--muted-foreground)"></span>Has PRD <b>41</b></span>
+          <span class="seg-pill"><span class="d" style="background:var(--warning)"></span>⚠ Needs refinement <b>18</b></span>
+          <span class="seg-pill"><span class="d" style="background:var(--muted-foreground);opacity:.5"></span>⊘ Stale candidates <b>9</b></span>
+          <span class="seg-pill active"><span class="d" style="background:var(--destructive)"></span>Tier&nbsp;1 · Now <b>14</b></span>
+        </div>
+
+        <!-- ── view/filter bar ── -->
+        <div class="viewbar">
+          <span class="lbl">Show</span>
+          <select class="select" style="min-width:150px;height:28px"><option>Tier 1 · Now (14)</option><option>Tiers 1–2 (52)</option><option>Top 40 + neighbors</option><option>Everything (522)</option></select>
+          <span class="lbl" style="margin-left:6px">Importance</span>
+          <button class="toggle on"><span class="d" style="background:var(--destructive)"></span>critical</button>
+          <button class="toggle on"><span class="d" style="background:var(--warning)"></span>high</button>
+          <button class="toggle"><span class="d" style="background:var(--color-neutral-400)"></span>medium</button>
+          <button class="toggle"><span class="d" style="background:color-mix(in srgb,var(--muted-foreground) 55%,transparent)"></span>low</button>
+          <span class="lbl" style="margin-left:6px">Only</span>
+          <button class="toggle"><span class="d" style="background:var(--info);border-radius:50%"></span>in pipeline</button>
+          <button class="toggle"><span class="d" style="background:var(--success);border-radius:50%"></span>ready</button>
+          <button class="toggle"><span class="d" style="background:var(--warning);border-radius:50%"></span>needs refine</button>
+          <div class="vb-spacer"></div>
+          <div class="search2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>filter by id / title…</span></div>
+        </div>
+
+        <!-- ── tier ribbon ── -->
+        <div class="tierrib">
+          <div class="tier now active"><div class="t-name">🔴 Now</div><div class="t-count">14</div><div class="t-sub">act on these first · ranks 1–14</div></div>
+          <div class="tier next"><div class="t-name">🟠 Next</div><div class="t-count">38</div><div class="t-sub">queued behind Now · ranks 15–52</div></div>
+          <div class="tier later"><div class="t-name">🔵 Later</div><div class="t-count">96</div><div class="t-sub">planned horizon · ranks 53–148</div></div>
+          <div class="tier someday"><div class="t-name">⚪ Someday</div><div class="t-count">374</div><div class="t-sub">long tail · ranks 149–522</div></div>
+        </div>
+
+        <div class="focus-note"><span class="pill">Showing Tier 1 · Now</span> 14 of 522 issues rendered as a graph — the rest are summarized below and reachable via filters or the tier ribbon.</div>
+
+        <!-- ── DAG (top tier) + rationale ── -->
+        <div class="split">
+          <div class="dag-wrap"><div class="dag-canvas" id="canvas"><svg class="edges" id="edges"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="rgba(255,255,255,.32)"/></marker></defs></svg></div></div>
+          <aside class="rationale" id="panel"></aside>
+        </div>
+
+        <!-- ── collapsed long-tail ── -->
+        <div class="tail">
+          <div class="tail-head">
+            <span class="tt">Tier 2 · Next</span>
+            <span class="ts">ranks 15–52 · 38 issues — preview</span>
+            <span class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span>
+          </div>
+          <div class="tail-rows" id="tailrows"></div>
+          <div class="tail-more">+ <b>34</b> more in Next, then <b>96</b> Later and <b>374</b> Someday — <span style="text-decoration:underline">expand the full ranked list</span></div>
+        </div>
+
+        <div class="footnote">
+          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Tier 1 (Now) nodes — same focused set rendered as the graph ──
+    const NODES = [
+      { id:'PAN-1665', rank:1,  size:'l',  imp:'crit', score:96, deps:[],            pipe:'work',   ready:false, prd:true,
+        title:'Throttle agent spawn so the deacon can be un-frozen',
+        why:'Root unblocker. Until spawn rate is bounded, un-freezing the deacon floods the box and everything downstream stalls. Gates the next four items.' },
+      { id:'PAN-1801', rank:2,  size:'m',  imp:'high', score:88, deps:['PAN-1665'],  pipe:null,     ready:true,  prd:true,
+        title:'Relay CI check failures back to the work agent',
+        why:'Work agents fly blind on red checks today. Cheap, high-impact, already fully planned (vBRIEF + beads on disk).' },
+      { id:'PAN-1491', rank:3,  size:'m',  imp:'high', score:84, deps:[],            pipe:null,     ready:false, prd:true,
+        title:'Metric-aware flywheel prioritization',
+        why:'Compounding leverage: once the flywheel ranks by outcome metrics, every later pick gets better. Independent of the throttle work.' },
+      { id:'PAN-1666', rank:4,  size:'l',  imp:'high', score:81, deps:['PAN-1665'],  pipe:'review', ready:false, prd:false,
+        title:'Pipeline throughput un-freeze rollout plan',
+        why:'Consumes the throttle. In review now — the plan it lands defines how the deacon comes back online safely.' },
+      { id:'PAN-1781', rank:5,  size:'m',  imp:'med',  score:72, deps:['PAN-1801'],  pipe:null,     ready:true,  prd:false,
+        title:'Fresh-session seeding to survive compact-boundary bypass',
+        why:'Reliability fix for long GPT-5.5 sessions. Planned and pickable; mid impact — affects a subset of runs.' },
+      { id:'PAN-1674', rank:6,  size:'s',  imp:'low',  score:55, deps:['PAN-1491'],  pipe:null,     ready:true,  prd:false,
+        title:'Reap per-workspace TLDR .venv disk hog',
+        why:'Reclaims ~235G. Low strategic weight but tiny and ready, so it slots in cheaply.' },
+      { id:'PAN-1691', rank:7,  size:'l',  imp:'med',  score:69, deps:['PAN-1666'],  pipe:'plan',   ready:false, prd:true,
+        title:'Merge-train engine + v3 flywheel UI',
+        why:'Builds on the un-freeze. Being planned now; large surface, so it sits behind the rollout it depends on.' },
+      { id:'PAN-1737', rank:8,  size:'xl', imp:'med',  score:64, deps:['PAN-1666','PAN-1781'], pipe:null, ready:false, prd:true,
+        title:'UAT batch trains — assemble and promote generations',
+        why:'Biggest single item (XL). High value but expensive; consumes the un-freeze and informs from the compact-boundary fix.' },
+      { id:'PAN-1705', rank:9,  size:'m',  imp:'med',  score:58, deps:['PAN-1674'],  pipe:null,     ready:false, prd:false,
+        title:'Eliminate gate-window request queueing on click',
+        why:'UX latency fix. Real but not blocking; needs a PRD before it is pickable.' },
+      { id:'PAN-1672', rank:10, size:'m',  imp:'med',  score:53, deps:[],            pipe:null,     ready:false, prd:false, cond:'refine',
+        title:'Break the CLIProxy long-session context deadlock',
+        why:'Real and recurring, but the body is one sentence — no repro, no acceptance criteria. A human must refine it before an agent can plan it.' },
+      { id:'PAN-1714', rank:11, size:'m',  imp:'low',  score:44, deps:['PAN-1705'],  pipe:null,     ready:false, prd:false,
+        title:'Classify dead-vs-busy servers in the watchdog probe',
+        why:'Stability polish on top of the queueing fix. Low weight, moderate effort.' },
+      { id:'PAN-1852', rank:12, size:'xs', imp:'low',  score:31, deps:['PAN-1714'],  pipe:null,     ready:false, prd:false,
+        title:'Fix doubled vBRIEF path in a PRD reference',
+        why:'Trivial doc correction. Costs almost nothing to defer.' },
+      { id:'PAN-1861', rank:13, size:'s',  imp:'low',  score:28, deps:['PAN-1691'],  pipe:null,     ready:false, prd:false,
+        title:'Nudge fires but never un-wedges a stuck agent',
+        why:'Edge-case reliability nit downstream of the merge-train UI work. Low impact, small.' },
+      { id:'PAN-1803', rank:14, size:'s',  imp:'low',  score:18, deps:[],            pipe:null,     ready:false, prd:false, cond:'stale',
+        title:'Revert and re-land the admin-merge change',
+        why:'The revert already landed and the re-land folded into PAN-1691. Likely describes work that no longer exists — candidate to close.' },
+    ];
+    const EDGES = [
+      ['PAN-1665','PAN-1801','unblocks'],['PAN-1665','PAN-1666','unblocks'],['PAN-1801','PAN-1781','unblocks'],
+      ['PAN-1491','PAN-1674','unblocks'],['PAN-1666','PAN-1691','unblocks'],['PAN-1666','PAN-1737','unblocks'],
+      ['PAN-1781','PAN-1737','informs'],['PAN-1674','PAN-1705','unblocks'],['PAN-1705','PAN-1714','unblocks'],
+      ['PAN-1714','PAN-1852','unblocks'],['PAN-1691','PAN-1861','unblocks'],['PAN-1672','PAN-1714','informs'],
+    ];
+    const POS = { 'PAN-1665':[400,24],'PAN-1801':[150,196],'PAN-1491':[660,196],'PAN-1666':[120,372],'PAN-1781':[404,376],'PAN-1674':[702,376],'PAN-1691':[92,556],'PAN-1737':[356,548],'PAN-1705':[700,556],'PAN-1714':[392,744],'PAN-1672':[672,744],'PAN-1852':[150,904],'PAN-1861':[330,900],'PAN-1803':[520,900] };
+
+    // ── Tier 2 (Next) preview rows — the collapsed long tail ──
+    const TAIL = [
+      { rank:15, id:'PAN-1776', size:'m', imp:'med', title:'Webhook check-suite correlation for PR head SHA', flags:['prd'] },
+      { rank:16, id:'PAN-1696', size:'l', imp:'med', title:'Command Deck issue cockpit — agent tree + conversation', flags:['prd'] },
+      { rank:17, id:'PAN-1517', size:'m', imp:'med', title:'Cross-provider cache cost attribution', flags:[] },
+      { rank:18, id:'PAN-1533', size:'s', imp:'low', title:'Deacon ignore-flag should survive review reset', flags:['ready'] },
+      { rank:19, id:'PAN-1574', size:'xl',imp:'med', title:'Harness landscape: evaluate adopting additional coding agents', flags:['refine'] },
+      { rank:20, id:'PAN-1549', size:'m', imp:'low', title:'Workspace panes — stack health surface polish', flags:[] },
+      { rank:21, id:'PAN-1519', size:'s', imp:'low', title:'Settings: per-role harness override UI', flags:['ready'] },
+      { rank:22, id:'PAN-1531', size:'l', imp:'low', title:'Stash taxonomy collapse follow-ups', flags:['stale'] },
+      { rank:23, id:'PAN-1787', size:'l', imp:'med', title:'Remote Fly substrate — OAuth staleness 401 mitigation', flags:['prd'] },
+      { rank:24, id:'PAN-1775', size:'xs',imp:'low', title:'Codex quota watch — drop the stale note', flags:[] },
+      { rank:25, id:'PAN-1788', size:'xl',imp:'med', title:'Merge-train live-cascade validation harness', flags:['prd'] },
+      { rank:26, id:'PAN-1799', size:'s', imp:'low', title:'Pi GPT-5.x auth preflight doctor row', flags:['ready'] },
+    ];
+
+    const SIZE_TAG = { xs:'XS', s:'S', m:'M', l:'L', xl:'XL' };
+    const IMP_LABEL = { crit:'critical', high:'high', med:'medium', low:'low' };
+    const IMP_SW = { crit:'var(--destructive)', high:'var(--warning)', med:'var(--color-neutral-400)', low:'color-mix(in srgb,var(--muted-foreground) 55%,transparent)' };
+    const PHASE_LABEL = { work:'work', review:'review', plan:'plan' };
+
+    const canvas = document.getElementById('canvas');
+    const byId = Object.fromEntries(NODES.map(n => [n.id, n]));
+
+    for (const n of NODES) {
+      const [x,y] = POS[n.id];
+      const el = document.createElement('div');
+      el.className = `node ${n.size} ${n.imp}` + (n.pipe ? ` pipe phase-${n.pipe}` : '') + (n.cond && n.cond!=='ok' ? ` cond-${n.cond}` : '');
+      el.id = 'node-' + n.id; el.style.left = x+'px'; el.style.top = y+'px';
+      const chips = [];
+      if (n.pipe)            chips.push(`<span class="chip verb ${n.pipe}"><span class="pulsedot"></span>${PHASE_LABEL[n.pipe]}</span>`);
+      if (n.cond==='refine') chips.push(`<span class="chip refine">⚠ REFINE</span>`);
+      if (n.cond==='stale')  chips.push(`<span class="chip stale">⊘ STALE</span>`);
+      if (n.ready) chips.push(`<span class="chip ready">✓ READY</span>`);
+      if (n.prd)   chips.push(`<span class="chip prd">PRD</span>`);
+      el.innerHTML = `<div class="row1"><span class="rank">#${n.rank}</span><span class="iid">${n.id}</span><span class="size-tag">${SIZE_TAG[n.size]}</span></div><div class="title">${n.title}</div><div class="chips">${chips.join('')}<span class="score" style="margin-left:auto">${n.score}</span></div>`;
+      el.addEventListener('click', () => select(n.id));
+      canvas.appendChild(el);
+    }
+
+    function drawEdges() {
+      const svg = document.getElementById('edges');
+      [...svg.querySelectorAll('path.edge')].forEach(p => p.remove());
+      const crect = canvas.getBoundingClientRect();
+      for (const [from,to,type] of EDGES) {
+        const a = document.getElementById('node-'+from).getBoundingClientRect();
+        const b = document.getElementById('node-'+to).getBoundingClientRect();
+        const x1 = a.left-crect.left + a.width/2, y1 = a.bottom-crect.top;
+        const x2 = b.left-crect.left + b.width/2, y2 = b.top-crect.top;
+        const dy = Math.max(28, (y2-y1)*0.5);
+        const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1+dy}, ${x2} ${y2-dy}, ${x2} ${y2}`);
+        p.setAttribute('class','edge'); p.setAttribute('fill','none');
+        p.setAttribute('stroke','rgba(255,255,255,.26)'); p.setAttribute('stroke-width','1.6');
+        if (type==='informs') p.setAttribute('stroke-dasharray','5 4');
+        p.setAttribute('marker-end','url(#arrow)'); svg.appendChild(p);
+      }
+    }
+
+    function select(id) {
+      document.querySelectorAll('.node.selected').forEach(e => e.classList.remove('selected'));
+      const el = document.getElementById('node-'+id); if (el) el.classList.add('selected');
+      const n = byId[id];
+      const flags = [];
+      if (n.pipe)            flags.push(`<span class="chip verb ${n.pipe}"><span class="pulsedot"></span>in pipeline · ${PHASE_LABEL[n.pipe]}</span>`);
+      if (n.cond==='refine') flags.push(`<span class="chip refine">⚠ needs refinement</span>`);
+      if (n.cond==='stale')  flags.push(`<span class="chip stale">⊘ likely stale · candidate to close</span>`);
+      if (n.ready) flags.push(`<span class="chip ready">✓ READY</span>`);
+      if (n.prd)   flags.push(`<span class="chip prd">PRD</span>`);
+      if (!flags.length) flags.push(`<span class="chip prd" style="opacity:.7">not yet planned</span>`);
+      document.getElementById('panel').innerHTML = `
+        <div class="eyebrow">Why rank #${n.rank}</div>
+        <div class="r-id mono">${n.id}</div>
+        <div class="r-title">${n.title}</div>
+        <div class="r-meta">
+          <span class="k">Importance</span><span class="v"><span class="heatpill"><span class="sw" style="background:${IMP_SW[n.imp]}"></span>${IMP_LABEL[n.imp]}</span></span>
+          <span class="k">Impact score</span><span class="v mono">${n.score} / 100</span>
+        </div>
+        <div class="scorebar"><i style="width:${n.score}%"></i></div>
+        <div style="height:12px"></div>
+        <div class="r-meta">
+          <span class="k">Est. size</span><span class="v">${SIZE_TAG[n.size]} effort</span>
+          <span class="k">Depends on</span><span class="v mono">${n.deps.length ? n.deps.join(', ') : '— none'}</span>
+        </div>
+        <div class="r-flags">${flags.join('')}</div>
+        <div class="r-body"><div class="why">AI rationale · from sequence.md</div>${n.why}</div>`;
+    }
+
+    // tail rows
+    const FLAG_ICON = { refine:'<span class="micon refine" title="needs refinement">⚠</span>', stale:'<span class="micon stale" title="likely stale">⊘</span>', ready:'<span class="micon ready" title="ready">✓</span>', prd:'<span class="micon prd" title="has PRD">▦</span>' };
+    document.getElementById('tailrows').innerHTML = TAIL.map(t => `
+      <div class="trow">
+        <span class="trank">#${t.rank}</span>
+        <span class="tid">${t.id}</span>
+        <span class="theat" style="background:${IMP_SW[t.imp]}"></span>
+        <span class="ttitle">${t.title}</span>
+        <span class="tflags">${t.flags.map(f=>FLAG_ICON[f]||'').join('')}<span class="tsize">${SIZE_TAG[t.size]}</span></span>
+      </div>`).join('');
+
+    drawEdges();
+    select('PAN-1665');
+    window.addEventListener('resize', drawEdges);
+  </script>
+</body>
+</html>
