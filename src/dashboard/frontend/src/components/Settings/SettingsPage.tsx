@@ -1373,7 +1373,7 @@ export function SettingsPage() {
     updateMemorySettings({ [key]: value === '' ? undefined : Number(value) }, { debounce: true });
   };
 
-  const saveCloisterSnapshot = useCallback(async (snapshot: CloisterConfig) => {
+  const saveCloisterSnapshot = async (snapshot: CloisterConfig) => {
     setSaveStatus('saving');
     try {
       await saveCloisterConfig(snapshot);
@@ -1391,7 +1391,7 @@ export function SettingsPage() {
       setSaveStatus('error');
       toast.error(`Failed to save Cloister settings: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }, [queryClient]);
+  };
 
   const updateCloisterConcurrency = (
     key: 'max_work_agents' | 'reserved_advancing_slots',
