@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Auto-merge toggle — placement mockup</title>
+<style>
+  :root{
+    --bg:#0a0e13; --panel:#10151c; --panel2:#141b24; --line:#1e2731; --line2:#28323e;
+    --text:#cdd9e5; --muted:#7d8997; --faint:#566270;
+    --accent:#3fb6f0; --teal:#2dd4bf; --green:#3fb950; --amber:#d6a429; --red:#f0625a; --violet:#9a86fd;
+    --auto-bg:rgba(45,212,191,.12); --hold-bg:rgba(214,164,41,.12);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 22px 60px}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px}
+  header.top h1{font-size:18px;margin:0 0 6px;font-weight:650}
+  header.top p{margin:4px 0;color:var(--muted);max-width:880px}
+  .pill{display:inline-block;padding:1px 8px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--line2)}
+  .pill.note{color:var(--violet);border-color:rgba(154,134,253,.4);background:rgba(154,134,253,.08)}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
+  .surface{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+  .surface > .shead{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;justify-content:space-between;background:linear-gradient(180deg,#131a23,#10151c)}
+  .surface > .shead .stitle{font-weight:650;font-size:13px}
+  .surface > .shead .ssub{color:var(--faint);font-size:11px}
+  .tag{font-size:10.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:2px 7px;border-radius:5px}
+  .tag.rec{color:#062;background:var(--teal)}
+  .tag.bulk{color:#04263a;background:var(--accent)}
+  .tag.light{color:var(--muted);border:1px solid var(--line2)}
+  .tag.high{color:#3a1c00;background:var(--amber)}
+  .sbody{padding:14px}
+
+  /* segmented auto-merge control */
+  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:#0c1117;user-select:none}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--muted);padding:6px 12px;font:600 12px/1 inherit;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.12s}
+  .seg button + button{border-left:1px solid var(--line2)}
+  .seg button .ic{font-size:13px}
+  .seg button.on[data-v="auto"]{background:var(--auto-bg);color:var(--teal)}
+  .seg button.on[data-v="hold"]{background:var(--hold-bg);color:var(--amber)}
+  .seg button:not(.on):hover{color:var(--text);background:#11171f}
+
+  /* mini switch */
+  .sw{position:relative;width:38px;height:21px;border-radius:20px;background:#222c37;border:1px solid var(--line2);cursor:pointer;transition:.15s;flex:0 0 auto}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#8794a2;transition:.15s}
+  .sw.on{background:var(--auto-bg);border-color:var(--teal)}
+  .sw.on::after{left:19px;background:var(--teal)}
+
+  /* badge toggle */
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:650;cursor:pointer;border:1px solid var(--line2);transition:.12s}
+  .badge.auto{color:var(--teal);background:var(--auto-bg);border-color:rgba(45,212,191,.35)}
+  .badge.hold{color:var(--amber);background:var(--hold-bg);border-color:rgba(214,164,41,.35)}
+  .badge:hover{filter:brightness(1.18)}
+
+  /* slide-out mock */
+  .slideout{border:1px solid var(--line2);border-radius:10px;background:var(--panel2);overflow:hidden}
+  .so-head{padding:11px 13px;border-bottom:1px solid var(--line)}
+  .so-id{color:var(--faint);font-size:11px}
+  .so-title{font-weight:650;margin-top:2px}
+  .so-tabs{display:flex;gap:2px;padding:0 8px;border-bottom:1px solid var(--line);background:#0e131a;overflow:auto}
+  .so-tabs span{padding:8px 10px;font-size:12px;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent}
+  .so-tabs span.active{color:var(--text);border-bottom-color:var(--accent)}
+  .so-strip{display:flex;align-items:center;gap:14px;padding:11px 13px;border-bottom:1px solid var(--line);background:#0f141b;flex-wrap:wrap}
+  .meta{display:flex;flex-direction:column;gap:2px}
+  .meta .k{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.4px}
+  .meta .v{font-size:12px;font-weight:600}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+  .dot.g{background:var(--green)} .dot.a{background:var(--amber)} .dot.r{background:var(--red)}
+  .so-strip .spacer{flex:1}
+  .so-body-stub{padding:14px;color:var(--faint);font-size:12px}
+  .callout{margin-top:9px;font-size:11.5px;color:var(--muted)}
+  .callout .arrow{color:var(--teal);font-weight:700}
+
+  /* roster table */
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--faint);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  td.id{color:var(--accent);font-family:ui-monospace,monospace;font-size:11.5px}
+  .phase{font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:5px;color:var(--muted);border:1px solid var(--line2)}
+  .ready-y{color:var(--green);font-weight:600}
+  .ready-n{color:var(--faint)}
+  .roster-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .roster-sum{font-size:12px;color:var(--muted)}
+  .roster-sum b.auto{color:var(--teal)} .roster-sum b.hold{color:var(--amber)}
+
+  /* pipeline rows */
+  .prow{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line)}
+  .prow:last-child{border-bottom:0}
+  .prow .pid{color:var(--accent);font-family:ui-monospace,monospace;font-size:11.5px;width:78px;flex:0 0 auto}
+  .prow .pt{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow .pphase{margin-right:2px}
+
+  /* awaiting-merge rows */
+  .amrow{display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid var(--line)}
+  .amrow:last-child{border-bottom:0}
+  .amrow .checks{color:var(--green);font-size:11px;font-weight:600}
+  .am-actions{display:flex;align-items:center;gap:8px}
+  .btn{appearance:none;border:1px solid var(--line2);background:#121922;color:var(--text);border-radius:7px;padding:6px 11px;font:600 12px/1 inherit;cursor:pointer}
+  .btn.primary{background:var(--teal);color:#062;border-color:var(--teal)}
+  .btn:hover{filter:brightness(1.12)}
+  .mergeNext{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line2);color:var(--muted);font-size:12px}
+  .stepper{display:inline-flex;align-items:center;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+  .stepper button{appearance:none;border:0;background:#121922;color:var(--text);width:24px;height:24px;cursor:pointer;font-size:14px}
+  .stepper span{min-width:26px;text-align:center;font-weight:700}
+  .foot{margin-top:24px;color:var(--faint);font-size:11.5px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Per-issue auto-merge toggle — placement mockup <span class="pill note">PAN-1691 routing key</span></h1>
+    <p><b>What's new:</b> there is no persistent per-issue auto-merge flag today (auto-merge is a transient per-PR schedule). This introduces an <code>autoMerge</code> policy bit on the issue: <b style="color:var(--teal)">⚡ Auto-merge</b> = ride the train, ship when green · <b style="color:var(--amber)">🔒 Hold for UAT</b> = wait for me to review the batch.</p>
+    <div class="legend">
+      <span><span class="dot g"></span>gate passed</span>
+      <span><span class="dot a"></span>pending</span>
+      <span>Everything here is clickable — flip the toggles.</span>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- A: SLIDE-OUT -->
+    <section class="surface">
+      <div class="shead">
+        <div><div class="stitle">A · Issue slide-out</div><div class="ssub">inline control in the header strip — not a tab</div></div>
+        <span class="tag rec">✓ recommended primary</span>
+      </div>
+      <div class="sbody">
+        <div class="slideout">
+          <div class="so-head"><div class="so-id mono">PAN-1686</div><div class="so-title">Surface UAT test plan + expected changes on Awaiting Merge cards</div></div>
+          <div class="so-tabs"><span>Conversation</span><span class="active">Plan</span><span>Spec</span><span>View Run</span><span>Write Report</span></div>
+          <div class="so-strip">
+            <div class="meta"><span class="k">Gates</span><span class="v"><span class="dot g"></span>review <span class="dot g"></span>test</span></div>
+            <div class="meta"><span class="k">PR</span><span class="v mono" style="color:var(--accent)">#1690</span></div>
+            <div class="meta"><span class="k">Cost</span><span class="v mono">$0.84</span></div>
+            <div class="spacer"></div>
+            <div class="meta" style="align-items:flex-end"><span class="k">Merge policy</span>
+              <div class="seg" data-seg>
+                <button data-v="auto" class="on"><span class="ic">⚡</span>Auto</button>
+                <button data-v="hold"><span class="ic">🔒</span>Hold for UAT</button>
+              </div>
+            </div>
+          </div>
+          <div class="so-body-stub">… plan / conversation content renders below, unaffected by the toggle …</div>
+        </div>
+        <div class="callout"><span class="arrow">→</span> Always visible no matter which tab is active. One bit, one glance, one click — no new dynamically-generated tab to wrangle.</div>
+      </div>
+    </section>
+
+    <!-- B: FLYWHEEL ROSTER -->
+    <section class="surface">
+      <div class="shead">
+        <div><div class="stitle">B · Flywheel page — "Merge policy" section</div><div class="ssub">new roster section, set policy in bulk</div></div>
+        <span class="tag bulk">bulk control</span>
+      </div>
+      <div class="sbody">
+        <div class="roster-head">
+          <div class="roster-sum">Merge policy — <b class="auto" data-count-auto>4</b> auto · <b class="hold" data-count-hold>2</b> hold</div>
+          <div style="color:var(--faint);font-size:11px">train preview: ⚡ batches together when green</div>
+        </div>
+        <table>
+          <thead><tr><th>Issue</th><th>Title</th><th>Phase</th><th>Ready</th><th style="text-align:right">Auto-merge</th></tr></thead>
+          <tbody>
+            <tr><td class="id">PAN-1685</td><td>guard image attachments on text-only models</td><td><span class="phase">ship</span></td><td class="ready-y">●&nbsp;yes</td><td style="text-align:right"><div class="sw on" data-sw></div></td></tr>
+            <tr><td class="id">PAN-1684</td><td>seed marketing copy bank</td><td><span class="phase">ship</span></td><td class="ready-y">●&nbsp;yes</td><td style="text-align:right"><div class="sw on" data-sw></div></td></tr>
+            <tr><td class="id">PAN-1681</td><td>deterministic test verdict artifact</td><td><span class="phase">review</span></td><td class="ready-n">○&nbsp;no</td><td style="text-align:right"><div class="sw on" data-sw></div></td></tr>
+            <tr><td class="id">PAN-1520</td><td>terminal per-pane theme + diff color-scheme</td><td><span class="phase">test</span></td><td class="ready-n">○&nbsp;no</td><td style="text-align:right"><div class="sw" data-sw></div></td></tr>
+            <tr><td class="id">PAN-1666</td><td>pipeline-throughput deacon-unfreeze</td><td><span class="phase">work</span></td><td class="ready-n">○&nbsp;no</td><td style="text-align:right"><div class="sw on" data-sw></div></td></tr>
+            <tr><td class="id">PAN-1661</td><td>[EPIC] redesign the Command Deck issue-view</td><td><span class="phase">plan</span></td><td class="ready-n">○&nbsp;no</td><td style="text-align:right"><div class="sw" data-sw></div></td></tr>
+          </tbody>
+        </table>
+        <div class="callout"><span class="arrow">→</span> One screen to glance at the whole pipeline's merge policy and flip a few. Summary updates live.</div>
+      </div>
+    </section>
+
+    <!-- C: PIPELINE BADGES -->
+    <section class="surface">
+      <div class="shead">
+        <div><div class="stitle">C · Pipeline page — row badge</div><div class="ssub">lightweight, click-to-toggle inline</div></div>
+        <span class="tag light">lightweight</span>
+      </div>
+      <div class="sbody">
+        <div class="prow"><span class="pid mono">PAN-1685</span><span class="pt">guard image attachments on text-only models</span><span class="phase pphase">ship</span><span class="badge auto" data-badge><span>⚡</span>auto</span></div>
+        <div class="prow"><span class="pid mono">PAN-1684</span><span class="pt">seed marketing copy bank</span><span class="phase pphase">ship</span><span class="badge auto" data-badge><span>⚡</span>auto</span></div>
+        <div class="prow"><span class="pid mono">PAN-1520</span><span class="pt">terminal per-pane theme + diff color-scheme</span><span class="phase pphase">test</span><span class="badge hold" data-badge><span>🔒</span>hold</span></div>
+        <div class="prow"><span class="pid mono">PAN-1661</span><span class="pt">[EPIC] redesign the Command Deck issue-view</span><span class="phase pphase">plan</span><span class="badge hold" data-badge><span>🔒</span>hold</span></div>
+        <div class="callout"><span class="arrow">→</span> Same badge, click to flip. No layout cost — slots into the existing per-issue row.</div>
+      </div>
+    </section>
+
+    <!-- D: AWAITING MERGE -->
+    <section class="surface">
+      <div class="shead">
+        <div><div class="stitle">D · Awaiting Merge page</div><div class="ssub">where the toggle actually fires</div></div>
+        <span class="tag high">highest impact</span>
+      </div>
+      <div class="sbody">
+        <div class="amrow">
+          <span class="pid mono" style="width:78px;color:var(--accent)">PAN-1685</span>
+          <span style="flex:1">guard image attachments… <span class="checks">✓ CI green</span></span>
+          <div class="am-actions"><div class="seg" data-seg style="transform:scale(.92)"><button data-v="auto" class="on"><span class="ic">⚡</span></button><button data-v="hold"><span class="ic">🔒</span></button></div><button class="btn primary">Merge</button></div>
+        </div>
+        <div class="amrow">
+          <span class="pid mono" style="width:78px;color:var(--accent)">PAN-1684</span>
+          <span style="flex:1">seed marketing copy bank <span class="checks">✓ CI green</span></span>
+          <div class="am-actions"><div class="seg" data-seg style="transform:scale(.92)"><button data-v="auto" class="on"><span class="ic">⚡</span></button><button data-v="hold"><span class="ic">🔒</span></button></div><button class="btn primary">Merge</button></div>
+        </div>
+        <div class="amrow">
+          <span class="pid mono" style="width:78px;color:var(--accent)">PAN-1520</span>
+          <span style="flex:1">terminal per-pane theme… <span class="checks">✓ CI green</span></span>
+          <div class="am-actions"><div class="seg" data-seg style="transform:scale(.92)"><button data-v="auto"><span class="ic">⚡</span></button><button data-v="hold" class="on"><span class="ic">🔒</span></button></div><button class="btn">Merge</button></div>
+        </div>
+        <div class="mergeNext">
+          <span>Merge next</span>
+          <div class="stepper"><button data-step="-1">−</button><span data-n>2</span><button data-step="1">+</button></div>
+          <span>of the ⚡ auto batch</span>
+          <button class="btn primary" style="margin-left:auto">Ship batch</button>
+        </div>
+        <div class="callout"><span class="arrow">→</span> Per-row policy + the PAN-1691 "merge next N" control living together.</div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="foot">
+    Mockup · clickable, non-functional · <code>.tmp/automerge-toggle-mockup.html</code><br/>
+    Data model: add <code>autoMerge: boolean</code> to <code>ReviewStatus</code> (review-status.ts). Toggle hits a single <code>POST /api/flywheel/issues/:id/auto-merge</code> that all four surfaces share. The flag is the routing key for PAN-1691's fast-lane vs UAT-lane.
+  </div>
+</div>
+
+<script>
+  // segmented controls
+  document.querySelectorAll('[data-seg]').forEach(seg=>{
+    seg.addEventListener('click',e=>{
+      const b=e.target.closest('button'); if(!b) return;
+      seg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+    });
+  });
+  // switches + live summary
+  const recount=()=>{
+    const sw=[...document.querySelectorAll('[data-sw]')];
+    const a=sw.filter(s=>s.classList.contains('on')).length;
+    const ca=document.querySelector('[data-count-auto]'), ch=document.querySelector('[data-count-hold]');
+    if(ca) ca.textContent=a; if(ch) ch.textContent=sw.length-a;
+  };
+  document.querySelectorAll('[data-sw]').forEach(s=>s.addEventListener('click',()=>{s.classList.toggle('on');recount();}));
+  recount();
+  // badges
+  document.querySelectorAll('[data-badge]').forEach(b=>b.addEventListener('click',()=>{
+    const auto=b.classList.toggle('auto'); b.classList.toggle('hold',!auto);
+    b.innerHTML = auto ? '<span>⚡</span>auto' : '<span>🔒</span>hold';
+  }));
+  // stepper
+  document.querySelectorAll('.stepper').forEach(st=>{
+    const n=st.querySelector('[data-n]');
+    st.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+      let v=parseInt(n.textContent,10)+parseInt(btn.dataset.step,10);
+      n.textContent=Math.max(1,Math.min(9,v));
+    }));
+  });
+</script>
+</body>
+</html>

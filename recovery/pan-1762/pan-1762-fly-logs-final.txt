@@ -1,0 +1,36 @@
+[2m2026-06-12T18:54:38Z[0m runner[7812076c571018] [32miad[0m [[34minfo[0m]machine restart policy set to 'no', not restarting
+[2m2026-06-13T04:56:46Z[0m runner[d8d1009a536948] [32miad[0m [[34minfo[0m]Pulling container image registry.fly.io/pan-workspaces@sha256:22272b7a8d6a5af661b078faffc7e81955c42f0825db34122aa3ce2f7d563563
+[2m2026-06-13T04:57:03Z[0m runner[d8d1009a536948] [32miad[0m [[34minfo[0m]Successfully prepared image registry.fly.io/pan-workspaces@sha256:22272b7a8d6a5af661b078faffc7e81955c42f0825db34122aa3ce2f7d563563 (17.079910817s)
+[2m2026-06-13T04:57:04Z[0m runner[d8d1009a536948] [32miad[0m [[34minfo[0m]Configuring firecracker
+[2m2026-06-13T04:57:04Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026-06-13T04:57:04.839519655 [01KTZNDW0T7MS58A1H5PD9XNYA:main] Running Firecracker v1.14.4
+[2m2026-06-13T04:57:04Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026-06-13T04:57:04.839733539 [01KTZNDW0T7MS58A1H5PD9XNYA:main] Listening on API socket ("/fc.sock").
+[2m2026-06-13T04:57:05Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Starting init (commit: ea887ee)...
+[2m2026-06-13T04:57:05Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Preparing to run: `sleep infinity` as root
+[2m2026-06-13T04:57:05Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m [fly api proxy] listening at /.fly/api
+[2m2026-06-13T04:57:06Z[0m runner[d8d1009a536948] [32miad[0m [[34minfo[0m]Machine created and started in 19.493s
+[2m2026-06-13T04:57:06Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026/06/13 04:57:06 INFO SSH listening listen_address=[fdaa:53:bbdd:a7b:60c:a421:978d:2]:22
+[2m2026-06-13T05:03:35Z[0m runner[e826324f044658] [32miad[0m [[34minfo[0m]Pulling container image registry.fly.io/pan-workspaces@sha256:22272b7a8d6a5af661b078faffc7e81955c42f0825db34122aa3ce2f7d563563
+[2m2026-06-13T05:03:49Z[0m runner[e826324f044658] [32miad[0m [[34minfo[0m]Successfully prepared image registry.fly.io/pan-workspaces@sha256:22272b7a8d6a5af661b078faffc7e81955c42f0825db34122aa3ce2f7d563563 (13.969888297s)
+[2m2026-06-13T05:03:49Z[0m runner[e826324f044658] [32miad[0m [[34minfo[0m]Configuring firecracker
+[2m2026-06-13T05:03:50Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m]2026-06-13T05:03:50.029440503 [01KTZNTB8Q0N4PJG0B6B6WCSGK:main] Running Firecracker v1.14.4
+[2m2026-06-13T05:03:50Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m]2026-06-13T05:03:50.029591613 [01KTZNTB8Q0N4PJG0B6B6WCSGK:main] Listening on API socket ("/fc.sock").
+[2m2026-06-13T05:03:50Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m]2026-06-13T05:03:50.032310039 [01KTZNTB8Q0N4PJG0B6B6WCSGK:fc_api] API server started.
+[2m2026-06-13T05:03:50Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m][32m INFO[0m Starting init (commit: ea887ee)...
+[2m2026-06-13T05:03:50Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m][32m INFO[0m Preparing to run: `sleep infinity` as root
+[2m2026-06-13T05:03:50Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m][32m INFO[0m [fly api proxy] listening at /.fly/api
+[2m2026-06-13T05:03:51Z[0m runner[e826324f044658] [32miad[0m [[34minfo[0m]Machine created and started in 15.74s
+[2m2026-06-13T05:03:51Z[0m app[e826324f044658] [32miad[0m [[34minfo[0m]2026/06/13 05:03:51 INFO SSH listening listen_address=[fdaa:53:bbdd:a7b:7d2:dced:bef1:2]:22
+[2m2026-06-13T05:15:13Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026/06/13 05:15:13 INFO New SSH session email=edward.becker@gmail.com verified=true
+[2m2026-06-13T05:16:27Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026/06/13 05:16:27 INFO New SSH session email=edward.becker@gmail.com verified=true
+[2m2026-06-13T05:17:18Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Sending signal SIGINT to main child process w/ PID 665
+[2m2026-06-13T05:17:18Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Main child exited with signal (with signal 'SIGINT', core dumped? false)
+[2m2026-06-13T05:17:18Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Starting clean up.
+[2m2026-06-13T05:17:18Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][ 1213.537519] reboot: Restarting system
+[2m2026-06-13T05:17:36Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026-06-13T05:17:36.375075186 [01KTZNDW0T7MS58A1H5PD9XNYA:main] Running Firecracker v1.14.4
+[2m2026-06-13T05:17:36Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026-06-13T05:17:36.375513753 [01KTZNDW0T7MS58A1H5PD9XNYA:main] Listening on API socket ("/fc.sock").
+[2m2026-06-13T05:17:37Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Starting init (commit: ea887ee)...
+[2m2026-06-13T05:17:37Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m Preparing to run: `sleep infinity` as root
+[2m2026-06-13T05:17:37Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m][32m INFO[0m [fly api proxy] listening at /.fly/api
+[2m2026-06-13T05:17:37Z[0m runner[d8d1009a536948] [32miad[0m [[34minfo[0m]Machine started in 1.282s
+[2m2026-06-13T05:17:37Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026/06/13 05:17:37 INFO SSH listening listen_address=[fdaa:53:bbdd:a7b:60c:a421:978d:2]:22
+[2m2026-06-13T05:17:54Z[0m app[d8d1009a536948] [32miad[0m [[34minfo[0m]2026/06/13 05:17:54 INFO New SSH session email=edward.becker@gmail.com verified=true
