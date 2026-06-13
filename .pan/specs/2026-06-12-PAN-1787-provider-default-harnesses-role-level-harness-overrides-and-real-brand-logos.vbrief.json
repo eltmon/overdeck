@@ -4,17 +4,17 @@
     "created": "2026-06-12T06:38:55Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1787: Provider default harnesses, role-level harness overrides, and real brand logos",
-    "updated": "2026-06-12T17:04:07.287Z"
+    "updated": "2026-06-13T01:30:06.815Z"
   },
   "plan": {
     "id": "pan-1787",
     "title": "Provider default harnesses, role-level harness overrides, and real brand logos",
-    "status": "running",
+    "status": "completed",
     "uid": "39309664-bccb-4daa-a38e-5a371cad4879",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-06-12T06:38:55Z",
-    "updated": "2026-06-12T17:04:07.287Z",
+    "updated": "2026-06-13T01:30:06.815Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1787",
@@ -1357,5 +1357,5 @@
       "canonicalFilename": "2026-06-12-PAN-1787-provider-default-harnesses-role-level-harness-overrides-and-real-brand-logos.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
