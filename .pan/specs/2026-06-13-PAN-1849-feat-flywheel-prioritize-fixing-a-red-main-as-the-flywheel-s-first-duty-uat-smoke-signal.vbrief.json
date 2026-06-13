@@ -1,0 +1,679 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T14:10:40.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1849: prioritize fixing a red main as the flywheel's first duty (+ UAT/smoke signal)",
+    "updated": "2026-06-13T14:16:54.107Z"
+  },
+  "plan": {
+    "id": "pan-1849",
+    "title": "feat(flywheel): prioritize fixing a red main as the flywheel's first duty (+ UAT/smoke signal)",
+    "status": "proposed",
+    "uid": "b3f1c2a4-7d9e-4a6b-9c1f-2e5d8a0b4c63",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T14:10:40.000Z",
+    "updated": "2026-06-13T14:16:54.107Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1849",
+        "label": "PAN-1849",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "deacon",
+      "main-health",
+      "quality-gate",
+      "dashboard",
+      "uat-smoke"
+    ],
+    "narratives": {
+      "Problem": "A red/broken main poisons every downstream work agent. Main can go red via the --changed gate blind spot, a gate-bypassing merge (strike or operator/conversation direct merge), or — the worst class proven the night before planning — a frontend runtime/visual regression that unit tests and typecheck miss and only loading the page catches. Today the flywheel has no signal for main-health and no duty to fix it first, so it keeps launching feature work on a broken foundation. The deacon is FROZEN and the flywheel OFF; this safety net must be in place BEFORE autonomous operation is re-enabled.",
+      "Proposal": "Add a server-computed, durable main-health signal (green/red/unknown) persisted in app_settings. Detect via a deacon patrol gated every N cycles plus a post-merge re-check, both reusing runQualityGates() against origin/main, change-scoped to the last-green SHA, skipping (not false-redding) when the worktree is dirty/off-main. Phase 2 adds a headless-Playwright browser smoke (home + Settings + a conversation; no console error, no error-boundary) as an additional signal so UI runtime regressions count as red. Make a red main the flywheel's first duty deterministically: a pure server-side suggestion injector prepends an urgent main-fix to the snapshot's suggestions in the status-ingestion route, plus a Step-0 main-health gate in roles/flywheel.md that withholds new feature work until green. Surface it via GET /api/flywheel/main-health, a Flywheel dashboard badge that renders independent of orchestrator state, and a pan flywheel main-health [--check] CLI.",
+      "NonGoals": "- Do NOT enable the deacon or the flywheel — they stay frozen/off (issue guardrail).\n- No hard CLI launch-block that refuses pan plan/start while main is red — rely on suggestion ranking + the orchestrator prompt; a forced block risks blocking legitimate operator action (deferred).\n- main-health is NOT a windowed FlywheelStats criterion (c8) — it is point-in-time, surfaced as a status badge.\n- No auto-fixing a red main without orchestrator/human dispatch — detection + prioritization only; the fix runs through the normal pipeline.\n- No isolated throwaway clone/worktree for detection — Phase 1 runs in the primary worktree with the dirty/off-main skip guard.\n- Single-project only: the Panopticon project's own main; no multi-project main-health."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Detection lives in the deacon patrol (gated every N cycles) and a post-merge re-check, reusing runQualityGates() against origin/main.",
+        "rationale": "Reuses the battle-tested gate runner (validation.ts:337) and the established every-N-cycles pattern (deacon.ts:5179); avoids a throwaway clone."
+      },
+      {
+        "summary": "Persist main-health as JSON in app_settings under key flywheel.main_health.",
+        "rationale": "app_settings is the established durable key/value store surviving restarts (app-settings.ts), already home to every flywheel/deacon flag."
+      },
+      {
+        "summary": "Deterministic prioritization = a pure server-side suggestion injector in postFlywheelStatusPayload PLUS a Step-0 gate in the orchestrator prompt; no hard CLI launch-block.",
+        "rationale": "Injection makes the signal deterministic and unit-testable regardless of LLM output; the prompt drives the action. A hard block risks blocking the operator and exceeds the issue's 'top-ranked suggestion' wording."
+      },
+      {
+        "summary": "Detection change-scopes to the last-green SHA and skips (records 'unknown') on a dirty/off-main worktree rather than reporting a false red.",
+        "rationale": "A full unscoped suite per cycle would starve agents; a dirty tree (agents work on main during dev) is not evidence origin/main is broken."
+      },
+      {
+        "summary": "The dashboard badge reads GET /api/flywheel/main-health directly, not the snapshot, so it renders even when the orchestrator is off.",
+        "rationale": "The flywheel is frozen now; the safety net must show red regardless of orchestrator state."
+      },
+      {
+        "summary": "Ship both Phase 1 and Phase 2 in this issue, Phase 2 depending on Phase 1 plumbing.",
+        "rationale": "The title includes '(+ UAT/smoke signal)' and CLAUDE.md requires delivering complete features; Phase 2 beads are independently mergeable on top of the state plumbing."
+      },
+      {
+        "summary": "The browser smoke is a standalone Node/Playwright subprocess with an isolated context; unavailable browser => 'unavailable', never a false red.",
+        "rationale": "Keeps the dashboard event loop free (no execSync, no in-process browser) and degrades gracefully."
+      }
+    ],
+    "items": [
+      {
+        "id": "main-health-contract",
+        "title": "Define FlywheelMainHealth contract + app_settings persistence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "main-health-checker",
+            "main-health-endpoint",
+            "main-health-priority",
+            "main-health-dashboard"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an Effect Schema.Struct FlywheelMainHealth in packages/contracts/src/flywheel.ts with fields status (Literals green|red|unknown), checkedSha?, lastGreenSha?, lastGreenAt?, lastCheckedAt, reason?, failingGates? (Array String), source (Literals patrol|post-merge|cli|smoke), and smoke? (Literals pass|fail|unavailable); export the interface + schema and re-export from the contracts index. Add mainHealth: Schema.optional(FlywheelMainHealth) to the FlywheelStatus struct and interface. In src/lib/database/app-settings.ts add FLYWHEEL_MAIN_HEALTH_KEY = 'flywheel.main_health' plus getMainHealth() (JSON.parse, null on missing/malformed) and setMainHealth(state) (JSON.stringify via setSetting). Rebuild packages/contracts."
+        },
+        "items": [
+          {
+            "id": "main-health-contract.ac1",
+            "title": "Given a value with status 'green'|'red'|'unknown', the FlywheelMainHealth schema accepts it and rejects any other status string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-contract.ac2",
+            "title": "FlywheelStatus accepts a snapshot carrying mainHealth and still decodes a snapshot that omits it (back-compat preserved).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-contract.ac3",
+            "title": "Given setMainHealth(x) was called, getMainHealth() returns the same object; getMainHealth() returns null when the key is absent or stores malformed JSON.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-contract.ac4",
+            "title": "A persisted main-health state survives a fresh getDatabase() handle: getMainHealth() returns it after the DB is re-opened.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-checker",
+        "title": "checkMainHealth(): run the test gate against origin/main and record state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1849",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "main-health-patrol",
+            "main-health-post-merge",
+            "main-health-cli",
+            "browser-smoke-wire"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/main-health.ts exporting async checkMainHealth(opts?: { source?: 'patrol'|'post-merge'|'cli'; projectRoot?; now? }): Promise<FlywheelMainHealth>. Resolve the Panopticon project root and its configured 'test' quality gate (fall back to DEFAULT_GATES.test). Run git fetch origin main via execAsync; if the primary worktree is dirty or HEAD differs from origin/main, persist and return status 'unknown' with a reason WITHOUT running tests. Otherwise run the test gate via runQualityGates with the {{CHANGED_BASE}} placeholder set to the stored lastGreenSha (or the project default when none). Interpret: all required gates pass => 'green' and advance lastGreenSha/lastGreenAt to the checked SHA; any required gate fails => 'red' with failingGates and a short reason. Wrap the whole body so a thrown git/infra error resolves to 'unknown' (never a rejected promise). Persist via setMainHealth and return. Use execAsync/spawn only — never execSync."
+        },
+        "items": [
+          {
+            "id": "main-health-checker.ac1",
+            "title": "Given a stubbed gate runner returning all-pass, checkMainHealth resolves status 'green' and sets lastGreenSha to the checked SHA.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-checker.ac2",
+            "title": "Given a stubbed gate runner where the test gate fails, checkMainHealth resolves status 'red', failingGates contains 'test', and lastGreenSha is preserved (not advanced).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-checker.ac3",
+            "title": "When the primary worktree is dirty or HEAD differs from origin/main, checkMainHealth resolves status 'unknown' and the gate runner is never spawned.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-checker.ac4",
+            "title": "checkMainHealth persists its result via setMainHealth so a subsequent getMainHealth() returns the same status.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-checker.ac5",
+            "title": "When the underlying git/fetch step throws, checkMainHealth resolves status 'unknown' and never rejects, so a caller patrol cannot crash on it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-patrol",
+        "title": "Run checkMainHealth from the deacon patrol on a gated cadence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add main_health_every_cycles to MonitoringConfig (src/lib/cloister/config.ts:48) with a documented default in the defaults block (config.ts:306) and plumb it into the deacon config the same way stash_janitor_every_cycles is (deacon.ts:287). In runPatrol() (deacon.ts), after the existing gated checks, call checkMainHealth({ source: 'patrol' }) only when patrolCycle % mainHealthEveryCycles === 0, push a log action describing the result, and guard the call so a rejection cannot escape the patrol cycle. Use the existing every-N-cycles arithmetic pattern at deacon.ts:5179 as the template."
+        },
+        "items": [
+          {
+            "id": "main-health-patrol.ac1",
+            "title": "Given a config with main_health_every_cycles set, the deacon respects that value; when unset it defaults to the documented cadence.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-patrol.ac2",
+            "title": "When patrolCycle % mainHealthEveryCycles === 0 the patrol spawns the main-health check, and on other cycles it does not (gating arithmetic test).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-patrol.ac3",
+            "title": "When checkMainHealth rejects, runPatrol still resolves a PatrolResult (the patrol does not crash).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-post-merge",
+        "title": "Re-check main-health after each merge (idempotent fire-and-forget)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In postMergeLifecycle() (src/lib/cloister/merge-agent.ts) at the late insertion point (~:566, after notifyTldrDaemon and before the _completedPostMerge marker), trigger checkMainHealth({ source: 'post-merge' }) as a non-awaited fire-and-forget (void checkMainHealth(...).catch(log)) so it neither blocks the lifecycle nor re-enters it. Do not touch the in-flight guard or the completion-marker logic."
+        },
+        "items": [
+          {
+            "id": "main-health-post-merge.ac1",
+            "title": "When a merge completes, postMergeLifecycle spawns a checkMainHealth call with source 'post-merge' (spy asserts the invocation).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-post-merge.ac2",
+            "title": "When checkMainHealth rejects, postMergeLifecycle still resolves and still sets the completion marker.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-post-merge.ac3",
+            "title": "The in-flight-guard idempotency test passes — postMergeLifecycle still runs at most once per merge.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-endpoint",
+        "title": "GET /api/flywheel/main-health returns the persisted state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add getMainHealthPayload() in src/dashboard/server/routes/flywheel.ts returning getMainHealth(), or a default { status: 'unknown', lastCheckedAt: null } body when no check has run, and register a GET /api/flywheel/main-health route alongside the other flywheel GET routes (near :525)."
+        },
+        "items": [
+          {
+            "id": "main-health-endpoint.ac1",
+            "title": "GET /api/flywheel/main-health returns 200 with the persisted main-health state when one exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-endpoint.ac2",
+            "title": "When no check has run yet, GET /api/flywheel/main-health returns 200 with a status 'unknown' body (never 404 or 500).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-priority",
+        "title": "Deterministically rank a main-fix top when main is red",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a pure applyMainHealthPriority(snapshot, mainHealth) helper (new module, e.g. src/lib/flywheel-main-health-priority.ts) that stamps snapshot.mainHealth = mainHealth and, when mainHealth.status === 'red', prepends an urgent suggestion { action: 'investigate', rationale: 'main is red: <reason> (failing: <gates>)', priority: 'urgent' } to suggestions[] unless an equivalent main-fix already leads (dedupe). For green/unknown it leaves suggestions unchanged. Wire it into postFlywheelStatusPayload (src/dashboard/server/routes/flywheel.ts:196), reading getMainHealth(), before the snapshot is persisted."
+        },
+        "items": [
+          {
+            "id": "main-health-priority.ac1",
+            "title": "Given red main-health and a snapshot whose first suggestion is a feature 'start', applyMainHealthPriority returns a snapshot whose first suggestion is the urgent main-fix 'investigate'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-priority.ac2",
+            "title": "Calling applyMainHealthPriority twice with red main-health produces only one injected main-fix suggestion (deduped).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-priority.ac3",
+            "title": "Given green main-health, applyMainHealthPriority preserves the original suggestions and stamps snapshot.mainHealth.status to 'green'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-priority.ac4",
+            "title": "postFlywheelStatusPayload persists a snapshot whose mainHealth reflects the current getMainHealth() value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-cli",
+        "title": "pan flywheel main-health [--check] CLI + skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a pan flywheel main-health subcommand in src/cli/commands/flywheel.ts (the command block at :910) that prints the current main-health state (status, reason, failingGates) read from GET /api/flywheel/main-health or getMainHealth() directly; with --check it runs checkMainHealth({ source: 'cli' }), persists, and prints the fresh result. Update skills/pan-flywheel/SKILL.md to document the new verb and the --check flag in the same commit so scripts/lint-skills.sh passes."
+        },
+        "items": [
+          {
+            "id": "main-health-cli.ac1",
+            "title": "pan flywheel main-health prints the current status, reason, and failing gates.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-cli.ac2",
+            "title": "pan flywheel main-health --check runs detection, updates the persisted state, and prints the fresh result.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-cli.ac3",
+            "title": "npm run lint passes — skills/pan-flywheel/SKILL.md documents main-health and --check matching pan flywheel --help.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "main-health-dashboard",
+        "title": "Surface a main-health badge on the Flywheel page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/FlywheelPage.tsx, poll GET /api/flywheel/main-health (mirroring the existing 5s status poll) and render a red/green/unknown badge in the header near the run badge (:429), plus a reason + failing-gates line when red. Follow pan-style-guide: danger token for red, success token for green, muted token for unknown; no pill badge, no decorative color. The badge must render from the endpoint even when no flywheel run is active."
+        },
+        "items": [
+          {
+            "id": "main-health-dashboard.ac1",
+            "title": "When the endpoint returns status 'red', the page renders a danger-toned main-health badge that shows the reason text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-dashboard.ac2",
+            "title": "When status is 'green' the page renders a success-toned badge; when 'unknown' it renders a muted badge.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "main-health-dashboard.ac3",
+            "title": "Given a null active run and red main-health, a component test shows the red badge still renders (orchestrator-independent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-prompt-gate",
+        "title": "Add a Step-0 main-health gate to the orchestrator prompt",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Main-health gate' step to roles/flywheel.md ahead of the tick loop: each tick call GET /api/flywheel/main-health; when status is 'red' the top-ranked suggestion MUST be a main-fix (file a substrate bug capturing reason/failingGates if none exists, then launch it via pan strike or pan plan --auto --auto-start), and no new feature/substrate work may be launched until main is green (finishing in-flight work that fixes main is allowed). Keep the orchestrator's no-direct-code-edits posture."
+        },
+        "items": [
+          {
+            "id": "flywheel-prompt-gate.ac1",
+            "title": "roles/flywheel.md contains a 'Main-health gate' step that directs reading GET /api/flywheel/main-health before ranking suggestions each tick.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-prompt-gate.ac2",
+            "title": "roles/flywheel.md contains the rule that a red main makes a main-fix the top-ranked suggestion and blocks new feature/substrate launches until green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-prompt-gate.ac3",
+            "title": "roles/flywheel.md contains instructions to file a substrate bug from reason/failingGates and launch the fix via the normal pipeline (no direct code edits).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-smoke-script",
+        "title": "Headless browser smoke script (home + Settings + a conversation)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create a standalone Node script (e.g. scripts/main-smoke.mjs) using the installed playwright package. Launch headless chromium with a fresh isolated browser context, navigate to the dashboard home (/), Settings, and a conversation page (/conv/<id> using the most recent id from GET /api/conversations, skipping that page gracefully when none exists), collecting pageerror and console.error events and checking for the React error-boundary fallback rendered by src/dashboard/frontend/src/recovery.tsx. Print a JSON summary { smoke: 'pass'|'fail'|'unavailable', failures: [...] } and exit 0 on pass, non-zero on fail, and a distinct unavailable code when playwright or the browser binary is missing. Close the context before exit."
+        },
+        "items": [
+          {
+            "id": "browser-smoke-script.ac1",
+            "title": "Run against a healthy dashboard, the script exits 0 and prints a JSON summary with smoke 'pass'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-smoke-script.ac2",
+            "title": "When a visited route logs an uncaught console error or renders the error-boundary fallback, the script exits non-zero and reports smoke 'fail' with the offending route.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-smoke-script.ac3",
+            "title": "The script opens an isolated Playwright browser context (fresh profile) and closes it before exiting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-smoke-script.ac4",
+            "title": "When playwright or the browser binary is unavailable, the script exits with the unavailable code and prints smoke 'unavailable' (never a false fail).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-smoke-wire",
+        "title": "Feed the browser smoke into main-health detection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:10:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In checkMainHealth (src/lib/cloister/main-health.ts) run the browser smoke script via execAsync after the test gate, parse its JSON result, and fold it into the main-health state: smoke 'fail' forces status 'red' even when the test gate passed; smoke 'unavailable' records smoke:'unavailable' and never flips a green test result to red; smoke 'pass' keeps the test-gate verdict. Store the smoke sub-result on the persisted FlywheelMainHealth.smoke field."
+        },
+        "items": [
+          {
+            "id": "browser-smoke-wire.ac1",
+            "title": "When the browser smoke reports 'fail', checkMainHealth resolves status 'red' even if the test gate passed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-smoke-wire.ac2",
+            "title": "When the smoke reports 'unavailable', checkMainHealth records smoke 'unavailable' and does not flip a green test result to red.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-smoke-wire.ac3",
+            "title": "checkMainHealth persists the smoke sub-result so GET /api/flywheel/main-health returns the smoke field.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "main-health-contract",
+        "to": "main-health-checker",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-contract",
+        "to": "main-health-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-contract",
+        "to": "main-health-priority",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-contract",
+        "to": "main-health-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-checker",
+        "to": "main-health-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-checker",
+        "to": "main-health-post-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-checker",
+        "to": "main-health-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-checker",
+        "to": "browser-smoke-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-endpoint",
+        "to": "main-health-dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "main-health-endpoint",
+        "to": "flywheel-prompt-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "browser-smoke-script",
+        "to": "browser-smoke-wire",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1849-feat-flywheel-prioritize-fixing-a-red-main-as-the-flywheel-s-first-duty-uat-smoke-signal.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

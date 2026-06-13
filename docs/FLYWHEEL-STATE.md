@@ -2278,3 +2278,30 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
   orchestrator cannot do. Surfaced as an openQuestion for the operator.
 - **PAN-1803 convoy STILL wedged** (>40min). Unchanged. Main advanced to `b59ac3207`
   (a parallel merge landed during the tick). RAM 24/64 GB, swap 1.4/8.2.
+
+## RUN-32 tick 3 (2026-06-13 ~14:35Z) — PAN-1818 landing the overflow fix; PAN-1834 started; 6 productive agents
+
+- **PAN-1818 work agent is FLOWING and committing the fix.** `agent-pan-1818` (kimi-k2.7-code)
+  has 6 commits on `feature/pan-1818`, including the keystones: `feat(deacon): fast-fail
+  overflowed convoy reviewers without respawn`, `feat(review): large-changeset signal +
+  selective-reading guardrail`, `fix(cloister): exclude convoy reviewer sub-roles from
+  checkApiErrorAgents`. This directly closes the PAN-1803 wedge class. It sat at ctx 87%
+  (174k/200k) but kept flowing — no overflow crash yet; PAN-1675 compact brake is the net.
+- **DURABLE LESSON — kimi-k2.7-code renders RAW JSON in the tmux pane.** A live kimi work/
+  review agent shows streaming `{"type":"toolCall"...}` / `toolResult` / `{"type":"turn_start"}`
+  objects in its pane, NOT a rendered TUI. **This is normal, not a crash.** Distinguish
+  live-vs-wedged by whether `timestamp`/`responseId` ADVANCES between captures: `agent-pan-1818`
+  advanced (live, working); `agent-pan-1803-review` shows the SAME `responseId`
+  (`...ihf3Sa1hXwsHGkRPEaApeqbg`, ts 1781359455389) across ticks 2→3 = genuinely FROZEN/dead.
+  Do not misread kimi raw-JSON panes as crashes — check timestamp advancement.
+- **PAN-1834 finalized → proposed (6 items) → started work** (`agent-pan-1834`, kimi, 6 beads).
+  Its spec ("...rate-limit-modal-detection-needs-you-triangle...") **SUBSUMES PAN-1830** —
+  do NOT launch PAN-1830 separately; recommend operator close it as covered once 1834 lands.
+- **PAN-1507 idle zombie** (`planning-pan-1507` on the closed-as-non-bug issue) still parked at
+  prompt — harmless; not flywheel-reapable (no `pan kill`).
+- **Scaled up: launched PAN-1813 + PAN-1802 planning.** Now **6 productive agents** (2 work:
+  1818/1834; 4 planning: 1813/1802/1817/1849). planning-pan-1817 is quiet at ctx 13% — watch
+  for a stall next tick. **0 bd-lock errors across 7 launches this run** — concurrent-bd
+  contention is NOT materializing; can keep scaling.
+- **PAN-1803 convoy frozen >60min** — surfaced as investigate + openQuestion; can't resume.
+  Main advanced to `c0c26f955`. RAM 27/64 GB, swap 3.3/8.2.
