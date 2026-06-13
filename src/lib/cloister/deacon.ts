@@ -28,7 +28,7 @@ import {
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { isContextOverflowTail } from '../context-overflow.js';
-import type { ReviewSubRole } from './review-monitor.js';
+import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -5728,6 +5728,8 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
 }
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
+const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;
+const reviewReportsPresentNudges = new Map<string, number>();
 
 /**
  * Respawn a convoy reviewer that has gone idle without writing its output.
@@ -5792,6 +5794,81 @@ async function respawnIdleReviewer(state: AgentState, agentId: string): Promise<
   }
 }
 
+async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentState[]): Promise<string[]> {
+  const actions: string[] = [];
+  const now = Date.now();
+  const synthesisStates = states.filter(state =>
+    state.role === 'review'
+    && !state.reviewSubRole
+    && state.reviewRunId
+    && state.workspace
+    && state.issueId
+  );
+
+  for (const state of synthesisStates) {
+    const status = getReviewStatusSync(state.issueId);
+    if (!status || status.reviewStatus !== 'reviewing') continue;
+
+    const reviewDir = join(state.workspace, '.pan', 'review', state.reviewRunId!);
+    if (existsSync(join(reviewDir, 'synthesis.md'))) continue;
+
+    const sessionAlive = await Effect.runPromise(sessionExists(state.id)).catch(() => false);
+    if (!sessionAlive) continue;
+    const paneDead = await Effect.runPromise(isPaneDead(state.id)).catch(() => true);
+    if (paneDead) continue;
+
+    const startedMs = Date.parse(state.startedAt);
+    const readyLines: string[] = [];
+    let allReportsPresent = true;
+    for (const subRole of REVIEW_SUB_ROLES) {
+      const outputPath = join(reviewDir, `${subRole}.md`);
+      if (!existsSync(outputPath)) {
+        allReportsPresent = false;
+        break;
+      }
+      try {
+        const outputMtimeMs = statSync(outputPath).mtimeMs;
+        if (Number.isFinite(startedMs) && outputMtimeMs < startedMs) {
+          allReportsPresent = false;
+          break;
+        }
+      } catch {
+        allReportsPresent = false;
+        break;
+      }
+      readyLines.push(`REVIEWER_READY ${subRole} ${outputPath}`);
+    }
+    if (!allReportsPresent) continue;
+
+    const nudgeKey = `${state.id}:${state.reviewRunId}`;
+    const lastNudge = reviewReportsPresentNudges.get(nudgeKey);
+    if (lastNudge && now - lastNudge < REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS) continue;
+
+    const message = [
+      'Deacon fallback: all reviewer report files for this review run are present on disk, but synthesis has not been written yet.',
+      'If you have not already synthesized this run, treat these as the missing terminal reviewer signals and proceed now:',
+      '',
+      ...readyLines,
+      '',
+      'Read the four reports, write synthesis.md, then signal review status exactly as roles/review.md instructs.',
+    ].join('\n');
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(state.id, message);
+      reviewReportsPresentNudges.set(nudgeKey, now);
+      const action = `Nudged ${state.id} to synthesize from ${REVIEW_SUB_ROLES.length} reviewer reports`;
+      actions.push(action);
+      logDeaconEventSync(`monitorReviewConvoySignals: ${action}`);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logDeaconEventSync(`monitorReviewConvoySignals: failed to nudge ${state.id} for complete reviewer reports: ${errMsg}`);
+    }
+  }
+
+  return actions;
+}
+
 export async function monitorReviewConvoySignals(): Promise<string[]> {
   const actions: string[] = [];
   if (!existsSync(AGENTS_DIR)) return actions;
@@ -5803,10 +5880,13 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     return actions;
   }
 
+  const reviewStates: AgentState[] = [];
+
   for (const agentId of agentDirs) {
     const state = getAgentStateSync(agentId);
     if (!state) continue;
     if (state.role !== 'review') continue;
+    reviewStates.push(state);
     if (!state.reviewSubRole || !state.reviewSynthesisAgentId) continue;
     if (state.reviewMonitorSignaled) continue;
 
@@ -5954,6 +6034,8 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
       logDeaconEventSync(`monitorReviewConvoySignals: failed to signal ${state.reviewSynthesisAgentId} for ${agentId}: ${errMsg}`);
     }
   }
+
+  actions.push(...await nudgeSynthesisForCompleteReviewerReports(reviewStates));
 
   return actions;
 }

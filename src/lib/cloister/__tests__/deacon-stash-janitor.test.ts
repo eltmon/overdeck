@@ -511,6 +511,52 @@ describe('monitorReviewConvoySignals', () => {
     ]);
   });
 
+  it('nudges synthesis when all reviewer reports are present but no synthesis was written', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const runId = 'agent-pan-879-review-abcdef12';
+    const reviewDir = `/workspace/.pan/review/${runId}`;
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+      const value = String(path);
+      return value === '/tmp/test-agents'
+        || value === `${reviewDir}/security.md`
+        || value === `${reviewDir}/correctness.md`
+        || value === `${reviewDir}/performance.md`
+        || value === `${reviewDir}/requirements.md`;
+    });
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-13T00:00:01.000Z') } as any);
+    vi.mocked(agents.getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-879-review',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'running',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewRunId: runId,
+    } as any);
+    mockGetReviewStatus.mockReturnValue({ issueId: 'PAN-879', reviewStatus: 'reviewing' } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(name === 'agent-pan-879-review') as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      expect.stringContaining(`REVIEWER_READY security ${reviewDir}/security.md`),
+    );
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      expect.stringContaining(`REVIEWER_READY requirements ${reviewDir}/requirements.md`),
+    );
+    expect(actions).toEqual([
+      'Nudged agent-pan-879-review to synthesize from 4 reviewer reports',
+    ]);
+  });
+
   it('respawns an idle reviewer with no output once before the hard deadline (PAN-1806)', async () => {
     const fs = await import('fs');
     const agents = await import('../../../lib/agents.js');
