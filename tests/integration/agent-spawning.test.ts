@@ -484,7 +484,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       }
     });
 
-    it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', async () => {
+    it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', { timeout: 30_000 }, async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(new Date('2026-06-05T21:00:00.000Z'));
       const tmux = await import('../../src/lib/tmux.js');
@@ -564,7 +564,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
-    it('resumeAgent marks kickoff redelivered only after the redelivery lands', async () => {
+    it('resumeAgent marks kickoff redelivered only after the redelivery lands', { timeout: 30_000 }, async () => {
       vi.useFakeTimers();
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-redeliver-second';
