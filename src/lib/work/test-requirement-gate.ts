@@ -6,6 +6,15 @@
  * orchestration lives in done-preflight.ts.
  */
 
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { Data, Effect } from 'effect';
+import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
+import { getLinearApiKey } from '../shadow-utils.js';
+import { resolveGitHubIssueSync } from '../tracker-utils.js';
+
+const execAsync = promisify(exec);
+
 export interface TestRequirement {
   /** The keyword / phrase that matched. */
   keyword: string;
@@ -94,4 +103,98 @@ export function countTestDeltaInDiff(numstatOutput: string): number {
   }
 
   return total;
+}
+
+/**
+ * Error raised when the issue-body fetcher cannot retrieve the body for a
+ * reason other than an unreachable/unauthenticated tracker.
+ */
+export class TrackerFetchError extends Data.TaggedError('TrackerFetchError')<{
+  issueId: string;
+  message: string;
+  cause?: unknown;
+}> {}
+
+/**
+ * Fetch the raw issue body for the test-requirement gate.
+ *
+ * Supports GitHub (`gh issue view`) and Linear (LinearClient SDK). Returns
+ * `null` when the tracker is unreachable, unauthenticated, or the issue is
+ * missing, so the orchestrator can decide whether to abort.
+ */
+export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | null, TrackerFetchError> {
+  return Effect.gen(function* () {
+    const ghInfo = resolveGitHubIssueSync(issueId);
+
+    if (ghInfo.isGitHub) {
+      const command = `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json body --jq '.body'`;
+      const result = yield* Effect.tryPromise({
+        try: () => execAsync(command),
+        catch: (cause) =>
+          new TrackerFetchError({
+            issueId,
+            message: `gh issue view failed for ${issueId}`,
+            cause,
+          }),
+      }).pipe(Effect.catchTag('TrackerFetchError', () => Effect.succeed(null)));
+      if (result === null) return null;
+      return result.stdout.trim();
+    }
+
+    const issueNum = extractNumberSync(issueId);
+    const teamKey = extractPrefixSync(issueId);
+    if (issueNum === null || teamKey === null) {
+      return yield* Effect.fail(
+        new TrackerFetchError({
+          issueId,
+          message: `Could not parse issue ID ${issueId} for Linear lookup`,
+        }),
+      );
+    }
+
+    const apiKey = yield* getLinearApiKey();
+    if (apiKey === null) return null;
+
+    const { LinearClient } = yield* Effect.tryPromise({
+      try: () => import('@linear/sdk'),
+      catch: (cause) =>
+        new TrackerFetchError({
+          issueId,
+          message: `Failed to load @linear/sdk for ${issueId}`,
+          cause,
+        }),
+    });
+
+    const client = new LinearClient({ apiKey });
+    const response = yield* Effect.tryPromise({
+      try: () =>
+        client.issues({
+          filter: {
+            number: { eq: issueNum },
+            team: { key: { eq: teamKey } },
+          },
+          first: 1,
+        }),
+      catch: (cause) =>
+        new TrackerFetchError({
+          issueId,
+          message: `Linear issues query failed for ${issueId}`,
+          cause,
+        }),
+    }).pipe(Effect.catchTag('TrackerFetchError', () => Effect.succeed(null)));
+
+    if (response === null || response.nodes.length === 0) return null;
+
+    const description = yield* Effect.tryPromise({
+      try: () => response.nodes[0].description,
+      catch: (cause) =>
+        new TrackerFetchError({
+          issueId,
+          message: `Failed to read Linear issue description for ${issueId}`,
+          cause,
+        }),
+    }).pipe(Effect.catchTag('TrackerFetchError', () => Effect.succeed(null)));
+
+    return description ?? null;
+  });
 }

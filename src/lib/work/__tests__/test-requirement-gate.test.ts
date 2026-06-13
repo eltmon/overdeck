@@ -1,11 +1,34 @@
-import { describe, expect, it } from 'vitest';
+import { exec } from 'child_process';
+import { Effect } from 'effect';
+import { describe, expect, it, vi } from 'vitest';
 import {
   countTestDeltaInDiff,
   detectTestRequirements,
+  fetchIssueBodyForGate,
   TEST_FILE_PATTERN,
   TEST_REQUIREMENT_KEYWORDS,
+  TrackerFetchError,
   type TestRequirement,
 } from '../test-requirement-gate.js';
+import { getLinearApiKey } from '../../shadow-utils.js';
+import { LinearClient } from '@linear/sdk';
+import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+
+vi.mock('child_process', () => ({
+  exec: vi.fn(),
+}));
+
+vi.mock('@linear/sdk', () => ({
+  LinearClient: vi.fn(),
+}));
+
+vi.mock('../../tracker-utils.js', () => ({
+  resolveGitHubIssueSync: vi.fn(),
+}));
+
+vi.mock('../../shadow-utils.js', () => ({
+  getLinearApiKey: vi.fn(() => Promise.resolve('test-api-key')),
+}));
 
 describe('detectTestRequirements', () => {
   it('returns an empty array for empty, null, or undefined input (AC4)', () => {
@@ -154,5 +177,94 @@ describe('countTestDeltaInDiff', () => {
       '10\t2\tsrc/lib/bar.test.ts',
     ].join('\n');
     expect(countTestDeltaInDiff(numstat)).toBe(35);
+  });
+});
+
+describe('fetchIssueBodyForGate', () => {
+  it('returns the GitHub issue body via gh issue view (AC1)', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'panopticon-cli',
+      number: 1501,
+    } as ReturnType<typeof resolveGitHubIssueSync>);
+
+    vi.mocked(exec).mockImplementation(((_cmd, callback) => {
+      callback?.(null, { stdout: 'GitHub body\n' }, '');
+      return undefined as unknown as ReturnType<typeof exec>;
+    }) as typeof exec);
+
+    const body = await Effect.runPromise(fetchIssueBodyForGate('PAN-1501'));
+    expect(body).toBe('GitHub body');
+  });
+
+  it('returns null when gh issue view fails (AC3)', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'panopticon-cli',
+      number: 1501,
+    } as ReturnType<typeof resolveGitHubIssueSync>);
+
+    vi.mocked(exec).mockImplementation(((cmd: string, callback: unknown) => {
+      (callback as (err: Error | null, stdout: { stdout: string }, stderr: string) => void)(
+        new Error('gh not authenticated'),
+        { stdout: '' },
+        '',
+      );
+      return undefined as unknown as ReturnType<typeof exec>;
+    }) as typeof exec);
+
+    const body = await Effect.runPromise(fetchIssueBodyForGate('PAN-1501'));
+    expect(body).toBeNull();
+  });
+
+  it('returns the Linear issue description (AC2)', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed('test-key'));
+
+    const mockDescription = Promise.resolve('Linear description');
+    const mockIssue = { description: mockDescription };
+    vi.mocked(LinearClient).mockImplementation(
+      function () {
+        return {
+          issues: vi.fn().mockResolvedValue({ nodes: [mockIssue] }),
+        } as unknown as ReturnType<typeof LinearClient>;
+      } as unknown as typeof LinearClient,
+    );
+
+    const body = await Effect.runPromise(fetchIssueBodyForGate('MIN-123'));
+    expect(body).toBe('Linear description');
+  });
+
+  it('returns null when Linear API key is missing (AC3)', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed(null));
+
+    const body = await Effect.runPromise(fetchIssueBodyForGate('MIN-123'));
+    expect(body).toBeNull();
+  });
+
+  it('returns null when Linear issue is missing (AC3)', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed('test-key'));
+    vi.mocked(LinearClient).mockImplementation(
+      function () {
+        return {
+          issues: vi.fn().mockResolvedValue({ nodes: [] }),
+        } as unknown as ReturnType<typeof LinearClient>;
+      } as unknown as typeof LinearClient,
+    );
+
+    const body = await Effect.runPromise(fetchIssueBodyForGate('MIN-123'));
+    expect(body).toBeNull();
+  });
+
+  it('fails with TrackerFetchError for an unparseable issue ID', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+
+    await expect(Effect.runPromise(fetchIssueBodyForGate('not-an-issue'))).rejects.toBeInstanceOf(
+      TrackerFetchError,
+    );
   });
 });
