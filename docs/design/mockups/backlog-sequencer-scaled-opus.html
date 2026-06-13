@@ -82,6 +82,8 @@
     .node.cond-stale { opacity: .5; filter: grayscale(.6); border-style: dashed; }
     .node.cond-stale .title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent); }
     .node.cond-stale:hover, .node.cond-stale.selected { opacity: 1; filter: none; }
+    /* a stale issue that is ALSO in the pipeline stays bright (active) — the ring + STALE flag carry the warning, not dimming */
+    .node.pipe.cond-stale { opacity: 1; filter: none; }
     .node .row1 { display: flex; align-items: center; gap: 7px; }
     .node .rank { font-family: "SF Mono", monospace; font-size: 11px; font-weight: 600; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 5px; line-height: 17px; }
     .node .iid { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
@@ -106,6 +108,7 @@
     .gate-seg button.on-auto { background: var(--accent); color: var(--foreground); }
     .gate-seg button.on-ready { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--foreground); }
     .gate-seg button.on-block { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning-foreground); }
+    .gate-seg button.on-plan { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning-foreground); }
     .gate-hint { font-size: 11px; color: var(--muted-foreground); margin-top: 7px; line-height: 1.45; }
     .chip.verb { display: inline-flex; align-items: center; gap: 3px; }
     .chip.verb.work { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
@@ -235,7 +238,7 @@
           <div class="tier now active"><div class="t-name">🔴 Now</div><div class="t-count">14</div><div class="t-sub">act on these first · ranks 1–14</div></div>
           <div class="tier next"><div class="t-name">🟠 Next</div><div class="t-count">38</div><div class="t-sub">queued behind Now · ranks 15–52</div></div>
           <div class="tier later"><div class="t-name">🔵 Later</div><div class="t-count">96</div><div class="t-sub">planned horizon · ranks 53–148</div></div>
-          <div class="tier someday"><div class="t-name">⚪ Someday</div><div class="t-count">374</div><div class="t-sub">long tail · ranks 149–522</div></div>
+          <div class="tier someday"><div class="t-name">⚪ Someday</div><div class="t-count">374</div><div class="t-sub">long tail · ranks 149–522 · shown as <b style="color:var(--foreground);font-weight:500">list</b> (&gt;150 nodes)</div></div>
         </div>
 
         <div class="focus-note"><span class="pill">Showing Tier 1 · Now</span> 14 of 522 issues rendered as a graph — the rest are summarized below and reachable via filters or the tier ribbon.</div>
@@ -258,7 +261,7 @@
         </div>
 
         <div class="footnote">
-          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. <b>In-pipeline issues are pinned</b> — never re-ranked under you. Each issue also carries an <b>operator pickup gate</b> (Auto / <span style="color:var(--foreground)">📌 Ready</span> / <span style="color:var(--warning-foreground)">⛔ Block</span>, see the rationale panel): <b>Ready</b> promotes it for auto-pickup, <b>Block</b> holds it out and sets a parked label — and when <code>auto_pickup_backlog</code> is on, the <b>Flywheel pulls the highest-ranked eligible issue straight from this sequence</b> instead of oldest-first. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
+          <b>The scale story.</b> panopticon-cli has <b>522 open issues</b>. Rendering all of them as a DAG would be unreadable — and the underlying <code>.pan/backlog/sequence.md</code> would balloon to ~120k tokens if every issue carried a full rationale. So the Sequencer keeps a <b>one-line rationale for every issue</b> and a <b>full paragraph only for the active tier</b> (≈ top 80), holding the file near <b>~50–65k tokens</b>. The page mirrors that: a <b>tiered view</b> renders only the tier you select (Now / Next / Later / Someday) plus its dependency neighbors, the long tail collapses behind counts, and the segment pills + filters let you pivot the whole 522 by importance, condition, in-pipeline, or ready. A <b>full Creation or Review pass</b> reads ~370k tokens of issue bodies, so it runs as a chunked map-reduce; the cheap <b>Incremental</b> pass (default) only re-reads what changed. <b>In-pipeline issues are pinned</b> — never re-ranked under you. A <code>⊘ STALE</code> issue the AI thinks is no longer relevant <b>sinks to Someday</b> and shows up under the <b>⊘ Stale candidates</b> filter for one-click closing — <i>unless</i> it is already in the pipeline (like PAN-1803 here at #14), in which case it stays pinned in place and flagged so you can abort dead work instead of finishing it. Each issue also carries an <b>operator pickup gate</b> (Auto / <span style="color:var(--foreground)">📌 Ready</span> / <span style="color:var(--warning-foreground)">⛔ Block</span>, see the rationale panel): <b>Ready</b> promotes it for auto-pickup, <b>Block</b> holds it out and sets a parked label — and when <code>auto_pickup_backlog</code> is on, the <b>Flywheel pulls the highest-ranked eligible issue straight from this sequence</b> instead of oldest-first — and with a sequence present the <b>Sequencer is the single ranker, the Flywheel the executor</b> (its only write is emergency-promoting a new pipeline-critical issue).<br><br><b>Three orthogonal per-issue axes</b> — this retires <code>needs-design</code>/<code>needs-discussion</code> as a separate concept (click any node, see the panel): <b>Planning</b> {Skip / Auto / ⚑ Interactive} = <i>how</i> to plan it (Interactive is a hard human gate → surfaced as needs-you, never auto-run; AI defaults: AI-created or tiny → non-interactive, big features → interactive); <b>Pickup gate</b> {Auto / ✓ Ready / ⛔ Block} = <i>whether</i> the Flywheel may pick it; <b>Condition</b> {ok / ⚠ refine / ⊘ stale} = the <i>state of the issue itself</i>. The two parked labels decompose across these: needs-human-design → Planning <b>Interactive</b>, too-vague → Condition <b>refine</b>, on-hold → Pickup <b>Block</b>. <b>Render budget:</b> each tier shows the pinned set + that tier as a DAG up to ~150 nodes; larger tiers (Someday) render as a virtualized ranked list. &nbsp;<i>Mockup v2 for <b>PAN-1866</b> — same ReactFlow 11 + @dagrejs/dagre stack as the vBRIEF DAG.</i>
         </div>
       </div>
     </div>
@@ -282,33 +285,33 @@
       { id:'PAN-1781', rank:5,  size:'m',  imp:'med',  score:72, deps:['PAN-1801'],  pipe:null,     ready:true,  prd:false,
         title:'Fresh-session seeding to survive compact-boundary bypass',
         why:'Reliability fix for long GPT-5.5 sessions. Planned and pickable; mid impact — affects a subset of runs.' },
-      { id:'PAN-1674', rank:6,  size:'s',  imp:'low',  score:55, deps:['PAN-1491'],  pipe:null,     ready:true,  prd:false,
+      { id:'PAN-1674', rank:6,  size:'s',  imp:'low',  score:55, deps:['PAN-1491'],  pipe:null,     ready:true,  prd:false, plan:'skip',
         title:'Reap per-workspace TLDR .venv disk hog',
         why:'Reclaims ~235G. Low strategic weight but tiny and ready, so it slots in cheaply.' },
-      { id:'PAN-1691', rank:7,  size:'l',  imp:'med',  score:69, deps:['PAN-1666'],  pipe:'plan',   ready:false, prd:true,
+      { id:'PAN-1691', rank:7,  size:'l',  imp:'med',  score:69, deps:['PAN-1666'],  pipe:'plan',   ready:false, prd:true, plan:'interactive',
         title:'Merge-train engine + v3 flywheel UI',
         why:'Builds on the un-freeze. Being planned now; large surface, so it sits behind the rollout it depends on.' },
-      { id:'PAN-1737', rank:8,  size:'xl', imp:'med',  score:64, deps:['PAN-1666','PAN-1781'], pipe:null, ready:false, prd:true, gate:'blocked',
+      { id:'PAN-1737', rank:8,  size:'xl', imp:'med',  score:64, deps:['PAN-1666','PAN-1781'], pipe:null, ready:false, prd:true, gate:'blocked', plan:'interactive',
         title:'UAT batch trains — assemble and promote generations',
         why:'Biggest single item (XL). High value but expensive; consumes the un-freeze and informs from the compact-boundary fix.' },
       { id:'PAN-1705', rank:9,  size:'m',  imp:'med',  score:58, deps:['PAN-1674'],  pipe:null,     ready:false, prd:false,
         title:'Eliminate gate-window request queueing on click',
         why:'UX latency fix. Real but not blocking; needs a PRD before it is pickable.' },
-      { id:'PAN-1672', rank:10, size:'m',  imp:'med',  score:53, deps:[],            pipe:null,     ready:false, prd:false, cond:'refine',
+      { id:'PAN-1672', rank:10, size:'m',  imp:'med',  score:53, deps:[],            pipe:null,     ready:false, prd:false, cond:'refine', plan:'interactive',
         title:'Break the CLIProxy long-session context deadlock',
         why:'Real and recurring, but the body is one sentence — no repro, no acceptance criteria. A human must refine it before an agent can plan it.' },
       { id:'PAN-1714', rank:11, size:'m',  imp:'low',  score:44, deps:['PAN-1705'],  pipe:null,     ready:false, prd:false,
         title:'Classify dead-vs-busy servers in the watchdog probe',
         why:'Stability polish on top of the queueing fix. Low weight, moderate effort.' },
-      { id:'PAN-1852', rank:12, size:'xs', imp:'low',  score:31, deps:['PAN-1714'],  pipe:null,     ready:false, prd:false,
+      { id:'PAN-1852', rank:12, size:'xs', imp:'low',  score:31, deps:['PAN-1714'],  pipe:null,     ready:false, prd:false, plan:'skip',
         title:'Fix doubled vBRIEF path in a PRD reference',
         why:'Trivial doc correction. Costs almost nothing to defer.' },
       { id:'PAN-1861', rank:13, size:'s',  imp:'low',  score:28, deps:['PAN-1691'],  pipe:null,     ready:false, prd:false,
         title:'Nudge fires but never un-wedges a stuck agent',
         why:'Edge-case reliability nit downstream of the merge-train UI work. Low impact, small.' },
-      { id:'PAN-1803', rank:14, size:'s',  imp:'low',  score:18, deps:[],            pipe:null,     ready:false, prd:false, cond:'stale',
+      { id:'PAN-1803', rank:14, size:'s',  imp:'low',  score:18, deps:[],            pipe:'review', ready:false, prd:false, cond:'stale',
         title:'Revert and re-land the admin-merge change',
-        why:'The revert already landed and the re-land folded into PAN-1691. Likely describes work that no longer exists — candidate to close.' },
+        why:'In review right now — but the AI believes this work was superseded (the revert already landed; the re-land folded into PAN-1691). It surfaces here in Now precisely because it is already in the pipeline: a non-pipeline stale issue would sink to Someday under the Stale-candidates filter, but this one is active, so it stays pinned and flagged so you can abort the agent rather than finish dead work.' },
     ];
     const EDGES = [
       ['PAN-1665','PAN-1801','unblocks'],['PAN-1665','PAN-1666','unblocks'],['PAN-1801','PAN-1781','unblocks'],
@@ -384,9 +387,13 @@
       const el = document.getElementById('node-'+id); if (el) el.classList.add('selected');
       const n = byId[id];
       const gate = n.gate || 'auto';
-      const gateHint = gate==='ready' ? 'Promoted: eligible for auto-pickup now, even ahead of heuristics.'
-                     : gate==='blocked' ? 'Held: the Flywheel will not auto-pick this; Block also sets a parked label.'
+      const gateHint = gate==='ready' ? 'Promoted: eligible for auto-pickup now, even ahead of heuristics (operator or Flywheel emergency-promote).'
+                     : gate==='blocked' ? 'Held: the Flywheel will not auto-pick this.'
                      : 'Auto: normal eligibility (ready · not blocked · passes the security filter).';
+      const plan = n.plan || 'auto';
+      const planHint = plan==='interactive' ? 'Interactive: a human drives planning — a HARD gate. The Flywheel surfaces it as needs-you and never auto-runs it.'
+                     : plan==='skip' ? 'Skip: no planning — pan start --auto straight to work (trivial/tiny/urgent).'
+                     : 'Auto: the AI plans it end-to-end (pan plan --auto).';
       const flags = [];
       if (n.pipe)            flags.push(`<span class="chip verb ${n.pipe}"><span class="pulsedot"></span>in pipeline · ${PHASE_LABEL[n.pipe]}</span>`);
       if (n.cond==='refine') flags.push(`<span class="chip refine">⚠ needs refinement</span>`);
@@ -410,6 +417,15 @@
         </div>
         <div class="r-flags">${flags.join('')}</div>
         <div class="gate-row">
+          <div class="glbl">Planning · AI-suggested, operator-overridable</div>
+          <div class="gate-seg">
+            <button class="${plan==='skip'?'on-auto':''}">Skip</button>
+            <button class="${plan==='auto'?'on-auto':''}">Auto</button>
+            <button class="${plan==='interactive'?'on-plan':''}">⚑ Interactive</button>
+          </div>
+          <div class="gate-hint">${planHint}</div>
+        </div>
+        <div class="gate-row" style="border-top:none;padding-top:0">
           <div class="glbl">Pickup gate · operator</div>
           <div class="gate-seg">
             <button class="${gate==='auto'?'on-auto':''}">Auto</button>
