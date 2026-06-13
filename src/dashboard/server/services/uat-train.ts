@@ -157,18 +157,27 @@ export async function runUatTrainReconcile(options: { force?: boolean; projectKe
 }
 
 let reconcilerTimer: ReturnType<typeof setInterval> | null = null;
+let reconcilerInFlight: Promise<UatTrainReconcileResults> | null = null;
+
+function runScheduledUatTrainReconcile(label: string): void {
+  if (reconcilerInFlight) return;
+  reconcilerInFlight = runUatTrainReconcile()
+    .catch((err) => {
+      console.warn(`[uat-train] ${label} reconcile failed:`, err instanceof Error ? err.message : err);
+      return {};
+    })
+    .finally(() => {
+      reconcilerInFlight = null;
+    });
+}
 
 export function startUatTrainReconciler(): void {
   if (reconcilerTimer) return;
   reconcilerTimer = setInterval(() => {
-    void runUatTrainReconcile().catch((err) => {
-      console.warn('[uat-train] reconcile tick failed:', err instanceof Error ? err.message : err);
-    });
+    runScheduledUatTrainReconcile('tick');
   }, RECONCILE_INTERVAL_MS);
   reconcilerTimer.unref?.();
-  void runUatTrainReconcile().catch((err) => {
-    console.warn('[uat-train] initial reconcile failed:', err instanceof Error ? err.message : err);
-  });
+  runScheduledUatTrainReconcile('initial');
 }
 
 export function stopUatTrainReconciler(): void {

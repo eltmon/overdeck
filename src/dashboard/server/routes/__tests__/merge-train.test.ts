@@ -144,6 +144,8 @@ describe('GET /api/merge-train/queues', () => {
       '/repo/mind',
       expect.any(Object),
     );
+    expect(mocks.buildIssueTitleMap).toHaveBeenCalledTimes(1);
+    expect(mocks.listEligibleCandidatesByProject).toHaveBeenCalledTimes(1);
   });
 });
 

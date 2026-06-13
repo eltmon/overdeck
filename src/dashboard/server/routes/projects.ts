@@ -14,6 +14,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import {
   resolveProjectFromIssueSync,
   listProjectsSync,
@@ -588,6 +589,9 @@ const postProjectMergeTrainRoute = HttpRouter.add(
   'POST',
   '/api/projects/:projectKey/merge-train',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const params = yield* HttpRouter.params;
     const key = params['projectKey'] ?? '';
     if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });

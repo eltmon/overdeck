@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getUatGenerationsPayload, runUatTrainReconcile } from '../uat-train.js';
+import {
+  getUatGenerationsPayload,
+  runUatTrainReconcile,
+  startUatTrainReconciler,
+  stopUatTrainReconciler,
+} from '../uat-train.js';
 import type { UatGeneration } from '../../../../lib/database/uat-generations-db.js';
 import type { MergeCandidate } from '../../../../lib/flywheel-merge-order.js';
 
@@ -221,7 +226,27 @@ describe('uat train service', () => {
   });
 
   afterEach(async () => {
+    stopUatTrainReconciler();
+    vi.useRealTimers();
     if (tmp) await rm(tmp, { recursive: true, force: true });
+  });
+
+  it('does not start overlapping scheduled reconciler passes', async () => {
+    vi.useFakeTimers();
+    let releaseInitial!: () => void;
+    mocks.buildIssueTitleMap.mockReturnValue(new Promise<void>((resolve) => {
+      releaseInitial = resolve;
+    }));
+
+    startUatTrainReconciler();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(mocks.buildIssueTitleMap).toHaveBeenCalledTimes(1);
+
+    releaseInitial();
+    await Promise.resolve();
+    await Promise.resolve();
   });
 
   it('assembles a ready non-PAN issue in its own project without a flywheel run', async () => {

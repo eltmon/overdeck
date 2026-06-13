@@ -162,11 +162,11 @@ Allowed when `require_uat_before_merge=false`:
 
 Allowed when `require_uat_before_merge=true` — **auto-assemble the UAT candidate** (this is the under-UAT flow; do it, don't ask the operator to flip UAT off):
 
-- With UAT required you must **not** schedule merges — but you **should** keep a ready-to-UAT bundle assembled so the operator can review and ship a batch in one sitting. Each tick:
-  1. `GET /api/flywheel/uat-candidate` → `{ branchName, bundled }`. `bundled` is the disjoint, batch-safe set of ready features (conflicting ones serialize and are excluded).
-  2. If `bundled` is non-empty, `POST /api/flywheel/assemble-uat` (empty `{}` body). This (re)builds the per-day `uat/<label>-<codename>-<MMDD>` branch off current `origin/main` and merges the bundle onto it.
-  3. Surface the candidate in your status/report: the branch name, the bundled issue IDs, and any merge conflicts it reported. The operator UATs that one branch, then clicks **Ship batch** (or `POST /api/flywheel/merge-next`).
-- **This call is idempotent and safe to run every tick.** The branch name is deterministic per day and the branch is force-reset onto current main, so repeated assembly rebuilds the *same* branch from the current bundle rather than proliferating new ones. Assembling is *not* a merge — it never touches `main` — so the merge-policy gate below does not apply to it.
+- With UAT required you must **not** schedule merges — but you **should** keep a ready-to-UAT bundle assembled per project so the operator can review and ship a batch in one sitting. Each tick:
+  1. `GET /api/merge-train/queues` and inspect each enabled project section. Each section's `queue` is already the disjoint, batch-safe ready set for that project; conflicting features serialize through later batches.
+  2. For each enabled project with a non-empty queue and no current live generation, `POST /api/merge-train/assemble` with `{ "project": "<projectKey>" }`. This (re)builds that project's `uat/<label>-<codename>-<MMDD>` branch off current `origin/main` and merges only that project's bundle onto it.
+  3. `GET /api/merge-train/generations` and surface the generated branch name, project, bundled issue IDs, and any merge conflicts in your status/report. The operator UATs that one project branch, then uses the project batch merge action (or calls `POST /api/merge-train/merge-next` with `{ "project": "<projectKey>", "n": <count> }`).
+- **This assembly call is idempotent and safe to run every tick per project.** The branch name is deterministic per day and the branch is force-reset onto current main, so repeated assembly rebuilds the *same* branch from the current project bundle rather than proliferating new ones. Assembling is *not* a merge — it never touches `main` — so the merge-policy gate below does not apply to it.
 - Do **not** ask the operator "want me to flip `require_uat_before_merge=false`?" The UAT candidate *is* the answer under UAT. Only the operator changes that toggle.
 
 Never:

@@ -14,6 +14,7 @@ import { exec } from 'child_process';
 import { getAllReviewStatusesFromDb } from '../database/review-status-db.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { spawnRun } from '../agents.js';
+import { isMergeTrainEnabledForProject } from './auto-merge-policy.js';
 import type { ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
 
 const execAsync = promisify(exec);
@@ -28,13 +29,16 @@ export function buildRealReconcileDeps(): ReconcileDeps {
   return {
     getReadySiblings: (mergedIssueId) => {
       const merged = mergedIssueId.toUpperCase();
+      const mergedProject = resolveProjectFromIssueSync(mergedIssueId);
       return Object.values(getAllReviewStatusesFromDb())
-        .filter(
-          (rs) =>
-            rs.readyForMerge === true &&
-            rs.mergeStatus !== 'merged' &&
-            rs.issueId.toUpperCase() !== merged,
-        )
+        .filter((rs) => {
+          if (rs.readyForMerge !== true || rs.mergeStatus === 'merged' || rs.issueId.toUpperCase() === merged) {
+            return false;
+          }
+          const siblingProject = resolveProjectFromIssueSync(rs.issueId);
+          if (!siblingProject || !isMergeTrainEnabledForProject(siblingProject.projectKey)) return false;
+          return !mergedProject || siblingProject.projectKey === mergedProject.projectKey;
+        })
         .map((rs) => rs.issueId);
     },
 

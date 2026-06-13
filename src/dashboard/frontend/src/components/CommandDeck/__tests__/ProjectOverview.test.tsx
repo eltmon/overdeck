@@ -17,6 +17,13 @@ import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-panopticon-csrf-token': 'test-csrf',
+  })),
+}));
+
 const fetchMock = vi.fn();
 let mergeTrainSetting: { value: 'enabled' | 'disabled' | null; effective: boolean };
 

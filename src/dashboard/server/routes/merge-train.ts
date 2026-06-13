@@ -10,6 +10,7 @@ import {
   computeMergeQueueFromCandidates,
   listEligibleCandidatesByProject,
   resolveMergeQueuePrUrl,
+  type MergeCandidate,
   type MergeQueueItem,
 } from '../../../lib/flywheel-merge-order.js';
 import { buildIssueTitleMap } from '../services/issue-title-map.js';
@@ -45,12 +46,7 @@ function projectByKey(projectKey: string) {
   return listProjectsSync().find((project) => project.key === projectKey) ?? null;
 }
 
-async function queueForProject(projectKey: string, projectRoot: string): Promise<MergeQueueItem[]> {
-  const issueTitles = await buildIssueTitleMap();
-  const candidates = listEligibleCandidatesByProject({
-    titleFor: (issueId) => issueTitles.get(issueId) ?? issueTitles.get(issueId.toLowerCase()),
-  }).get(projectKey)?.candidates ?? [];
-
+async function queueForProject(projectRoot: string, candidates: readonly MergeCandidate[]): Promise<MergeQueueItem[]> {
   return Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectRoot, {
       getPrUrl: resolveMergeQueuePrUrl,
@@ -59,13 +55,18 @@ async function queueForProject(projectKey: string, projectRoot: string): Promise
 }
 
 export async function getMergeTrainQueuesPayload(): Promise<MergeTrainQueuePayload[]> {
+  const issueTitles = await buildIssueTitleMap();
+  const candidatesByProject = listEligibleCandidatesByProject({
+    titleFor: (issueId) => issueTitles.get(issueId) ?? issueTitles.get(issueId.toLowerCase()),
+  });
   const payload: MergeTrainQueuePayload[] = [];
   for (const { key, config } of listProjectsSync()) {
+    const candidates = candidatesByProject.get(key)?.candidates ?? [];
     payload.push({
       projectKey: key,
       projectName: config.name,
       enabled: isMergeTrainEnabledForProject(key),
-      queue: await queueForProject(key, config.path),
+      queue: await queueForProject(config.path, candidates),
     });
   }
   return payload;
@@ -74,7 +75,11 @@ export async function getMergeTrainQueuesPayload(): Promise<MergeTrainQueuePaylo
 async function defaultGetOrderedIssueIds(projectKey: string): Promise<string[]> {
   const project = projectByKey(projectKey);
   if (!project) return [];
-  const queue = await queueForProject(projectKey, project.config.path);
+  const issueTitles = await buildIssueTitleMap();
+  const candidates = listEligibleCandidatesByProject({
+    titleFor: (issueId) => issueTitles.get(issueId) ?? issueTitles.get(issueId.toLowerCase()),
+  }).get(projectKey)?.candidates ?? [];
+  const queue = await queueForProject(project.config.path, candidates);
   return queue.map((item) => item.issueId);
 }
 

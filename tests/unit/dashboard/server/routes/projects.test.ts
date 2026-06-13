@@ -71,6 +71,14 @@ vi.mock('node:fs/promises', async () => {
 });
 
 import { fetchProjectSessionTree, projectsRouteLayer } from '../../../../../src/dashboard/server/routes/projects.ts';
+import {
+  DASHBOARD_CSRF_HEADER,
+  DASHBOARD_SESSION_COOKIE,
+  _resetDashboardSessionTokenForTests,
+  dashboardCsrfToken,
+  dashboardSessionCookieHeader,
+} from '../../../../../src/dashboard/server/routes/dashboard-auth.js';
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../../src/lib/internal-token.js';
 import { getProjectSync, listProjectsSync, setProjectMergeTrainSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
@@ -94,6 +102,10 @@ async function requestProjectsRoute(path: string, init: RequestInit = {}): Promi
   const responseBody = response.body as { body?: Uint8Array } | null;
   const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
   return { status: response.status, body: JSON.parse(text) };
+}
+
+function authHeaders(): HeadersInit {
+  return { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token' };
 }
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
@@ -257,7 +269,20 @@ describe('fetchProjectSessionTree', () => {
 
 describe('project merge-train routes', () => {
   beforeEach(() => {
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-session-token';
+    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
+    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
   });
 
   it('returns the configured value and effective fallback', async () => {
@@ -291,6 +316,7 @@ describe('project merge-train routes', () => {
 
     const result = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
       method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({ value: 'enabled' }),
     });
 
@@ -306,6 +332,7 @@ describe('project merge-train routes', () => {
 
     const result = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
       method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({ value: 'auto' }),
     });
 
@@ -322,6 +349,7 @@ describe('project merge-train routes', () => {
 
     const postResult = await requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
       method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({ value: null }),
     });
 
@@ -351,5 +379,41 @@ describe('project merge-train routes', () => {
       status: 404,
       body: { error: 'Project not found' },
     });
+  });
+
+  it('rejects unauthenticated and CSRF-missing override writes', async () => {
+    vi.mocked(getProjectSync).mockReturnValue({ name: 'panopticon-cli', path: '/repo' });
+
+    await expect(requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: 'disabled' }),
+    })).resolves.toEqual({ status: 401, body: { error: 'unauthorized' } });
+
+    const cookie = dashboardSessionCookieHeader().split(';')[0]!;
+    await expect(requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: `${DASHBOARD_SESSION_COOKIE}=${cookie.split('=')[1]}`,
+        origin: 'http://localhost:3011',
+      },
+      body: JSON.stringify({ value: 'disabled' }),
+    })).resolves.toEqual({ status: 403, body: { error: 'Invalid CSRF token' } });
+
+    vi.mocked(isMergeTrainEnabledForProject).mockReturnValue(false);
+    await expect(requestProjectsRoute('/api/projects/panopticon-cli/merge-train', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: `${DASHBOARD_SESSION_COOKIE}=${cookie.split('=')[1]}`,
+        [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
+        origin: 'http://localhost:3011',
+      },
+      body: JSON.stringify({ value: 'disabled' }),
+    })).resolves.toEqual({ status: 200, body: { value: 'disabled', effective: false } });
+
+    expect(setProjectMergeTrainSync).toHaveBeenCalledTimes(1);
+    expect(setProjectMergeTrainSync).toHaveBeenCalledWith('panopticon-cli', 'disabled');
   });
 });

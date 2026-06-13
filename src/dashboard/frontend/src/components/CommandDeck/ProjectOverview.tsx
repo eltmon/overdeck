@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
 import PhaseHeader from '../primitives/PhaseHeader';
@@ -284,7 +285,7 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
     mutationFn: async (next: MergeTrainOverride) => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/merge-train`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ value: next }),
       });
       if (!res.ok) throw new Error('Failed to save project setting');
