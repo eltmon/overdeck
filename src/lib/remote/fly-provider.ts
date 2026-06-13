@@ -40,6 +40,8 @@ export interface FlyProviderConfig {
   image?: string;
   /** API token (falls back to FLY_API_TOKEN env var) */
   apiToken?: string;
+  /** Durability/resiliency tier (default: ephemeral) */
+  resiliencyTier?: 'ephemeral' | 'durable';
 }
 
 function mapFlyStateToVmStatus(state: string): VmStatus {
@@ -91,7 +93,12 @@ export class FlyProvider implements RemoteProvider {
       vmMemory: config.vmMemory ?? 1024,
       image: config.image ?? 'registry.fly.io/pan-workspace:latest',
       apiToken: config.apiToken ?? process.env.FLY_API_TOKEN ?? '',
+      resiliencyTier: config.resiliencyTier ?? 'ephemeral',
     };
+  }
+
+  getResiliencyTier(): 'ephemeral' | 'durable' {
+    return this.config.resiliencyTier;
   }
 
   private getApi(): FlyApiClient {
@@ -184,7 +191,9 @@ export class FlyProvider implements RemoteProvider {
         };
       }
 
-      // Create machine
+      // Create machine. Tier is read here so the ephemeral path below keeps
+      // today's payload unchanged; durable wiring lands in later beads.
+      void this.config.resiliencyTier;
       const machine = await api.createMachine(this.config.app, name, {
         image: this.config.image,
         size: this.config.vmSize,

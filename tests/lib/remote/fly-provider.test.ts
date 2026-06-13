@@ -86,6 +86,21 @@ describe('FlyProvider', () => {
       expect(result.machineId).toBe('new-machine');
       expect(result.name).toBe('ws-123');
     });
+
+    it('ephemeral-tier create preserves restart:no and omits mounts', async () => {
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(provider.createVm('ws-123'));
+
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        restart: { policy: 'no' },
+      }));
+      const [, , config] = mockApi.createMachine.mock.calls[0];
+      expect(config).not.toHaveProperty('mounts');
+    });
   });
 
   describe('deleteVm', () => {
@@ -189,6 +204,12 @@ describe('createFlyProvider', () => {
     expect(p.name).toBe('fly');
     expect(p.getAppName()).toBe('pan-workspaces');
   });
+
+  it('defaults resiliencyTier to ephemeral', () => {
+    process.env.FLY_API_TOKEN = 'test-token';
+    const p = createFlyProvider();
+    expect(p.getResiliencyTier()).toBe('ephemeral');
+  });
 });
 
 import { createFlyProviderFromConfig } from '../../../src/lib/remote/index.js';
@@ -202,6 +223,7 @@ describe('createFlyProviderFromConfig', () => {
     const fly = createFlyProviderFromConfig();
     expect(fly).toBeInstanceOf(FlyProvider);
     expect(fly.getAppName()).toBe('pan-workspaces');
+    expect(fly.getResiliencyTier()).toBe('ephemeral');
   });
 
   it('maps fly config fields to FlyProvider options', () => {
@@ -217,6 +239,16 @@ describe('createFlyProviderFromConfig', () => {
       },
     });
     expect(fly.getAppName()).toBe('my-app');
+  });
+
+  it('routes resiliency_tier from remote config into FlyProvider', () => {
+    const fly = createFlyProviderFromConfig({ resiliency_tier: 'durable' });
+    expect(fly.getResiliencyTier()).toBe('durable');
+  });
+
+  it('tier override wins over config resiliency_tier', () => {
+    const fly = createFlyProviderFromConfig({ resiliency_tier: 'durable' }, 'ephemeral');
+    expect(fly.getResiliencyTier()).toBe('ephemeral');
   });
 
   it('uses api_token_env to resolve token', () => {

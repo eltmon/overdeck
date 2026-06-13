@@ -87,19 +87,24 @@ export async function isRemoteAvailable(): Promise<{ available: boolean; reason?
 /**
  * Create a FlyProvider from config settings
  */
-export function createFlyProviderFromConfig(remoteConfig?: {
-  fly?: {
-    app?: string;
-    org?: string;
-    region?: string;
-    vm_size?: string;
-    vm_memory?: number;
-    image?: string;
-    api_token_env?: string;
-  };
-}): FlyProvider {
+export function createFlyProviderFromConfig(
+  remoteConfig?: {
+    fly?: {
+      app?: string;
+      org?: string;
+      region?: string;
+      vm_size?: string;
+      vm_memory?: number;
+      image?: string;
+      api_token_env?: string;
+    };
+    resiliency_tier?: 'ephemeral' | 'durable';
+  },
+  tierOverride?: 'ephemeral' | 'durable',
+): FlyProvider {
   const fly = remoteConfig?.fly;
   const tokenEnv = fly?.api_token_env ?? 'FLY_API_TOKEN';
+  const resiliencyTier = tierOverride ?? remoteConfig?.resiliency_tier ?? 'ephemeral';
   return createFlyProvider({
     app: fly?.app,
     org: fly?.org,
@@ -108,5 +113,6 @@ export function createFlyProviderFromConfig(remoteConfig?: {
     vmMemory: fly?.vm_memory,
     image: fly?.image,
     apiToken: process.env[tokenEnv],
+    resiliencyTier,
   });
 }
