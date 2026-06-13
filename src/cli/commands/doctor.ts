@@ -277,6 +277,50 @@ export function checkTrackerRateLimits(): CheckResult {
   }
 }
 
+export function checkTrackerQuota(): CheckResult {
+  let cache: CacheService | undefined;
+  try {
+    cache = new CacheService();
+    const warnings: string[] = [];
+    const trackers = ['github', 'linear', 'rally'] as const;
+
+    for (const tracker of trackers) {
+      const health = cache.getPollHealth(tracker);
+      if (health?.status === 'quota_exhausted') {
+        warnings.push(`${tracker} quota exhausted${health.message ? `: ${health.message}` : ''}`);
+      }
+    }
+
+    const ghLimit = cache.getRateLimit('github');
+    if (ghLimit && ghLimit.remaining <= 0 && new Date(ghLimit.resetAt).getTime() > Date.now()) {
+      warnings.push(`GitHub rate limit exhausted (${ghLimit.remaining}/${ghLimit.total} until ${ghLimit.resetAt})`);
+    }
+
+    if (warnings.length > 0) {
+      return {
+        name: 'Tracker Quota',
+        status: 'warn',
+        message: warnings.join('; '),
+        fix: 'Wait for the quota window to reset, or rotate/upgrade the affected tracker API key.',
+      };
+    }
+
+    return {
+      name: 'Tracker Quota',
+      status: 'ok',
+      message: 'No tracker quota exhaustion signals',
+    };
+  } catch (err: any) {
+    return {
+      name: 'Tracker Quota',
+      status: 'ok',
+      message: `Skipped (${err.message})`,
+    };
+  } finally {
+    cache?.close();
+  }
+}
+
 export async function checkClosedIssueOrphanAgentDirs(
   issues: unknown[],
   agentsDir: string = AGENTS_DIR,
@@ -764,6 +808,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
   checks.push(checkTrackerRateLimits());
+  checks.push(checkTrackerQuota());
   checks.push(checkStoppedListClassification({
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
