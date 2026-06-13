@@ -31,6 +31,7 @@ export function resolveWorkTypeKey(session: Pick<SessionNode, 'type' | 'role'>):
   return session.type === 'review' ? 'role:review'
     : session.type === 'reviewer' && session.role ? `role:review.${session.role}`
     : session.type === 'work' ? 'role:work'
+    : session.type === 'strike' ? 'role:strike'
     : session.type === 'planning' ? 'role:plan'
     : session.type === 'test' ? 'role:test'
     : session.type === 'ship' || session.type === 'merge' ? 'role:ship'
