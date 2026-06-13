@@ -148,16 +148,35 @@ export async function resolveClaudeSessionId(
 }
 
 /**
- * Resolve the Claude Code JSONL transcript for an agent.
+ * Resolve the JSONL transcript for an agent. Handles three harnesses:
+ * - Codex: rollout JSONL under per-agent codex-home/sessions/ (PAN-1805)
+ * - Claude Code: session UUID → ~/.claude/projects/<dir>/<uuid>.jsonl
  *
- * Returns the absolute path if both the claudeSessionId is known AND the
- * corresponding JSONL file exists; otherwise null.
+ * Returns the absolute path if found; otherwise null.
  */
 export async function resolveJsonlPath(
   agentId: string,
   workspacePath: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const codexHome = join(agentsRoot, agentId, 'codex-home');
+
+  // Codex agents: resolve the rollout JSONL under per-agent codex-home.
+  // Mirror the resolveCodexSessionFile logic from conversations.ts (PAN-1805).
+  if (await pathExists(codexHome)) {
+    const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
+    const threadIdPath = join(agentsRoot, agentId, 'codex-thread-id');
+    const threadIdRaw = await readOptional(threadIdPath);
+    const threadId = threadIdRaw?.trim();
+    if (threadId) {
+      const path = findRolloutPath(codexHome, threadId);
+      if (path) return path;
+    }
+    return findLatestRollout(codexHome);
+  }
+
+  // Claude Code agents: resolve via session UUID → ~/.claude/projects/<dir>/<uuid>.jsonl
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
   if (!claudeSessionId) return null;
 

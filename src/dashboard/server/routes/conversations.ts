@@ -3058,6 +3058,11 @@ const getConversationMessagesRoute = HttpRouter.add(
                 }
               }
             } catch { /* session resolution failed */ }
+            // Codex work/planning agents: fall back to codex rollout resolution (PAN-1805).
+            if (!sessionFile) {
+              const resolved = await resolveCodexSessionFile(name);
+              if (resolved) sessionFile = resolved;
+            }
           }
           if (!sessionFile) {
             return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
