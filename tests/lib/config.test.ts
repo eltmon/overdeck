@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -84,6 +84,50 @@ describe('config', () => {
       expect(config.trackers.linear).toBeDefined();
       expect(config.trackers.github).toBeUndefined();
       expect(config.trackers.gitlab).toBeUndefined();
+    });
+  });
+
+  describe('normalizeRemoteConfig', () => {
+    it('defaults resiliency_tier to ephemeral when unset', async () => {
+      const { getDefaultConfigSync, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
+      delete (config.remote as { resiliency_tier?: string }).resiliency_tier;
+      normalizeRemoteConfig(config);
+      expect(config.remote?.resiliency_tier).toBe('ephemeral');
+    });
+
+    it('preserves a valid durable tier', async () => {
+      const { getDefaultConfigSync, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
+      config.remote = { enabled: true, resiliency_tier: 'durable', max_concurrent_agents: 5 };
+      normalizeRemoteConfig(config);
+      expect(config.remote.resiliency_tier).toBe('durable');
+      expect(config.remote.max_concurrent_agents).toBe(5);
+    });
+
+    it('rejects an invalid resiliency_tier', async () => {
+      const { getDefaultConfigSync, normalizeRemoteConfig } = await import('../../src/lib/config.js');
+      const config = getDefaultConfigSync();
+      config.remote = { enabled: true, resiliency_tier: 'invalid' as any };
+      expect(() => normalizeRemoteConfig(config)).toThrow('Invalid remote.resiliency_tier');
+    });
+  });
+
+  describe('loadConfigSync remote round-trip', () => {
+    it('reads resiliency_tier and max_concurrent_agents from a config file', async () => {
+      const configPath = join(tempDir, 'config.toml');
+      writeFileSync(
+        configPath,
+        `[remote]\nenabled = true\nresiliency_tier = "durable"\nmax_concurrent_agents = 7\n`,
+      );
+      vi.resetModules();
+      vi.doMock('../../src/lib/paths.js', () => ({ CONFIG_FILE: configPath }));
+      const { loadConfigSync } = await import('../../src/lib/config.js');
+      const config = loadConfigSync();
+      expect(config.remote?.enabled).toBe(true);
+      expect(config.remote?.resiliency_tier).toBe('durable');
+      expect(config.remote?.max_concurrent_agents).toBe(7);
+      vi.doUnmock('../../src/lib/paths.js');
     });
   });
 });

@@ -83,6 +83,10 @@ export interface RemoteConfig {
   overflow_to_remote?: boolean;
   /** Auto-hibernate idle workspaces after N minutes (0 = disabled) */
   auto_hibernate_minutes?: number;
+  /** Durability/resiliency tier for remote work agents */
+  resiliency_tier?: 'ephemeral' | 'durable';
+  /** Maximum concurrent remote work agents (0 = unlimited) */
+  max_concurrent_agents?: number;
   /** Fly.io specific configuration */
   fly?: RemoteFlyConfig;
 }
@@ -212,6 +216,10 @@ const DEFAULT_CONFIG: PanopticonConfig = {
     dashboard_port: 8080,
     domain: 'pan.localhost',
   },
+  remote: {
+    enabled: false,
+    resiliency_tier: 'ephemeral',
+  },
   shadow: {
     enabled: false,
     trackers: {
@@ -272,18 +280,50 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
   return result;
 }
 
+const VALID_RESILIENCY_TIERS = ['ephemeral', 'durable'] as const;
+
+/** Normalize and validate the remote config section. Mutates `config.remote`. */
+export function normalizeRemoteConfig(config: PanopticonConfig): void {
+  if (!config.remote) return;
+
+  if (config.remote.resiliency_tier === undefined) {
+    config.remote.resiliency_tier = 'ephemeral';
+  }
+
+  if (
+    !VALID_RESILIENCY_TIERS.includes(
+      config.remote.resiliency_tier as (typeof VALID_RESILIENCY_TIERS)[number],
+    )
+  ) {
+    throw new Error(
+      `Invalid remote.resiliency_tier '${config.remote.resiliency_tier}'. Must be one of: ${VALID_RESILIENCY_TIERS.join(', ')}`,
+    );
+  }
+
+  if (
+    config.remote.max_concurrent_agents !== undefined &&
+    typeof config.remote.max_concurrent_agents !== 'number'
+  ) {
+    throw new Error('remote.max_concurrent_agents must be a number');
+  }
+}
+
 export function loadConfigSync(): PanopticonConfig {
   if (!existsSync(CONFIG_FILE)) {
-    return DEFAULT_CONFIG;
+    const config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+    normalizeRemoteConfig(config);
+    return config;
   }
 
   try {
     const content = readFileSync(CONFIG_FILE, 'utf8');
     const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
-    return deepMerge(DEFAULT_CONFIG, parsed);
+    const config = deepMerge(DEFAULT_CONFIG, parsed);
+    normalizeRemoteConfig(config);
+    return config;
   } catch (error) {
     console.error('Warning: Failed to parse config, using defaults');
-    return DEFAULT_CONFIG;
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
   }
 }
 
@@ -296,13 +336,17 @@ async function loadConfigFromFile(): Promise<PanopticonConfig> {
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
     const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
-    return deepMerge(DEFAULT_CONFIG, parsed);
+    const config = deepMerge(DEFAULT_CONFIG, parsed);
+    normalizeRemoteConfig(config);
+    return config;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return DEFAULT_CONFIG;
+      const config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+      normalizeRemoteConfig(config);
+      return config;
     }
     console.error('Warning: Failed to parse config, using defaults');
-    return DEFAULT_CONFIG;
+    return JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
   }
 }
 
