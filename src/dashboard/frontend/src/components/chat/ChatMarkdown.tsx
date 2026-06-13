@@ -85,10 +85,17 @@ function sanitizeStyleAttr(styleValue: string): string {
     .join('; ');
 }
 
-const sharedDomParser = new DOMParser();
+let sharedDomParser: DOMParser | null = null;
+
+function getSharedDomParser(): DOMParser {
+  if (!sharedDomParser) {
+    sharedDomParser = new DOMParser();
+  }
+  return sharedDomParser;
+}
 
 function sanitizeShikiHtml(html: string): string {
-  const doc = sharedDomParser.parseFromString(html, 'text/html');
+  const doc = getSharedDomParser().parseFromString(html, 'text/html');
 
   function walk(node: Node): Node | null {
     if (node.nodeType === Node.TEXT_NODE) {
