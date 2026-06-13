@@ -5868,9 +5868,10 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
 
     // PAN-1818: context-window overflow is deterministic on the same diff/manifest.
     // Capture the pane tail and fast-fail BEFORE the idle-respawn branch so we never
-    // burn another cycle respawning a reviewer that will re-overflow.
+    // burn another cycle respawning a reviewer that will re-overflow. Only check when
+    // the reviewer is idle at its prompt — an active reviewer cannot have hit a 400 yet.
     let contextOverflowDetected = false;
-    if (!outputWrittenForThisRun) {
+    if (!outputWrittenForThisRun && runtimeState?.state === 'idle') {
       const tail = await Effect.runPromise(capturePane(agentId, 100)).catch(() => '');
       contextOverflowDetected = isContextOverflowTail(tail);
     }

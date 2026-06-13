@@ -645,7 +645,7 @@ describe('monitorReviewConvoySignals', () => {
     );
     mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
     mockGetAgentRuntimeState.mockReturnValue({
-      state: 'active',
+      state: 'idle',
       lastActivity: new Date().toISOString(),
     } as any);
     mockCapturePane.mockResolvedValue('API Error: 400 Your input exceeds the context window of this model.');
