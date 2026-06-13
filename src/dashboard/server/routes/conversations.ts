@@ -3031,7 +3031,7 @@ const getConversationMessagesRoute = HttpRouter.add(
                   setSpecialistSessionCache(name, piSession);
                 }
               }
-            } catch { /* fall through to the Claude lookup */ }
+            } catch { /* resolver failed; skip stale Claude fallback for known pi/codex harness */ }
             // Resolve JSONL via the unified session-id lookup chain
             // (session.id file → sessions.json → runtime state) in
             // ~/.panopticon/agents/<name>/. Covers work agents, planning

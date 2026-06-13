@@ -11,6 +11,9 @@ export function withConcurrencyLimitPromise<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {
+  if (!Number.isInteger(max) || max <= 0) {
+    return Promise.reject(new RangeError('max concurrency must be a positive integer'));
+  }
   return new Promise((resolve, reject) => {
     const results = new Array<T>(tasks.length);
     let index = 0;

@@ -35,8 +35,16 @@ import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 
-/** Valid agent / tmux session identifier. */
-export const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+/**
+ * Valid agent / tmux session identifier.
+ *
+ * Panopticon builds tmux session names from the project key, issue id, and
+ * role; project keys may contain dots (e.g. `panopticon.cli`). The pattern is
+ * intentionally broad for filesystem-safe names; the actual containment guard
+ * is `safeAgentDir` + `containedPath`, which ensures paths stay under the
+ * per-agent directory.
+ */
+export const SAFE_AGENT_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 function isSafeAgentId(agentId: string): boolean {
   return SAFE_AGENT_ID_PATTERN.test(agentId);
@@ -363,7 +371,7 @@ export async function resolveJsonlPath(
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
-  if (!claudeSessionId) return null;
+  if (!claudeSessionId || !SAFE_AGENT_ID_PATTERN.test(claudeSessionId)) return null;
 
   const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
   const encodedDir = encodeClaudeProjectDir(workspacePath);
