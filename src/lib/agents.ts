@@ -925,6 +925,8 @@ export interface AgentState {
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
+  /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
+  reviewRetryAttempt?: number;
   hostOverride?: boolean;
 }
 
@@ -979,6 +981,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
+    reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
   };
 }
