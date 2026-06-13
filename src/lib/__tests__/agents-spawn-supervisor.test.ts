@@ -15,6 +15,12 @@ let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
+let runtimeSnapshot: {
+  activity: 'working' | 'thinking' | 'idle' | 'stopped' | 'waiting';
+  lastActivity: string;
+  sessionModel?: string;
+  sessionHarness?: string;
+} | null;
 
 function baseState(partial: Partial<AgentState> = {}): AgentState {
   return {
@@ -28,6 +34,22 @@ function baseState(partial: Partial<AgentState> = {}): AgentState {
     startedAt: '2026-05-23T00:00:00.000Z',
     ...partial,
   };
+}
+
+function writeResumableWorkAgent(agentId: string, partial: Partial<AgentState> = {}): string {
+  const agentDir = join(tmpHome, 'agents', agentId);
+  mkdirSync(agentDir, { recursive: true });
+  const state = baseState({
+    id: agentId,
+    issueId: 'PAN-1797',
+    status: 'stopped',
+    kickoffDelivered: true,
+    ...partial,
+  });
+  writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state, null, 2));
+  writeFileSync(join(agentDir, 'session.id'), `${agentId}-session`);
+  writeFileSync(join(agentDir, 'initial-prompt.md'), 'Initial kickoff prompt');
+  return agentDir;
 }
 
 function writeSupervisorArtifact(): string {
@@ -55,7 +77,7 @@ function mockSpawnDependencies(): void {
     emitAgentEvent: emitAgentEventMock,
   }));
   vi.doMock('../agent-runtime-mirror.js', () => ({
-    getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
+    getRuntimeSnapshot: vi.fn(() => Effect.succeed(runtimeSnapshot)),
     isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
   }));
   vi.doMock('../runtimes/codex.js', () => ({
@@ -165,6 +187,7 @@ beforeEach(() => {
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
   activeFlywheelRunId = null;
+  runtimeSnapshot = null;
   delete process.env.PAN_DOCKER;
   delete process.env.PANOPTICON_DOCKER_WORKSPACE;
   mockSpawnDependencies();
@@ -418,6 +441,78 @@ describe('spawnAgent PTY supervisor wiring', () => {
     const modelSetCall = emitAgentEventMock.mock.calls.find(([, event]) => event.kind === 'model_set');
     expect(modelSetCall?.[1]).not.toHaveProperty('sessionModel');
     expect(modelSetCall?.[1]).not.toHaveProperty('sessionHarness');
+  });
+
+  it('persists resume fresh-session origin when session origin drift forces a respawn', async () => {
+    const agentId = 'agent-pan-resume-origin-drift';
+    writeResumableWorkAgent(agentId, {
+      model: 'claude-sonnet-4-6',
+      harness: 'claude-code',
+    });
+    runtimeSnapshot = {
+      activity: 'idle',
+      lastActivity: '2026-05-23T00:00:00.000Z',
+      sessionModel: 'claude-sonnet-4-6',
+      sessionHarness: 'claude-code',
+    };
+    const { resumeAgent } = await import('../agents.js');
+
+    await expect(resumeAgent(agentId, undefined, { model: 'gpt-5.5', harness: 'codex' }))
+      .resolves.toEqual(expect.objectContaining({ success: true }));
+
+    expect(emitAgentEventMock).toHaveBeenCalledWith(
+      agentId,
+      expect.objectContaining({
+        kind: 'model_set',
+        model: 'unknown',
+        sessionModel: 'gpt-5.5',
+        sessionHarness: 'codex',
+      }),
+    );
+  });
+
+  it('preserves resume session origin when session origin matches', async () => {
+    const agentId = 'agent-pan-resume-origin-match';
+    writeResumableWorkAgent(agentId, {
+      model: 'gpt-5.5',
+      harness: 'codex',
+      codexMode: 'work-tui',
+    });
+    runtimeSnapshot = {
+      activity: 'idle',
+      lastActivity: '2026-05-23T00:00:00.000Z',
+      sessionModel: 'gpt-5.5',
+      sessionHarness: 'codex',
+    };
+    const { resumeAgent } = await import('../agents.js');
+
+    await expect(resumeAgent(agentId)).resolves.toEqual(expect.objectContaining({ success: true }));
+
+    const originRewrite = emitAgentEventMock.mock.calls.find(([, event]) => (
+      event.kind === 'model_set'
+      && (Object.prototype.hasOwnProperty.call(event, 'sessionModel')
+        || Object.prototype.hasOwnProperty.call(event, 'sessionHarness'))
+    ));
+    expect(originRewrite).toBeUndefined();
+  });
+
+  it('re-resolves legacy resume harnesses without passing the stored harness as explicit', async () => {
+    const agentId = 'agent-pan-resume-legacy-resolve';
+    writeResumableWorkAgent(agentId, {
+      model: 'gpt-5.5',
+      harness: 'claude-code',
+    });
+    runtimeSnapshot = {
+      activity: 'idle',
+      lastActivity: '2026-05-23T00:00:00.000Z',
+    };
+    const { resumeAgent } = await import('../agents.js');
+
+    await expect(resumeAgent(agentId)).resolves.toEqual(expect.objectContaining({ success: true }));
+
+    const resolveCall = resolveHarnessMock.mock.calls.find(([input]) => input.model === 'gpt-5.5');
+    expect(resolveCall?.[0]).toEqual(expect.objectContaining({ role: 'work', model: 'gpt-5.5' }));
+    expect(Object.prototype.hasOwnProperty.call(resolveCall?.[0] ?? {}, 'explicit')).toBe(false);
   });
 
   it('threads flywheel orchestrator provenance env into launcher and tmux session', async () => {
