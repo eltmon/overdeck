@@ -211,7 +211,7 @@ function getCodexLauncherFields(agentId: string, model: string, workspacePath?: 
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+  const codexHome = join(getAgentDir(agentId), 'codex-home');
   // PAN-1803: codex work agents must inherit the user's configured codex
   // permission level (Settings → Permissions → Codex) and pre-trust the
   // workspace, EXACTLY like the conversation path
@@ -1686,13 +1686,17 @@ async function deliverInitialPromptWithRetry(
   // claude-code/pi line-based input handle the full prompt fine.
   let deliveredPrompt = prompt;
   try {
-    const codexState = await Effect.runPromise(getAgentState(normalizeAgentId(agentId)));
+    const normalizedAgentId = normalizeAgentId(agentId);
+    const codexState = await Effect.runPromise(getAgentState(normalizedAgentId));
     if (codexState?.harness === 'codex' && codexState.workspace) {
-      const kickoffPath = join(codexState.workspace, '.pan', 'kickoff.md');
-      mkdirSync(dirname(kickoffPath), { recursive: true });
-      writeFileSync(kickoffPath, prompt, 'utf-8');
+      const kickoffDir = getAgentDir(normalizedAgentId);
+      const kickoffPath = join(kickoffDir, 'kickoff.md');
+      const tmpPath = join(kickoffDir, `kickoff.${process.pid}.${randomUUID()}.tmp`);
+      await mkdirAsync(kickoffDir, { recursive: true });
+      await writeFileAsync(tmpPath, prompt, { encoding: 'utf-8', mode: 0o600 });
+      await renameAsync(tmpPath, kickoffPath);
       deliveredPrompt =
-        'Your complete task brief has been written to `.pan/kickoff.md` in this workspace. '
+        `Your complete task brief has been written to \`${kickoffPath}\` on this machine. `
         + 'Read that file in full now and execute it exactly — it is your full set of work '
         + 'instructions. Begin immediately and keep working autonomously until done; do not '
         + 'wait for further input.';
@@ -3430,7 +3434,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (resolvedHarness === 'codex' && state.codexMode !== 'work-tui') {
     const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
       await import('./runtimes/codex.js');
-    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    const codexHomeForAgent = join(getAgentDir(agentId), 'codex-home');
     const rolloutPath = await waitForCodexRollout(codexHomeForAgent, 30000);
     if (rolloutPath) {
       const threadId = extractThreadIdFromRollout(rolloutPath);
