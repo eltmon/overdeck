@@ -33,7 +33,6 @@ import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
 import { resetHarnessResolveCachesForTests } from '../../src/lib/harness-resolve.js';
-import { AGENTS_DIR } from '../../src/lib/paths.js';
 
 const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
@@ -48,6 +47,10 @@ const transcriptLandingMocks = vi.hoisted(() => ({
 
 const runtimeMirrorMocks = vi.hoisted(() => ({
   snapshots: new Map<string, any>(),
+}));
+
+const persistentLoggerMocks = vi.hoisted(() => ({
+  logAgentLifecycleSync: vi.fn(),
 }));
 
 const configMocks = vi.hoisted(() => ({
@@ -80,6 +83,14 @@ vi.mock('../../src/lib/agent-runtime-mirror.js', () => ({
   getRuntimeSnapshot: vi.fn((agentId: string) => Effect.succeed(runtimeMirrorMocks.snapshots.get(agentId) ?? null)),
   isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
 }));
+
+vi.mock('../../src/lib/persistent-logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/persistent-logger.js')>();
+  return {
+    ...actual,
+    logAgentLifecycleSync: persistentLoggerMocks.logAgentLifecycleSync,
+  };
+});
 
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
@@ -325,6 +336,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     const beadsQuery = await import('../../src/lib/beads-query.js');
     vi.mocked(beadsQuery.assertIssueHasBeads).mockReturnValue(Effect.void);
     piFifoMocks.writePiCommand.mockClear();
+    persistentLoggerMocks.logAgentLifecycleSync.mockClear();
   });
 
   afterEach(async () => {
@@ -672,8 +684,10 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const state = getAgentStateSync(agentId);
       expect(state?.harness).toBe('codex');
       expect(state?.codexMode).toBe('work-tui');
-      const lifecycle = readFileSync(join(AGENTS_DIR, agentId, 'lifecycle.log'), 'utf8');
-      expect(lifecycle).toContain('legacy harness migration claude-code→codex for model gpt-5.5');
+      expect(persistentLoggerMocks.logAgentLifecycleSync).toHaveBeenCalledWith(
+        agentId,
+        expect.stringContaining('legacy harness migration claude-code→codex for model gpt-5.5'),
+      );
     });
 
     it('resumeAgent migrates legacy Kimi agents to Pi fresh sessions when Pi is installed', async () => {
