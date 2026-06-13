@@ -7,6 +7,7 @@ const mockPollHealth = new Map<string, PollHealth>();
 const mockRateLimits = new Map<string, RateLimitInfo>();
 
 vi.mock('../../../dashboard/server/services/cache-service.js', () => ({
+  DEFAULT_TTLS: { github: 60, linear: 30, rally: 120 },
   CacheService: class MockCacheService {
     recordPollHealth(tracker: string, health: PollHealth): void {
       mockPollHealth.set(tracker, health);
@@ -75,5 +76,14 @@ describe('doctor checkTrackerQuota (PAN-1817)', () => {
     expect(result.status).toBe('warn');
     expect(result.message).toMatch(/linear/i);
     expect(result.message).toMatch(/rally/i);
+  });
+
+  it('ignores stale quota_exhausted records', () => {
+    const staleObservedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    mockPollHealth.set('linear', { status: 'quota_exhausted', message: 'old rate limit', observedAt: staleObservedAt });
+
+    const result = checkTrackerQuota();
+    expect(result.status).toBe('ok');
+    expect(result.message).toMatch(/no tracker quota/i);
   });
 });

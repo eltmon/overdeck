@@ -631,9 +631,19 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     Promise.resolve(getDockerStatsCollector().getStats()),
   ]);
 
-  const cache = new CacheService();
-  const trackerQuota = readTrackerQuota(cache);
-  cache.close();
+  let trackerQuota: { exhaustedTrackers: string[]; githubRemaining: number | null } = {
+    exhaustedTrackers: [],
+    githubRemaining: null,
+  };
+  let cache: CacheService | undefined;
+  try {
+    cache = new CacheService();
+    trackerQuota = readTrackerQuota(cache);
+  } catch (err: any) {
+    console.error('[system-health] Failed to read tracker quota:', err.message);
+  } finally {
+    cache?.close();
+  }
 
   const thresholds = defaultThresholds();
   const coreCount = Math.max(cpus().length, 1);

@@ -20,7 +20,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { normalizeAgentId } from '../../lib/agents.js';
 import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
-import { CacheService } from '../../dashboard/server/services/cache-service.js';
+import { CacheService, DEFAULT_TTLS } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 
 // Minimum supported Pi binary version for the Pi harness (PAN-636).
@@ -284,11 +284,18 @@ export function checkTrackerQuota(): CheckResult {
     const warnings: string[] = [];
     const trackers = ['github', 'linear', 'rally'] as const;
 
+    const nowMs = Date.now();
     for (const tracker of trackers) {
       const health = cache.getPollHealth(tracker);
-      if (health?.status === 'quota_exhausted') {
-        warnings.push(`${tracker} quota exhausted${health.message ? `: ${health.message}` : ''}`);
-      }
+      if (health?.status !== 'quota_exhausted') continue;
+
+      const observedMs = new Date(health.observedAt).getTime();
+      if (!Number.isFinite(observedMs)) continue;
+
+      const staleMs = (DEFAULT_TTLS[tracker] ?? 60) * 2 * 1000;
+      if (nowMs - observedMs > staleMs) continue; // stale signal, ignore
+
+      warnings.push(`${tracker} quota exhausted${health.message ? `: ${health.message}` : ''}`);
     }
 
     const ghLimit = cache.getRateLimit('github');
