@@ -1,18 +1,18 @@
 /**
  * Unit tests for the EventStore (PAN-434)
  *
- * Uses an in-memory better-sqlite3 database so tests are fast, isolated,
+ * Uses an in-memory SQLite adapter database so tests are fast, isolated,
  * and do not touch the filesystem.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js'
 import { createEventStore, DbAdapter } from '../../src/dashboard/server/event-store.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeDb(): DbAdapter {
-  const db = new (Database as any)(':memory:')
+  const db = openDatabase(':memory:')
   db.exec(`
     CREATE TABLE events (
       sequence  INTEGER PRIMARY KEY AUTOINCREMENT,

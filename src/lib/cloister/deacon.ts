@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSy
 // PAN-1249: readFile / writeFile / unlink are consumed by the additive Effect
 // helpers below (`readFileOp`, `writeFileOp`, `unlinkPath`).
 import { readdir, readFile, writeFile, unlink } from 'fs/promises';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { homedir, loadavg, cpus } from 'os';
@@ -28,6 +28,7 @@ import {
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { isContextOverflowTail } from '../context-overflow.js';
+import type { ReviewSubRole } from './review-monitor.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -161,6 +162,7 @@ import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
@@ -4910,6 +4912,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...closedIssueAgentActions);
   for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-1817: stop the server+frontend UI containers of workspaces whose agent
+  // has been idle (no agent, no tmux) past the grace window. Light-touch and
+  // reversible — never touches the agent (host tmux), worktree, or branch.
+  const idleStackActions = await reconcileIdleWorkspaceStacks();
+  actions.push(...idleStackActions);
+  for (const a of idleStackActions) addLog('action', a, state.patrolCycle);
+
   // Re-send the resume continue prompt when a work agent is alive and idle after
   // resume but no user record landed in the JSONL transcript.
   const stalledResumeActions = await nudgeStalledResumeWorkAgents();
@@ -4970,6 +4979,20 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reapedWorkActions = await checkMergedWorkSessions();
   actions.push(...reapedWorkActions);
   for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1778: proactively refresh Claude credentials on active remote agents
+  // when the host credentials file changes, with a 15 min fallback cadence.
+  // Runs before the reactive 401 heal/reap path so long remote runs get fresh
+  // OAuth tokens before they stall. Zero active remote agents is a local state
+  // scan only — no Fly provider construction and no Fly API calls.
+  try {
+    const { refreshClaudeCredentialsForActiveRemoteAgents } = await import('../remote/remote-completion.js');
+    const remoteCredentialActions = await refreshClaudeCredentialsForActiveRemoteAgents();
+    actions.push(...remoteCredentialActions);
+    for (const a of remoteCredentialActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
+  } catch (err: any) {
+    addLog('warn', `Remote credential refresh patrol failed: ${err.message}`, state.patrolCycle);
+  }
 
   // PAN-1676: hand completed remote (fly.io) agents to the review pipeline.
   // Cheap no-op when no remote-state.json is active (local file scan only —
@@ -5684,6 +5707,71 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
   return actions;
 }
 
+const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
+
+/**
+ * Respawn a convoy reviewer that has gone idle without writing its output.
+ *
+ * PAN-1806: when a reviewer hits a terminal API error it lands back at an idle
+ * TUI prompt and never writes a report. Deacon detects that idle state and,
+ * on the first occurrence, kills the stale session and starts a fresh reviewer
+ * against the same runId, output path, and context manifest. The retry count is
+ * persisted on the fresh agent state so a second idle detection signals failure.
+ */
+async function respawnIdleReviewer(state: AgentState, agentId: string): Promise<boolean> {
+  const outputPath = state.reviewOutputPath;
+  const attempt = (state.reviewRetryAttempt ?? 0) + 1;
+  logDeaconEventSync(`monitorReviewConvoySignals: ${agentId} idle with no output — respawning reviewer (attempt ${attempt})`);
+
+  try {
+    await Effect.runPromise(killSession(agentId));
+  } catch (err) {
+    logDeaconEventSync(`monitorReviewConvoySignals: failed to kill ${agentId} before respawn: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  if (!outputPath || !state.reviewSubRole || !state.reviewRunId) {
+    logDeaconEventSync(`monitorReviewConvoySignals: cannot respawn ${agentId} — missing output/run/subRole`);
+    return false;
+  }
+
+  try {
+    const { spawnReviewSubRoleForIssue } = await import('./review-agent.js');
+    const contextManifestPath = join(dirname(outputPath), 'context.json');
+    const result = await Effect.runPromise(
+      spawnReviewSubRoleForIssue({
+        issueId: state.issueId,
+        workspace: state.workspace,
+        subRole: state.reviewSubRole as ReviewSubRole,
+        runId: state.reviewRunId,
+        outputPath,
+        contextManifestPath,
+        synthesisAgentId: state.reviewSynthesisAgentId,
+        model: state.model,
+        harness: state.harness,
+        allowHost: state.hostOverride ?? false,
+      }),
+    );
+
+    if (!result.success) {
+      logDeaconEventSync(`monitorReviewConvoySignals: respawn of ${agentId} failed: ${result.error ?? result.message}`);
+      return false;
+    }
+
+    const freshState = getAgentStateSync(agentId);
+    if (freshState) {
+      freshState.reviewRetryAttempt = attempt;
+      saveAgentStateSync(freshState);
+    }
+
+    logDeaconEventSync(`monitorReviewConvoySignals: respawned ${agentId} as ${result.sessionId}`);
+    return true;
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logDeaconEventSync(`monitorReviewConvoySignals: respawn of ${agentId} threw: ${errMsg}`);
+    return false;
+  }
+}
+
 export async function monitorReviewConvoySignals(): Promise<string[]> {
   const actions: string[] = [];
   if (!existsSync(AGENTS_DIR)) return actions;
@@ -5746,12 +5834,31 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     const REVIEWER_STARTUP_GRACE_MS = 90_000;
     const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_STARTUP_GRACE_MS;
 
+    // PAN-1806: detect a reviewer that hit a terminal API error and is now
+    // idle at its TUI prompt with no report written. The Stop-hook mirror
+    // reports 'idle' once the model ends its turn; if that persists while the
+    // session is alive and the output file is missing, fail fast rather than
+    // wait for the hard deadline. Retry once before signaling failure.
+    const runtimeState = getAgentRuntimeStateSync(agentId);
+    const runtimeIdleAgeMs =
+      runtimeState?.state === 'idle'
+        ? Date.now() - new Date(runtimeState.lastActivity).getTime()
+        : 0;
+    const idleAndNoOutput = reviewerSessionAlive && !outputWrittenForThisRun && runtimeIdleAgeMs > REVIEWER_IDLE_FAILURE_MS;
+
     let signal: 'ready' | 'failed' | 'timeout' | null = null;
     let reason = '';
     if (outputWrittenForThisRun) {
       // Report exists for this run but the Stop-hook didn't signal (no fresh
       // marker) — back it up with READY. Safe: the report is on disk.
       signal = 'ready';
+    } else if (idleAndNoOutput) {
+      const attempt = state.reviewRetryAttempt ?? 0;
+      if (attempt < 1 && (await respawnIdleReviewer(state, agentId))) {
+        continue;
+      }
+      signal = 'failed';
+      reason = `reviewer idle with no output after terminal API error${attempt >= 1 ? ' (retry exhausted)' : ' (retry failed)'}`;
     } else if (reviewerSessionAlive) {
       // Still working or idling attachably. Only intervene if well past the
       // deadline (genuinely wedged).

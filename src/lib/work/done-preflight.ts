@@ -44,7 +44,11 @@ async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): 
     .split('\n')
     .filter((line) => line.trim().length > 0)
     .map((line) => JSON.parse(line) as BeadRecord)
-    .filter((bead) => Array.isArray(bead.labels) && bead.labels.map(String).includes(label));
+    .filter((bead) => {
+      const labelsMatch = Array.isArray(bead.labels) && bead.labels.map(String).includes(label);
+      const titleMatch = typeof bead.title === 'string' && bead.title.toLowerCase().includes(label);
+      return labelsMatch || titleMatch;
+    });
 }
 
 async function listBeadsByStatus(
@@ -57,10 +61,17 @@ async function listBeadsByStatus(
     return JSON.stringify(preloadedBeads.filter((bead) => bead.status === status));
   }
 
+  // Prefer the workspace beads DB directly — it is authoritative for this issue
+  // and avoids the PAN-XXX label/title filtering pitfall (PAN-1812).
+  const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
+  if (jsonlBeads !== null) {
+    return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
+  }
+
   try {
     const { stdout } = await execFileAsync(
       'bd',
-      ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
+      ['list', '--status', status, '--title-contains', issueId.toLowerCase(), '--limit', '0', '--json'],
       {
         cwd: workspacePath,
         encoding: 'utf-8',
@@ -71,10 +82,6 @@ async function listBeadsByStatus(
     return stdout;
   } catch (error) {
     if (!isMissingCommand(error) && !isTimeout(error)) throw error;
-    const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
-    if (jsonlBeads !== null) {
-      return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
-    }
     throw error;
   }
 }async function checkOpenBeadsPromise(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
@@ -84,8 +91,9 @@ async function listBeadsByStatus(
   } catch (error: unknown) {
     if (isMissingCommand(error)) return [];
     if (isTimeout(error)) {
-      console.warn(chalk.yellow(`  ⚠ Beads open-work check timed out after ${BD_LIST_TIMEOUT_MS / 1000}s; continuing without the bead gate`));
-      return [];
+      // PAN-1812: a timeout is unknown, not proof of zero open beads. Do not
+      // let the completion gate pass while the bead source of truth is unavailable.
+      return [`  Open beads check timed out after ${BD_LIST_TIMEOUT_MS / 1000}s — cannot verify whether open beads exist; retry or resolve bead store lock contention`];
     }
     return ['  Open beads check failed — run `bd list --status open` to diagnose'];
   }

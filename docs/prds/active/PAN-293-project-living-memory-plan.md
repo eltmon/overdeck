@@ -103,7 +103,7 @@ Each line in `memories.jsonl`:
 | CONSTRAINT | Hard rules (NEVER/ALWAYS) | "NEVER use execSync in dashboard server" |
 | CONVENTION | Style/naming norms | "Test files use .spec.ts not .test.ts" |
 | GOTCHA | Non-obvious traps | "tmux send-keys needs 300ms delay before C-m" |
-| DEPENDENCY | Integration knowledge | "better-sqlite3 needs npm rebuild after Node upgrade" |
+| DEPENDENCY | Integration knowledge | "node-pty needs npm rebuild after Node upgrade" |
 
 ### sqlite-vec Index Schema
 

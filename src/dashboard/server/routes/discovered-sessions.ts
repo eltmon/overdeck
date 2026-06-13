@@ -13,7 +13,7 @@
  *   POST /api/discovered-sessions/embed      — bulk embed
  *   GET  /api/discovered-sessions/stats      — discovery stats
  *
- * Zero sync FS calls — all lib functions use fs/promises or better-sqlite3 (sync only in CLI context).
+ * Zero sync FS calls — lib functions use fs/promises; SQLite work stays in the existing sync DB layer.
  */
 
 import { Effect, Layer, Schema } from 'effect';

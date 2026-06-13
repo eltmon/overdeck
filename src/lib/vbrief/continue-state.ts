@@ -90,7 +90,7 @@ export interface ContinueBeadsMapping {
 export interface ContinueFeedbackEntry {
   /** Sequence number — matches the NNN prefix of the legacy .planning/feedback/ filename. */
   seq: number;
-  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent';
+  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent' | 'ci-monitor';
   /** Outcome label (e.g. "changes-requested", "approved"). */
   outcome: string;
   /** ISO 8601 timestamp when feedback was written. */

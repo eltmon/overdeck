@@ -2180,3 +2180,25 @@ after RUN-27 (assumed reboot casualty like RUN-19/RUN-21):
 - **Main green, unchanged** at origin `2148beaf7` (CI success 16:24Z). The local
   FLYWHEEL-STATE.md commit was pushed (`10425baa0`), moving local main 62 ahead
   of origin.
+
+## RUN-28 tick 3 (2026-06-12) — killed corrupted PAN-1775, paused idle done agents, freed stuck count to 0
+
+- **Cloister "stuck" count dropped to 0** after pausing the remaining idle
+  work agents that had completed work but stayed at the prompt:
+  PAN-1641 (pan done, review/test running), PAN-1658 (review passed,
+  merge_status failed — needs pipeline investigation), PAN-1642 (verification
+  failing repeatedly on feedback loop).
+- **PAN-1775 workspace corruption identified and killed.** Its workspace
+  `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775` contained
+  a PAN-1788 spec + continue.json (PAN-1788 is closed-out). The work agent was
+  asking which issue to implement because its loaded plan pointed to a closed
+  issue. Killed all PAN-1775 agents and re-launched `pan plan PAN-1775 --auto`
+  so it gets a fresh PAN-1775 vBRIEF. This is a workspace/planning-orphan
+  corruption instance — likely from a prior merged issue reusing or shadowing
+  the workspace path.
+- **4 critical substrate bugs still planning:** PAN-1799, PAN-1798, PAN-1805,
+  PAN-1807 (all in `planning-*` sessions, ~18 minutes in, Fable 5). PAN-1808
+  work agent is running but hit a provider cooldown (429) and is at 80% ctx.
+- **Memory pressure stable:** RAM ~48-50 GB, swap dropped to 7.2/8.2 GB after
+  killing PAN-1775 stack.
+- **No merges this tick.** The operator UAT gate remains the bottleneck.

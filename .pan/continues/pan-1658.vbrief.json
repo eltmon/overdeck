@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1658",
   "created": "2026-06-09T23:10:17.751Z",
-  "updated": "2026-06-10T07:33:35.400Z",
+  "updated": "2026-06-12T18:09:46.809Z",
   "gitState": {
     "branch": "feature/pan-1658",
     "sha": "78db92a4d",
@@ -117,15 +117,32 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-10T07:33:35.400Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-06-11T14:02:02.212Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T14:12Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-11T14:12:26.990Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:46Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-12T17:46:23.230Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:51Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-12T17:51:08.408Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T18:01Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-12T18:01:25.954Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-10T07:33:34Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1658\n\n# Review Synthesis — PAN-1658 — 2026-06-10T07:32:37Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/context.json\n- Branch: feature/pan-1658\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658\n- HEAD reviewed: ba5342cdbc0efd37d7532433cd81b6de979a903d\n- PR merge-base: 2d42bf49f77791df5d48158fa3564b88eee6a37c\n- PR commit count: 12\n- Cycle number: 2\n- Prior cycle SHA: 72f497cda7e0f89edfd9044f0c0905708ec1c447\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Green-CI reconciliation can emit shipping before stale-review detection runs — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:4960`\nThe new patrol step runs `reconcileTestStatusFromGreenCi()` at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:4960-4965`, before the existing stale-review guard `checkPostReviewCommits()` runs at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:5008-5010`. The reconciler can write `testStatus: 'passed'` at `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/test-status-green-ci-reconciler.ts:90-93`, which derives `readyForMerge` and emits the `test.passed` lifecycle event. Reactive scheduling can then dispatch shipping for an unreviewed post-review commit before stale-review detection resets the issue later in the same patrol.\n\nScope gate: this finding is inside the PR diff. The targeted PR diff adds `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:4960-4966`; the cycle diff since prior review SHA `72f497cda7e0f89edfd9044f0c0905708ec1c447` also moves this patrol block into the pre-stale-review position. Cycle number is 2, so the cycle-3 convergence gate does not apply.\n\nRequired fix: run `checkPostReviewCommits()` before `reconcileTestStatusFromGreenCi()` and before pending-test dispatch, or make the green-CI reconciler prove the current PR HEAD is still the reviewed tree (for example by exact `reviewedAtCommit` match or the same tree-equivalence check used by `checkPostReviewCommits()`) before writing `testStatus: 'passed'`.\n\n## Non-blocking Findings\n\n### [correctness] Reconciler does not re-check candidate state after async GitHub lookups — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/test-status-green-ci-reconciler.ts:60`\nThe reconciler reads candidate state once, awaits PR and CI API calls, then writes `testStatus: 'passed'` without re-reading the issue row. A concurrent lifecycle path could move the issue from `testStatus='pending'` to `testStatus='testing'` while those requests are in flight, allowing the stale snapshot to overwrite an active test run. Consider re-reading status or using compare-and-set immediately before writing.\n\n### [performance] Duplicate GitHub status/check-run lookups in the new patrol reconciler — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/cloister/deacon.ts:3395`\nThe reconciler uses `getPullRequestState()` to learn PR state/head SHA, but that helper also computes full legacy commit state by fetching both `/status` and `/check-runs`; the new reconciler then calls `getCiCheckRunsState()` and fetches check-runs again for the same head SHA. This is avoidable daemon-path API work. A lightweight PR-head helper would preserve existing callers while letting this path fetch the check-runs-only verdict once.\n\n### [requirements] Changed files outside the stated PAN-1658 requirements\nThe requirements reviewer found full in-scope coverage for the CI greenness helper and testStatus reconciler requirements, but noted that `.panopticon/projects.yaml`, `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/dashboard/server/routes/__tests__/conversation-compaction.test.ts`, and `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/src/lib/__tests__/config-yaml-conversation-search.test.ts` are not mapped to the stated requirements. This is non-blocking for requirements coverage but should remain intentional.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1658/.pan/review/agent-pan-1658-review-ba5342cd/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1658 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }

@@ -4,17 +4,17 @@
     "created": "2026-06-11T01:31:21.694Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1747: bug(roles): roles/ship.md does not exist but every ship spawn passes --agent roles/ship.md",
-    "updated": "2026-06-11T02:14:50.118Z"
+    "updated": "2026-06-12T20:21:42.973Z"
   },
   "plan": {
     "id": "pan-1747",
     "title": "Finish the PAN-1531 ship-role removal: stop spawning the vestigial ship agent and reconcile docs",
-    "status": "proposed",
+    "status": "completed",
     "uid": "13976290-eeb7-4916-9130-a70dd166539b",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-11T01:31:21.694Z",
-    "updated": "2026-06-11T02:14:50.118Z",
+    "updated": "2026-06-12T20:21:42.973Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1747",
@@ -302,5 +302,5 @@
       "canonicalFilename": "2026-06-11-PAN-1747-finish-the-pan-1531-ship-role-removal-stop-spawning-the-vestigial-ship-agent-and-reconcile-docs.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -113,6 +113,14 @@ Do not:
 
 When you find a substrate bug: file or reference the tracking issue, keep the provenance trailer in the issue body, rank it in `suggestions[]`, emit the status snapshot, and let the operator choose the normal pipeline path.
 
+## Governor slot discipline (PAN-1812)
+
+The `maxAgents` ceiling is a launch throttle, not a license to reap agents that the operator deliberately started or to declare work complete when it is not.
+
+- **Never claim "work complete, no open beads" without verifying in the agent's workspace.** Run `bd list --status open --title-contains <issueId> --json` (or read the workspace `.beads/issues.jsonl`) from the agent's workspace directory. If the bead query errors, times out, or returns lock-contention symptoms, treat the answer as **unknown** — not as zero open beads. Do not pause or stop an agent on a "no open beads" conclusion you could not verify.
+- **Slot-reaping pauses must not mark agents troubled.** When you pause an agent solely to free a governor work slot, use the exact reason prefix `[governor-slot]` (e.g. `pan pause agent-pan-1234 -r "[governor-slot] freeing work slot (RUN-28)"`). That prefix tells the system to clear any troubled gate on pause so the agent remains resumable when a slot frees.
+- **Operator-started agents are exempt from governor reaping.** An agent with no `flywheelRunId` in its state was started directly by the operator, not by the flywheel. When `cloister.concurrency.exempt_operator_started` is true (the default), do not pause or reap such agents to satisfy `maxAgents`. Only flywheel-initiated agents (state has a `flywheelRunId`) are candidates for slot reaping.
+
 ## Human input invariant
 
 By default the required human input is choosing whether to apply a suggestion and the merge decision after UAT. When `flywheel.require_uat_before_merge=false` is set, even the merge gate is delegated to the orchestrator — the only intentional human-in-the-loop moments are issue creation and the optional configuration of the autonomy toggles.

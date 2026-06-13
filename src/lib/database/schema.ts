@@ -14,8 +14,8 @@
  * @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
-import type Database from 'better-sqlite3';
 import { existsSync } from 'fs';
+import type { SqliteDatabase } from './driver.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
@@ -35,7 +35,7 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-function backfillDiscoveredSessionArrayIndexes(db: Database.Database): void {
+function backfillDiscoveredSessionArrayIndexes(db: SqliteDatabase): void {
   const rows = db.prepare(`SELECT id, tools_used, files_touched, tags FROM discovered_sessions`).all() as Array<{
     id: number;
     tools_used: string | null;
@@ -61,7 +61,7 @@ function backfillDiscoveredSessionArrayIndexes(db: Database.Database): void {
   for (const row of rows) replaceRow(row);
 }
 
-export function initDiscoveredSessionsSchema(db: Database.Database): void {
+export function initDiscoveredSessionsSchema(db: SqliteDatabase): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS discovered_sessions (
       id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -155,7 +155,7 @@ export function initDiscoveredSessionsSchema(db: Database.Database): void {
   `);
 }
 
-export function initWorkspaceDiscoveredSessionsSchema(db: Database.Database): void {
+export function initWorkspaceDiscoveredSessionsSchema(db: SqliteDatabase): void {
   initDiscoveredSessionsSchema(db);
 }
 
@@ -163,7 +163,7 @@ export function initWorkspaceDiscoveredSessionsSchema(db: Database.Database): vo
  * Initialize the complete database schema.
  * Idempotent — uses CREATE TABLE IF NOT EXISTS throughout.
  */
-export function initSchema(db: Database.Database): void {
+export function initSchema(db: SqliteDatabase): void {
   db.exec(`
     -- ===== Cost Events =====
     CREATE TABLE IF NOT EXISTS cost_events (
@@ -679,7 +679,7 @@ export function initSchema(db: Database.Database): void {
  * Run schema migrations if the database version is older than SCHEMA_VERSION.
  * This function handles upgrading from older schema versions.
  */
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: SqliteDatabase): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
   if (currentVersion === SCHEMA_VERSION) {

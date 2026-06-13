@@ -10,6 +10,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
+import type { RuntimeName } from './runtimes/types.js';
 import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
@@ -30,6 +31,7 @@ export interface ProviderConfig {
   name: ProviderName;
   displayName: string;
   compatibility: 'direct';
+  defaultHarness: RuntimeName;
   baseUrl?: string; // For direct providers
   authType?: ProviderAuthType; // Defaults to 'static'
   credentialFile?: string; // Path to credential file (for 'credential-file' auth)
@@ -62,6 +64,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'anthropic',
     displayName: 'Anthropic',
     compatibility: 'direct',
+    defaultHarness: 'claude-code',
     models: ['claude-fable-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
@@ -71,6 +74,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
@@ -81,6 +85,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openai',
     displayName: 'OpenAI',
     compatibility: 'direct',
+    defaultHarness: 'codex',
     models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2'],
     tierModels: { opus: 'gpt-5.5', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
     tested: true,
@@ -91,6 +96,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
     tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite-preview' },
     tested: true,
@@ -101,6 +107,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'minimax',
     displayName: 'MiniMax',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'],
@@ -114,6 +121,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'zai',
     displayName: 'Z.AI',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
     models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
@@ -127,6 +135,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'mimo',
     displayName: 'Xiaomi MiMo',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
@@ -140,6 +149,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openrouter',
     displayName: 'OpenRouter',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     baseUrl: 'https://openrouter.ai/api/v1',
     authType: 'static',
     models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
@@ -151,6 +161,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'nous',
     displayName: 'Nous Portal',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('nous'),
     authType: 'static',
     models: ['qwen/qwen3.6-plus'],
@@ -164,6 +175,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'dashscope',
     displayName: 'Alibaba DashScope',
     compatibility: 'direct',
+    defaultHarness: 'pi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
     models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'],
@@ -173,6 +185,13 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     description: 'Route Alibaba DashScope Qwen models through Panopticon’s local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).',
   },
 };
+
+export function getBuiltInDefaultHarness(provider: ProviderName | string): RuntimeName {
+  if (provider in PROVIDERS) {
+    return PROVIDERS[provider as ProviderName].defaultHarness;
+  }
+  return 'claude-code';
+}
 
 /**
  * Get provider for a given model ID
