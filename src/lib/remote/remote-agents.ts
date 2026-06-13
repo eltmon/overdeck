@@ -18,6 +18,7 @@ import { join } from 'path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { access, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'os';
+import { withConcurrencyLimitPromise } from '../concurrency.js';
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
@@ -109,10 +110,15 @@ async function loadRemoteAgentStateAsync(agentId: string): Promise<RemoteAgentSt
  * Uses `node:fs/promises` so callers on the dashboard server's request path
  * do not block the Node.js event loop while scanning `~/.panopticon/agents`.
  */
-export async function listActiveRemoteAgentStatesAsync(): Promise<RemoteAgentState[]> {
+export async function listActiveRemoteAgentStatesAsync(
+  concurrency = 15,
+): Promise<RemoteAgentState[]> {
   if (!(await pathExistsAsync(AGENTS_DIR))) return [];
-  const entries = await readdir(AGENTS_DIR).catch(() => []);
-  const states = await Promise.all(entries.map((agentId) => loadRemoteAgentStateAsync(agentId)));
+  const entries = await readdir(AGENTS_DIR).catch(() => [] as string[]);
+  const states = await withConcurrencyLimitPromise(
+    entries.map((agentId) => () => loadRemoteAgentStateAsync(agentId)),
+    concurrency,
+  );
   return states.filter((state): state is RemoteAgentState =>
     state?.location === 'remote' && (state.status === 'running' || state.status === 'starting'));
 }

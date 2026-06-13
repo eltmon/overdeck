@@ -286,7 +286,10 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
     const fallbackModel = !actualModel
       ? (resolvedModels[resolveWorkTypeKey(session) ?? ''] ?? undefined)
       : undefined;
-    const endedAt = session.presence === 'ended' ? (session.endedAt ?? null) : (session.endedAt ?? null);
+    // Backend now guarantees endedAt for ended sessions; do not fabricate a
+    // fallback here. If an edge case still surfaces, ConversationPanel's
+    // spawning placeholder is the correct signal to fix the data source.
+    const endedAt = session.endedAt ?? null;
     return {
       id: -1,
       name: session.sessionId,

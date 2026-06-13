@@ -73,6 +73,9 @@ interface ActivityContext {
   agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
 }
 
+/** Maximum number of projects processed by the batch session-trees endpoint. */
+const MAX_BATCH_PROJECT_KEYS = 50;
+
 function awaitingInputFromProjection(
   agentId: string,
   agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
@@ -235,21 +238,19 @@ async function collectSessionTreeNodes(
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
       const startedAt = remoteState?.startedAt || state.startedAt || state.createdAt || new Date().toISOString();
-      const endedAt = presence === 'ended'
-        ? (remoteState?.lastActivity ?? rtState?.lastActivity ?? state.lastActivity ?? null)
-        : undefined;
-      const durationEndMs = endedAt ? new Date(endedAt).getTime() : Date.now();
-      const startedAtMs = new Date(startedAt).getTime();
       sections.push({
         type: sectionType,
         sessionId: checkId,
         tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning') ? checkId : undefined,
         model: remoteState?.model || state.model || 'unknown',
         startedAt,
-        endedAt,
-        duration: Number.isNaN(startedAtMs) || Number.isNaN(durationEndMs)
-          ? null
-          : Math.floor(Math.max(0, durationEndMs - startedAtMs) / 1000),
+        endedAt: undefined,
+        duration: startedAt
+          ? (() => {
+              const ms = Date.now() - new Date(startedAt).getTime();
+              return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+            })()
+          : null,
         status: normalizeAgentStatus(
           isRemoteActive
             ? (remoteState.status || 'running')
@@ -290,7 +291,6 @@ async function collectSessionTreeNodes(
         sessionId,
         model: 'unknown',
         startedAt,
-        endedAt: startedAt,
         duration: 0,
         status: 'stopped',
         presence: 'ended',
@@ -313,13 +313,12 @@ async function collectSessionTreeNodes(
         ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
         : 'ended';
       const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
-      const reviewEndedAt = orchestratorPresence === 'ended' ? (latestReview.timestamp ?? null) : undefined;
       sections.push({
         type: 'review',
         sessionId: orchestratorSessionName,
         model: 'specialist',
         startedAt: latestReview.timestamp,
-        endedAt: reviewEndedAt,
+        endedAt: undefined,
         duration: 0,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
@@ -335,7 +334,7 @@ async function collectSessionTreeNodes(
         projectPath,
         tmuxSessionNames: context.tmuxSessionNames,
         startedAt: latestReview.timestamp,
-        endedAt: reviewEndedAt,
+        endedAt: undefined,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
       sections.push(...(reviewerNodes as unknown as SessionNode[]));
@@ -350,16 +349,15 @@ async function collectSessionTreeNodes(
       const testSessionName = `agent-${issueLower}-test`;
       const testIsLive = context.tmuxSessionNames.has(testSessionName);
       const testJsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
-      const testPresence = testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended';
       sections.push({
         type: 'test',
         sessionId: testSessionName,
         model: 'specialist',
         startedAt: latestTest.timestamp,
-        endedAt: testPresence === 'ended' ? (latestTest.timestamp ?? null) : undefined,
+        endedAt: undefined,
         duration: 0,
         status: normalizeAgentStatus(latestTest.status === 'testing' ? 'running' : latestTest.status),
-        presence: testPresence,
+        presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
         ...(await readSessionPauseFields(testSessionName)),
@@ -373,17 +371,16 @@ async function collectSessionTreeNodes(
     if (latestMerge) {
       const shipSessionName = `agent-${issueLower}-ship`;
       const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
-      const shipPresence = shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended';
       const shipJsonlPath = await resolveJsonlPath(shipSessionName, workspacePath);
       sections.push({
         type: 'ship',
         sessionId: shipSessionName,
         model: 'specialist',
         startedAt: latestMerge.timestamp,
-        endedAt: shipPresence === 'ended' ? (latestMerge.timestamp ?? null) : undefined,
+        endedAt: undefined,
         duration: 0,
         status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
-        presence: shipPresence,
+        presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
         ...(await readSessionPauseFields(shipSessionName)),
@@ -581,6 +578,35 @@ export async function fetchProjectSessionTree(
 
   features.push(...results.filter((f): f is NonNullable<typeof f> => f !== null));
 
+  // Post-process: ended sessions need a stable endedAt and a duration that does
+  // not grow after the session ends. This is done outside collectSessionTreeNodes
+  // so the already-reviewed session-row synthesis remains untouched.
+  const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
+  const agentDirMtimes = new Map<string, number>();
+  try {
+    const agentDirs = await readdir(AGENTS_DIR).catch(() => [] as string[]);
+    await Promise.all(
+      agentDirs
+        .filter((name) => /^agent-[a-z]+-\d+$/.test(name))
+        .map(async (name) => {
+          const s = await stat(join(AGENTS_DIR, name, 'state.json')).catch(() => null);
+          if (s) agentDirMtimes.set(name, s.mtime.getTime());
+        }),
+    );
+  } catch { /* non-fatal: post-processing best-effort */ }
+  for (const feature of features) {
+    for (const session of feature.sessions) {
+      if (session.presence !== 'ended' || session.endedAt) continue;
+      const mtimeMs = agentDirMtimes.get(session.sessionId);
+      session.endedAt = mtimeMs ? new Date(mtimeMs).toISOString() : session.startedAt;
+      const startedAtMs = Date.parse(session.startedAt);
+      const endedAtMs = Date.parse(session.endedAt);
+      if (!Number.isNaN(startedAtMs) && !Number.isNaN(endedAtMs)) {
+        session.duration = Math.floor(Math.max(0, endedAtMs - startedAtMs) / 1000);
+      }
+    }
+  }
+
   // Sort features by issueId for stable ordering
   features.sort((a, b) => a.issueId.localeCompare(b.issueId));
 
@@ -617,8 +643,13 @@ const getAllSessionTreesRoute = HttpRouter.add(
           agentSnapshotsById,
         };
 
+        const uniqueProjectKeys = [...new Set(projectKeys)];
+        if (uniqueProjectKeys.length > MAX_BATCH_PROJECT_KEYS) {
+          throw new Error(`Too many projects requested (max ${MAX_BATCH_PROJECT_KEYS})`);
+        }
+
         return Promise.all(
-          projectKeys.map(async (projectKey) => {
+          uniqueProjectKeys.map(async (projectKey) => {
             const tree = await fetchProjectSessionTree(projectKey, sharedContext);
             return tree ?? { projectKey, features: [] };
           }),

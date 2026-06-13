@@ -1,4 +1,4 @@
-import { Effect } from 'effect';function withConcurrencyLimitPromise<T>(
+import { Effect } from 'effect';export function withConcurrencyLimitPromise<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {
