@@ -434,7 +434,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
-      vi.mocked(tmux.createSession).mockImplementation(() => Effect.void);
+      let sessionCreated = false;
+      vi.mocked(tmux.createSession).mockImplementation(() => Effect.sync(() => {
+        sessionCreated = true;
+      }));
+      vi.mocked(tmux.sessionExists).mockImplementation(() => Effect.succeed(sessionCreated));
 
       try {
         const state = await spawnAgent({
@@ -456,6 +460,30 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       }
     });
 
+    it('fails spawn fast when the work-agent session exits before kickoff delivery', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const tmux = await import('../../src/lib/tmux.js');
+      vi.mocked(tmux.createSession).mockImplementation(() => Effect.void);
+      vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
+
+      try {
+        await expect(spawnAgent({
+          issueId: 'PAN-KICKOFF-EXIT',
+          workspace: testWorkspace,
+          role: 'work',
+          prompt: 'do the work',
+        })).rejects.toThrow('Agent agent-pan-kickoff-exit exited before kickoff could be delivered');
+
+        const reloaded = getAgentStateSync('agent-pan-kickoff-exit');
+        expect(reloaded?.status).toBe('stopped');
+        expect(reloaded?.kickoffDelivered).toBe(false);
+        expect(reloaded?.lastFailureReason).toBe('session-exited-before-kickoff');
+        expect(tmux.sendKeys).not.toHaveBeenCalledWith('agent-pan-kickoff-exit', expect.stringContaining('do the work'));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(new Date('2026-06-05T21:00:00.000Z'));
@@ -463,12 +491,15 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const workspace = join(testPanopticonHome, 'ghost-workspace');
       mkdirSync(workspace, { recursive: true });
       let createCount = 0;
+      let sessionAlive = false;
       let firstCreated!: () => void;
       let secondCreated!: () => void;
       const firstCreatedPromise = new Promise<void>((resolve) => { firstCreated = resolve; });
       const secondCreatedPromise = new Promise<void>((resolve) => { secondCreated = resolve; });
+      vi.mocked(tmux.sessionExists).mockImplementation(() => Effect.succeed(sessionAlive));
       vi.mocked(tmux.createSession).mockImplementation((agentId: string) => Effect.sync(() => {
         createCount += 1;
+        sessionAlive = true;
         if (createCount === 1) {
           firstCreated();
           return;
@@ -487,6 +518,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
           prompt: 'original ghost kickoff',
         });
         await firstCreatedPromise;
+        sessionAlive = false;
 
         writeFileSync(join(getAgentDir('agent-pan-ghost-life'), 'session.id'), 'agent-pan-ghost-life-session');
 

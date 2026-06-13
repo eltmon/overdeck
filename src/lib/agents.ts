@@ -875,6 +875,8 @@ export type DeliveryResult = {
   failure?: string;
 };
 
+const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
+
 export interface AgentState {
   id: string;
   issueId: string;
@@ -1710,8 +1712,10 @@ async function deliverInitialPromptWithRetry(
     const readyTimeoutSeconds = promptReadyTimeoutSeconds();
     const ready = await waitForPromptReady(agentId, harness, readyTimeoutSeconds);
     if (!ready) {
-      lastFailure = 'ready-signal-timeout';
+      const alive = await Effect.runPromise(sessionExists(normalizeAgentId(agentId)));
+      lastFailure = alive ? 'ready-signal-timeout' : SESSION_EXITED_BEFORE_KICKOFF;
       console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
+      if (!alive) break;
       continue;
     }
 
@@ -1727,6 +1731,29 @@ async function deliverInitialPromptWithRetry(
   }
 
   return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+async function recordStartupSessionExit(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<never> {
+  await Effect.runPromise(recordAgentFailure(state.id, SESSION_EXITED_BEFORE_KICKOFF));
+  const failedState = await Effect.runPromise(getAgentState(state.id));
+  if (failedState) {
+    failedState.status = 'stopped';
+    failedState.stoppedAt = new Date().toISOString();
+    failedState.kickoffDelivered = false;
+    failedState.lastFailureReason = SESSION_EXITED_BEFORE_KICKOFF;
+    await Effect.runPromise(saveAgentState(failedState));
+  }
+  state.status = 'stopped';
+  state.stoppedAt = new Date().toISOString();
+  state.kickoffDelivered = false;
+  state.lastFailureReason = SESSION_EXITED_BEFORE_KICKOFF;
+  emitActivityEntrySync({
+    source,
+    level: 'error',
+    message: `${state.id}: session exited before kickoff could be delivered`,
+    issueId,
+  });
+  throw new Error(`Agent ${state.id} exited before kickoff could be delivered`);
 }
 
 export function buildDefaultResumeContinueMessage(issueId: string): string {
@@ -3775,6 +3802,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         saveAgentStateSync(state);
       }
     } else if (role === 'work') {
+      if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
+        await recordStartupSessionExit(state, options.issueId, role);
+      }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       return state;
     }
