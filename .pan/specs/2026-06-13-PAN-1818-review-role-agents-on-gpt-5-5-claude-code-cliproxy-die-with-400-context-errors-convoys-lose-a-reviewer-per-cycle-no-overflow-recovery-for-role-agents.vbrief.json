@@ -4,7 +4,7 @@
     "created": "2026-06-13T14:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1818: Role-agent context-overflow handling for review convoys — fast-fail reviewers on 400 context errors, stop the generic patrol from mis-handling them, add a large-changeset reading guardrail, and reconcile CLIProxy window honesty.",
-    "updated": "2026-06-13T14:00:33.070Z"
+    "updated": "2026-06-13T14:36:26.566Z"
   },
   "plan": {
     "id": "pan-1818",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "d413aee2-57cf-4880-beeb-03107fd48875",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T14:05:00.000Z",
-    "updated": "2026-06-13T14:00:33.070Z",
+    "updated": "2026-06-13T14:36:26.566Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1818",
