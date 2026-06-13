@@ -8,33 +8,10 @@
  * Tracks rate limits per tracker for adaptive backoff.
  */
 
-import type Database from 'better-sqlite3';
-import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
-
-declare const Bun: unknown;
-const _require = createRequire(import.meta.url);
-
-function openSqliteDb(dbPath: string): Database.Database {
-  if (typeof Bun !== 'undefined') {
-    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
-    const bunDb = new BunDatabase(dbPath);
-    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): any {
-      if (options?.simple) {
-        const key = sql.trim();
-        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
-        return row?.[key] ?? null;
-      }
-      bunDb.exec(`PRAGMA ${sql}`);
-      return undefined;
-    };
-    return bunDb as Database.Database;
-  }
-  const BetterSqlite3 = _require('better-sqlite3');
-  return new BetterSqlite3(dbPath) as Database.Database;
-}
+import { openDatabase, type SqliteDatabase } from '../../../lib/database/driver.js';
 
 const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
 const CACHE_DB_PATH = join(PANOPTICON_HOME, 'cache.db');
@@ -75,13 +52,13 @@ export interface CacheEntry {
 }
 
 export class CacheService {
-  private db: Database.Database;
+  private db: SqliteDatabase;
   private l1: Map<string, L1Entry> = new Map();
   private readonly l1MaxEntries = 50;
   private readonly l1TtlMs = 10_000; // 10 seconds
 
   constructor() {
-    this.db = openSqliteDb(CACHE_DB_PATH);
+    this.db = openDatabase(CACHE_DB_PATH);
     this.db.pragma('journal_mode = WAL');
     this.createSchema();
   }

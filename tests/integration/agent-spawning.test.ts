@@ -13,7 +13,7 @@
  */
 
 import { Effect } from 'effect';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -86,28 +86,27 @@ vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
 
 // Mock tmux module to avoid actual session creation
 vi.mock('../../src/lib/tmux.js', () => ({
-  createSession: vi.fn().mockResolvedValue(undefined),
   createSession: vi.fn(() => Effect.void),
-  killSession: vi.fn().mockResolvedValue(undefined),
-  killSessionSync: vi.fn().mockResolvedValue(undefined),
+  createSessionSync: vi.fn(),
   killSession: vi.fn(() => Effect.void),
-  killSessionSync: vi.fn(() => Effect.void),
+  killSessionSync: vi.fn(),
   sendKeys: vi.fn(() => Effect.void),
+  sendKeysSync: vi.fn(),
   sendKeysProgram: vi.fn(() => Effect.void),
   sendRawKeystroke: vi.fn(() => Effect.void),
-  sessionExists: vi.fn().mockReturnValue(false),
-  sessionExistsSync: vi.fn().mockReturnValue(false),
   sessionExists: vi.fn(() => Effect.succeed(false)),
   sessionExistsSync: vi.fn(() => Effect.succeed(false)),
-  getAgentSessions: vi.fn().mockResolvedValue([]),
-  getAgentSessionsSync: vi.fn().mockResolvedValue([]),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => Effect.succeed([])),
+  listSessions: vi.fn(() => Effect.succeed([])),
+  listSessionsSync: vi.fn(() => []),
   listPaneValues: vi.fn(() => Effect.succeed([])),
+  listPaneValuesSync: vi.fn().mockReturnValue([]),
   setOption: vi.fn(() => Effect.void),
+  exactSession: (name: string) => name.startsWith('=') ? name : `=${name}`,
   exactPaneTarget: (name: string) => name.startsWith('=') ? (name.endsWith(':') ? name : `${name}:`) : `=${name}:`,
-  capturePane: vi.fn().mockResolvedValue('Claude Code'),
   capturePane: vi.fn(() => Effect.succeed('Claude Code')),
+  capturePaneSync: vi.fn(() => 'Claude Code'),
 }));
 
 vi.mock('../../src/lib/hooks.js', () => ({
@@ -219,6 +218,45 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let testWorkspace: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
   const originalPromptReadyTimeout = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  const originalTmuxSocketName = process.env.PANOPTICON_TMUX_SOCKET_NAME;
+  const originalTestHarnessCommand = process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+  const testTmuxSocketName = `pan-test-${process.pid}`;
+  const supervisorScriptPath = join(process.cwd(), 'dist', 'pty-supervisor.js');
+  let createdSupervisorStub = false;
+
+  beforeAll(() => {
+    // PAN-1808: never touch the shared panopticon socket; use a throwaway
+    // per-process socket and a harmless harness command as defense in depth.
+    process.env.PANOPTICON_TMUX_SOCKET_NAME = testTmuxSocketName;
+    process.env.PANOPTICON_TEST_HARNESS_COMMAND = 'true';
+    if (!existsSync(supervisorScriptPath)) {
+      mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
+      writeFileSync(supervisorScriptPath, '#!/usr/bin/env node\n');
+      createdSupervisorStub = true;
+    }
+  });
+
+  afterAll(() => {
+    if (createdSupervisorStub) {
+      rmSync(supervisorScriptPath, { force: true });
+    }
+    // Tear down the throwaway tmux server so no sessions linger.
+    try {
+      execSync(`tmux -L ${testTmuxSocketName} kill-server`, { stdio: 'ignore' });
+    } catch {
+      // Server may already be gone; ignore.
+    }
+    if (originalTmuxSocketName) {
+      process.env.PANOPTICON_TMUX_SOCKET_NAME = originalTmuxSocketName;
+    } else {
+      delete process.env.PANOPTICON_TMUX_SOCKET_NAME;
+    }
+    if (originalTestHarnessCommand) {
+      process.env.PANOPTICON_TEST_HARNESS_COMMAND = originalTestHarnessCommand;
+    } else {
+      delete process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+    }
+  });
 
   beforeEach(async () => {
     testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -709,7 +747,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).not.toContain('--print');
       expect(launcher).not.toContain('initial-prompt.md');
       expect(launcher).not.toContain('"$prompt"');
-      expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
+      // PAN-1808: tests run with PANOPTICON_TEST_HARNESS_COMMAND=true so the
+      // launcher command is a stub, but it must still carry a session-id.
+      expect(launcher).toContain("--session-id '");
     });
 
     it('review sub-role launcher carries no signal block — Stop-hook owns REVIEWER_READY (PAN-1557)', async () => {

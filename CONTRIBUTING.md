@@ -88,7 +88,7 @@ panopticon-cli/
 │   │   └── server/             # Effect.js API server + Socket.io + WebSocket
 │   ├── lib/
 │   │   ├── cloister/           # Agent lifecycle: spawn, route, specialists
-│   │   ├── database/           # SQLite queries (better-sqlite3)
+│   │   ├── database/           # SQLite query helpers and driver adapter
 │   │   ├── workspace-manager.ts
 │   │   ├── review-status.ts
 │   │   └── pipeline-notifier.ts

@@ -130,7 +130,6 @@ Two hard blockers for running the dashboard server under Bun in containers:
 The init service command must include all three steps in order:
 ```sh
 bun install &&
-npm rebuild better-sqlite3 &&  # native addon compat for Node 22
 cd packages/contracts && bun run build && cd ../.. &&
 npm run build:dashboard:server  # builds dist/dashboard/server.js
 ```

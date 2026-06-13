@@ -1,11 +1,11 @@
 /**
  * Unit tests for ProjectionCacheService (PAN-437)
  *
- * Uses an in-memory better-sqlite3 database — fast, isolated, no filesystem.
+ * Uses an in-memory SQLite adapter database — fast, isolated, no filesystem.
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js'
 import type { DbAdapter } from '../../src/dashboard/server/event-store.js'
 import { createProjectionCache } from '../../src/dashboard/server/services/projection-cache.js'
 import type { DashboardSnapshot } from '@panctl/contracts'
@@ -13,7 +13,7 @@ import type { DashboardSnapshot } from '@panctl/contracts'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeDb(): DbAdapter {
-  const db = new (Database as any)(':memory:')
+  const db = openDatabase(':memory:')
   db.exec(`
     CREATE TABLE projection_cache (
       key        TEXT PRIMARY KEY,

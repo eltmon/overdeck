@@ -7,7 +7,6 @@
 
 import { Effect } from 'effect';
 import { initDashboardLogFile } from './server-log-file.js';
-import { ensureNativeSqliteAbi } from '../../lib/native-sqlite-guard.js';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
@@ -58,10 +57,6 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
-
-// Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
-// under Node 22 then loaded under Node 24) before any database is opened.
-ensureNativeSqliteAbi();
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });

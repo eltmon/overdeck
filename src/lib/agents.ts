@@ -450,6 +450,12 @@ export async function getAgentRuntimeBaseCommand(
     return `codex`;
   }
 
+  // Integration tests can inject a harmless harness command so a leaked or
+  // intentionally-real tmux session never runs the production `claude` binary.
+  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
+    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+  }
+
   const provider = getProviderForModelSync(validatedModel);
   const permissionFlags = getClaudePermissionFlagsStringSync();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
@@ -538,6 +544,12 @@ export async function getRoleRuntimeBaseCommand(
   }
   if (harness === 'codex') {
     return `codex`;
+  }
+
+  // Integration tests can inject a harmless harness command so a leaked or
+  // intentionally-real tmux session never runs the production `claude` binary.
+  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
+    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
   }
 
   const provider = getProviderForModelSync(validatedModel);
@@ -783,9 +795,7 @@ export function clearReadySignal(agentId: string): void {
 export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
-  for (let i = 0; i < timeoutSeconds; i++) {
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
-
+  for (let i = 0; i <= timeoutSeconds; i++) {
     if (existsSync(readyPath)) {
       try {
         const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
@@ -797,6 +807,10 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
       } catch {
         // File exists but mid-write / invalid — keep waiting.
       }
+    }
+
+    if (i < timeoutSeconds) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
     }
   }
 
@@ -923,6 +937,8 @@ export interface AgentState {
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
+  /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
+  reviewRetryAttempt?: number;
   hostOverride?: boolean;
 }
 
@@ -977,6 +993,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
+    reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
   };
 }
@@ -1369,21 +1386,21 @@ async function postUnixSocketJson(
     // post-response socket error could reject after the response already
     // resolved the promise.
     let settled = false;
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    const clearTimer = () => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const clearClientTimeout = () => {
       if (timeout) clearTimeout(timeout);
-      timeout = null;
+      timeout = undefined;
     };
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       resolveCall(value);
     };
     const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
-      clearTimer();
+      clearClientTimeout();
       reject(err);
     };
 
@@ -3685,6 +3702,26 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       return state;
     }
+  }
+
+  // For codex work agents, poll for the first rollout JSONL in the background
+  // and persist the thread-id so transcript/cost lookups hit the fast path
+  // (PAN-1805). Non-blocking — codex writes its rollout only after the kickoff
+  // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
+  // fallback covers sessions whose first turn lands after this window.
+  if (resolvedHarness === 'codex') {
+    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    void (async () => {
+      try {
+        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+          await import('./runtimes/codex.js');
+        const rollout = await waitForCodexRollout(codexHomeForAgent, 120_000);
+        if (rollout) {
+          const threadId = extractThreadIdFromRollout(rollout);
+          if (threadId) writeThreadId(agentId, threadId);
+        }
+      } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
+    })();
   }
 
   // Update status
