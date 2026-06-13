@@ -32,6 +32,133 @@ const REMOTE_TMUX_CONFIG_CONTENT = [
   '',
 ].join('\n');
 
+const PUSH_DAEMON_INTERVAL_SECONDS = 300;
+
+export interface PushDaemonOptions {
+  issueId: string;
+  branch: string;
+  intervalSeconds?: number;
+  logFile?: string;
+}
+
+/**
+ * Generate a self-contained Node.js heartbeat script that commits and pushes
+ * /workspace changes on an interval. The script reads config from environment
+ * variables when run directly, and exports `runHeartbeat` for testing.
+ */
+export function generatePushDaemonScript(options: PushDaemonOptions): string {
+  const intervalSeconds = options.intervalSeconds ?? PUSH_DAEMON_INTERVAL_SECONDS;
+  const logFile = options.logFile ?? `${REMOTE_PAN_DIR}/push-daemon.log`;
+  const issueIdLiteral = JSON.stringify(options.issueId);
+  const branchLiteral = JSON.stringify(options.branch);
+
+  return [
+    "const { execFile } = require('child_process');",
+    "const fs = require('fs');",
+    "const path = require('path');",
+    '',
+    'function log(message) {',
+    '  try {',
+    `    fs.appendFileSync(${JSON.stringify(logFile)}, '[' + new Date().toISOString() + '] ' + message + '\\n');`,
+    '  } catch {}',
+    '}',
+    '',
+    'function runOnce() {',
+    "  const cwd = '/workspace';",
+    '  try {',
+    `    if (!fs.existsSync(path.join(cwd, '.git'))) {`,
+    "      log('Not a git repository; skipping heartbeat');",
+    '      return;',
+    '    }',
+    '  } catch (err) {',
+    `    log('Error checking repository: ' + (err && err.message ? err.message : String(err)));`,
+    '    return;',
+    '  }',
+    '',
+    "  execFile('git', ['-C', cwd, 'add', '-A'], (err) => {",
+    '    if (err) {',
+    "      log('git add failed: ' + (err.message || String(err)));",
+    '      return;',
+    '    }',
+    "    execFile('git', ['-C', cwd, 'diff', '--cached', '--quiet'], (err) => {",
+    '      if (!err) {',
+    '        return;',
+    '      }',
+    `      const message = 'wip(remote): heartbeat for ' + ${issueIdLiteral};`,
+    '      execFile(',
+    "        'git',",
+    `        ['-C', cwd, '-c', 'user.name=Panopticon Remote', '-c', 'user.email=remote@panopticon.local', 'commit', '-m', message],`,
+    '        (err) => {',
+    '          if (err) {',
+    "            log('git commit failed: ' + (err.message || String(err)));",
+    '            return;',
+    '          }',
+    `          execFile('git', ['-C', cwd, 'push', 'origin', ${branchLiteral}], (err) => {`,
+    '            if (err) {',
+    "              log('git push failed: ' + (err.message || String(err)));",
+    '            }',
+    '          });',
+    '        }',
+    '      );',
+    '    });',
+    '  });',
+    '}',
+    '',
+    'function runHeartbeat(config) {',
+    '  runOnce();',
+    '  setInterval(runOnce, config.intervalSeconds * 1000);',
+    '}',
+    '',
+    'if (require.main === module) {',
+    '  runHeartbeat({',
+    `    intervalSeconds: Number(process.env.PAN_INTERVAL_SECONDS || '${intervalSeconds}'),`,
+    '  });',
+    '}',
+    '',
+    'module.exports = { runHeartbeat };',
+  ].join('\n');
+}
+
+/**
+ * Install a detached tmux heartbeat daemon on the VM that continuously commits
+ * and pushes the feature branch for the issue.
+ */
+export async function installPushDaemon(
+  provider: FlyProvider,
+  vmName: string,
+  issueId: string,
+): Promise<void> {
+  const branch = `feature/${issueId.toLowerCase()}`;
+  const baseName = `push-daemon-${issueId.toLowerCase()}`;
+  const scriptPath = `${REMOTE_PAN_DIR}/${baseName}.js`;
+  const logFile = `${REMOTE_PAN_DIR}/${baseName}.log`;
+
+  const script = generatePushDaemonScript({ issueId, branch, logFile });
+  await writeRemoteFile(provider, vmName, scriptPath, script);
+
+  const envVars = [
+    `PAN_ISSUE_ID=${shellQuote(issueId)}`,
+    `PAN_BRANCH=${shellQuote(branch)}`,
+    `PAN_LOG_FILE=${shellQuote(logFile)}`,
+    `PAN_INTERVAL_SECONDS=${PUSH_DAEMON_INTERVAL_SECONDS}`,
+  ].join(' ');
+
+  const daemonCmd = `${envVars} node ${scriptPath}`;
+  const tmuxCmd = buildRemoteTmuxCommand([
+    'new-session',
+    '-d',
+    '-s',
+    baseName,
+    '-c',
+    '/workspace',
+    daemonCmd,
+  ]);
+  const result = await runSsh(provider, vmName, tmuxCmd);
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to start push daemon on ${vmName}: ${result.stderr}`);
+  }
+}
+
 export interface RemoteAgentState {
   id: string;
   issueId: string;
@@ -265,6 +392,10 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     saveRemoteAgentState(state);
     throw new Error(`Failed to start agent: ${result.stderr}`);
   }
+
+  // Install a continuous commit+push heartbeat daemon in its own tmux session.
+  // This runs independently of the agent session and survives agent crashes.
+  await installPushDaemon(fly, vmName, issueId);
 
   // Update status
   state.status = 'running';
