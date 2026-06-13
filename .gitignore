@@ -69,6 +69,11 @@ CLAUDE.md
 # must never block the work-completion clean-tree check. See src/lib/docs/index-builder.ts.
 .pan-docs-index-tmp/
 
+# Docs-index builder scratch dir (buildDocsIndex writes docs-index.*.tmp.sqlite
+# here, renames the result into dist/, but never removes the dir). Transient —
+# must never block the work-completion clean-tree check. See src/lib/docs/index-builder.ts.
+.pan-docs-index-tmp/
+
 # Planning artifacts — tracked on feature branches, excluded from merges to main.
 # postMergeLifecycle removes them from main programmatically (PAN-337).
 # DO NOT gitignore .planning/ — agents and dashboard need these files throughout

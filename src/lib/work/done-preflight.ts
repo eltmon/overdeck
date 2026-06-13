@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
 import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
+import { runTestRequirementCheck } from './test-requirement-gate.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -188,7 +189,7 @@ export function checkVBriefACStatusSync(workspacePath: string): string[] {
     // vBRIEF not available — skip check
     return [];
   }
-}async function runPreflightChecksPromise(workspacePath: string, issueId: string): Promise<string[]> {
+}async function runPreflightChecksPromise(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
   const failures: string[] = [];
 
   // Check 1: Open beads
@@ -221,6 +222,14 @@ export function checkVBriefACStatusSync(workspacePath: string): string[] {
   // Check 3: vBRIEF AC status
   const acFailures = checkVBriefACStatusSync(workspacePath);
   failures.push(...acFailures);
+
+  // Check 4: Test-requirement gate (PAN-1501 / PAN-1454 pattern 8)
+  // Blocks pan done when the issue body asks for tests but the branch adds no
+  // new lines under *.test.ts / *.spec.ts / *.test.tsx / *.spec.tsx.
+  const testRequirementFailures = await Effect.runPromise(
+    runTestRequirementCheck(workspacePath, issueId, testWaived),
+  );
+  failures.push(...testRequirementFailures);
 
   return failures;
 }
@@ -274,8 +283,9 @@ export const checkVBriefACStatus = (
 export const runPreflightChecks = (
   workspacePath: string,
   issueId: string,
+  testWaived?: string,
 ): Effect.Effect<string[], ProcessSpawnError> =>
   Effect.tryPromise({
-    try: () => runPreflightChecksPromise(workspacePath, issueId),
+    try: () => runPreflightChecksPromise(workspacePath, issueId, testWaived),
     catch: (cause) => toPreflightProcessError('runPreflightChecks', cause),
   });

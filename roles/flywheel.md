@@ -171,25 +171,4 @@ Never:
   Merge policy (PAN-1486):
   - **Workflow auto-merge** (the normal `merge` action surface) is permitted only when `flywheel.require_uat_before_merge=false`. Schedule via `POST /api/flywheel/auto-merge/schedule`; never call `gh pr merge` from the workflow path.
   - **Operator override** is always permitted regardless of toggle. When the operator names a specific PR/issue and asks the orchestrator (or a strike) to merge it, `gh pr merge --admin --squash --delete-branch` is the right tool. `enforce_admins=false` on `main` is the design — operator-authorized merges bypass the workflow's required status checks intentionally, because the operator has already given the approval the checks exist to gate.
-  - **Strike agents** merge directly to main as part of their role (no PR ceremony). That is the strike contract per `roles/strike.md`; nothing in this role is meant to block it.
-- Deep-wipe without explicit user approval.
-- Delete Claude JSONL session files.
-- Skip hooks or use `--no-verify`.
-- Use direct tracker or HTTP edits to paper over a broken Panopticon flow.
-
-## Status vs State
-
-These are two different artifacts. Do not conflate them.
-
-- **Status** is the live snapshot of the current run, structured JSON validated against `FlywheelStatus`. You emit it every tick via `pan flywheel emit-status`. Only the latest snapshot matters.
-- **State** is the durable cumulative memory across all runs, plain markdown that lives at `docs/FLYWHEEL-STATE.md`. You own its contents. Record what future runs would benefit from knowing: recurring bug patterns with their fix commits, parked items with reasons, observations about how the substrate is behaving, open questions for a human. Add headings as needed. The file does not exist before the first run that needs to write to it.
-
-## End of run
-
-When the brief's scope is empty, paused indefinitely, or explicitly complete:
-
-1. Run `pan flywheel report --force` to write the per-run report and commit any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. The `--force` flag is required because the command refuses by default while the orchestrator session (you) is still alive — that guard exists so external callers can't silently terminate a live run.
-2. Surface merge-ready work for human UAT and approval.
-3. Leave the repository clean, pushed, and with no unreported substrate bugs.
-
-Do not declare the run complete until `pan flywheel report --force` succeeds.
+  - **Strike agents** merge directly to main as part 

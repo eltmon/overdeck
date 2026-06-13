@@ -24,6 +24,7 @@ import type { MergeSet } from '../../lib/merge-set.js';
 interface DoneOptions {
   comment?: string;
   force?: boolean;
+  testWaived?: string;
   /**
    * Strike-agent shape (PAN strike role). When true, `pan done` short-circuits
    * the review-pipeline dispatch: the strike has already merged to main and
@@ -147,6 +148,36 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
     console.error('GitHub API error:', error);
     return false;
   }
+}
+
+export async function recordTestWaiver(workspacePath: string, reason: string): Promise<void> {
+  try {
+    const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
+    if (!continueState) return;
+
+    const now = new Date().toISOString();
+    await Effect.runPromise(
+      writeWorkspaceContinue(workspacePath, {
+        ...continueState,
+        decisions: [
+          ...continueState.decisions,
+          {
+            id: 'D-test-waived',
+            summary: `Test gate waived: ${reason}`,
+            recordedAt: now,
+          },
+        ],
+      }),
+    );
+  } catch (err: any) {
+    console.warn(`[pan done] Failed to record test waiver in continue state (non-fatal): ${err?.message ?? err}`);
+  }
+}
+
+export function augmentCommentWithWaiver(comment: string | undefined, waiverReason: string): string {
+  const waiverText = `Test gate waived: ${waiverReason}`;
+  if (!comment) return waiverText;
+  return `${comment}\n\n${waiverText}`;
 }
 
 async function isMergeSetMergedIntoTargets(
@@ -277,7 +308,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       } catch { /* non-fatal */ }
 
-      const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId));
+      const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId, options.testWaived));
 
       if (failures.length > 0) {
         console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
@@ -309,6 +340,14 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
         }
       } catch { /* non-fatal */ }
+
+      // PAN-1501: persist --test-waived reason to continue.json and append it to
+      // the tracker comment so human reviewers see the waiver without reading
+      // continue.json.
+      if (options.testWaived) {
+        await recordTestWaiver(workspacePath, options.testWaived);
+        options.comment = augmentCommentWithWaiver(options.comment, options.testWaived);
+      }
     }
   }
 
