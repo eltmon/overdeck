@@ -45,6 +45,29 @@ export interface FlyExecResult {
   exit_code: number;
 }
 
+export interface FlyVolume {
+  id: string;
+  name: string;
+  state: string; // 'created', 'pending', etc.
+  size_gb: number;
+  region: string;
+  zone?: string;
+  encrypted?: boolean;
+  attached_machine_id?: string | null;
+  attached_alloc_id?: string | null;
+  created_at?: string;
+  fstype?: string;
+  snapshot_retention?: number;
+  auto_backup_enabled?: boolean;
+}
+
+export interface FlyCreateVolumeInput {
+  name: string;
+  region: string;
+  sizeGb: number;
+  encrypted?: boolean;
+}
+
 export class FlyApiError extends Error {
   constructor(
     message: string,
@@ -173,6 +196,50 @@ export class FlyApiClient {
       `/apps/${appName}/machines`
     );
     return result ?? [];
+  }
+
+  /** Create a volume in an app */
+  async createVolume(
+    appName: string,
+    input: FlyCreateVolumeInput
+  ): Promise<FlyVolume> {
+    const body: Record<string, unknown> = {
+      name: input.name,
+      region: input.region,
+      size_gb: input.sizeGb,
+    };
+    if (input.encrypted !== undefined) {
+      body.encrypted = input.encrypted;
+    }
+    return this.request<FlyVolume>('POST', `/apps/${appName}/volumes`, body);
+  }
+
+  /** Get a volume by ID */
+  async getVolume(
+    appName: string,
+    volumeId: string
+  ): Promise<FlyVolume> {
+    return this.request<FlyVolume>(
+      'GET',
+      `/apps/${appName}/volumes/${volumeId}`
+    );
+  }
+
+  /** List all volumes in an app */
+  async listVolumes(appName: string): Promise<FlyVolume[]> {
+    const result = await this.request<FlyVolume[] | null>(
+      'GET',
+      `/apps/${appName}/volumes`
+    );
+    return result ?? [];
+  }
+
+  /** Delete a volume by ID */
+  async deleteVolume(appName: string, volumeId: string): Promise<void> {
+    await this.request<void>(
+      'DELETE',
+      `/apps/${appName}/volumes/${volumeId}`
+    );
   }
 
   /** Execute a command inside a running machine */
@@ -364,6 +431,49 @@ export const listMachines = (
 ): Effect.Effect<FlyMachine[], FlyApiError> =>
   Effect.tryPromise({
     try: () => client.listMachines(appName),
+    catch: toFlyApiError,
+  });
+
+/** Create a volume in an app (Effect variant). */
+export const createVolume = (
+  client: FlyApiClient,
+  appName: string,
+  input: FlyCreateVolumeInput,
+): Effect.Effect<FlyVolume, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.createVolume(appName, input),
+    catch: toFlyApiError,
+  });
+
+/** Get a volume by ID (Effect variant). */
+export const getVolume = (
+  client: FlyApiClient,
+  appName: string,
+  volumeId: string,
+): Effect.Effect<FlyVolume, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.getVolume(appName, volumeId),
+    catch: toFlyApiError,
+  });
+
+/** List all volumes in an app (Effect variant). */
+export const listVolumes = (
+  client: FlyApiClient,
+  appName: string,
+): Effect.Effect<FlyVolume[], FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.listVolumes(appName),
+    catch: toFlyApiError,
+  });
+
+/** Delete a volume by ID (Effect variant). */
+export const deleteVolume = (
+  client: FlyApiClient,
+  appName: string,
+  volumeId: string,
+): Effect.Effect<void, FlyApiError> =>
+  Effect.tryPromise({
+    try: () => client.deleteVolume(appName, volumeId),
     catch: toFlyApiError,
   });
 
