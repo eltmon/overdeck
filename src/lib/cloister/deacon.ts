@@ -161,6 +161,7 @@ import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcileOrphanProposedSpecs } from './orphan-proposed-reconciler.js';
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
+import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
@@ -4909,6 +4910,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const closedIssueAgentActions = await reconcileClosedIssueAgents();
   actions.push(...closedIssueAgentActions);
   for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1817: stop the server+frontend UI containers of workspaces whose agent
+  // has been idle (no agent, no tmux) past the grace window. Light-touch and
+  // reversible — never touches the agent (host tmux), worktree, or branch.
+  const idleStackActions = await reconcileIdleWorkspaceStacks();
+  actions.push(...idleStackActions);
+  for (const a of idleStackActions) addLog('action', a, state.patrolCycle);
 
   // Re-send the resume continue prompt when a work agent is alive and idle after
   // resume but no user record landed in the JSONL transcript.
