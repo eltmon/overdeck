@@ -1,73 +1,627 @@
 {
   "version": "1",
   "issueId": "PAN-1775",
-  "created": "2026-06-11T10:39:48.392Z",
-  "updated": "2026-06-12T20:14:49.063Z",
-  "gitState": {},
-  "decisions": [],
-  "hazards": [],
+  "created": "2026-06-12T20:13:50.429Z",
+  "updated": "2026-06-13T00:28:49.021Z",
+  "gitState": {
+    "branch": "feature/pan-1775",
+    "sha": "ad1270440",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Fix-cycle plan, not a re-plan: the feature is already implemented on feature/pan-1775 (core commit 441eeecbc) with open PR #1786 and green CI. Review cycle 3 blocked on one finding. The work agent commits fixes onto the existing branch; do not recreate or restructure the merged-in implementation.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Resolve the blocking finding by untracking BOTH workspace working copies with `git rm --cached .pan/continue.json .pan/spec.vbrief.json` in a NEW commit. Planning discovered .pan/spec.vbrief.json is tracked too (same PAN-1073 invariant, also carrying foreign PAN-1788 content, inherited from the merge-base so absent from the PR diff). No history rewrite, no .gitignore edits (both already ignored at lines 59-60 and 120/123), files stay on disk as workspace runtime state.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Fix the demoted correctness finding: in fetchProjectSessionTree (src/dashboard/server/routes/projects.ts:471-542), seed feature candidates from listActiveRemoteAgentStates() (src/lib/remote/remote-agents.ts:82) in addition to the workspaces/feature-* scan. Use the dynamic-import + try/catch pattern from src/dashboard/server/services/resource-discovery.ts:507-521. Filter to the requested project (resolve state.issueId to a project and compare with project.key) and dedupe by issueLower against workspace-scan candidates.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Out of scope: the 5s remote-output polling cadence in SessionPanel.tsx RemoteSessionOutput (performance reviewer classified it acceptable and non-blocking), any interactive remote terminal bridge, and changes to collectSessionTreeNodes synthesis.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Completion path: after both beads pass quality gates (npm run typecheck, npm run lint, npm test), follow the review synthesis instruction — commit, then `pan review request PAN-1775 -m \"Fixed review issues\"` (pan done handles rebase/push/PR submission).",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": ".pan/continue.json AND .pan/spec.vbrief.json are currently TRACKED on the branch; planning tooling overwrites their content (the bootstrap replaced foreign PAN-1788 state with PAN-1775 state). Any broad `git add` before the untrack bead lands will re-commit them. Beware: `git check-ignore` reports them as NOT ignored while tracked — gitignore patterns do not apply to tracked files; this is expected and resolves after `git rm --cached`.",
+      "mitigation": "Land the untrack bead first. After every commit, verify `git ls-files -- .pan/continue.json .pan/spec.vbrief.json` returns nothing."
+    },
+    {
+      "id": "H2",
+      "summary": "origin/main no longer tracks .pan/continue.json, so the pre-merge rebase can hit a modify/delete conflict on this path.",
+      "mitigation": "Resolve in favor of deletion from the index (accept main's removal); the on-disk file is untouched."
+    },
+    {
+      "id": "H3",
+      "summary": "Review convergence gate: editing src/dashboard/server/routes/projects.ts in this cycle makes the previously demoted 'remote-only agents excluded from session tree' finding promotable to a blocker in cycle 4.",
+      "mitigation": "The remote-candidate seeding bead must fully resolve that finding, with a unit test proving the no-local-workspace case."
+    },
+    {
+      "id": "H4",
+      "summary": "For remote-only candidates, collectSessionTreeNodes receives a workspacePath that does not exist on disk. Its internals tolerate missing paths (readOptional/pathExists guards), but resolveJsonlPath and getSessionTreeWorkspacePath must not throw on a nonexistent directory.",
+      "mitigation": "The unit test must exercise exactly this path: active remote-state.json, no workspaces/feature-<issue> directory."
+    },
+    {
+      "id": "H5",
+      "summary": "A prior minimal auto-start spec for PAN-1775 (2026-06-11) exists in .pan/specs/ on main, and old continue state recorded its 'auto-start' bead as completed.",
+      "mitigation": "pan plan finalize owns spec promotion and bead creation deterministically; never hand-run bd create or hand-edit the old spec."
+    }
+  ],
   "resumePoint": null,
   "beadsMapping": {},
-  "agentModel": "gpt-5.5",
+  "agentModel": "agent:claude-fable-5",
   "sessionHistory": [
     {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-11T10:39:48.392Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-11T13:01:25.422Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-11T13:03:03.033Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-11T13:03:10.007Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-06-11T13:49Z] verification-gate → FAILED — seq 1",
-      "timestamp": "2026-06-11T13:49:43.562Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-11T13:49:43.811Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-06-11T13:53Z] verification-gate → FAILED — seq 2",
-      "timestamp": "2026-06-11T13:53:03.922Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.5",
-      "timestamp": "2026-06-11T14:04:27.146Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-06-12T19:22Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-06-12T19:22:16.826Z"
+      "timestamp": "2026-06-12T20:13:50.429Z",
+      "reason": "planning",
+      "note": "Planning session for PAN-1775 (auto mode). Established this is a fix-cycle: implementation already on feature/pan-1775 (PR #1786, CI green), review cycle 3 blocked on tracked .pan/continue.json carrying PAN-1788 state; demoted finding: remote-only Fly agents (no local workspace dir) still get no session row. Plan = 2 beads: untrack continue.json; seed session-tree candidates from listActiveRemoteAgentStates().",
+      "agentModel": "agent:claude-fable-5"
     },
     {
       "reason": "resume",
       "agentModel": "kimi-k2.6",
-      "timestamp": "2026-06-12T20:14:49.063Z"
+      "timestamp": "2026-06-12T20:33:08.156Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:35:05.012Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:37:04.967Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:39:03.839Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:41:03.732Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:43:03.876Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:45:03.786Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:47:05.157Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:49:03.757Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:51:03.848Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:53:03.935Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:55:03.892Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:57:03.948Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T20:59:04.001Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:01:04.068Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:03:03.907Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:05:05.030Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:07:03.907Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:09:04.992Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:11:03.952Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:13:03.829Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:15:03.889Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:17:03.857Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:19:03.800Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:21:04.075Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:23:03.823Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:25:05.110Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:27:03.825Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:29:04.028Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:31:03.925Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:33:03.898Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:35:03.955Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:37:03.852Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:39:03.848Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:41:04.269Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:43:03.890Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:45:03.935Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:47:03.988Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:49:03.930Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:51:04.258Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:53:03.978Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:55:03.998Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:57:04.356Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T21:59:03.951Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:01:04.087Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:03:03.990Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:05:04.127Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:07:04.012Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:09:04.012Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:11:04.012Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:13:05.372Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:15:04.025Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:17:04.130Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:35:04.364Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:37:03.993Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:39:04.247Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:41:04.015Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:43:04.071Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:45:04.343Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:47:04.309Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:49:04.262Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:51:04.828Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:53:04.229Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:55:04.436Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:57:04.295Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T22:59:04.301Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:01:04.262Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:03:04.339Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:05:04.183Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:07:04.057Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:09:04.090Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:11:04.181Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:13:04.330Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:15:04.611Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:17:04.247Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:19:04.310Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:21:04.474Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:23:04.657Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:25:04.672Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:27:04.476Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:29:07.352Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:31:05.054Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:33:05.190Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:35:04.542Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:36:47.688Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:38:46.555Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:40:45.410Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:42:46.368Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:44:45.627Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:46:46.707Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:48:46.778Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:50:47.209Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:52:47.434Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:54:47.039Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:56:47.853Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-12T23:58:48.206Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:00:49.004Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:02:48.099Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:04:47.817Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:06:48.063Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:08:46.766Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:10:47.339Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:12:48.353Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:14:48.070Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:16:47.999Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:18:49.382Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:20:47.576Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:24:47.684Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:26:47.668Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-06-13T00:28:49.021Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-06-12T19:22:16Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1775\n\n# Review Synthesis — PAN-1775 — 2026-06-12T19:21:29Z\n\n## Verdict: CHANGES REQUESTED — tracked workspace `.pan/continue.json` contains unrelated PAN-1788 state\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-b1aa3a01/context.json\n- Branch: feature/pan-1775 (manifest listed feature/1775)\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775\n- HEAD reviewed: b1aa3a01325097cebb3dd3461ea908ca13000ce2\n- Cycle number: 3\n- Prior cycle SHA: 8e2ad5950a89ee5036656d9bd8c7aec41fd49d1d\n- PR merge-base: 2148beaf7b0ba05faa68ebf23b5e248d4007211b\n- PR commit count: 5\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-b1aa3a01/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-b1aa3a01/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-b1aa3a01/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-b1aa3a01/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Tracked workspace continue state carries unrelated PAN-1788 state — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/continue.json:3`\nThe branch tracks `.pan/continue.json`, and the file currently declares `\"issueId\": \"PAN-1788\"` with `\"branch\": \"feature/pan-1788\"` in a PAN-1775 review workspace. The file is in both the PR diff and the cycle diff (`8e2ad5950a89ee5036656d9bd8c7aec41fd49d1d..HEAD`), so it survives the mandatory PR-scope and convergence gates.\n\nThis violates the repository lifecycle invariant that workspace-local `.pan/continue.json` is mutable runtime state and must not be committed to main; canonical committed continue artifacts live under `.pan/continues/`. If merged, future checkouts/worktrees would inherit stale PAN-1788 planning decisions, hazards, and status overrides, which can cause agents or code reading the workspace continue file to resume against the wrong issue context.\n\nRequired fix: remove `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/continue.json` from the branch/tracking and verify `git ls-files -- .pan/continue.json` returns nothing.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: previously reviewed] Remote-only Fly agents are still excluded from the session tree — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/src/dashboard/server/routes/projects.ts:501`\nThe correctness reviewer found that `fetchProjectSessionTree()` still seeds feature candidates only from local `workspaces/feature-*` directories before calling `collectSessionTreeNodes()`, so an active remote/Fly agent with `remote-state.json` but no local workspace can still fail to produce a session-tree row. This is in the PR diff, but cycle 3 applies the convergence gate: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/src/dashboard/server/routes/projects.ts` did not change since the prior approved synthesis SHA `8e2ad5950a89ee5036656d9bd8c7aec41fd49d1d`, while `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/continue.json` did. Per `roles/review.md`, a finding on code already seen in prior cycles is not promotable to a blocker in this cycle, so this remains surfaced as a non-blocking demotion rather than a blocking verdict item.\n\n### [performance] Remote terminal output polls Fly exec on a fixed 5s cadence — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:216`\n`RemoteSessionOutput` polls `GET /api/agents/:id/output?lines=200` every 5 seconds while a remote terminal view is open. The endpoint can resolve output through Fly remote execution to capture tmux output. The performance reviewer classified this as acceptable at current scale and non-blocking because it is bounded to selected/open remote panels; suggested follow-up is server-side streaming/caching or visibility/backoff gating before remote terminal usage broadens.\n\n### [requirements] Unrelated continue-state artifact is included in the diff — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/continue.json:3`\nThe requirements reviewer also noted the unrelated continue-state artifact as `≉`: it does not affect the remote-session acceptance behavior directly, but it is unrelated review surface for this PR. The correctness finding above is the blocking form because it violates the repo lifecycle artifact invariant.\n\n### [requirements] Local row presentation is pre-existing, not part of this diff\nThe requirements reviewer classified the PAN-1765 local-agent row as a pre-existing baseline rather than new PR scope. The PR-specific acceptance checks for remote session payload wiring, openable remote output view, and headline aggregation were marked implemented by the requirements reviewer.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1775/.pan/review/agent-pan-1775-review-b1aa3a01/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1775 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }

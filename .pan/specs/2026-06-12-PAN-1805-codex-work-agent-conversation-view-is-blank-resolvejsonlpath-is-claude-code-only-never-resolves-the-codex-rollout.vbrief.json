@@ -4,17 +4,17 @@
     "created": "2026-06-12T19:57:12Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1805: Codex work-agent conversation view is blank — resolveJsonlPath is claude-code-only, never resolves the codex rollout",
-    "updated": "2026-06-12T20:01:42.881Z"
+    "updated": "2026-06-12T23:35:42.393Z"
   },
   "plan": {
     "id": "pan-1805",
     "title": "Codex work-agent conversation view is blank — resolveJsonlPath is claude-code-only, never resolves the codex rollout",
-    "status": "proposed",
+    "status": "running",
     "uid": "ddd7e321-93b0-4b05-beed-3302384927c7",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-12T19:57:12Z",
-    "updated": "2026-06-12T20:01:42.881Z",
+    "updated": "2026-06-12T23:35:42.393Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1805",
@@ -344,5 +344,5 @@
       "canonicalFilename": "2026-06-12-PAN-1805-codex-work-agent-conversation-view-is-blank-resolvejsonlpath-is-claude-code-only-never-resolves-the-codex-rollout.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
