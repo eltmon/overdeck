@@ -3860,6 +3860,13 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   }
 }
 
+export function handleForkPipelineFailure(name: string, err: unknown): void {
+  console.error(`[fork-pipeline] Failed for ${name}:`, err);
+  const msg = err instanceof Error ? err.message : String(err);
+  updateForkStatus(name, 'failed', msg);
+  markConversationEnded(name);
+}
+
 export async function runForkPipeline(
   convName: string,
   parentConv: Conversation,
@@ -4317,8 +4324,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         registerInFlightForkPipeline(
           runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
         ).catch((err) => {
-          console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
-          updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
+          handleForkPipelineFailure(newConv.name, err);
         });
 
         return jsonResponse({
