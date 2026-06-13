@@ -14,6 +14,7 @@ const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   openrouter: 'pi',
   nous: 'pi',
   dashscope: 'pi',
+  xai: 'pi',
 };
 
 describe('providers', () => {

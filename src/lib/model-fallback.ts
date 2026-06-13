@@ -14,7 +14,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai';
 
 /**
  * Map of model ID to provider
@@ -86,6 +86,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'qwen3-coder-plus': 'dashscope',
   'qwen3-plus': 'dashscope',
   'qwen3.7-max': 'dashscope',
+
+  // xAI models
+  'grok-build-0.1': 'xai',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -159,6 +162,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'qwen3-coder-plus': 'claude-sonnet-4-6',
   'qwen3-plus': 'claude-haiku-4-5',
   'qwen3.7-max': 'claude-sonnet-4-6',
+
+  // xAI → Anthropic
+  'grok-build-0.1': 'claude-sonnet-4-6', // Coding flagship → Sonnet
 };
 
 /**
@@ -222,6 +228,7 @@ export function getModelProviderSync(modelId: ModelId | string): ModelProvider {
   if (modelId.startsWith('kimi-')) return 'kimi';
   if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
   if (modelId.startsWith('mimo-')) return 'mimo';
+  if (modelId.startsWith('grok-')) return 'xai';
   return 'anthropic';
 }
 
@@ -433,6 +440,7 @@ export function detectEnabledProvidersSync(apiKeys: {
   zai?: string;
   mimo?: string;
   nous?: string;
+  xai?: string;
 }): Set<ModelProvider> {
   const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
 
@@ -460,6 +468,9 @@ export function detectEnabledProvidersSync(apiKeys: {
   }
   if (apiKeys.nous && apiKeys.nous.trim()) {
     enabled.add('nous');
+  }
+  if (apiKeys.xai && apiKeys.xai.trim()) {
+    enabled.add('xai');
   }
 
   return enabled;

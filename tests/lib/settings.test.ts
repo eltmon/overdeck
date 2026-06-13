@@ -497,6 +497,17 @@ describe('settings', () => {
       expect(available.kimi).toEqual(['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
     });
 
+    it('should return xAI models when XAI_API_KEY is configured', async () => {
+      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+
+      const settings = getDefaultSettingsSync();
+      settings.api_keys.xai = 'xai-test-key';
+
+      const available = getAvailableModelsSync(settings);
+
+      expect(available.xai).toEqual(['grok-build-0.1']);
+    });
+
     it('should return multiple providers when multiple API keys configured', async () => {
       const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
 

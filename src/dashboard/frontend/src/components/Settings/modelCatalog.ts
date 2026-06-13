@@ -115,6 +115,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
     ],
   },
+  xai: {
+    name: 'xAI (Grok)',
+    models: [
+      { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
+    ],
+  },
 };
 
 /** Look up a model definition by id across all providers. */

@@ -509,5 +509,18 @@ describe('model-fallback', () => {
       expect(models).toContain('glm-4.7-flash');
       expect(models).toContain('glm-5.1');
     });
+
+    it('grok-build-0.1 is recognized as xai provider', () => {
+      expect(getModelProviderSync('grok-build-0.1' as ModelId)).toBe('xai');
+    });
+
+    it('grok-build-0.1 falls back to Sonnet when xai is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallbackSync('grok-build-0.1' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('grok-build-0.1 is a known model capability', () => {
+      expect(hasModelCapabilitySync('grok-build-0.1')).toBe(true);
+    });
   });
 });
