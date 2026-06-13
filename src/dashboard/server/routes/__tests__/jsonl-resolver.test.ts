@@ -7,6 +7,7 @@ import {
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
   resolveJsonlPath,
+  resolvePiSessionPath,
 } from '../jsonl-resolver.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 
@@ -308,6 +309,136 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     await writeFile(join(agentsDir, AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
     // state.json without harness — pre-harness agents
     await writeFile(join(agentsDir, AGENT_ID, 'state.json'), JSON.stringify({ id: AGENT_ID }));
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+});
+
+describe('resolvePiSessionPath (PAN-1827)', () => {
+  const PI_AGENT_ID = 'agent-pan-1827';
+
+  async function setupPiAgent(sessions: Array<{ relPath: string; offsetMin?: number }>): Promise<string[]> {
+    const agentDir = join(agentsDir, PI_AGENT_ID);
+    const sessionsDir = join(agentDir, 'sessions');
+    const paths: string[] = [];
+    for (let i = 0; i < sessions.length; i++) {
+      const { relPath, offsetMin = sessions.length - i } = sessions[i]!;
+      const p = join(sessionsDir, relPath);
+      await mkdir(join(p, '..'), { recursive: true });
+      await writeFile(p, '{"type":"event"}\n');
+      const t = new Date(Date.now() - offsetMin * 60_000);
+      await utimes(p, t, t);
+      paths.push(p);
+    }
+    return paths;
+  }
+
+  it('returns the freshest .jsonl found under sessions/ at any nesting depth', async () => {
+    const paths = await setupPiAgent([
+      { relPath: join('encoded-cwd', '2026-06-13T11-00-00_old.jsonl'), offsetMin: 10 },
+      { relPath: join('encoded-cwd', '2026-06-13T11-05-00_new.jsonl'), offsetMin: 2 },
+      { relPath: join('other-cwd', '2026-06-13T11-03-00_other.jsonl'), offsetMin: 5 },
+    ]);
+
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(paths[1]);
+  });
+
+  it('returns null when the agent has no sessions/ directory', async () => {
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBeNull();
+  });
+
+  it('returns null when sessions/ contains no .jsonl file', async () => {
+    const sessionsDir = join(agentsDir, PI_AGENT_ID, 'sessions');
+    await mkdir(join(sessionsDir, 'empty-dir'), { recursive: true });
+    await writeFile(join(sessionsDir, 'not-a-session.txt'), 'text');
+
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBeNull();
+  });
+});
+
+describe('resolveJsonlPath — pi agents (PAN-1827)', () => {
+  const PI_AGENT_ID = 'agent-pan-1827';
+
+  async function setupPiAgentWithState(opts: { sessions?: number } = {}): Promise<string[]> {
+    const agentDir = join(agentsDir, PI_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: PI_AGENT_ID,
+      harness: 'pi',
+    }));
+    const sessionsDir = join(agentDir, 'sessions');
+    const paths: string[] = [];
+    const count = opts.sessions ?? 0;
+    for (let i = 0; i < count; i++) {
+      const p = join(sessionsDir, `2026-06-13T11-0${i}-00_session-${i}.jsonl`);
+      await mkdir(join(p, '..'), { recursive: true });
+      await writeFile(p, '{"type":"event"}\n');
+      const t = new Date(Date.now() - (count - i) * 60_000);
+      await utimes(p, t, t);
+      paths.push(p);
+    }
+    return paths;
+  }
+
+  it('resolves the pi session JSONL via the pi branch', async () => {
+    const paths = await setupPiAgentWithState({ sessions: 2 });
+
+    const path = await resolveJsonlPath(PI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(paths[1]);
+  });
+
+  it('returns null when the pi agent has no session files yet', async () => {
+    await setupPiAgentWithState({ sessions: 0 });
+
+    const path = await resolveJsonlPath(PI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBeNull();
+  });
+
+  it('pi harness wins over a stale claude session.id', async () => {
+    const paths = await setupPiAgentWithState({ sessions: 1 });
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{"stale":"claude"}\n');
+    await writeFile(join(agentsDir, PI_AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
+
+    const path = await resolveJsonlPath(PI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    });
+
+    expect(path).toBe(paths[0]);
+  });
+
+  it('resolveJsonlPath still returns the claude JSONL for claude-code agents (regression)', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}');
+    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), CLAUDE_SESSION_ID);
+    await writeFile(join(agentsDir, AGENT_ID, 'state.json'), JSON.stringify({
+      id: AGENT_ID,
+      harness: 'claude-code',
+    }));
 
     const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
