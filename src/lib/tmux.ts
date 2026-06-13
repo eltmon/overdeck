@@ -22,7 +22,6 @@ function validateSessionName(name: string): void {
   }
 }
 
-const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
 const MANAGED_TMUX_SERVER_UNIT = 'panopticon-tmux-server';
 const SERVER_ALIVE_POLL_MS = 50;
 const SERVER_ALIVE_TIMEOUT_MS = 5000;
@@ -66,7 +65,7 @@ export function getManagedTmuxConfigPath(): string {
 }
 
 export function getManagedTmuxSocketName(): string {
-  return MANAGED_TMUX_SOCKET_NAME;
+  return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? 'panopticon';
 }
 
 function ensureLogDir(): void {

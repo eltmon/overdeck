@@ -450,6 +450,12 @@ export async function getAgentRuntimeBaseCommand(
     return `codex`;
   }
 
+  // Integration tests can inject a harmless harness command so a leaked or
+  // intentionally-real tmux session never runs the production `claude` binary.
+  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
+    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+  }
+
   const provider = getProviderForModelSync(validatedModel);
   const permissionFlags = getClaudePermissionFlagsStringSync();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
@@ -538,6 +544,12 @@ export async function getRoleRuntimeBaseCommand(
   }
   if (harness === 'codex') {
     return `codex`;
+  }
+
+  // Integration tests can inject a harmless harness command so a leaked or
+  // intentionally-real tmux session never runs the production `claude` binary.
+  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
+    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
   }
 
   const provider = getProviderForModelSync(validatedModel);
