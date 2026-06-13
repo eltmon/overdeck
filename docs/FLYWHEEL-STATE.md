@@ -2377,3 +2377,13 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
 - **Merge backlog is approval-ready but gated on red main:** PAN-1802 + PAN-1827 in review, PAN-1834 near done. The moment PAN-1859 greens main, auto-merge cascades them.
 - **PAN-1818 merged but NOT deployed** — PAN-1803 restart still deferred (needs pan reload). Surfaced.
 - bugsFixed=2, prsMerged=1, awaitingUat=17. 13 active agents (6 work + 2 strike + 2 planning + 3 review). RAM 35/64, swap pegged. Close-out still pending (default yes). Main red until PAN-1859 lands.
+
+## RUN-32 tick 10 (2026-06-13 ~17:26Z) — RED-MAIN SAGA RESOLVED: main GREEN, PAN-1818 DEPLOYED, pipeline unblocked
+
+- **PAN-1859 strike landed CLEANLY — main is GREEN.** Commit `ef2df6850` "stub pi binary on PATH for pi-resume test". Diff inspected: ONLY the test file (+12/-1), NO assertion weakened, no .skip/.todo. Root cause was correct: CI lacks the real `pi` CLI → `resolveHarness` fell back to claude-code → bypassed the Pi-FIFO delivery path the test verifies. The fix stubs a harmless `pi` binary on PATH so harness resolution is deterministic. **Not a bandaid — a proper test-infra fix.** Main CI = success on ef2df685.
+- **ALL THREE red-main causes now fixed:** PAN-1857 (verification-gate stale assertion, strike), PAN-1818 (reviewer overflow, merged), PAN-1859 (pi-binary stub, strike). The entire run's "nothing merges" mystery was red main on three independent causes.
+- **OPERATOR AUTHORIZED + I RAN `pan reload`** → PAN-1818's convoy-recovery fix is now DEPLOYED. Build was incremental (2.76s), "Dashboard reloaded and healthy", HTTP 200, and **all 14 agent tmux sessions survived** the restart. LESSON: pan reload mid-run is low-risk when the build is incremental — agents on the panopticon socket survive; only the server/deacon restart.
+- **Restarted PAN-1803's wedged review** (`pan review restart`) — fresh 4/4 convoy now running on the deployed fix. NEXT TICK: confirm it synthesizes cleanly (no signal-wedge) — that validates PAN-1818 in production. If it STILL wedges, the fix needs a follow-up.
+- **Merge backlog status (now main green + fix deployed):** PAN-1834 ~done; PAN-1802 review synthesizing; PAN-1827 review found 1 SMALL REAL correctness issue (`resolvePiSessionPath` doesn't verify the path is a regular file — a dir named `*.jsonl` would crash the parser) → work agent must fix before merge (NOT a bandaid-merge). Auto-merge cascade expected to begin next tick as reviews synthesize on the now-healthy pipeline.
+- **CLOSE-OUT of the 17 verifying_on_main:** OPERATOR is handling separately ("I or another agent will get back to you") — I am NOT acting on it.
+- bugsFixed=3, prsMerged=1. 12 active agents. RAM 35/64. Main `ef2df6850`+.
