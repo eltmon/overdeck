@@ -580,7 +580,16 @@ export class IssueDataService {
       Math.max(intervals.default + backoffMs, intervals.min),
       intervals.max
     );
-    state.currentInterval = effectiveInterval;
+
+    // If the tracker is exhausted, suspend polling until the rate-limit window resets.
+    // This bypasses intervals.max so we don't wake up before the quota resets.
+    const suspendMs = this.cache.getSuspensionMs(tracker);
+    let delayMs = effectiveInterval;
+    if (suspendMs > 0) {
+      delayMs = Math.min(suspendMs, 3_600_000);
+      console.warn(`[IssueDataService] ${tracker} tracker suspended until rate-limit reset; next poll in ${delayMs}ms`);
+    }
+    state.currentInterval = delayMs;
 
     state.timer = setTimeout(async () => {
       try {
@@ -594,7 +603,7 @@ export class IssueDataService {
         state.lastError = err.message;
       }
       this.scheduleNext(tracker);
-    }, effectiveInterval);
+    }, delayMs);
   }
 
   private async ensureShadowStateLoaded(): Promise<void> {

@@ -498,3 +498,76 @@ describe('IssueDataService - fetchLinearIssues rate-limit headers', () => {
     }));
   });
 });
+
+describe('IssueDataService - scheduleNext suspension', () => {
+  let service: IssueDataService;
+  let mockCache: any;
+  let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    vi.mocked(getLinearApiKey).mockReturnValue(null);
+
+    mockCache = {
+      get: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(),
+      getEtag: vi.fn(),
+      updateRateLimit: vi.fn(),
+      getRateLimit: vi.fn(),
+      getBackoffMs: vi.fn(() => 0),
+      getSuspensionMs: vi.fn(() => 0),
+      isStale: vi.fn(() => true),
+      invalidate: vi.fn(),
+    };
+    service = new IssueDataService(mockCache);
+    setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+  });
+
+  afterEach(() => {
+    service.stop();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('arms the timer for the suspension delay when getSuspensionMs > 0', () => {
+    mockCache.getSuspensionMs.mockReturnValue(120_000);
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 120_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(120_000);
+  });
+
+  it('clamps suspension delay to 3_600_000 ms', () => {
+    mockCache.getSuspensionMs.mockReturnValue(10_000_000);
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 3_600_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(3_600_000);
+  });
+
+  it('uses the normal effectiveInterval when getSuspensionMs returns 0', () => {
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(30_000);
+  });
+
+  it('resumes the normal interval after the suspension delay elapses and clears', async () => {
+    mockCache.getSuspensionMs.mockReturnValueOnce(120_000).mockReturnValueOnce(0);
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 120_000);
+
+    setTimeoutSpy.mockClear();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
+  });
+});
