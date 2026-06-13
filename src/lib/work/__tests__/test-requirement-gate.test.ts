@@ -5,6 +5,7 @@ import {
   countTestDeltaInDiff,
   detectTestRequirements,
   fetchIssueBodyForGate,
+  runTestRequirementCheck,
   TEST_FILE_PATTERN,
   TEST_REQUIREMENT_KEYWORDS,
   TrackerFetchError,
@@ -13,6 +14,10 @@ import {
 import { getLinearApiKey } from '../../shadow-utils.js';
 import { LinearClient } from '@linear/sdk';
 import { resolveGitHubIssueSync } from '../../tracker-utils.js';
+
+beforeEach(() => {
+  vi.resetAllMocks();
+});
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
@@ -189,8 +194,11 @@ describe('fetchIssueBodyForGate', () => {
       number: 1501,
     } as ReturnType<typeof resolveGitHubIssueSync>);
 
-    vi.mocked(exec).mockImplementation(((_cmd, callback) => {
-      callback?.(null, { stdout: 'GitHub body\n' }, '');
+    vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = (typeof optionsOrCallback === 'function'
+        ? optionsOrCallback
+        : maybeCallback) as (err: Error | null, stdout: { stdout: string }, stderr: string) => void;
+      callback(null, { stdout: 'GitHub body\n' }, '');
       return undefined as unknown as ReturnType<typeof exec>;
     }) as typeof exec);
 
@@ -206,12 +214,11 @@ describe('fetchIssueBodyForGate', () => {
       number: 1501,
     } as ReturnType<typeof resolveGitHubIssueSync>);
 
-    vi.mocked(exec).mockImplementation(((cmd: string, callback: unknown) => {
-      (callback as (err: Error | null, stdout: { stdout: string }, stderr: string) => void)(
-        new Error('gh not authenticated'),
-        { stdout: '' },
-        '',
-      );
+    vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = (typeof optionsOrCallback === 'function'
+        ? optionsOrCallback
+        : maybeCallback) as (err: Error | null, stdout: { stdout: string }, stderr: string) => void;
+      callback(new Error('gh not authenticated'), { stdout: '' }, '');
       return undefined as unknown as ReturnType<typeof exec>;
     }) as typeof exec);
 
@@ -266,5 +273,120 @@ describe('fetchIssueBodyForGate', () => {
     await expect(Effect.runPromise(fetchIssueBodyForGate('not-an-issue'))).rejects.toBeInstanceOf(
       TrackerFetchError,
     );
+  });
+});
+
+function mockLinearIssue(description: string) {
+  vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+  vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed('test-key'));
+  vi.mocked(LinearClient).mockImplementation(
+    function () {
+      return {
+        issues: vi.fn().mockResolvedValue({
+          nodes: [{ description: Promise.resolve(description) }],
+        }),
+      } as unknown as ReturnType<typeof LinearClient>;
+    } as unknown as typeof LinearClient,
+  );
+}
+
+describe('runTestRequirementCheck', () => {
+  const workspacePath = '/tmp/pan-1501-workspace';
+
+  it('returns [] immediately when a waiver reason is provided (AC1)', async () => {
+    const result = await Effect.runPromise(
+      runTestRequirementCheck(workspacePath, 'PAN-1501', 'covered by existing test at abc123'),
+    );
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] when the issue body has no test-keyword matches (AC2)', async () => {
+    mockLinearIssue('This is a feature with no qa mentions.');
+
+    vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = (typeof optionsOrCallback === 'function'
+        ? optionsOrCallback
+        : maybeCallback) as (err: Error | null, stdout: { stdout: string }, stderr: string) => void;
+      if (cmd.startsWith('git merge-base')) {
+        callback(null, { stdout: 'abc123\n' }, '');
+      } else if (cmd.startsWith('git diff --numstat')) {
+        callback(null, { stdout: '10\t2\tsrc/lib/foo.ts\n' }, '');
+      } else {
+        callback(null, { stdout: '' }, '');
+      }
+      return undefined as unknown as ReturnType<typeof exec>;
+    }) as typeof exec);
+
+    const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));
+    expect(result).toEqual([]);
+  });
+
+  it('returns failure lines when requirements match and no test lines were added (AC3)', async () => {
+    mockLinearIssue('Add a unit test for the new helper.');
+
+    vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = (typeof optionsOrCallback === 'function'
+        ? optionsOrCallback
+        : maybeCallback) as (err: Error | null, stdout: { stdout: string }, stderr: string) => void;
+      if (cmd.startsWith('git merge-base')) {
+        callback(null, { stdout: 'abc123\n' }, '');
+      } else if (cmd.startsWith('git diff --numstat')) {
+        callback(null, { stdout: '10\t2\tsrc/lib/foo.ts\n' }, '');
+      } else {
+        callback(null, { stdout: '' }, '');
+      }
+      return undefined as unknown as ReturnType<typeof exec>;
+    }) as typeof exec);
+
+    const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.some((line) => line.includes('unit test'))).toBe(true);
+    expect(result.some((line) => line.includes('--test-waived'))).toBe(true);
+    expect(result.some((line) => line.includes('Add tests'))).toBe(true);
+  });
+
+  it('returns [] when requirements match but test lines were added (AC3)', async () => {
+    mockLinearIssue('Add a unit test for the new helper.');
+
+    vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = (typeof optionsOrCallback === 'function'
+        ? optionsOrCallback
+        : maybeCallback) as (err: Error | null, stdout: { stdout: string }, stderr: string) => void;
+      if (cmd.startsWith('git merge-base')) {
+        callback(null, { stdout: 'abc123\n' }, '');
+      } else if (cmd.startsWith('git diff --numstat')) {
+        callback(null, { stdout: '10\t2\tsrc/lib/foo.test.ts\n' }, '');
+      } else {
+        callback(null, { stdout: '' }, '');
+      }
+      return undefined as unknown as ReturnType<typeof exec>;
+    }) as typeof exec);
+
+    const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));
+    expect(result).toEqual([]);
+  });
+
+  it('returns failure lines directing to --force or --test-waived when tracker fetch fails (AC4)', async () => {
+    vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
+    vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed(null));
+
+    const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.some((line) => line.includes('--test-waived'))).toBe(true);
+  });
+
+  it('soft-fails with [] when git merge-base and fallback both fail (AC5)', async () => {
+    mockLinearIssue('Add a unit test for the new helper.');
+
+    vi.mocked(exec).mockImplementation(((cmd: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
+      const callback = (typeof optionsOrCallback === 'function'
+        ? optionsOrCallback
+        : maybeCallback) as (err: Error | null, stdout: { stdout: string }, stderr: string) => void;
+      callback(new Error('git failed'), { stdout: '' }, '');
+      return undefined as unknown as ReturnType<typeof exec>;
+    }) as typeof exec);
+
+    const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));
+    expect(result).toEqual([]);
   });
 });
