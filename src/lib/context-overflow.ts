@@ -10,6 +10,22 @@ export const CONTEXT_OVERFLOW_PATTERNS = [
 
 export const CONTEXT_OVERFLOW_TAIL_LINES = 40;
 
+/**
+ * Recognize context-window overflow from any thrown error, including the
+ * claude -p non-zero exit envelope that carries "result":"Prompt is too long"
+ * and "terminal_reason":"blocking_limit".
+ */
+export function isContextOverflowError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+  const patterns = [
+    ...CONTEXT_OVERFLOW_PATTERNS,
+    'prompt is too long',
+    'blocking_limit',
+  ];
+  return patterns.some(pattern => normalized.includes(pattern.toLowerCase()));
+}
+
 export function isContextOverflowTail(output: string): boolean {
   const recentTail = output.split('\n').slice(-CONTEXT_OVERFLOW_TAIL_LINES).join('\n');
   return CONTEXT_OVERFLOW_PATTERNS.some(pattern => recentTail.includes(pattern));
