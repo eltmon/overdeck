@@ -1311,6 +1311,52 @@ export async function parseFromLastCompactBoundary(
   return parseConversationMessages(sessionFile, boundaryOffset, priorState);
 }
 
+// ─── Append-only snapshot guard (PAN-1642) ───────────────────────────────────
+
+/**
+ * Decide whether a live-stream emission may be sent as an authoritative
+ * `snapshot:true` (full transcript replace) or must be downgraded to a
+ * non-destructive merge (`snapshot:false`).
+ *
+ * Root-cause context: claude-code session transcripts are **append-only at a
+ * fixed path**. `claude --resume <id>` reuses the same session UUID/file
+ * (PAN-830), and both claude-native and Panopticon-native compaction *append*
+ * a `compact_boundary` marker rather than truncating. A read that shows the
+ * file SHRINK is therefore never a real content reset — it is a transient
+ * truncate-rewrite window (a respawn re-writing the resumed file, a read that
+ * landed mid-write, or a partial read under load). Emitting that smaller read
+ * as `snapshot:true` makes the client replace its populated transcript with the
+ * partial/empty one, blanking the view to "How can I help you?" or only the
+ * last few messages even while the operator is just reading (PAN-1642).
+ *
+ * The watcher only sets `fileWasReset` when it observed the file shrink and
+ * re-parsed from byte 0, so `newMessageCount` here is a FULL transcript count.
+ * We keep a per-subscription high-water mark of the largest full transcript we
+ * have emitted and only allow a snapshot that does not shrink it. A shrinking
+ * reset is suppressed to a merge; the subsequent appends re-flow normally and
+ * `mergeById` on the client dedupes the overlap. Erring toward merge can never
+ * lose history — the only failure mode it forgoes is replacing on a genuine
+ * smaller session, which cannot happen for an append-only claude-code file on a
+ * stable subscription.
+ */
+export function gateSnapshotEmission(
+  fileWasReset: boolean,
+  newMessageCount: number,
+  highWaterCount: number,
+): { snapshot: boolean; highWaterCount: number; suppressedShrink: boolean } {
+  if (!fileWasReset) {
+    // Normal incremental delta — always a merge, never touches the high-water mark.
+    return { snapshot: false, highWaterCount, suppressedShrink: false };
+  }
+  if (newMessageCount < highWaterCount) {
+    // Transient truncate-rewrite read — downgrade to merge so the client keeps
+    // its history. Do not lower the high-water mark.
+    return { snapshot: false, highWaterCount, suppressedShrink: true };
+  }
+  // A genuine, non-shrinking full re-parse — safe to assert as the snapshot.
+  return { snapshot: true, highWaterCount: newMessageCount, suppressedShrink: false };
+}
+
 // ─── File watcher ─────────────────────────────────────────────────────────────
 
 export interface ConversationWatchHandle {

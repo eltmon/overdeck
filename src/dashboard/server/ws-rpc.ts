@@ -15,7 +15,7 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
-import { contextUsageFromParseResult, parseConversationMessages, watchConversation, type ParseState } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
@@ -656,6 +656,21 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   const initial = await parseConversationMessages(sessionFile, 0, initialState);
                   let currentByteOffset = initial.byteOffset;
                   let currentContextUsage = contextUsageFromParseResult(initial, model);
+                  // Per-subscription high-water mark of the largest full transcript
+                  // we have emitted as an authoritative snapshot. The append-only
+                  // guard (gateSnapshotEmission) uses it to refuse any later
+                  // reset-snapshot that would shrink the transcript. See PAN-1642.
+                  let highWaterCount = initial.messages.length;
+                  if (initial.messages.length === 0 && currentByteOffset > 0) {
+                    // The file has complete lines on disk yet parsed to zero
+                    // messages — a transient read during a respawn rewrite, or a
+                    // transcript shape we failed to parse. Logged (not fatal) so a
+                    // recurring blank-on-subscribe can be correlated with respawns.
+                    console.warn(
+                      `[conv-stream] initial parse of ${input.conversationName} yielded 0 messages ` +
+                      `despite byteOffset=${currentByteOffset} — emitting empty snapshot (client HTTP backfill covers this)`,
+                    );
+                  }
                   const priorState: ParseState = {
                     pendingToolUse: initial.pendingToolUse,
                     unresolvedResults: initial.unresolvedResults,
@@ -686,14 +701,30 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   // events are deltas; the client merges them into its cache.
                   const handle = watchConversation(sessionFile, (result) => {
                     const fileWasReset = result.byteOffset < currentByteOffset;
+                    // Append-only guard: a watcher reset fires only when the file
+                    // shrank and was re-parsed from byte 0, so result.messages is a
+                    // full transcript. claude-code transcripts never legitimately
+                    // shrink on a stable subscription (resume reuses the same file;
+                    // compaction appends), so a smaller full re-parse is a transient
+                    // rewrite window — downgrade it to a merge instead of letting it
+                    // wipe the reader's view to "How can I help you?" (PAN-1642).
+                    const gate = gateSnapshotEmission(fileWasReset, result.messages.length, highWaterCount);
+                    highWaterCount = gate.highWaterCount;
                     currentByteOffset = result.byteOffset;
                     currentContextUsage = contextUsageFromParseResult(result, model);
+                    if (gate.suppressedShrink) {
+                      console.warn(
+                        `[conv-stream] suppressed shrinking reset for ${input.conversationName}: ` +
+                        `byteOffset ${currentByteOffset} (re-parsed ${result.messages.length} msgs) < ` +
+                        `high-water ${highWaterCount} — treating as transient rewrite, merging instead of replacing`,
+                      );
+                    }
                     offer({
                       kind: 'messages' as const,
                       messages: result.messages,
                       workLog: result.workLog,
                       streaming: result.streaming,
-                      snapshot: fileWasReset,
+                      snapshot: gate.snapshot,
                       proposedPlan: result.proposedPlan,
                       compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
                       contextUsage: currentContextUsage,

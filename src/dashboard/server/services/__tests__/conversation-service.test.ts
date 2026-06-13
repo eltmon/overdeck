@@ -1151,6 +1151,45 @@ describe('watchConversation', () => {
   });
 });
 
+describe('gateSnapshotEmission (PAN-1642 append-only guard)', () => {
+  it('passes a normal incremental delta through as a merge, untouched high-water', async () => {
+    const { gateSnapshotEmission } = await import('../conversation-service.js');
+    const r = gateSnapshotEmission(false, 2, 40);
+    expect(r).toEqual({ snapshot: false, highWaterCount: 40, suppressedShrink: false });
+  });
+
+  it('allows a non-shrinking reset to replace and raises the high-water mark', async () => {
+    const { gateSnapshotEmission } = await import('../conversation-service.js');
+    const r = gateSnapshotEmission(true, 50, 40);
+    expect(r).toEqual({ snapshot: true, highWaterCount: 50, suppressedShrink: false });
+  });
+
+  it('allows an equal-size reset to replace (compaction can re-emit the same count)', async () => {
+    const { gateSnapshotEmission } = await import('../conversation-service.js');
+    const r = gateSnapshotEmission(true, 40, 40);
+    expect(r.snapshot).toBe(true);
+    expect(r.highWaterCount).toBe(40);
+    expect(r.suppressedShrink).toBe(false);
+  });
+
+  it('suppresses a shrinking reset to a merge and keeps the high-water mark', async () => {
+    const { gateSnapshotEmission } = await import('../conversation-service.js');
+    // A transient truncate-rewrite re-parsed only 1 message; we already showed 40.
+    const r = gateSnapshotEmission(true, 1, 40);
+    expect(r.snapshot).toBe(false);
+    expect(r.highWaterCount).toBe(40); // never lowered
+    expect(r.suppressedShrink).toBe(true);
+  });
+
+  it('suppresses an empty reset (the "How can I help you?" wipe)', async () => {
+    const { gateSnapshotEmission } = await import('../conversation-service.js');
+    const r = gateSnapshotEmission(true, 0, 12);
+    expect(r.snapshot).toBe(false);
+    expect(r.highWaterCount).toBe(12);
+    expect(r.suppressedShrink).toBe(true);
+  });
+});
+
 describe('discoverSessionFile', () => {
   beforeEach(() => {
     vi.clearAllMocks();
