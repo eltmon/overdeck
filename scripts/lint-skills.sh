@@ -219,4 +219,38 @@ def main() -> int:
     max_workers = min(16, max(1, len(skills_to_check)))
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_skill = {
-            
+            executor.submit(run_pan, skill_name, "--help"): (skill_md, skill_name)
+            for skill_md, skill_name in skills_to_check
+        }
+        for future in as_completed(future_to_skill):
+            skill_md, skill_name = future_to_skill[future]
+            try:
+                help_by_skill[skill_name] = future.result()
+            except subprocess.CalledProcessError:
+                errors.append(f"{skill_md}: pan {skill_name} exists in top-level help but --help failed")
+
+    for skill_md, skill_name in skills_to_check:
+        help_text = help_by_skill.get(skill_name)
+        if help_text is None:
+            continue
+
+        flags = option_names(help_text)
+        subcommands = command_names(help_text)
+        text = skill_md.read_text()
+        for line_no, command in extract_commands(text, skill_name):
+            errors.extend(
+                validate_command(skill_md, line_no, command, skill_name, flags, subcommands, global_flags)
+            )
+
+    if errors:
+        print("skill CLI lint failed:", file=sys.stderr)
+        for error in errors:
+            print(f"  {error}", file=sys.stderr)
+        return 1
+
+    print("skill CLI lint passed")
+    return 0
+
+
+raise SystemExit(main())
+PY
