@@ -214,7 +214,7 @@ function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string
 }
 
 function RemoteSessionOutput({ sessionId, vmName }: { sessionId: string; vmName: string }) {
-  const { data: output = '', isFetching, refetch } = useQuery({
+  const { data: output = '', isFetching, error, refetch } = useQuery({
     queryKey: ['session-remote-output', sessionId],
     queryFn: () => fetchAgentOutput(sessionId),
     refetchInterval: 5_000,
@@ -234,9 +234,15 @@ function RemoteSessionOutput({ sessionId, vmName }: { sessionId: string; vmName:
           Refresh
         </button>
       </div>
-      <pre className="m-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed text-foreground">
-        {output.trim() ? output : 'No remote output available yet.'}
-      </pre>
+      {error ? (
+        <div className="p-3 text-xs text-destructive">
+          Failed to load remote output: {error.message}
+        </div>
+      ) : (
+        <pre className="m-0 flex-1 overflow-auto whitespace-pre-wrap p-3 font-mono text-xs leading-relaxed text-foreground">
+          {output.trim() ? output : 'No remote output available yet.'}
+        </pre>
+      )}
     </div>
   );
 }
@@ -280,15 +286,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
     const fallbackModel = !actualModel
       ? (resolvedModels[resolveWorkTypeKey(session) ?? ''] ?? undefined)
       : undefined;
-    // Defensive: an ended session MUST report a non-null endedAt, or
-    // ConversationPanel will read `!sessionAlive && !endedAt` as "still
-    // spawning" and render a "Starting…" placeholder over the JSONL. When the
-    // backend hasn't supplied one (e.g. a sub-reviewer that finished while its
-    // parent's endedAt is still null), fall back to startedAt so the panel
-    // takes the orphaned/message-history branch instead.
-    const endedAt = session.presence === 'ended'
-      ? (session.endedAt ?? session.startedAt ?? new Date().toISOString())
-      : (session.endedAt ?? null);
+    const endedAt = session.presence === 'ended' ? (session.endedAt ?? null) : (session.endedAt ?? null);
     return {
       id: -1,
       name: session.sessionId,

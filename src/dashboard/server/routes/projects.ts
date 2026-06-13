@@ -212,7 +212,7 @@ async function collectSessionTreeNodes(
 
     try {
       const state = stateText
-        ? JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string }
+        ? JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; lastActivity?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string }
         : {};
       const remoteState = remoteStateText
         ? JSON.parse(remoteStateText) as RemoteSessionState
@@ -235,19 +235,21 @@ async function collectSessionTreeNodes(
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
       const startedAt = remoteState?.startedAt || state.startedAt || state.createdAt || new Date().toISOString();
+      const endedAt = presence === 'ended'
+        ? (remoteState?.lastActivity ?? rtState?.lastActivity ?? state.lastActivity ?? null)
+        : undefined;
+      const durationEndMs = endedAt ? new Date(endedAt).getTime() : Date.now();
+      const startedAtMs = new Date(startedAt).getTime();
       sections.push({
         type: sectionType,
         sessionId: checkId,
         tmuxSession: !isRemoteAgent && (sectionType === 'work' || sectionType === 'planning') ? checkId : undefined,
         model: remoteState?.model || state.model || 'unknown',
         startedAt,
-        endedAt: undefined,
-        duration: startedAt
-          ? (() => {
-              const ms = Date.now() - new Date(startedAt).getTime();
-              return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
-            })()
-          : null,
+        endedAt,
+        duration: Number.isNaN(startedAtMs) || Number.isNaN(durationEndMs)
+          ? null
+          : Math.floor(Math.max(0, durationEndMs - startedAtMs) / 1000),
         status: normalizeAgentStatus(
           isRemoteActive
             ? (remoteState.status || 'running')
@@ -282,11 +284,13 @@ async function collectSessionTreeNodes(
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
+      const startedAt = planningStat?.mtime.toISOString() ?? new Date(0).toISOString();
       sections.push({
         type: 'legacy',
         sessionId,
         model: 'unknown',
-        startedAt: planningStat?.mtime.toISOString() ?? new Date(0).toISOString(),
+        startedAt,
+        endedAt: startedAt,
         duration: 0,
         status: 'stopped',
         presence: 'ended',
@@ -309,12 +313,13 @@ async function collectSessionTreeNodes(
         ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
         : 'ended';
       const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
+      const reviewEndedAt = orchestratorPresence === 'ended' ? (latestReview.timestamp ?? null) : undefined;
       sections.push({
         type: 'review',
         sessionId: orchestratorSessionName,
         model: 'specialist',
         startedAt: latestReview.timestamp,
-        endedAt: undefined,
+        endedAt: reviewEndedAt,
         duration: 0,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
@@ -330,7 +335,7 @@ async function collectSessionTreeNodes(
         projectPath,
         tmuxSessionNames: context.tmuxSessionNames,
         startedAt: latestReview.timestamp,
-        endedAt: undefined,
+        endedAt: reviewEndedAt,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
       sections.push(...(reviewerNodes as unknown as SessionNode[]));
@@ -345,15 +350,16 @@ async function collectSessionTreeNodes(
       const testSessionName = `agent-${issueLower}-test`;
       const testIsLive = context.tmuxSessionNames.has(testSessionName);
       const testJsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
+      const testPresence = testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended';
       sections.push({
         type: 'test',
         sessionId: testSessionName,
         model: 'specialist',
         startedAt: latestTest.timestamp,
-        endedAt: undefined,
+        endedAt: testPresence === 'ended' ? (latestTest.timestamp ?? null) : undefined,
         duration: 0,
         status: normalizeAgentStatus(latestTest.status === 'testing' ? 'running' : latestTest.status),
-        presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
+        presence: testPresence,
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
         ...(await readSessionPauseFields(testSessionName)),
@@ -367,16 +373,17 @@ async function collectSessionTreeNodes(
     if (latestMerge) {
       const shipSessionName = `agent-${issueLower}-ship`;
       const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
+      const shipPresence = shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended';
       const shipJsonlPath = await resolveJsonlPath(shipSessionName, workspacePath);
       sections.push({
         type: 'ship',
         sessionId: shipSessionName,
         model: 'specialist',
         startedAt: latestMerge.timestamp,
-        endedAt: undefined,
+        endedAt: shipPresence === 'ended' ? (latestMerge.timestamp ?? null) : undefined,
         duration: 0,
         status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
-        presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
+        presence: shipPresence,
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
         ...(await readSessionPauseFields(shipSessionName)),
@@ -522,18 +529,28 @@ export async function fetchProjectSessionTree(
   // Seed additional candidates from active remote (fly.io) agents so an issue
   // with a remote-state.json but no local workspace still gets a session row.
   try {
-    const { listActiveRemoteAgentStates } = await import('../../../lib/remote/remote-agents.js');
-    for (const state of listActiveRemoteAgentStates()) {
-      const issueLower = state.issueId.toLowerCase();
-      if (seenIssueLower.has(issueLower)) continue;
-      const resolved = await Effect.runPromise(resolveProjectFromIssue(state.issueId)).catch(() => null);
-      if (resolved?.projectKey !== project.key) continue;
-      featureCandidates.push({
-        name: `feature-${issueLower}`,
-        issueLower,
-        issueId: state.issueId,
-      });
-      seenIssueLower.add(issueLower);
+    const { listActiveRemoteAgentStatesAsync } = await import('../../../lib/remote/remote-agents.js');
+    const remoteStates = await listActiveRemoteAgentStatesAsync();
+    const remoteCandidates = await Effect.runPromise(withConcurrencyLimit(
+      remoteStates
+        .filter((state) => !seenIssueLower.has(state.issueId.toLowerCase()))
+        .map((state) => Effect.promise(async () => {
+          const issueLower = state.issueId.toLowerCase();
+          const resolved = await Effect.runPromise(resolveProjectFromIssue(state.issueId)).catch(() => null);
+          if (resolved?.projectKey !== project.key) return null;
+          return {
+            name: `feature-${issueLower}`,
+            issueLower,
+            issueId: state.issueId,
+          };
+        })),
+      15,
+    ));
+    for (const candidate of remoteCandidates) {
+      if (candidate) {
+        featureCandidates.push(candidate);
+        seenIssueLower.add(candidate.issueLower);
+      }
     }
   } catch {
     // Remote module unavailable — tree simply omits remote-only agents.

@@ -52,8 +52,10 @@ vi.mock('../../../../../src/lib/pan-dir/specs.js', () => ({
 }));
 
 const mockListActiveRemoteAgentStates = vi.hoisted(() => vi.fn(() => []));
+const mockListActiveRemoteAgentStatesAsync = vi.hoisted(() => vi.fn(async () => []));
 vi.mock('../../../../../src/lib/remote/remote-agents.js', () => ({
   listActiveRemoteAgentStates: mockListActiveRemoteAgentStates,
+  listActiveRemoteAgentStatesAsync: mockListActiveRemoteAgentStatesAsync,
 }));
 
 vi.mock('node:fs/promises', async () => {
@@ -90,6 +92,7 @@ describe('fetchProjectSessionTree', () => {
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
     mockListActiveRemoteAgentStates.mockReturnValue([]);
+    mockListActiveRemoteAgentStatesAsync.mockResolvedValue([]);
   });
 
   it('returns null for unknown project key', async () => {
@@ -267,7 +270,7 @@ describe('fetchProjectSessionTree', () => {
       (err as any).code = 'ENOENT';
       return Promise.reject(err);
     });
-    mockListActiveRemoteAgentStates.mockReturnValue([remoteState]);
+    mockListActiveRemoteAgentStatesAsync.mockResolvedValue([remoteState]);
 
     const result = await fetchProjectSessionTree('panopticon-cli');
     const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
@@ -326,7 +329,7 @@ describe('fetchProjectSessionTree', () => {
       (err as any).code = 'ENOENT';
       return Promise.reject(err);
     });
-    mockListActiveRemoteAgentStates.mockReturnValue([remoteState]);
+    mockListActiveRemoteAgentStatesAsync.mockResolvedValue([remoteState]);
 
     const result = await fetchProjectSessionTree('panopticon-cli');
     const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
@@ -346,7 +349,7 @@ describe('fetchProjectSessionTree', () => {
     mockAccess(new Set([]));
     (readdir as any).mockResolvedValue([]);
     (readFile as any).mockRejectedValue({ code: 'ENOENT' });
-    mockListActiveRemoteAgentStates.mockReturnValue([{
+    mockListActiveRemoteAgentStatesAsync.mockResolvedValue([{
       id: 'agent-min-123',
       issueId: 'MIN-123',
       vmName: 'min-min-123-ws',
@@ -393,7 +396,7 @@ describe('fetchProjectSessionTree', () => {
       (err as any).code = 'ENOENT';
       return Promise.reject(err);
     });
-    mockListActiveRemoteAgentStates.mockImplementation(() => {
+    mockListActiveRemoteAgentStatesAsync.mockImplementation(() => {
       throw new Error('remote-agents unavailable');
     });
 
