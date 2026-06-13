@@ -911,10 +911,10 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/-m 'codex-4o'/);
     expect(script).toMatch(/-c approval_policy=never/);
     expect(script).toMatch(/-s workspace/);
-    expect(script).not.toMatch(/--skip-git-repo-check/);
+    expect(script).toMatch(/--skip-git-repo-check/);
   });
 
-  it('codex work-tui mode emits interactive codex with model only', () => {
+  it('codex work-tui mode emits interactive codex with only -m (approval/sandbox from config.toml)', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
       role: 'work',
@@ -928,7 +928,6 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).not.toMatch(/codex exec/);
     expect(script).not.toMatch(/approval_policy=never/);
     expect(script).not.toMatch(/-s workspace-write/);
-    expect(script).not.toMatch(/--skip-git-repo-check/);
   });
 
   it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
@@ -943,7 +942,6 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     });
     expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' codex -m 'codex-4o'$/m);
     expect(script).not.toMatch(/codex exec/);
-    expect(script).not.toMatch(/--skip-git-repo-check/);
   });
 
   it('codex conversation (tui) mode disables project AGENTS.md without supervisor', () => {

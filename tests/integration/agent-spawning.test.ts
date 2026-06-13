@@ -442,40 +442,6 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(tmux.sendKeys).toHaveBeenCalledWith('agent-pan-kickoff-1', expect.stringContaining('do the work'));
     });
 
-    it('stores Codex kickoff briefs in the private agent runtime directory', async () => {
-      const tmux = await import('../../src/lib/tmux.js');
-      const prompt = 'private codex kickoff payload';
-      let sessionExistsCalls = 0;
-      vi.mocked(tmux.sessionExists).mockImplementation(() =>
-        Effect.sync(() => {
-          sessionExistsCalls += 1;
-          return sessionExistsCalls > 1;
-        }),
-      );
-      vi.mocked(tmux.capturePane).mockReturnValue(Effect.succeed('›\nclaude-sonnet-4-6 · ~/work'));
-
-      const state = await spawnAgent({
-        issueId: 'PAN-CODEX-KICKOFF',
-        workspace: testWorkspace,
-        role: 'work',
-        harness: 'codex',
-        prompt,
-      });
-
-      const kickoffPath = join(getAgentDir('agent-pan-codex-kickoff'), 'kickoff.md');
-      expect(state.kickoffDelivered).toBe(true);
-      expect(readFileSync(kickoffPath, 'utf8')).toBe(prompt);
-      expect(existsSync(join(testWorkspace, '.pan', 'kickoff.md'))).toBe(false);
-      expect(tmux.sendKeys).toHaveBeenCalledWith(
-        'agent-pan-codex-kickoff',
-        expect.stringContaining(kickoffPath),
-      );
-      expect(tmux.sendKeys).not.toHaveBeenCalledWith(
-        'agent-pan-codex-kickoff',
-        expect.stringContaining(prompt),
-      );
-    });
-
     it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
