@@ -466,6 +466,17 @@ projects:
   #         Pay special attention to:
   #         - Database migration safety
   #         - API backward compatibility
+  #   quality_gates:
+  #     typecheck:
+  #       command: npm run typecheck
+  #       required: true
+  #     lint:
+  #       command: npm run lint
+  #       required: true
+  #     test:
+  #       # Keep per-change gates fast. Put e2e/Playwright in CI-only or @slow tiers.
+  #       command: npx vitest run --changed {{CHANGED_BASE}}
+  #       required: true
 
   # Example: Panopticon itself
   # panopticon:
@@ -728,4 +739,3 @@ export const initializeProjectsConfig = (): Effect.Effect<void, FsError> =>
     try: () => initializeProjectsConfigSync(),
     catch: (cause) => new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'initializeProjectsConfig', cause }),
   });
-

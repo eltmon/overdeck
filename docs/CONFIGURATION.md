@@ -917,6 +917,27 @@ automatically with the dashboard — no manual installation needed.
 
 Panopticon can manage external service configurations as part of the workspace lifecycle. These are configured per-project in `~/.panopticon/projects.yaml` under the `workspace` section.
 
+## Project Registry Source Of Truth
+
+The runtime project registry is `~/.panopticon/projects.yaml`; `PROJECTS_CONFIG_FILE` resolves to that file and the dashboard reads it directly. The tracked `.panopticon/projects.yaml` in this repository is a portable seed/snapshot for Panopticon development workspaces, not the active runtime config.
+
+When Panopticon creates a workspace for this repo, `workspace-manager.ts` copies the live `~/.panopticon/projects.yaml` into `<workspace>/.panopticon/projects.yaml` so agents see the same project registry as the host. Keep the tracked snapshot aligned with intended defaults, but apply active-machine changes to `~/.panopticon/projects.yaml` by hand and restart/reload the dashboard when gate command behavior changes.
+
+### Change-Scoped Verification Gates
+
+The default `quality_gates.test` command is change-scoped:
+
+```yaml
+quality_gates:
+  test:
+    command: npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}
+    required: true
+```
+
+`{{CHANGED_BASE}}` is injected as `origin/<target-branch>` after the verification runner syncs the target branch. This keeps unrelated pre-existing failures from failing every work agent gate. Vitest's `--changed` graph follows static imports; dynamic imports, fixtures, generated files, and environment-driven branches may need explicit tests because they can be invisible to the changed-file graph.
+
+Keep e2e, Playwright, and other heavy browser tests out of the local per-change gate. Put them in CI-only jobs or an explicit `@slow` tier so local agent verification stays fast and targeted.
+
 ### Cloudflare Tunnels
 
 Automatically creates/deletes Cloudflare tunnel ingress routes so workspaces are accessible via public URLs (e.g., `api-feature-min-123.mindyournow.com`).
