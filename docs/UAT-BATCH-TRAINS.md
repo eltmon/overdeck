@@ -29,7 +29,7 @@ tree once, continuously, and automatically.
 
 | Term | Meaning |
 | --- | --- |
-| **Ready set** | All features at the merge gate, in merge order — the flywheel merge queue (`computeMergeQueue`, filtered to `MERGE_GATE_VERBS = {shipping, merging}`, see [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736)). |
+| **Ready set** | All features whose review-status records are merge-eligible (`mergeGateEligibility().eligible`) and not deacon-ignored, grouped per project and ordered by that project's conflict-aware merge queue. |
 | **Generation** | A throwaway `uat/<label>-<codename>-<MMDD>` branch off current main containing **as many ready features as possible, in merge order, with cross-feature conflicts resolved inside the batch**. |
 | **Assembly agent** | A timeboxed headless `claude -p` run (acceptEdits, no shell) that resolves a merge conflict *on the branch* when one feature collides with an already-merged member. Verification, staging, and the merge commit happen in code — the agent only edits files. |
 | **Held out** | A feature excluded from a generation because its conflict could not be resolved confidently (or the agent timed out). Shown on the card with the reason; retried in later generations once the conflicting predecessor merges or its branch changes. |
@@ -81,8 +81,10 @@ A 60-second interval (`startUatTrainReconciler` in
 [`main.ts`](../src/dashboard/server/main.ts)) keeps "always one batch ready"
 true. Each tick is **single-flight per project** and:
 
-1. **No-ops** unless `flywheel.merge_train_enabled` is on *and* a flywheel run is
-   active (the ready set is `null` with no run → nothing to do).
+1. **No-ops per project** unless the global `merge_train.enabled` flag and that
+   project's `merge_train` override resolve to enabled. If a project has no
+   ready features and no live generations, the tick skips git work; if it has
+   live generations, the tick still invalidates stale batches.
 2. **Invalidates** live generations that went stale — main advanced past their
    base, a member left the ready set, or a member branch gained commits.
    Invalidation tears down the generation's live stack. (A smaller *subset*
@@ -134,12 +136,20 @@ past the cap), and invalidation/promotion always tear a generation's stack down
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/flywheel/uat-generations` | The generation chain, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared vBRIEF extractor `src/lib/vbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. Returns `[]` when no flywheel run is active. |
-| `POST /api/flywheel/uat-generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
-| `POST /api/flywheel/uat-generations/:name/promote` | Promote (merge) the tested generation to main. |
-| `POST /api/flywheel/assemble-uat` | Force a reconcile/rebuild of the current generation (repurposed from the PAN-1691 one-shot assemble). |
-| `GET /api/flywheel/merge-queue` | The ready set (reference data), each row carrying `branchName` and `prUrl`. |
-| `POST /api/flywheel/merge-next` | The single-feature escape hatch — merge N queue items to main one at a time, stopping on first failure. Unchanged from PAN-1691. |
+| `GET /api/merge-train/generations` | Generation chains for every tracked project, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared vBRIEF extractor `src/lib/vbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. |
+| `POST /api/merge-train/generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
+| `POST /api/merge-train/generations/:name/promote` | Promote (merge) the tested generation to main. |
+| `POST /api/merge-train/assemble` | Force a reconcile/rebuild. The optional JSON body `{ "project": "<projectKey>" }` limits the rebuild to one project; omitted rebuilds all enabled projects. |
+| `GET /api/merge-train/queues` | Ready sets for every tracked project, each row carrying `branchName` and `prUrl`, plus the effective per-project enabled state. |
+| `POST /api/merge-train/merge-next` | The single-feature escape hatch — merge N queue items for one project to main one at a time, stopping on first failure. Body: `{ "project": "<projectKey>", "n": 1 }`. |
+
+## Multi-project behavior
+
+Batch trains are **per project**. Each tracked project gets its own ready set,
+generation chain, live-stack lifecycle, and `merge_train` project override. The
+Awaiting Merge and Flywheel views span projects so the operator can inspect and
+control all trains from one surface, but a generation never mixes features from
+different projects.
 
 ## The card — "UAT batches"
 
@@ -157,12 +167,11 @@ consequences. The string "Ship batch" no longer appears anywhere in the frontend
 
 ## Operating it
 
-Batch trains are gated **per tick** on `flywheel.merge_train_enabled` (the same
-flag PAN-1691 introduced) **and** an active flywheel run — so batches only
-assemble while a run is live. They are inert otherwise. The reconciler is a 60s
-dashboard-server interval, independent of the deacon; nothing assembles or merges
-without the merge-train flag on. Enabling the flag and starting a run is all the
-setup required.
+Batch trains are gated **per tick** on the global `merge_train.enabled` flag and
+each project's `merge_train` override. They do not require an active Flywheel
+run. The reconciler is a 60s dashboard-server interval, independent of the
+deacon; nothing assembles or merges without the effective merge-train policy
+enabled for that project.
 
 ## Relationship to the per-issue merge path
 
@@ -170,6 +179,6 @@ setup required.
 (work-done → review-passed → rebased → merged) is unchanged and remains the
 **escape hatch** — it's what the "Merge one feature to main…" button and the
 SQLite per-project merge-serialization queue drive. Batch promotion is the
-primary path while a flywheel run with the merge train enabled is active; the
-per-issue path covers everything else (and merging a single feature out-of-band
-invalidates the live batches and triggers reassembly).
+primary path for a project whose merge train is enabled; the per-issue path
+covers everything else (and merging a single feature out-of-band invalidates the
+live batches and triggers reassembly).
