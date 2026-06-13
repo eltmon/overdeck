@@ -54,6 +54,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
   let systemctlMainPid: string | null = null;
   let pgrepOutput = '';
   let cgroupOutput = '';
+  let cmdlineOutput = '';
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
   beforeEach(() => {
@@ -65,6 +66,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
     systemctlMainPid = null;
     pgrepOutput = '';
     cgroupOutput = '';
+    cmdlineOutput = '';
     warnSpy.mockClear();
 
     mockedExecFileSync.mockImplementation((cmd: unknown, args?: unknown, _options?: unknown) => {
@@ -125,6 +127,9 @@ describe('ensurePanopticonTmuxServerSync', () => {
     mockedReadFileSync.mockImplementation((path: unknown, _encoding?: unknown) => {
       if (typeof path === 'string' && path.includes('/proc/') && path.includes('/cgroup')) {
         return cgroupOutput;
+      }
+      if (typeof path === 'string' && path.includes('/proc/') && path.includes('/cmdline')) {
+        return cmdlineOutput;
       }
       throw new Error('ENOENT');
     });
@@ -192,10 +197,23 @@ describe('ensurePanopticonTmuxServerSync', () => {
     serverAlive = true;
     systemctlMainPid = '12345';
     cgroupOutput = '0::/user.slice/user-1000.slice/user@1000.service/panopticon-tmux-server.service\n';
+    cmdlineOutput = 'tmux\0-L\0panopticon\0-f\0/home/user/.panopticon/tmux/panopticon.tmux.conf\0start-server\0';
 
     ensurePanopticonTmuxServerSync({});
 
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('tmux-spawn'));
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('dirty cmdline'));
+  });
+
+  it('warns when the live server has a dirty cmdline founded by new-session', () => {
+    serverAlive = true;
+    systemctlMainPid = '12345';
+    cmdlineOutput = 'tmux\0-L\0panopticon\0new-session\0-d\0-s\0conv-20260612-3871\0bash\0launcher.sh\0';
+
+    ensurePanopticonTmuxServerSync({});
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('dirty cmdline'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID 12345'));
   });
 });
 

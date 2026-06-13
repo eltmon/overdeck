@@ -111,6 +111,14 @@ Each revolution is a tick. The output of every tick is a `FlywheelStatus` snapsh
 
 The FlywheelStatus snapshot must include the current headline counts, active pipeline, substrate bugs, running agents, parked work, ranked suggestions, system status, open questions, tick count, and `lastTickAt`.
 
+## Governor slot discipline (PAN-1812)
+
+The `maxAgents` ceiling governs how many agents the flywheel launches; it is not permission to reap operator-started agents or to declare work complete when beads are still open.
+
+- **Never claim "work complete, no open beads" without verifying in the agent's workspace.** Run `bd list --status open --title-contains <issueId> --json` from the agent's workspace directory, or read the workspace `.beads/issues.jsonl`. If the bead query errors, times out, or reports lock contention, treat the result as **unknown** — not as zero open beads. Do not pause or stop an agent on an unverified "no open beads" conclusion.
+- **Slot-reaping pauses must not mark agents troubled.** When you pause an agent solely to free a governor work slot, use the exact reason prefix `[governor-slot]` (e.g. `pan pause agent-pan-1234 -r "[governor-slot] freeing work slot (RUN-28)"`). That prefix clears the troubled gate on pause so the agent can resume when a slot frees.
+- **Operator-started agents are exempt from governor reaping.** An agent with no `flywheelRunId` in its state was started directly by the operator. When `cloister.concurrency.exempt_operator_started` is true (default), do not pause or reap such agents to satisfy `maxAgents`; only flywheel-initiated agents (state carries a `flywheelRunId`) are candidates for slot reaping.
+
 ## Discretion on parked items (decide, don't delegate)
 
 When the operator names a parked (`needs-discussion` / `needs-design`) item to unpark, **decide and act**. Do not bring the issue's sub-questions back to the operator. The operator authored ~99% of the open issues in this repo; the Flywheel role asking "which of these N options do you want" is the orchestrator delegating its own job back to the human, and that is a failure mode.

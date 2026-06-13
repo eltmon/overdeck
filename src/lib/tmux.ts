@@ -151,6 +151,18 @@ function readServerCgroupSync(pid: number): string {
 }
 
 /**
+ * PAN-1798: read /proc/<pid>/cmdline for the given PID. Returns empty string
+ * on failure.
+ */
+function readServerCmdlineSync(pid: number): string {
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`, 'utf-8').replace(/\0/g, ' ').trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
  * PAN-1798: warn if the live shared server is still stuck inside a per-spawn
  * scope (servers founded before this fix, or by manual tmux use). Never auto-
  * restart — the operator must decide when to migrate off the live founder.
@@ -164,6 +176,27 @@ function warnIfServerInTmuxSpawnScopeSync(): void {
     `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} lives in a per-spawn scope. ` +
       `Cgroup: ${cgroup.trim().replace(/\n/g, ' ')}. ` +
       `Killing the founding session/agent may destroy the entire shared server. ` +
+      `Restart Panopticon to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
+  );
+}
+
+/**
+ * PAN-1798: warn if the live shared server was founded implicitly by a client
+ * `new-session` rather than by the dedicated `start-server` founding. A dirty
+ * cmdline embeds the founding session name, so any cmdline-match teardown
+ * (pkill -f, pgrep -f) can hit the server itself. Never auto-restart.
+ */
+function warnIfServerCmdlineIsDirtySync(): void {
+  const pid = findManagedServerPidSync();
+  if (pid === undefined) return;
+  const cmdline = readServerCmdlineSync(pid);
+  // A clean dedicated founding looks like `tmux -L panopticon -f ... start-server`.
+  // Any `new-session` in the server argv means a client founded the server.
+  if (!cmdline.includes('new-session')) return;
+  console.warn(
+    `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} has a dirty cmdline ` +
+      `founded by a client new-session: ${cmdline.slice(0, 240)}. ` +
+      `Conversation/agent teardown that matches cmdlines may destroy the entire shared server. ` +
       `Restart Panopticon to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
   );
 }
@@ -191,6 +224,7 @@ export function ensurePanopticonTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): voi
 
   if (isManagedServerAliveSync()) {
     warnIfServerInTmuxSpawnScopeSync();
+    warnIfServerCmdlineIsDirtySync();
     return;
   }
 
