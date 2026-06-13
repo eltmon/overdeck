@@ -2403,3 +2403,5 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
 - **Verified it spawned as a PERSISTENT TUI** (not one-shot `codex exec`): pane shows the Codex TUI, read `.pan/kickoff.md`, "• Working", `gpt-5.5 default`. The PAN-1803 codex-TUI concern was moot — codex-TUI works in the current dist.
 - ⚠️ **Quota caveat:** the Codex TUI warns "<25% of weekly limit left" on the GPT-5.5/Codex subscription — the strike could exhaust quota mid-task. Watch for a stall on quota.
 - **NEXT-TICK CARE:** PAN-1861 modifies the REVIEW SYNTHESIS pipeline itself (deacon convoy monitoring / synthesize-from-report-files). A strike lands it directly on main with no review — **inspect its diff EXTRA carefully** (does it correctly synthesize from on-disk reports without breaking healthy convoys?). And like PAN-1818, the fix runs in the deacon → needs a **pan reload to deploy** after it lands. Don't double-launch a PAN-1861 fix — the strike is already on it.
+
+- **Quota: NON-ISSUE (operator clarified).** The "<25% weekly limit" is days of effort for the large Codex plan — do NOT monitor/flag codex quota for strike-pan-1861. Let it run.
