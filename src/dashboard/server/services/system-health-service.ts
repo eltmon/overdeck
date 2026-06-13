@@ -616,7 +616,9 @@ export function readTrackerQuota(cache: CacheService): { exhaustedTrackers: stri
   }
 
   const ghLimit = cache.getRateLimit('github');
-  const githubRemaining = ghLimit && new Date(ghLimit.resetAt).getTime() > nowMs ? ghLimit.remaining : null;
+  const resetMs = ghLimit ? new Date(ghLimit.resetAt).getTime() : NaN;
+  const resetInFuture = Number.isNaN(resetMs) || resetMs > nowMs;
+  const githubRemaining = ghLimit && resetInFuture ? ghLimit.remaining : null;
 
   return { exhaustedTrackers, githubRemaining };
 }

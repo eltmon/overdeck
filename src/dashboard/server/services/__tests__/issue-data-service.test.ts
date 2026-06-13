@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { computeBeadCounts, IssueDataService } from '../issue-data-service.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+import * as trackerConfig from '../tracker-config.js';
 
 describe('computeBeadCounts', () => {
   function makeDoc(items: Array<{ status: string }>): VBriefDocument {
@@ -173,5 +174,63 @@ describe('IssueDataService poll-outcome recording (PAN-1817)', () => {
     await (svc as any).pollLinear();
 
     expect(cache.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('records the worst GitHub outcome across multiple repos (quota_exhausted beats error)', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(trackerConfig, 'getGitHubConfig').mockReturnValue({
+      token: 'token',
+      repos: [
+        { owner: 'a', repo: 'a' },
+        { owner: 'b', repo: 'b' },
+      ],
+    });
+    vi.spyOn(svc as any, 'fetchGitHubRepoIssues')
+      .mockRejectedValueOnce(new Error('API rate limit'))
+      .mockRejectedValueOnce(new Error('network timeout'));
+
+    await (svc as any).pollGitHub();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledTimes(1);
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('github', {
+      status: 'quota_exhausted',
+      message: 'API rate limit',
+    });
+  });
+
+  it('records ok for GitHub when all repos succeed', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(trackerConfig, 'getGitHubConfig').mockReturnValue({
+      token: 'token',
+      repos: [
+        { owner: 'a', repo: 'a' },
+        { owner: 'b', repo: 'b' },
+      ],
+    });
+    vi.spyOn(svc as any, 'fetchGitHubRepoIssues').mockResolvedValue([]);
+
+    await (svc as any).pollGitHub();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledTimes(1);
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('github', {
+      status: 'ok',
+      message: 'ok',
+    });
+  });
+
+  it('handles a primitive thrown error when recording poll outcome', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(trackerConfig, 'getGitHubConfig').mockReturnValue({
+      token: 'token',
+      repos: [{ owner: 'a', repo: 'a' }],
+    });
+    vi.spyOn(svc as any, 'fetchGitHubRepoIssues').mockRejectedValueOnce('primitive failure');
+
+    await expect((svc as any).pollGitHub()).resolves.not.toThrow();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('github', {
+      status: 'error',
+      message: 'primitive failure',
+    });
   });
 });

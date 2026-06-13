@@ -791,7 +791,10 @@ export class IssueDataService {
   // ---------------------------------------------------------------
 
   private recordPollOutcome(tracker: string, error?: Error | { message: string } | null): void {
-    const msg = error && 'message' in error ? error.message : String(error ?? '');
+    const msg =
+      typeof error === 'object' && error !== null && 'message' in error
+        ? String(error.message)
+        : String(error ?? '');
     const isRateLimit = /rate.?limit/i.test(msg);
     const status: PollHealthStatus = error ? (isRateLimit ? 'quota_exhausted' : 'error') : 'ok';
     this.cache.recordPollHealth(tracker, { status, message: msg || 'ok' });
@@ -806,7 +809,10 @@ export class IssueDataService {
 
     const allIssues: any[] = [];
     const octokit = new Octokit({ auth: config.token });
-    let hadError = false;
+    let worstError: Error | { message: string } | null = null;
+    let worstStatusRank = -1;
+    const statusRank = (status: string) =>
+      status === 'quota_exhausted' ? 2 : status === 'error' ? 1 : 0;
 
     for (const { owner, repo, prefix } of config.repos) {
       try {
@@ -826,14 +832,19 @@ export class IssueDataService {
       } catch (error: any) {
         console.error(`[IssueDataService] Error fetching GitHub issues for ${owner}/${repo}:`, error.message);
         this.trackers.github.lastError = error.message;
-        hadError = true;
-        this.recordPollOutcome('github', error);
+        const msg =
+          typeof error === 'object' && error !== null && 'message' in error
+            ? String(error.message)
+            : String(error ?? '');
+        const rank = statusRank(/rate.?limit/i.test(msg) ? 'quota_exhausted' : 'error');
+        if (rank > worstStatusRank) {
+          worstStatusRank = rank;
+          worstError = error;
+        }
       }
     }
 
-    if (!hadError) {
-      this.recordPollOutcome('github', null);
-    }
+    this.recordPollOutcome('github', worstError);
 
     // Check if data actually changed (cheap length + updatedAt check)
     const oldData = this.trackers.github.lastFetchedIssues;

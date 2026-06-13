@@ -78,6 +78,18 @@ describe('doctor checkTrackerQuota (PAN-1817)', () => {
     expect(result.message).toMatch(/rally/i);
   });
 
+  it('warns when GitHub resetAt is unparseable but remaining is zero', () => {
+    mockRateLimits.set('github', {
+      remaining: 0,
+      total: 5000,
+      resetAt: 'invalid',
+    });
+
+    const result = checkTrackerQuota();
+    expect(result.status).toBe('warn');
+    expect(result.message).toMatch(/github rate limit exhausted/i);
+  });
+
   it('ignores stale quota_exhausted records', () => {
     const staleObservedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     mockPollHealth.set('linear', { status: 'quota_exhausted', message: 'old rate limit', observedAt: staleObservedAt });

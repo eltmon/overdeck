@@ -115,6 +115,14 @@ describe.sequential('system-health quota signal (PAN-1817)', () => {
         resetAt: new Date(Date.now() - 60 * 1000).toISOString(),
       });
       expect(readTrackerQuota(cache).githubRemaining).toBeNull();
+
+      // 5. Unparseable/missing resetAt is treated as still exhausted.
+      cache.updateRateLimit('github', {
+        remaining: 0,
+        total: 5000,
+        resetAt: 'invalid',
+      });
+      expect(readTrackerQuota(cache).githubRemaining).toBe(0);
     });
   });
 });
