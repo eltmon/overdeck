@@ -1,0 +1,73 @@
+{
+  "version": "1",
+  "issueId": "PAN-1818",
+  "created": "2026-06-13T13:45:06.214Z",
+  "updated": "2026-06-13T14:05:00.000Z",
+  "gitState": { "branch": "feature/pan-1818", "sha": "c8ea5dc2e", "dirty": true },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Ask #1 (cap inlined diff) is already satisfied by PAN-1125 — reviewer prompts inline only a Tier-1 summary (diff stat + top-15 risk-ranked files), never the raw diff (review-context.ts:25-27,194-196). Do NOT re-implement diff truncation. Address only the residual runtime-read overflow with a lightweight large-changeset reading guardrail (WI-3); do NOT rearchitect review into chunked passes.",
+      "recordedAt": "2026-06-13T14:05:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Core fix (ask #2): monitorReviewConvoySignals() must detect a context-overflow 400 in the reviewer's tmux tail and signal REVIEWER_FAILED immediately WITHOUT respawning. Overflow on the same diff/manifest is deterministic — respawning re-overflows and burns ~6 min. The new overflow branch must run BEFORE the existing idleAndNoOutput/respawnIdleReviewer branch (deacon.ts:5868). PAN-1806's respawn stays only for transient API errors.",
+      "recordedAt": "2026-06-13T14:05:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "checkApiErrorAgents() must EXCLUDE convoy reviewer sub-role sessions (regex /^agent-.*-review-(?:security|correctness|performance|requirements)$/, reused from cleanupOrphanedReviewSessions deacon.ts:5957). monitorReviewConvoySignals() is their sole lifecycle owner. Reason: checkApiErrorAgents derives issueId by stripping 'agent-' + uppercasing (deacon.ts:1005-1007), producing a garbage id for reviewers (e.g. PAN-1815-REVIEW-CORRECTNESS) and applying work-agent compact-respawn (bd/continue-seeded) to a reviewer — wrong, and it races the monitor.",
+      "recordedAt": "2026-06-13T14:05:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Ask #3 scoped to: fix the contradictory gpt-5.5 notes string (model-capabilities.ts:480 says 'ceiling is 200K' but contextWindow=150k) and add a test locking contextWindow === CLIPROXY_CODEX_CONTEXT_WINDOW. Generalizing the conservative ceiling to all CLIProxy models inside computeContextUsage is deferred to PAN-1672 (conversation-side window honesty) — NonGoal here.",
+      "recordedAt": "2026-06-13T14:05:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Large-changeset threshold = > 25 changed files OR > 1500 total changed lines (additions+deletions), as named constants REVIEW_LARGE_CHANGESET_FILES / REVIEW_LARGE_CHANGESET_LINES. Evidence PR #1815 was 24 vBRIEF items / +2514/-711 (~3225 lines); threshold triggers well below that and above ordinary PRs.",
+      "recordedAt": "2026-06-13T14:05:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Branch-ordering bug risk: if the new overflow fast-fail branch in monitorReviewConvoySignals is placed AFTER the idleAndNoOutput/respawn branch, an overflowed reviewer gets respawned (deterministic re-overflow) instead of fast-failing — silently defeating the whole fix.",
+      "mitigation": "Place the overflow check as the second branch (after outputWrittenForThisRun→ready, before idleAndNoOutput). Add a test asserting respawnIdleReviewer is NOT called when the tail shows overflow."
+    },
+    {
+      "id": "H2",
+      "summary": "Deacon runs in the dashboard Node event loop — execSync would freeze all HTTP/WS/polling (PAN-70).",
+      "mitigation": "Reuse the already-imported async capturePane (deacon.ts:156, used at :989/:5453) and Effect.runPromise; never add execSync."
+    },
+    {
+      "id": "H3",
+      "summary": "Tests touching reviewer idle thresholds / REVIEWER_IDLE_FAILURE_MS use real-time waits → flaky/slow and OOM-prone (project rule).",
+      "mitigation": "Use vi.useFakeTimers() + advanceTimersByTimeAsync in all monitorReviewConvoySignals tests; never real setTimeout, never maxForks:1."
+    },
+    {
+      "id": "H4",
+      "summary": "WI-2 excludes only reviewer SUB-ROLE sessions; the synthesis agent (agent-<issue>-review, no sub-role) still mis-derives issueId 'PAN-<n>-REVIEW' in checkApiErrorAgents and could receive work-agent compact-respawn on its own overflow. This is a known latent edge case, NOT in this issue's evidence.",
+      "mitigation": "Documented as a NonGoal. Do NOT broaden WI-2 to synthesis without a separate decision — synthesis overflow handling is its own concern."
+    },
+    {
+      "id": "H5",
+      "summary": "WI-3 selective-reading guidance must not silently weaken review: a reviewer that can't cover everything must BLOCK with a coverage gap, never approve unreviewed high-risk code.",
+      "mitigation": "Guidance block explicitly instructs: flag uncovered high-risk files as a blocking coverage gap. Keep the block conditional on isLarge so small-PR prompts are unchanged."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-13T13:45:06.214Z",
+      "reason": "planning",
+      "note": "Initial planning session (auto mode) for PAN-1818",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}
