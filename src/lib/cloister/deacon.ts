@@ -977,8 +977,15 @@ export async function checkApiErrorAgents(): Promise<string[]> {
   const agentSessions = sessionNames.filter(
     name => name.startsWith('agent-') || name.startsWith('specialist-') || name.startsWith('planning-'),
   );
+  // PAN-1818: convoy reviewer sub-role sessions (agent-<issue>-review-<subRole>)
+  // are owned exclusively by monitorReviewConvoySignals(). checkApiErrorAgents
+  // derives a garbage issueId from these names and would apply work-agent
+  // compact-respawn, racing the monitor. Skip them here.
+  const nonReviewerSessions = agentSessions.filter(
+    name => !/^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(name),
+  );
 
-  for (const sessionName of agentSessions) {
+  for (const sessionName of nonReviewerSessions) {
     const recovery = apiErrorRecoveryState.get(sessionName);
     if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
       continue;
