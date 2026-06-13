@@ -1,0 +1,308 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T15:10:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1802: pan handoff hard-fails ('Prompt is too long') when the source conversation is large — should truncate/skip the smart summary, not abort",
+    "updated": "2026-06-13T14:46:53.325Z"
+  },
+  "plan": {
+    "id": "pan-1802",
+    "title": "pan handoff must degrade, not abort, on a large source conversation",
+    "status": "proposed",
+    "uid": "de1a2bc2-af7d-421b-8e72-61b4a6fc8a8d",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T15:10:00.000Z",
+    "updated": "2026-06-13T14:46:53.325Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1802",
+        "label": "PAN-1802",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "handoff",
+      "summary-fork",
+      "resilience",
+      "smart-compaction"
+    ],
+    "narratives": {
+      "Problem": "pan handoff authors the successor's seed by summarizing the SOURCE conversation's full transcript. When the source is large the summarizer overflows the model context (claude -p exits non-zero with 'Prompt is too long' / terminal_reason=blocking_limit), runModelSummary rejects, generateSmartSummary wraps it as 'Smart summary generation failed', and runForkPipeline aborts. The orphan: the conversation row is created and marked active BEFORE the pipeline runs (conversations.ts:4252,4284), so a failed pipeline leaves a ghost conversation (forkStatus='failed', status='active') whose tmux session never spawned. The deepest cause is that runForkPipeline's fallback path (conversations.ts:3948-3953) calls buildSummary() UNGUARDED — it runs the same LLM summarizer on the same oversized transcript, which throws the same overflow, and that throw escapes the pipeline.",
+      "Proposal": "Make handoff a guaranteed-success degradation ladder. (1) The shared summarizer chokepoint generateSummaryFromPrompt catches context-overflow and retries once on a head+tail-truncated chunk instead of aborting — a degraded summary beats none, and this also makes authorHandoffExternal's precompaction resilient. (2) runForkPipeline guards every fallback buildSummary() so a throw drops to the heuristic local summary (generateFallbackSummary — no LLM, cannot overflow), and a further throw drops to a focus-only empty seed; the pipeline ALWAYS reaches ensureForkSessionReady and spawns, persisting forkFallbackReason. (3) If the pipeline still fails terminally, the fork route marks the conversation ended (not deleted) so it is not a live ghost. (4) Document the 500-char focus limit and the auto-degrade behavior in pan handoff --help and the pan-handoff skill.",
+      "NonGoals": "- Do NOT modify the legacy in-process createSummaryForkPromise lib path — it has no production callers (only a comment reference in fork-client.ts:10); the live path is runForkPipeline.\n- Do NOT change chunk budgets (CHUNK_BUDGET_CHARS_BY_MODEL) or which model summarizes — only overflow resilience.\n- Do NOT delete any conversation — conversations are never deleted, only archived (repo invariant, conversations.ts:2604-2606).\n- Do NOT change the --author source (live-agent) authoring mode beyond the shared fallback guard it already inherits.\n- Do NOT introduce a new overflow-detection module — extend src/lib/context-overflow.ts."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix #1 truncation is implemented once in the shared generateSummaryFromPrompt (smart-compaction.ts:791) as head+tail truncate + single retry, not as a top-level 'last N turns' pre-truncation.",
+        "rationale": "A single chokepoint covers all 5 callers (chunked loops at :899/:965 and non-chunked at :1082/:1088) and makes authorHandoffExternal precompaction resilient too — DRY. Head+tail preserves the early goal/context AND the recent work; retry-once bounds cost."
+      },
+      {
+        "summary": "Handoff fallback ladder = authored doc → LLM summary (truncation-resilient) → heuristic local summary (generateFallbackSummary, no LLM) → focus-only empty seed; always spawn.",
+        "rationale": "The heuristic fallback already exists and is structurally overflow-proof (no LLM call), so it is the correct floor before an empty seed; this guarantees the handoff never hard-fails while preserving as much context as possible."
+      },
+      {
+        "summary": "Terminal-failure disposition is markConversationEnded (status 'ended'), not delete.",
+        "rationale": "Repo invariant: conversations are never deleted, only archived (conversations.ts:2604-2606). Marking ended surfaces the dead fork without data loss."
+      },
+      {
+        "summary": "Reuse/extend src/lib/context-overflow.ts for the claude -p overflow detector rather than creating a new module.",
+        "rationale": "That module already owns context-overflow detection semantics (CONTEXT_OVERFLOW_PATTERNS, isContextOverflowTail); extending it keeps overflow knowledge in one place."
+      },
+      {
+        "summary": "The legacy createSummaryForkPromise lib path is left untouched.",
+        "rationale": "It has no production callers; touching it would be non-surgical and risk divergence with no user-facing benefit."
+      }
+    ],
+    "items": [
+      {
+        "id": "overflow-detector",
+        "title": "Add a claude -p context-overflow detector to context-overflow.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T15:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1802",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/context-overflow.ts with a pure matcher isContextOverflowError(err: unknown): boolean that recognizes the summarizer overflow signature. Add the claude -p phrasings ('prompt is too long', 'blocking_limit') to a patterns list and match case-insensitively against the error message (err instanceof Error ? err.message : String(err)), also reusing the existing CONTEXT_OVERFLOW_PATTERNS so the 400 'input exceeds the context window' tail is covered. No I/O, no side effects."
+        },
+        "items": [
+          {
+            "id": "overflow-detector.ac1",
+            "title": "isContextOverflowError returns true for an Error whose message contains the claude -p blocking-limit envelope (e.g. '...\"result\":\"Prompt is too long\"...\"terminal_reason\":\"blocking_limit\"...') and matches case-insensitively.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overflow-detector.ac2",
+            "title": "isContextOverflowError returns true for the existing 'input exceeds the context window' phrasing and returns false for an unrelated error such as 'ENOENT: no such file'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overflow-detector.ac3",
+            "title": "src/lib/context-overflow.ts provides a named isContextOverflowError(err) helper that returns a boolean and is importable by the summarizer module.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summarizer-truncate-retry",
+        "title": "Truncate (head+tail) and retry once when a summary chunk overflows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T15:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1802",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/conversations/smart-compaction.ts, make generateSummaryFromPrompt (:791) resilient to context overflow. Add a head+tail truncation helper (preserve the first and last portions, insert an elision marker like '[... N characters truncated ...]'). When the underlying runModelSummary call rejects AND isContextOverflowError(err) is true (from the overflow-detector bead), rebuild the prompt with the serialized chunk truncated head+tail to a per-model ceiling derived from getChunkBudgetChars(model), also capping previousSummary, and retry exactly once. If the retried call also overflows (or any non-overflow error occurs), reject so the caller's fallback handles it. Do not loop. This single chokepoint covers all generateSummaryFromPrompt call sites (chunked loops and non-chunked) and authorHandoffExternal precompaction."
+        },
+        "items": [
+          {
+            "id": "summarizer-truncate-retry.ac1",
+            "title": "Given the first runModelSummary call rejects with a context-overflow error, generateSummaryFromPrompt truncates the serialized chunk head+tail and retries once, returning the degraded summary from the second (truncated) call instead of throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summarizer-truncate-retry.ac2",
+            "title": "The head+tail truncation helper, given input longer than the ceiling, returns text containing both the original head and the original tail plus an elision marker, and is no longer than the ceiling plus the marker; verified by a unit test on a long string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summarizer-truncate-retry.ac3",
+            "title": "When the retried (truncated) call also rejects with overflow, generateSummaryFromPrompt rejects (no third attempt, no infinite loop), surfacing the error to its caller.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summarizer-truncate-retry.ac4",
+            "title": "When the first runModelSummary call succeeds, generateSummaryFromPrompt returns that result unchanged and makes no second call (asserted by call count), so normal-sized summaries are unaffected.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-always-spawns",
+        "title": "Guard the handoff fallback summary so the pipeline always spawns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T15:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1802",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts runForkPipeline (:3862), the handoff fallback paths (catch blocks at :3948-3953, :3956-3961, :3963-3972) call buildSummary() unguarded — a throw escapes the pipeline. Wrap the fallback so a throw drops to generateFallbackSummary(parentSessionFile) (heuristic, no LLM, cannot overflow), and a further throw drops to an empty summary string; prependFallbackFocus(...) still preserves the operator focus. After the handoff block, the pipeline must continue to updateForkStatus('spawning') + ensureForkSessionReady + injectForkSummary + markConversationActive + updateForkStatus(null) regardless of which fallback tier produced the summary. forkFallbackReason continues to be persisted via updateConversationForkFallbackReason."
+        },
+        "items": [
+          {
+            "id": "handoff-always-spawns.ac1",
+            "title": "Given authorHandoffExternal throws AND the LLM fallback summary throws a context-overflow error, runForkPipeline seeds the successor from generateFallbackSummary and resolves successfully — ensureForkSessionReady is invoked and forkStatus is cleared to null (the pipeline does not reject).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-always-spawns.ac2",
+            "title": "Given the heuristic generateFallbackSummary ALSO throws, runForkPipeline spawns with a focus-only seed (empty summary passed through prependFallbackFocus) and still clears forkStatus to null without rejecting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-always-spawns.ac3",
+            "title": "After a fallback, the successor's forkFallbackReason is persisted (updateConversationForkFallbackReason called with the reason) so the CLI prints the yellow 'Handoff fell back to summary fork' notice.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-always-spawns.ac4",
+            "title": "A test mocking authorHandoffExternal and generateSummaryForFork to throw overflow asserts runForkPipeline invokes ensureForkSessionReady and resolves without rejecting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mark-failed-fork-ended",
+        "title": "Mark the conversation ended when a fork pipeline fails terminally",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T15:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1802",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/conversations.ts, the fork route's pipeline error handler (:4288-4291) sets forkStatus='failed' but leaves the conversation status='active' (set at :4284), producing a live ghost. Add markConversationEnded(newConv.name) inside that .catch alongside updateForkStatus(newConv.name,'failed',msg) so a fork that dies before spawn is surfaced as ended, not active. Do not delete the conversation."
+        },
+        "items": [
+          {
+            "id": "mark-failed-fork-ended.ac1",
+            "title": "When runForkPipeline rejects, the fork route's catch calls markConversationEnded(name) in addition to updateForkStatus(name,'failed',msg).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mark-failed-fork-ended.ac2",
+            "title": "When the fork pipeline rejects, the conversation row persists status 'ended' and forkStatus 'failed' (not status 'active'), verified by a test that forces the pipeline to reject.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-limits",
+        "title": "Document focus limit and large-source auto-degrade in --help and skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T15:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1802",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the handoff command help in src/cli/index.ts (:433-441) so --help states that very large source conversations are auto-degraded (smart summary truncated, then heuristic/focus-only) and STILL hand off without aborting (the 500-char focus limit is already mentioned at :434). Update sync-sources/skills/pan-handoff/SKILL.md 'Fallback behavior' section (:90-99) to list the handoff-request-failed / degraded-summary fallback reason and to state that an oversized source produces a degraded handoff rather than a failure. Both files MUST change in the same commit (skills↔CLI lockstep) so scripts/lint-skills.sh stays green."
+        },
+        "items": [
+          {
+            "id": "document-limits.ac1",
+            "title": "Running `pan handoff --help` prints text stating the focus 500-character limit AND that very large source conversations are auto-degraded and still hand off without aborting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-limits.ac2",
+            "title": "The pan-handoff SKILL.md 'Fallback behavior' section contains the handoff-request-failed fallback reason and the statement that an oversized source produces a degraded handoff, not a failure.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-limits.ac3",
+            "title": "scripts/lint-skills.sh passes for the handoff command with no flag/help drift after the help text and skill are updated together.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "overflow-detector",
+        "to": "summarizer-truncate-retry",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1802-pan-handoff-must-degrade-not-abort-on-a-large-source-conversation.vbrief.json"
+    }
+  }
+}

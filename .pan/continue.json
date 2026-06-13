@@ -1,0 +1,27 @@
+{
+  "version": "1",
+  "issueId": "PAN-1802",
+  "created": "2026-06-13T14:34:06.575Z",
+  "updated": "2026-06-13T15:10:00.000Z",
+  "gitState": { "branch": "feature/pan-1802", "sha": "46dbb6d51", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Fix lives in the live server pipeline runForkPipeline (conversations.ts:3862), NOT the legacy lib createSummaryForkPromise — the latter has no production callers (only a comment in fork-client.ts:10).", "recordedAt": "2026-06-13T15:10:00.000Z" },
+    { "id": "D2", "summary": "Resilience is a degradation ladder: authored doc → LLM summary (truncation-resilient) → heuristic local summary (generateFallbackSummary, no LLM, cannot overflow) → focus-only empty seed. The pipeline ALWAYS reaches ensureForkSessionReady and spawns.", "recordedAt": "2026-06-13T15:10:00.000Z" },
+    { "id": "D3", "summary": "Fix #1 (truncate-and-retry) is implemented once in the shared generateSummaryFromPrompt (smart-compaction.ts:791) as a head+tail truncate + single retry. This covers all 5 call sites (chunked loops + non-chunked) and makes authorHandoffExternal precompaction resilient too — DRY single chokepoint.", "recordedAt": "2026-06-13T15:10:00.000Z" },
+    { "id": "D4", "summary": "Context-overflow detection extends src/lib/context-overflow.ts (already owns overflow semantics) with isContextOverflowError(err) matching 'prompt is too long' + 'blocking_limit' (case-insensitive) plus existing CONTEXT_OVERFLOW_PATTERNS. No new module.", "recordedAt": "2026-06-13T15:10:00.000Z" },
+    { "id": "D5", "summary": "Terminal-failure disposition = markConversationEnded (status 'ended'), NOT delete — repo invariant: conversations are never deleted, only archived (conversations.ts:2604-2606).", "recordedAt": "2026-06-13T15:10:00.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "The detector must match the ACTUAL runModelSummary rejection message. On code!==0 it rejects with `Summary generation failed: <stderr|stdout>`, and for an oversized prompt the detail is the claude -p JSON envelope containing \"result\":\"Prompt is too long\" and \"terminal_reason\":\"blocking_limit\". runModelSummaryPromise does NOT inspect is_error (smart-compaction.ts:753-766) — overflow surfaces only via the non-zero exit. If detector patterns drift from this, fix #1 silently no-ops.", "mitigation": "Bead-1 unit test asserts isContextOverflowError returns true for the exact issue string; bead-2 test mocks runModelSummary to reject with that real-world message and asserts the truncate-retry fires." },
+    { "id": "H2", "summary": "Even after truncating the chunk, an accumulated <previous-summary> (generateSummaryFromPrompt:805-809) can itself overflow the window.", "mitigation": "Bead-2 retry caps BOTH the serialized chunk and previousSummary to a head+tail ceiling; if the retried call still overflows, throw (caller's heuristic fallback in bead-3 catches it)." },
+    { "id": "H3", "summary": "Fake-timers repo rule: any test touching retry/backoff/delay must use vi.useFakeTimers(), never real setTimeout. runModelSummary uses a real setTimeout timeout.", "mitigation": "Tests mock runModelSummary/generateSummaryForFork entirely so no real LLM spawn or timeout runs; no wall-clock waits." },
+    { "id": "H4", "summary": "Skills↔CLI lockstep: bead-5 must edit src/cli/index.ts handoff help AND sync-sources/skills/pan-handoff/SKILL.md in the same commit or scripts/lint-skills.sh (in npm run lint) fails CI.", "mitigation": "Bead-5 scope explicitly includes both files; AC requires npm run lint to pass." },
+    { "id": "H5", "summary": "conversations.ts is dashboard-server-reachable: no execSync, async only. markConversationEnded is a sync DB write (fine).", "mitigation": "Reuse existing sync DB helpers (markConversationEnded, updateForkStatus); add no blocking calls." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    { "timestamp": "2026-06-13T14:34:06.575Z", "reason": "planning", "note": "Initial planning session", "agentModel": "agent:claude-opus-4-8" }
+  ]
+}
