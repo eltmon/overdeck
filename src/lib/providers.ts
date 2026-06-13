@@ -75,7 +75,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
     defaultHarness: 'pi',
-    models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    models: ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
     description: 'Route directly to Kimi Anthropic-compatible endpoints; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
@@ -231,7 +231,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Kimi models
-  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 

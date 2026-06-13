@@ -24,7 +24,7 @@ export type OpenAIModel =
   | 'gpt-4o'
   | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
-export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
+export type KimiModel = 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
@@ -254,7 +254,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
-    ? ['kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']
+    ? ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
