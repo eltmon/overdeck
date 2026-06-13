@@ -1,0 +1,416 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T14:20:05.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1834: Reviewer/sub-agent blocked on interactive modal shows no needs-you triangle and emits no activity-feed notification",
+    "updated": "2026-06-13T14:24:39.066Z"
+  },
+  "plan": {
+    "id": "pan-1834",
+    "title": "Surface blocked reviewers/sub-agents: rate-limit modal detection + needs-you triangle + activity-feed/TTS",
+    "status": "proposed",
+    "uid": "6900469b-be90-4b05-9f52-b252be858b12",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T14:20:05.000Z",
+    "updated": "2026-06-13T14:24:39.066Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1834",
+        "label": "PAN-1834",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1830",
+        "label": "PAN-1830 (signal side / modal suppression)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "enrichment",
+      "needs-you",
+      "activity-feed",
+      "tts",
+      "review-convoy",
+      "codex"
+    ],
+    "narratives": {
+      "Problem": "A convoy sub-reviewer (agent-pan-1696-review-correctness, codex/gpt-5.5) blocked on an interactive gpt-5.5 rate-limit/model-switch modal waiting for a keypress. The review stalled but the dashboard showed no needs-you triangle and emitted no activity-feed/TTS event, so the operator could not see the stall. An autonomous fleet must surface 'agent X is blocked waiting for input' loudly.",
+      "Proposal": "Five targeted fixes: (1) add a conservative pane signature for the rate-limit/model-switch modal (new reason 'rate_limit'); (2) introduce a 'rateLimit' PendingInputKind in both server+frontend unions and promote 'rate_limit' detections into pendingInputKinds so the triangle/Needs-you list fire; (3) stop the hasActiveSpecialist guard from suppressing an agent that is ITSELF the active specialist (fixes sub-reviewers); (4) make inspect agents enumerable by writing a minimal state.json at spawn (deacon-safe: it ignores the inspect- prefix); (5) emit a single activity.entry + activity.tts on the rising edge of pendingInputCount inside the enrichment poller, naming the blocked agent and what it is waiting for.",
+      "NonGoals": "- Suppressing or auto-dismissing the rate-limit modal on non-interactive sessions (that is PAN-1830 ask 2).\n- Auto-answering the modal or programmatically switching models.\n- Promoting inspect agents into deacon-managed lifecycle / auto-resume (deacon keeps ignoring the inspect- prefix).\n- Detecting arbitrary or unknown harness modals beyond the rate-limit/model-switch signature.\n- Changing AskUserQuestion detection, delivery, or the PAN-1520 hook.\n- Adding pane-detected permission menus to the needs-you list (pre-existing gap, out of scope)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the hasActiveSpecialist suppression inside computeAgentEnrichmentPromise rather than at its three call sites (poller, read-model, /api/agents route).",
+        "rationale": "Centralizing keeps all three sites consistent and avoids drift; the function already knows the agent's id/role. An agent is its own active specialist when derived role is review/test/ship."
+      },
+      {
+        "summary": "Make inspect agents enumerable by writing a minimal state.json at spawn, mirroring review-agent.ts:281, instead of a bespoke poller-only enumeration.",
+        "rationale": "Root-cause fix for 'no state.json'; reuses every existing enrichment path; deacon-safe because deacon patrols ignore the inspect- prefix (deacon.ts:978,2108,3908,4332,5430)."
+      },
+      {
+        "summary": "The activity-feed entry + TTS fire for ANY awaiting-input kind on the rising edge, not only the rate-limit modal.",
+        "rationale": "The underlying gap (no activity/TTS on awaiting-input) is general; a kind-agnostic rising-edge emitter fixes the whole class with one change and covers the observed incident."
+      },
+      {
+        "summary": "TTS priority = 1 (warn).",
+        "rationale": "A blocked agent is actionable and time-sensitive but not an error; warn is prominent without interrupting error-priority speech."
+      },
+      {
+        "summary": "The rate-limit signature requires both a 'Keep current model' option line and a 'Switch to <model>' option line near the bottom of the pane.",
+        "rationale": "This two-option pairing is specific to the model-switch modal and avoids matching prose that merely mentions rate limits. If a real capture shows different wording, widen the regex to it and keep the pairing + recent-index guard."
+      }
+    ],
+    "items": [
+      {
+        "id": "detect-rate-limit-modal",
+        "title": "Add 'rate_limit' pane signature for the harness rate-limit/model-switch modal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:20:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agent-input-detection.ts, add 'rate_limit' to the AwaitingInputReason union (line 5) and a new detection branch in detectAwaitingInputFromPaneSync (after the session-resume branch, ~line 224). Add a looksLikeRateLimitModelSwitchModal(text) helper that requires a 'Keep current model' option line AND a 'Switch to <model>' option line. Gate on isRecentPromptIndex so an answered/scrolled-away modal does not re-fire. Add positive and negative cases to src/lib/__tests__/agent-input-detection.test.ts."
+        },
+        "items": [
+          {
+            "id": "detect-rate-limit-modal.ac1",
+            "title": "Given a pane containing a 'Keep current model' option and a 'Switch to gpt-5.4-mini' option near the bottom, detectAwaitingInputFromPaneSync returns { reason: 'rate_limit' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-rate-limit-modal.ac2",
+            "title": "The AwaitingInputReason union contains 'rate_limit' and src/lib/agent-input-detection.ts typechecks under npm run typecheck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-rate-limit-modal.ac3",
+            "title": "detectAwaitingInputFromPaneSync returns null for a pane that mentions a rate limit only in prose with no option pairing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detect-rate-limit-modal.ac4",
+            "title": "detectAwaitingInputFromPaneSync returns null when the modal option lines have scrolled outside the recent-prompt window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rate-limit-pending-kind",
+        "title": "Introduce 'rateLimit' PendingInputKind and promote 'rate_limit' detections into pendingInputKinds",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:20:05.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'rateLimit' to the PendingInputKind union in BOTH src/lib/agent-enrichment.ts (line 45) and src/dashboard/frontend/src/lib/pendingInput.ts (line 12), and add a label to PENDING_INPUT_KIND_LABEL in pendingInput.ts (e.g. 'Rate-limit modal — pick a model'). In computeAgentEnrichmentPromise (agent-enrichment.ts), promote a rate_limit detection into pendingInputKinds, mirroring the session_resume promotion at line 502."
+        },
+        "items": [
+          {
+            "id": "rate-limit-pending-kind.ac1",
+            "title": "Each PendingInputKind union (server src/lib/agent-enrichment.ts and frontend src/dashboard/frontend/src/lib/pendingInput.ts) contains 'rateLimit' and both files typecheck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-pending-kind.ac2",
+            "title": "PENDING_INPUT_KIND_LABEL contains a human label for 'rateLimit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-pending-kind.ac3",
+            "title": "computeAgentEnrichmentPromise produces a pendingInputKinds array carrying 'rateLimit' when the merged detection.reason equals 'rate_limit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-pending-kind.ac4",
+            "title": "describePendingInput(['rateLimit']) returns the human label rather than the raw kind string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unsuppress-active-specialist",
+        "title": "Do not suppress pending-input for an agent that is itself the active specialist",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:20:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1834",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "awaiting-input-activity-tts"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agent-enrichment.ts computeAgentEnrichmentPromise, add a pure helper that decides whether the agent is its own active specialist (derived role in {review, test, ship}). Replace the two suppression checks (hasPendingQuestion at line 475 and the if (!hasActiveSpecialist) block at line 483) so suppression applies only when hasActiveSpecialist is true AND the agent is NOT its own active specialist. This corrects all three call sites (poller, read-model.ts:674, routes/agents.ts:765) at once. Add unit coverage for the helper."
+        },
+        "items": [
+          {
+            "id": "unsuppress-active-specialist.ac1",
+            "title": "A pure helper returns true when the agent's derived role is review, test, or ship, and returns false for work, plan, or undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unsuppress-active-specialist.ac2",
+            "title": "computeAgentEnrichmentPromise produces a non-empty pendingInputKinds for a review-role agent when hasActiveSpecialist is true and a detection fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unsuppress-active-specialist.ac3",
+            "title": "computeAgentEnrichmentPromise produces an empty pendingInputKinds for a work-role agent when hasActiveSpecialist is true, preserving existing parked-agent suppression",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unsuppress-active-specialist.ac4",
+            "title": "hasPendingQuestion returns true for a review-role agent with a detection even when hasActiveSpecialist is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-agents-enumerable",
+        "title": "Make inspect agents enumerable by writing a minimal state.json at spawn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T14:20:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1834",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "awaiting-input-activity-tts"
+          ],
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/inspect-agent.ts, after createSession, write a minimal AgentState via saveAgentState for the inspect agent id (tmuxSession) carrying issueId=context.issueId, workspace=context.workspace, role='work', and the inspect subRole, mirroring how review-agent.ts:281 persists sub-reviewer state. This makes listRunningAgents (which requires a readable state.json via getAgentStateSync) enumerate inspect agents so the enrichment poller scans them. Do NOT change deacon patrols — they filter on agent-/specialist-/planning- prefixes and already exclude inspect-."
+        },
+        "items": [
+          {
+            "id": "inspect-agents-enumerable.ac1",
+            "title": "The inspect spawn path saves a state.json for the inspect agent carrying its workspace, issueId, and role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-agents-enumerable.ac2",
+            "title": "getAgentStateSync('inspect-<issue>-<bead>') returns a non-null AgentState after an inspect agent spawns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-agents-enumerable.ac3",
+            "title": "listRunningAgents contains the inspect agent with tmuxActive reflecting its live tmux session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-agents-enumerable.ac4",
+            "title": "The inspect agent id keeps the 'inspect-' prefix so deacon orphan-recovery refuses to auto-resume it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "awaiting-input-activity-tts",
+        "title": "Emit an activity-feed entry + TTS on the rising edge of an agent becoming blocked on input",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T14:20:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-enrichment-service.ts pollOnce, after computing enrichment and before/with the enrichment_changed emit, detect the rising edge: previous enrichment pendingInputCount === 0 (or absent) AND new enrichment pendingInputCount > 0. On that edge call emitActivityEntrySync (source = the agent role, level 'warn', message naming the agent, issueId, and the pending kind(s) via describePendingInput) and emitActivityTtsSync (priority 1, issueId, a short speakable utterance). Extract a pure helper for the edge decision + message text so it is unit-testable. Do not emit while the agent stays blocked across subsequent polls."
+        },
+        "items": [
+          {
+            "id": "awaiting-input-activity-tts.ac1",
+            "title": "When an agent's pendingInputCount rises from 0 to greater than 0 across polls, the poller emits one activity.entry naming the agent, its issueId, and the pending kind(s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "awaiting-input-activity-tts.ac2",
+            "title": "The same rising edge emits one activity.tts with priority 1 naming the blocked agent and what it is waiting for",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "awaiting-input-activity-tts.ac3",
+            "title": "While the agent stays blocked across subsequent polls, the poller emits no further activity.entry or activity.tts for the same block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "awaiting-input-activity-tts.ac4",
+            "title": "The emitted activity.entry contains the agent's issueId so the activity feed associates it with the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-blocked-agent-surfaces",
+        "title": "Document the rate-limit kind, specialist-unsuppression, inspect enumeration, and activity/TTS notification",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-13T14:20:05.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update docs/ASKUSERQUESTION-DASHBOARD.md (the awaiting-input field guide) to cover the new rateLimit kind + rate-limit modal pane signature, the hasActiveSpecialist unsuppression for active specialists, inspect-agent enumeration via a minimal state.json, and the rising-edge activity-feed + TTS notification."
+        },
+        "items": [
+          {
+            "id": "document-blocked-agent-surfaces.ac1",
+            "title": "docs/ASKUSERQUESTION-DASHBOARD.md contains a section describing the 'rateLimit' kind and the rate-limit/model-switch modal pane signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-blocked-agent-surfaces.ac2",
+            "title": "docs/ASKUSERQUESTION-DASHBOARD.md contains a paragraph stating active specialists are no longer suppressed by hasActiveSpecialist and that inspect agents surface via a minimal state.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-blocked-agent-surfaces.ac3",
+            "title": "docs/ASKUSERQUESTION-DASHBOARD.md contains a description of the rising-edge activity-feed and TTS notification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "detect-rate-limit-modal",
+        "to": "rate-limit-pending-kind",
+        "type": "blocks"
+      },
+      {
+        "from": "unsuppress-active-specialist",
+        "to": "awaiting-input-activity-tts",
+        "type": "informs"
+      },
+      {
+        "from": "inspect-agents-enumerable",
+        "to": "awaiting-input-activity-tts",
+        "type": "informs"
+      },
+      {
+        "from": "rate-limit-pending-kind",
+        "to": "document-blocked-agent-surfaces",
+        "type": "informs"
+      },
+      {
+        "from": "awaiting-input-activity-tts",
+        "to": "document-blocked-agent-surfaces",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1834-surface-blocked-reviewers-sub-agents-rate-limit-modal-detection-needs-you-triangle-activity-feed-tts.vbrief.json"
+    }
+  }
+}

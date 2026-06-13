@@ -1,0 +1,40 @@
+{
+  "version": "1",
+  "issueId": "PAN-1834",
+  "created": "2026-06-13T14:10:57.946Z",
+  "updated": "2026-06-13T14:20:05.000Z",
+  "gitState": { "branch": "feature/pan-1834", "sha": "4aeb458dc", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Three independent root causes, three independent fixes: (a) no pane signature for the rate-limit/model-switch modal; (b) pane detections other than session_resume produce no actionable PendingInputKind; (c) hasActiveSpecialist suppresses the active specialist's OWN pending-input. Plus two amplifiers: inspect agents are never enumerated (no state.json), and the poller emits no activity/TTS on awaiting-input.", "recordedAt": "2026-06-13T14:20:05.000Z" },
+    { "id": "D2", "summary": "Fix the hasActiveSpecialist suppression INSIDE computeAgentEnrichmentPromise (src/lib/agent-enrichment.ts), not at the 3 call sites (poller :142, read-model.ts:674, routes/agents.ts:765). The function already knows the agent id/role; centralizing fixes all sites consistently. Treat an agent as its OWN active specialist when derived role is in {review, test, ship}; keep suppression for parked work/plan agents.", "recordedAt": "2026-06-13T14:20:05.000Z" },
+    { "id": "D3", "summary": "A new pane reason MUST also become a new PendingInputKind AND be promoted into pendingInputKinds (mirror the session_resume promotion at agent-enrichment.ts:502). The needs-you list (selectPendingInputSubjects, store.ts:322) is kind-gated (kinds.length>0, PAN-1591) and ignores the fuzzy hasPendingQuestion bool, so reason alone does not raise the triangle.", "recordedAt": "2026-06-13T14:20:05.000Z" },
+    { "id": "D4", "summary": "Inspect agents become enumerable by writing a minimal state.json at spawn (inspect-agent.ts), mirroring review-agent.ts:281 saveAgentState(run). This is deacon-safe: deacon patrols filter on agent-/specialist-/planning- prefixes (deacon.ts:978,2108,3908,4332,5430) and never match inspect-, so no auto-resume ripple.", "recordedAt": "2026-06-13T14:20:05.000Z" },
+    { "id": "D5", "summary": "The awaiting-input activity-feed entry + TTS fire on the RISING EDGE of pendingInputCount (not-waiting -> waiting) inside the poller pollOnce, kind-agnostic (covers rate-limit, AUQ, plan-mode, session-resume). TTS priority 1 (warn). One emit per transition, not per poll.", "recordedAt": "2026-06-13T14:20:05.000Z" },
+    { "id": "D6", "summary": "PendingInputKind is defined twice and MUST stay in sync: server src/lib/agent-enrichment.ts:45 and frontend src/dashboard/frontend/src/lib/pendingInput.ts:12. Adding 'rateLimit' touches both, plus the PENDING_INPUT_KIND_LABEL map in pendingInput.ts.", "recordedAt": "2026-06-13T14:20:05.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "No live capture of the exact gpt-5.5 rate-limit modal text. Signature is built from the issue's quoted wording ('Switch to gpt-5.4-mini' / 'Keep current model').", "mitigation": "Require BOTH a 'Keep current model' option line and a 'Switch to <model>' option line near the bottom of the pane, plus a recent/current prompt-index guard (like the existing detections). Ship with a fixture test in src/lib/__tests__/agent-input-detection.test.ts; if a real capture surfaces different wording, widen the regex to it and keep the two-option-pairing + recent-index guard." },
+    { "id": "H2", "summary": "False-positive needs-you rows would erode trust (the exact failure PAN-1591 fixed).", "mitigation": "Keep the signature conservative (two-option pairing + recent index). Add a negative test: a pane that merely mentions a rate limit in prose, and an answered/scrolled-away modal, must return null." },
+    { "id": "H3", "summary": "Giving inspect agents a state.json makes them appear in OTHER listRunningAgents consumers (session tree, stopped-agent banner), and the state.json lingers as 'stopped' after the inspect finishes.", "mitigation": "Accepted: visibility is the issue's goal. Deacon is prefix-safe (ignores inspect-). Reuse the sub-reviewer state.json shape so existing agent-directory-cleanup handling applies. Reviewer/UAT should confirm no auto-resume and no duplicate/duelling inspect sessions." },
+    { "id": "H4", "summary": "Server restart clears the poller's in-memory state.lastEnrichment, so the first poll after restart sees an already-blocked agent as a fresh rising edge and re-announces it.", "mitigation": "Accepted as benign — re-announcing a still-blocked agent after a restart is desirable, not noise. Do not persist edge state to disk for this." },
+    { "id": "H5", "summary": "Inspect agents have no workspace in state.json historically, so JSONL-derived kinds (AUQ) may not resolve; pane detection (the rate-limit case) does resolve from the tmux session alone.", "mitigation": "Populate the inspect state.json with the real workspace (context.workspace) so getAgentWorkspacePromise resolves the JSONL path too. The PRIMARY case (rate-limit modal) is pane-based and works regardless." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session for PAN-1834. See .pan/drafts/PAN-1834.md for the full PRD, root-cause analysis (verified at 4aeb458dc), requirements (FR-1..FR-6, NFR-1..NFR-3), and auto-decisions. Original orchestration-context preserved in git history of this file.",
+      "note": "Planning session started for PAN-1834: Reviewer/sub-agent blocked on interactive modal shows no needs-you triangle and emits no activity-feed notification — operator can't see the stall",
+      "timestamp": "2026-06-13T14:10:57.946Z"
+    },
+    {
+      "timestamp": "2026-06-13T14:20:05.000Z",
+      "reason": "planning",
+      "note": "Discovery complete (--auto). 6 beads authored; vBRIEF written; root causes 1-5 verified against code.",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}
