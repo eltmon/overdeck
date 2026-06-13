@@ -41,6 +41,17 @@ export interface RateLimitInfo {
   resetAt: string;
 }
 
+/**
+ * Parse an integer value from a response header.
+ * Returns null when the header is missing or not a finite integer.
+ */
+export function parseIntegerHeader(headers: Headers, name: string): number | null {
+  const raw = headers.get(name);
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 // Cache entry returned from get()
 export interface CacheEntry {
   data: any;

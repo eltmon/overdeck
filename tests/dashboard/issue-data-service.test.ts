@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { IssueDataService, getCanonicalStatus } from '../../src/dashboard/server/services/issue-data-service.js';
 import { CacheService } from '../../src/dashboard/server/services/cache-service.js';
+import { getLinearApiKey } from '../../src/dashboard/server/services/tracker-config.js';
 
-// Mock dependencies
 vi.mock('../../src/dashboard/server/services/tracker-config.js', () => ({
   getGitHubConfig: vi.fn(() => null),
   getLinearApiKey: vi.fn(() => null),
@@ -238,5 +238,187 @@ describe('IssueDataService - getIssues cycle filter', () => {
         mergeStatus: 'merged',
       });
     });
+  });
+});
+
+describe('IssueDataService - fetchLinearIssues rate-limit headers', () => {
+  let service: IssueDataService;
+  let mockCache: any;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    mockCache = {
+      get: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(),
+      getEtag: vi.fn(),
+      updateRateLimit: vi.fn(),
+      getRateLimit: vi.fn(),
+      getBackoffMs: vi.fn(() => 0),
+      isStale: vi.fn(() => true),
+      invalidate: vi.fn(),
+    };
+    service = new IssueDataService(mockCache);
+
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    vi.mocked(getLinearApiKey).mockReturnValue('linear-api-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  function makeLinearResponse(headers: Record<string, string>, body: any) {
+    return {
+      ok: true,
+      status: 200,
+      headers: new Headers(headers),
+      json: vi.fn().mockResolvedValue(body),
+    };
+  }
+
+  it('records Linear rate-limit headers before reading the body', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '2499',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', {
+      remaining: 2499,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    });
+  });
+
+  it('normalizes reset values below 1e12 as Unix seconds', async () => {
+    const resetSeconds = 1_700_000_000;
+    const expectedResetAt = new Date(resetSeconds * 1000).toISOString();
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '100',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetSeconds),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      resetAt: expectedResetAt,
+    }));
+  });
+
+  it('normalizes reset values at or above 1e12 as Unix milliseconds', async () => {
+    const resetMs = 1_700_000_000_000;
+    const expectedResetAt = new Date(resetMs).toISOString();
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '100',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      resetAt: expectedResetAt,
+    }));
+  });
+
+  it('falls back to bare x-ratelimit-* header names', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-remaining': '1500',
+          'x-ratelimit-limit': '2500',
+          'x-ratelimit-reset': String(resetMs),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', {
+      remaining: 1500,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    });
+  });
+
+  it('skips update and does not throw when headers are missing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {},
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('skips update and does not throw when header values are unparseable', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': 'nope',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(Date.now() + 3_600_000),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('records rate-limit headers even when the GraphQL body contains errors', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { errors: [{ message: 'RATELIMITED' }] }
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('RATELIMITED');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    }));
   });
 });

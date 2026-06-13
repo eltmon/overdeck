@@ -17,7 +17,7 @@ import { existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
-import { CacheService, DEFAULT_TTLS } from './cache-service.js';
+import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
@@ -1007,6 +1007,14 @@ export class IssueDataService {
     }
   }
 
+  private normalizeLinearResetAt(resetValue: number | null): string | null {
+    if (resetValue === null) return null;
+    // Linear sends reset as Unix milliseconds, but other trackers use Unix seconds.
+    // Defensive normalization: values below 1e12 are seconds, otherwise milliseconds.
+    const epochMs = resetValue < 1_000_000_000_000 ? resetValue * 1000 : resetValue;
+    return new Date(epochMs).toISOString();
+  }
+
   private async fetchLinearIssues(apiKey: string, sinceUpdatedAt: string | null): Promise<any[]> {
     const allIssues: any[] = [];
     let hasMore = true;
@@ -1094,6 +1102,23 @@ export class IssueDataService {
         },
         body: JSON.stringify({ query, variables: { after: cursor } }),
       });
+
+      // Parse Linear rate-limit headers before reading the body or throwing on errors.
+      // Linear uses x-ratelimit-requests-*; fall back to the bare x-ratelimit-* names.
+      const rlRemaining =
+        parseIntegerHeader(response.headers, 'x-ratelimit-requests-remaining') ??
+        parseIntegerHeader(response.headers, 'x-ratelimit-remaining');
+      const rlTotal =
+        parseIntegerHeader(response.headers, 'x-ratelimit-requests-limit') ??
+        parseIntegerHeader(response.headers, 'x-ratelimit-limit');
+      const rlReset =
+        this.normalizeLinearResetAt(
+          parseIntegerHeader(response.headers, 'x-ratelimit-requests-reset') ??
+            parseIntegerHeader(response.headers, 'x-ratelimit-reset')
+        );
+      if (rlRemaining !== null && rlTotal !== null && rlReset !== null) {
+        this.cache.updateRateLimit('linear', { remaining: rlRemaining, total: rlTotal, resetAt: rlReset });
+      }
 
       const json = await response.json();
 
