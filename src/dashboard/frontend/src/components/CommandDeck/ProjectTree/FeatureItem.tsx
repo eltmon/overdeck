@@ -324,6 +324,7 @@ function formatRoleList(roles: readonly string[]): string {
 
 function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
   return session.type === 'work'
+    || session.type === 'strike'
     || session.type === 'planning'
     || session.type === 'review'
     || session.type === 'reviewer'
@@ -565,13 +566,14 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
 
 const TYPE_PRIORITY: Record<string, number> = {
   work: 0,
-  review: 1,
-  test: 2,
-  reviewer: 3,
-  planning: 4,
-  ship: 5,
-  merge: 6,
-  legacy: 7,
+  strike: 1,
+  review: 2,
+  test: 3,
+  reviewer: 4,
+  planning: 5,
+  ship: 6,
+  merge: 7,
+  legacy: 8,
 };
 
 const PRESENCE_PRIORITY: Record<string, number> = {

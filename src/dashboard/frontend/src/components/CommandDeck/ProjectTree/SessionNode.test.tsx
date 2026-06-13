@@ -23,6 +23,7 @@ vi.mock('lucide-react', async (importOriginal) => {
     ClipboardList: (props: Record<string, unknown>) => <svg data-testid="clipboard" {...props} />,
     Layers: (props: Record<string, unknown>) => <svg data-testid="layers" {...props} />,
     Archive: (props: Record<string, unknown>) => <svg data-testid="archive" {...props} />,
+    Zap: (props: Record<string, unknown>) => <svg data-testid="zap" {...props} />,
   };
 });
 
@@ -176,6 +177,7 @@ describe('SessionNode', () => {
       test: 'claude-sonnet-4-6',
       ship: 'claude-sonnet-4-6',
       merge: 'claude-sonnet-4-6',
+      strike: 'claude-opus-4-8',
       legacy: null,
     };
   });
@@ -380,5 +382,33 @@ describe('SessionNode', () => {
 
     expect(screen.getAllByText('Start (sonnet-4-6)')).toHaveLength(2);
     expect(screen.getAllByText('Restart (sonnet-4-6)')).toHaveLength(2);
+  });
+
+  it('renders a strike node with label, purpose tooltip, model, and restart affordance', () => {
+    runtimeById['strike-pan-1835'] = {
+      lastActivity: '2026-05-06T11:55:00.000Z',
+    };
+
+    render(
+      <SessionNode
+        issueId="PAN-1835"
+        onRestartSession={vi.fn()}
+        session={makeSession({
+          sessionId: 'strike-pan-1835',
+          type: 'strike',
+          role: 'strike',
+          model: 'claude-opus-4-8',
+          status: 'running',
+          presence: 'active',
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Strike')).toHaveAttribute(
+      'title',
+      'Drop-in implement-and-merge agent for this issue. Model: opus-4-8. Session: strike-pan-1835. Last heard: 5m ago.',
+    );
+    expect(screen.getByText('opus-4-8')).toBeInTheDocument();
+    expect(screen.getByText('Restart (opus-4-8)')).toBeInTheDocument();
   });
 });
