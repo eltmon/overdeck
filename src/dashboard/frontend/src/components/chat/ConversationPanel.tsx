@@ -211,7 +211,7 @@ export function ConversationPanel({
       // overwritten by stale HTTP data.
       if (streamActiveRef.current) {
         const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
-        return cached ?? { messages: [], workLog: [] };
+        return cached ?? { messages: [], workLog: [], streaming: false };
       }
       return fetched;
     },
