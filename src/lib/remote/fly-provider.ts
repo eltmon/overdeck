@@ -45,6 +45,7 @@ export interface FlyProviderConfig {
 }
 
 const DURABLE_VOLUME_SIZE_GB = 10;
+const DURABLE_MAX_RETRIES = 3;
 
 function mapFlyStateToVmStatus(state: string): VmStatus {
   switch (state) {
@@ -233,7 +234,9 @@ export class FlyProvider implements RemoteProvider {
         size: this.config.vmSize,
         memory: this.config.vmMemory,
         region: this.config.region,
-        restart: { policy: 'no' },
+        restart: isDurable
+          ? { policy: 'on-failure', max_retries: DURABLE_MAX_RETRIES }
+          : { policy: 'no' },
         auto_destroy: false,
         ...(volumeId ? { mounts: [{ volume: volumeId, path: '/workspace' }] } : {}),
       });

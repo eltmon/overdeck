@@ -123,6 +123,7 @@ describe('FlyProvider', () => {
         sizeGb: 10,
       });
       expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        restart: { policy: 'on-failure', max_retries: 3 },
         mounts: [{ volume: 'vol-1', path: '/workspace' }],
       }));
     });
