@@ -366,13 +366,12 @@ describe('runTestRequirementCheck', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns failure lines directing to --force or --test-waived when tracker fetch fails (AC4)', async () => {
+  it('soft-fails with [] when the tracker is unreachable or unauthenticated (AC4)', async () => {
     vi.mocked(resolveGitHubIssueSync).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssueSync>);
     vi.mocked(getLinearApiKey).mockReturnValue(Effect.succeed(null));
 
     const result = await Effect.runPromise(runTestRequirementCheck(workspacePath, 'MIN-123'));
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.some((line) => line.includes('--test-waived'))).toBe(true);
+    expect(result).toEqual([]);
   });
 
   it('soft-fails with [] when git merge-base and fallback both fail (AC5)', async () => {
