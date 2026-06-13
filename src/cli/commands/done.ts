@@ -278,7 +278,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       } catch { /* non-fatal */ }
 
-      const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId));
+      const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId, options.testWaived));
 
       if (failures.length > 0) {
         console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
