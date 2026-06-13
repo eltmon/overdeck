@@ -361,6 +361,23 @@ export class CacheService {
   }
 
   /**
+   * Calculate suspension delay in ms for an exhausted tracker.
+   * Returns 0 when there is no rate limit row, remaining > 0, resetAt has
+   * passed, or resetAt is unparseable. Callers clamp to their own ceiling.
+   */
+  getSuspensionMs(tracker: string, now: number = Date.now()): number {
+    const limit = this.getRateLimit(tracker);
+    if (!limit) return 0;
+    if (limit.remaining > 0) return 0;
+
+    const resetMs = new Date(limit.resetAt).getTime();
+    if (!Number.isFinite(resetMs)) return 0;
+    if (resetMs <= now) return 0;
+
+    return resetMs - now;
+  }
+
+  /**
    * Get cache status for all trackers (for diagnostics endpoint).
    */
   getStatus(): Record<string, {
