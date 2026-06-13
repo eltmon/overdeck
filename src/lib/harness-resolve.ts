@@ -107,13 +107,13 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
 
   if (!(await hasHarnessBinary(winner))) {
     const binary = BINARY_BY_HARNESS[winner];
-    // PAN-1871 — same rule as the policy-denied path above: never silently
-    // route a non-native model to claude-code/CLIProxy when its own harness
-    // binary is missing at spawn time (this is what leaked PAN-1845 onto
-    // claude-code). Fail loudly so the cause is visible and recoverable.
-    if (builtInHarness && builtInHarness !== 'claude-code') {
+    // PAN-1871 — never silently fall back to claude-code from (a) an
+    // explicitly-requested harness, or (b) a non-native (CLIProxy) model whose
+    // own binary is missing at spawn. Silently routing kimi onto claude-code is
+    // what leaked PAN-1845. Fail loudly so the cause is visible and recoverable.
+    if (winnerIsExplicit || (builtInHarness && builtInHarness !== 'claude-code')) {
       throw new HarnessResolutionError(
-        `Harness ${winner} requested for ${input.model}, but ${binary} is not installed; ${input.model} is not native to claude-code (provider default is ${builtInHarness}), so refusing to silently fall back to claude-code/CLIProxy. Install ${binary} (check its PATH) and retry.`,
+        `Harness ${winner} (${winnerIsExplicit ? 'explicitly requested' : `provider default for ${input.model}`}) has no installed ${binary} binary at spawn — refusing to silently fall back to claude-code. Install ${binary} (check its PATH) and retry.`,
       );
     }
     console.warn(`harness ${winner} requested for ${provider}, but ${binary} is not installed — falling back to native claude-code`);
