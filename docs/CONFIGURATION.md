@@ -930,9 +930,11 @@ The default `quality_gates.test` command is change-scoped:
 ```yaml
 quality_gates:
   test:
-    command: npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}
+    command: npx vitest run --changed {{CHANGED_BASE}}
     required: true
 ```
+
+A project with extra test roots (e.g. panopticon-cli's `src/dashboard/frontend`) appends them in its own explicit `quality_gates.test` (`… && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}`). The generic default stays single-root so it works for any project.
 
 `{{CHANGED_BASE}}` is injected as `origin/<target-branch>` after the verification runner syncs the target branch. This keeps unrelated pre-existing failures from failing every work agent gate. Vitest's `--changed` graph follows static imports; dynamic imports, fixtures, generated files, and environment-driven branches may need explicit tests because they can be invisible to the changed-file graph.
 
