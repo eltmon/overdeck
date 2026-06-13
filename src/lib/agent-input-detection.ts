@@ -2,7 +2,7 @@ import { Effect } from 'effect'
 import { capturePane } from './tmux.js'
 import { TmuxError } from './errors.js'
 
-export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'other'
+export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'rate_limit' | 'other'
 
 export interface AwaitingInputDetection {
   reason: AwaitingInputReason
@@ -153,6 +153,16 @@ function looksLikeSessionResumeDialog(text: string): boolean {
 }
 
 /**
+ * PAN-1834 — Codex/gpt-5.5 rate-limit / model-switch modal. The harness shows a
+ * choice between keeping the current model and switching to an alternative.
+ * To avoid matching prose that merely mentions rate limits, require BOTH option
+ * lines to be present near the bottom of the pane.
+ */
+function looksLikeRateLimitModelSwitchModal(text: string): boolean {
+  return /keep current model/i.test(text) && /switch to\s+\S+/i.test(text)
+}
+
+/**
  * PAN-1690 — Codex TUI approval prompt header. Codex asks for approval with a
  * distinctive "Would you like to …?" prompt box (command run, edits, network/
  * host grants) followed by a numbered Yes/…/No menu. Unlike Claude's menu,
@@ -226,6 +236,17 @@ export function detectAwaitingInputFromPaneSync(
     return {
       reason: 'session_resume',
       prompt: snippetAround(lines, resumeIndex >= 0 ? resumeIndex : lines.length - 1, 8, 2),
+    }
+  }
+
+  // PAN-1834 — Codex/gpt-5.5 rate-limit / model-switch modal.
+  if (looksLikeRateLimitModelSwitchModal(recentText)) {
+    const rateLimitIndex = lastIndexMatching(lines, (line) => /keep current model|switch to\s+\S+/i.test(line))
+    if (isRecentPromptIndex(lines, rateLimitIndex)) {
+      return {
+        reason: 'rate_limit',
+        prompt: snippetAround(lines, rateLimitIndex >= 0 ? rateLimitIndex : lines.length - 1, 8, 2),
+      }
     }
   }
 

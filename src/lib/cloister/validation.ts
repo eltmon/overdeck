@@ -332,7 +332,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   typecheck: { command: 'npm run typecheck 2>&1' },
   lint: { command: 'npm run lint 2>&1' },
   test: {
-    command: 'npx vitest run --changed {{CHANGED_BASE}}',
+    command: 'npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
   },
 };async function runQualityGatesPromise(
   gates: Record<string, QualityGateConfig>,
