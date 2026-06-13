@@ -14,6 +14,7 @@
  */
 
 import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
+import { readdir as readdirAsync, stat as statAsync, access } from 'node:fs/promises'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -121,6 +122,54 @@ function walkForThread(dir: string, threadId: string): string | null {
     }
     if (isDir) {
       const hit = walkForThread(full, threadId)
+      if (hit) return hit
+    } else if (entry.endsWith(`-${threadId}.jsonl`)) {
+      return full
+    }
+  }
+  return null
+}
+
+/** Async equivalent of {@link findRolloutPath}. */
+export async function findRolloutPathAsync(codexHomeDir: string, threadId: string): Promise<string | null> {
+  const cacheKey = `${codexHomeDir}:${threadId}`
+  const cached = rolloutPathCache.get(cacheKey)
+  if (cached) {
+    try {
+      await access(cached)
+      return cached
+    } catch {
+      rolloutPathCache.delete(cacheKey)
+    }
+  }
+  const sessionsRoot = join(codexHomeDir, 'sessions')
+  try {
+    await access(sessionsRoot)
+  } catch {
+    return null
+  }
+  const result = await walkForThreadAsync(sessionsRoot, threadId)
+  if (result) rolloutPathCache.set(cacheKey, result)
+  return result
+}
+
+async function walkForThreadAsync(dir: string, threadId: string): Promise<string | null> {
+  let entries: string[]
+  try {
+    entries = await readdirAsync(dir)
+  } catch {
+    return null
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry)
+    let isDir = false
+    try {
+      isDir = (await statAsync(full)).isDirectory()
+    } catch {
+      continue
+    }
+    if (isDir) {
+      const hit = await walkForThreadAsync(full, threadId)
       if (hit) return hit
     } else if (entry.endsWith(`-${threadId}.jsonl`)) {
       return full
@@ -362,6 +411,36 @@ export function findLatestRollout(codexHomeDir: string): string | null {
     .map((p) => {
       try { return { p, mtimeMs: statSync(p).mtimeMs } } catch { return null }
     })
+    .filter((e): e is { p: string; mtimeMs: number } => e !== null)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+  for (const { p } of byMtimeDesc) {
+    if (!isSubagentRollout(p)) return p
+  }
+  // All rollouts are subagent threads — better to show one than nothing.
+  return byMtimeDesc[0]?.p ?? null
+}
+
+/** Async equivalent of {@link findLatestRollout}. */
+export async function findLatestRolloutAsync(codexHomeDir: string): Promise<string | null> {
+  const sessionsRoot = join(codexHomeDir, 'sessions')
+  const paths: string[] = []
+  const walk = async (dir: string): Promise<void> => {
+    let entries: string[]
+    try { entries = await readdirAsync(dir) } catch { return }
+    await Promise.all(entries.map(async (entry) => {
+      const full = join(dir, entry)
+      let isDir = false
+      try { isDir = (await statAsync(full)).isDirectory() } catch { return }
+      if (isDir) await walk(full)
+      else if (entry.startsWith('rollout-') && entry.endsWith('.jsonl')) paths.push(full)
+    }))
+  }
+  await walk(sessionsRoot)
+  const byMtimeDesc = (await Promise.all(
+    paths.map(async (p) => {
+      try { return { p, mtimeMs: (await statAsync(p)).mtimeMs } } catch { return null }
+    })
+  ))
     .filter((e): e is { p: string; mtimeMs: number } => e !== null)
     .sort((a, b) => b.mtimeMs - a.mtimeMs)
   for (const { p } of byMtimeDesc) {

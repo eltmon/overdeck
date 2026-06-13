@@ -188,14 +188,14 @@ export async function resolveCodexRolloutPath(
   const codexHome = join(agentDir, 'codex-home');
   if (!(await pathExists(codexHome))) return null;
 
-  const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
+  const { findRolloutPathAsync, findLatestRolloutAsync } = await import('../../../lib/runtimes/codex.js');
 
   const threadId = (await readOptional(join(agentDir, 'codex-thread-id')))?.trim();
   if (threadId) {
-    const rollout = findRolloutPath(codexHome, threadId);
+    const rollout = await findRolloutPathAsync(codexHome, threadId);
     if (rollout) return rollout;
   }
-  return findLatestRollout(codexHome);
+  return findLatestRolloutAsync(codexHome);
 }
 
 /**
@@ -221,6 +221,7 @@ export async function resolvePiSessionPath(
     const p = join(sessionsDir, relative);
     try {
       const s = await stat(p);
+      if (!s.isFile()) continue;
       if (!best || s.mtimeMs > best.mtimeMs) {
         best = { path: p, mtimeMs: s.mtimeMs };
       }
