@@ -603,7 +603,8 @@ export function isQualifiedAgentId(input: string): boolean {
  * agent IDs ("agent-pan-1148-ship", "strike-pan-1723", "inspect-pan-1744-x",
  * "flywheel-orchestrator"). For issue IDs, prefers the canonical work-agent
  * directory when present, then falls back to the single registered agent state
- * for that issue. Returns null when multiple non-work state dirs match.
+ * for that issue. If no single fallback exists, preserves the historical
+ * canonical agent-* target.
  */
 export function resolveAgentTargetSync(input: string): string | null {
   if (isQualifiedAgentId(input)) return input.toLowerCase();
@@ -631,7 +632,6 @@ export function resolveAgentTargetSync(input: string): string | null {
       }
     }
     if (matches.length === 1) return matches[0].toLowerCase();
-    if (matches.length > 1) return null;
     return canonicalAgentId;
   } catch {
     return canonicalAgentId;
