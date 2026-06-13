@@ -4825,6 +4825,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',
       lastActivity: resumedAt,
+      ...(!shouldResumeSavedSession ? { sessionModel: model, sessionHarness: effectiveHarness } : {}),
     });
 
     // Update agent state
