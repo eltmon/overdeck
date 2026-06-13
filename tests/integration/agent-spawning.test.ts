@@ -14,7 +14,7 @@
 
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { chmodSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
@@ -23,6 +23,7 @@ import {
   spawnRun,
   getAgentStateSync,
   resumeAgent,
+  restartAgent,
   type SpawnOptions,
   getAgentDir,
 } from '../../src/lib/agents.js';
@@ -31,6 +32,7 @@ import { closeFeatureRegistryStorage } from '../../src/lib/registry/feature-regi
 import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
+import { resetHarnessResolveCachesForTests } from '../../src/lib/harness-resolve.js';
 
 const piFifoMocks = vi.hoisted(() => ({
   writePiCommand: vi.fn(),
@@ -41,6 +43,14 @@ const transcriptLandingMocks = vi.hoisted(() => ({
   landed: false,
   useLandedFlag: false,
   snapshotCounts: undefined as number[] | undefined,
+}));
+
+const runtimeMirrorMocks = vi.hoisted(() => ({
+  snapshots: new Map<string, any>(),
+}));
+
+const configMocks = vi.hoisted(() => ({
+  roleOverrides: {} as Record<string, any>,
 }));
 
 vi.mock('../../src/lib/transcript-landing.js', () => ({
@@ -63,6 +73,11 @@ vi.mock('../../src/lib/transcript-landing.js', () => ({
   hasNewTranscriptUserRecord: vi.fn((before: { userRecordCount: number }, after: { userRecordCount: number }) =>
     after.userRecordCount > before.userRecordCount,
   ),
+}));
+
+vi.mock('../../src/lib/agent-runtime-mirror.js', () => ({
+  getRuntimeSnapshot: vi.fn((agentId: string) => Effect.succeed(runtimeMirrorMocks.snapshots.get(agentId) ?? null)),
+  isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
 }));
 
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
@@ -93,6 +108,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sendKeys: vi.fn(() => Effect.void),
   sendKeysSync: vi.fn(),
   sendKeysProgram: vi.fn(() => Effect.void),
+  sendEscapeKeyAsync: vi.fn(() => Promise.resolve()),
   sendRawKeystroke: vi.fn(() => Effect.void),
   sessionExists: vi.fn(() => Effect.succeed(false)),
   sessionExistsSync: vi.fn(() => Effect.succeed(false)),
@@ -159,7 +175,7 @@ vi.mock('../../src/lib/github-app.js', async (importOriginal) => {
 // resolveModel() and the role harness lookup find consistent values.
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/config-yaml.js')>();
-  const loadedConfig = {
+  const buildLoadedConfig = () => ({
     config: {
       preset: 'balanced',
       enabledProviders: new Set(['anthropic']),
@@ -168,7 +184,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
       providerPlan: {},
       openrouterFavorites: [],
       workhorses: { ...actual.DEFAULT_WORKHORSES },
-      roles: { ...actual.DEFAULT_ROLES },
+      roles: { ...actual.DEFAULT_ROLES, ...configMocks.roleOverrides },
       overrides: {},
       geminiThinkingLevel: 3,
       trackerKeys: {},
@@ -183,12 +199,12 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
       experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
       caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
     } as NormalizedConfig,
-  };
+  });
   return {
     ...actual,
     isClaudeCodeChannelsMcpEnabled: vi.fn().mockReturnValue(false),
-    loadConfig: vi.fn().mockReturnValue(loadedConfig),
-    loadConfigSync: vi.fn().mockReturnValue(loadedConfig),
+    loadConfig: vi.fn().mockImplementation(buildLoadedConfig),
+    loadConfigSync: vi.fn().mockImplementation(buildLoadedConfig),
   };
 });
 
@@ -218,6 +234,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let testWorkspace: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
   const originalPromptReadyTimeout = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  const originalPath = process.env.PATH;
   const originalTmuxSocketName = process.env.PANOPTICON_TMUX_SOCKET_NAME;
   const originalTestHarnessCommand = process.env.PANOPTICON_TEST_HARNESS_COMMAND;
   const testTmuxSocketName = `pan-test-${process.pid}`;
@@ -274,9 +291,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     transcriptLandingMocks.landed = false;
     transcriptLandingMocks.useLandedFlag = false;
     transcriptLandingMocks.snapshotCounts = undefined;
+    runtimeMirrorMocks.snapshots.clear();
+    configMocks.roleOverrides = {};
+    resetHarnessResolveCachesForTests();
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
     vi.mocked(tmux.sendKeys).mockImplementation(() => Effect.void);
+    vi.mocked(tmux.sendEscapeKeyAsync).mockResolvedValue(undefined);
     vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
     // PAN-1594: spawnRun/spawnAgent now wait for the session-start hook to write
     // ready.json (waitForReadySignal) instead of scraping the tmux pane. The real
@@ -298,6 +319,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await closeFeatureRegistryStorage();
     if (originalPanopticonHome) {
       process.env.PANOPTICON_HOME = originalPanopticonHome;
@@ -308,6 +330,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = originalPromptReadyTimeout;
     } else {
       delete process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+    }
+    if (originalPath) {
+      process.env.PATH = originalPath;
+    } else {
+      delete process.env.PATH;
     }
     if (existsSync(testPanopticonHome)) {
       rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
@@ -335,6 +362,18 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       ...(kickoffDelivered === undefined ? {} : { kickoffDelivered }),
     }));
     return workspace;
+  }
+
+  function setRuntimeOrigin(agentId: string, sessionModel?: string, sessionHarness?: string): void {
+    runtimeMirrorMocks.snapshots.set(agentId, {
+      id: agentId,
+      activity: 'idle',
+      lastActivity: new Date().toISOString(),
+      claudeSessionId: `${agentId}-session`,
+      model: sessionModel,
+      sessionModel,
+      sessionHarness,
+    });
   }
 
   describe('work role (spawnAgent)', () => {
@@ -535,6 +574,62 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
+    it('resumeAgent keeps --resume when session origin model and harness are unchanged', async () => {
+      const agentId = 'agent-pan-resume-same-origin';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).toContain(`--resume '${agentId}-session'`);
+    });
+
+    it('resumeAgent drops --resume when the requested model differs from session origin', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-model-drift';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
+
+      const result = await resumeAgent(agentId, undefined, { model: 'claude-haiku-4-5' });
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
+      expect(freshSessionId).not.toBe(`${agentId}-session`);
+      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
+      expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+    });
+
+    it('resumeAgent drops --resume when the requested harness differs from session origin', async () => {
+      const agentId = 'agent-pan-resume-harness-drift';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
+
+      const result = await resumeAgent(agentId, undefined, { harness: 'claude-code' });
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
+      expect(freshSessionId).not.toBe(`${agentId}-session`);
+      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
+    });
+
+    it('resumeAgent keeps --resume for legacy sessions with no origin metadata', async () => {
+      const agentId = 'agent-pan-resume-legacy-origin';
+      writeResumableWorkAgent(agentId, true);
+      setRuntimeOrigin(agentId);
+
+      const result = await resumeAgent(agentId, undefined, { model: 'claude-haiku-4-5' });
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).toContain(`--resume '${agentId}-session'`);
+    });
+
     it('resumeAgent surfaces missing original kickoff instead of sending a contextless continue', async () => {
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-missing-kickoff';
@@ -546,6 +641,34 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(result.error).toContain('kickoff prompt missing');
       expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(false);
+    });
+
+    it.each([
+      ['new model', { model: 'claude-haiku-4-5' }],
+      ['new harness', { harness: 'pi' as const }],
+      ['new model and harness', { model: 'claude-haiku-4-5', harness: 'pi' as const }],
+    ])('restartAgent with %s starts fresh without --resume', async (_label, opts) => {
+      const agentId = `agent-pan-restart-${_label.replaceAll(' ', '-')}`;
+      writeResumableWorkAgent(agentId, true);
+
+      const result = await restartAgent(agentId, { ...opts, graceful: false });
+
+      expect(result).toEqual({ success: true });
+      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
+      expect(launcher).not.toContain('--resume');
+    });
+
+    it('non-graceful restart skips Escape and grace wait', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-restart-nongraceful';
+      writeResumableWorkAgent(agentId, true);
+      vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(true));
+
+      const result = await restartAgent(agentId, { graceful: false });
+
+      expect(result).toEqual({ success: true });
+      expect(tmux.sendEscapeKeyAsync).not.toHaveBeenCalled();
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Restarting in 60s'));
     });
 
     it('honours an explicit options.model over the role config default', async () => {
@@ -791,6 +914,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
+      const binDir = join(testPanopticonHome, 'bin');
+      mkdirSync(binDir, { recursive: true });
+      const fakePi = join(binDir, 'pi');
+      writeFileSync(fakePi, '#!/bin/sh\nexit 0\n');
+      chmodSync(fakePi, 0o755);
+      process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+      resetHarnessResolveCachesForTests();
+      configMocks.roleOverrides = {
+        test: { ...DEFAULT_ROLES.test, harness: 'pi' },
+      };
       vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
@@ -800,7 +933,6 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
         workspace: testWorkspace,
-        harness: 'pi',
         prompt: 'run the tests',
       });
 
@@ -824,43 +956,35 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   });
 
   describe('harness policy gate at the spawn entry points', () => {
-    // PAN-1048 review feedback 005 (C4): canUseHarness() must run before
-    // spawnRun/spawnAgent persist the resolved harness or hand it to the
-    // launcher, so a config'd `roles.<role>.harness: pi` cannot smuggle a
-    // ToS-blocked combo (Pi + Anthropic + subscription auth) into the
-    // launcher. resolveEffectiveHarness() collapses the requested harness
-    // to claude-code when the gate denies the combination.
-    it('downgrades pi → claude-code for spawnRun review when canUseHarness denies the combo', async () => {
+    it('rejects explicit pi for spawnRun review when canUseHarness denies the combo', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
       vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
         allowed: false,
         reason: 'Pi cannot run Anthropic models with subscription auth',
       });
 
-      const state = await spawnRun('PAN-PI-1', 'review', {
+      await expect(spawnRun('PAN-PI-1', 'review', {
         workspace: testWorkspace,
         harness: 'pi',
-      });
+      })).rejects.toThrow('Pi cannot run Anthropic models with subscription auth');
 
-      expect(state.harness).toBe('claude-code');
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 
-    it('downgrades pi → claude-code for spawnAgent work when canUseHarness denies the combo', async () => {
+    it('rejects explicit pi for spawnAgent work when canUseHarness denies the combo', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
       vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
         allowed: false,
         reason: 'Pi cannot run Anthropic models with subscription auth',
       });
 
-      const state = await spawnAgent({
+      await expect(spawnAgent({
         issueId: 'PAN-PI-2',
         workspace: testWorkspace,
         role: 'work',
         harness: 'pi',
-      });
+      })).rejects.toThrow('Pi cannot run Anthropic models with subscription auth');
 
-      expect(state.harness).toBe('claude-code');
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 
