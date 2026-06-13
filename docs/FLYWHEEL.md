@@ -122,22 +122,38 @@ Status writes must be atomic. Write a temporary file in the run directory, then 
 
 ## Merge: UAT batch trains
 
-While a run is active and `flywheel.merge_train_enabled` is on, merge-ready
-features don't wait in a queue for one-at-a-time human merges. A 60-second
-reconciler assembles them into rolling **UAT batch trains** — throwaway `uat/*`
-branches off main that bundle as many ready features as possible, resolving
-cross-feature conflicts inside the batch, so a human can UAT the combined result
-and **promote the batch** (merge exactly what they tested) in one action. Each
-generation can serve a live stack at `uat-<codename>.pan.localhost`.
+When the effective merge-train policy is enabled for a project, merge-ready
+features do not wait in a queue for one-at-a-time human merges. A 60-second
+dashboard-server reconciler assembles them into rolling **UAT batch trains** —
+throwaway `uat/*` branches off that project's main branch that bundle as many
+ready features as possible, resolving cross-feature conflicts inside the batch,
+so a human can UAT the combined result and **promote the batch** (merge exactly
+what they tested) in one action. Each generation can serve a live stack at
+`uat-<project-label>-<codename>-<mmdd>.<project-domain>`.
 
-This is the primary merge path for a flywheel run; the per-issue merge (see
-[`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md)) remains the escape hatch. The full
-model — generations, the assembly agent, held-out features, promotion, the live
-stacks (max 2), and the "UAT batches" card — is documented in
-[`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). Batch trains are inert until the
-merge-train flag is on and a run is active; the ready set is computed from the
-merge queue (`computeMergeQueue`, gated on `MERGE_GATE_VERBS = {shipping,
-merging}` per [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736)).
+Batch trains are a per-project pipeline feature, not a Flywheel-run feature.
+They are gated by the global `merge_train.enabled` flag plus each project's
+optional `merge_train` override, and their ready sets come from review-status
+records grouped by tracked project. They do not require an active Flywheel run.
+The per-issue merge path (see [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md))
+remains the escape hatch. The full model — generations, the assembly agent,
+held-out features, promotion, live stacks (max 2), and the "UAT batches" card —
+is documented in [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md).
+
+## Scope vs merge-train independence
+
+Flywheel scope controls which projects the singleton orchestrator inventories
+and advances during a run. `pan-only` keeps the orchestrator focused on
+Panopticon issues; `all-tracked-projects` lets it consider every configured
+project that matches the brief and safety gates. Scope is persisted on each run
+and changing the configured value affects the next run start or resume, not an
+already-running loop.
+
+Merge trains and UAT batch trains are independent of that orchestrator scope.
+Each tracked project has its own ready set, generation chain, live-stack
+lifecycle, and `merge_train` override. The Awaiting Merge page and Flywheel page
+can span projects as view/control surfaces, but a batch never mixes issues from
+different projects. Cross-project batches remain out of scope.
 
 ## Settings → Roles → Flywheel
 
@@ -185,11 +201,11 @@ Do not put secrets, machine-local paths, or one-time session state in a brief. P
 | API | `GET /api/flywheel/runs` | Lists run summaries for the sidebar live badge and Flywheel page. |
 | API | `GET /api/flywheel/runs/:id` | Returns a run detail plus its latest validated status snapshot. |
 | API | `GET /api/flywheel/brief` / `POST /api/flywheel/brief` | Reads and updates the markdown brief, constrained to paths inside the project root. |
-| API | `GET /api/flywheel/uat-generations` | UAT batch-train chain (members + per-member acceptance criteria, held-out, resolutions, live-stack status). `[]` when no run is active. See [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). |
-| API | `POST /api/flywheel/uat-generations/:name/stack` | Ensures a generation's live UAT stack (max 2 concurrent). |
-| API | `POST /api/flywheel/uat-generations/:name/promote` | Promotes (merges) a tested generation to main. |
-| API | `POST /api/flywheel/assemble-uat` | Forces a reconcile/rebuild of the current generation. |
-| API | `GET /api/flywheel/merge-queue` / `POST /api/flywheel/merge-next` | The ready set (reference) and the single-feature merge escape hatch. |
+| API | `GET /api/merge-train/generations` | UAT batch-train chains across tracked projects (members + per-member acceptance criteria, held-out, resolutions, live-stack status). See [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). |
+| API | `POST /api/merge-train/generations/:name/stack` | Ensures a generation's live UAT stack (max 2 concurrent). |
+| API | `POST /api/merge-train/generations/:name/promote` | Promotes (merges) a tested generation to main. |
+| API | `POST /api/merge-train/assemble` | Forces a reconcile/rebuild across enabled projects, or one project when the body includes `{ "project": "<projectKey>" }`. |
+| API | `GET /api/merge-train/queues` / `POST /api/merge-train/merge-next` | Per-project ready sets and the single-feature merge escape hatch. |
 | UI | `/flywheel` | Two-pane layout. Left pane has **Status**, **Stats**, and **State** tabs. Right pane is the orchestrator conversation. |
 | UI | `/flywheel` → Status tab | Renders the live `FlywheelStatus` snapshot via `subscribeFlywheelStatus`. Default tab. |
 | UI | `/flywheel` → Stats tab | Renders the rolling-window readiness metrics for the seven v1.0 criteria. |

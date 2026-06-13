@@ -10,7 +10,7 @@ preview stack from PAN-1738.
 
 Read this with:
 
-- [`FLYWHEEL.md`](./FLYWHEEL.md) — the orchestrator that drives the ready-set the trains assemble from.
+- [`FLYWHEEL.md`](./FLYWHEEL.md) — the orchestrator surface that can view and control trains without owning their ready set.
 - [`MERGE-WORKFLOW.md`](./MERGE-WORKFLOW.md) — the per-issue merge state machine, which remains the escape hatch.
 - [`../.pan/drafts/PAN-1737.md`](../.pan/drafts/PAN-1737.md) — the originating PRD (full design rationale).
 - [`../docs/design/pan-1737-uat-batch-trains.html`](./design/pan-1737-uat-batch-trains.html) — the approved 3-state mockup.

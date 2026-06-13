@@ -9,7 +9,9 @@
 > This document is retained as the historical PAN-1691 decision record (the engine,
 > the tri-state auto-merge policy, and the reconciler it describes still underpin
 > the batch trains). The verb-contract gap noted in §7 was fixed in
-> [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736).
+> [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736). The
+> Flywheel-coupling gap noted in §7 was resolved by
+> [PAN-1696](https://github.com/eltmon/panopticon-cli/issues/1696) in 2026-06.
 
 > Mind-dump / handoff for PAN-1691 and friends, written 2026-06-09 because the
 > implementing session is near compaction. This is the single source of truth
@@ -106,7 +108,7 @@ Turn `merge_train_enabled` ON, observe ONE real cascade (a merge → siblings re
 - Anything git-mutating or agent-spawning goes behind a flag or an explicit user action.
 - `pan reload` to make server changes live (frontend is also live via build); verify with Playwright over `https://pan.localhost` (Playwright blocks `file://` — serve over http for mockups).
 
-## 7. Future: decouple merge-train from the Flywheel?
+## 7. Future: decouple merge-train from the Flywheel? — resolved by PAN-1696 (2026-06)
 
 The Flywheel began as a Panopticon-dev tool (keep agents working, surface holes the
 deacon alone can't). The merge-train is broadly useful — and it's **already mostly
@@ -115,14 +117,14 @@ reconciler fires from the **post-merge path** (`specialists.ts`), not the flywhe
 run loop, and the per-issue/per-project policy works whether or not a flywheel run
 is active.
 
-The only real coupling is cosmetic/locational:
+The original coupling was cosmetic/locational:
 1. the flag is `flywheel.merge_train_enabled` (flywheel-namespaced),
 2. `GET /api/flywheel/merge-queue` + `/uat-candidate` read `flywheel.activePipeline`, so they're empty when no flywheel run is live,
 3. the UI lives on the Flywheel page.
 
-**Recommendation (for later):** treat the merge-train as a **per-project pipeline**
-feature, not a flywheel-run feature — (a) rename the flag to `merge_train.enabled` /
-per-project config, (b) compute the queue/candidate off the pipeline ready-set
-(review-status DB) instead of `activePipeline`, (c) surface the controls per-project
-(cockpit + Awaiting Merge), with the Flywheel page just one viewer. Low urgency —
-the coupling is shallow — but worth doing before other projects rely on it.
+**Resolved by PAN-1696 (2026-06):** the merge-train is now a **per-project
+pipeline** feature, not a flywheel-run feature. The global flag moved to
+`merge_train.enabled` with a per-project `merge_train` override, ready sets come
+from review-status records grouped by project instead of `activePipeline`, the
+Awaiting Merge page and project cockpit expose the primary controls, and the
+Flywheel page is just one viewer.
