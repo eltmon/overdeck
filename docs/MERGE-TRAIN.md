@@ -45,7 +45,7 @@ PAN-1213, PAN-1658**. The expensive part isn't the rebase, it's the forced
 - **Resolution order**: per-issue `autoMerge` → per-project `auto_merge_default` (`'auto'|'hold'`) → global `flywheel.require_uat_before_merge`. Implemented in `shouldHoldForUat()`.
 - **Disjoint branches batch** (merge together, one verification pass); **conflicting branches serialize broadest-file-footprint first** (the rest rebase once onto the worst offender).
 - **Conflicts are resolved by an AGENT, never a human.** On a sibling rebase conflict the reconciler dispatches a `work` agent with the just-merged issue as context; the agent must reconcile *both* features' intent. Who resolves (work vs merge agent) is secondary; understanding both changesets is the firm requirement.
-- **Merge train is behind a default-OFF flag** `flywheel.merge_train_enabled` (it mutates git). Inert until an operator enables it.
+- **Merge train is behind a default-OFF flag** `merge_train.enabled` (it mutates git). Inert until an operator enables it for a project.
 - **Idempotency is structural, not a prompt.** The post-merge re-entry guard is `createInFlightGuard()` locked by `in-flight-guard.test.ts` (replaced the CLAUDE.md "never delete this" note). Adding to the post-merge path is fine as long as that test stays green.
 - **UAT candidate naming**: **codename + short date**, e.g. `uat/pan-otter-0609` (random word + MMDD). User-approved. Generator needs a small wordlist + collision-check vs existing `uat/` branches.
 - **UAT bundle shown once**: the bundled issues render as members grouped *under* the candidate header; serial items sit below — never a "bundles X,Y" line AND a separate queue list.
@@ -64,7 +64,7 @@ Engine (pure + tested):
 - `src/lib/cloister/auto-merge-policy.ts` — `shouldHoldForUat` (3-tier), `getProjectAutoMergeDefault`.
 
 Flag + data:
-- `src/lib/database/app-settings.ts` — `isMergeTrainEnabled` / `setMergeTrainEnabled` (`flywheel.merge_train_enabled`, default false).
+- `src/lib/database/app-settings.ts` — `isMergeTrainEnabled` / `setMergeTrainEnabled` (`merge_train.enabled`, default false).
 - `src/lib/review-status.ts` — `autoMerge` field + `setAutoMerge` (emits `status_changed`).
 - `src/lib/database/review-status-db.ts` — `auto_merge` column, **schema v50** migration.
 - `packages/contracts/src/types.ts` — `ReviewStatusSnapshot.autoMerge`; `src/dashboard/server/read-model.ts` maps it.
@@ -118,7 +118,7 @@ run loop, and the per-issue/per-project policy works whether or not a flywheel r
 is active.
 
 The original coupling was cosmetic/locational:
-1. the flag is `flywheel.merge_train_enabled` (flywheel-namespaced),
+1. the flag was flywheel-namespaced,
 2. `GET /api/flywheel/merge-queue` + `/uat-candidate` read `flywheel.activePipeline`, so they're empty when no flywheel run is live,
 3. the UI lives on the Flywheel page.
 

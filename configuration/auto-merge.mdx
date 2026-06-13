@@ -45,10 +45,11 @@ for any issue that satisfies the eligibility predicate.
 <Note>
 **Auto-merge vs. UAT batch trains.** This toggle controls *per-issue* scheduled
 auto-merge — Panopticon merging one eligible PR at a time without a human click.
-The separate `flywheel.merge_train_enabled` flag enables [UAT batch
+The separate `merge_train.enabled` flag enables [UAT batch
 trains](/features/merge-batches), where ready features are assembled into one
-tested batch you promote together. They are independent flags: auto-merge ships
-individual PRs on a cooldown; batch trains assemble-and-promote a tested bundle.
+tested batch you promote together per project. They are independent flags:
+auto-merge ships individual PRs on a cooldown; batch trains
+assemble-and-promote a tested bundle.
 Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when you
 want a human to UAT each batch before promoting it.
 </Note>
