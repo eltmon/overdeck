@@ -571,3 +571,86 @@ describe('IssueDataService - scheduleNext suspension', () => {
     expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
   });
 });
+
+describe('IssueDataService - getDiagnostics', () => {
+  let service: IssueDataService;
+  let mockCache: any;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    mockCache = {
+      get: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(),
+      getEtag: vi.fn(),
+      updateRateLimit: vi.fn(),
+      getRateLimit: vi.fn(),
+      getBackoffMs: vi.fn(() => 0),
+      getSuspensionMs: vi.fn(() => 0),
+      isStale: vi.fn(() => true),
+      invalidate: vi.fn(),
+    };
+    service = new IssueDataService(mockCache);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('exposes backoffMs, suspendedUntil, and rateLimited for each tracker', () => {
+    const diagnostics = service.getDiagnostics();
+
+    for (const tracker of ['github', 'linear', 'rally']) {
+      expect(diagnostics[tracker]).toMatchObject({
+        remaining: null,
+        total: null,
+        backoffMs: 0,
+        suspendedUntil: null,
+        rateLimited: false,
+        pollInterval: expect.any(Number),
+        lastFetched: null,
+        lastError: null,
+        issueCount: 0,
+      });
+    }
+  });
+
+  it('reports rateLimited:true and suspendedUntil when a tracker is suspended', () => {
+    const resetAt = new Date(Date.now() + 3_600_000).toISOString();
+    mockCache.getRateLimit.mockReturnValue({ remaining: 0, total: 2500, resetAt });
+    mockCache.getSuspensionMs.mockReturnValue(3_600_000);
+    mockCache.getBackoffMs.mockReturnValue(270_000);
+
+    const diagnostics = service.getDiagnostics();
+
+    expect(diagnostics.linear).toMatchObject({
+      remaining: 0,
+      total: 2500,
+      backoffMs: 270_000,
+      suspendedUntil: resetAt,
+      rateLimited: true,
+    });
+  });
+
+  it('preserves existing fields and reports rateLimited:false when within limits', () => {
+    const resetAt = new Date(Date.now() + 3_600_000).toISOString();
+    mockCache.getRateLimit.mockReturnValue({ remaining: 2499, total: 2500, resetAt });
+    mockCache.getSuspensionMs.mockReturnValue(0);
+
+    const diagnostics = service.getDiagnostics();
+
+    expect(diagnostics.linear).toMatchObject({
+      remaining: 2499,
+      total: 2500,
+      rateLimited: false,
+      suspendedUntil: null,
+      pollInterval: expect.any(Number),
+      lastFetched: null,
+      lastError: null,
+      issueCount: 0,
+    });
+  });
+});

@@ -551,9 +551,15 @@ export class IssueDataService {
     const result: Record<string, any> = {};
     for (const [tracker, state] of Object.entries(this.trackers)) {
       const limit = this.cache.getRateLimit(tracker);
+      const intervals = POLL_INTERVALS[tracker as keyof typeof POLL_INTERVALS];
+      const backoffMs = intervals ? this.cache.getBackoffMs(tracker, intervals.default) : 0;
+      const suspendMs = this.cache.getSuspensionMs(tracker);
       result[tracker] = {
         remaining: limit?.remaining ?? null,
         total: limit?.total ?? null,
+        backoffMs,
+        suspendedUntil: suspendMs > 0 ? new Date(Date.now() + suspendMs).toISOString() : null,
+        rateLimited: suspendMs > 0,
         pollInterval: state.currentInterval,
         lastFetched: state.lastFetchedAt,
         lastError: state.lastError,
