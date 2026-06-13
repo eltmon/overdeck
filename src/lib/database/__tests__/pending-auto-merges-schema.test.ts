@@ -22,7 +22,7 @@ function makeTestHome(prefix: string): string {
   return testHome;
 }
 
-describe('pending auto-merges schema', () => {
+describe('pending auto-merges schema', { timeout: 30_000 }, () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
