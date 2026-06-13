@@ -17,7 +17,7 @@ import { existsSync } from 'fs';
 import { stat } from 'fs/promises';
 import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
-import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.js';
+import { CacheService, DEFAULT_TTLS, parseIntegerHeader, type PollHealthStatus } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
@@ -790,6 +790,13 @@ export class IssueDataService {
   // GitHub polling — uses Octokit REST + ETags (304 = FREE)
   // ---------------------------------------------------------------
 
+  private recordPollOutcome(tracker: string, error?: Error | { message: string } | null): void {
+    const msg = error && 'message' in error ? error.message : String(error ?? '');
+    const isRateLimit = /rate.?limit/i.test(msg);
+    const status: PollHealthStatus = error ? (isRateLimit ? 'quota_exhausted' : 'error') : 'ok';
+    this.cache.recordPollHealth(tracker, { status, message: msg || 'ok' });
+  }
+
   private async pollGitHub(): Promise<void> {
     const config = getGitHubConfig();
     if (!config) {
@@ -799,6 +806,7 @@ export class IssueDataService {
 
     const allIssues: any[] = [];
     const octokit = new Octokit({ auth: config.token });
+    let hadError = false;
 
     for (const { owner, repo, prefix } of config.repos) {
       try {
@@ -818,7 +826,13 @@ export class IssueDataService {
       } catch (error: any) {
         console.error(`[IssueDataService] Error fetching GitHub issues for ${owner}/${repo}:`, error.message);
         this.trackers.github.lastError = error.message;
+        hadError = true;
+        this.recordPollOutcome('github', error);
       }
+    }
+
+    if (!hadError) {
+      this.recordPollOutcome('github', null);
     }
 
     // Check if data actually changed (cheap length + updatedAt check)
@@ -1022,9 +1036,11 @@ export class IssueDataService {
         this.pushUpdated();
         this.pushMeta();
       }
+      this.recordPollOutcome('linear', null);
     } catch (err: any) {
       console.error('[IssueDataService] Linear poll error:', err.message);
       this.trackers.linear.lastError = err.message;
+      this.recordPollOutcome('linear', err);
     }
   }
 
@@ -1446,12 +1462,14 @@ export class IssueDataService {
         this.pushUpdated();
         this.pushMeta();
       }
+      this.recordPollOutcome('rally', null);
     } catch (err: any) {
       const errorMsg = err.message?.includes('Could not parse')
         ? `${err.message} - Check Rally workspace/project configuration. Enable DEBUG=rally for query details.`
         : err.message;
       console.error('[IssueDataService] Rally poll error:', errorMsg);
       this.trackers.rally.lastError = errorMsg;
+      this.recordPollOutcome('rally', { message: errorMsg });
     }
   }
 }

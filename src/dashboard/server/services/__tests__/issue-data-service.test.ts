@@ -104,3 +104,74 @@ describe('IssueDataService tracker-polling gate (PAN-1817)', () => {
     svc.stop();
   });
 });
+
+describe('IssueDataService poll-outcome recording (PAN-1817)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
+
+  function makeServiceWithRecording() {
+    const recorded: Array<{ tracker: string; status: string; message: string }> = [];
+    const cache = {
+      getBackoffMs: () => 0,
+      set: vi.fn(),
+      recordPollHealth: vi.fn((tracker: string, health: { status: string; message: string }) => {
+        recorded.push({ tracker, ...health });
+      }),
+      updateRateLimit: vi.fn(),
+    } as any;
+
+    const svc = new IssueDataService(cache);
+    vi.spyOn(svc as any, 'ensureShadowStateLoaded').mockResolvedValue(undefined);
+    vi.spyOn(svc as any, 'loadCachedData').mockImplementation(() => {});
+    vi.spyOn(svc as any, 'pushSnapshot').mockImplementation(() => {});
+    vi.spyOn(svc as any, 'pushUpdated').mockImplementation(() => {});
+    vi.spyOn(svc as any, 'pushMeta').mockImplementation(() => {});
+
+    return { svc, cache, recorded };
+  }
+
+  it('records quota_exhausted when Linear poll error matches rate-limit pattern', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('API rate-limit exceeded'));
+
+    await (svc as any).pollLinear();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('linear', {
+      status: 'quota_exhausted',
+      message: 'API rate-limit exceeded',
+    });
+  });
+
+  it('records error for a non-rate-limit Linear poll error', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('network timeout'));
+
+    await (svc as any).pollLinear();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('linear', {
+      status: 'error',
+      message: 'network timeout',
+    });
+  });
+
+  it('records ok on a successful Linear poll, clearing any prior quota signal', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockResolvedValue([]);
+
+    await (svc as any).pollLinear();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('linear', {
+      status: 'ok',
+      message: 'ok',
+    });
+  });
+
+  it('does NOT call updateRateLimit for linear (rate_limits table stays GitHub-only)', async () => {
+    const { svc, cache } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('API rate-limit exceeded'));
+
+    await (svc as any).pollLinear();
+
+    expect(cache.updateRateLimit).not.toHaveBeenCalled();
+  });
+});

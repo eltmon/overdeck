@@ -46,3 +46,52 @@ describe('CacheService SQLite storage', () => {
     });
   });
 });
+
+describe('CacheService poll health (PAN-1817)', () => {
+  it('returns null for a tracker with no recorded poll outcome', async () => {
+    const { CacheService } = await import('../cache-service.js');
+    const cache = new CacheService();
+    service = cache;
+
+    expect(cache.getPollHealth('linear')).toBeNull();
+  });
+
+  it('persists and returns poll health status and message', async () => {
+    const { CacheService } = await import('../cache-service.js');
+    const cache = new CacheService();
+    service = cache;
+
+    cache.recordPollHealth('linear', { status: 'quota_exhausted', message: 'rate limit hit' });
+
+    const health = cache.getPollHealth('linear');
+    expect(health?.status).toBe('quota_exhausted');
+    expect(health?.message).toBe('rate limit hit');
+    expect(health?.observedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('upserts the latest poll health for the same tracker', async () => {
+    const { CacheService } = await import('../cache-service.js');
+    const cache = new CacheService();
+    service = cache;
+
+    cache.recordPollHealth('github', { status: 'error', message: 'timeout' });
+    cache.recordPollHealth('github', { status: 'ok', message: 'ok' });
+
+    const health = cache.getPollHealth('github');
+    expect(health?.status).toBe('ok');
+    expect(health?.message).toBe('ok');
+  });
+
+  it('keeps records isolated per tracker', async () => {
+    const { CacheService } = await import('../cache-service.js');
+    const cache = new CacheService();
+    service = cache;
+
+    cache.recordPollHealth('linear', { status: 'quota_exhausted', message: 'linear rate limited' });
+    cache.recordPollHealth('github', { status: 'ok', message: 'ok' });
+
+    expect(cache.getPollHealth('linear')?.status).toBe('quota_exhausted');
+    expect(cache.getPollHealth('github')?.status).toBe('ok');
+    expect(cache.getPollHealth('rally')).toBeNull();
+  });
+});

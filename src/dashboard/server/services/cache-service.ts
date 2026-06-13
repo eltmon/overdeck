@@ -41,6 +41,15 @@ export interface RateLimitInfo {
   resetAt: string;
 }
 
+// Poll health info (PAN-1817)
+export type PollHealthStatus = 'ok' | 'quota_exhausted' | 'error';
+
+export interface PollHealth {
+  status: PollHealthStatus;
+  message: string;
+  observedAt: string;
+}
+
 /**
  * Parse an integer value from a response header.
  * Returns null when the header is missing or not a finite integer.
@@ -94,6 +103,13 @@ export class CacheService {
         total INTEGER,
         reset_at TEXT,
         updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS tracker_poll_health (
+        tracker TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        message TEXT NOT NULL,
+        observed_at TEXT NOT NULL
       );
     `);
   }
@@ -324,6 +340,38 @@ export class CacheService {
       remaining: row.remaining,
       total: row.total,
       resetAt: row.reset_at,
+    };
+  }
+
+  /**
+   * Record the health outcome of a tracker poll (PAN-1817).
+   */
+  recordPollHealth(tracker: string, health: { status: PollHealthStatus; message: string }): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO tracker_poll_health (tracker, status, message, observed_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(tracker) DO UPDATE SET
+        status = excluded.status,
+        message = excluded.message,
+        observed_at = excluded.observed_at
+    `);
+    stmt.run(tracker, health.status, health.message, new Date().toISOString());
+  }
+
+  /**
+   * Get the most recent poll health for a tracker (PAN-1817).
+   */
+  getPollHealth(tracker: string): PollHealth | null {
+    const stmt = this.db.prepare(`
+      SELECT status, message, observed_at FROM tracker_poll_health WHERE tracker = ?
+    `);
+    const row = stmt.get(tracker) as any;
+    if (!row) return null;
+
+    return {
+      status: row.status,
+      message: row.message,
+      observedAt: row.observed_at,
     };
   }
 

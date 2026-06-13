@@ -14,6 +14,7 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { initEventStore } from '../event-store.js';
+import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 
 const execAsync = promisify(exec);
 const DEFAULT_HEALTH_POLL_SECONDS = 15;
@@ -126,6 +127,10 @@ export interface SystemHealthSnapshot {
   };
   thresholds: SystemHealthThresholds;
   reasons: string[];
+  trackerQuota: {
+    exhaustedTrackers: string[];
+    githubRemaining: number | null;
+  };
   agents: HealthAgentProcess[];
   leakedSpecialists: HealthLeakedSpecialist[];
   topConsumers: HealthConsumer[];
@@ -440,7 +445,7 @@ function buildLeakedSpecialists(
     }));
 }
 
-function evaluateSeverity(
+export function evaluateSeverity(
   thresholds: SystemHealthThresholds,
   data: {
     availableMemoryBytes: number;
@@ -448,6 +453,7 @@ function evaluateSeverity(
     loadPerCore1m: number;
     overcommitPercent: number;
     leakedSpecialistCount: number;
+    trackerQuota: { exhaustedTrackers: string[]; githubRemaining: number | null };
   },
 ): { severity: SystemHealthSeverity; reasons: string[] } {
   const criticalReasons: string[] = [];
@@ -479,6 +485,15 @@ function evaluateSeverity(
 
   if (data.leakedSpecialistCount > 0) {
     warningReasons.push(`${data.leakedSpecialistCount} leaked specialist session${data.leakedSpecialistCount === 1 ? '' : 's'} detected.`);
+  }
+
+  for (const tracker of data.trackerQuota.exhaustedTrackers) {
+    const label = tracker[0].toUpperCase() + tracker.slice(1);
+    warningReasons.push(`${label} API quota exhausted — tracker poller is rate-limited; lifecycle tracker steps may fail.`);
+  }
+
+  if (data.trackerQuota.githubRemaining === 0) {
+    warningReasons.push('GitHub API rate limit is exhausted — tracker poller may fail and lifecycle steps may be blocked.');
   }
 
   if (criticalReasons.length > 0) {
@@ -580,6 +595,32 @@ function buildTopConsumers(
     .slice(0, 10);
 }
 
+export function readTrackerQuota(cache: CacheService): { exhaustedTrackers: string[]; githubRemaining: number | null } {
+  const exhaustedTrackers: string[] = [];
+  const trackers = ['github', 'linear', 'rally'] as const;
+  const nowMs = Date.now();
+
+  for (const tracker of trackers) {
+    const health = cache.getPollHealth(tracker);
+    if (!health) continue;
+
+    const observedMs = new Date(health.observedAt).getTime();
+    if (!Number.isFinite(observedMs)) continue;
+
+    const staleMs = (DEFAULT_TTLS[tracker] ?? 60) * 2 * 1000;
+    if (nowMs - observedMs > staleMs) continue; // signal is stale, ignore
+
+    if (health.status === 'quota_exhausted') {
+      exhaustedTrackers.push(tracker);
+    }
+  }
+
+  const ghLimit = cache.getRateLimit('github');
+  const githubRemaining = ghLimit && new Date(ghLimit.resetAt).getTime() > nowMs ? ghLimit.remaining : null;
+
+  return { exhaustedTrackers, githubRemaining };
+}
+
 async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<SystemHealthSnapshot> {
   await ensureResourceConfigLoaded();
   const [memory, loadAverage1m, cpuPercent, agents, containers] = await Promise.all([
@@ -589,6 +630,10 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     collectAgentProcesses(),
     Promise.resolve(getDockerStatsCollector().getStats()),
   ]);
+
+  const cache = new CacheService();
+  const trackerQuota = readTrackerQuota(cache);
+  cache.close();
 
   const thresholds = defaultThresholds();
   const coreCount = Math.max(cpus().length, 1);
@@ -603,6 +648,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     loadPerCore1m,
     overcommitPercent,
     leakedSpecialistCount: leakedSpecialists.length,
+    trackerQuota,
   });
 
   const containerMemoryBytes = containers.reduce((sum, container) => sum + container.memoryUsage, 0);
@@ -664,6 +710,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     },
     thresholds,
     reasons: evaluation.reasons,
+    trackerQuota,
     agents: sortedAgents,
     leakedSpecialists,
     topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),

@@ -363,6 +363,10 @@ export interface SystemHealthSnapshot {
     overcommitCriticalPercent: number;
   };
   reasons: string[];
+  trackerQuota: {
+    exhaustedTrackers: string[];
+    githubRemaining: number | null;
+  };
   agents: SystemHealthAgentProcess[];
   leakedSpecialists: SystemHealthLeakedSpecialist[];
   topConsumers: SystemHealthConsumer[];
