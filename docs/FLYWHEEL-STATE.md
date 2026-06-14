@@ -782,3 +782,11 @@ red-main strike.
 - **Cross-check caught a FALSE-READY read** (tick-3 lesson paid off): `pan review pending --ready` listed 5 PRs but GitHub showed only PAN-1242 (#1516) genuinely MERGEABLE; 1775/1827/1491 were CONFLICTING/DIRTY (stale review-status). PAN-1242 — the only real one — is HELD (conv/2920 overlap). NO merge this tick. ALWAYS cross-check GitHub mergeable before scheduling.
 - conv/2920 still not pushed. planning-pan-1896 = operator (GH-CLI approval friction), left alone. strike-pan-1711 lingering (reap). Re-compacted this file 915→776 (operator asked); PAN-1889 = the permanent auto-retention fix.
 - **NEXT:** PAN-1887/1711 work; PAN-1845 synthesis; on conv/2920 push → deploy PAN-1614 (reload from clean tree) + rebase 1242/1775 onto it; serialize conflicting drain via merge train; MIN-831 operator merge; PAN-1491 awaits PAN-1893.
+
+### RUN-35 tick 9 (2026-06-14 ~19:46Z) — gate still closed; PAN-1845 also overlaps 2920; filed PAN-1897 (prep hang)
+
+- **conv/2920 gate STILL closed** (7 WIP files dirty, not pushed) → PAN-1614 deploy held; PAN-1242/1775 held. Main GREEN (92986d4d), dashboard healthy.
+- **PAN-1845** review = CHANGES REQUESTED (real blocker: orphaned volume in fly-provider.ts:191) — iterating, not mergeable. **Also overlaps conv/2920** (#1886 touches settings-api.ts/SettingsPage) → joins the held set once it passes.
+- **PAN-1711** plan finalized but `pan start` work-start TIMED OUT on workspace prep (>120s) — same as PAN-1827. **Filed PAN-1897** (pan start workspace-prep hangs on re-entry, no spawn/no error; blocks 1711+1827). The `--auto-start` non-chain (1887, 1711) is a separate pattern to watch.
+- **No merge this tick** (cross-check: only PAN-1242 mergeable, held). 8 active agents; serialized. strike-pan-1711 reaped.
+- **NEXT:** watch conv/2920 push → deploy PAN-1614 + rebase 1242/1775/1845; PAN-1887 GitLab PR; PAN-1845 fix→re-review; PAN-1897 (prep hang) candidate plan/strike; MIN-831 awaits PAN-1887.

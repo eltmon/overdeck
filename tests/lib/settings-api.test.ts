@@ -138,6 +138,37 @@ describe('settings-api', () => {
       expect(settings.models.providers.kimi).toBe(true);
     });
 
+    it('returns default remote settings when none are configured', () => {
+      const settings = loadSettingsApi();
+      expect(settings.remote).toEqual({
+        resiliency_tier: 'ephemeral',
+        max_concurrent_agents: 0,
+      });
+    });
+
+    it('returns configured remote settings from config.yaml', () => {
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['anthropic']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' },
+          conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
+          trackerKeys: {},
+          tts: makeTtsConfig(),
+          remote: { resiliencyTier: 'durable', maxConcurrentAgents: 5 },
+        },
+        migration: null,
+      } as any);
+      const settings = loadSettingsApi();
+      expect(settings.remote).toEqual({
+        resiliency_tier: 'durable',
+        max_concurrent_agents: 5,
+      });
+    });
+
     it('does not surface legacy model-route overrides in the settings API', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
@@ -191,6 +222,32 @@ describe('settings-api', () => {
         openai: 'sk-test-123',
       },
     };
+
+    it('rejects invalid remote settings', () => {
+      const invalid = {
+        ...validSettings,
+        remote: {
+          resiliency_tier: 'permanent',
+          max_concurrent_agents: -1,
+        },
+      };
+      const result = validateSettingsApi(invalid);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('remote.resiliency_tier must be ephemeral or durable');
+      expect(result.errors).toContain('remote.max_concurrent_agents must be a non-negative integer');
+    });
+
+    it('accepts valid remote settings', () => {
+      const settings = {
+        ...validSettings,
+        remote: {
+          resiliency_tier: 'durable',
+          max_concurrent_agents: 10,
+        },
+      };
+      const result = validateSettingsApi(settings);
+      expect(result.valid).toBe(true);
+    });
 
     it('should return valid for valid settings', () => {
       const result = validateSettingsApi(validSettings);
@@ -543,6 +600,37 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('zai: zai-test-123');
       expect(yamlContent).toContain('dashscope: dashscope-test-123');
       expect(yamlContent).toContain('gemini_thinking_level: 4');
+    });
+
+    it('persists remote tier and concurrency to YAML', async () => {
+      const { writeFile } = await import('fs/promises');
+      const settings: ApiSettingsConfig = {
+        models: {
+          providers: {
+            anthropic: true,
+            openai: false,
+            google: false,
+            minimax: false,
+            zai: false,
+            kimi: false,
+            openrouter: false,
+            nous: false,
+            dashscope: false,
+          },
+          overrides: {},
+        },
+        api_keys: {},
+        remote: {
+          resiliency_tier: 'durable',
+          max_concurrent_agents: 7,
+        },
+      };
+      await Effect.runPromise(saveSettingsApi(settings));
+      const callArgs = vi.mocked(writeFile).mock.calls.at(-1)!;
+      const yamlContent = callArgs[1] as string;
+      expect(yamlContent).toContain('remote:');
+      expect(yamlContent).toContain('resiliency_tier: durable');
+      expect(yamlContent).toContain('max_concurrent_agents: 7');
     });
 
     it('persists background_ai.cheap_mode: false to YAML (Low-cost mode toggle sticks)', async () => {

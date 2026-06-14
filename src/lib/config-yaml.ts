@@ -112,6 +112,20 @@ export interface NormalizedComplianceConfig {
   mode: ComplianceMode;
 }
 
+export type ResiliencyTier = 'ephemeral' | 'durable';
+
+export interface RemoteConfig {
+  /** Durability/resiliency tier for remote work agents. */
+  resiliency_tier?: ResiliencyTier;
+  /** Maximum concurrent remote work agents (0 = unlimited). */
+  max_concurrent_agents?: number;
+}
+
+export interface NormalizedRemoteConfig {
+  resiliencyTier: ResiliencyTier;
+  maxConcurrentAgents: number;
+}
+
 export interface FeatureRegistryClassificationConfig {
   enabled?: boolean;
   provider?: 'anthropic' | 'cliproxy';
@@ -138,6 +152,48 @@ function isComplianceMode(value: unknown): value is ComplianceMode {
 
 function isFeatureRegistryClassificationProvider(value: unknown): value is NormalizedFeatureRegistryConfig['classification']['provider'] {
   return value === 'anthropic' || value === 'cliproxy';
+}
+
+const VALID_RESILIENCY_TIERS: readonly ResiliencyTier[] = ['ephemeral', 'durable'] as const;
+
+function isResiliencyTier(value: unknown): value is ResiliencyTier {
+  return typeof value === 'string' && (VALID_RESILIENCY_TIERS as readonly string[]).includes(value);
+}
+
+/**
+ * Merge remote work-agent provisioning settings from a single config source.
+ */
+function mergeRemoteConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  const remote = config?.remote;
+  if (!remote) return;
+
+  if (remote.resiliency_tier !== undefined) {
+    if (!isResiliencyTier(remote.resiliency_tier)) {
+      throw new Error(
+        `config.yaml: remote.resiliency_tier must be one of ${VALID_RESILIENCY_TIERS.join(', ')}`,
+      );
+    }
+    result.remote = {
+      ...(result.remote ?? { maxConcurrentAgents: 0 }),
+      resiliencyTier: remote.resiliency_tier,
+    };
+  }
+
+  if (remote.max_concurrent_agents !== undefined) {
+    if (
+      typeof remote.max_concurrent_agents !== 'number' ||
+      !Number.isInteger(remote.max_concurrent_agents) ||
+      remote.max_concurrent_agents < 0
+    ) {
+      throw new Error(
+        'config.yaml: remote.max_concurrent_agents must be a non-negative integer',
+      );
+    }
+    result.remote = {
+      ...(result.remote ?? { resiliencyTier: 'ephemeral' }),
+      maxConcurrentAgents: remote.max_concurrent_agents,
+    };
+  }
 }
 
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
@@ -588,6 +644,9 @@ export interface YamlConfig {
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
+
+  /** Remote work-agent provisioning settings (dashboard-editable subset). */
+  remote?: RemoteConfig;
 }
 
 /**
@@ -843,6 +902,9 @@ export interface NormalizedConfig {
   codex: {
     permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
+
+  /** Remote work-agent provisioning settings surfaced by the dashboard. */
+  remote?: NormalizedRemoteConfig;
 }
 
 /**
@@ -2215,6 +2277,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {
       result.codex.permissionMode = config.codex.permissionMode;
     }
+
+    // Merge remote work-agent provisioning settings
+    mergeRemoteConfig(result, config);
 
     // Merge conversationSearch configuration
     if (config.conversationSearch) {

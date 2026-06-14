@@ -23,6 +23,7 @@ const execAsync = promisify(exec);
 export interface CreateRemoteWorkspaceOptions {
   dryRun?: boolean;
   spinner?: { text: string };
+  tier?: 'ephemeral' | 'durable';
 }async function createRemoteWorkspacePromise(
   issueId: string,
   options: CreateRemoteWorkspaceOptions = {}
@@ -36,7 +37,8 @@ export interface CreateRemoteWorkspaceOptions {
 
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const branchName = `feature/${normalizedId}`;
-  const fly = createFlyProviderFromConfig(config.remote);
+  const tier = options.tier ?? config.remote?.resiliency_tier;
+  const fly = createFlyProviderFromConfig(config.remote, tier);
 
   // Determine project context
   const teamPrefix = extractTeamPrefix(issueId);

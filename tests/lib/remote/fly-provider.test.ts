@@ -18,6 +18,9 @@ const { execAsyncMock, spawnMock, mockApi } = vi.hoisted(() => {
     execCommand: vi.fn(),
     waitForState: vi.fn(),
     ensureApp: vi.fn(),
+    createVolume: vi.fn(),
+    listVolumes: vi.fn(),
+    deleteVolume: vi.fn(),
   };
   return { execAsyncMock, spawnMock, mockApi };
 });
@@ -86,6 +89,92 @@ describe('FlyProvider', () => {
       expect(result.machineId).toBe('new-machine');
       expect(result.name).toBe('ws-123');
     });
+
+    it('ephemeral-tier create preserves restart:no and omits mounts', async () => {
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.createMachine.mockResolvedValue({ id: 'new-machine', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(provider.createVm('ws-123'));
+
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        restart: { policy: 'no' },
+      }));
+      const [, , config] = mockApi.createMachine.mock.calls[0];
+      expect(config).not.toHaveProperty('mounts');
+      expect(mockApi.listVolumes).not.toHaveBeenCalled();
+    });
+
+    it('durable-tier create provisions a volume and mounts it at /workspace', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.listVolumes.mockResolvedValue([]);
+      mockApi.createVolume.mockResolvedValue({ id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad' });
+      mockApi.createMachine.mockResolvedValue({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(durable.createVm('ws-123'));
+
+      expect(mockApi.createVolume).toHaveBeenCalledWith('test-app', {
+        name: 'ws-123-workspace',
+        region: 'iad',
+        sizeGb: 10,
+      });
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        restart: { policy: 'on-failure', max_retries: 3 },
+        mounts: [{ volume: 'vol-1', path: '/workspace' }],
+      }));
+    });
+
+    it('durable-tier adopts an existing machine with its volume attached', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' }]);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: 'm1' },
+      ]);
+      mockApi.getMachine.mockResolvedValue({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      const result = await run(durable.createVm('ws-123'));
+
+      expect(mockApi.createMachine).not.toHaveBeenCalled();
+      expect(mockApi.createVolume).not.toHaveBeenCalled();
+      expect(result.machineId).toBe('m1');
+    });
+
+    it('durable-tier refuses to adopt a machine missing its volume without creating one', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([{ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' }]);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: null },
+      ]);
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await expect(run(durable.createVm('ws-123'))).rejects.toThrow('does not have volume');
+      expect(mockApi.createVolume).not.toHaveBeenCalled();
+    });
+
+    it('durable-tier reuses an unattached volume for a fresh machine', async () => {
+      const durable = createFlyProvider({ app: 'test-app', org: 'test-org', region: 'iad', resiliencyTier: 'durable' });
+      mockApi.ensureApp.mockResolvedValue(undefined);
+      mockApi.listMachines.mockResolvedValue([]);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'ws-123-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: null },
+      ]);
+      mockApi.createMachine.mockResolvedValue({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      mockApi.waitForState.mockResolvedValue(undefined);
+
+      await run(durable.createVm('ws-123'));
+
+      expect(mockApi.createVolume).not.toHaveBeenCalled();
+      expect(mockApi.createMachine).toHaveBeenCalledWith('test-app', 'ws-123', expect.objectContaining({
+        mounts: [{ volume: 'vol-1', path: '/workspace' }],
+      }));
+    });
   });
 
   describe('deleteVm', () => {
@@ -95,6 +184,27 @@ describe('FlyProvider', () => {
       await run(provider.deleteVm('test-vm'));
 
       expect(mockApi.destroyMachine).toHaveBeenCalledWith('test-app', 'machine-1');
+    });
+
+    it('deletes the associated durable volume after destroying the machine', async () => {
+      mockApi.destroyMachine.mockResolvedValue(undefined);
+      mockApi.listVolumes.mockResolvedValue([
+        { id: 'vol-1', name: 'test-vm-workspace', state: 'created', size_gb: 10, region: 'iad', attached_machine_id: 'machine-1' },
+      ]);
+      mockApi.deleteVolume.mockResolvedValue(undefined);
+
+      await run(provider.deleteVm('test-vm'));
+
+      expect(mockApi.deleteVolume).toHaveBeenCalledWith('test-app', 'vol-1');
+    });
+
+    it('skips volume deletion for an ephemeral (volumeless) machine', async () => {
+      mockApi.destroyMachine.mockResolvedValue(undefined);
+      mockApi.listVolumes.mockResolvedValue([]);
+
+      await run(provider.deleteVm('test-vm'));
+
+      expect(mockApi.deleteVolume).not.toHaveBeenCalled();
     });
   });
 
@@ -189,6 +299,12 @@ describe('createFlyProvider', () => {
     expect(p.name).toBe('fly');
     expect(p.getAppName()).toBe('pan-workspaces');
   });
+
+  it('defaults resiliencyTier to ephemeral', () => {
+    process.env.FLY_API_TOKEN = 'test-token';
+    const p = createFlyProvider();
+    expect(p.getResiliencyTier()).toBe('ephemeral');
+  });
 });
 
 import { createFlyProviderFromConfig } from '../../../src/lib/remote/index.js';
@@ -202,6 +318,7 @@ describe('createFlyProviderFromConfig', () => {
     const fly = createFlyProviderFromConfig();
     expect(fly).toBeInstanceOf(FlyProvider);
     expect(fly.getAppName()).toBe('pan-workspaces');
+    expect(fly.getResiliencyTier()).toBe('ephemeral');
   });
 
   it('maps fly config fields to FlyProvider options', () => {
@@ -217,6 +334,16 @@ describe('createFlyProviderFromConfig', () => {
       },
     });
     expect(fly.getAppName()).toBe('my-app');
+  });
+
+  it('routes resiliency_tier from remote config into FlyProvider', () => {
+    const fly = createFlyProviderFromConfig({ resiliency_tier: 'durable' });
+    expect(fly.getResiliencyTier()).toBe('durable');
+  });
+
+  it('tier override wins over config resiliency_tier', () => {
+    const fly = createFlyProviderFromConfig({ resiliency_tier: 'durable' }, 'ephemeral');
+    expect(fly.getResiliencyTier()).toBe('ephemeral');
   });
 
   it('uses api_token_env to resolve token', () => {
