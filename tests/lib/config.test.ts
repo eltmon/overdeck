@@ -122,12 +122,17 @@ describe('config', () => {
       );
       vi.resetModules();
       vi.doMock('../../src/lib/paths.js', () => ({ CONFIG_FILE: configPath }));
+      // Prevent the real ~/.panopticon/config.yaml from overriding TOML values
+      vi.doMock('../../src/lib/config-yaml.js', () => ({
+        loadConfigSync: () => ({ config: {}, migration: null }),
+      }));
       const { loadConfigSync } = await import('../../src/lib/config.js');
       const config = loadConfigSync();
       expect(config.remote?.enabled).toBe(true);
       expect(config.remote?.resiliency_tier).toBe('durable');
       expect(config.remote?.max_concurrent_agents).toBe(7);
       vi.doUnmock('../../src/lib/paths.js');
+      vi.doUnmock('../../src/lib/config-yaml.js');
     });
 
     it('lets config.yaml remote settings override config.toml values', async () => {
