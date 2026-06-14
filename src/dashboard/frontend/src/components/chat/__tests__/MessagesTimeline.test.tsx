@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MessagesTimeline, type RoundMarker } from '../MessagesTimeline';
-import type { ChatMessage } from '../chat-types';
+import type { ChatMessage, WorkLogEntry } from '../chat-types';
 
 vi.mock('../ChatMarkdown', () => ({
   ChatMarkdownSettingsProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -353,5 +353,32 @@ describe('MessagesTimeline — roundMarkers', () => {
     expect(screen.queryByText(/tool calls were made/)).not.toBeInTheDocument();
     expect(screen.getByText('Bash')).toBeInTheDocument();
     expect(screen.getByText('Context compacted')).toBeInTheDocument();
+  });
+
+  it('shows command detail for Codex shell work log rows', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog: WorkLogEntry[] = [
+      {
+        id: 'w1',
+        createdAt: new Date(1_700_000_005_000).toISOString(),
+        label: 'Shell',
+        command: 'git status --short\nnpm test',
+        tone: 'tool',
+      },
+    ];
+
+    render(
+      <MessagesTimeline
+        messages={messages}
+        workLog={workLog}
+        streaming={false}
+      />,
+    );
+
+    expect(screen.getByText('Shell')).toBeInTheDocument();
+    expect(screen.getByText('git status --short')).toBeInTheDocument();
   });
 });
