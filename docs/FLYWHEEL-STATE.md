@@ -2644,6 +2644,58 @@ operator's strikes cover the systemic fixes. So the Flywheel's correct output th
 tick was: confirm the red-main win, emit the snapshot, and stay out of the operator's
 active work — not manufacture launches.
 
+## RUN-34 tick 3 (2026-06-14, after operator pause) — closed out 4; deacon STOPPED freezes recovery
+
+### Closed out 4 verified-merged issues (operator-directed)
+
+Operator lifted the brief's `pan close` prohibition and directed close-out of the
+verifying-on-main set. Verified each (PR MERGED + merge commit confirmed on
+origin/main + workspace clean, 0 dirty) then `pan close --force`: **PAN-1642, 1501,
+1658, 1802** — GitHub issues closed, `closed-out` labeled, vBRIEFs→completed, ghost
+agent-state dirs removed, review status cleared. awaitingUat now 0. (Squash-merged PRs
+show "N commits not on main" — that's the normal squash artifact; the merge commit IS
+on main. Always verify via `git merge-base --is-ancestor <mergeCommit> origin/main`,
+not the branch-ahead count.) Note: close-out's `[pan-dir/auto-commit] rebase failed
+for main` warning fired on each — that was the primary-main divergence, since reconciled.
+
+### Primary-main divergence: ROOT CAUSE + resolution
+
+The divergence was a double-authored history: `docs(sop): topology` and
+`test(harness): reconcile harness-resolve` were each committed TWICE — once on the
+local primary worktree (`c32072d25`/`24054b9a9`), once on the line that reached origin
+(`9f3786de0`/`626b6f8b1`) — touching the same files, so no fast-forward. Operator
+reconciled it (local==origin==`27e879f5b`, "after main reconcile" commit preserved the
+RUN-34 state). **Lesson:** unpushed commits on the shared primary main worktree +
+parallel pipeline pushes to origin = double-authored divergence. The flywheel commits
+ONLY docs/FLYWHEEL-STATE.md and (now that operator cleared "never push") pushes when
+the tree is clean and it's a fast-forward; never force-push/rebase a dirty tree with
+operator work in it.
+
+### HARNESS RULE (operator correction — now in memory)
+
+Tick 1 I ran `pan strike PAN-1880 --harness claude-code` because my RUN-34 task header
+says "Harness: claude-code". That header is the ORCHESTRATOR's own harness, NOT a
+directive for spawned strikes. Cloister routed the strike to kimi-k2.7-code, and
+claude-code+non-native = the CLIProxy 200k deadlock (PAN-1865) — it hit 80% ctx.
+Operator killed + re-dispatched on default (kimi→pi). **RULE: never pass --harness for
+strikes/agents; let the provider route (kimi→pi, gpt-5.5→codex). Only override with a
+specific safe reason.** Systemic guard = PAN-1881 (resolveHarness throws for
+claude-code+non-native; operator was writing it live in the tree). Saved as memory
+feedback_strike_default_harness.
+
+### DEACON IS STOPPED — the dominant blocker now
+
+On resume: dashboard UP (HTTP 200), main green (27e879f5b), but the Cloister deacon is
+`Status: Stopped` (auto-start enabled, no freeze flag). No patrols → no auto-resume, no
+forward dispatch. The 11 in-review issues (1827,1817,1775,1765,1696,1641,1629,1614,
+1498,1491,1242) + critical PAN-1845 are stalled and CANNOT recover while the deacon is
+down. The PAN-1879 boot-gate fix is deployed, so the highest-value action is to start
+the deacon WITH resume enabled — but the system is under active operator deploy, so the
+flywheel surfaces this (urgent suggestion) rather than starting it (avoid colliding
+with the live deploy). Did NOT launch agents this tick: launching into a frozen pipeline
+(deacon stopped) is pointless, and auto_pickup_backlog=false forbids fresh backlog —
+the recovery path runs through the deacon, which is the operator's to restart.
+
 ### Memory is NOT the limiter this run (contrast RUN-33)
 
 RAM 15/64 GB, **swap 0/8GB** (RUN-33 was 99.9% swap). The launch ceiling this run is
