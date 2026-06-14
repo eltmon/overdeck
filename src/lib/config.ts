@@ -5,6 +5,7 @@ import { join, dirname, parse as parsePath } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
+import { loadConfigSync as loadYamlConfigSync } from './config-yaml.js';
 import type { TrackerType } from './tracker/interface.js';
 import { FsError } from './errors.js';
 
@@ -83,6 +84,10 @@ export interface RemoteConfig {
   overflow_to_remote?: boolean;
   /** Auto-hibernate idle workspaces after N minutes (0 = disabled) */
   auto_hibernate_minutes?: number;
+  /** Durability/resiliency tier for remote work agents */
+  resiliency_tier?: 'ephemeral' | 'durable';
+  /** Maximum concurrent remote work agents (0 = unlimited) */
+  max_concurrent_agents?: number;
   /** Fly.io specific configuration */
   fly?: RemoteFlyConfig;
 }
@@ -212,6 +217,10 @@ const DEFAULT_CONFIG: PanopticonConfig = {
     dashboard_port: 8080,
     domain: 'pan.localhost',
   },
+  remote: {
+    enabled: false,
+    resiliency_tier: 'ephemeral',
+  },
   shadow: {
     enabled: false,
     trackers: {
@@ -272,19 +281,69 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
   return result;
 }
 
-export function loadConfigSync(): PanopticonConfig {
-  if (!existsSync(CONFIG_FILE)) {
-    return DEFAULT_CONFIG;
+const VALID_RESILIENCY_TIERS = ['ephemeral', 'durable'] as const;
+
+/** Normalize and validate the remote config section. Mutates `config.remote`. */
+export function normalizeRemoteConfig(config: PanopticonConfig): void {
+  if (!config.remote) return;
+
+  if (config.remote.resiliency_tier === undefined) {
+    config.remote.resiliency_tier = 'ephemeral';
   }
 
-  try {
-    const content = readFileSync(CONFIG_FILE, 'utf8');
-    const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
-    return deepMerge(DEFAULT_CONFIG, parsed);
-  } catch (error) {
-    console.error('Warning: Failed to parse config, using defaults');
-    return DEFAULT_CONFIG;
+  if (
+    !VALID_RESILIENCY_TIERS.includes(
+      config.remote.resiliency_tier as (typeof VALID_RESILIENCY_TIERS)[number],
+    )
+  ) {
+    throw new Error(
+      `Invalid remote.resiliency_tier '${config.remote.resiliency_tier}'. Must be one of: ${VALID_RESILIENCY_TIERS.join(', ')}`,
+    );
   }
+
+  if (
+    config.remote.max_concurrent_agents !== undefined &&
+    typeof config.remote.max_concurrent_agents !== 'number'
+  ) {
+    throw new Error('remote.max_concurrent_agents must be a number');
+  }
+}
+
+export function loadConfigSync(): PanopticonConfig {
+  let config: PanopticonConfig;
+
+  if (!existsSync(CONFIG_FILE)) {
+    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+  } else {
+    try {
+      const content = readFileSync(CONFIG_FILE, 'utf8');
+      const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+      config = deepMerge(DEFAULT_CONFIG, parsed);
+    } catch (error) {
+      console.error('Warning: Failed to parse config, using defaults');
+      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+    }
+  }
+
+  normalizeRemoteConfig(config);
+
+  // Dashboard-editable remote tier/concurrency live in config.yaml and override
+  // the config.toml values so operators can change them without hand-editing
+  // the TOML file.
+  try {
+    const yamlRemote = loadYamlConfigSync().config.remote;
+    if (yamlRemote) {
+      config.remote = {
+        ...(config.remote ?? { enabled: false }),
+        resiliency_tier: yamlRemote.resiliencyTier,
+        max_concurrent_agents: yamlRemote.maxConcurrentAgents,
+      };
+    }
+  } catch {
+    // If config.yaml is missing or malformed, fall back to config.toml values.
+  }
+
+  return config;
 }
 
 export function saveConfigSync(config: PanopticonConfig): void {
@@ -293,17 +352,37 @@ export function saveConfigSync(config: PanopticonConfig): void {
 }
 
 async function loadConfigFromFile(): Promise<PanopticonConfig> {
+  let config: PanopticonConfig;
+
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
     const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
-    return deepMerge(DEFAULT_CONFIG, parsed);
+    config = deepMerge(DEFAULT_CONFIG, parsed);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return DEFAULT_CONFIG;
+      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+    } else {
+      console.error('Warning: Failed to parse config, using defaults');
+      return JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
     }
-    console.error('Warning: Failed to parse config, using defaults');
-    return DEFAULT_CONFIG;
   }
+
+  normalizeRemoteConfig(config);
+
+  try {
+    const yamlRemote = loadYamlConfigSync().config.remote;
+    if (yamlRemote) {
+      config.remote = {
+        ...(config.remote ?? { enabled: false }),
+        resiliency_tier: yamlRemote.resiliencyTier,
+        max_concurrent_agents: yamlRemote.maxConcurrentAgents,
+      };
+    }
+  } catch {
+    // Fall back to config.toml values if config.yaml is unreadable.
+  }
+
+  return config;
 }
 
 async function saveConfigToFile(config: PanopticonConfig): Promise<void> {

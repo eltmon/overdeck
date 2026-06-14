@@ -248,6 +248,20 @@ export interface ApiSettingsConfig {
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
+  /**
+   * Remote work-agent provisioning settings.
+   *
+   * `resiliency_tier` controls whether remote work agents use ephemeral
+   * (cheaper, no disk) or durable (volume-backed, survives crashes) machines.
+   * `max_concurrent_agents` caps how many remote work agents may run at once
+   * (0 = unlimited).
+   *
+   * Persisted under `remote` in `~/.panopticon/config.yaml`.
+   */
+  remote?: {
+    resiliency_tier?: 'ephemeral' | 'durable';
+    max_concurrent_agents?: number;
+  };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -265,7 +279,7 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('minimax')) return resolveModelIdSync('minimax-m2.7-highspeed');
   if (config.enabledProviders.has('google')) return resolveModelIdSync('gemini-3.1-pro-preview');
   if (config.enabledProviders.has('kimi')) return resolveModelIdSync('kimi-k2.5');
-  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.1');
+  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.2');
   if (config.enabledProviders.has('mimo')) return resolveModelIdSync('mimo-v2.5-pro');
   if (config.enabledProviders.has('nous')) return resolveModelIdSync('qwen/qwen3.6-plus');
   if (config.enabledProviders.has('dashscope')) return resolveModelIdSync('qwen3-coder-plus');
@@ -691,6 +705,10 @@ export function loadSettingsApi(): ApiSettingsConfig {
     codex: {
       permissionMode: (config.codex?.permissionMode ?? 'auto-review') as 'read-only' | 'workspace' | 'auto-review' | 'full-access',
     },
+    remote: {
+      resiliency_tier: config.remote?.resiliencyTier ?? 'ephemeral',
+      max_concurrent_agents: config.remote?.maxConcurrentAgents ?? 0,
+    },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
@@ -764,6 +782,12 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     for (const [key, value] of Object.entries(config.tts)) {
       doc.setIn(['tts', key], value);
     }
+  }
+
+  if (config.remote !== undefined) {
+    doc.setIn(['remote'], config.remote);
+  } else {
+    doc.deleteIn(['remote']);
   }
 
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
@@ -873,6 +897,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     codex: settings.codex?.permissionMode
       ? { permissionMode: settings.codex.permissionMode }
       : undefined,
+    remote: settings.remote,
   };
 
   await writeYamlConfigPreservingComments(yamlConfig);
@@ -971,6 +996,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     codex: {
       ...current.codex,
       ...updates.codex,
+    },
+    remote: {
+      ...current.remote,
+      ...updates.remote,
     },
   };
 
@@ -1131,6 +1160,26 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       errors.push('tts must be an object');
     } else {
       validateApiTtsConfigFields(settings.tts, errors);
+    }
+  }
+
+  if (settings.remote !== undefined) {
+    if (!isRecord(settings.remote)) {
+      errors.push('remote must be an object');
+    } else {
+      if (
+        settings.remote.resiliency_tier !== undefined &&
+        settings.remote.resiliency_tier !== 'ephemeral' &&
+        settings.remote.resiliency_tier !== 'durable'
+      ) {
+        errors.push('remote.resiliency_tier must be ephemeral or durable');
+      }
+      if (
+        settings.remote.max_concurrent_agents !== undefined &&
+        (!Number.isInteger(settings.remote.max_concurrent_agents) || settings.remote.max_concurrent_agents < 0)
+      ) {
+        errors.push('remote.max_concurrent_agents must be a non-negative integer');
+      }
     }
   }
 
