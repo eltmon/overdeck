@@ -85,11 +85,22 @@ const getResourcesRoute = HttpRouter.add(
         readdir(agentsDir).catch(() => [] as string[]),
       );
 
-      for (const name of names) {
-        const stateFile = join(agentsDir, name, 'state.json');
-        const stateText = yield* Effect.promise(() =>
-          readFile(stateFile, 'utf-8').catch(() => null as string | null),
-        );
+      // Read every agent's state.json with bounded concurrency rather than one
+      // await at a time. This route is polled every 5s per open panel; with
+      // hundreds of accumulated agent dirs the old sequential loop made it take
+      // 20-25s under disk contention and stalled the event loop (PAN-1711).
+      const stateTexts = yield* Effect.all(
+        names.map((name) =>
+          Effect.promise(() =>
+            readFile(join(agentsDir, name, 'state.json'), 'utf-8').catch(
+              () => null as string | null,
+            ),
+          ),
+        ),
+        { concurrency: 24 },
+      );
+
+      for (const stateText of stateTexts) {
         if (!stateText) continue;
         try {
           const state = JSON.parse(stateText) as Record<string, unknown>;
