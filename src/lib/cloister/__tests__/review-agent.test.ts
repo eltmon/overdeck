@@ -108,7 +108,7 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
   });
 
-  it('inherits host override from the completed work agent for synthesis and reviewer spawns', async () => {
+  it('inherits host override from the completed work agent for synthesis spawn (discovery mode)', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
       workspace: '/tmp/pan-review-host-override',
@@ -117,15 +117,18 @@ describe('spawnReviewRoleForIssue', () => {
 
     expect(result.success).toBe(true);
     expect(mocks.getAgentStateProgram).toHaveBeenCalledWith('agent-pan-1194');
+    // Discovery mode (cc default): only the parent synthesis agent is spawned
+    expect(mocks.spawnRun).toHaveBeenCalledTimes(1);
     expect(mocks.spawnRun).toHaveBeenCalledWith(
       'PAN-1194',
       'review',
       expect.objectContaining({ allowHost: true, workspace: '/tmp/pan-review-host-override' }),
     );
-    expect(mocks.spawnRun).toHaveBeenCalledWith(
+    // No inline convoy — reviewers are forked later via handleDiscoveryReady
+    expect(mocks.spawnRun).not.toHaveBeenCalledWith(
       'PAN-1194',
       'review',
-      expect.objectContaining({ allowHost: true, subRole: 'security' }),
+      expect.objectContaining({ subRole: expect.anything() }),
     );
   });
 

@@ -50,6 +50,7 @@ import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveCo
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
+import { getAgentState, getLatestSessionIdSync, messageAgent, saveAgentState, spawnRun } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 /**
@@ -151,30 +152,68 @@ function buildReviewRolePrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
   tier1Summary?: string;
+  discoveryMode?: boolean;
 }): string {
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
   const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
+
+  const openingBlock = opts.discoveryMode
+    ? [
+        `REVIEW — DISCOVERY AND SYNTHESIS for ${opts.issueId}`,
+        '',
+        'Your role has two phases. Start on Phase 1 immediately.',
+        '',
+        '## Phase 1 — Discovery (do this NOW)',
+        '',
+        'Follow roles/review.md §0 exactly: read the PR diff and the high-risk changed',
+        'files into your context. The four convoy reviewers will be forked from your',
+        'session once you signal ready, so they inherit your warm prompt-cache context',
+        'instead of each re-reading the same diff at full cost.',
+        '',
+        'When your discovery reads are complete, signal ready:',
+        '',
+        `  pan admin specialists discovery-ready review ${opts.issueId}`,
+        '',
+        'Then stop and wait. Do NOT proceed to Phase 2 until you receive all four',
+        'REVIEWER_READY (or REVIEWER_FAILED / REVIEWER_TIMEOUT) signals — one per sub-role.',
+        '',
+        '## Phase 2 — Synthesis (begins only after all four signals arrive)',
+        '',
+        'You will receive exactly one signal per sub-role as each reviewer finishes:',
+        expectedSignals,
+        '',
+        'Until all four terminal signals have arrived: do nothing. Do not read the',
+        'reviewer output files, do not run git, do not inspect tmux sessions. Just',
+        'wait — the reviewers notify you, and Deacon is the failsafe.',
+        '',
+        'Once all four signals are in, follow roles/review.md exactly to read the',
+        'reports, synthesize the verdict, write the synthesis report, and signal.',
+      ]
+    : [
+        `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
+        '',
+        'Do NOT do anything yet. The Panopticon server has already spawned the four',
+        'convoy reviewers (security, correctness, performance, requirements) and they',
+        'are running in parallel right now. Your work begins only once they finish.',
+        '',
+        'You will receive exactly one `pan tell` signal per sub-role as each reviewer',
+        'finishes — these are delivered to you as user messages:',
+        expectedSignals,
+        '',
+        'Until all four terminal signals have arrived: do nothing. Do not read the',
+        'reviewer output files, do not run git, do not inspect tmux sessions, do not',
+        'poll anything. Just wait — the reviewers notify you when they finish, and',
+        'Deacon is the failsafe if one never starts or never completes. Acting early',
+        'wastes tokens reviewing nothing.',
+        '',
+        'Once you have all four terminal signals, follow roles/review.md exactly to',
+        'read the reports, synthesize the verdict, write the synthesis report, and',
+        'signal the status.',
+      ];
+
   const prompt = [
-    `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
-    '',
-    'Do NOT do anything yet. The Panopticon server has already spawned the four',
-    'convoy reviewers (security, correctness, performance, requirements) and they',
-    'are running in parallel right now. Your work begins only once they finish.',
-    '',
-    'You will receive exactly one `pan tell` signal per sub-role as each reviewer',
-    'finishes — these are delivered to you as user messages:',
-    expectedSignals,
-    '',
-    'Until all four terminal signals have arrived: do nothing. Do not read the',
-    'reviewer output files, do not run git, do not inspect tmux sessions, do not',
-    'poll anything. Just wait — the reviewers notify you when they finish, and',
-    'Deacon is the failsafe if one never starts or never completes. Acting early',
-    'wastes tokens reviewing nothing.',
-    '',
-    'Once you have all four terminal signals, follow roles/review.md exactly to',
-    'read the reports, synthesize the verdict, write the synthesis report, and',
-    'signal the status.',
+    ...openingBlock,
     '',
     '── Review context ──',
     `Issue: ${opts.issueId}`,
@@ -214,7 +253,9 @@ function buildReviewRolePrompt(opts: {
   const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
   console.log(`[review-agent] Synthesis prompt for ${opts.issueId}: ${sizeBytes} bytes`);
   return prompt;
-}async function spawnReviewSubRoleForIssuePromise(opts: {
+}
+
+async function spawnReviewSubRoleForIssuePromise(opts: {
   issueId: string;
   workspace: string;
   subRole: ReviewSubRole;
@@ -225,9 +266,10 @@ function buildReviewRolePrompt(opts: {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
+  /** When set, the reviewer is spawned with `--resume <forkSessionId>` to inherit the parent's cache. */
+  forkSessionId?: string;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentState, spawnRun } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -270,6 +312,9 @@ function buildReviewRolePrompt(opts: {
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
       allowHost: opts.allowHost ?? false,
+      // PAN-1862: when forked from the parent's session, resume the forked JSONL
+      // so the reviewer inherits the parent's warm prompt-cache context.
+      ...(opts.forkSessionId ? { resumeSessionId: opts.forkSessionId } : {}),
     });
     run.reviewSubRole = opts.subRole;
     run.reviewRunId = opts.runId;
@@ -291,7 +336,9 @@ function buildReviewRolePrompt(opts: {
       error: err instanceof Error ? err.message : String(err),
     };
   }
-}async function spawnReviewRoleForIssuePromise(
+}
+
+async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
@@ -434,7 +481,6 @@ function buildReviewRolePrompt(opts: {
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentState } = await import('../agents.js');
     const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
@@ -469,7 +515,14 @@ function buildReviewRolePrompt(opts: {
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+    // PAN-1862: discovery mode — parent does a shared discovery pass, then the
+    // server forks its session into convoy reviewers on a discovery-ready signal.
+    // Only applicable for claude-code harness (fork-cache is cc-specific); non-cc
+    // harnesses use the old inline-spawn path (decision D9).
+    // Check the explicit harness option; undefined → cc default → discovery mode.
+    const discoveryMode = opts.harness !== 'pi' && opts.harness !== 'codex';
+
+    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, discoveryMode });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
@@ -490,6 +543,16 @@ function buildReviewRolePrompt(opts: {
     console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntrySync({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
+    if (discoveryMode) {
+      // Discovery mode: parent will signal pan admin specialists discovery-ready
+      // after reading the diff; the server then forks the session for each reviewer.
+      console.log(`[review-agent] Discovery mode: ${run.id} will signal ready after discovery phase`);
+      return {
+        success: true,
+        message: `Review role (discovery) spawned: ${run.id}; convoy will be forked after discovery phase`,
+      };
+    }
+
     const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
       const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
       const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
@@ -506,7 +569,6 @@ function buildReviewRolePrompt(opts: {
       }));
       if (!result.success) {
         try {
-          const { messageAgent } = await import('../agents.js');
           await messageAgent(run.id, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
         } catch (signalErr) {
           console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${run.id}:`, signalErr);
@@ -669,6 +731,7 @@ export const spawnReviewSubRoleForIssue = (opts: {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
+  forkSessionId?: string;
 }): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
   Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
 
@@ -699,3 +762,121 @@ export const killAllReviewerSessions = (
  */
 export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
   Effect.promise(() => killAllReviewSessionsPromise());
+
+/**
+ * Handle a `pan admin specialists discovery-ready review <issueId>` signal.
+ *
+ * Called by the parent synthesis agent after completing its discovery phase.
+ * Forks the parent's session into four convoy reviewer sessions (claude-code only)
+ * and delivers the per-sub-role kickoff prompts. For non-cc parents, falls back
+ * to the old independent-read inline spawn. Idempotent on convoyLaunchedAt.
+ *
+ * PAN-1862
+ */
+export async function handleDiscoveryReady(
+  issueId: string,
+  workspace: string,
+): Promise<{ success: boolean; message: string; noOp?: boolean; error?: string }> {
+  const parentAgentId = `agent-${issueId.toLowerCase()}-review`;
+
+  const { sessionFilePath } = await import('../paths.js');
+
+  // Load parent synthesis agent state
+  let parentState = await Effect.runPromise(getAgentState(parentAgentId));
+  if (!parentState) {
+    return { success: false, message: `Parent review agent not found: ${parentAgentId}` };
+  }
+
+  // Idempotency: if convoy already launched (e.g. duplicate signal), return no-op
+  if (parentState.convoyLaunchedAt) {
+    console.log(`[review-agent] handleDiscoveryReady: convoy already launched for ${issueId} (convoyLaunchedAt=${parentState.convoyLaunchedAt}) — no-op`);
+    return { success: true, message: 'Convoy already launched (idempotent no-op)', noOp: true };
+  }
+
+  // Stamp discoveryReadyAt before doing any spawning
+  parentState.discoveryReadyAt = new Date().toISOString();
+  await Effect.runPromise(saveAgentState(parentState));
+
+  const runId = parentState.reviewRunId ?? parentAgentId;
+  const contextManifestPath = join(workspace, PAN_DIRNAME, 'review', runId, 'context.json');
+
+  // Non-cc harness fallback (D9): fork is a claude-code-only optimization
+  if (parentState.harness && parentState.harness !== 'claude-code') {
+    console.log(`[review-agent] handleDiscoveryReady: harness=${parentState.harness} — independent-read path`);
+    const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(subRole =>
+      spawnReviewSubRoleForIssuePromise({
+        issueId,
+        workspace,
+        subRole,
+        runId,
+        contextManifestPath,
+        synthesisAgentId: parentAgentId,
+        allowHost: parentState!.hostOverride ?? false,
+      })
+    ));
+
+    for (let i = 0; i < reviewerResults.length; i++) {
+      if (!reviewerResults[i].success) {
+        try {
+          await messageAgent(parentAgentId, `REVIEWER_FAILED ${REVIEW_SUB_ROLES[i]} ${reviewerResults[i].error ?? reviewerResults[i].message}`);
+        } catch { /* non-fatal */ }
+      }
+    }
+
+    parentState = { ...parentState, convoyLaunchedAt: new Date().toISOString() };
+    await Effect.runPromise(saveAgentState(parentState));
+    const ok = reviewerResults.filter(r => r.success).length;
+    return { success: true, message: `Convoy launched (independent-read): ${ok}/${REVIEW_SUB_ROLES.length}` };
+  }
+
+  // CC path: get parent JSONL and fork into each reviewer
+  const parentSessionId = getLatestSessionIdSync(parentAgentId);
+  if (!parentSessionId) {
+    return { success: false, message: `Could not resolve session ID for ${parentAgentId}`, error: 'session ID missing' };
+  }
+
+  const parentJSONL = sessionFilePath(workspace, parentSessionId);
+  const { forkSession } = await import('../conversations/fork-session.js');
+
+  const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
+    try {
+      const { sessionId: forkedId } = await forkSession({
+        sourceSessionFile: parentJSONL,
+        destCwd: workspace,
+        fullHistory: true,
+      });
+      return await spawnReviewSubRoleForIssuePromise({
+        issueId,
+        workspace,
+        subRole,
+        runId,
+        contextManifestPath,
+        synthesisAgentId: parentAgentId,
+        forkSessionId: forkedId,
+        allowHost: parentState!.hostOverride ?? false,
+      });
+    } catch (err) {
+      return {
+        success: false,
+        message: `Failed to fork+spawn ${subRole}`,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }));
+
+  // Signal REVIEWER_FAILED to parent for any sub-role that didn't spawn
+  for (let i = 0; i < reviewerResults.length; i++) {
+    if (!reviewerResults[i].success) {
+      try {
+        await messageAgent(parentAgentId, `REVIEWER_FAILED ${REVIEW_SUB_ROLES[i]} ${reviewerResults[i].error ?? reviewerResults[i].message}`);
+      } catch { /* non-fatal */ }
+    }
+  }
+
+  parentState = { ...parentState, convoyLaunchedAt: new Date().toISOString() };
+  await Effect.runPromise(saveAgentState(parentState));
+
+  const ok = reviewerResults.filter(r => r.success).length;
+  console.log(`[review-agent] Convoy forked+spawned for ${issueId}: ${ok}/${REVIEW_SUB_ROLES.length}`);
+  return { success: true, message: `Convoy launched (fork path): ${ok}/${REVIEW_SUB_ROLES.length} reviewers forked+spawned` };
+}

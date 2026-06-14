@@ -20,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
   buildConvoyPrompt,
+  handleDiscoveryReady,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
@@ -40,6 +41,8 @@ const {
   mockSetReviewStatus,
   mockGetReviewStatus,
   mockArchiveFeedbackFiles,
+  mockGetLatestSessionIdSync,
+  mockForkSession,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +56,8 @@ const {
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
   mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
+  mockGetLatestSessionIdSync: vi.fn(() => 'parent-session-uuid'),
+  mockForkSession: vi.fn().mockResolvedValue({ sessionId: 'forked-uuid', sessionFile: '/tmp/forked.jsonl' }),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -78,7 +83,21 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
+  getLatestSessionIdSync: mockGetLatestSessionIdSync,
+  getProviderAuthMode: vi.fn().mockResolvedValue(undefined),
 }));
+
+vi.mock('../../../src/lib/conversations/fork-session.js', () => ({
+  forkSession: mockForkSession,
+}));
+
+vi.mock('../../../src/lib/paths.js', async () => {
+  const actual = await vi.importActual('../../../src/lib/paths.js');
+  return {
+    ...actual as object,
+    sessionFilePath: vi.fn((_cwd: string, sessionId: string) => `/tmp/sessions/${sessionId}.jsonl`),
+  };
+});
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
@@ -766,6 +785,164 @@ describe('deacon gated review deferral', () => {
 // can retry. The deacon at deacon.ts only re-dispatches when reviewStatus===
 // 'pending'; setting 'failed' leaves reviews permanently stuck after a transient
 // dispatch error (e.g., tmux not ready, file-system issue).
+
+// ── discovery-fork orchestration (PAN-1862) ───────────────────────────────────
+
+describe('discovery-fork orchestration (PAN-1862)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1862-review', harness: 'claude-code' });
+    mockSaveAgentStateAsync.mockResolvedValue(undefined);
+    mockGetLatestSessionIdSync.mockReturnValue('parent-session-uuid');
+    mockForkSession.mockResolvedValue({ sessionId: 'forked-uuid', sessionFile: '/tmp/forked.jsonl' });
+  });
+
+  describe('spawnReviewRoleForIssue — discovery mode (AC1)', () => {
+    it('spawns exactly one parent session when harness is unset (cc default)', async () => {
+      mockGetAgentState.mockReturnValue(null);
+      const result = await Effect.runPromise(spawnReviewRoleForIssue({
+        issueId: 'PAN-1862',
+        workspace: '/workspace',
+        branch: 'feature/pan-1862',
+      }));
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('discovery');
+      // Only one spawnRun call (parent) — no inline convoy
+      expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+      expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1862', 'review', expect.not.objectContaining({ subRole: expect.anything() }));
+    });
+
+    it('discovery prompt contains pan admin specialists discovery-ready command', async () => {
+      mockGetAgentState.mockReturnValue(null);
+      await Effect.runPromise(spawnReviewRoleForIssue({
+        issueId: 'PAN-1862',
+        workspace: '/workspace',
+        branch: 'feature/pan-1862',
+      }));
+
+      const [, , spawnOpts] = mockSpawnRun.mock.calls[0];
+      expect(spawnOpts.prompt).toContain('pan admin specialists discovery-ready review PAN-1862');
+      expect(spawnOpts.prompt).toContain('Phase 1');
+    });
+
+    it('spawns inline convoy for pi harness (D9 non-cc fallback)', async () => {
+      mockGetAgentState.mockReturnValue(null);
+      mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1862-review', harness: 'pi' });
+      const result = await Effect.runPromise(spawnReviewRoleForIssue({
+        issueId: 'PAN-1862',
+        workspace: '/tmp/pan-test-pi-convoy',
+        branch: 'feature/pan-1862',
+        harness: 'pi',
+      }));
+
+      expect(result.success).toBe(true);
+      // 1 parent + 4 convoy reviewers = 5 total spawnRun calls
+      expect(mockSpawnRun).toHaveBeenCalledTimes(5);
+      // Parent prompt should be STANDBY, not discovery
+      const [, , parentOpts] = mockSpawnRun.mock.calls[0];
+      expect(parentOpts.prompt).toContain('STANDBY');
+      expect(parentOpts.prompt).not.toContain('discovery-ready');
+    });
+  });
+
+  describe('handleDiscoveryReady (AC2, AC3, AC4, AC5)', () => {
+    it('AC2: forks parent into 4 reviewer sessions and spawns each', async () => {
+      mockGetAgentState.mockReturnValue({
+        id: 'agent-pan-1862-review',
+        issueId: 'PAN-1862',
+        harness: 'claude-code',
+        reviewRunId: 'agent-pan-1862-review-abc12345',
+        hostOverride: false,
+      });
+      mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1862-review-security' });
+
+      const result = await handleDiscoveryReady('PAN-1862', '/tmp/pan-1862-disc-cc');
+
+      expect(result.success).toBe(true);
+      expect(result.noOp).toBeUndefined();
+      // forkSession called 4 times (one per sub-role)
+      expect(mockForkSession).toHaveBeenCalledTimes(4);
+      expect(mockForkSession).toHaveBeenCalledWith(expect.objectContaining({
+        sourceSessionFile: '/tmp/sessions/parent-session-uuid.jsonl',
+        destCwd: '/tmp/pan-1862-disc-cc',
+        fullHistory: true,
+      }));
+      // spawnRun called 4 times (reviewers)
+      expect(mockSpawnRun).toHaveBeenCalledTimes(4);
+      expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1862', 'review', expect.objectContaining({
+        resumeSessionId: 'forked-uuid',
+        subRole: expect.stringMatching(/^(security|correctness|performance|requirements)$/),
+      }));
+    });
+
+    it('AC3: second signal is a no-op when convoyLaunchedAt is already set', async () => {
+      mockGetAgentState.mockReturnValue({
+        id: 'agent-pan-1862-review',
+        issueId: 'PAN-1862',
+        harness: 'claude-code',
+        reviewRunId: 'agent-pan-1862-review-abc12345',
+        convoyLaunchedAt: '2026-06-14T12:00:00.000Z',
+      });
+
+      const result = await handleDiscoveryReady('PAN-1862', '/workspace');
+
+      expect(result.success).toBe(true);
+      expect(result.noOp).toBe(true);
+      expect(mockForkSession).not.toHaveBeenCalled();
+      expect(mockSpawnRun).not.toHaveBeenCalled();
+    });
+
+    it('AC4: non-cc harness falls back to independent-read spawn (no fork)', async () => {
+      mockGetAgentState.mockReturnValue({
+        id: 'agent-pan-1862-review',
+        issueId: 'PAN-1862',
+        harness: 'pi',
+        reviewRunId: 'agent-pan-1862-review-abc12345',
+        hostOverride: false,
+      });
+      mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1862-review-security' });
+
+      const result = await handleDiscoveryReady('PAN-1862', '/tmp/pan-1862-disc-pi');
+
+      expect(result.success).toBe(true);
+      expect(result.message).toContain('independent-read');
+      expect(mockForkSession).not.toHaveBeenCalled();
+      // 4 inline spawns, no resumeSessionId
+      expect(mockSpawnRun).toHaveBeenCalledTimes(4);
+      expect(mockSpawnRun).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ resumeSessionId: expect.anything() }));
+    });
+
+    it('AC5: sets discoveryReadyAt and convoyLaunchedAt on synthesis state', async () => {
+      mockGetAgentState.mockReturnValue({
+        id: 'agent-pan-1862-review',
+        issueId: 'PAN-1862',
+        harness: 'claude-code',
+        reviewRunId: 'agent-pan-1862-review-abc12345',
+        hostOverride: false,
+      });
+      mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1862-review-security' });
+
+      await handleDiscoveryReady('PAN-1862', '/workspace');
+
+      // saveAgentState called at least twice: once for discoveryReadyAt, once for convoyLaunchedAt
+      expect(mockSaveAgentStateAsync).toHaveBeenCalledTimes(2);
+      const firstCall = mockSaveAgentStateAsync.mock.calls[0][0];
+      expect(firstCall).toMatchObject({ discoveryReadyAt: expect.any(String) });
+      const lastCall = mockSaveAgentStateAsync.mock.calls[mockSaveAgentStateAsync.mock.calls.length - 1][0];
+      expect(lastCall).toMatchObject({ convoyLaunchedAt: expect.any(String) });
+    });
+
+    it('returns error when parent agent state not found', async () => {
+      mockGetAgentState.mockReturnValue(null);
+
+      const result = await handleDiscoveryReady('PAN-1862', '/workspace');
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('not found');
+    });
+  });
+});
 
 describe('dispatch failure reviewStatus regression', () => {
   it('workspaces.ts request-review route blocks dirty worktrees before verification', async () => {
