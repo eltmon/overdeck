@@ -4,17 +4,17 @@
     "created": "2026-06-13T15:32:41.958Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1821: Linear responses never feed updateRateLimit — getBackoffMs('linear') is always 0, so pollers have zero rate-limit awareness",
-    "updated": "2026-06-13T15:37:27.340Z"
+    "updated": "2026-06-14T04:46:14.909Z"
   },
   "plan": {
     "id": "pan-1821",
     "title": "Linear responses never feed updateRateLimit — pollers have zero rate-limit awareness",
-    "status": "proposed",
+    "status": "completed",
     "uid": "23589528-d5db-44e3-a423-42953fcf77b3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T15:32:41.958Z",
-    "updated": "2026-06-13T15:37:27.340Z",
+    "updated": "2026-06-14T04:46:14.909Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1821",
@@ -380,5 +380,5 @@
       "canonicalFilename": "2026-06-13-PAN-1821-linear-responses-never-feed-updateratelimit-pollers-have-zero-rate-limit-awareness.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
