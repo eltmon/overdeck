@@ -11,7 +11,6 @@ import {
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { sessionExistsSync } from '../tmux.js';
-import { sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import {
@@ -22,18 +21,6 @@ import {
 } from './stuck-remediation-state.js';
 
 const execFileAsync = promisify(execFile);
-
-/**
- * PAN-1865: context-usage threshold at which a stuck work agent is treated as
- * context-ceiling-wedged rather than a generic stall. Normal nudges/resumes
- * re-send the same oversized context, so we escalate to out-of-band compact
- * recovery (resumeAgent({compact:true})) instead.
- *
- * Deliberately higher than the proactive /compact high-water mark so this path
- * only fires for agents that have already pinned themselves near the hard
- * ceiling.
- */
-const CONTEXT_OVERFLOW_RECOVERY_THRESHOLD_PERCENT = 95;
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -83,19 +70,6 @@ function logAction(actions: string[], action: string): void {
   logDeaconEventSync(action);
 }
 
-async function getAgentContextUsage(agent: AgentState): Promise<{ percentUsed: number } | null> {
-  const runtimeState = getAgentRuntimeStateSync(agent.id);
-  const sessionId = agent.sessionId ?? runtimeState?.claudeSessionId;
-  if (!agent.workspace || !sessionId || !agent.model) return null;
-
-  try {
-    const { computeContextUsage } = await import('../../dashboard/server/services/conversation-service.js');
-    return await computeContextUsage(sessionFilePath(agent.workspace, sessionId), agent.model);
-  } catch {
-    return null;
-  }
-}
-
 async function evaluateAgent(
   agent: AgentState,
   config: StuckRemediationConfig,
@@ -119,6 +93,7 @@ async function evaluateAgent(
   const reviewStatus = getReviewStatusSync(issueId);
   if (shouldSkipReviewStatus(reviewStatus)) return;
   if (!isAgentIdleForNudge(agentId, 5 * 60 * 1000, now)) return;
+  if (await hasReadyBeads(agent, issueId.toLowerCase())) return;
 
   const runtime = getAgentRuntimeStateSync(agentId);
   if (!runtime?.lastActivity) return;
@@ -136,39 +111,8 @@ async function evaluateAgent(
   }
 
   const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
-  let lastStage = stuckState?.lastStage ?? 0;
+  const lastStage = stuckState?.lastStage ?? 0;
   const firstStuck = firstStuckAt(runtime.lastActivity, stuckState);
-
-  // PAN-1865: a work agent pinned near the context ceiling is not a normal
-  // stall — nudging or normal-resuming just re-sends the same oversized
-  // context. Try out-of-band compaction + fresh-session reseed before any
-  // further escalation. A context-wedged agent must not be hidden by the
-  // "has ready beads" heuristic; it cannot make progress regardless of beads.
-  let contextOverflowWedged = false;
-  if (idleMinutes >= config.stage2_minutes && lastStage < 2) {
-    const contextUsage = await getAgentContextUsage(agent);
-    if (contextUsage && contextUsage.percentUsed >= CONTEXT_OVERFLOW_RECOVERY_THRESHOLD_PERCENT) {
-      const result = await resumeAgent(agentId, undefined, { compact: true });
-      if (result.success) {
-        clearStuckRemediationState(agentId);
-        logAction(
-          actions,
-          `[deacon] stuck-remediation context-overflow issue=${issueId} idleMin=${idleMinutes} action=compact-recovered (${Math.round(contextUsage.percentUsed)}%)`,
-        );
-        return;
-      }
-      // Compact attempt failed. Advance to stage 2 so we do not retry every
-      // patrol cycle, and bypass the ready-beads guard so the agent still
-      // escalates to stage 3 (marked-troubled) if it stays wedged. Update the
-      // in-memory stage so the subsequent stage-2 block does not immediately
-      // run a normal resume.
-      contextOverflowWedged = true;
-      writeStuckRemediationState(agentId, stageState(2, now, firstStuck));
-      lastStage = 2;
-    }
-  }
-
-  if (!contextOverflowWedged && await hasReadyBeads(agent, issueId.toLowerCase())) return;
 
   if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
     markAgentTroubled(agentId);

@@ -18,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   readStuckRemediationState: vi.fn(),
   writeStuckRemediationState: vi.fn(),
   pauseFlywheel: vi.fn(),
-  computeContextUsage: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -72,10 +71,6 @@ vi.mock('../flywheel.js', () => ({
   FLYWHEEL_ORCHESTRATOR_AGENT_ID: 'flywheel-orchestrator',
 }));
 
-vi.mock('../../../dashboard/server/services/conversation-service.js', () => ({
-  computeContextUsage: mocks.computeContextUsage,
-}));
-
 import { checkStuckAgentRemediation } from '../stuck-remediation.js';
 
 const NOW = Date.parse('2026-05-23T12:00:00.000Z');
@@ -92,12 +87,10 @@ function lastActivity(idleMinutes: number): string {
   return new Date(NOW - idleMinutes * 60_000).toISOString();
 }
 
-function runtime(idleMinutes: number, overrides: Record<string, unknown> = {}) {
+function runtime(idleMinutes: number) {
   return {
     state: 'idle',
     lastActivity: lastActivity(idleMinutes),
-    claudeSessionId: 'session-1415',
-    ...overrides,
   };
 }
 
@@ -108,7 +101,6 @@ function agent(overrides: Partial<AgentState> = {}): AgentState {
     workspace: '/tmp/workspace-pan-1415',
     role: 'work',
     status: 'running',
-    model: 'kimi-k2.7-code',
     startedAt: '2026-05-23T10:00:00.000Z',
     tmuxActive: true,
     ...overrides,
@@ -154,7 +146,6 @@ describe('checkStuckAgentRemediation', () => {
     mocks.readStuckRemediationState.mockReturnValue(null);
     mocks.messageAgent.mockResolvedValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: true });
-    mocks.computeContextUsage.mockResolvedValue({ percentUsed: 30 });
     mockReadyBeads();
   });
 
@@ -215,73 +206,6 @@ describe('checkStuckAgentRemediation', () => {
       firstStuckAt: lastActivity(50),
     });
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
-  });
-
-  it('PAN-1865: compacts a context-wedged work agent at stage 2 instead of normal resume', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
-    mocks.readStuckRemediationState.mockReturnValue(state(1, 50));
-    mocks.computeContextUsage.mockResolvedValue({ percentUsed: 98 });
-
-    const actions = await checkStuckAgentRemediation({ now: NOW });
-
-    expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-1415', undefined, { compact: true });
-    expect(mocks.resumeAgent).toHaveBeenCalledTimes(1);
-    expect(mocks.messageAgent).not.toHaveBeenCalled();
-    expect(mocks.writeStuckRemediationState).not.toHaveBeenCalled();
-    expect(mocks.clearStuckRemediationState).toHaveBeenCalledWith('agent-pan-1415');
-    expect(actions).toEqual([
-      '[deacon] stuck-remediation context-overflow issue=PAN-1415 idleMin=50 action=compact-recovered (98%)',
-    ]);
-  });
-
-  it('PAN-1865: bypasses ready-beads guard for a context-wedged work agent', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
-    mocks.readStuckRemediationState.mockReturnValue(state(1, 50));
-    mocks.computeContextUsage.mockResolvedValue({ percentUsed: 99 });
-    mockReadyBeads('○ workspace-zkug pan-1415: remaining task\n');
-
-    const actions = await checkStuckAgentRemediation({ now: NOW });
-
-    expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-1415', undefined, { compact: true });
-    expect(mocks.execFile).not.toHaveBeenCalled();
-    expect(mocks.clearStuckRemediationState).toHaveBeenCalledWith('agent-pan-1415');
-    expect(actions.some((a) => a.includes('compact-recovered'))).toBe(true);
-  });
-
-  it('PAN-1865: advances to stage 2 and falls through when compact recovery fails', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
-    mocks.readStuckRemediationState.mockReturnValue(state(1, 50));
-    mocks.computeContextUsage.mockResolvedValue({ percentUsed: 97 });
-    mocks.resumeAgent.mockResolvedValue({ success: false, error: 'spawn failed' });
-
-    const actions = await checkStuckAgentRemediation({ now: NOW });
-
-    expect(mocks.resumeAgent).toHaveBeenCalledTimes(1);
-    expect(mocks.resumeAgent).toHaveBeenCalledWith('agent-pan-1415', undefined, { compact: true });
-    expect(mocks.writeStuckRemediationState).toHaveBeenCalledWith('agent-pan-1415', {
-      lastStage: 2,
-      lastStageAt: new Date(NOW).toISOString(),
-      firstStuckAt: lastActivity(50),
-    });
-    expect(mocks.markAgentTroubled).not.toHaveBeenCalled();
-    // No normal stage-2 resume should run because we just advanced to stage 2.
-    expect(actions).toEqual([]);
-  });
-
-  it('PAN-1865: does not compact a work agent below the context-overflow threshold', async () => {
-    mocks.getAgentRuntimeStateSync.mockReturnValue(runtime(50));
-    mocks.readStuckRemediationState.mockReturnValue(state(1, 50));
-    mocks.computeContextUsage.mockResolvedValue({ percentUsed: 94 });
-
-    const actions = await checkStuckAgentRemediation({ now: NOW });
-
-    expect(mocks.resumeAgent).toHaveBeenCalledWith(
-      'agent-pan-1415',
-      expect.stringContaining('auto-detected stall (50 min idle)'),
-    );
-    expect(actions).toEqual([
-      '[deacon] stuck-remediation stage=2 issue=PAN-1415 idleMin=50 action=resumed',
-    ]);
   });
 
   it('does not advance stage 2 state when resume fails', async () => {
@@ -367,6 +291,7 @@ describe('checkStuckAgentRemediation', () => {
 
     expect(actions).toEqual([]);
     expectNoStage();
+    expect(mocks.readStuckRemediationState).not.toHaveBeenCalled();
   });
 
   it.each([
