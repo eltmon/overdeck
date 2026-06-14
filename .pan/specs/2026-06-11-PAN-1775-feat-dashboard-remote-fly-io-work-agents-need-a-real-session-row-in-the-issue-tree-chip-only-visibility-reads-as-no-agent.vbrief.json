@@ -4,17 +4,17 @@
     "created": "2026-06-12T20:21:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1775: feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
-    "updated": "2026-06-12T20:26:31.969Z"
+    "updated": "2026-06-14T18:02:27.471Z"
   },
   "plan": {
     "id": "pan-1775",
     "title": "feat(dashboard): remote (fly.io) work agents need a real session row in the issue tree — chip-only visibility reads as 'no agent'",
-    "status": "proposed",
+    "status": "running",
     "uid": "a04e57c1-c2cf-4daf-857d-d2b210e4de38",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 6,
     "created": "2026-06-12T20:21:00Z",
-    "updated": "2026-06-12T20:26:31.969Z",
+    "updated": "2026-06-14T18:02:27.471Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1775",
@@ -184,5 +184,5 @@
       "canonicalFilename": "2026-06-12-PAN-1775-feat-dashboard-remote-fly-io-work-agents-need-a-real-session-row-in-the-issue-tree-chip-only-visibility-reads-as-no-agent.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

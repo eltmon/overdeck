@@ -4,17 +4,17 @@
     "created": "2026-05-25T14:49:42Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1498: Substrate fix (PAN-1454 pattern 1): require live-code-path trace in requirements review",
-    "updated": "2026-05-25T14:52:41.552Z"
+    "updated": "2026-06-14T18:00:16.467Z"
   },
   "plan": {
     "id": "pan-1498",
     "title": "Substrate fix (PAN-1454 pattern 1): require live-code-path trace in requirements review",
-    "status": "proposed",
+    "status": "running",
     "uid": "311589fc-0053-4140-a091-47438bf9a9ff",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-25T14:49:42Z",
-    "updated": "2026-05-25T14:52:41.552Z",
+    "updated": "2026-06-14T18:00:16.467Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1498",
@@ -370,5 +370,5 @@
       "canonicalFilename": "2026-05-25-PAN-1498-substrate-fix-pan-1454-pattern-1-require-live-code-path-trace-in-requirements-review.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

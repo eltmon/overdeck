@@ -4,17 +4,17 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-06-11T09:04:33.851Z"
+    "updated": "2026-06-14T18:01:19.375Z"
   },
   "plan": {
     "id": "pan-1242",
     "title": "Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 139,
+    "sequence": 4,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-06-11T09:04:33.851Z",
+    "updated": "2026-06-14T18:01:19.375Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -74,7 +74,7 @@
       {
         "id": "new-issue-api",
         "title": "Add `POST /api/issues` endpoint",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -95,7 +95,7 @@
           {
             "id": "new-issue-api.ac1",
             "title": "POST `/api/issues` with valid `{projectKey,'todo',title}` returns 200 and the created `Issue` JSON; the issue appears on the next `GET /api/issues` call in the `todo` column.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -103,7 +103,7 @@
           {
             "id": "new-issue-api.ac2",
             "title": "POST with missing `title`, missing `projectKey`, or invalid `targetStatus` (anything other than `backlog`/`todo`) returns 400 with a structured error.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -111,7 +111,7 @@
           {
             "id": "new-issue-api.ac3",
             "title": "POST with an unknown `projectKey` returns 404; POST against a project whose `tracker` is `gitlab` returns 501 with an explanatory message and does not call `createIssue`.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -119,7 +119,7 @@
           {
             "id": "new-issue-api.ac4",
             "title": "On success, `issueDataService.invalidateTracker(<projectTrackerType>)` is invoked and an `issue.statusChanged` (or `issue.created`) event is appended to `EventStoreService` so live dashboards refresh.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -127,7 +127,7 @@
           {
             "id": "new-issue-api.ac5",
             "title": "Endpoint uses `execAsync` / Effect / promise-based I/O only — no `execSync`, `readFileSync`, `writeFileSync`, or other event-loop-blocking calls (per CLAUDE.md no-blocking-calls rule).",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -137,7 +137,7 @@
       {
         "id": "new-issue-dialog",
         "title": "Build `NewIssueDialog` component",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -153,7 +153,7 @@
           {
             "id": "new-issue-dialog.ac1",
             "title": "Opening the dialog with `defaultProjectKey='panopticon-cli'` and `targetStatus='todo'` renders a title input, optional description textarea, a Create button (disabled while title is empty), and a Cancel button.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -161,7 +161,7 @@
           {
             "id": "new-issue-dialog.ac2",
             "title": "When more than one project is available, the dialog shows a project picker pre-selected to `defaultProjectKey`; GitLab-only projects are filtered out of the picker.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -169,7 +169,7 @@
           {
             "id": "new-issue-dialog.ac3",
             "title": "Submitting with a valid title POSTs `/api/issues`, calls `onCreated(newIssue)` once on success, and calls `refreshDashboardState(queryClient)` before closing.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -177,7 +177,7 @@
           {
             "id": "new-issue-dialog.ac4",
             "title": "A non-2xx response surfaces the server's error message inline (e.g., 'GitLab issue creation is not yet supported'); the dialog remains open so the user can retry or cancel.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
           {
             "id": "new-issue-dialog.ac5",
             "title": "ESC and Cancel close the dialog without firing the POST.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -195,7 +195,7 @@
       {
         "id": "column-footer-button",
         "title": "Replace KanbanBoard TODO with `+ New issue` column footer button",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -211,7 +211,7 @@
           {
             "id": "column-footer-button.ac1",
             "title": "Backlog and Todo columns each render a `+ New issue` button at the bottom of their card list, matching the `.add-btn` style from the PRD mockup (dashed border, plus icon, muted text, hover state).",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -219,7 +219,7 @@
           {
             "id": "column-footer-button.ac2",
             "title": "In Progress, In Review, Verifying, and Done columns do NOT render the button.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -227,7 +227,7 @@
           {
             "id": "column-footer-button.ac3",
             "title": "Clicking the button on the Backlog column opens `NewIssueDialog` with `targetStatus='backlog'`; clicking on the Todo column opens it with `targetStatus='todo'`.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -235,7 +235,7 @@
           {
             "id": "column-footer-button.ac4",
             "title": "When `selectedProjects.size === 1`, the dialog opens with `defaultProjectKey` set to that project; otherwise it opens with no default and shows the picker.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -243,7 +243,7 @@
           {
             "id": "column-footer-button.ac5",
             "title": "After a successful create, the new card appears on the targeted column on the next render (via `refreshDashboardState(queryClient)`).",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -251,7 +251,7 @@
           {
             "id": "column-footer-button.ac6",
             "title": "The TODO comment `// TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6` is removed from `KanbanBoard.tsx`.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -261,7 +261,7 @@
       {
         "id": "gitlab-unsupported-state",
         "title": "Hide / disable button for GitLab-only project context",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -277,7 +277,7 @@
           {
             "id": "gitlab-unsupported-state.ac1",
             "title": "If `selectedProjects` contains only a GitLab-tracked project, the `+ New issue` button is hidden (or rendered disabled with explanatory tooltip).",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -285,7 +285,7 @@
           {
             "id": "gitlab-unsupported-state.ac2",
             "title": "If at least one non-GitLab project is visible (selected explicitly or by default), the button is rendered enabled.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -295,7 +295,7 @@
       {
         "id": "new-issue-api-test",
         "title": "Vitest coverage for `POST /api/issues` endpoint",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -311,7 +311,7 @@
           {
             "id": "new-issue-api-test.ac1",
             "title": "Test file runs under `npm test` and all new test cases pass.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -319,7 +319,7 @@
           {
             "id": "new-issue-api-test.ac2",
             "title": "At minimum the suite covers: happy path, missing title (400), invalid targetStatus (400), unknown projectKey (404), GitLab project (501).",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -327,7 +327,7 @@
           {
             "id": "new-issue-api-test.ac3",
             "title": "Tracker `createIssue` is mocked — no real HTTP calls to GitHub/Linear/Rally are made.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -337,7 +337,7 @@
       {
         "id": "new-issue-button-test",
         "title": "Vitest coverage for column footer button + dialog wiring",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T16:22:30.504Z",
         "metadata": {
@@ -353,7 +353,7 @@
           {
             "id": "new-issue-button-test.ac1",
             "title": "Test asserts the button renders on Backlog and Todo and not on In Progress / In Review / Verifying / Done.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -361,7 +361,7 @@
           {
             "id": "new-issue-button-test.ac2",
             "title": "Clicking the button opens `NewIssueDialog` with `targetStatus` matching the column.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -369,7 +369,7 @@
           {
             "id": "new-issue-button-test.ac3",
             "title": "Submitting the dialog issues a `POST /api/issues` with `{ projectKey, targetStatus, title, description }` matching the user's input (verified against a mocked fetch).",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -377,7 +377,7 @@
           {
             "id": "new-issue-button-test.ac4",
             "title": "Project-picker behavior: single-project fixture → picker hidden, project pre-selected; multi-project fixture → picker shown.",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -413,96 +413,8 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json",
-      "pipeline": {
-        "phase": "merge",
-        "issueId": "PAN-1242",
-        "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T09:04:33.851Z",
-        "work": {
-          "updatedAt": "2026-06-10T07:41:32.778Z",
-          "history": []
-        },
-        "verification": {
-          "status": "passed",
-          "updatedAt": "2026-06-11T09:04:33.851Z",
-          "notes": "All PAN-1242 vBRIEF acceptance criteria marked completed after verifying implementation and rerunning gates after the origin/main sync.",
-          "history": [
-            {
-              "status": "passed",
-              "at": "2026-06-10T07:41:32.778Z",
-              "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
-            },
-            {
-              "status": "passed",
-              "at": "2026-06-11T09:04:33.851Z",
-              "notes": "All PAN-1242 vBRIEF acceptance criteria marked completed after verifying implementation and rerunning gates after the origin/main sync."
-            }
-          ]
-        },
-        "review": {
-          "status": "passed",
-          "updatedAt": "2026-06-10T07:41:32.778Z",
-          "notes": "Approved; raw findings demoted by cycle-7 convergence gate",
-          "history": [
-            {
-              "status": "passed",
-              "at": "2026-06-10T07:41:32.778Z",
-              "notes": "Approved; raw findings demoted by cycle-7 convergence gate"
-            }
-          ],
-          "approval": "approved"
-        },
-        "test": {
-          "status": "passed",
-          "updatedAt": "2026-06-11T08:59:40.309Z",
-          "notes": "Sync conflicts with origin/main resolved for PAN-1242. Quality gates after the merge: bun install PASS, npm run typecheck PASS, npm run lint PASS, npm test PASS (root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests).",
-          "history": [
-            {
-              "status": "failed",
-              "at": "2026-06-10T07:41:32.778Z",
-              "notes": "Quality gates: typecheck PASS, lint PASS, build PASS, test 5550 passed / 1 failed. Failure in config-yaml-conversation-search.test.ts unrelated to PAN-1242 (introduced by PAN-1395). PAN-1242 issues-create endpoint tests all PASS."
-            },
-            {
-              "status": "passed",
-              "at": "2026-06-11T08:51:01.048Z",
-              "notes": "Quality gates pass after fixing config-yaml-conversation-search.test.ts to avoid machine-local conversationSearch defaults: typecheck PASS, build:cli PASS, lint PASS, npm test PASS (root 527 passed / 4 skipped files, 5551 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests)."
-            },
-            {
-              "status": "passed",
-              "at": "2026-06-11T08:59:40.309Z",
-              "notes": "Sync conflicts with origin/main resolved for PAN-1242. Quality gates after the merge: bun install PASS, npm run typecheck PASS, npm run lint PASS, npm test PASS (root 564 passed / 4 skipped files, 5917 passed / 51 skipped tests; frontend 3 passed files, 30 passed tests)."
-            }
-          ]
-        },
-        "uat": {
-          "updatedAt": "2026-06-10T07:41:32.778Z",
-          "history": []
-        },
-        "merge": {
-          "status": "pending",
-          "updatedAt": "2026-06-11T08:59:40.309Z",
-          "history": [
-            {
-              "status": "pending",
-              "at": "2026-06-10T07:41:32.778Z"
-            },
-            {
-              "status": "pending",
-              "at": "2026-06-11T08:51:01.048Z",
-              "notes": "Ready for merge after test specialist passed PAN-1242."
-            },
-            {
-              "status": "pending",
-              "at": "2026-06-11T08:59:40.309Z",
-              "notes": "Ready for merge after resolving sync conflicts and rerunning gates."
-            }
-          ],
-          "readyForMerge": true,
-          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1516"
-        }
-      }
+      "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
