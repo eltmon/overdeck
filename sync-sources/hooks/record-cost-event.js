@@ -4600,7 +4600,9 @@ function initSchema(db) {
       -- PAN-938: current merge pipeline step
       merge_step              TEXT,
       -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
-      auto_merge              INTEGER
+      auto_merge              INTEGER,
+      -- PAN-1862: per-sub-role reviewer verdicts from discovery-fork convoy (JSON)
+      reviewer_verdicts       TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -5659,6 +5661,9 @@ function runMigrations(db) {
 		} catch {}
 		try {
 			db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN reviewer_verdicts TEXT`);
 		} catch {}
 	}
 	db.pragma(`user_version = 54`);
