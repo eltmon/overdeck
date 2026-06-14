@@ -1,0 +1,33 @@
+{
+  "version": "1",
+  "issueId": "PAN-1887",
+  "created": "2026-06-14T18:13:30.753Z",
+  "updated": "2026-06-14T18:22:28.792Z",
+  "gitState": { "branch": "feature/pan-1887", "sha": "d9b9dbe6d", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Forge detection is by URL path pattern, not host: /pull/(\\d+) => github, /-/merge_requests/(\\d+) => gitlab. Supports self-hosted GitLab. New parseArtifactRef() lives in src/lib/forge.ts.", "recordedAt": "2026-06-14T18:22:28.792Z" },
+    { "id": "D2", "summary": "Add a real `forge TEXT NOT NULL DEFAULT 'github'` column to pending_auto_merges (SCHEMA_VERSION 53->54) rather than overloading prNumber. Back-fills existing rows to 'github'. Makes the row self-describing so a GitLab iid in prNumber is never misread as a GitHub PR number.", "recordedAt": "2026-06-14T18:22:28.792Z" },
+    { "id": "D3", "summary": "GitLab eligibility is a focused injectable helper inside auto-merge-eligibility.ts, NOT a unified ForgeAdapter.getArtifactState() abstraction. The shared-abstraction convergence with PAN-933 is deferred.", "recordedAt": "2026-06-14T18:22:28.792Z" },
+    { "id": "D4", "summary": "GitLab MR mergeability uses `detailed_merge_status === 'mergeable'` as primary signal, with state==='opened' + draft pre-checks and merge_status==='can_be_merged' fallback. glab field names are an implementation checkpoint (confirm against a real MYN MR; fallback documented).", "recordedAt": "2026-06-14T18:22:28.792Z" },
+    { "id": "D5", "summary": "Execution is NOT re-wired: triggerMerge (workspaces.ts) already resolves primaryForge from the merge set and merges via getForgeAdapter(forge).mergeReviewArtifact (glab mr merge for gitlab). The auto-merge executor delegates to triggerMerge. Issue work-item 3 is a verification + missing forge.ts test, not new code.", "recordedAt": "2026-06-14T18:22:28.792Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "isAutoMergeEligible fires at flywheel.ts:325 BEFORE parsePrNumber at :333. It is GitHub-only and would 422 a GitLab MR first. Fixing only parsePrNumber (as the issue brief framed the 'blocking gap') does NOT unblock MIN-831.", "mitigation": "WI-4 makes eligibility forge-aware; WI-3 makes the schedule parse forge-aware. BOTH must merge for the end-to-end fix. Each lands without regressing GitHub." },
+    { "id": "H2", "summary": "glab `mr view -F json` field names (detailed_merge_status, merge_status, state, draft, has_conflicts) are assumed snake_case from go-gitlab; the installed GitLab instance may not populate detailed_merge_status.", "mitigation": "WI-4 implementation checkpoint: confirm fields via `glab mr view 62 -R eltmon/mind-your-now -F json | jq 'keys'`; documented fallback to state+merge_status+has_conflicts." },
+    { "id": "H3", "summary": "The `glab` eligibility call is server-reachable; execSync would freeze the dashboard event loop (PAN-70).", "mitigation": "WI-4 uses promisified execFile only; an injectable dep keeps it unit-testable with no real glab call." },
+    { "id": "H4", "summary": "Schema column add must stay in lockstep with pending-auto-merges-schema.test.ts which pins SCHEMA_VERSION===53 and the exact column list.", "mitigation": "WI-2 updates the test (version 54 + 'forge' in the column list) in the same bead as the migration." },
+    { "id": "H5", "summary": "GitLab eligibility needs the project path for `glab -R`; eligibility only has prUrl.", "mitigation": "Parse <projectPath> from https://<host>/<projectPath>/-/merge_requests/<iid>. MYN is gitlab.com; self-hosted host-credentialed routing is a NonGoal." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Initial planning session for PAN-1887 (pan plan --auto). Verified the code: execution is already forge-aware via triggerMerge->forge adapter; the real blocking gaps are the two GitHub-only gates in the schedule path (isAutoMergeEligible + parsePrNumber). 5 beads.",
+      "timestamp": "2026-06-14T18:22:28.792Z",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": []
+}
