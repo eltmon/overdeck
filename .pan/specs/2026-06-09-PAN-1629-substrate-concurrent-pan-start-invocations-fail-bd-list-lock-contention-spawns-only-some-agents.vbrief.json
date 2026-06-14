@@ -4,17 +4,17 @@
     "created": "2026-06-09T23:44:24.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1629: Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "updated": "2026-06-14T17:57:29.326Z"
+    "updated": "2026-06-14T22:52:28.741Z"
   },
   "plan": {
     "id": "pan-1629",
     "title": "Substrate: concurrent 'pan start' invocations fail — bd list lock contention spawns only some agents",
-    "status": "running",
+    "status": "completed",
     "uid": "c4ec4efd-b20a-4cc4-aa72-b826cc409370",
     "author": "agent:claude-opus-4-8",
-    "sequence": 10,
+    "sequence": 11,
     "created": "2026-06-09T23:44:24.000Z",
-    "updated": "2026-06-14T17:57:29.326Z",
+    "updated": "2026-06-14T22:52:28.741Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1629",
@@ -503,5 +503,5 @@
       }
     }
   },
-  "status": "active"
+  "status": "completed"
 }
