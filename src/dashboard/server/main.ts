@@ -554,24 +554,6 @@ try {
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
 
-// PAN-1531: startup stash audit narrowed to surface only `salvageable:*`
-// stashes — the only kind that requires human review. Retired stash kinds
-// (pre-merge, pre-spawn, review-temp) and ad-hoc residue are ignored. The
-// scan runs once per project root, not per worktree, because worktrees
-// share `refs/stash` with their parent.
-if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
-  void import('../../lib/cloister/deacon.js')
-    .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
-    .then((findings) => {
-      if (findings.length > 0) {
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} salvageable stash(es) on startup; review via workspace inspector` });
-      }
-    })
-    .catch((err: any) => {
-      console.warn(`[panopticon] Failed salvageable-stash startup scan: ${err.message}`);
-    });
-}
-
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan done`, nudges dead-end agents,
 // and detects stuck thinking loops. Without it, stalled agents are invisible.

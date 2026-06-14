@@ -48,8 +48,6 @@ export interface StuckRemediationConfig {
 export interface MonitoringConfig {
   check_interval: number; // seconds between health checks
   heartbeat_sources: ('jsonl_mtime' | 'tmux_activity' | 'git_activity' | 'active_heartbeat')[];
-  /** Patrol cycles between stash janitor sweeps. Default: hourly based on patrol cadence. */
-  stash_janitor_every_cycles?: number;
 }
 
 /**
@@ -443,23 +441,6 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
   return result;
 }
 
-function applyEnvironmentOverrides(config: CloisterConfig): CloisterConfig {
-  const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
-  if (stashJanitorEnv === undefined) return config;
-
-  const parsed = Number.parseInt(stashJanitorEnv, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) return config;
-
-  return {
-    ...config,
-    monitoring: {
-      ...config.monitoring,
-      stash_janitor_every_cycles: parsed,
-    },
-  };
-}
-
-
 /**
  * Load Cloister configuration
  *
@@ -491,7 +472,7 @@ export function loadCloisterConfigSync(): CloisterConfig {
     }
   }
 
-  return applyEnvironmentOverrides(config);
+  return config;
 }
 
 
@@ -598,20 +579,6 @@ export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | Co
           console.error('Using default configuration');
           config = DEFAULT_CLOISTER_CONFIG;
         }
-      }
-    }
-
-    const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
-    if (stashJanitorEnv !== undefined) {
-      const parsedEnv = Number.parseInt(stashJanitorEnv, 10);
-      if (Number.isFinite(parsedEnv) && parsedEnv >= 0) {
-        config = {
-          ...config,
-          monitoring: {
-            ...config.monitoring,
-            stash_janitor_every_cycles: parsedEnv,
-          },
-        };
       }
     }
 

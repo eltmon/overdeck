@@ -151,7 +151,6 @@ import {
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
 import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
-import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
@@ -178,14 +177,6 @@ import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
  * Default parameters for stuck-session detection.
  * Per gastown: "Let agents decide thresholds. 'Stuck' is a judgment call."
  */
-const DEFAULT_STASH_JANITOR_AGE_DAYS = 28;
-const STASH_JANITOR_BASELINE_MISSING_PATTERNS = [
-  'unknown revision or path not in the working tree',
-  'bad revision',
-  'ambiguous argument',
-  'fatal: invalid revision range',
-];
-
 const DEFAULT_CONFIG: DeaconConfig = {
   pingTimeoutMs: 30_000,           // How long to wait for response
   consecutiveFailures: 3,          // Failures before force-kill
@@ -193,7 +184,6 @@ const DEFAULT_CONFIG: DeaconConfig = {
   patrolIntervalMs: 60_000,        // Safety net — immediate processing happens via pipeline events
   massDeathThreshold: 2,           // Deaths within window triggers alert
   massDeathWindowMs: 60_000,       // 1 minute window for mass death detection
-  stashJanitorEveryCycles: 60,
 };
 
 export interface DeaconConfig {
@@ -203,7 +193,6 @@ export interface DeaconConfig {
   patrolIntervalMs: number;
   massDeathThreshold: number;
   massDeathWindowMs: number;
-  stashJanitorEveryCycles: number;
 }
 
 // ============================================================================
@@ -285,12 +274,6 @@ export function loadConfig(): DeaconConfig {
     }
   } catch (error) {
     console.error('[deacon] Failed to load config:', error);
-  }
-
-  const cloisterConfig = loadCloisterConfigSync();
-  const configuredJanitorCycles = cloisterConfig.monitoring.stash_janitor_every_cycles;
-  if (typeof configuredJanitorCycles === 'number' && configuredJanitorCycles >= 0) {
-    config.stashJanitorEveryCycles = configuredJanitorCycles;
   }
 
   return config;
@@ -3764,49 +3747,6 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
-/**
- * PAN-1531: scanner narrowed to surface only `salvageable:*` stashes, which
- * are the only kind that needs human attention. Hand-typed stashes, retired
- * `pre-merge` / `pre-spawn` / `review-temp` residue, and other non-canonical
- * entries are no longer flagged — they're inert in `refs/stash` and the
- * operator can clean them up at their leisure via a future `pan stash audit`
- * command.
- *
- * Also: git worktrees share `refs/stash` with the parent repo, so listing
- * once at the project root is enough; iterating workspaces would yield the
- * same stash N times. Take the project root from the first workspace; if
- * none exist, scan nothing.
- */
-export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
-  const actions: string[] = [];
-  const seenProjectRoots = new Set<string>();
-
-  for (const { workspacePath } of listFeatureWorkspaces()) {
-    if (!existsSync(workspacePath)) continue;
-
-    // workspaces/feature-<id>/ → project root is two levels up
-    const projectRoot = workspacePath.replace(/\/workspaces\/[^/]+\/?$/, '');
-    if (seenProjectRoots.has(projectRoot)) continue;
-    seenProjectRoots.add(projectRoot);
-    if (!existsSync(projectRoot)) continue;
-
-    try {
-      const stashes = await Effect.runPromise(listStashes(projectRoot));
-      for (const stash of stashes) {
-        if (stash.kind !== 'salvageable') continue;
-        const message = `Salvageable stash in ${projectRoot}: ${stash.ref} ${stash.message} — review and recover or dismiss via workspace inspector`;
-        console.warn(`[deacon] ${message}`);
-        actions.push(message);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[deacon] Failed salvageable-stash audit for ${projectRoot}: ${message}`);
-    }
-  }
-
-  return actions;
-}
-
 async function reconcileAndCheckIfMerged(
   issueId: string,
   cycleCache?: Map<string, boolean>,
@@ -3925,114 +3865,6 @@ async function reconcileAndCheckIfMerged(
   }
 
   return remember(false);
-}
-
-export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<string[]> {
-  const actions: string[] = [];
-
-  try {
-    const agents = listRunningAgentsSync();
-    for (const agent of agents) {
-      if (!agent.id.startsWith('agent-')) continue;
-      const agentState = getAgentStateSync(agent.id);
-      if (!agentState?.workspace || !agentState.preSpawnStashRef) continue;
-      if (!existsSync(agentState.workspace)) continue;
-      if (!agentState.preSpawnBaselineHead) {
-        console.warn(`[deacon] Missing pre-spawn baseline head for ${agentState.issueId}; preserving stash`);
-        continue;
-      }
-
-      let hasCommitsAhead = false;
-      try {
-        const { stdout } = await execAsync(`git rev-list ${agentState.preSpawnBaselineHead}..HEAD --count`, {
-          cwd: agentState.workspace,
-          encoding: 'utf-8',
-        });
-        hasCommitsAhead = (parseInt(stdout.trim(), 10) || 0) > 0;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const baselineMissing = STASH_JANITOR_BASELINE_MISSING_PATTERNS.some((pattern) => message.includes(pattern));
-        if (!baselineMissing) {
-          console.warn(`[deacon] Failed checking post-spawn commits for ${agentState.issueId}: ${message}`);
-          continue;
-        }
-        console.warn(`[deacon] Missing baseline ref for ${agentState.issueId}; dropping pre-spawn stash because the running agent has moved past spawn`);
-        hasCommitsAhead = true;
-      }
-
-      if (!hasCommitsAhead) continue;
-
-      try {
-        await Effect.runPromise(dropStash(agentState.workspace, agentState.preSpawnStashRef));
-        agentState.preSpawnStashRef = undefined;
-        agentState.preSpawnStashMessage = undefined;
-        agentState.preSpawnBaselineHead = undefined;
-        saveAgentStateSync(agentState);
-        actions.push(`Dropped pre-spawn stash for ${agentState.issueId}`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!/not found|does not exist/i.test(message)) {
-          console.warn(`[deacon] Failed dropping pre-spawn stash for ${agentState.issueId}: ${message}`);
-          continue;
-        }
-        agentState.preSpawnStashRef = undefined;
-        agentState.preSpawnStashMessage = undefined;
-        agentState.preSpawnBaselineHead = undefined;
-        saveAgentStateSync(agentState);
-      }
-    }
-
-    const mergeReconciliationCache = new Map<string, boolean>();
-
-    for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
-      if (!existsSync(workspacePath)) continue;
-
-      try {
-        const stashes = await Effect.runPromise(listStashes(workspacePath));
-        const matchingPreMergeStashes = stashes.filter(
-          (stash) => stash.kind === 'pre-merge' && stash.issueId === issueId.toUpperCase(),
-        );
-        const issueAlreadyMerged = matchingPreMergeStashes.length > 0
-          ? await reconcileAndCheckIfMerged(issueId, mergeReconciliationCache)
-          : false;
-        const mergedPreMergeStashes = issueAlreadyMerged ? matchingPreMergeStashes : [];
-
-        const staleStashes = stashes
-          .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, DEFAULT_STASH_JANITOR_AGE_DAYS, now));
-        // Preserve the first occurrence so a stash that is both "merged" and "stale" keeps the
-        // merged label in logs. Drop known stack slots in descending order so earlier slots stay
-        // stable, then fall back to SHA-based resolution for entries without stackRef.
-        const dedupedStashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
-          .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index);
-        const stashesWithStackRef = dedupedStashesToDrop
-          .map((stash) => {
-            const indexMatch = stash.stackRef?.match(/stash@\{(\d+)\}/);
-            const stashIndex = indexMatch ? parseInt(indexMatch[1], 10) : Number.NaN;
-            return { stash, stashIndex };
-          })
-          .filter((entry) => Number.isFinite(entry.stashIndex))
-          .sort((a, b) => b.stashIndex - a.stashIndex)
-          .map((entry) => entry.stash);
-        const stashesWithoutStackRef = dedupedStashesToDrop.filter((stash) => !stash.stackRef);
-        const stashesToDrop = [...stashesWithStackRef, ...stashesWithoutStackRef];
-        for (const stash of stashesToDrop) {
-          await Effect.runPromise(dropStash(workspacePath, stash.ref, stash.stackRef));
-          const reason = mergedPreMergeStashes.some((entry) => entry.ref === stash.ref)
-            ? 'merged issue'
-            : 'stale';
-          actions.push(`Dropped ${reason} ${stash.kind} stash for ${issueId}: ${stash.ref}`);
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[deacon] Failed stash janitor sweep for ${issueId}: ${message}`);
-      }
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[deacon] Error in stash janitor: ${message}`);
-  }
-
-  return actions;
 }
 
 // Track per-agent cooldowns for first-completion nudges
@@ -5218,17 +5050,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stuckRemediationActions = await checkStuckAgentRemediation();
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
-
-  const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
-    ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);
-  const stashJanitorEveryCycles = configuredStashJanitorEveryCycles > 0
-    ? Math.max(1, configuredStashJanitorEveryCycles)
-    : Number.POSITIVE_INFINITY;
-  if (Number.isFinite(stashJanitorEveryCycles) && state.patrolCycle % stashJanitorEveryCycles === 0) {
-    const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
-    actions.push(...stashJanitorActions);
-    for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
-  }
 
   // PAN-1625: reap orphaned dashboard-server processes (failed-restart leftovers
   // that lost the port but keep running — and can run a second Deacon). Low

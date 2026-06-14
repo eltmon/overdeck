@@ -29,7 +29,7 @@ curl -X POST http://localhost:3011/api/issues/PAN-XXX/sync-main
 
 ## What It Does
 
-1. Checks for uncommitted changes (blocks if any — must commit or `pan workspace discard --confirm` first; agents never `git stash`)
+1. Checks for uncommitted changes (blocks if any — must commit, explicitly discard, or surface to the operator first; agents never `git stash`)
 2. Cleans up any stale git locks
 3. Runs `git fetch origin main`
 4. Runs `git merge origin/main`
