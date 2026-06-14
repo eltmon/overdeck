@@ -4,17 +4,17 @@
     "created": "2026-06-14T20:52:13.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1758: UAT-off merge lane — continuous, deterministic convergence",
-    "updated": "2026-06-14T21:11:17.020Z"
+    "updated": "2026-06-14T22:36:50.094Z"
   },
   "plan": {
     "id": "pan-1758",
     "title": "bug(cloister): UAT-off merge lane cannot converge on a continuously-moving main",
-    "status": "proposed",
+    "status": "running",
     "uid": "bda0fd21-5fcc-4bbe-a6ad-34cd084df768",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-14T20:52:13.000Z",
-    "updated": "2026-06-14T21:11:17.020Z",
+    "updated": "2026-06-14T22:36:50.094Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1758",
@@ -414,5 +414,5 @@
       "canonicalFilename": "2026-06-14-PAN-1758-bug-cloister-uat-off-merge-lane-cannot-converge-on-a-continuously-moving-main.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
