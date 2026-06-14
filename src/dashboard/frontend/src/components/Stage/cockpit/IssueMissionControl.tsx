@@ -19,7 +19,6 @@ import {
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
-import DrawerReviewSpecialists from '../../drawer/DrawerReviewSpecialists'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -480,105 +479,6 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
       )}
       <IssueActionDialogHost issueId={issueId} actions={actions} />
     </div>
-  )
-}
-
-function PipelineNode({
-  label,
-  state,
-  summary,
-  children,
-}: {
-  label: string
-  state: PipelineState
-  summary: string
-  children?: ReactNode
-}) {
-  const [open, setOpen] = useState(state === 'active' || state === 'fail')
-  return (
-    <div className="rounded-[16px] border border-border bg-card/70">
-      <button
-        type="button"
-        className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-accent/50"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-[9px] border text-[12px] ${pipelineTone(state)}`}>
-          {pipelineGlyph(state)}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[12.5px] font-semibold text-foreground">{label}</span>
-          <span className="block truncate text-[11px] text-muted-foreground">{summary}</span>
-        </span>
-        <span className={`text-[10px] text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
-      </button>
-      {open && children && (
-        <div className="border-t border-border px-3 py-3 text-[12px] text-muted-foreground">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PipelineLane({ issueId }: { issueId: string }) {
-  const review = useReviewStatusQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const ci = useIssueCheckRunsQuery(issueId)
-  const actions = useIssueActions(issueId)
-  const rs = review.data
-  const sections = activity.data?.sections ?? []
-  const work = sections.find((section) => section.type === 'work')
-  const test = sections.find((section) => section.type === 'test')
-  const ship = sections.find((section) => section.type === 'ship')
-  const states = computePipelineStates({ hasPlan: actions.state.hasPlan, rs, ci: ci.data, work })
-
-  const smallActions = ['restartReview', 'recoverReview', 'reviewTest', 'viewPr']
-    .map((key) => actions.all.find((view) => view.action.key === key))
-    .filter((view): view is IssueActionView => Boolean(view && view.enabled))
-
-  return (
-    <aside className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-card/50 p-3">
-      <div className="flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        <span>◢ Pipeline · live</span>
-        <span>stage details</span>
-      </div>
-      <PipelineNode label="Plan" state={states.plan} summary={states.plan === 'done' ? 'plan artifacts present' : 'not planned'}>
-        <div>vBRIEF and beads state are sourced from the plan and workspace panels.</div>
-      </PipelineNode>
-      <PipelineNode label="Work" state={states.work} summary={work ? `${work.sessionId} · ${work.status}` : 'no work session'}>
-        {work ? <div className="font-mono text-[11px]">{work.sessionId} · {work.model}</div> : <div>No work agent session found.</div>}
-      </PipelineNode>
-      <PipelineNode label="Review" state={states.review} summary={rs?.reviewStatus ?? 'pending'}>
-        <DrawerReviewSpecialists issueId={issueId} />
-        {rs?.reviewNotes && <div className="mt-2 rounded-[10px] border-l-2 border-destructive/60 bg-destructive/[0.06] px-3 py-2 text-foreground/85">{rs.reviewNotes}</div>}
-      </PipelineNode>
-      <PipelineNode label="Test" state={states.test} summary={rs?.testStatus ?? 'pending'}>
-        <div className="space-y-1">
-          <div>testStatus: <span className="text-foreground">{rs?.testStatus ?? 'pending'}</span></div>
-          {test && <div className="font-mono text-[11px]">{test.sessionId} · {test.status}</div>}
-          {rs?.testNotes && <div>{rs.testNotes}</div>}
-        </div>
-      </PipelineNode>
-      <PipelineNode label="GitHub CI/CD" state={states.ci} summary={ci.data?.summary.total ? `${ci.data.summary.passed}/${ci.data.summary.total} pass` : 'no checks'}>
-        <CheckRunList checkRuns={ci.data?.checkRuns ?? []} compact />
-      </PipelineNode>
-      <PipelineNode label="Ship" state={states.ship} summary={rs?.mergeStatus ?? 'waiting'}>
-        {ship ? <div className="font-mono text-[11px]">{ship.sessionId} · {ship.status}</div> : <div>Rebase, verify, and push after review/test gates pass.</div>}
-      </PipelineNode>
-      <PipelineNode label="Merge" state={states.merge} summary={rs?.mergeStatus === 'merged' ? 'merged' : rs?.readyForMerge ? 'ready for human merge' : 'gated'}>
-        <div>Merge is gated on Panopticon review/test plus GitHub PR state.</div>
-      </PipelineNode>
-      {smallActions.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-2 px-1">
-          {smallActions.map((view) => (
-            <button key={view.action.key} type="button" disabled={view.isPending} onClick={view.invoke} className="rounded-[var(--radius-sm)] border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent disabled:opacity-50">
-              {view.action.label}
-            </button>
-          ))}
-        </div>
-      )}
-      <IssueActionDialogHost issueId={issueId} actions={actions} />
-    </aside>
   )
 }
 
