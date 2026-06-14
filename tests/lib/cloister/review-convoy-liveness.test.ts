@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
     killSessionSync: vi.fn(),
     killSession: vi.fn(),
     spawnReviewRoleForIssue: vi.fn(),
+    tryReserveAdvancingSlot: vi.fn(() => true),
   };
 });
 
@@ -85,6 +86,18 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
 
 vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
   spawnReviewRoleForIssue: (...args: unknown[]) => mocks.spawnReviewRoleForIssue(...args),
+}));
+
+// PAN-1665: permissive concurrency governor — these tests assert the dispatch
+// logic itself, not the slot budget, so allow a slot by default.
+vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
+  resetPatrolDispatchBudget: () => {},
+  tryReserveAdvancingSlot: (...args: unknown[]) => mocks.tryReserveAdvancingSlot(...args),
+  canDispatchAdvancing: () => true,
+  getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
+  countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+  workResumeSlotsAvailable: () => 6,
+  describeRunningAgents: () => '0 work / 0 advancing',
 }));
 
 import {
@@ -207,6 +220,7 @@ describe('recoverStalledReviewConvoys', () => {
     mocks.killSessionSync.mockClear();
     mocks.killSession.mockClear();
     mocks.spawnReviewRoleForIssue.mockReset().mockReturnValue(Effect.succeed({ success: true, message: 'dispatched' }));
+    mocks.tryReserveAdvancingSlot.mockReset().mockReturnValue(true);
     stalledReviewConvoyRecoveryState.clear();
     setStatuses({ 'PAN-1614': { ...stalledStatus } });
   });
@@ -360,5 +374,39 @@ describe('recoverStalledReviewConvoys', () => {
 
     expect(actions).toEqual(['Failed to re-dispatch stalled review convoy for PAN-1614: harness denied']);
     expect(stalledReviewConvoyRecoveryState.get('PAN-1614')?.attempts).toBe(1);
+  });
+
+  it('defers without consuming an attempt when the advancing-role ceiling is reached', async () => {
+    mocks.tryReserveAdvancingSlot.mockReturnValue(false);
+
+    const actions = await recoverStalledReviewConvoys(async () => 'in_review');
+
+    expect(actions).toEqual(['Stalled review convoy for PAN-1614: deferring — advancing-role concurrency ceiling reached']);
+    expect(mocks.spawnReviewRoleForIssue).not.toHaveBeenCalled();
+    expect(stalledReviewConvoyRecoveryState.has('PAN-1614')).toBe(false);
+  });
+
+  it('grants a fresh attempt budget after a human unstick', async () => {
+    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: false, message: 'spawn failed', error: 'spawn failed' }));
+
+    await recoverStalledReviewConvoys(async () => 'in_review');
+    await vi.advanceTimersByTimeAsync(cooldownMs);
+    await recoverStalledReviewConvoys(async () => 'in_review');
+    await vi.advanceTimersByTimeAsync(cooldownMs);
+    await recoverStalledReviewConvoys(async () => 'in_review');
+    await vi.advanceTimersByTimeAsync(cooldownMs);
+
+    const escalated = await recoverStalledReviewConvoys(async () => 'in_review');
+    expect(escalated).toEqual(['Stalled review convoy for PAN-1614: recovery cap reached after 3 attempts — marked stuck']);
+    expect(stalledReviewConvoyRecoveryState.get('PAN-1614')?.escalated).toBe(true);
+
+    // Human unsticks the issue.
+    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'dispatched' }));
+    setStatuses({ 'PAN-1614': { ...stalledStatus, stuck: false } });
+    await vi.advanceTimersByTimeAsync(cooldownMs);
+
+    const actions = await recoverStalledReviewConvoys(async () => 'in_review');
+    expect(actions).toEqual(['Re-dispatched stalled review convoy for PAN-1614 (attempt 1/3)']);
+    expect(stalledReviewConvoyRecoveryState.has('PAN-1614')).toBe(false);
   });
 });

@@ -2150,8 +2150,14 @@ export async function recoverStalledReviewConvoys(
       }
 
       const key = issueId.toUpperCase();
-      const record = stalledReviewConvoyRecoveryState.get(key) ?? { lastAttempt: 0, attempts: 0, escalated: false };
+      let record = stalledReviewConvoyRecoveryState.get(key) ?? { lastAttempt: 0, attempts: 0, escalated: false };
       const now = Date.now();
+
+      // If a human un-stuck the issue, grant a fresh recovery budget.
+      if (record.escalated && !status.stuck) {
+        stalledReviewConvoyRecoveryState.delete(key);
+        record = { lastAttempt: 0, attempts: 0, escalated: false };
+      }
 
       if (record.attempts >= STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS) {
         if (!record.escalated) {
@@ -2193,6 +2199,14 @@ export async function recoverStalledReviewConvoys(
       if (now - record.lastAttempt < STALLED_REVIEW_CONVOY_RECOVERY_COOLDOWN_MS) {
         actions.push(
           `Stalled review convoy for ${issueId}: deferring — cooldown active after attempt ${record.attempts}/${STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS}`,
+        );
+        continue;
+      }
+
+      // PAN-1665: honor advancing-role concurrency budget before dispatch.
+      if (!tryReserveAdvancingSlot()) {
+        actions.push(
+          `Stalled review convoy for ${issueId}: deferring — advancing-role concurrency ceiling reached`,
         );
         continue;
       }
