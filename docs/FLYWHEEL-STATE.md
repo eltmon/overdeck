@@ -2736,6 +2736,19 @@ pipeline won't progress. Productive output this tick = 3 close-outs + the strand
 diagnosis. Recovery runs through operator: (a) restart WITH resume, (b) re-enter the 11
 stranded reviews.
 
+## RUN-34 tick 5 — steady-state hold; filed PAN-1883 (review-status durability)
+
+No change from tick 4: deacon Running but boot --no-resume still active (160 gates),
+0 live agents, same 11 in-review stranded, main green (dcb24daa0), nothing to close
+out, nothing readyForMerge. Pipeline remains frozen on the operator's restart-with-
+resume + per-issue review re-entry. Productive action this tick = filed **PAN-1883**
+(bug,substrate-improvement): review-status.json is uncommitted/unversioned single-file
+state at ~/.panopticon with no backup or reconstruct path, so the wipe that stranded
+the 11 in-review issues had no recovery — proposed fix = atomic writes + refuse-empty-
+overwrite + reconstruct-on-boot from GitHub labels/PRs. Held launches (correct): no
+productive launch into a resume-gated/review-state-lost pipeline; auto_pickup_backlog
+=false forbids fresh backlog.
+
 ### Memory is NOT the limiter this run (contrast RUN-33)
 
 RAM 15/64 GB, **swap 0/8GB** (RUN-33 was 99.9% swap). The launch ceiling this run is
