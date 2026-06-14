@@ -95,24 +95,24 @@
     .header {
       background: var(--card);
       border-bottom: 1px solid var(--border);
-      padding: 16px 22px 14px;
+      padding: 14px 22px 12px;
       display: grid;
-      gap: 14px;
+      gap: 12px;
     }
 
     .header-top {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 16px;
+      gap: 12px;
       align-items: start;
     }
 
     .issue-title {
       min-width: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr);
+      align-items: start;
+      gap: 8px;
     }
 
     .issue-button {
@@ -128,6 +128,7 @@
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
+      white-space: nowrap;
     }
 
     .issue-button:hover {
@@ -136,10 +137,12 @@
     }
 
     .issue-name {
-      font-size: 17px;
+      font-size: 16px;
       line-height: 1.2;
       font-weight: 500;
-      min-width: min(420px, 100%);
+      min-width: 0;
+      max-width: 520px;
+      grid-column: 1 / -1;
     }
 
     .ready-pill {
@@ -160,13 +163,16 @@
       display: flex;
       gap: 8px;
       align-items: center;
+      position: relative;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .metric {
-      min-width: 72px;
+      min-width: 66px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 6px 10px;
+      padding: 5px 9px;
       text-align: right;
       background: var(--card);
     }
@@ -194,10 +200,10 @@
       border: 1px solid var(--border);
       background: var(--card);
       color: var(--foreground);
-      padding: 0 12px;
+      padding: 0 10px;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
@@ -209,78 +215,158 @@
       color: var(--primary-foreground);
     }
 
-    .summary-line {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 6px;
+    .btn.subtle {
+      background: rgba(0, 0, 0, 0.03);
     }
 
-    .stage-chip {
-      min-width: 0;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 7px;
-      align-items: center;
-      border-radius: 8px;
+    .btn.pending {
       color: var(--muted-foreground);
-      font-size: 11px;
+      background: var(--muted);
+      cursor: default;
+    }
+
+    .action-menu {
+      position: absolute;
+      top: 42px;
+      right: 0;
+      width: 330px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.14);
+      padding: 8px;
+      display: none;
+      z-index: 30;
+    }
+
+    .action-menu.open {
+      display: block;
+    }
+
+    .menu-section {
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .menu-section:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .menu-label {
+      padding: 6px 8px 4px;
+      color: var(--muted-foreground);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .menu-item {
+      min-height: 34px;
+      width: 100%;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--foreground);
+      padding: 7px 8px;
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .menu-item:hover {
+      background: var(--muted);
+    }
+
+    .menu-item.danger {
+      color: var(--destructive-foreground);
+    }
+
+    .menu-item[disabled] {
+      color: var(--muted-foreground);
+      opacity: 0.48;
+      cursor: not-allowed;
+    }
+
+    .menu-item[disabled]:hover {
+      background: transparent;
+    }
+
+    .menu-item small {
+      color: var(--muted-foreground);
+      font-size: 10px;
       font-weight: 500;
     }
 
-    .stage-chip .mark {
-      width: 17px;
-      height: 17px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--border);
-      font-size: 10px;
-      color: var(--muted-foreground);
-      background: var(--card);
+    .status-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
     }
 
-    .stage-chip.done .mark {
-      border-color: rgba(16, 185, 129, 0.24);
+    .status-chip {
+      min-width: 0;
+      min-height: 24px;
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      padding: 0 8px;
+      color: var(--muted-foreground);
+      font-size: 10.5px;
+      font-weight: 500;
+    }
+
+    .status-chip .mark {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--muted-foreground);
+    }
+
+    .status-chip.ready {
       color: var(--success-foreground);
+      border-color: rgba(16, 185, 129, 0.22);
       background: rgba(16, 185, 129, 0.06);
     }
 
-    .stage-chip.merge .mark {
-      border-color: rgba(168, 85, 247, 0.26);
-      color: var(--signal-review-foreground);
-      background: rgba(168, 85, 247, 0.08);
-    }
-
-    .stage-chip .bar {
-      height: 4px;
-      border-radius: 999px;
-      margin-top: 5px;
-      background: var(--muted);
-      overflow: hidden;
-    }
-
-    .stage-chip.done .bar::before,
-    .stage-chip.merge .bar::before {
-      content: "";
-      display: block;
-      height: 100%;
-      width: 100%;
+    .status-chip.ready .mark {
       background: var(--success);
     }
 
-    .stage-chip.merge .bar::before {
+    .status-chip.review {
+      color: var(--signal-review-foreground);
+      border-color: rgba(168, 85, 247, 0.22);
+      background: rgba(168, 85, 247, 0.06);
+    }
+
+    .status-chip.review .mark {
       background: var(--signal-review);
+    }
+
+    .status-chip.warning .mark {
+      background: var(--warning);
     }
 
     .content {
       min-height: 0;
       display: grid;
-      grid-template-columns: 76px minmax(0, 1fr);
+      grid-template-columns: 64px minmax(0, 1fr);
       transition: grid-template-columns 160ms ease;
     }
 
     .content.pipeline-open {
-      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-columns: 244px minmax(0, 1fr);
     }
 
     .pipeline {
@@ -293,7 +379,7 @@
 
     .pipeline-head {
       height: 52px;
-      padding: 0 12px;
+      padding: 0 8px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -328,22 +414,22 @@
     }
 
     .stage-list {
-      padding: 10px;
+      padding: 8px;
       overflow: auto;
       display: grid;
-      gap: 7px;
+      gap: 6px;
     }
 
     .stage-row {
       min-width: 0;
-      height: 54px;
+      height: 50px;
       border: 1px solid transparent;
       border-radius: 8px;
       display: grid;
-      grid-template-columns: 36px minmax(0, 1fr) auto;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
       align-items: center;
-      gap: 8px;
-      padding: 0 8px;
+      gap: 7px;
+      padding: 0 6px;
       color: var(--muted-foreground);
       background: transparent;
     }
@@ -355,8 +441,8 @@
     }
 
     .stage-row .stage-icon {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 8px;
       border: 1px solid var(--border);
       display: grid;
@@ -414,24 +500,6 @@
 
     .content.pipeline-open .stage-caret {
       display: block;
-    }
-
-    .pipeline-actions {
-      margin-top: auto;
-      padding: 10px;
-      border-top: 1px solid var(--border);
-      display: grid;
-      gap: 7px;
-    }
-
-    .content:not(.pipeline-open) .pipeline-actions .btn {
-      width: 36px;
-      padding: 0;
-      justify-content: center;
-    }
-
-    .content:not(.pipeline-open) .pipeline-actions .btn span {
-      display: none;
     }
 
     .main-panel {
@@ -662,10 +730,6 @@
         grid-template-columns: 1fr;
       }
 
-      .summary-line {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
       .stage-grid {
         grid-template-columns: 1fr;
       }
@@ -696,19 +760,38 @@
             <div class="metric"><span>Branch</span><strong>feature/min-832</strong></div>
             <div class="metric"><span>PR / CI</span><strong>no PR</strong></div>
             <div class="metric"><span>Cost</span><strong>$226.40</strong></div>
-            <button class="btn primary" type="button">✓ Merge</button>
-            <button class="btn" type="button">⌘ Actions</button>
+            <button class="btn subtle" type="button">↻ Review &amp; test</button>
+            <button class="btn subtle" type="button">↗ View PR</button>
+            <button class="btn pending" type="button">⊖ Merge — test pending</button>
+            <button class="btn" id="actionsButton" type="button" aria-expanded="false" aria-controls="actionsMenu">⌘ Actions ▾</button>
+            <div class="action-menu" id="actionsMenu" role="menu" aria-label="Issue actions">
+              <div class="menu-section">
+                <div class="menu-label">Next actions</div>
+                <button class="menu-item" type="button"><span>↻</span><span>Review &amp; test</span><small>rerun gates</small></button>
+                <button class="menu-item" type="button"><span>↗</span><span>View PR</span><small>opens GitHub</small></button>
+                <button class="menu-item" id="openIssueFromMenu" type="button"><span>▣</span><span>Open issue drawer</span><small>MIN-832</small></button>
+              </div>
+              <div class="menu-section">
+                <div class="menu-label">Agent</div>
+                <button class="menu-item" type="button"><span>✎</span><span>Tell agent</span><small>send instruction</small></button>
+                <button class="menu-item" type="button"><span>◐</span><span>Switch model</span><small>new session</small></button>
+                <button class="menu-item danger" type="button"><span>↯</span><span>Restart agent</span><small>requires confirm</small></button>
+              </div>
+              <div class="menu-section">
+                <div class="menu-label">Workspace</div>
+                <button class="menu-item" type="button"><span>⇣</span><span>Sync main</span><small>rebase workspace</small></button>
+                <button class="menu-item" type="button"><span>⌘</span><span>Copy settings</span><small>clipboard</small></button>
+                <button class="menu-item" type="button" disabled><span>＋</span><span>Create workspace</span><small>already exists</small></button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <section class="summary-line" aria-label="Pipeline summary">
-          <div class="stage-chip done"><span class="mark">✓</span><span>Plan approved<div class="bar"></div></span></div>
-          <div class="stage-chip done"><span class="mark">✓</span><span>Work done<div class="bar"></div></span></div>
-          <div class="stage-chip done"><span class="mark">✓</span><span>Review passed<div class="bar"></div></span></div>
-          <div class="stage-chip done"><span class="mark">✓</span><span>Test passed<div class="bar"></div></span></div>
-          <div class="stage-chip"><span class="mark">◦</span><span>CI/CD<div class="bar"></div></span></div>
-          <div class="stage-chip"><span class="mark">◦</span><span>Ship<div class="bar"></div></span></div>
-          <div class="stage-chip merge"><span class="mark">◆</span><span>Merge ready<div class="bar"></div></span></div>
+        <section class="status-strip" aria-label="Issue readiness summary">
+          <div class="status-chip ready"><span class="mark"></span><span>Plan, work, review, and test complete</span></div>
+          <div class="status-chip"><span class="mark"></span><span>CI/CD no checks</span></div>
+          <div class="status-chip review"><span class="mark"></span><span>Merge-ready yes</span></div>
+          <div class="status-chip warning"><span class="mark"></span><span>Human approval remains</span></div>
         </section>
       </header>
 
@@ -755,11 +838,6 @@
               <div class="stage-copy"><strong>Merge</strong><span>ready for human merge</span></div>
               <div class="stage-caret">›</div>
             </div>
-          </div>
-
-          <div class="pipeline-actions">
-            <button class="btn" type="button">↻ <span>Review &amp; test</span></button>
-            <button class="btn" type="button">↗ <span>View PR</span></button>
           </div>
         </aside>
 
@@ -832,7 +910,7 @@
       </section>
       <section class="drawer-card">
         <h3>Pipeline</h3>
-        <p>Plan, work, review, and test are complete. CI/CD has no checks. Merge is ready for explicit human approval.</p>
+        <p>Plan and work are visible in the rail. The header carries the current gate state, including blocked merge reasons such as pending tests.</p>
       </section>
       <section class="drawer-card">
         <h3>UAT / Workspace</h3>
@@ -852,22 +930,39 @@
     const scrim = document.getElementById('scrim');
     const openIssue = document.getElementById('openIssue');
     const openIssueSecondary = document.getElementById('openIssueSecondary');
+    const openIssueFromMenu = document.getElementById('openIssueFromMenu');
     const closeIssue = document.getElementById('closeIssue');
+    const actionsButton = document.getElementById('actionsButton');
+    const actionsMenu = document.getElementById('actionsMenu');
 
     togglePipeline.addEventListener('click', () => {
       content.classList.toggle('pipeline-open');
       togglePipeline.textContent = content.classList.contains('pipeline-open') ? '⇤' : '⇥';
     });
 
+    function setActionsMenu(open) {
+      actionsMenu.classList.toggle('open', open);
+      actionsButton.setAttribute('aria-expanded', String(open));
+    }
+
     function setDrawer(open) {
       drawer.classList.toggle('open', open);
       scrim.classList.toggle('open', open);
+      if (open) setActionsMenu(false);
     }
 
     openIssue.addEventListener('click', () => setDrawer(true));
     openIssueSecondary.addEventListener('click', () => setDrawer(true));
+    openIssueFromMenu.addEventListener('click', () => setDrawer(true));
     closeIssue.addEventListener('click', () => setDrawer(false));
     scrim.addEventListener('click', () => setDrawer(false));
+    actionsButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setActionsMenu(!actionsMenu.classList.contains('open'));
+    });
+    document.addEventListener('click', (event) => {
+      if (!actionsMenu.contains(event.target) && event.target !== actionsButton) setActionsMenu(false);
+    });
   </script>
 </body>
 </html>
