@@ -4,17 +4,17 @@
     "created": "2026-06-11T07:04:43.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1765: bug(pipeline): conflict-flagged branches churn full review convoys — passed verdicts reset minutes later; conflict resolution should gate review dispatch",
-    "updated": "2026-06-14T17:58:31.571Z"
+    "updated": "2026-06-14T22:33:11.671Z"
   },
   "plan": {
     "id": "pan-1765",
     "title": "bug(pipeline): conflict-flagged branches churn full review convoys — passed verdicts reset minutes later; conflict resolution should gate review dispatch",
-    "status": "running",
+    "status": "completed",
     "uid": "c0b51592-9a05-4166-9ece-350bb55d964c",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-06-11T07:04:43.000Z",
-    "updated": "2026-06-14T17:58:31.571Z",
+    "updated": "2026-06-14T22:33:11.671Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1765",
@@ -470,5 +470,5 @@
       "canonicalFilename": "2026-06-11-PAN-1765-bug-pipeline-conflict-flagged-branches-churn-full-review-convoys-passed-verdicts-reset-minutes-later-conflict-resolution-should-gate-review-dispatch.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

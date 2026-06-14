@@ -99,6 +99,38 @@ function setupRedirect(workspacePath: string): void {
 }
 
 /**
+ * Deterministically initialize the mocked bd DB state for a test.
+ *
+ * Returns the in-memory bead store and a mock implementation that can be
+ * passed to `mockExecAsync.mockImplementation`. The implementation covers
+ * `which`, `bd ping`, `bd list`, `bd delete`, and `bd create` so that the
+ * title-based recovery and `bd doctor --fix` paths are never reached.
+ */
+function createMockBdState() {
+  const beads: Array<{ id: string; title: string }> = [];
+  let nextId = 1;
+
+  const implementation = async (file: string, args: string[]) => {
+    if (file === 'which') return { stdout: '/usr/bin/bd', stderr: '' };
+    if (file === 'bd' && args[0] === 'ping') return { stdout: '', stderr: '' };
+    if (file === 'bd' && args[0] === 'list') return { stdout: JSON.stringify(beads), stderr: '' };
+    if (file === 'bd' && args[0] === 'delete') {
+      const index = beads.findIndex(bead => bead.id === args[1]);
+      if (index !== -1) beads.splice(index, 1);
+      return { stdout: '', stderr: '' };
+    }
+    if (file === 'bd' && args[0] === 'create') {
+      const id = `bead-${nextId++}`;
+      beads.push({ id, title: args[1] });
+      return { stdout: `${id}\n`, stderr: '' };
+    }
+    throw new Error(`unexpected call: ${file} ${args.join(' ')}`);
+  };
+
+  return { beads, implementation };
+}
+
+/**
  * Create the standard project + workspace directory structure.
  * Issue ID must match PREFIX-NUMBER format (e.g. PAN-500).
  * Returns { projectRoot, workspacePath }.
@@ -551,44 +583,41 @@ describe('createBeadsFromVBrief', () => {
 
     it('three consecutive calls leave exactly planItemCount beads', async () => {
       const ws8 = createWorkspace('PAN-507');
-      setupRedirect(ws8.workspacePath);
-      writePlan(ws8.projectRoot, 'PAN-507', makeDoc('PAN-507', [
-        { id: 'item-a', title: 'Alpha task' },
-        { id: 'item-b', title: 'Beta task' },
-      ]));
+      try {
+        setupRedirect(ws8.workspacePath);
+        writePlan(ws8.projectRoot, 'PAN-507', makeDoc('PAN-507', [
+          { id: 'item-a', title: 'Alpha task' },
+          { id: 'item-b', title: 'Beta task' },
+        ]));
 
-      const beads: Array<{ id: string; title: string }> = [];
-      let nextId = 1;
-      mockExecAsync.mockImplementation(async (file: string, args: string[]) => {
-        if (file === 'which') return { stdout: '/usr/bin/bd', stderr: '' };
-        if (file === 'bd' && args[0] === 'ping') return { stdout: '', stderr: '' };
-        if (file === 'bd' && args[0] === 'list') return { stdout: JSON.stringify(beads), stderr: '' };
-        if (file === 'bd' && args[0] === 'delete') {
-          const index = beads.findIndex(bead => bead.id === args[1]);
-          if (index !== -1) beads.splice(index, 1);
-          return { stdout: '', stderr: '' };
-        }
-        if (file === 'bd' && args[0] === 'create') {
-          const id = `bead-${nextId++}`;
-          beads.push({ id, title: args[1] });
-          return { stdout: `${id}\n`, stderr: '' };
-        }
-        throw new Error(`unexpected call: ${file} ${args.join(' ')}`);
-      });
+        // Initialize the mocked bd DB deterministically before exercising
+        // createBeadsFromVBrief. The mock covers all commands on the happy path
+        // so the title-based recovery and bd doctor --fix paths are never
+        // reached, keeping the test hermetic and deterministic.
+        const { beads, implementation } = createMockBdState();
+        mockExecAsync.mockImplementation(implementation);
 
-      for (let i = 0; i < 3; i++) {
-        const result = await Effect.runPromise(runCreateBeads(ws8.workspacePath));
-        expect(result.success).toBe(true);
+        for (let i = 0; i < 3; i++) {
+          const result = await Effect.runPromise(runCreateBeads(ws8.workspacePath));
+          expect(result.success).toBe(true);
+        }
+
+        expect(beads).toHaveLength(2);
+        expect(beads.map(bead => bead.title).sort()).toEqual([
+          'PAN-507: Alpha task',
+          'PAN-507: Beta task',
+        ]);
+        expect(new Set(beads.map(bead => bead.title)).size).toBe(2);
+
+        // Guard against the PAN-1903 flake: no recovery/doctor path should run.
+        const doctorCalls = mockExecAsync.mock.calls.filter(
+          ([file, args]: [string, string[]]) =>
+            file === 'bd' && Array.isArray(args) && args[0] === 'doctor' && args[1] === '--fix',
+        );
+        expect(doctorCalls).toHaveLength(0);
+      } finally {
+        rmSync(ws8.projectRoot, { recursive: true, force: true });
       }
-
-      expect(beads).toHaveLength(2);
-      expect(beads.map(bead => bead.title).sort()).toEqual([
-        'PAN-507: Alpha task',
-        'PAN-507: Beta task',
-      ]);
-      expect(new Set(beads.map(bead => bead.title)).size).toBe(2);
-
-      rmSync(ws8.projectRoot, { recursive: true, force: true });
     });
 
     it('aborts when bd list throws during dedup', async () => {

@@ -4581,6 +4581,8 @@ function initSchema(db) {
       reviewed_at_commit    TEXT,
       -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
       review_spawned_at     TEXT,
+      -- PAN-1765: timestamp when conflict resolution was dispatched
+      conflict_resolution_dispatched_at TEXT,
       -- PAN-699: number of test-agent dispatch retries (circuit breaker)
       test_retry_count      INTEGER DEFAULT 0,
       -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
@@ -5651,9 +5653,14 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
 		} catch {}
 	}
-	if (currentVersion < 54) try {
-		db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
-	} catch {}
+	if (currentVersion < 54) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
+		} catch {}
+	}
 	db.pragma(`user_version = 54`);
 }
 //#endregion

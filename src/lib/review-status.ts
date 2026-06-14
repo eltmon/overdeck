@@ -94,6 +94,8 @@ export interface ReviewStatus {
   stuckDetails?: string;
   /** PAN-699: timestamp when review agents were dispatched (deacon timeout detection) */
   reviewSpawnedAt?: string;
+  /** PAN-1765: timestamp when a conflict-resolution work agent was dispatched. */
+  conflictResolutionDispatchedAt?: string;
   /** PAN-699: number of test-agent dispatch retries (circuit breaker) */
   testRetryCount?: number;
   /** PAN-794: number of consecutive parallel-review re-dispatch attempts within the current cycle */

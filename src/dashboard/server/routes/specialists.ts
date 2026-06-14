@@ -1589,6 +1589,17 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       harness,
     });
 
+    if (result.gated) {
+      return jsonResponse({
+        success: false,
+        gated: true,
+        message: result.message,
+        killed: killResult.killed,
+        model: model ?? undefined,
+        harness: harness ?? undefined,
+      }, { status: 409 });
+    }
+
     return jsonResponse({
       success: result.success,
       message: result.message,

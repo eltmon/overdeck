@@ -78,6 +78,9 @@ import {
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../lib/git-activity.js';
+import {
+  getCachedConflictGateMergeability,
+} from '../../../lib/cloister/conflict-gate.js';
 import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
   computeQueuePositionFromStatusSync,
@@ -3708,6 +3711,27 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     }
     setReviewStatus(issueId, reviewReset);
 
+    // PAN-1765: short-circuit conflict-gated dispatches before responding so the
+    // HTTP client gets a 409 with the deferral message instead of a false 200.
+    // Use only the synchronous probe cache here: if a fresh cached result says
+    // the branch is not mergeable, return 409 immediately. When the cache is
+    // absent/stale, fall through to the background block below, which runs the
+    // async probe inside spawnReviewRoleForIssue without holding the HTTP response.
+    const cachedMergeability = getCachedConflictGateMergeability(issueId);
+    if (cachedMergeability === 'conflicts' || cachedMergeability === 'unknown') {
+      const message = cachedMergeability === 'conflicts'
+        ? `Review deferred: merge conflict with main must be resolved before review dispatch`
+        : `Review deferred: mergeability against main could not be verified; deferring review conservatively`;
+      setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
+      completePendingOperation(issueId, message);
+      return jsonResponse({
+        success: false,
+        gated: true,
+        message,
+        pipeline: 'deferred',
+      }, { status: 409 });
+    }
+
     // Respond immediately
     // Run pipeline in background
     (async () => {
@@ -3825,6 +3849,16 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             }));
 
             if (!reviewResult.success) {
+              if (reviewResult.gated) {
+                console.log(`[review] review dispatch deferred for ${issueId}: ${reviewResult.message}`);
+                completePendingOperation(issueId, reviewResult.message);
+                setReviewStatus(issueId, {
+                  reviewStatus: 'pending',
+                  reviewNotes: reviewResult.message,
+                });
+                return;
+              }
+
               console.warn(
                 `[review] review dispatch failed: ${reviewResult.message}`
               );
@@ -4032,6 +4066,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
               // managed by the review role itself via /api/review/:id/status.
               console.log(`[request-review] Review role spawned for ${issueId}`);
+            } else if (result.gated) {
+              console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+              setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: result.message });
             } else {
               const errorMsg = result.error || result.message || 'Failed to dispatch review';
               console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
@@ -4264,7 +4301,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         // PAN-511: set 'reviewing' only after spawn succeeds. spawnReviewRoleForIssue
         // already flips reviewStatus internally, but we keep this redundant write
         // to preserve the original ordering invariant for downstream readers.
-        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+        // Increment autoRequeueCount only on a real dispatch.
+        setReviewStatus(issueId, { reviewStatus: 'reviewing', autoRequeueCount: newCount });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
           timestamp: new Date().toISOString(),
@@ -4277,6 +4315,23 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           autoRequeueCount: newCount,
           remainingRequeues: MAX_AUTO_REQUEUE - newCount,
         });
+      } else if (result.gated) {
+        console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          reviewNotes: result.message,
+          autoRequeueCount: currentCount,
+        });
+        return jsonResponse(
+          {
+            success: false,
+            gated: true,
+            message: result.message,
+            autoRequeueCount: currentCount,
+            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
+          },
+          { status: 409 }
+        );
       } else {
         console.warn(
           `[request-review] Dispatch failed for ${issueId}: ${result.error}`
@@ -4284,12 +4339,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
           reviewNotes: `Dispatch failed: ${result.error || result.message}`,
+          autoRequeueCount: currentCount,
         });
         return jsonResponse(
           {
             success: false,
             error: result.error || 'Failed to dispatch review',
-            autoRequeueCount: newCount,
+            autoRequeueCount: currentCount,
+            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
           },
           { status: 500 }
         );
@@ -6039,7 +6096,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         // posts the verdict via /api/review/:id/status. Test dispatch is NOT
         // part of the review prompt — reactive Cloister picks up the
         // review.approved lifecycle event and spawns the test role.
-        let reviewResult: { success: boolean; message: string; error?: string };
+        let reviewResult: { success: boolean; message: string; error?: string; gated?: boolean };
         try {
           const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
           reviewResult = await Effect.runPromise(spawnReviewRoleForIssue({
@@ -6057,6 +6114,23 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         }
 
         if (!reviewResult.success) {
+          if (reviewResult.gated) {
+            console.log(`[approve] review dispatch deferred for ${issueId}: ${reviewResult.message}`);
+            completePendingOperation(issueId, reviewResult.message);
+            setReviewStatusBase(issueId, {
+              reviewStatus: 'pending',
+              reviewNotes: reviewResult.message,
+            });
+            return jsonResponse({
+              success: false,
+              gated: true,
+              message: reviewResult.message,
+              pipeline: 'deferred',
+              ...(recentPushWarning && { recentPushWarning }),
+              ...(mainAdvancedBy > 0 && { mainAdvancedBy }),
+            }, { status: 409 });
+          }
+
           console.warn(`[approve] review role failed to start: ${reviewResult.message}`);
           console.log(`[approve] Falling back to direct merge...`);
         } else {

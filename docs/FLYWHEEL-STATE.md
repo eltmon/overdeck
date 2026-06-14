@@ -823,3 +823,11 @@ red-main strike.
 - **PAN-1887 (GitLab auto-merge wiring) MERGED** (#1898, 2051340ba). Needs `pan reload` from current main to deploy → then MIN-831 (GitLab MR, ready) can auto-merge.
 - **planning-pan-1758 + planning-pan-1900 still PLANNING** (the two key fixes). agent-pan-1862 (review cache) working. Conflict cluster (1498/1827/1775/1491) still blocked (PAN-1893/1897).
 - **Local primary-main DIVERGED 6 ahead / 13 behind** (bot-state churn vs origin's 13 merges incl PAN-1887). Integrated via `git merge origin/main` (backup flywheel-backup-t12), resolved the only conflict (.beads/issues.jsonl → took origin's regenerable state), now 0-behind. Also removed a stray untracked `record-cost-event.js.map` that origin now tracks (blocked the merge). **Recurring-divergence note:** the flywheel/pipeline committing bot state to the live primary-main worktree while origin moves fast keeps forcing this integration — worth its own fix.
+
+### RUN-35 tick 14 (2026-06-14 ~22:12Z) — RED MAIN struck (PAN-1903); PAN-1629 (bd-lock) merged; reduce-churn worked
+
+- **RED MAIN P0 — struck PAN-1903.** Cause: flaky `create-beads.test.ts` bd-DB-init race (`Error 1146 table not found: issues` -> title-based recovery inflates bead count -> assertion fails), from PAN-1629 (#1715, merged 84317b10 GREEN; flake surfaced next run e0e91b43). Live bd healthy (ping ok, 55 issues) — a TEST-env race. Same bd FAILED/EMPTY recovery path blocking PAN-1758's `pan start`. RED main blocks the UAT ship + PAN-1887 deploy + MIN-831 -> told operator HOLD shipping ember until PAN-1903 greens main (corrects earlier 'ember safe').
+- **PAN-1629 (concurrent pan start bd-lock) MERGED** — the unblock for PAN-1758's start; needs deploy. PAN-1900 -> in-review; PAN-1901 -> planning (operator-approved .pan/.beads merge).
+- **reduce-churn WORKED:** skipping the FLYWHEEL-STATE commit last tick let the assembler bundle PAN-1765 into a fresh UAT batch (vale->ember). Confirms: fewer flywheel main-commits = ready PRs converge.
+- **PAN-1758 STILL not started** after 3 attempts — bd FAILED/EMPTY bead-create (~580s/6 beads). Beads now 6/6 but agent won't spawn in budget. Retry after PAN-1903 + PAN-1629 deploy.
+- **NEXT:** PAN-1903 strike -> green main -> ship ember, `pan reload` (deploy PAN-1629+1887), retry PAN-1758, PAN-1900 review->merge, PAN-1901 plan->work.

@@ -8,7 +8,7 @@
 
 import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
-import type { ReviewStatus, StatusHistoryEntry } from '../review-status.js';
+import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 
 /**
@@ -48,6 +48,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         stuck, stuck_reason, stuck_at, stuck_details,
         reviewed_at_commit,
         review_spawned_at,
+        conflict_resolution_dispatched_at,
         test_retry_count,
         review_retry_count,
         recovery_started_at,
@@ -59,7 +60,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         merge_step,
         auto_merge
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -89,6 +90,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         stuck_details         = excluded.stuck_details,
         reviewed_at_commit    = excluded.reviewed_at_commit,
         review_spawned_at     = excluded.review_spawned_at,
+        conflict_resolution_dispatched_at = excluded.conflict_resolution_dispatched_at,
         test_retry_count      = excluded.test_retry_count,
         review_retry_count    = excluded.review_retry_count,
         recovery_started_at   = excluded.recovery_started_at,
@@ -128,6 +130,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.stuckDetails ?? null,
       s.reviewedAtCommit ?? null,
       s.reviewSpawnedAt ?? null,
+      s.conflictResolutionDispatchedAt ?? null,
       s.testRetryCount ?? null,
       s.reviewRetryCount ?? null,
       s.recoveryStartedAt ?? null,
@@ -206,6 +209,60 @@ export const getReviewStatusFromDb = (
       }),
     catch: (cause) => new DatabaseError({ operation: 'getReviewStatusFromDb', cause }),
   });
+
+// ============== Merge-blocker reconcile candidates ==============
+
+export interface MergeBlockerReconcileCandidate {
+  issueId: string;
+  prUrl: string | undefined;
+  blockerReasons: BlockerReason[] | undefined;
+  readyForMerge: boolean;
+}
+
+/**
+ * Selective query for the merge-blocker reconcile service.
+ * Returns only rows that are either ready for merge or carry mergeability
+ * blockers, avoiding a full-table scan and history hydration.
+ */
+export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileCandidate[] {
+  const db = getDatabase();
+
+  const rows = db.prepare(`
+    SELECT issue_id, pr_url, blocker_reasons, ready_for_merge
+    FROM review_status
+    WHERE ready_for_merge = 1
+      OR blocker_reasons LIKE '%merge_conflict%'
+      OR blocker_reasons LIKE '%not_mergeable%'
+  `).all() as Array<{
+    issue_id: string;
+    pr_url: string | null;
+    blocker_reasons: string | null;
+    ready_for_merge: number;
+  }>;
+
+  return rows.map((row) => ({
+    issueId: row.issue_id.toUpperCase(),
+    prUrl: row.pr_url ?? undefined,
+    blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
+    readyForMerge: row.ready_for_merge === 1,
+  }));
+}
+
+export const getMergeBlockerReconcileCandidates =
+  (): Effect.Effect<MergeBlockerReconcileCandidate[], DatabaseError> =>
+    Effect.tryPromise({
+      try: () =>
+        new Promise<MergeBlockerReconcileCandidate[]>((resolve, reject) => {
+          setImmediate(() => {
+            try {
+              resolve(getMergeBlockerReconcileCandidatesSync());
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }),
+      catch: (cause) => new DatabaseError({ operation: 'getMergeBlockerReconcileCandidates', cause }),
+    });
 
 
 // ============== Read operations ==============
@@ -358,6 +415,8 @@ interface DbReviewStatusRow {
   reviewed_at_commit: string | null;
   // PAN-699: timestamp when review agents were dispatched
   review_spawned_at: string | null;
+  // PAN-1765: timestamp when conflict resolution was dispatched
+  conflict_resolution_dispatched_at: string | null;
   // PAN-699: test-agent dispatch retry counter
   test_retry_count: number | null;
   // PAN-794: parallel-review re-dispatch retry counter
@@ -411,6 +470,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
     reviewSpawnedAt: row.review_spawned_at ?? undefined,
+    conflictResolutionDispatchedAt: row.conflict_resolution_dispatched_at ?? undefined,
     testRetryCount: row.test_retry_count ?? undefined,
     reviewRetryCount: row.review_retry_count ?? undefined,
     recoveryStartedAt: row.recovery_started_at ?? undefined,

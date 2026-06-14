@@ -27,13 +27,32 @@ import {
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
 
-const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessageAgent, mockNotifyPipeline, mockGetAgentState } = vi.hoisted(() => ({
+const {
+  mockKillSessionAsync,
+  mockSaveAgentStateAsync,
+  mockSpawnRun,
+  mockMessageAgent,
+  mockNotifyPipeline,
+  mockGetAgentState,
+  mockResolveConflictGate,
+  mockBuildRealConflictGateDeps,
+  mockGetCachedConflictGateMergeability,
+  mockSetReviewStatus,
+  mockGetReviewStatus,
+  mockArchiveFeedbackFiles,
+} = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
   mockNotifyPipeline: vi.fn(),
   mockGetAgentState: vi.fn(() => null),
+  mockResolveConflictGate: vi.fn().mockResolvedValue({ gated: false }),
+  mockBuildRealConflictGateDeps: vi.fn(() => ({ real: true })),
+  mockGetCachedConflictGateMergeability: vi.fn(() => undefined),
+  mockSetReviewStatus: vi.fn(),
+  mockGetReviewStatus: vi.fn(() => null),
+  mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -71,6 +90,35 @@ vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: mockNotifyPipeline,
   notifyPipelineSync: mockNotifyPipeline,
 }));
+
+vi.mock('../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: mockGetReviewStatus,
+  setReviewStatusSync: mockSetReviewStatus,
+}));
+
+vi.mock('../../../src/lib/cloister/conflict-gate.js', () => ({
+  buildRealConflictGateDeps: mockBuildRealConflictGateDeps,
+  resolveConflictGate: mockResolveConflictGate,
+  getCachedConflictGateMergeability: mockGetCachedConflictGateMergeability,
+}));
+
+vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
+  archiveFeedbackFiles: mockArchiveFeedbackFiles,
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
+  mockKillSessionAsync.mockResolvedValue(undefined);
+  mockSaveAgentStateAsync.mockResolvedValue(undefined);
+  mockMessageAgent.mockResolvedValue(undefined);
+  mockGetAgentState.mockReturnValue(null);
+  mockGetReviewStatus.mockReturnValue(null);
+  mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
+  mockResolveConflictGate.mockResolvedValue({ gated: false });
+  mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
+  mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+});
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
 // PAN-931: pan down must kill review sessions so they don't survive dashboard
@@ -232,6 +280,60 @@ describe('killAllReviewerSessions', () => {
     expect(isReviewSessionForIssue('agent-pan-1080-review-security', 'panopticon-cli', 'PAN-1080')).toBe(true);
     expect(isReviewSessionForIssue('agent-pan-1080', 'panopticon-cli', 'PAN-1080')).toBe(false);
     expect(isReviewSessionForIssue('agent-pan-1081-review', 'panopticon-cli', 'PAN-1080')).toBe(false);
+  });
+});
+
+// ── conflict gate dispatch deferral (PAN-1765) ────────────────────────────────
+
+describe('spawnReviewRoleForIssue conflict gate', () => {
+  it('defers review without spawning or archiving feedback when conflict-gated', async () => {
+    mockResolveConflictGate.mockResolvedValue({
+      gated: true,
+      reason: 'merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
+    });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1765',
+      workspace: '/tmp/pan-review-gated',
+      branch: 'feature/pan-1765',
+      force: true,
+    }));
+
+    expect(result).toEqual({
+      success: false,
+      gated: true,
+      message: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
+    });
+    expect(mockResolveConflictGate).toHaveBeenCalledWith(
+      'PAN-1765',
+      '/tmp/pan-review-gated',
+      'main',
+      { real: true },
+    );
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1765', {
+      reviewStatus: 'pending',
+      reviewNotes: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
+    });
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockArchiveFeedbackFiles).not.toHaveBeenCalled();
+  });
+
+  it('places the gate before feedback archiving and review-spawn status writes', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const dispatchBlock = agentSrc.match(
+      /const gate = await resolveConflictGate[\s\S]*?setReviewStatusSync\(opts\.issueId, \{\s*reviewStatus: 'reviewing'/,
+    );
+    expect(dispatchBlock).not.toBeNull();
+    const block = dispatchBlock![0];
+    expect(block.indexOf('resolveConflictGate')).toBeLessThan(block.indexOf('archiveFeedbackFiles'));
+    expect(block).toContain('if (gate.gated)');
+    expect(block).toContain('return { success: false, gated: true, message }');
   });
 });
 
@@ -595,6 +697,46 @@ describe('convoy orchestration', () => {
   });
 });
 
+// ── deacon gated review deferral (PAN-1765) ───────────────────────────────────
+
+describe('deacon gated review deferral', () => {
+  it('deacon treats gated review dispatch as deferred, not failed, and releases the advancing slot', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const deaconSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/deacon.ts'),
+      'utf-8',
+    );
+
+    expect(deaconSrc).toContain('releaseAdvancingSlot');
+    expect(deaconSrc).toContain('if (dispatchResult.gated)');
+    expect(deaconSrc).toContain('Deferred review re-dispatch for');
+    expect(deaconSrc).toContain('Deferred post-review re-dispatch for');
+
+    const gatedBlocks = deaconSrc.match(/if \(dispatchResult\.gated\) \{[\s\S]*?\n\s*\}/g) ?? [];
+    expect(gatedBlocks.length).toBeGreaterThanOrEqual(2);
+    for (const block of gatedBlocks) {
+      expect(block).toContain('releaseAdvancingSlot()');
+      expect(block).not.toContain('reviewRetryCount');
+      expect(block).not.toContain('Failed to re-dispatch');
+    }
+  });
+
+  it('startup recovery logs gated dispatch as a deferral', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const serviceSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/service.ts'),
+      'utf-8',
+    );
+
+    const recoveryBlock = serviceSrc.match(/const dispatchResult = await Effect\.runPromise\(spawnReviewRoleForIssue[\s\S]*?Re-dispatched recovery review/);
+    expect(recoveryBlock).not.toBeNull();
+    expect(recoveryBlock![0]).toContain('if (dispatchResult.gated)');
+    expect(recoveryBlock![0]).toContain('Deferred recovery review');
+  });
+});
+
 // ── dispatch failure sets 'pending' not 'failed' ─────────────────────────────
 // Regression: dispatch failures must set reviewStatus='pending' so the deacon
 // can retry. The deacon at deacon.ts only re-dispatches when reviewStatus===
@@ -644,6 +786,71 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).toContain('yield* getWorkspaceGitInfo(workspacePath)');
     expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
+  });
+
+  it('specialists review restart route returns 409 for gated dispatches', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/specialists.ts'),
+      'utf-8',
+    );
+
+    const restartMatch = routeSrc.match(
+      /postProjectReviewRestartRoute[\s\S]*?postProjectReviewerRoleRestartRoute/,
+    );
+    expect(restartMatch).not.toBeNull();
+    const restartBlock = restartMatch![0];
+
+    expect(restartBlock).toContain('if (result.gated)');
+    expect(restartBlock).toContain('gated: true');
+    expect(restartBlock).toContain('message: result.message');
+    expect(restartBlock).toContain('{ status: 409 }');
+  });
+
+  it('workspaces.ts review request routes treat gated dispatches as deferrals', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    expect(routeSrc).toContain('reviewResult.gated');
+    expect(requestReviewBlock).toContain('Review deferred for');
+    expect(requestReviewBlock).toContain('gated: true');
+    expect(requestReviewBlock).toContain('{ status: 409 }');
+    expect(requestReviewBlock).toContain('reviewNotes: result.message');
+  });
+
+  it('workspaces.ts approve route treats gated dispatches as deferrals', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const approveMatch = routeSrc.match(
+      /POST \/api\/issues\/:issueId\/approve[\s\S]*?Fallback \(PAN-1531\): direct server-side rebase/,
+    );
+    expect(approveMatch).not.toBeNull();
+    const approveBlock = approveMatch![0];
+
+    expect(approveBlock).toContain('gated?: boolean');
+    expect(approveBlock).toContain('if (reviewResult.gated)');
+    expect(approveBlock).toContain('review dispatch deferred for');
+    expect(approveBlock).toContain('gated: true');
+    expect(approveBlock).toContain("pipeline: 'deferred'");
+    expect(approveBlock).toContain('{ status: 409 }');
+    expect(approveBlock).toContain('return jsonResponse');
+    expect(approveBlock).toContain('setReviewStatusBase(issueId, {');
   });
 
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
