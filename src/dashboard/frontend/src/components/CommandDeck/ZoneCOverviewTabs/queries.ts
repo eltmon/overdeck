@@ -384,12 +384,24 @@ export interface WorkspaceContainerStatus {
   running: boolean;
   uptime: string | null;
   status?: string;
+  health?: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports?: number[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
 }
 
 export interface WorkspaceStackHealth {
   healthy: boolean;
   reasons: string[];
   lastObserved: string;
+}
+
+export interface WorkspacePendingOperation {
+  type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge' | 'clean' | 'refresh-db' | 'rebuild-stack';
+  issueId?: string;
+  startedAt: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  error?: string;
 }
 
 export interface WorkspaceData {
@@ -410,7 +422,7 @@ export interface WorkspaceData {
   stackHealth?: WorkspaceStackHealth;
   hasDocker?: boolean;
   canContainerize?: boolean;
-  pendingOperation?: string | null;
+  pendingOperation?: WorkspacePendingOperation | null;
   location?: 'local' | 'remote';
   isRemote?: boolean;
   vmName?: string;

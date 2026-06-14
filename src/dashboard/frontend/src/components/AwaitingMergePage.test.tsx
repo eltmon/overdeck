@@ -108,6 +108,30 @@ describe('AwaitingMergeRow UAT context', () => {
     expect(screen.getByText('Use the issue description as the manual UAT checklist.')).toBeTruthy();
   });
 
+  it('renders inline UAT stack startup state in the merge row', () => {
+    renderRow({
+      frontendUrl: 'https://feature-pan-1686.pan.localhost',
+      apiUrl: 'https://api-feature-pan-1686.pan.localhost',
+      stackHealthy: false,
+      stackHealth: {
+        healthy: false,
+        reasons: ['api unhealthy: connection refused'],
+        lastObserved: '2026-06-14T19:02:00.000Z',
+      },
+      containers: {
+        postgres: { running: true, uptime: '2m', status: 'running', health: 'healthy', ports: [5432] },
+        api: { running: true, uptime: '42s', status: 'running', health: 'starting', ports: [8080], lastFailureReason: 'connection refused' },
+      },
+    });
+
+    expect(screen.getByTestId('merge-uat-stack-PAN-1686')).toBeTruthy();
+    expect(screen.getByText('UAT stack 1/2 healthy')).toBeTruthy();
+    expect(screen.getByText('api unhealthy: connection refused')).toBeTruthy();
+    expect(screen.getByText('postgres')).toBeTruthy();
+    expect(screen.getByText('api')).toBeTruthy();
+    expect(screen.getByText('starting')).toBeTruthy();
+  });
+
   it('renders expected deliverables, changed files, and omitted-file count', () => {
     renderRow({
       uatContext: {
