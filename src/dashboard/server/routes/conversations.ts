@@ -2127,12 +2127,23 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
               // transcript scan for sessions whose hooks predate the auth fix
               // and so have no mirror state yet.
               const rt = getAgentRuntimeStateSync(conv.tmuxSession);
-              if (rt && rt.state !== 'uninitialized') {
+              if (conv.harness === 'codex' && convSf && existsSync(convSf)) {
+                try {
+                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
+                  isWorking = summary.isWorking;
+                  currentTool = summary.currentTool;
+                } catch {
+                  if (rt && rt.state !== 'uninitialized') {
+                    isWorking = rt.state === 'active';
+                    currentTool = rt.currentTool ?? null;
+                  }
+                }
+              } else if (rt && rt.state !== 'uninitialized') {
                 isWorking = rt.state === 'active';
                 currentTool = rt.currentTool ?? null;
               } else if (convSf && existsSync(convSf)) {
                 try {
-                  const summary = await summarizeConversationActivity(convSf);
+                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
                   isWorking = summary.isWorking;
                   currentTool = summary.currentTool;
                 } catch {
