@@ -127,7 +127,7 @@ export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
-import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
+import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -1986,16 +1986,27 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             // PAN-1048 R4: deacon recovery routes through the role primitive.
             const { spawnReviewRoleForIssue } = await import('./review-agent.js');
             try {
-              await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
-              // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally;
-              // keep local status in sync so this patrol doesn't re-process the issue.
-              status.reviewStatus = 'reviewing';
-              actions.push(
-                `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
-              );
-              console.log(
-                `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
-              );
+              const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
+              if (dispatchResult.gated) {
+                releaseAdvancingSlot();
+                actions.push(`Deferred review re-dispatch for ${issueId} — ${dispatchResult.message}`);
+                console.log(`[deacon] Deferred review re-dispatch for ${issueId}: ${dispatchResult.message}`);
+              } else if (dispatchResult.success) {
+                // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally;
+                // keep local status in sync so this patrol doesn't re-process the issue.
+                status.reviewStatus = 'reviewing';
+                actions.push(
+                  `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
+                );
+                console.log(
+                  `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
+                );
+              } else {
+                actions.push(
+                  `Failed to re-dispatch pending review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`,
+                );
+                console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, dispatchResult.error || dispatchResult.message);
+              }
             } catch (err) {
               actions.push(
                 `Failed to re-dispatch pending review for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
@@ -3060,7 +3071,11 @@ export async function checkPostReviewCommits(): Promise<string[]> {
           branch,
           force: true,
         }));
-        if (dispatchResult.success) {
+        if (dispatchResult.gated) {
+          releaseAdvancingSlot();
+          actions.push(`Deferred post-review re-dispatch for ${issueId} — ${dispatchResult.message}`);
+          console.log(`[deacon] Deferred post-review re-dispatch for ${issueId}: ${dispatchResult.message}`);
+        } else if (dispatchResult.success) {
           actions.push(`Re-dispatched review for ${issueId}`);
           console.log(`[deacon] Re-dispatched review convoy for ${issueId} after post-review commit reset`);
         } else {

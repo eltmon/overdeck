@@ -90,6 +90,25 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveAgentStateSync: vi.fn(),
 }));
 
+const mockSpawnReviewRoleForIssue = vi.fn();
+
+vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
+  spawnReviewRoleForIssue: (...args: unknown[]) => Effect.tryPromise({
+    try: () => Promise.resolve(mockSpawnReviewRoleForIssue(...args)),
+    catch: (cause) => cause as any,
+  }),
+}));
+
+vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
+  resetPatrolDispatchBudget: () => {},
+  tryReserveAdvancingSlot: () => true,
+  canDispatchAdvancing: () => true,
+  releaseAdvancingSlot: () => {},
+  getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
+  countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+  workResumeSlotsAvailable: () => 6,
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
   resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
@@ -128,6 +147,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
   let checkFailedMergeRetry: () => Promise<string[]>;
   let checkPostReviewCommits: () => Promise<string[]>;
   let ciRetryMap: Map<string, { count: number; lastAttempt: number }>;
+  let mockGetReviewStatusSync: (issueId: string) => unknown;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -136,6 +156,7 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
     mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
+    mockSpawnReviewRoleForIssue.mockReset().mockResolvedValue({ success: true, message: 'dispatched' });
     mockIsIssueClosed.mockReset().mockResolvedValue(false);
     // Default: read the real review-status.json so tests that write to it work
     mockLoadReviewStatuses.mockReset().mockImplementation(() => {
@@ -159,6 +180,9 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     checkPostReviewCommits = mod.checkPostReviewCommits;
     ciRetryMap = mod.ciRetryMap;
     ciRetryMap.clear(); // Reset in-memory state for each test
+
+    const reviewStatusMod = await import('../../../src/lib/review-status.js');
+    mockGetReviewStatusSync = reviewStatusMod.getReviewStatusSync as (issueId: string) => unknown;
   });
 
   afterEach(() => {
@@ -341,6 +365,67 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       expect(retryActions[0]).toMatch(/CI failure notification/);
       expect(retryActions[0]).toMatch(/attempt 1\/5/); // count starts at 1, not blocked at 6
       expect(ciRetryMap.get(ISSUE_ID)?.count).toBe(1);
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it('(g) checkPostReviewCommits records Deferred and leaves reviewRetryCount unchanged when spawnReviewRoleForIssue is gated', async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'pan-deacon-ci-retry-gated-'));
+    const workspacePath = join(projectPath, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
+    mkdirSync(workspacePath, { recursive: true });
+    execSync('git init && git commit --allow-empty -m "fix: ci checks"', {
+      cwd: workspacePath,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test.com',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test.com',
+      },
+    });
+
+    try {
+      writeStatusFile({
+        [ISSUE_ID]: {
+          reviewStatus: 'passed',
+          readyForMerge: true,
+          mergeStatus: undefined,
+          reviewedAtCommit: 'deadbeef00000000000000000000000000000000',
+          reviewRetryCount: 0,
+        },
+      });
+      mockResolveProjectFromIssue.mockReturnValue({ projectPath });
+      mockSpawnReviewRoleForIssue.mockResolvedValue({
+        gated: true,
+        success: false,
+        message: 'Review deferred: merge conflict with main must be resolved first',
+      });
+      // After the status reset, checkPostReviewCommits re-reads the status to
+      // decide whether to dispatch. Make it see a pending review so the gated
+      // path is exercised.
+      (mockGetReviewStatusSync as any).mockReturnValue({ reviewStatus: 'pending' });
+
+      const actions = await checkPostReviewCommits();
+
+      expect(actions.length).toBeGreaterThanOrEqual(1);
+      const deferredAction = actions.find((a) => a.includes('Deferred post-review re-dispatch'));
+      expect(deferredAction).toBeDefined();
+      expect(deferredAction).toContain(ISSUE_ID);
+
+      // reviewRetryCount must NOT be incremented on a gated deferral; if it is
+      // reset to 0 by the new-commit path, that is acceptable.
+      const incrementedCalls = mockSetReviewStatus.mock.calls.filter(
+        (call) => call[1] && typeof call[1] === 'object' && (call[1] as any).reviewRetryCount > 0,
+      );
+      expect(incrementedCalls).toHaveLength(0);
+
+      // A successful dispatch was attempted exactly once
+      expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
+      expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ issueId: ISSUE_ID, workspace: workspacePath, force: true }),
+      );
     } finally {
       rmSync(projectPath, { recursive: true, force: true });
     }
