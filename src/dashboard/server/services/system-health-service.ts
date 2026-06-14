@@ -612,8 +612,8 @@ export function readTrackerQuota(cache: CacheService): { exhaustedTrackers: stri
       nowMs - observedMs <= staleMs;
 
     // A recent quota_exhausted poll-health record is live, but so is an ongoing
-    // suspension (e.g. Linear recordLinearExhaustion) even if the stale window
-    // has elapsed and no new poll has been attempted yet.
+    // rate-limit suspension (recorded in the rate_limits table) even if the
+    // poll-health stale window has elapsed and no new poll has been attempted yet.
     if (recentQuotaExhausted || suspendedMs > 0) {
       // GitHub suspension is already surfaced via githubRemaining; avoid a
       // duplicate reason here.
