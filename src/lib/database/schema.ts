@@ -19,7 +19,7 @@ import type { SqliteDatabase } from './driver.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 53;
+export const SCHEMA_VERSION = 54;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -511,6 +511,7 @@ export function initSchema(db: SqliteDatabase): void {
       prUrl            TEXT NOT NULL,
       prNumber         INTEGER,
       projectKey       TEXT NOT NULL,
+      forge            TEXT NOT NULL DEFAULT 'github',
       "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
       scheduledMergeAt TEXT NOT NULL,
       scheduledAt      TEXT NOT NULL,
@@ -1471,6 +1472,13 @@ export function runMigrations(db: SqliteDatabase): void {
   if (currentVersion < 53) {
     try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+  }
+
+  // v53 → v54: add forge column to pending_auto_merges (PAN-1887)
+  if (currentVersion < 54) {
+    try {
+      db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

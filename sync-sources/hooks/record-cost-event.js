@@ -4851,6 +4851,7 @@ function initSchema(db) {
       prUrl            TEXT NOT NULL,
       prNumber         INTEGER,
       projectKey       TEXT NOT NULL,
+      forge            TEXT NOT NULL DEFAULT 'github',
       "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
       scheduledMergeAt TEXT NOT NULL,
       scheduledAt      TEXT NOT NULL,
@@ -5009,7 +5010,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 53`);
+	db.pragma(`user_version = 54`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -5017,7 +5018,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 53) return;
+	if (currentVersion === 54) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5650,7 +5651,10 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
 		} catch {}
 	}
-	db.pragma(`user_version = 53`);
+	if (currentVersion < 54) try {
+		db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
+	} catch {}
+	db.pragma(`user_version = 54`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

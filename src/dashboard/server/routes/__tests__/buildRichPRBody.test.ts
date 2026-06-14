@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { buildRichPRBody } from '../workspaces.js';
 
 vi.mock('../../../../lib/beads-query.js', () => ({
-  queryBeadsForIssue: vi.fn(() => Effect.succeed([])),
+  queryBeadsForIssue: vi.fn(() => Effect.succeed({ beads: [] })),
 }));
 
 import { queryBeadsForIssue } from '../../../../lib/beads-query.js';
@@ -23,7 +23,7 @@ describe('buildRichPRBody', () => {
     projectRoot = join(tmpdir(), `pan-test-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     workspacePath = join(projectRoot, 'workspaces', 'feature-pan-42');
     mkdirSync(workspacePath, { recursive: true });
-    vi.mocked(queryBeadsForIssue).mockReset().mockReturnValue(Effect.succeed([]));
+    vi.mocked(queryBeadsForIssue).mockReset().mockReturnValue(Effect.succeed({ beads: [] }));
   });
 
   afterEach(async () => {
@@ -85,7 +85,7 @@ describe('buildRichPRBody', () => {
       { id: 'bead-1', title: 'pan-42: Fix the bug', status: 'closed', labels: ['pan-42'] },
       { id: 'bead-2', title: 'pan-42: Add the feature', status: 'open', labels: ['pan-42'] },
     ];
-    vi.mocked(queryBeadsForIssue).mockReturnValue(Effect.succeed(beads));
+    vi.mocked(queryBeadsForIssue).mockReturnValue(Effect.succeed({ beads }));
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Implementation Tasks');
@@ -107,7 +107,7 @@ describe('buildRichPRBody', () => {
     await writeMainSpec('PAN-42', plan);
 
     const bead = { id: 'b1', title: 'pan-42: Task one', status: 'closed', labels: ['pan-42'] };
-    vi.mocked(queryBeadsForIssue).mockReturnValue(Effect.succeed([bead]));
+    vi.mocked(queryBeadsForIssue).mockReturnValue(Effect.succeed({ beads: [bead] }));
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Acceptance Criteria');

@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
+import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type BdProcessLockOptions, type RunBdWithRetryOptions } from '../bd-process-lock.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -37,6 +38,7 @@ export interface CreateBeadsResult {
   success: boolean;
   created: string[];
   errors: string[];
+  transientFailure?: unknown;
   /** Map from vBRIEF item ID → created bead ID */
   beadIds: Map<string, string>;
 }
@@ -44,6 +46,23 @@ export interface CreateBeadsResult {
 export interface ClearBeadsResult {
   cleared: number;
   errors: string[];
+  transientFailure?: unknown;
+}
+
+type BdRetryOptions = Omit<RunBdWithRetryOptions, 'workspacePath'>;
+
+type ClearBeadsOptions = BdRetryOptions & {
+  lockAlreadyHeld?: boolean;
+  timeoutMs?: number;
+};
+
+function normalizeClearBeadsOptions(
+  value: number | ClearBeadsOptions = {},
+): Required<Pick<ClearBeadsOptions, 'timeoutMs'>> & ClearBeadsOptions {
+  if (typeof value === 'number') {
+    return { timeoutMs: value };
+  }
+  return { timeoutMs: BD_TIMEOUT_FLOOR_MS, ...value };
 }
 
 function firstLine(value: unknown): string {
@@ -113,15 +132,24 @@ function beadIdsFromList(beads: any[]): string[] {
     .map(id => String(id));
 }
 
-async function listBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number): Promise<any[]> {
-  return retryBd(async () => {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-      { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs }
-    );
-    return parseBdList(stdout);
-  });
+async function listBeadsForIssue(
+  workspacePath: string,
+  issueLabel: string,
+  options: ClearBeadsOptions = {},
+): Promise<any[]> {
+  const { timeoutMs = BD_TIMEOUT_FLOOR_MS, ...retryOptions } = normalizeClearBeadsOptions(options);
+  return runBdWithRetry(
+    `list beads for ${issueLabel}`,
+    async () => {
+      const { stdout } = await execFileAsync(
+        'bd',
+        ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
+        { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs },
+      );
+      return parseBdList(stdout);
+    },
+    { ...retryOptions, workspacePath },
+  );
 }
 
 /**
@@ -141,7 +169,7 @@ async function recoverBeadIdByTitle(
 ): Promise<{ id: string | null; ambiguity: boolean }> {
   let beads: any[];
   try {
-    beads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+    beads = await listBeadsForIssue(workspacePath, issueLabel, { timeoutMs });
   } catch {
     return { id: null, ambiguity: false };
   }
@@ -159,9 +187,14 @@ async function recoverBeadIdByTitle(
   return { id: null, ambiguity: false };
 }
 
+async function defaultBdSleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 interface RetryBdOptions {
   attempts?: number;
   baseDelayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -175,6 +208,7 @@ interface RetryBdOptions {
 export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions = {}): Promise<T> {
   const attempts = options.attempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 500;
+  const sleep = options.sleep ?? defaultBdSleep;
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -184,7 +218,7 @@ export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions =
       lastError = error;
       if (attempt < attempts) {
         const delay = baseDelayMs * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await sleep(delay);
       }
     }
   }
@@ -206,6 +240,7 @@ async function verifyAndRepairDependencyEdges(
   planEdges: VBriefEdge[],
   beadIds: Map<string, string>,
   timeoutMs: number,
+  retryOptions: BdRetryOptions = {},
 ): Promise<{ success: boolean; errors: string[] }> {
   const blockEdges = planEdges.filter(edge => edge.type === 'blocks');
   if (blockEdges.length === 0 || beadIds.size === 0) {
@@ -216,9 +251,13 @@ async function verifyAndRepairDependencyEdges(
 
   let actualDeps: any[];
   try {
-    const { stdout } = await retryBd(() => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
-      encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-    }));
+    const { stdout } = await runBdWithRetry(
+      `dep list for ${createdBeadIds.length} beads`,
+      () => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+      }),
+      { ...retryOptions, workspacePath },
+    );
     actualDeps = parseBdList(stdout);
   } catch (error: any) {
     return { success: false, errors: [`dep list failed: ${execFileErrorMessage(error)}`] };
@@ -250,9 +289,13 @@ async function verifyAndRepairDependencyEdges(
 
   for (const repair of missingRepairs) {
     try {
-      await retryBd(() => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-      }));
+      await runBdWithRetry(
+        `dep add ${repair.beadTo} ${repair.beadFrom}`,
+        () => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
+          encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+        }),
+        { ...retryOptions, workspacePath },
+      );
       actualDepSet.add(`${repair.beadTo}|${repair.beadFrom}`);
     } catch (error: any) {
       errors.push(`Failed to repair dependency edge ${repair.from} -> ${repair.to}: ${execFileErrorMessage(error)}`);
@@ -294,19 +337,34 @@ async function deleteBead(workspacePath: string, id: string, timeoutMs: number):
   }
 }
 
-export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
+export async function clearBeadsForIssue(
+  workspacePath: string,
+  issueLabel: string,
+  timeoutMsOrOptions: number | ClearBeadsOptions = {},
+): Promise<ClearBeadsResult> {
+  const options = normalizeClearBeadsOptions(timeoutMsOrOptions);
+  const { timeoutMs = BD_TIMEOUT_FLOOR_MS } = options;
+
   let existingBeads: any[];
   try {
-    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
-    return { cleared: 0, errors: [`list failed: ${execFileErrorMessage(error)}`] };
+    return {
+      cleared: 0,
+      errors: [`list failed: ${execFileErrorMessage(error)}`],
+      transientFailure: error instanceof BdTransientFailure ? error : undefined,
+    };
   }
 
   const errors: string[] = [];
   let cleared = 0;
   for (const id of beadIdsFromList(existingBeads)) {
     try {
-      await retryBd(() => deleteBead(workspacePath, id, timeoutMs));
+      await runBdWithRetry(
+        `delete bead ${id} for ${issueLabel}`,
+        () => deleteBead(workspacePath, id, timeoutMs),
+        { ...options, workspacePath },
+      );
       cleared++;
     } catch (error: any) {
       errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
@@ -315,10 +373,14 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
 
   let residualBeads: any[];
   try {
-    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
     errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
-    return { cleared, errors };
+    return {
+      cleared,
+      errors,
+      transientFailure: error instanceof BdTransientFailure ? error : undefined,
+    };
   }
 
   const residualIds = beadIdsFromList(residualBeads);
@@ -341,7 +403,7 @@ function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefI
   return { requiresInspection, inspectionDepth };
 }
 
-export interface CreateBeadsOptions {
+export interface CreateBeadsOptions extends BdRetryOptions {
   /**
    * Exact plan file to materialize beads from. Used by `pan plan finalize` so
    * a re-plan creates beads from the workspace draft being finalized rather
@@ -349,13 +411,21 @@ export interface CreateBeadsOptions {
    * resolves main-first, which is correct everywhere EXCEPT mid-finalize.
    */
   planPath?: string;
+  /**
+   * Optional lock acquisition tuning. Tests pass fake-timer-compatible sleep
+   * and now so the cross-process lock advances deterministically.
+   */
+  lockOptions?: BdProcessLockOptions;
 }
 
 async function createBeadsFromVBriefPromise(
   workspacePath: string,
   options: CreateBeadsOptions = {},
 ): Promise<CreateBeadsResult> {
-  return withBdMutexPromise(async () => {
+  const { planPath, lockOptions, ...retryOptions } = options;
+  return withBdProcessLock(
+    'create beads from vBRIEF',
+    async () => withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -400,7 +470,7 @@ async function createBeadsFromVBriefPromise(
   }
 
   // Read the vBRIEF plan — must be spec-compliant format
-  const doc = options.planPath ? readPlanSync(options.planPath) : readWorkspacePlanSync(workspacePath);
+  const doc = planPath ? readPlanSync(planPath) : readWorkspacePlanSync(workspacePath);
   if (!doc) {
     return { success: false, created: [], errors: ['No plan.vbrief.json found in workspace'], beadIds };
   }
@@ -418,7 +488,7 @@ async function createBeadsFromVBriefPromise(
   try {
     await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-    }));
+    }), { sleep: retryOptions.sleep });
   } catch (connectErr: any) {
     const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
     const firstLine = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
@@ -442,7 +512,7 @@ async function createBeadsFromVBriefPromise(
     try {
       await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
         encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-      }));
+      }), { sleep: retryOptions.sleep });
     } catch (retryErr: any) {
       if (!redirectExists && !existsSync(mainBeadsDir)) {
         const prefix = deriveProjectPrefix(workspacePath);
@@ -473,12 +543,16 @@ async function createBeadsFromVBriefPromise(
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, bdTimeoutMs);
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, {
+    ...retryOptions,
+    timeoutMs: bdTimeoutMs,
+  });
   if (clearResult.errors.length > 0) {
     return {
       success: false,
       created: [],
       errors: clearResult.errors.map(error => `dedup failed: ${error}`),
+      transientFailure: clearResult.transientFailure,
       beadIds: new Map(),
     };
   }
@@ -639,11 +713,12 @@ async function createBeadsFromVBriefPromise(
     planEdges,
     beadIds,
     bdTimeoutMs,
+    retryOptions,
   );
   errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
-  });
+  }), { workspacePath, ...lockOptions });
 }
 
 /**
