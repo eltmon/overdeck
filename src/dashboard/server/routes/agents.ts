@@ -3026,6 +3026,7 @@ const postAgentsRoute = HttpRouter.add(
         workspace: workspaceMetadata,
         prompt: agentPrompt,
         model: spawnModel,
+        tier: fly.getResiliencyTier(),
       }));
 
       // Write canonical state.json so activeRoleRunExists() sees this remote

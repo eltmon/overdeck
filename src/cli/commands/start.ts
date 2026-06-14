@@ -396,6 +396,7 @@ async function handleRemoteWorkspace(
       // until the Fly worker image bundles the pi binary — tracked separately).
       model: options.model,
       prompt,
+      tier: fly.getResiliencyTier(),
     });
 
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
