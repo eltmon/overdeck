@@ -3,7 +3,7 @@ import { Terminal, type ITheme } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, SunMoon } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
@@ -114,11 +114,19 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const effectiveIsDark = themeOverride === 'auto' ? isDark : themeOverride === 'dark';
   const effectiveIsDarkRef = useRef(effectiveIsDark);
   effectiveIsDarkRef.current = effectiveIsDark;
-  const toggleTheme = useCallback(() => {
-    const next = effectiveIsDarkRef.current ? 'light' : 'dark';
-    localStorage.setItem(themeOverrideKey, next);
-    setThemeOverride(next);
-  }, [themeOverrideKey]);
+  // Cycle auto → light → dark → auto. Without the 'auto' step the toggle was a
+  // one-way trip out of follow mode — once clicked, a pane could never
+  // auto-follow the dashboard again. Pure updater so rapid clicks compound
+  // correctly; persistence is handled by the effect below.
+  const cycleTheme = useCallback(() => {
+    setThemeOverride((prev) => (prev === 'auto' ? 'light' : prev === 'light' ? 'dark' : 'auto'));
+  }, []);
+  // Persist the override, or clear it for 'auto' so the pane resumes following
+  // the dashboard theme.
+  useEffect(() => {
+    if (themeOverride === 'auto') localStorage.removeItem(themeOverrideKey);
+    else localStorage.setItem(themeOverrideKey, themeOverride);
+  }, [themeOverride, themeOverrideKey]);
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -742,14 +750,18 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           the settings gear is hidden when embedded (the host owns the chrome). */}
       <div className="absolute top-2 right-2 z-10 flex gap-2">
         <button
-          onClick={toggleTheme}
+          onClick={cycleTheme}
           className="p-1.5 rounded bg-card/80 hover:bg-accent/80 text-muted-foreground transition-colors"
           title={`Terminal theme: ${
-            themeOverride === 'auto' ? `auto (${isDark ? 'dark' : 'light'})` : themeOverride
-          } — click to ${effectiveIsDark ? 'lighten' : 'darken'} this pane`}
-          aria-label="Toggle terminal light/dark theme"
+            themeOverride === 'auto' ? `auto (following ${isDark ? 'dark' : 'light'})` : themeOverride
+          } — click to switch to ${
+            themeOverride === 'auto' ? 'light' : themeOverride === 'light' ? 'dark' : 'auto'
+          }`}
+          aria-label="Cycle terminal theme: auto, light, or dark"
         >
-          {effectiveIsDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {themeOverride === 'auto'
+            ? <SunMoon className="w-4 h-4" />
+            : effectiveIsDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
         {!embedded && (
           <button
