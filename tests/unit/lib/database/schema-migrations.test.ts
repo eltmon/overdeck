@@ -358,4 +358,50 @@ describe('schema migrations', () => {
     expect(forkRetryCount).toMatchObject({ notnull: 1, dflt_value: '0' });
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
+
+  // ── v53 → v54: forge column on pending_auto_merges (PAN-1887) ──────────────
+
+  it('fresh initSchema includes forge column on pending_auto_merges', () => {
+    initSchema(db);
+
+    const cols = db.pragma('table_info(pending_auto_merges)') as Array<{ name: string; notnull: number; dflt_value: string | null }>;
+    const forge = cols.find((col) => col.name === 'forge');
+
+    expect(forge).toBeDefined();
+    expect(forge).toMatchObject({ notnull: 1, dflt_value: "'github'" });
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v53 → v54: adds forge column to pending_auto_merges idempotently', () => {
+    initSchema(db);
+    db.pragma('user_version = 53');
+    db.exec(`
+      CREATE TABLE pending_auto_merges_v53 AS SELECT
+        id, issueId, prUrl, prNumber, projectKey, "status",
+        scheduledMergeAt, scheduledAt, mergedAt, failureReason, cancelledAt, cancelledBy
+      FROM pending_auto_merges;
+      DROP TABLE pending_auto_merges;
+      ALTER TABLE pending_auto_merges_v53 RENAME TO pending_auto_merges;
+    `);
+
+    db.prepare(`
+      INSERT INTO pending_auto_merges (issueId, prUrl, prNumber, projectKey, "status", scheduledMergeAt, scheduledAt)
+      VALUES ('PAN-MIGRATE-AM', 'https://github.com/eltmon/panopticon-cli/pull/1', 1, 'panopticon-cli', 'pending', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+    `).run();
+
+    const before = db.pragma('table_info(pending_auto_merges)') as Array<{ name: string }>;
+    expect(before.map((col) => col.name)).not.toContain('forge');
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const after = db.pragma('table_info(pending_auto_merges)') as Array<{ name: string; notnull: number; dflt_value: string | null }>;
+    const forge = after.find((col) => col.name === 'forge');
+    expect(forge).toBeDefined();
+    expect(forge).toMatchObject({ notnull: 1, dflt_value: "'github'" });
+
+    const row = db.prepare(`SELECT forge FROM pending_auto_merges WHERE issueId = ?`).get('PAN-MIGRATE-AM') as { forge: string };
+    expect(row.forge).toBe('github');
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
 });
