@@ -179,7 +179,7 @@ export async function resolveCodexRolloutPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
   const codexHome = join(agentDir, 'codex-home');
   if (!(await pathExists(codexHome))) return null;
