@@ -47,6 +47,10 @@ vi.mock('../../../lib/cloister/work-agent-prompt.js', () => ({
   readBeadsTasks: vi.fn(async () => []),
 }));
 
+vi.mock('../../../lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/config.js')>()),
+}));
+
 describe('pan start sync-main conflict (PAN-1872)', () => {
   let tmpDir: string;
   let exitSpy: ReturnType<typeof vi.spyOn>;

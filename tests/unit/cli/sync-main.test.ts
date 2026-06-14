@@ -5,7 +5,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock config to return a predictable API URL
-vi.mock('../../../src/lib/config.js', () => ({
+vi.mock('../../../src/lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../src/lib/config.js')>()),
   getDashboardApiUrl: vi.fn(() => 'http://localhost:3011'),
   getDashboardApiUrlSync: vi.fn(() => 'http://localhost:3011'),
 }));
