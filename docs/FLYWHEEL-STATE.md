@@ -2321,7 +2321,7 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
 **KEY FINDING — the "16 merge gate" is a CLOSE-OUT gate, not a merge gate:**
 - The 16 "awaiting UAT" issues are **already merged to main** (`verifying_on_main`, tracker still OPEN). Auto-merge **cannot** act on them — they have no open PR / are not readyForMerge.
 - The ACTUAL merge gate (in_review issues that are review+test-passed-and-not-merged) is **currently EMPTY**: probed `/api/flywheel/auto-merge/schedule {issueId}` for PAN-1491/1242/1629 → all `"review status is not readyForMerge"`. The endpoint self-gates on `isAutoMergeEligible` + `readyForMerge` + PR URL, so it's safe to probe — ineligible → 422/422, never a premature merge.
-- **Auto-merge mechanics (for future ticks):** `POST /api/flywheel/auto-merge/schedule` with header `Origin: http://localhost:3011` and body `{"issueId":"PAN-XXXX"}`. Checks: shouldHoldForUat (per-issue autoMerge → project default → global require-UAT; global now false) → not paused → flywheel running → isAutoMergeEligible → readyForMerge → PR URL → schedules merge. Single issue per call. Review-status store: `~/.panopticon/review-status.json` (sparse — live status is in the read model via `getReviewStatusSync`).
+- **Auto-merge mechanics (for future ticks):** `POST /api/flywheel/auto-merge/schedule` with header `Origin: http://localhost:3011` and body `{"issueId":"PAN-XXXX"}`. Checks: shouldHoldForUat (per-issue autoMerge → project default → global require-UAT; global now false) → not paused → flywheel running → isAutoMergeEligible → readyForMerge → PR URL → schedules merge. Single issue per call. Review-status truth is SQLite (`review_status` in `panopticon.db`), surfaced through CLI/API/read-model helpers.
 - **Clearing the 16 needs CLOSE-OUT** (`pan close` / dashboard Close Out) — which is forbidden to the orchestrator AND semi-destructive (closes tracker + tears down workspace/branches per close_out config) AND was not one of the three named authorizations. **Surfaced as the single genuine blocker** with default recommendation YES. Also surfaced: should UAT-off imply auto-close-out (substrate gap)?
 - **0 bd-lock errors across 11 launches.** RAM 29-31/64 GB, swap 3.7/8.2. 9 productive agents + 2 review convoys active. Main `69040f19c`.
 
@@ -2714,39 +2714,33 @@ This is exactly PAN-1879: re-enabling auto-resume needs a restart WITH resume on
 up/dev without --no-resume, or the PAN-1879 explicit flag), not just the deacon process up.
 So the deacon patrols but won't auto-resume the stalled set.
 
-### review-status.json is UNCOMMITTED runtime state — and it was lost for the 11 in-review
+### Correction: review-status.json is legacy scratch; SQLite/API is pipeline truth
 
-`src/lib/review-status.ts:153` → `DEFAULT_STATUS_FILE = join(homedir(), '.panopticon',
-'review-status.json')`. `~/.panopticon` is NOT a git repo, so review-status.json is NEVER
-committed and has no version history / no rollback. At tick 4 the file was 336 bytes with
-NO entries for any of the 11 in-review issues (1827,1817,1775,1765,1696,1641,1629,1614,
-1498,1491,1242) despite their GitHub in-review labels. The pipeline LOST their review
-state (likely a restart/reset or #1877's live-file mutation), and because the store isn't
-version-controlled there's nothing to restore from. **Consequence:** these 11 are stranded
-beyond simple resume — the deacon's checkOrphanedReviewStatuses has no entry to act on, so
-even with resume re-enabled they may need `pan review restart <id>`/re-entry per issue
-(flywheel-forbidden). The GitHub label is the only surviving signal of where they were.
+The tick-4 diagnosis above was wrong. `~/.panopticon/review-status.json` is legacy/test-only
+scratch; the authoritative review/test/merge state is SQLite (`review_status` in
+`~/.panopticon/panopticon.db`) surfaced through `pan review pending --ready`,
+`GET /api/flywheel/merge-blockers`, and dashboard review snapshots. The 11 in-review issues
+were present in SQLite and blocked by real reasons (`merge_conflict`, `failing_checks`, or
+review blocked), not stranded by a wiped JSON file. Future ticks must never read
+`review-status.json` to judge pipeline state.
 
 ### Held launches (correct, not passive)
 
-0 live agents at tick 4. No productive launch exists: in-review = review-state-lost +
-resume-gated; in-progress (1845/1491) resume-gated; nothing readyForMerge; auto_pickup
-_backlog=false forbids fresh backlog. Launching into a resume-gated, review-state-lost
-pipeline won't progress. Productive output this tick = 3 close-outs + the stranded-state
-diagnosis. Recovery runs through operator: (a) restart WITH resume, (b) re-enter the 11
-stranded reviews.
+0 live agents at tick 4. No productive launch exists: in-review = SQLite-recorded blockers +
+resume-gated; in-progress (1845/1491) resume-gated; nothing readyForMerge; auto_pickup_backlog=false
+forbids fresh backlog. Launching into a resume-gated, blocked pipeline won't
+progress. Productive output this tick = 3 close-outs + the blocker diagnosis. Recovery runs
+through operator: (a) restart WITH resume, (b) unblock or re-enter the 11 blocked reviews.
 
 ## RUN-34 tick 5 — steady-state hold; filed PAN-1883 (review-status durability)
 
 No change from tick 4: deacon Running but boot --no-resume still active (160 gates),
-0 live agents, same 11 in-review stranded, main green (dcb24daa0), nothing to close
+0 live agents, same 11 in-review blocked in SQLite, main green (dcb24daa0), nothing to close
 out, nothing readyForMerge. Pipeline remains frozen on the operator's restart-with-
-resume + per-issue review re-entry. Productive action this tick = filed **PAN-1883**
-(bug,substrate-improvement): review-status.json is uncommitted/unversioned single-file
-state at ~/.panopticon with no backup or reconstruct path, so the wipe that stranded
-the 11 in-review issues had no recovery — proposed fix = atomic writes + refuse-empty-
-overwrite + reconstruct-on-boot from GitHub labels/PRs. Held launches (correct): no
-productive launch into a resume-gated/review-state-lost pipeline; auto_pickup_backlog
+resume + per-issue unblock/review re-entry. Productive action this tick = filed **PAN-1883**
+(bug,substrate-improvement): the Flywheel misdiagnosed pipeline state by reading legacy
+`review-status.json` instead of the SQLite-backed CLI/API surfaces. Held launches (correct): no
+productive launch into a resume-gated/blocked pipeline; auto_pickup_backlog
 =false forbids fresh backlog.
 
 ### Memory is NOT the limiter this run (contrast RUN-33)

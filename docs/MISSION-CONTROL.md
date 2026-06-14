@@ -23,7 +23,7 @@ Projects appear as collapsible folders. Each active feature shows:
 | Issue ID | PAN-123, MIN-456, etc. |
 | State label | Idle, Planning, In Progress, In Review, Done, Has Context, Suspended |
 
-State labels are computed from multiple signals: tmux session presence, heartbeat freshness (10-minute threshold), review/test status from the central `review-status.json`, and agent state files.
+State labels are computed from multiple signals: tmux session presence, heartbeat freshness (10-minute threshold), review/test status from SQLite (`review_status` in `panopticon.db`), and agent state files.
 
 ### Activity View
 

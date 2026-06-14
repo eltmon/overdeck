@@ -326,6 +326,7 @@ review
   .command('pending')
   .description('List completed work awaiting review')
   .option('--ready', 'List issues ready for merge (review+test green, not merged) regardless of origin')
+  .option('--blocked', 'List issues blocked in review/test/merge from the SQLite review-status store')
   .action(pendingCommand);
 
 review

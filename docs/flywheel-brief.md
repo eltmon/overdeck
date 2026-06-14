@@ -131,6 +131,8 @@ Never merge without explicit human approval. Do not invoke the merge flow yourse
 
 ## Status vs State
 
+Pipeline truth lives in SQLite and is surfaced through the CLI/API, not raw files. Use `pan review pending --ready`, `GET /api/flywheel/merge-blockers`, and dashboard review snapshots for review/test/merge state. `~/.panopticon/review-status.json` is legacy/test-only scratch; an empty or stale file means nothing and must never be used to judge pipeline state.
+
 These are different artifacts. Do not conflate them.
 
 - **Status** is the live snapshot of the current run. Emit it every tick via `pan flywheel emit-status`. It is structured JSON validated against `FlywheelStatus`. The dashboard renders the latest snapshot live. Status is ephemeral — only the latest snapshot matters.
