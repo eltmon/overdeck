@@ -3717,6 +3717,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     if (gate.gated) {
       const message = gate.reason ?? `Review deferred: merge conflict with main must be resolved first`;
       setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
+      completePendingOperation(issueId, message);
       return jsonResponse({
         success: false,
         gated: true,
@@ -4294,7 +4295,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         // PAN-511: set 'reviewing' only after spawn succeeds. spawnReviewRoleForIssue
         // already flips reviewStatus internally, but we keep this redundant write
         // to preserve the original ordering invariant for downstream readers.
-        setReviewStatus(issueId, { reviewStatus: 'reviewing' });
+        // Increment autoRequeueCount only on a real dispatch.
+        setReviewStatus(issueId, { reviewStatus: 'reviewing', autoRequeueCount: newCount });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
           timestamp: new Date().toISOString(),
@@ -4312,13 +4314,15 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
           reviewNotes: result.message,
+          autoRequeueCount: currentCount,
         });
         return jsonResponse(
           {
             success: false,
             gated: true,
             message: result.message,
-            autoRequeueCount: newCount,
+            autoRequeueCount: currentCount,
+            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
           },
           { status: 409 }
         );
@@ -4329,12 +4333,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
           reviewNotes: `Dispatch failed: ${result.error || result.message}`,
+          autoRequeueCount: currentCount,
         });
         return jsonResponse(
           {
             success: false,
             error: result.error || 'Failed to dispatch review',
-            autoRequeueCount: newCount,
+            autoRequeueCount: currentCount,
+            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
           },
           { status: 500 }
         );

@@ -68,6 +68,7 @@ vi.mock('../../../src/lib/cloister/concurrency.js', () => ({
   resetPatrolDispatchBudget: () => {},
   tryReserveAdvancingSlot: () => true,
   canDispatchAdvancing: () => true,
+  releaseAdvancingSlot: () => {},
   getConcurrencyLimits: () => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 }),
   countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
   workResumeSlotsAvailable: () => 6,
@@ -625,5 +626,56 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(mockSetReviewStatus).toHaveBeenCalled();
     // The call must include testStatus so we know it's a real mutation, not a no-op
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({ testStatus: 'testing' }));
+  });
+
+  it('repeated patrol ticks against a gated issue do not trip the review-infra breaker', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
+    const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
+    const agentDir = join(getPanopticonHome(), 'agents', agentId);
+    const completedProcessedPath = join(agentDir, 'completed.processed');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(completedProcessedPath, '', 'utf-8');
+
+    mockLoadReviewStatuses.mockReturnValue({
+      [ISSUE_ID]: {
+        issueId: ISSUE_ID,
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1',
+        readyForMerge: false,
+        reviewRetryCount: 0,
+        history: [],
+      },
+    });
+
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockSpawnReviewRoleForIssue.mockResolvedValue({
+      gated: true,
+      success: false,
+      message: 'Review deferred: merge conflict with main must be resolved first',
+    });
+
+    const THRESHOLD = 3;
+    const TICKS = THRESHOLD + 2;
+    for (let i = 0; i < TICKS; i += 1) {
+      const actions = await checkOrphanedReviewStatuses();
+      expect(actions).toHaveLength(1);
+      expect(actions[0]).toContain('Deferred review re-dispatch');
+      expect(actions[0]).toContain(ISSUE_ID);
+    }
+
+    // Gated deferrals must never increment reviewRetryCount or mark the issue stuck
+    const retryCalls = mockSetReviewStatus.mock.calls.filter(
+      (call) => call[1] && typeof call[1] === 'object' && 'reviewRetryCount' in call[1],
+    );
+    expect(retryCalls).toHaveLength(0);
+    const stuckCalls = mockSetReviewStatus.mock.calls.filter(
+      (call) => call[1] && typeof call[1] === 'object' && call[1].reviewStatus === 'stuck',
+    );
+    expect(stuckCalls).toHaveLength(0);
+
+    // Dispatch was attempted on every tick
+    expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledTimes(TICKS);
   });
 });
