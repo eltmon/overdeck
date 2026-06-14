@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // default 5s timeout even though each assertion path is fast once loaded.
 vi.setConfig({ testTimeout: 20_000 });
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 let panopticonHome: string;
@@ -78,7 +78,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
 }));
 
 function conversationDir(session: string): string {
-  return join(homedir(), '.panopticon', 'conversations', session);
+  return join(panopticonHome, 'conversations', session);
 }
 
 function launcherFor(session: string): string {
@@ -87,7 +87,6 @@ function launcherFor(session: string): string {
 
 function cleanupSession(session: string): void {
   rmSync(conversationDir(session), { recursive: true, force: true });
-  rmSync(join(homedir(), '.panopticon', 'agents', session), { recursive: true, force: true });
   rmSync(join(panopticonHome, 'agents', session), { recursive: true, force: true });
   rmSync(join(panopticonHome, 'sockets', `pty-${session}.sock`), { force: true });
 }
@@ -153,7 +152,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-codex-supervisor-test');
     expect(launcher).toContain("export PANOPTICON_AGENT_ID='conv-codex-supervisor-test'");
-    expect(launcher).toContain(`export CODEX_HOME='${join(homedir(), '.panopticon', 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
+    expect(launcher).toContain(`export CODEX_HOME='${join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' codex");
     expect(existsSync(join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(true);
