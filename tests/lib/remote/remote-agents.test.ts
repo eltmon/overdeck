@@ -34,6 +34,7 @@ import {
   installEphemeralWatchdog,
   refreshHostHeartbeatForEphemeralVms,
   checkRemoteSpendCap,
+  checkRemoteDurabilityPreflight,
 } from '../../../src/lib/remote/remote-agents.js';
 
 describe('generatePushDaemonScript', () => {
@@ -263,6 +264,41 @@ describe('checkRemoteSpendCap', () => {
     );
     expect(result.allowed).toBe(false);
     expect(result.current).toBe(1);
+  });
+});
+
+describe('checkRemoteDurabilityPreflight', () => {
+  it('passes for ephemeral tier without checking volume', async () => {
+    const provider = {
+      ssh: vi.fn(() => Effect.succeed({ stdout: '', stderr: '', exitCode: 0 })),
+    } as unknown as import('../../../src/lib/remote/fly-provider.js').FlyProvider;
+
+    const result = await checkRemoteDurabilityPreflight(provider, 'vm-eph', 'ephemeral');
+    expect(result.ok).toBe(true);
+    expect(provider.ssh).not.toHaveBeenCalled();
+  });
+
+  it('passes for durable tier when /workspace is mounted', async () => {
+    const provider = {
+      ssh: vi.fn(() => Effect.succeed({ stdout: 'mounted\n', stderr: '', exitCode: 0 })),
+    } as unknown as import('../../../src/lib/remote/fly-provider.js').FlyProvider;
+
+    const result = await checkRemoteDurabilityPreflight(provider, 'vm-dur', 'durable');
+    expect(result.ok).toBe(true);
+    expect(provider.ssh).toHaveBeenCalledTimes(1);
+    expect(provider.ssh).toHaveBeenCalledWith('vm-dur', expect.stringContaining('/workspace'));
+  });
+
+  it('fails for durable tier when /workspace is not mounted', async () => {
+    const provider = {
+      ssh: vi.fn(() => Effect.succeed({ stdout: 'missing\n', stderr: '', exitCode: 0 })),
+    } as unknown as import('../../../src/lib/remote/fly-provider.js').FlyProvider;
+
+    const result = await checkRemoteDurabilityPreflight(provider, 'vm-dur', 'durable');
+    expect(result.ok).toBe(false);
+    expect(result.missing).toContain('volume');
+    expect(result.message).toContain('volume');
+    expect(result.message).toContain('Durable remote work requires a Fly volume');
   });
 });
 

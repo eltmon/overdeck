@@ -425,6 +425,50 @@ export function checkRemoteSpendCap(
   return { allowed: true, current: activeStates.length, cap };
 }
 
+export interface RemoteDurabilityPreflightResult {
+  ok: boolean;
+  missing: Array<'push_daemon' | 'volume'>;
+  message?: string;
+}
+
+/**
+ * Verify that the remote machine satisfies the durability requirements for the
+ * chosen tier before the work agent starts. Durable tier requires a persistent
+ * volume mounted at /workspace; the continuous push daemon is wired by the
+ * spawn path itself, so this gate focuses on machine-level guarantees.
+ */
+export async function checkRemoteDurabilityPreflight(
+  provider: FlyProvider,
+  vmName: string,
+  tier: 'ephemeral' | 'durable',
+): Promise<RemoteDurabilityPreflightResult> {
+  const missing: Array<'push_daemon' | 'volume'> = [];
+
+  if (tier === 'durable') {
+    const mountCheck = await runSsh(
+      provider,
+      vmName,
+      "mount | grep -q ' on /workspace ' && echo mounted || echo missing",
+    );
+    if (mountCheck.stdout.trim() !== 'mounted') {
+      missing.push('volume');
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      missing,
+      message:
+        `Durability preflight failed for ${tier} tier on ${vmName}: missing ${missing.join(', ')}. ` +
+        `Durable remote work requires a Fly volume mounted at /workspace. ` +
+        `Destroy this machine and re-create it with the durable tier, or spawn as ephemeral.`,
+    };
+  }
+
+  return { ok: true, missing: [] };
+}
+
 /**
  * Check if remote agent session exists
  */
@@ -536,6 +580,13 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   // Check if agent already exists
   if (await remoteSessionExists(fly, vmName, agentId)) {
     throw new Error(`Agent ${agentId} already running on ${vmName}. Use 'pan tell' to message it.`);
+  }
+
+  // Durability preflight: durable-tier machines must have a persistent volume
+  // mounted at /workspace before we run work that expects to survive restarts.
+  const durability = await checkRemoteDurabilityPreflight(fly, vmName, tier);
+  if (!durability.ok) {
+    throw new Error(durability.message);
   }
 
   // Create agent state
