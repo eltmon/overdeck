@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import { useWorkspaceQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
+import { UatStackStatus } from '../../CommandDeck/UatStackStatus'
 import { CockpitCard } from './CockpitCard'
 
 function KV({ k, children }: { k: string; children: React.ReactNode }) {
@@ -37,10 +38,14 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
     if (ws.frontendUrl) services.push({ name: 'Frontend', url: ws.frontendUrl })
     if (ws.apiUrl) services.push({ name: 'API', url: ws.apiUrl })
   }
-  const containerCount = ws.containers ? Object.keys(ws.containers).length : 0
-  const runningCount = ws.containers
-    ? Object.values(ws.containers).filter((c) => c?.status === 'running').length
-    : 0
+  const pendingOperation = ws.pendingOperation && typeof ws.pendingOperation === 'object'
+    ? ws.pendingOperation
+    : null
+  const stackPending = pendingOperation?.status === 'running' && (
+    pendingOperation.type === 'containerize' ||
+    pendingOperation.type === 'start' ||
+    pendingOperation.type === 'rebuild-stack'
+  )
 
   const wsActions = ['syncMain', 'createWorkspace']
     .map((key) => actions.all.find((v) => v.action.key === key))
@@ -72,13 +77,20 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
           <span className="text-muted-foreground">none</span>
         )}
       </KV>
-      <KV k="Containers">
-        {containerCount > 0 ? (
-          <span>{runningCount}/{containerCount} running</span>
-        ) : (
-          <span className="text-muted-foreground">none</span>
+      <div className="border-b border-border py-2 last:border-b-0">
+        <div className="mb-2 text-[12px] text-muted-foreground">UAT environment</div>
+        <UatStackStatus
+          containers={ws.containers}
+          stackHealth={ws.stackHealth}
+          frontendUrl={ws.frontendUrl}
+          apiUrl={ws.apiUrl}
+          pending={stackPending}
+          density="full"
+        />
+        {!ws.containers && !ws.stackHealth && (
+          <span className="text-[12px] text-muted-foreground">No container state available.</span>
         )}
-      </KV>
+      </div>
       {ws.agentSessionId && (
         <KV k="Attach">
           <span className="font-mono text-[11px] text-muted-foreground" title={`tmux -L panopticon attach -t ${ws.agentSessionId}`}>

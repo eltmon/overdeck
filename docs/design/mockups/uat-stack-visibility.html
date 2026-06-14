@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UAT Stack Visibility Mockups</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --panel-2: #f8fafc;
+      --ink: #202534;
+      --muted: #697386;
+      --line: #dde3ee;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --red: #dc2626;
+      --red-soft: #fee2e2;
+      --shadow: 0 18px 50px rgba(30, 41, 59, 0.14);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 24px; letter-spacing: 0; }
+    h2 { font-size: 15px; margin-bottom: 10px; }
+    h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    p { color: var(--muted); line-height: 1.45; }
+
+    .intro {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(340px, 0.92fr) minmax(520px, 1.4fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .mock {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .mock-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .mock-body { padding: 14px; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .tab {
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      color: var(--muted);
+      background: #fff;
+      font-size: 11px;
+    }
+    .tab.active { background: #eef2ff; color: #26304c; border-color: #cfd7f7; }
+
+    .tree-project {
+      font-weight: 700;
+      color: #30374a;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .issue-row {
+      border-left: 3px solid #f59e0b;
+      background: #e9eefc;
+      padding: 8px 8px 9px 10px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .issue-title {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      min-width: 0;
+    }
+    .issue-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #566071; white-space: nowrap; }
+    .issue-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .badges, .inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .badge {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 11px;
+      line-height: 16px;
+      color: #475569;
+      background: rgba(255,255,255,0.72);
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      min-height: 20px;
+    }
+    .badge.green { background: var(--green-soft); color: #137333; border-color: #bbf7d0; }
+    .badge.amber { background: var(--amber-soft); color: #92400e; border-color: #fde68a; }
+    .badge.blue { background: var(--blue-soft); color: #1d4ed8; border-color: #bfdbfe; }
+    .badge.red { background: var(--red-soft); color: #991b1b; border-color: #fecaca; }
+
+    .pipeline {
+      margin-left: auto;
+      display: inline-grid;
+      grid-template-columns: repeat(5, 11px);
+      gap: 3px;
+    }
+    .pipeline i {
+      height: 4px;
+      border-radius: 999px;
+      background: #bcc6d7;
+    }
+    .pipeline .done { background: var(--green); }
+    .pipeline .active { background: var(--amber); }
+
+    .resource-row {
+      margin-left: 22px;
+      display: grid;
+      gap: 5px;
+      color: #6b7280;
+      font-size: 12px;
+    }
+    .tree-resource {
+      display: grid;
+      grid-template-columns: 18px 1fr auto auto;
+      gap: 7px;
+      align-items: center;
+      min-height: 22px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #94a3b8;
+      display: inline-block;
+    }
+    .dot.green { background: var(--green); }
+    .dot.amber { background: var(--amber); }
+    .dot.blue { background: var(--blue); }
+    .dot.red { background: var(--red); }
+    .spin {
+      width: 10px;
+      height: 10px;
+      border: 2px solid #f6c56b;
+      border-top-color: var(--amber);
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .slideout {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      min-height: 640px;
+    }
+    .crumbs { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .detail-title { font-size: 20px; line-height: 1.25; margin: 8px 0; max-width: 520px; }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      min-width: 260px;
+    }
+
+    button, .button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      text-decoration: none;
+    }
+    .button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .button.warn { background: var(--amber-soft); color: #92400e; border-color: #fcd34d; }
+    .button.disabled { color: #94a3b8; background: #f8fafc; }
+
+    .gate-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .gate {
+      border-bottom: 4px solid var(--green);
+      padding-bottom: 8px;
+      color: #30374a;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .body-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 14px;
+      padding: 14px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+      display: grid;
+      gap: 10px;
+    }
+
+    .stack-summary {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 9px;
+      padding: 9px;
+      background: var(--amber-soft);
+      border: 1px solid #fcd34d;
+      border-radius: 7px;
+    }
+
+    .service-list { display: grid; gap: 7px; }
+    .service {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+    }
+    .service-name { font-weight: 650; }
+    .service-meta { color: var(--muted); font-size: 11px; }
+
+    .timeline {
+      display: grid;
+      gap: 7px;
+      font-size: 12px;
+    }
+    .event {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 8px;
+      padding-bottom: 7px;
+      border-bottom: 1px solid #eef2f7;
+    }
+    .event:last-child { border-bottom: 0; padding-bottom: 0; }
+    .time { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+
+    .awaiting-row {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      background: #fff;
+    }
+    .awaiting-main {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+    .uat-panel {
+      border: 1px solid #fcd34d;
+      background: #fffbeb;
+      border-radius: 7px;
+      padding: 10px;
+      display: grid;
+      gap: 9px;
+    }
+
+    .note-list {
+      padding-left: 18px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .note-list strong { color: var(--ink); }
+
+    @media (max-width: 900px) {
+      .grid, .body-grid, .awaiting-main { grid-template-columns: 1fr; }
+      .top-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro">
+      <h1>UAT Stack Visibility Mockups</h1>
+      <p>Goal: after clicking <strong>Rebuild to UAT</strong>, the operator should see Docker/container startup state in the issue tree and the issue slide-out, not only a toast that says to watch the activity feed.</p>
+    </section>
+
+    <section class="grid" aria-label="Issue tree and detail slide-out mockups">
+      <div class="mock">
+        <div class="mock-header">
+          <h2>Issue Tree: Inline UAT Stack State</h2>
+          <span class="badge amber"><span class="spin"></span> rebuilding</span>
+        </div>
+        <div class="mock-body">
+          <div class="tabs">
+            <div class="tab active">All</div>
+            <div class="tab">Alive</div>
+            <div class="tab">Failed</div>
+          </div>
+          <div class="tree-project"><span>mind-your-now</span><span>1</span></div>
+          <div class="issue-row">
+            <div class="issue-title">
+              <span class="issue-id">MIN-831</span>
+              <span class="issue-name">Migrate Kaia voice pipeline to Gemini 2.5 Flash Live</span>
+            </div>
+            <div class="badges">
+              <span class="badge">work</span>
+              <span class="badge">5</span>
+              <span class="badge amber">In Review</span>
+              <span class="badge amber">Ready · awaiting merge</span>
+              <span class="badge blue">Merge</span>
+              <span class="pipeline" aria-label="pipeline">
+                <i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="active"></i>
+              </span>
+            </div>
+            <div class="badges">
+              <span class="badge">workspace</span>
+              <span class="badge">vBRIEF</span>
+              <span class="badge">beads</span>
+              <span class="badge amber"><span class="spin"></span> UAT stack 1/4 healthy</span>
+            </div>
+            <div class="resource-row">
+              <div class="tree-resource"><span></span><span>Work</span><span>gpt-5.5</span><span>83h</span></div>
+              <div class="tree-resource"><span></span><span>Review</span><span>kimi-k2.7-code</span><span>clean</span></div>
+              <div class="tree-resource"><span></span><span>Test</span><span>haiku-4-5</span><span></span></div>
+              <div class="tree-resource"><span>▾</span><span>UAT environment</span><span>rebuilding</span><span>2m</span></div>
+              <div class="tree-resource"><span class="dot green"></span><span>postgres</span><span>healthy</span><span>5432</span></div>
+              <div class="tree-resource"><span class="dot amber"></span><span>api</span><span>starting</span><span>8080</span></div>
+              <div class="tree-resource"><span class="dot"></span><span>frontend</span><span>created</span><span>5173</span></div>
+              <div class="tree-resource"><span class="dot"></span><span>server</span><span>pending</span><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mock slideout">
+        <div class="mock-header">
+          <div>
+            <div class="crumbs">mind-your-now / Issues</div>
+            <strong>MIN-831</strong>
+            <h2 class="detail-title">Migrate Kaia voice pipeline to Gemini 2.5 Flash Live</h2>
+            <span class="badge green">READY</span>
+          </div>
+          <div class="top-actions">
+            <a class="button warn" href="#"><span class="spin"></span> Rebuilding UAT</a>
+            <a class="button disabled" href="#">UAT opens when healthy</a>
+          </div>
+        </div>
+
+        <div class="mock-body">
+          <h3>Issue cockpit · mission control</h3>
+          <div class="gate-row">
+            <div class="gate"><span class="dot green"></span> Plan approved</div>
+            <div class="gate"><span class="dot green"></span> Work done</div>
+            <div class="gate"><span class="dot green"></span> Review passed</div>
+            <div class="gate"><span class="dot green"></span> Test passed</div>
+          </div>
+        </div>
+
+        <div class="body-grid">
+          <section class="section">
+            <h3>UAT environment</h3>
+            <div class="stack-summary">
+              <span class="spin"></span>
+              <div>
+                <strong>Workspace stack is rebuilding</strong>
+                <p>1 of 4 containers healthy. API health check is still warming up.</p>
+              </div>
+              <span class="badge amber">2m 14s</span>
+            </div>
+            <div class="service-list">
+              <div class="service">
+                <span class="dot green"></span>
+                <div><div class="service-name">postgres</div><div class="service-meta">Up 2m · healthy · 5432</div></div>
+                <span class="badge green">healthy</span>
+              </div>
+              <div class="service">
+                <span class="dot amber"></span>
+                <div><div class="service-name">api</div><div class="service-meta">Up 42s · health: starting · 8080</div></div>
+                <span class="badge amber">starting</span>
+              </div>
+              <div class="service">
+                <span class="dot"></span>
+                <div><div class="service-name">frontend</div><div class="service-meta">container created · waiting on api</div></div>
+                <span class="badge">created</span>
+              </div>
+              <div class="service">
+                <span class="dot"></span>
+                <div><div class="service-name">server</div><div class="service-meta">pending start</div></div>
+                <span class="badge">pending</span>
+              </div>
+            </div>
+            <div class="inline">
+              <button>View logs</button>
+              <button>Restart stack</button>
+              <button>Refresh status</button>
+            </div>
+          </section>
+
+          <section class="section">
+            <h3>Recent stack activity</h3>
+            <div class="timeline">
+              <div class="event"><span class="time">15:02:41</span><span>Rebuild requested from Awaiting Merge.</span></div>
+              <div class="event"><span class="time">15:02:43</span><span>docker compose down -v --remove-orphans completed.</span></div>
+              <div class="event"><span class="time">15:03:09</span><span>Rendered .devcontainer from project template.</span></div>
+              <div class="event"><span class="time">15:03:28</span><span>postgres reported healthy.</span></div>
+              <div class="event"><span class="time">15:04:02</span><span>api container is starting; last probe: connection refused on 8080.</span></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="mock" style="margin-top:18px">
+      <div class="mock-header">
+        <h2>Awaiting Merge: Keep the Rebuild Action, Add Inline State</h2>
+        <span class="badge amber">replaces toast-only feedback</span>
+      </div>
+      <div class="mock-body">
+        <div class="awaiting-row">
+          <div class="awaiting-main">
+            <div>
+              <div class="inline" style="margin-bottom:6px">
+                <span class="badge">MIN-831</span>
+                <span class="badge amber">ready 14m ago</span>
+              </div>
+              <strong>Migrate Kaia voice pipeline to Gemini 2.5 Flash Live</strong>
+              <p style="margin-top:5px">The UAT link remains disabled while the stack is unhealthy, but the row now shows why and what is moving.</p>
+            </div>
+            <div class="inline">
+              <button class="button warn"><span class="spin"></span> Rebuilding...</button>
+              <button class="button disabled">UAT</button>
+              <button class="button primary">Merge</button>
+            </div>
+          </div>
+
+          <div class="uat-panel">
+            <div class="inline">
+              <span class="badge amber"><span class="spin"></span> UAT stack starting</span>
+              <span class="badge">1/4 containers healthy</span>
+              <span class="badge">last probe 8s ago</span>
+            </div>
+            <div class="service-list">
+              <div class="service"><span class="dot green"></span><span>postgres healthy</span><span class="service-meta">2m</span></div>
+              <div class="service"><span class="dot amber"></span><span>api starting</span><span class="service-meta">8080 refused</span></div>
+              <div class="service"><span class="dot"></span><span>frontend pending</span><span class="service-meta">waiting</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mock" style="margin-top:18px">
+      <div class="mock-header">
+        <h2>Implementation Notes From Code Investigation</h2>
+      </div>
+      <div class="mock-body">
+        <ul class="note-list">
+          <li><strong>Existing data:</strong> <code>/api/workspaces/:issueId</code> already returns <code>containers</code>, <code>stackHealth</code>, <code>frontendUrl</code>, <code>apiUrl</code>, and <code>pendingOperation</code>.</li>
+          <li><strong>Current gap:</strong> <code>AwaitingMergePage</code> posts to <code>/api/workspaces/:issueId/rebuild-stack</code>, then only shows a toast: “Watch the activity feed; the UAT link works once it is healthy.”</li>
+          <li><strong>Issue tree:</strong> <code>FeatureItem</code> already expands a resources group and can render container nodes; the mockup adds a first-class “UAT environment” row with aggregate health.</li>
+          <li><strong>Slide-out:</strong> the current <code>WorkspaceCard</code> compresses containers to <code>running/total</code>. Replace that with a compact service list and recent rebuild activity.</li>
+          <li><strong>Polling:</strong> while a rebuild is pending or stack health is unhealthy, poll workspace state every 2-5 seconds; return to the normal 30-second interval once healthy.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

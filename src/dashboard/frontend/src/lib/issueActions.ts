@@ -152,7 +152,7 @@ const isDoneOrCanceled = (state: IssueActionState) => {
 const isMerged = (state: IssueActionState) => state.isMerged === true || state.reviewStatus?.mergeStatus === 'merged';
 const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
 const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);
-const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
+const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && state.hasBeads && !isMerged(state) && !isDoneOrCanceled(state);
 const canStartWithoutPlanning = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && isTodo(state) && !isMerged(state);
 // PAN-1517: `hasParallelizablePlan` removed alongside the `swarm` action entry —
 // parallelism is now an in-context concern owned by the work agent (see
