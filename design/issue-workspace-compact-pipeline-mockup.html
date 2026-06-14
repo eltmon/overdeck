@@ -358,6 +358,89 @@
       background: var(--warning);
     }
 
+    .workflow-line {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 7px;
+      align-items: start;
+    }
+
+    .workflow-step {
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 7px;
+      align-items: start;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .workflow-step .mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted-foreground);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    .workflow-step .copy {
+      min-width: 0;
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .workflow-step .bar {
+      grid-column: 2;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--muted);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .workflow-step.done .mark {
+      border-color: rgba(16, 185, 129, 0.28);
+      background: rgba(16, 185, 129, 0.07);
+      color: var(--success-foreground);
+    }
+
+    .workflow-step.done .bar::before,
+    .workflow-step.active .bar::before {
+      content: "";
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--success);
+    }
+
+    .workflow-step.active {
+      color: var(--foreground);
+    }
+
+    .workflow-step.active .mark {
+      border-color: rgba(168, 85, 247, 0.30);
+      background: rgba(168, 85, 247, 0.10);
+      color: var(--signal-review-foreground);
+    }
+
+    .workflow-step.active .bar::before {
+      background: var(--signal-review);
+    }
+
     .content {
       min-height: 0;
       display: grid;
@@ -552,6 +635,123 @@
       gap: 14px;
       align-items: start;
       max-width: 1120px;
+    }
+
+    .stage-inspector {
+      display: grid;
+      gap: 14px;
+      max-width: 1120px;
+    }
+
+    .inspector-head {
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .inspector-head h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 500;
+    }
+
+    .inspector-head p {
+      margin: 5px 0 0;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .mode-toggle {
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--muted);
+      padding: 2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .mode-toggle button {
+      height: 26px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .mode-toggle button.active {
+      background: var(--card);
+      color: var(--foreground);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .activity-panel {
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .conversation-view,
+    .terminal-view {
+      display: none;
+      min-height: 360px;
+      padding: 16px;
+    }
+
+    .conversation-view.active,
+    .terminal-view.active {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .message {
+      max-width: 780px;
+      border-radius: 8px;
+      padding: 11px 12px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+    }
+
+    .message.agent {
+      margin-left: 34px;
+      background: rgba(59, 130, 246, 0.04);
+    }
+
+    .message strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+    }
+
+    .message p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .terminal-view {
+      background: #101113;
+      color: #e5e5e5;
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
     }
 
     .banner {
@@ -787,11 +987,14 @@
           </div>
         </div>
 
-        <section class="status-strip" aria-label="Issue readiness summary">
-          <div class="status-chip ready"><span class="mark"></span><span>Plan, work, review, and test complete</span></div>
-          <div class="status-chip"><span class="mark"></span><span>CI/CD no checks</span></div>
-          <div class="status-chip review"><span class="mark"></span><span>Merge-ready yes</span></div>
-          <div class="status-chip warning"><span class="mark"></span><span>Human approval remains</span></div>
+        <section class="workflow-line" aria-label="Issue workflow">
+          <button class="workflow-step done" type="button" data-stage="Plan"><span class="mark">✓</span><span><span class="copy">Plan approved</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Work"><span class="mark">✓</span><span><span class="copy">Work done</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Review"><span class="mark">✓</span><span><span class="copy">Review passed</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Test"><span class="mark">✓</span><span><span class="copy">Test passed</span><span class="bar"></span></span></button>
+          <button class="workflow-step" type="button" data-stage="CI/CD"><span class="mark">◦</span><span><span class="copy">CI/CD</span><span class="bar"></span></span></button>
+          <button class="workflow-step" type="button" data-stage="Ship"><span class="mark">◦</span><span><span class="copy">Ship</span><span class="bar"></span></span></button>
+          <button class="workflow-step active" type="button" data-stage="Merge"><span class="mark">◆</span><span><span class="copy">Merge ready</span><span class="bar"></span></span></button>
         </section>
       </header>
 
@@ -855,7 +1058,48 @@
           </nav>
 
           <div class="stage-area">
-            <div class="stage-grid">
+            <div class="stage-inspector">
+              <section class="inspector-head">
+                <div>
+                  <h2><span id="stageTitle">Merge</span> activity</h2>
+                  <p id="stageSummary">Ready for human merge. Review the conversation or switch to terminal output without leaving the stage context.</p>
+                </div>
+                <div class="mode-toggle" aria-label="Activity view">
+                  <button class="active" type="button" data-mode="conversation">Conversation</button>
+                  <button type="button" data-mode="terminal">Terminal</button>
+                </div>
+              </section>
+
+              <section class="activity-panel">
+                <div class="conversation-view active" id="conversationView">
+                  <div class="message">
+                    <strong>operator</strong>
+                    <p>Check the merge gate for MIN-832 and confirm what remains before we move this to main.</p>
+                  </div>
+                  <div class="message agent">
+                    <strong>merge-agent</strong>
+                    <p>Review and test gates are passing. GitHub CI has no checks for this branch. The remaining blocker is explicit human approval.</p>
+                  </div>
+                  <div class="message">
+                    <strong>operator</strong>
+                    <p>Keep the PR link and rerun controls close to this state so I do not need the left pipeline expanded.</p>
+                  </div>
+                </div>
+                <pre class="terminal-view" id="terminalView">agent-min-832 $ pan status MIN-832
+Issue: MIN-832
+Stage: Merge
+Review: passed
+Test: passed
+CI/CD: no checks
+Merge: waiting for human approval
+
+agent-min-832 $ git status --short
+# clean
+</pre>
+              </section>
+            </div>
+
+            <div class="stage-grid" style="margin-top: 14px;">
               <div class="banner">
                 <div class="ok">✓</div>
                 <div>
@@ -934,6 +1178,55 @@
     const closeIssue = document.getElementById('closeIssue');
     const actionsButton = document.getElementById('actionsButton');
     const actionsMenu = document.getElementById('actionsMenu');
+    const stageTitle = document.getElementById('stageTitle');
+    const stageSummary = document.getElementById('stageSummary');
+    const conversationView = document.getElementById('conversationView');
+    const terminalView = document.getElementById('terminalView');
+
+    const stageSummaries = {
+      Plan: 'Planning artifacts are present. Review the planning discussion or inspect the plan generation terminal output.',
+      Work: 'Work agent completed and stopped. Review the implementation conversation or terminal session inline.',
+      Review: 'Review passed. The conversation captures reviewer findings and final approval.',
+      Test: 'Tests passed. Use the terminal view to inspect command output without switching tabs.',
+      'CI/CD': 'No GitHub checks are attached to this branch. This stage stays visible but inactive.',
+      Ship: 'Ship is pending. This will show release/ship activity when the stage starts.',
+      Merge: 'Ready for human merge. Review the conversation or switch to terminal output without leaving the stage context.',
+    };
+
+    const terminalSamples = {
+      Plan: `planning-min-832 $ pan plan MIN-832
+Plan artifacts: present
+Beads: generated
+Status: approved`,
+      Work: `agent-min-832 $ git status --short
+# clean
+
+agent-min-832 $ npm test
+Review handoff complete.`,
+      Review: `review-min-832 $ pan review MIN-832
+Correctness: passed
+Requirements: passed
+Security: passed`,
+      Test: `test-min-832 $ npm run test -- --run
+tests passed
+
+test-min-832 $ npm run typecheck
+clean`,
+      'CI/CD': `github $ gh pr checks
+No checks found for feature/min-832`,
+      Ship: `ship-min-832 $ pan ship status
+Pending: waiting for merge readiness`,
+      Merge: `agent-min-832 $ pan status MIN-832
+Issue: MIN-832
+Stage: Merge
+Review: passed
+Test: passed
+CI/CD: no checks
+Merge: waiting for human approval
+
+agent-min-832 $ git status --short
+# clean`,
+    };
 
     togglePipeline.addEventListener('click', () => {
       content.classList.toggle('pipeline-open');
@@ -962,6 +1255,36 @@
     });
     document.addEventListener('click', (event) => {
       if (!actionsMenu.contains(event.target) && event.target !== actionsButton) setActionsMenu(false);
+    });
+
+    function setStage(stage) {
+      document.querySelectorAll('.workflow-step').forEach((step) => {
+        step.classList.toggle('active', step.dataset.stage === stage);
+      });
+      stageTitle.textContent = stage;
+      stageSummary.textContent = stageSummaries[stage] || stageSummaries.Merge;
+      terminalView.textContent = terminalSamples[stage] || terminalSamples.Merge;
+      conversationView.querySelectorAll('.message').forEach((message, index) => {
+        const paragraphs = [
+          `Open the ${stage} stage context for MIN-832.`,
+          `${stageSummaries[stage] || stageSummaries.Merge}`,
+          `Keep ${stage} conversation and terminal output available in-place so the workflow remains visible.`,
+        ];
+        message.querySelector('p').textContent = paragraphs[index] || paragraphs[0];
+      });
+    }
+
+    document.querySelectorAll('.workflow-step').forEach((step) => {
+      step.addEventListener('click', () => setStage(step.dataset.stage));
+    });
+
+    document.querySelectorAll('.mode-toggle button').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.mode-toggle button').forEach((item) => item.classList.toggle('active', item === button));
+        const terminal = button.dataset.mode === 'terminal';
+        conversationView.classList.toggle('active', !terminal);
+        terminalView.classList.toggle('active', terminal);
+      });
     });
   </script>
 </body>
