@@ -471,14 +471,15 @@
     .main-panel {
       min-width: 0;
       min-height: 0;
+      display: grid;
+      grid-template-rows: 52px minmax(0, 1fr);
       background: #fcfcfb;
     }
 
     .workspace-view {
       min-width: 0;
       min-height: 0;
-      display: grid;
-      grid-template-rows: 52px minmax(0, 1fr);
+      display: block;
     }
 
     .workspace-view.hidden {
@@ -1232,19 +1233,19 @@
         </aside>
 
         <section class="main-panel">
-          <div class="workspace-view hidden" id="workspaceView">
-            <nav class="tabs" aria-label="Issue workspace tabs">
-              <button class="tab active" type="button">Overview</button>
-              <button class="tab" type="button">Review</button>
-              <button class="tab" type="button">Test</button>
-              <button class="tab" type="button">PR &amp; CI</button>
-              <button class="tab" type="button">Conversation</button>
-              <button class="tab" type="button">Diff</button>
-              <button class="tab" type="button">Files</button>
-              <button class="tab" type="button">Terminal</button>
-              <button class="tab" type="button">PRD / Plan</button>
-            </nav>
+          <nav class="tabs" id="workspaceTabs" aria-label="Issue workspace tabs">
+            <button class="tab" type="button">Overview</button>
+            <button class="tab" type="button">Review</button>
+            <button class="tab" type="button">Test</button>
+            <button class="tab" type="button">PR &amp; CI</button>
+            <button class="tab" type="button">Conversation</button>
+            <button class="tab" type="button">Diff</button>
+            <button class="tab" type="button">Files</button>
+            <button class="tab" type="button">Terminal</button>
+            <button class="tab" type="button">PRD / Plan</button>
+          </nav>
 
+          <div class="workspace-view hidden" id="workspaceView">
             <div class="stage-area">
               <div class="stage-inspector">
                 <section class="inspector-head">
@@ -1427,6 +1428,7 @@ agent-min-832 $ git status --short
     const contextTimeline = document.getElementById('contextTimeline');
     const contextFacts = document.getElementById('contextFacts');
     const backToWorkspace = document.getElementById('backToWorkspace');
+    const workspaceTabs = Array.from(document.querySelectorAll('#workspaceTabs .tab'));
 
     const stageSummaries = {
       Plan: 'Planning artifacts are present. Review the planning discussion or inspect the plan generation terminal output.',
@@ -1660,6 +1662,7 @@ agent-min-832 $ git status --short
       const data = contextData[key] || contextData.issue;
       workspaceView.classList.add('hidden');
       contextView.classList.add('active');
+      workspaceTabs.forEach((tab) => tab.classList.remove('active'));
       contextTitle.textContent = data.title;
       contextSummary.textContent = data.summary;
       treeConversationView.innerHTML = data.messages.map(([speaker, body], index) => `
@@ -1687,6 +1690,16 @@ agent-min-832 $ git status --short
       contextView.classList.remove('active');
       workspaceView.classList.remove('hidden');
       document.querySelectorAll('[data-context]').forEach((node) => node.classList.remove('active'));
+      workspaceTabs.forEach((tab, index) => tab.classList.toggle('active', index === 0));
+    });
+
+    workspaceTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        contextView.classList.remove('active');
+        workspaceView.classList.remove('hidden');
+        workspaceTabs.forEach((item) => item.classList.toggle('active', item === tab));
+        document.querySelectorAll('[data-context]').forEach((node) => node.classList.remove('active'));
+      });
     });
   </script>
 </body>
