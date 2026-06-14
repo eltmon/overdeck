@@ -965,6 +965,9 @@ export interface AgentState {
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
   hostOverride?: boolean;
+  /** Timestamps for the cache-sharing fork path (PAN-1862). Set on the synthesis agent's state. */
+  discoveryReadyAt?: string;
+  convoyLaunchedAt?: string;
 
   /** Inspect sub-role for inspect-* agents (PAN-1834). */
   inspectSubRole?: string;
@@ -1023,6 +1026,8 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
+    discoveryReadyAt: raw.discoveryReadyAt,
+    convoyLaunchedAt: raw.convoyLaunchedAt,
     inspectSubRole: raw.inspectSubRole,
   };
 }

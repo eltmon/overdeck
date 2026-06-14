@@ -9,6 +9,7 @@ import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
 import { resetCommand } from './reset.js';
 import { doneCommand } from './done.js';
+import { discoveryReadyCommand } from './discovery-ready.js';
 import { logsCommand, cleanupLogsCommand } from './logs.js';
 
 export function registerSpecialistsCommands(program: Command): void {
@@ -45,6 +46,12 @@ export function registerSpecialistsCommands(program: Command): void {
     .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
     .option('--notes <notes>', 'Optional notes about the result')
     .action(doneCommand);
+
+  // pan specialists discovery-ready <type> <issueId>
+  specialists
+    .command('discovery-ready <type> <issueId>')
+    .description('Signal discovery phase complete — forks parent session into convoy reviewers (PAN-1862)')
+    .action(discoveryReadyCommand);
 
   // pan specialists logs <project> <type> [runId]
   specialists
