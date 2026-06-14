@@ -265,7 +265,7 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('minimax')) return resolveModelIdSync('minimax-m2.7-highspeed');
   if (config.enabledProviders.has('google')) return resolveModelIdSync('gemini-3.1-pro-preview');
   if (config.enabledProviders.has('kimi')) return resolveModelIdSync('kimi-k2.5');
-  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.1');
+  if (config.enabledProviders.has('zai')) return resolveModelIdSync('glm-5.2');
   if (config.enabledProviders.has('mimo')) return resolveModelIdSync('mimo-v2.5-pro');
   if (config.enabledProviders.has('nous')) return resolveModelIdSync('qwen/qwen3.6-plus');
   if (config.enabledProviders.has('dashscope')) return resolveModelIdSync('qwen3-coder-plus');

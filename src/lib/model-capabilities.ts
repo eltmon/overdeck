@@ -822,6 +822,31 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
   },
 
   // Z.AI models
+  'glm-5.2': {
+    model: 'glm-5.2',
+    provider: 'zai',
+    displayName: 'GLM-5.2',
+    costPer1MTokens: 2.0,
+    contextWindow: 128000,
+    // GLM-5.2 exposes only two reasoning efforts (high and max); lower/xhigh
+    // levels are rejected by the role effort validator.
+    effortLevels: ['high', 'max'],
+    skills: {
+      'code-generation': 85,
+      'code-review': 83,
+      debugging: 83,
+      planning: 81,
+      documentation: 80,
+      testing: 80,
+      security: 77,
+      performance: 77,
+      synthesis: 82,
+      speed: 84,
+      'context-length': 75,
+    },
+    notes: 'Z.AI GLM-5.2 flagship via Anthropic-compatible API. Supports only high and max effort levels. Scores provisional — verify against benchmarks.',
+  },
+
   'glm-5.1': {
     model: 'glm-5.1',
     provider: 'zai',
@@ -841,7 +866,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 85,
       'context-length': 75,
     },
-    notes: 'Z.AI GLM-5.1 model via Anthropic-compatible API.',
+    notes: 'Z.AI GLM-5.1 model via Anthropic-compatible API. Previous flagship; retained alongside GLM-5.2.',
   },
 
   'glm-4.7': {
