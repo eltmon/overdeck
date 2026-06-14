@@ -300,6 +300,57 @@ describe('auto-merge executor', () => {
     expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge exploded');
   });
 
+  it('resurrects blocked entries that become eligible again', async () => {
+    const resurrectStrandedAutoMerge = vi.fn().mockReturnValue(true);
+    const isEligible = vi.fn().mockResolvedValue({ eligible: true });
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [],
+      listProblemEntries: () => [pendingEntry({ status: 'blocked' })],
+      isPaused: () => false,
+      isEligible,
+      resurrectStrandedAutoMerge,
+    });
+
+    expect(isEligible).toHaveBeenCalledWith('PAN-1486');
+    expect(resurrectStrandedAutoMerge).toHaveBeenCalledWith(1, NOW.toISOString());
+  });
+
+  it('does not resurrect failed entries at the attempt cap', async () => {
+    const resurrectStrandedAutoMerge = vi.fn();
+    const isEligible = vi.fn().mockResolvedValue({ eligible: true });
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [],
+      listProblemEntries: () => [pendingEntry({ status: 'failed', attempts: 3 })],
+      isPaused: () => false,
+      isEligible,
+      resurrectStrandedAutoMerge,
+    });
+
+    expect(isEligible).not.toHaveBeenCalled();
+    expect(resurrectStrandedAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('does not resurrect entries that are still ineligible', async () => {
+    const resurrectStrandedAutoMerge = vi.fn();
+    const isEligible = vi.fn().mockResolvedValue({ eligible: false, reason: 'CI pending', code: 'checks_pending' });
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [],
+      listProblemEntries: () => [pendingEntry({ status: 'blocked' })],
+      isPaused: () => false,
+      isEligible,
+      resurrectStrandedAutoMerge,
+    });
+
+    expect(isEligible).toHaveBeenCalledWith('PAN-1486');
+    expect(resurrectStrandedAutoMerge).not.toHaveBeenCalled();
+  });
+
   it('ticks every 30 seconds when started', async () => {
     const listEntries = vi.fn(() => []);
 

@@ -4,10 +4,12 @@ import {
   deferPendingAutoMerge,
   incrementAttempts,
   listDuePendingAutoMerges,
+  listProblemAutoMerges,
   markBlocked,
   markFailed,
   markMerged,
   requeueToPending,
+  resurrectStrandedAutoMerge,
   transitionToMerging,
   type PendingAutoMerge,
 } from '../../../lib/database/pending-auto-merges-db.js';
@@ -26,6 +28,7 @@ interface MergeResult {
 export interface AutoMergeExecutorDeps {
   now?: () => Date;
   listEntries?: () => PendingAutoMerge[];
+  listProblemEntries?: () => PendingAutoMerge[];
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   transition?: (id: number) => boolean;
@@ -34,6 +37,7 @@ export interface AutoMergeExecutorDeps {
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
   deferPendingAutoMerge?: (id: number, nextScheduledMergeAt: string) => boolean;
+  resurrectStrandedAutoMerge?: (id: number, nextScheduledMergeAt: string) => boolean;
   incrementAttempts?: (id: number) => boolean;
   mergeIssue?: (issueId: string) => Promise<MergeResult>;
   announceFailure?: (issueId: string, reason: string) => void;
@@ -76,6 +80,35 @@ function defaultAnnounceFailure(issueId: string, reason: string): void {
 export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): Promise<void> {
   const now = deps.now ?? (() => new Date());
   const nowDate = now();
+  const isPaused = deps.isPaused ?? isFlywheelGloballyPaused;
+  const log = deps.log ?? console.log;
+
+  if (isPaused()) {
+    log('[auto-merge] flywheel paused, skipping tick');
+    return;
+  }
+
+  // Step 1: resurrect recoverable stranded rows (blocked/failed) before trying new merges.
+  const problemEntries = (deps.listProblemEntries ?? listProblemAutoMerges)();
+  for (const entry of problemEntries) {
+    if (entry.attempts >= MAX_MERGE_ATTEMPTS) {
+      log(`[auto-merge] ${entry.issueId} (#${entry.id}) at attempt cap, leaving stranded for LLM`);
+      continue;
+    }
+
+    const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
+    if (!eligibility.eligible) {
+      log(`[auto-merge] ${entry.issueId} (#${entry.id}) still ineligible, staying stranded`);
+      continue;
+    }
+
+    if ((deps.resurrectStrandedAutoMerge ?? resurrectStrandedAutoMerge)(entry.id, nowDate.toISOString())) {
+      log(`[auto-merge] resurrected ${entry.issueId} (#${entry.id}) from ${entry.status} to pending`);
+    } else {
+      log(`[auto-merge] lost resurrection race for ${entry.issueId} (#${entry.id}), skipping`);
+    }
+  }
+
   const entries = deps.listEntries
     ? deps.listEntries()
       .filter((entry) => entry.status === 'pending' && Date.parse(entry.scheduledMergeAt) <= nowDate.getTime())
@@ -83,13 +116,6 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     : listDuePendingAutoMerges(nowDate.toISOString());
 
   if (entries.length === 0) return;
-
-  const isPaused = deps.isPaused ?? isFlywheelGloballyPaused;
-  const log = deps.log ?? console.log;
-  if (isPaused()) {
-    log('[auto-merge] flywheel paused, skipping tick');
-    return;
-  }
 
   for (const entry of entries) {
     if (isPaused()) {
