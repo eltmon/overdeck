@@ -110,4 +110,103 @@ describe('auto-merge eligibility', () => {
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
       .resolves.toEqual({ eligible: true });
   });
+
+  it('returns eligible for a mergeable GitLab MR', async () => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus({
+      prUrl: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62',
+    }));
+    const getGitLabMrState = vi.fn(async () => ({
+      state: 'opened',
+      draft: false,
+      detailed_merge_status: 'mergeable',
+    }));
+    const getPullRequestState = vi.fn(async () => makePrState());
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('MIN-831', {
+      getReviewStatus,
+      getGitLabMrState,
+      getPullRequestState,
+      getIssueLabels,
+    })).resolves.toEqual({ eligible: true });
+
+    expect(getGitLabMrState).toHaveBeenCalledWith('eltmon/mind-your-now', 62);
+    expect(getPullRequestState).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { state: 'merged', reason: 'MR is already merged' },
+    { state: 'closed', reason: 'MR is closed' },
+    { state: 'opened', draft: true, reason: 'MR is a draft' },
+    { state: 'opened', has_conflicts: true, reason: 'MR has conflicts' },
+    { state: 'opened', detailed_merge_status: 'ci_still_running', reason: 'MR is not mergeable (detailed_merge_status=ci_still_running)' },
+  ])('rejects a GitLab MR in a non-mergeable state: %j', async (overrides) => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus({
+      prUrl: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62',
+    }));
+    const getGitLabMrState = vi.fn(async () => ({
+      state: 'opened',
+      draft: false,
+      ...overrides,
+    }));
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('MIN-831', {
+      getReviewStatus,
+      getGitLabMrState,
+      getIssueLabels,
+    })).resolves.toEqual({ eligible: false, reason: overrides.reason });
+  });
+
+  it('falls back to merge_status when detailed_merge_status is absent', async () => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus({
+      prUrl: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62',
+    }));
+    const getGitLabMrState = vi.fn(async () => ({
+      state: 'opened',
+      draft: false,
+      merge_status: 'can_be_merged',
+    }));
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('MIN-831', {
+      getReviewStatus,
+      getGitLabMrState,
+      getIssueLabels,
+    })).resolves.toEqual({ eligible: true });
+  });
+
+  it('returns ineligible when the GitLab MR state lookup throws', async () => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus({
+      prUrl: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62',
+    }));
+    const getGitLabMrState = vi.fn(async () => { throw new Error('glab not found'); });
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('MIN-831', {
+      getReviewStatus,
+      getGitLabMrState,
+      getIssueLabels,
+    })).resolves.toEqual({ eligible: false, reason: 'GitLab MR state lookup failed: glab not found' });
+  });
+
+  it('self-hosted GitLab MRs are detected by path and parsed for project path', async () => {
+    const getReviewStatus = vi.fn(() => makeReviewStatus({
+      prUrl: 'https://git.example.com/g/r/-/merge_requests/5',
+    }));
+    const getGitLabMrState = vi.fn(async () => ({
+      state: 'opened',
+      draft: false,
+      detailed_merge_status: 'mergeable',
+    }));
+    const getIssueLabels = vi.fn(async () => []);
+
+    await expect(isAutoMergeEligible('PAN-SELF', {
+      getReviewStatus,
+      getGitLabMrState,
+      getIssueLabels,
+    })).resolves.toEqual({ eligible: true });
+
+    expect(getGitLabMrState).toHaveBeenCalledWith('g/r', 5);
+  });
 });

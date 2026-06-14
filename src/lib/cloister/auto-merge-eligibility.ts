@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { getPullRequestState as getPullRequestStateEffect, type GitHubPullRequestState } from '../github-app.js';
+import { parseArtifactRef } from '../forge.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
@@ -12,9 +13,20 @@ export const BLOCKER_LABELS = ['needs-design', 'needs-discussion', 'do-not-merge
 export type AutoMergeEligibility = { eligible: true } | { eligible: false; reason: string };
 type PullRequestLookup = (owner: string, repo: string, number: number) => Promise<GitHubPullRequestState>;
 
+interface GitLabMrState {
+  state: string;
+  draft: boolean;
+  detailed_merge_status?: string;
+  merge_status?: string;
+  has_conflicts?: boolean;
+}
+
+type GitLabMrLookup = (projectPath: string, iid: number) => Promise<GitLabMrState>;
+
 export interface AutoMergeEligibilityDeps {
   getReviewStatus?: (issueId: string) => ReviewStatus | null;
   getPullRequestState?: PullRequestLookup;
+  getGitLabMrState?: GitLabMrLookup;
   getIssueLabels?: (issueId: string) => Promise<string[]>;
 }
 
@@ -26,6 +38,43 @@ function parsePullRequestUrl(prUrl: string | undefined): { owner: string; repo: 
 
 async function defaultGetPullRequestState(owner: string, repo: string, number: number): Promise<GitHubPullRequestState> {
   return Effect.runPromise(getPullRequestStateEffect(owner, repo, number));
+}
+
+async function defaultGetGitLabMrState(projectPath: string, iid: number): Promise<GitLabMrState> {
+  const { stdout } = await execFileAsync('glab', [
+    'mr', 'view', String(iid), '-R', projectPath, '-F', 'json',
+  ], { encoding: 'utf-8' });
+  return JSON.parse(stdout) as GitLabMrState;
+}
+
+function parseGitLabProjectPath(prUrl: string | undefined): string | null {
+  if (!prUrl) return null;
+  const match = prUrl.match(/:\/\/[^/]+\/(.+?)\/-\/merge_requests\/\d+/);
+  return match ? match[1] : null;
+}
+
+function evaluateGitLabMrState(state: GitLabMrState): AutoMergeEligibility {
+  if (state.state !== 'opened') {
+    if (state.state === 'merged') return { eligible: false, reason: 'MR is already merged' };
+    if (state.state === 'closed') return { eligible: false, reason: 'MR is closed' };
+    return { eligible: false, reason: `MR is not opened (state=${state.state})` };
+  }
+  if (state.draft) {
+    return { eligible: false, reason: 'MR is a draft' };
+  }
+  if (state.has_conflicts === true) {
+    return { eligible: false, reason: 'MR has conflicts' };
+  }
+  if (state.detailed_merge_status === 'mergeable') {
+    return { eligible: true };
+  }
+  if (state.detailed_merge_status) {
+    return { eligible: false, reason: `MR is not mergeable (detailed_merge_status=${state.detailed_merge_status})` };
+  }
+  if (state.merge_status === 'can_be_merged') {
+    return { eligible: true };
+  }
+  return { eligible: false, reason: `MR is not mergeable (merge_status=${state.merge_status ?? 'unknown'})` };
 }
 
 async function getIssueLabels(issueId: string): Promise<string[]> {
@@ -63,34 +112,60 @@ export async function isAutoMergeEligible(
     return { eligible: false, reason: 'held for UAT (auto-merge toggled off)' };
   }
 
-  const prRef = parsePullRequestUrl(reviewStatus.prUrl);
-  if (!prRef) {
+  const prUrl = reviewStatus.prUrl;
+  const artifactRef = parseArtifactRef(prUrl);
+  if (!artifactRef || !prUrl) {
     return { eligible: false, reason: 'review status PR URL is missing or invalid' };
   }
 
-  const prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+  if (artifactRef.forge === 'gitlab') {
+    const projectPath = parseGitLabProjectPath(prUrl);
+    if (!projectPath) {
+      return { eligible: false, reason: 'review status PR URL is missing or invalid' };
+    }
 
-  // Reviewer P1: tighten to positive "green and mergeable" instead of "not known
-  // failed". The previous predicate accepted pending checks, draft PRs,
-  // closed-unmerged PRs, and mergeable=false — at best noisy GitHub rejections,
-  // at worst merging before CI finishes.
-  if (prState.merged) {
-    return { eligible: false, reason: 'PR is already merged' };
-  }
-  if (prState.state === 'CLOSED') {
-    return { eligible: false, reason: 'PR is closed' };
-  }
-  if (prState.draft) {
-    return { eligible: false, reason: 'PR is a draft' };
-  }
-  if (prState.checksFailed) {
-    return { eligible: false, reason: `CI checks failing on PR HEAD ${prState.headSha}` };
-  }
-  if (prState.checksPending) {
-    return { eligible: false, reason: `CI checks still pending on PR HEAD ${prState.headSha}` };
-  }
-  if (prState.mergeable === false) {
-    return { eligible: false, reason: `PR is not mergeable${prState.mergeableState ? ` (state=${prState.mergeableState})` : ''}` };
+    let mrState: GitLabMrState;
+    try {
+      mrState = await (deps.getGitLabMrState ?? defaultGetGitLabMrState)(projectPath, artifactRef.number);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      return { eligible: false, reason: `GitLab MR state lookup failed: ${message}` };
+    }
+
+    const eligibility = evaluateGitLabMrState(mrState);
+    if (!eligibility.eligible) {
+      return eligibility;
+    }
+  } else {
+    const prRef = parsePullRequestUrl(reviewStatus.prUrl);
+    if (!prRef) {
+      return { eligible: false, reason: 'review status PR URL is missing or invalid' };
+    }
+
+    const prState = await (deps.getPullRequestState ?? defaultGetPullRequestState)(prRef.owner, prRef.repo, prRef.number);
+
+    // Reviewer P1: tighten to positive "green and mergeable" instead of "not known
+    // failed". The previous predicate accepted pending checks, draft PRs,
+    // closed-unmerged PRs, and mergeable=false — at best noisy GitHub rejections,
+    // at worst merging before CI finishes.
+    if (prState.merged) {
+      return { eligible: false, reason: 'PR is already merged' };
+    }
+    if (prState.state === 'CLOSED') {
+      return { eligible: false, reason: 'PR is closed' };
+    }
+    if (prState.draft) {
+      return { eligible: false, reason: 'PR is a draft' };
+    }
+    if (prState.checksFailed) {
+      return { eligible: false, reason: `CI checks failing on PR HEAD ${prState.headSha}` };
+    }
+    if (prState.checksPending) {
+      return { eligible: false, reason: `CI checks still pending on PR HEAD ${prState.headSha}` };
+    }
+    if (prState.mergeable === false) {
+      return { eligible: false, reason: `PR is not mergeable${prState.mergeableState ? ` (state=${prState.mergeableState})` : ''}` };
+    }
   }
 
   const labels = await (deps.getIssueLabels ?? getIssueLabels)(issueId);
