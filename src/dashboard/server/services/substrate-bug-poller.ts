@@ -1,6 +1,6 @@
 import type { EventStore } from '../event-store.js';
 import { initEventStore } from '../event-store.js';
-import { CacheService } from './cache-service.js';
+import { CacheService, parseIntegerHeader } from './cache-service.js';
 import { getGitHubConfig, type GitHubConfig } from './tracker-config.js';
 import {
   getByIssueId,
@@ -101,13 +101,6 @@ class CacheServiceRateLimitStore implements RateLimitStore {
 
 const defaultRepository: SubstrateBugRepository = { getByIssueId, upsert, markFixed };
 let activePoller: ReturnType<typeof createSubstrateBugPoller> | null = null;
-
-function parseIntegerHeader(headers: Headers, name: string): number | null {
-  const raw = headers.get(name);
-  if (!raw) return null;
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 export function parseSubstrateBugTrailer(body: string | null | undefined): SubstrateBugTrailer {
   const text = body ?? '';

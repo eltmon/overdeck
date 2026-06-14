@@ -1,10 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { Effect } from 'effect';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { evaluatePlanFinalizeQualityGate, promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
+import * as planFinalizeModule from '../plan-finalize.js';
+import { evaluatePlanFinalizeQualityGate, planFinalizeCommand, promotePlanning, stampPlanForFinalization } from '../plan-finalize.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import * as beadsModule from '../../../lib/vbrief/beads.js';
+
+vi.mock('../../../lib/vbrief/beads.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof beadsModule>();
+  return {
+    ...actual,
+    createBeadsFromVBrief: vi.fn(),
+  };
+});
 
 let TEST_DIR: string;
 let OLD_DASHBOARD_URL: string | undefined;
@@ -289,5 +300,71 @@ describe('stampPlanForFinalization', () => {
     writePlan(path, doc);
     stampPlanForFinalization(path, 'PAN-946');
     expect(readDoc(path).plan.sequence).toBe(1);
+  });
+});
+
+describe('planFinalizeCommand', () => {
+  function makeWorkspace(issueId: string): string {
+    const workspacePath = join(TEST_DIR, `feature-${issueId.toLowerCase()}`);
+    const panDir = join(workspacePath, '.pan');
+    mkdirSync(panDir, { recursive: true });
+    writeFileSync(join(panDir, 'spec.vbrief.json'), JSON.stringify(makePlanDoc({ status: 'draft', id: issueId.toLowerCase() }), null, 2), 'utf-8');
+    return workspacePath;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(process, 'exit').mockImplementation((code?: string | number | null | undefined) => {
+      throw new Error(`process.exit:${code}`);
+    });
+  });
+
+  it('does not stamp plan.status=proposed when beads creation fails (AC1)', async () => {
+    const workspacePath = makeWorkspace('PAN-946');
+    const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+    vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+      Effect.succeed({ success: false, created: [], errors: ['bd timed out'], beadIds: new Map() }),
+    );
+
+    await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false }))
+      .rejects.toThrow('process.exit:2');
+
+    expect(readDoc(planPath).plan.status).toBe('draft');
+  });
+
+  it('stamps plan.status=proposed after beads creation succeeds (AC2)', async () => {
+    const workspacePath = makeWorkspace('PAN-947');
+    const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+    vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+      Effect.succeed({ success: true, created: ['PAN-947: Task one'], errors: [], beadIds: new Map() }),
+    );
+
+    await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false });
+
+    const after = readDoc(planPath);
+    expect(after.plan.status).toBe('proposed');
+    expect(after.plan.metadata?.canonicalFilename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-947-/);
+  });
+
+  it('runs a clean finalize on retry after a prior beads failure (AC3)', async () => {
+    const workspacePath = makeWorkspace('PAN-948');
+    const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+
+    // First run fails.
+    vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+      Effect.succeed({ success: false, created: [], errors: ['bd timed out'], beadIds: new Map() }),
+    );
+    await expect(planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false }))
+      .rejects.toThrow('process.exit:2');
+    expect(readDoc(planPath).plan.status).toBe('draft');
+
+    // Second run succeeds and stamps cleanly.
+    vi.mocked(beadsModule.createBeadsFromVBrief).mockReturnValue(
+      Effect.succeed({ success: true, created: ['PAN-948: Task one'], errors: [], beadIds: new Map() }),
+    );
+    await planFinalizeCommand({ workspace: workspacePath, promote: false, qualityLint: false });
+    expect(readDoc(planPath).plan.status).toBe('proposed');
   });
 });

@@ -122,6 +122,18 @@ function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSna
   );
 }
 
+function blockedVariant(
+  reviewStatus?: ReviewStatusSnapshot,
+): Extract<VerbBadgeVariant, 'CHANGES REQUESTED' | 'MERGE BLOCKED' | 'CI BLOCKED'> {
+  const types = new Set((reviewStatus?.blockerReasons ?? []).map(b => b.type));
+  if (types.has('merge_conflict') || types.has('not_mergeable') || types.has('draft_pr')) return 'MERGE BLOCKED';
+  if (types.has('failing_checks')) return 'CI BLOCKED';
+  if (types.has('changes_requested') || types.has('unresolved_conversations')) return 'CHANGES REQUESTED';
+  if (MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '')) return 'MERGE BLOCKED';
+  if (TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '')) return 'CI BLOCKED';
+  return 'CHANGES REQUESTED';
+}
+
 /**
  * Project lifetime spend (PAN-1589). `issueCosts` is a GLOBAL map (every issue
  * across all projects, keyed by both `PAN-1` and a lowercased alias). We scope
@@ -415,7 +427,7 @@ function PipelineSection({
 }
 
 function verbBadgePropsForPhase(entry: BucketedFeature): { variant: Exclude<VerbBadgeVariant, 'STUCK · Nh'> } | { variant: 'STUCK · Nh'; hours: number } {
-  if (isBlockedFeature(entry.feature, entry.reviewStatus)) return { variant: 'CHANGES REQUESTED' };
+  if (isBlockedFeature(entry.feature, entry.reviewStatus)) return { variant: blockedVariant(entry.reviewStatus) };
   if (entry.phase === 'ship' && (entry.reviewStatus?.readyForMerge || entry.feature.readyForMerge)) return { variant: 'READY TO MERGE' };
   if (entry.phase === 'ship') return { variant: 'SHIP RUNNING' };
   if (entry.phase === 'review') return { variant: 'REVIEW RUNNING' };
@@ -673,4 +685,3 @@ function subStatus(entry: BucketedFeature): string | undefined {
 
   return undefined;
 }
-

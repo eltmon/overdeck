@@ -106,5 +106,4 @@ The four push-back shapes that require this signal: **self-abort** (planning can
 ## Boundaries
 
 - No implementation code. No commits to feature files. The implementation agent does that.
-- Caveman compression is disabled for this agent — narrative fields in continue.json must remain full prose so crash recovery and downstream specialists have the context they need.
-- Inspect-on-bead-close is disabled — planning beads are administrative, not code.
+- Caveman compression is disabled for this agent — narrative fields in continue.json must remain full prose so crash recovery and dow

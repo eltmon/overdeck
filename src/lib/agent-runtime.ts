@@ -64,7 +64,7 @@ type HeartbeatBody =
   | { kind: 'waiting_clear'; clearedBy: 'user_response' | 'timeout' | 'stopped' | 'tool_resumed' }
   | { kind: 'message_received'; direction: 'to_agent' | 'from_agent'; source: 'user' | 'cloister' | 'specialist' | 'automated' }
   | { kind: 'channel_reply'; reply: { kind: ChannelReplyKind; summary: string; artifactRefs?: ChannelReplyArtifactRef[] } }
-  | { kind: 'model_set'; model: string; claudeSessionId?: string }
+  | { kind: 'model_set'; model: string; claudeSessionId?: string; sessionModel?: string; sessionHarness?: string }
   | { kind: 'resolution_set'; resolution: AgentResolution; resolutionCount: number }
   | { kind: 'current_issue_set'; currentIssue?: string }
   | { kind: 'context_saturation_changed'; contextSaturatedAt?: string }
@@ -119,7 +119,8 @@ export const emitModelSet = (
   agentId: string,
   model: string,
   claudeSessionId?: string,
-): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'model_set', model, claudeSessionId })
+  sessionOrigin?: { sessionModel?: string; sessionHarness?: string },
+): Effect.Effect<boolean> => emitAgentEvent(agentId, { kind: 'model_set', model, claudeSessionId, ...sessionOrigin })
 
 export const emitMessageReceived = (
   agentId: string,

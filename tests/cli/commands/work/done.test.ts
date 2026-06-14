@@ -97,7 +97,8 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatus,
 }));
 
-vi.mock('../../../../src/lib/config.js', () => ({
+vi.mock('../../../../src/lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../src/lib/config.js')>()),
   getDashboardApiUrl: mockGetDashboardApiUrl,
   getDashboardApiUrlSync: mockGetDashboardApiUrl,
 }));
@@ -110,6 +111,14 @@ vi.mock('../../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
   getVBriefACStatusSync: mockGetVBriefACStatus,
   syncBeadStatusToVBrief: vi.fn().mockReturnValue(Effect.succeed(null)),
+}));
+
+// PAN-1501: the test-requirement gate reaches out to the issue tracker and
+// diffs the feature branch. Those checks are covered by dedicated unit tests;
+// command-level tests here assume a clean gate so they stay independent of
+// local tracker configuration and real issue bodies.
+vi.mock('../../../../src/lib/work/test-requirement-gate.js', () => ({
+  runTestRequirementCheck: vi.fn().mockReturnValue(Effect.succeed([])),
 }));
 
 // Suppress ora spinner output in tests

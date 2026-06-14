@@ -413,6 +413,28 @@ describe('auto-resume gates', () => {
     expect(state?.consecutiveFailures).toBe(1);
   });
 
+  it('recovers orphaned strike agents whose registered session is missing', async () => {
+    const agentId = 'strike-pan-1820';
+    const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1820',
+      workspace: workspaceFor(agentId),
+      harness: 'codex',
+      role: 'strike',
+      model: 'gpt-5',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+    });
+
+    const actions = await recoverOrphanedAgents('patrol');
+
+    expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
+    const state = agents.getAgentStateSync(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.consecutiveFailures).toBe(1);
+  });
+
   it('does not orphan-recover verify-paused running agents with killed tmux sessions', async () => {
     const agentId = 'agent-pan-1141-verify-orphan';
     const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
@@ -447,6 +469,65 @@ describe('auto-resume gates', () => {
     expect(state?.status).toBe('running');
     expect(state?.consecutiveFailures).toBeUndefined();
     expect(vi.mocked(logger.logDeaconEventSync)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
+  });
+
+  it('counts rapid post-resume orphan deaths toward the troubled gate', async () => {
+    const agentId = 'agent-pan-1141-rapid-death';
+    const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'pi',
+      role: 'work',
+      model: 'kimi-k2.6',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+      lastResumeAt: new Date(BASE_TIME.getTime() - 30_000).toISOString(),
+      consecutiveFailures: 2,
+      firstFailureInRunAt: new Date(BASE_TIME.getTime() - 4 * 60_000).toISOString(),
+      lastFailureAt: new Date(BASE_TIME.getTime() - 2 * 60_000).toISOString(),
+      lastFailureReason: 'rapid post-resume death: tmux session missing within 120s (patrol)',
+      lastFailureNextRetryAt: new Date(BASE_TIME.getTime() - 90_000).toISOString(),
+    });
+
+    const actions = await recoverOrphanedAgents('patrol');
+
+    expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
+    const state = agents.getAgentStateSync(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.consecutiveFailures).toBe(3);
+    expect(state?.troubled).toBe(true);
+    expect(state?.lastFailureReason).toContain('rapid post-resume death');
+  });
+
+  it('starts a fresh failure run when an orphan death is not rapid after resume', async () => {
+    const agentId = 'agent-pan-1141-late-death';
+    const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'pi',
+      role: 'work',
+      model: 'kimi-k2.6',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+      lastResumeAt: new Date(BASE_TIME.getTime() - 5 * 60_000).toISOString(),
+      consecutiveFailures: 2,
+      firstFailureInRunAt: new Date(BASE_TIME.getTime() - 6 * 60_000).toISOString(),
+      lastFailureAt: new Date(BASE_TIME.getTime() - 5 * 60_000).toISOString(),
+      lastFailureReason: 'rapid post-resume death: tmux session missing within 120s (patrol)',
+      lastFailureNextRetryAt: new Date(BASE_TIME.getTime() - 4 * 60_000).toISOString(),
+    });
+
+    await recoverOrphanedAgents('patrol');
+
+    const state = agents.getAgentStateSync(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.consecutiveFailures).toBe(1);
+    expect(state?.troubled).toBeUndefined();
+    expect(state?.lastFailureReason).toBe('orphaned: tmux session missing (patrol)');
   });
 
   it('queues feedback without resuming paused agents', async () => {

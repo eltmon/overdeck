@@ -7,7 +7,6 @@
 
 import { Effect } from 'effect';
 import { initDashboardLogFile } from './server-log-file.js';
-import { ensureNativeSqliteAbi } from '../../lib/native-sqlite-guard.js';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
@@ -50,6 +49,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
+import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 
 declare const Bun: unknown;
 
@@ -58,10 +58,7 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
-
-// Self-heal a Node-ABI-mismatched better-sqlite3 (e.g. a stale npx cache built
-// under Node 22 then loaded under Node 24) before any database is opened.
-ensureNativeSqliteAbi();
+console.log(`[panopticon] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
@@ -86,33 +83,46 @@ await initTrackerConfigCache().catch(err => {
 // Start the shared IssueDataService — fire and forget.
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
 // then fetches fresh data from APIs in the background.
-void startSharedIssueService().then(() => {
-  console.log('[panopticon] IssueDataService background fetch complete');
-  // Once the issue cache is warm, prune review-status rows for issues that
-  // are CLOSED on the tracker. Without this, manually-closed issues
-  // (`gh issue close` instead of `pan close`) leave stale review-state
-  // behind, and the deacon keeps auto-resuming agents and re-dispatching
-  // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
-  // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
-  // already calls clearReviewStatus on its own path.
-  void pruneClosedIssueReviewStatuses().catch((err) => {
-    console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+//
+// PAN-1817: peer dashboards inside workspace containers (PANOPTICON_DISABLE_DEACON=1)
+// load the SQLite cache and serve READ-ONLY without polling the trackers. The host
+// `pan up` dashboard is the single tracker poller. Without this gate, every workspace
+// container ran its own Linear/GitHub poller against the shared API key — ~17 of them
+// at once exhausted Linear's 2500/hr quota. This mirrors the single-deacon invariant:
+// a peer dashboard is a read/UI peer, never a second orchestrator.
+const isPeerDashboard = process.env.PANOPTICON_DISABLE_DEACON === '1';
+if (isPeerDashboard) {
+  void startSharedIssueService({ skipPolling: true });
+  console.log('[panopticon] IssueDataService started in CACHE-ONLY mode — peer dashboard (PANOPTICON_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
+} else {
+  void startSharedIssueService().then(() => {
+    console.log('[panopticon] IssueDataService background fetch complete');
+    // Once the issue cache is warm, prune review-status rows for issues that
+    // are CLOSED on the tracker. Without this, manually-closed issues
+    // (`gh issue close` instead of `pan close`) leave stale review-state
+    // behind, and the deacon keeps auto-resuming agents and re-dispatching
+    // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
+    // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
+    // already calls clearReviewStatus on its own path.
+    void pruneClosedIssueReviewStatuses().catch((err) => {
+      console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+    });
+    void Effect.runPromise(cleanupClosedIssueAgentDirectories({
+      issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
+      force: true,
+    })).then((result) => {
+      if (result.removed.length > 0) {
+        console.log(`[panopticon] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+      }
+      if (result.protected.length > 0) {
+        console.warn(`[panopticon] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
+      }
+    }).catch((err) => {
+      console.warn('[panopticon] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
+    });
   });
-  void Effect.runPromise(cleanupClosedIssueAgentDirectories({
-    issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
-    force: true,
-  })).then((result) => {
-    if (result.removed.length > 0) {
-      console.log(`[panopticon] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
-    }
-    if (result.protected.length > 0) {
-      console.warn(`[panopticon] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
-    }
-  }).catch((err) => {
-    console.warn('[panopticon] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
-  });
-});
-console.log('[panopticon] IssueDataService started (non-blocking)');
+  console.log('[panopticon] IssueDataService started (non-blocking)');
+}
 
 // Start background enrichment poller — emits agent.enrichment_changed events
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
@@ -543,24 +553,6 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
-
-// PAN-1531: startup stash audit narrowed to surface only `salvageable:*`
-// stashes — the only kind that requires human review. Retired stash kinds
-// (pre-merge, pre-spawn, review-temp) and ad-hoc residue are ignored. The
-// scan runs once per project root, not per worktree, because worktrees
-// share `refs/stash` with their parent.
-if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
-  void import('../../lib/cloister/deacon.js')
-    .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
-    .then((findings) => {
-      if (findings.length > 0) {
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} salvageable stash(es) on startup; review via workspace inspector` });
-      }
-    })
-    .catch((err: any) => {
-      console.warn(`[panopticon] Failed salvageable-stash startup scan: ${err.message}`);
-    });
-}
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan done`, nudges dead-end agents,

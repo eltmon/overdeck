@@ -16,9 +16,6 @@ const mocks = vi.hoisted(() => ({
   getReviewStatusSync: vi.fn(),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
-  listStashes: vi.fn(),
-  dropStash: vi.fn(),
-  createNamedStash: vi.fn(),
   buildReviewContext: vi.fn(),
   formatTier1Summary: vi.fn(),
   archiveFeedbackFiles: vi.fn(),
@@ -56,14 +53,6 @@ vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatus,
   setReviewStatus: mocks.setReviewStatus,
   setReviewStatusSync: mocks.setReviewStatus,
-}));
-
-vi.mock('../../stashes.js', () => ({
-  buildStashMessage: vi.fn(() => 'review-temp:PAN-1194:1'),
-  createNamedStash: mocks.createNamedStash,
-  dropStash: mocks.dropStash,
-  getNextReviewTempSequence: vi.fn(() => 1),
-  listStashes: mocks.listStashes,
 }));
 
 vi.mock('../../config-yaml.js', () => ({
@@ -114,8 +103,6 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
-    mocks.listStashes.mockReturnValue(Effect.succeed([]));
-    mocks.createNamedStash.mockReturnValue(Effect.succeed(null));
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);

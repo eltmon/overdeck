@@ -19,12 +19,11 @@ import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-uti
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
-import { isTransientBdError, BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from '../../lib/bd-process-lock.js';
-
-export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
+import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -89,8 +88,8 @@ import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 
 interface IssueOptions {
   model: string;
-  /** PAN-636 — coding-agent harness override. Defaults to claude-code. */
-  harness?: 'claude-code' | 'pi' | 'codex';
+  /** PAN-636 — explicit coding-agent harness override. Omit to use resolver defaults. */
+  harness?: RuntimeName;
   /** Claude Code `--effort` level. Overrides roles.work.effort for this spawn. */
   effort?: RoleEffort;
   dryRun?: boolean;
@@ -153,6 +152,32 @@ async function confirmHostOverride(options: IssueOptions): Promise<boolean> {
   } finally {
     rl.close();
   }
+}
+
+async function resolveExplicitHarnessFlag(
+  harness: string | undefined,
+  model: string | undefined,
+): Promise<RuntimeName | undefined> {
+  if (harness === undefined) {
+    return undefined;
+  }
+
+  if (harness !== 'claude-code' && harness !== 'pi' && harness !== 'codex') {
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
+    process.exit(1);
+  }
+
+  if (model) {
+    const { canUseHarnessSync } = await import('../../lib/harness-policy.js');
+    const { getProviderAuthMode } = await import('../../lib/agents.js');
+    const decision = canUseHarnessSync(harness, model, await getProviderAuthMode(model));
+    if (!decision.allowed) {
+      process.stderr.write(`${decision.reason}\n`);
+      process.exit(1);
+    }
+  }
+
+  return harness;
 }
 
 /**
@@ -785,25 +810,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 
-  // PAN-636 — validate --harness up front. canUseHarness gates the
-  // {harness, model, authMode} combination; invalid combos exit non-zero
-  // with the human-readable reason text on stderr (no spinner, no
-  // workspace setup) so callers don't get a half-prepared workspace
-  // when they pick something the gate refuses.
-  const requestedHarness: 'claude-code' | 'pi' | 'codex' = options.harness ?? 'claude-code';
-  if (requestedHarness !== 'claude-code' && requestedHarness !== 'pi' && requestedHarness !== 'codex') {
-    process.stderr.write(`Invalid --harness value: ${options.harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
-    process.exit(1);
-  }
-  if (options.model) {
-    const { canUseHarnessSync } = await import('../../lib/harness-policy.js');
-    const { getProviderAuthMode } = await import('../../lib/agents.js');
-    const decision = canUseHarnessSync(requestedHarness, options.model, await getProviderAuthMode(options.model));
-    if (!decision.allowed) {
-      process.stderr.write(`${decision.reason}\n`);
-      process.exit(1);
-    }
-  }
+  // PAN-636 — validate only an explicit --harness flag up front. Flagless
+  // spawns intentionally forward undefined so spawnAgent's resolveHarness()
+  // applies role/provider defaults after model resolution.
+  const requestedHarness = await resolveExplicitHarnessFlag(options.harness, options.model);
 
   // Resolve the Claude Code --effort level for this spawn: explicit --effort
   // wins, otherwise fall back to roles.work.effort from config. The flag
@@ -936,6 +946,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Fetch and merge latest main before the agent starts working.
     if (workspaceExisted) {
       spinner.text = 'Syncing latest main into workspace...';
+      let syncConflictFiles: string[] | undefined;
       try {
         const syncResult = await syncMainIntoWorkspace(workspace, id);
         if (syncResult.success) {
@@ -945,10 +956,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             spinner.text = `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`;
           }
         } else {
-          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}`);
+          syncConflictFiles = syncResult.conflictFiles;
+          const conflictHint = syncConflictFiles?.length
+            ? ` Conflicts: ${syncConflictFiles.join(', ')}.`
+            : '';
+          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
         }
       } catch (syncErr: any) {
         spinner.warn(`Sync main failed: ${syncErr.message}`);
+      }
+
+      // PAN-1872: a sync-main conflict must not strand the issue. Continue
+      // spawning the work agent so it can resolve the conflicts and re-submit.
+      if (syncConflictFiles && syncConflictFiles.length > 0) {
+        spinner.text = `Preparing agent to resolve ${syncConflictFiles.length} sync-main conflict(s)...`;
       }
     }
 
@@ -1230,6 +1251,30 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
+    try {
+      const transition = await Effect.runPromise(transitionVBriefOnMain(
+        projectRoot,
+        id,
+        'active',
+        'approved',
+        `scope: approve ${id.toUpperCase()} vBRIEF`,
+      ));
+      if (transition.moved) {
+        console.log(chalk.green(`  ✓ vBRIEF moved ${transition.fromDir} → active`));
+      }
+    } catch (err: any) {
+      console.warn(chalk.dim(`  ⚠ Could not update main vBRIEF lifecycle: ${err?.message ?? String(err)}`));
+    }
+
+    const spawnedPlanPath = findPlanSync(workspace);
+    if (spawnedPlanPath) {
+      try {
+        updatePlanStatus(spawnedPlanPath, 'running');
+      } catch (err: any) {
+        console.warn(chalk.dim(`  ⚠ Could not set workspace vBRIEF status=running: ${err?.message ?? String(err)}`));
+      }
+    }
+
     // Check shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
 
@@ -1275,5 +1320,5 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
 export const __testInternals = {
   failPostCreateValidation,
-  failTransientBeadsValidation,
+  resolveExplicitHarnessFlag,
 };

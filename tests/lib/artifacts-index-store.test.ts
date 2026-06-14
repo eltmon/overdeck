@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ArtifactIndexRepository,
@@ -34,7 +34,7 @@ describe('artifact index store', () => {
     expect(getArtifactIndexPath()).toBe(join(home, 'artifacts', 'index.sqlite'));
     expect(getArtifactSnapshotPath('abc12345')).toBe(join(home, 'artifacts', 'snapshots', 'abc12345', 'index.html'));
 
-    const db = new Database(getArtifactIndexPath());
+    const db = openDatabase(getArtifactIndexPath());
     try {
       const objects = db.prepare(`
         SELECT name, type

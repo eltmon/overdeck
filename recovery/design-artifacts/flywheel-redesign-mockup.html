@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Flywheel page — redesign mockup</title>
+<style>
+  :root{
+    --bg:#0a0e13; --panel:#10151c; --panel2:#141b24; --line:#1e2731; --line2:#28323e;
+    --text:#cdd9e5; --muted:#7d8997; --faint:#566270;
+    --teal:#2dd4bf; --blue:#4a9eff; --green:#3fb950; --amber:#d6a429; --red:#f0625a; --violet:#9a86fd;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,Menlo,monospace}
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 22px 60px}
+  h1.top{font-size:18px;margin:0 0 4px;font-weight:650}
+  p.sub{margin:0 0 18px;color:var(--muted);max-width:860px}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:2px 7px;border-radius:5px}
+  .tag.rec{color:#062;background:var(--teal)}
+  .tag.alt{color:var(--muted);border:1px solid var(--line2)}
+  .legend{color:var(--faint);font-size:12px;margin:6px 0 18px}
+
+  /* the redesigned page shell */
+  .app{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel);margin-bottom:10px}
+
+  /* 1. slim header bar */
+  .bar{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#131a23,#10151c);flex-wrap:wrap}
+  .bar .title{font-weight:650;font-size:14px;display:flex;align-items:center;gap:8px}
+  .runpill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--green);border:1px solid rgba(63,185,80,.4);background:rgba(63,185,80,.08);border-radius:20px;padding:2px 9px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .bar .spacer{flex:1}
+  .switches{display:flex;gap:14px;align-items:center}
+  .sw{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .sw .knob{width:30px;height:17px;border-radius:20px;background:#222c37;border:1px solid var(--line2);position:relative}
+  .sw.on .knob{background:rgba(45,212,191,.18);border-color:var(--teal)}
+  .sw .knob::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#8794a2;transition:.15s}
+  .sw.on .knob::after{left:15px;background:var(--teal)}
+  .stat{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+  .stat .v{font-weight:700;font-size:14px}.stat .k{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.4px}
+
+  /* 2. two-column body: control rail + run */
+  .body{display:grid;grid-template-columns:340px 1fr;min-height:430px}
+  @media(max-width:920px){.body{grid-template-columns:1fr}}
+  .rail{border-right:1px solid var(--line);background:var(--panel2);overflow:auto}
+  @media(max-width:920px){.rail{border-right:0;border-bottom:1px solid var(--line)}}
+
+  /* collapsible card */
+  .card{border-bottom:1px solid var(--line)}
+  .card > .chead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;cursor:pointer;user-select:none}
+  .card > .chead:hover{background:#11171f}
+  .chead .lbl{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.4px;color:var(--text)}
+  .chead .count{font-size:10.5px;color:var(--muted);font-weight:600}
+  .chead .chev{color:var(--faint);transition:.15s}
+  .card.collapsed .cbody{display:none}
+  .card.collapsed .chev{transform:rotate(-90deg)}
+  .cbody{padding:4px 14px 12px}
+
+  .row{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row .id{color:var(--blue);font-family:ui-monospace,monospace;font-size:11px;width:74px;flex:0 0 auto}
+  .row .t{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px}
+  .chip.auto{color:var(--teal);background:rgba(45,212,191,.1)}
+  .chip.hold{color:var(--amber);background:rgba(214,164,41,.1)}
+  .chip.batch{color:var(--green);background:rgba(63,185,80,.1)}
+  .chip.serial{color:var(--amber);background:rgba(214,164,41,.1)}
+  .uatline{margin:8px 0 4px;border:1px dashed rgba(45,212,191,.4);background:rgba(45,212,191,.05);border-radius:7px;padding:6px 9px;font-size:11px}
+  .uatline b{color:var(--teal)}
+
+  /* run column */
+  .run{display:flex;flex-direction:column}
+  .runhead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .runhead .seg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden;margin-left:auto}
+  .runhead .seg span{padding:4px 10px;font-size:11px;color:var(--muted);cursor:pointer}
+  .runhead .seg span.on{background:#11171f;color:var(--text)}
+  .runbody{flex:1;padding:14px;color:var(--faint);font-size:12px;display:flex;flex-direction:column;gap:8px}
+  .msg{border:1px solid var(--line);border-radius:8px;padding:9px 11px;background:#0e131a}
+  .msg .who{font-size:10.5px;color:var(--blue);font-weight:600;margin-bottom:3px}
+
+  .callout{margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .callout .arrow{color:var(--teal);font-weight:700}
+
+  /* tabbed alt */
+  .alt-wrap{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  @media(max-width:920px){.alt-wrap{grid-template-columns:1fr}}
+  .mini{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .mini h3{margin:0;padding:9px 12px;font-size:12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .mini .tabs{display:flex;gap:2px;padding:6px 10px 0;border-bottom:1px solid var(--line);background:#0e131a}
+  .mini .tabs span{font-size:11px;padding:6px 9px;color:var(--muted);border-bottom:2px solid transparent}
+  .mini .tabs span.on{color:var(--text);border-bottom-color:var(--blue)}
+  .mini .mbody{padding:12px;color:var(--faint);font-size:11.5px;min-height:120px}
+  .mini.col2 .split{display:grid;grid-template-columns:1fr 1fr;min-height:130px}
+  .mini.col2 .split > div{padding:10px;font-size:11px;color:var(--faint)}
+  .mini.col2 .split > div:first-child{border-right:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="top">Flywheel page redesign <span class="tag rec">✓ recommended</span></h1>
+  <p class="sub">Same content as today — config toggles, suggestions, pending auto-merges, merge policy, merge queue + UAT candidate, the run conversation, activity — reorganized so it reads top-to-bottom instead of stacking into a glob. Nothing is dropped; everything gets a home.</p>
+  <div class="legend">Recommended: <b>slim header bar + collapsible control rail + run column</b>. Two alternatives shown below for comparison.</div>
+
+  <!-- RECOMMENDED -->
+  <div class="app">
+    <!-- header bar -->
+    <div class="bar">
+      <span class="title">⚙️ Fix-All Flywheel <span class="runpill"><span class="dot"></span>running · RUN-7</span></span>
+      <span class="spacer"></span>
+      <div class="switches">
+        <span class="sw on" title="Auto-pickup backlog"><span class="knob"></span>Auto-pickup</span>
+        <span class="sw on" title="Require UAT before merge"><span class="knob"></span>Require UAT</span>
+        <span class="sw" title="Merge train (auto-rebase ready siblings)"><span class="knob"></span>Merge train</span>
+      </div>
+      <div style="display:flex;gap:18px;margin-left:8px">
+        <div class="stat"><span class="v">5</span><span class="k">agents</span></div>
+        <div class="stat"><span class="v">11</span><span class="k">in flight</span></div>
+        <div class="stat"><span class="v">$0.27</span><span class="k">spend</span></div>
+      </div>
+    </div>
+
+    <!-- two-column body -->
+    <div class="body">
+      <!-- collapsible control rail -->
+      <div class="rail">
+        <div class="card">
+          <div class="chead"><span class="lbl">⚡ Merge policy <span class="count">3 auto · 2 hold</span></span><span class="chev">▾</span></div>
+          <div class="cbody">
+            <div class="row"><span class="id mono">PAN-1685</span><span class="t">guard image attachments</span><span class="chip auto">auto</span></div>
+            <div class="row"><span class="id mono">PAN-1520</span><span class="t">terminal theme toggle</span><span class="chip hold">hold</span></div>
+            <div class="row"><span class="id mono">PAN-1455</span><span class="t">codex auth dist fix</span><span class="chip auto">auto</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="chead"><span class="lbl">⛙ Merge queue <span class="count">3 ready</span></span><span class="chev">▾</span></div>
+          <div class="cbody">
+            <div class="uatline"><b>UAT candidate</b> <span class="mono" style="color:var(--muted)">uat/pan-2026-06-09</span> — bundles 2: PAN-1685, PAN-1455</div>
+            <div class="row"><span class="id mono">PAN-1685</span><span class="t">#1690</span><span class="chip batch">⚡ batch</span></div>
+            <div class="row"><span class="id mono">PAN-1455</span><span class="t">#1672</span><span class="chip batch">⚡ batch</span></div>
+            <div class="row"><span class="id mono">PAN-1520</span><span class="t">#1655</span><span class="chip serial">serial</span></div>
+          </div>
+        </div>
+        <div class="card collapsed">
+          <div class="chead"><span class="lbl">◷ Pending auto-merges <span class="count">1</span></span><span class="chev">▾</span></div>
+          <div class="cbody"></div>
+        </div>
+        <div class="card collapsed">
+          <div class="chead"><span class="lbl">💡 Suggestions <span class="count">4</span></span><span class="chev">▾</span></div>
+          <div class="cbody"></div>
+        </div>
+      </div>
+
+      <!-- run column -->
+      <div class="run">
+        <div class="runhead">
+          <span style="font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">Run conversation</span>
+          <span class="seg"><span class="on">Conversation</span><span>State</span><span>Stats</span><span>Activity</span></span>
+        </div>
+        <div class="runbody">
+          <div class="msg"><div class="who">flywheel</div>Scanning pipeline · 11 issues in flight, 3 ready for merge.</div>
+          <div class="msg"><div class="who">flywheel</div>PAN-1685 + PAN-1455 are disjoint — batched onto the UAT candidate.</div>
+          <div class="msg"><div class="who">you</div>hold PAN-1520 for UAT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="callout"><span class="arrow">→</span> Toggles + run status live in one slim bar. The stacked banners become <b>collapsible cards in a left rail</b> (fold the ones you don't need). The activity feed becomes a tab of the run column instead of a third stacked panel.</div>
+
+  <!-- ALTERNATIVES -->
+  <h1 class="top" style="margin-top:30px;font-size:15px">Alternatives <span class="tag alt">for comparison</span></h1>
+  <div class="alt-wrap">
+    <div class="mini">
+      <h3>A · Tabbed control panel <span style="color:var(--faint);font-weight:400">one panel, switch views</span></h3>
+      <div class="tabs"><span class="on">Merge policy</span><span>Queue</span><span>Pending</span><span>Suggestions</span></div>
+      <div class="mbody">One control panel, tab between merge policy / queue / pending / suggestions. Less scrolling, but you can only see one at a time — worse when you want policy + queue side by side.</div>
+    </div>
+    <div class="mini col2">
+      <h3>B · Two-column split <span style="color:var(--faint);font-weight:400">controls | run, no folding</span></h3>
+      <div class="split">
+        <div><b>Controls</b><br/>policy, queue, pending, suggestions all stacked (today's content) but in a fixed left column.</div>
+        <div><b>Run + activity</b><br/>conversation and activity on the right.</div>
+      </div>
+      <div style="padding:8px 10px;font-size:11px;color:var(--faint);border-top:1px solid var(--line)">Simplest, but the left column still stacks everything — closest to today, just walled off from the run.</div>
+    </div>
+  </div>
+  <div class="callout"><span class="arrow">→</span> My pick is the recommended one (collapsible rail) — it shows what you want, folds what you don't, and promotes the merge-train/UAT info you just added to first-class cards. (A) hides too much; (B) doesn't solve the stacking.</div>
+
+  <div style="margin-top:22px;color:var(--faint);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px">Mockup · static · <code>.tmp/flywheel-redesign-mockup.html</code> · PAN-1694</div>
+</div>
+</body>
+</html>

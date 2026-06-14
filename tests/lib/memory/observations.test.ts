@@ -96,7 +96,7 @@ describe('observation writer', () => {
       SELECT source, display_content
       FROM memory_fts
       WHERE source = ?
-    `).all(first.id) as Array<Record<string, unknown>>);
+    `).all<Record<string, unknown>>(first.id));
     expect(ftsRows).toEqual([{ source: 'obs-1', display_content: 'Updated summary.' }]);
 
     const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'));
@@ -117,7 +117,7 @@ describe('observation writer', () => {
       SELECT id, observation_path_jsonl, byte_offset
       FROM observation_index
       WHERE id = ?
-    `).get(entry.id) as { id: string; observation_path_jsonl: string; byte_offset: number });
+    `).get<{ id: string; observation_path_jsonl: string; byte_offset: number }>(entry.id));
     expect(indexRow).toEqual({ id: entry.id, observation_path_jsonl: jsonlPath, byte_offset: 0 });
   });
 
@@ -136,7 +136,7 @@ describe('observation writer', () => {
              session_id, agent_role, agent_harness
       FROM memory_fts
       WHERE memory_fts MATCH 'prompt memory indexing'
-    `).all() as Array<Record<string, unknown>>);
+    `).all<Record<string, unknown>>());
     expect(ftsRows).toHaveLength(1);
     expect(ftsRows[0]).toMatchObject({
       content: 'Narrative details about prompt memory indexing.\n\nSummary details about prompt memory indexing.',
@@ -163,7 +163,7 @@ describe('observation writer', () => {
       SELECT id, observation_path_jsonl, byte_offset
       FROM observation_index
       WHERE id = ?
-    `).get(entry.id) as { id: string; observation_path_jsonl: string; byte_offset: number });
+    `).get<{ id: string; observation_path_jsonl: string; byte_offset: number }>(entry.id));
     expect(indexRow).toEqual({ id: entry.id, observation_path_jsonl: result.jsonlPath, byte_offset: 0 });
 
     const raw = await readFile(indexRow.observation_path_jsonl, 'utf8');
@@ -187,7 +187,7 @@ describe('observation writer', () => {
         SELECT observation_path_jsonl, byte_offset
         FROM observation_index
         WHERE id = ?
-      `).get(entry.id) as { observation_path_jsonl: string; byte_offset: number });
+      `).get<{ observation_path_jsonl: string; byte_offset: number }>(entry.id));
       expect(indexRow.observation_path_jsonl).toBe(jsonlPath);
       const indexedJson = raw.slice(indexRow.byte_offset).split('\n')[0];
       expect(JSON.parse(indexedJson)).toEqual(entry);

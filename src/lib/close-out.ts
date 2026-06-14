@@ -38,12 +38,23 @@ async function isBranchMerged(
   branchName: string,
   projectPath: string,
 ): Promise<{ status: 'merged' | 'unmerged' | 'no-branch'; message: string }> {
-  // Check review-status first — the merge specialist validates before marking merged
+  // Check review-status as a hint — but NEVER trust it over the live git state.
+  // An issue that merged once can be re-activated and accumulate new unmerged
+  // commits; honoring a stale mergeStatus here would let close-out tear down a
+  // workspace with un-landed work. Only honor it when the branch has nothing
+  // beyond main; otherwise fall through to the robust git checks below (which
+  // still recognise squash-merges via the code-diff check).
   try {
     const issueId = branchName.replace('feature/', '').toUpperCase();
     const statuses = loadReviewStatuses();
     if (statuses[issueId]?.mergeStatus === 'merged') {
-      return { status: 'merged', message: 'Merge specialist confirmed merge completed' };
+      const { stdout: aheadOfMain } = await execAsync(
+        `git log main..${branchName} --oneline 2>/dev/null || true`,
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      if (!aheadOfMain.trim()) {
+        return { status: 'merged', message: 'Merge specialist confirmed merge completed' };
+      }
     }
   } catch {
     // review-status.json may not exist, continue with git checks
@@ -233,6 +244,18 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
       message: `Could not verify merge: ${(err as Error).message}`,
     });
     return { success: false, issueId: ctx.issueId, steps, error: 'Could not verify branch merge status' };
+  }
+
+  // Step 2.5: Refuse close-out while the work agent session is still alive.
+  // postMergeLifecycle pauses the work agent at merge, so a live agent-<issue>
+  // session means the issue was re-activated and is doing in-progress work that
+  // tearing down the workspace would destroy (the verifying_on_main tag can be
+  // stale — it is set at first merge and not cleared when work resumes).
+  const liveAgentSession = `agent-${issueLower}`;
+  if (sessionExistsSync(liveAgentSession)) {
+    const activeMsg = `${liveAgentSession} is still running — pause/stop it before close-out (it was re-activated after merge; closing now would kill in-progress work).`;
+    steps.push({ name: 'No active work agent', status: 'failed', message: activeMsg });
+    return { success: false, issueId: ctx.issueId, steps, error: activeMsg };
   }
 
   // Step 3: Clean up workspace

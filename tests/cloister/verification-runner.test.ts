@@ -71,6 +71,7 @@ vi.mock('../../src/lib/cloister/validation.js', () => ({
   DEFAULT_GATES: {
     typecheck: { command: 'npm run typecheck 2>&1' },
     lint: { command: 'npm run lint 2>&1' },
+    test: { command: 'npx vitest run --changed {{CHANGED_BASE}} && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}' },
   },
 }));
 

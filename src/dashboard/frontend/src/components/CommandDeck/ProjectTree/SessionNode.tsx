@@ -22,6 +22,7 @@ import {
   Globe,
   Bot,
   Wrench,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
@@ -187,6 +188,7 @@ interface SessionNodeProps {
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   work: Code2,
+  strike: Zap,
   planning: Compass,
   review: Eye,
   test: FlaskConical,
@@ -244,6 +246,7 @@ function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | 
     case 'review': return 'Review';
     case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
     case 'work': return 'Work';
+    case 'strike': return 'Strike';
     case 'planning': return 'Planning';
     case 'legacy': return 'Planning state';
     default: return session.type;
@@ -254,6 +257,8 @@ function describeSessionPurpose(session: SessionNodeType): string {
   switch (session.type) {
     case 'work':
       return 'Implementation agent for this issue.';
+    case 'strike':
+      return 'Drop-in implement-and-merge agent for this issue.';
     case 'planning':
       return 'Planning and context-building session for this issue.';
     case 'review':

@@ -6,9 +6,9 @@ import { join } from 'node:path';
 
 import { openEmbeddingsDb, dimensionsForModel } from '../conversation-embeddings-db.js';
 import type { ChunkInsert, EmbeddingsDbHandle } from '../conversation-embeddings-db.js';
+import { openDatabase, type SqliteDatabase } from '../driver.js';
 
 const require = createRequire(import.meta.url);
-const BetterSqlite3 = require('better-sqlite3');
 const sqliteVec = require('sqlite-vec') as { getLoadablePath: () => string };
 
 let tmpDir: string | undefined;
@@ -35,8 +35,8 @@ function makeChunk(overrides: Partial<ChunkInsert> = {}): ChunkInsert {
   };
 }
 
-function openRawDb(dbPath: string): any {
-  const db = new BetterSqlite3(dbPath);
+function openRawDb(dbPath: string): SqliteDatabase {
+  const db = openDatabase(dbPath, { allowExtension: true });
   db.loadExtension(sqliteVec.getLoadablePath());
   return db;
 }

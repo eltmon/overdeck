@@ -6,7 +6,7 @@
  * shell commands with a deterministic, programmatic conversion.
  */
 
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { readFile } from 'node:fs/promises';
@@ -17,9 +17,8 @@ import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type RunBdWithRe
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
-import { subItemsOf, type VBriefDocument, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDocument, type VBriefEdge, type VBriefInspectionPolicy, type VBriefItem, type VBriefItemStatus } from './types.js';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 /**
@@ -63,6 +62,47 @@ function execFileErrorMessage(error: any): string {
   return firstLine(error?.stderr?.toString() || error?.message || error);
 }
 
+/** Bootstrap timeout for the latency probe that derives the operational timeout. */
+const BD_PING_BOOTSTRAP_TIMEOUT_MS = 8000;
+/** Floor for the adaptive bd operational timeout. Preserves today's 30s default. */
+const BD_TIMEOUT_FLOOR_MS = 30000;
+/** Ceiling for the adaptive bd operational timeout. Prevents near-unbounded waits. */
+const BD_TIMEOUT_CEILING_MS = 180000;
+/** Multiplier applied to bd ping total_ms to derive the operational timeout. */
+const BD_TIMEOUT_MULTIPLIER = 20;
+
+/**
+ * Resolve the operational timeout for all bd calls in this finalize.
+ *
+ * - If PANOPTICON_BD_TIMEOUT_MS is a positive integer, return it verbatim and
+ *   do NOT probe bd.
+ * - Otherwise run `bd ping --json` once with a fixed bootstrap timeout, read
+ *   total_ms, and clamp(total_ms * 20, 30s, 180s).
+ * - If the probe fails or returns unparseable JSON, return the 30s floor.
+ *
+ * The caller (createBeadsFromVBriefPromise) caches the result for the lifetime
+ * of one finalize so the probe runs once.
+ */
+export async function resolveBdTimeout(workspacePath: string): Promise<number> {
+  const envValue = Number(process.env.PANOPTICON_BD_TIMEOUT_MS);
+  if (Number.isInteger(envValue) && envValue > 0) {
+    return Math.min(BD_TIMEOUT_CEILING_MS, Math.max(BD_TIMEOUT_FLOOR_MS, envValue));
+  }
+
+  try {
+    const { stdout } = await execFileAsync('bd', ['ping', '--json'], {
+      encoding: 'utf-8',
+      cwd: workspacePath,
+      timeout: BD_PING_BOOTSTRAP_TIMEOUT_MS,
+    });
+    const parsed = JSON.parse(stdout);
+    const totalMs = typeof parsed?.total_ms === 'number' ? parsed.total_ms : 0;
+    return Math.min(BD_TIMEOUT_CEILING_MS, Math.max(BD_TIMEOUT_FLOOR_MS, totalMs * BD_TIMEOUT_MULTIPLIER));
+  } catch {
+    return BD_TIMEOUT_FLOOR_MS;
+  }
+}
+
 function parseBdList(stdout: unknown): any[] {
   const parsed = JSON.parse(String(stdout || '[]'));
   if (!Array.isArray(parsed)) throw new Error('bd list returned non-array JSON');
@@ -76,42 +116,191 @@ function beadIdsFromList(beads: any[]): string[] {
     .map(id => String(id));
 }
 
-type BdRetryOptions = Omit<RunBdWithRetryOptions, 'workspacePath'>;
-
-type ClearBeadsOptions = BdRetryOptions & {
-  lockAlreadyHeld?: boolean;
-};
-
-async function listBeadsForIssueRaw(workspacePath: string, issueLabel: string): Promise<any[]> {
-  const { stdout } = await execFileAsync(
-    'bd',
-    ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-    { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 }
-  );
-  return parseBdList(stdout);
+async function listBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number): Promise<any[]> {
+  return retryBd(async () => {
+    const { stdout } = await execFileAsync(
+      'bd',
+      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
+      { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs }
+    );
+    return parseBdList(stdout);
+  });
 }
 
-async function listBeadsForIssue(workspacePath: string, issueLabel: string, options: ClearBeadsOptions = {}): Promise<any[]> {
-  return runBdWithRetry(
-    `list beads for ${issueLabel}`,
-    () => listBeadsForIssueRaw(workspacePath, issueLabel),
-    { ...options, workspacePath },
-  );
+/**
+ * After a bd create timeout or empty-stdout, recover the bead ID by exact-title
+ * re-query. A client-side timeout usually means the create succeeded on the
+ * server, so the only missing piece is the ID.
+ *
+ * Returns the recovered id, or null if no unique match is found. ambiguity=true
+ * means more than one bead matched the full title and the caller must NOT pick
+ * one silently.
+ */
+async function recoverBeadIdByTitle(
+  workspacePath: string,
+  issueLabel: string,
+  fullTitle: string,
+  timeoutMs: number,
+): Promise<{ id: string | null; ambiguity: boolean }> {
+  let beads: any[];
+  try {
+    beads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+  } catch {
+    return { id: null, ambiguity: false };
+  }
+
+  const matches = beads.filter(bead => bead?.title === fullTitle);
+  if (matches.length === 1) {
+    const id = matches[0]?.id;
+    if (id !== undefined && id !== null && String(id).length > 0) {
+      return { id: String(id), ambiguity: false };
+    }
+  } else if (matches.length > 1) {
+    return { id: null, ambiguity: true };
+  }
+
+  return { id: null, ambiguity: false };
 }
 
-async function deleteBeadForIssue(workspacePath: string, issueLabel: string, id: string, options: ClearBeadsOptions = {}): Promise<void> {
-  const deleteBead = async () => {
+interface RetryBdOptions {
+  attempts?: number;
+  baseDelayMs?: number;
+}
+
+/**
+ * Bounded exponential-backoff retry for idempotent bd operations.
+ *
+ * Retries `fn` up to `attempts` times (default 3), waiting
+ * `baseDelayMs * 2^(attempt-1)` milliseconds between attempts. Surfaces the
+ * last error once attempts are exhausted. Used only for reads/deletes — never
+ * for bd create, which is not idempotent.
+ */
+export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions = {}): Promise<T> {
+  const attempts = options.attempts ?? 3;
+  const baseDelayMs = options.baseDelayMs ?? 500;
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        const delay = baseDelayMs * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Post-condition verification for dependency edges.
+ *
+ * Issues one batched `bd dep list` over all created bead IDs, compares the
+ * actual `blocks` dependencies against plan.edges, and repairs any missing edge
+ * with `bd dep add`. Edges whose endpoints were not both captured are reported
+ * as errors and not repaired. After repairs, any edge that is still missing
+ * causes success:false so finalize exits non-zero rather than silently shipping
+ * a corrupt DAG.
+ */
+async function verifyAndRepairDependencyEdges(
+  workspacePath: string,
+  planEdges: VBriefEdge[],
+  beadIds: Map<string, string>,
+  timeoutMs: number,
+): Promise<{ success: boolean; errors: string[] }> {
+  const blockEdges = planEdges.filter(edge => edge.type === 'blocks');
+  if (blockEdges.length === 0 || beadIds.size === 0) {
+    return { success: true, errors: [] };
+  }
+
+  const createdBeadIds = Array.from(new Set(beadIds.values()));
+
+  let actualDeps: any[];
+  try {
+    const { stdout } = await retryBd(() => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
+      encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+    }));
+    actualDeps = parseBdList(stdout);
+  } catch (error: any) {
+    return { success: false, errors: [`dep list failed: ${execFileErrorMessage(error)}`] };
+  }
+
+  const isBlocksDep = (dep: any) =>
+    dep?.dependency_type === 'blocks' || dep?.type === 'blocks' || dep?.relationship === 'blocks';
+  const actualDepSet = new Set(
+    actualDeps
+      .filter(isBlocksDep)
+      .map(dep => `${dep.issue_id}|${dep.depends_on_id ?? dep.id}`),
+  );
+
+  const errors: string[] = [];
+  const missingRepairs: Array<{ from: string; to: string; beadFrom: string; beadTo: string }> = [];
+
+  for (const edge of blockEdges) {
+    const beadFrom = beadIds.get(edge.from);
+    const beadTo = beadIds.get(edge.to);
+    if (!beadFrom || !beadTo) {
+      errors.push(`Missing bead IDs for dependency edge ${edge.from} -> ${edge.to}`);
+      continue;
+    }
+    const key = `${beadTo}|${beadFrom}`;
+    if (!actualDepSet.has(key)) {
+      missingRepairs.push({ from: edge.from, to: edge.to, beadFrom, beadTo });
+    }
+  }
+
+  for (const repair of missingRepairs) {
+    try {
+      await retryBd(() => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+      }));
+      actualDepSet.add(`${repair.beadTo}|${repair.beadFrom}`);
+    } catch (error: any) {
+      errors.push(`Failed to repair dependency edge ${repair.from} -> ${repair.to}: ${execFileErrorMessage(error)}`);
+    }
+  }
+
+  // Any edge still missing after repair attempts is a hard failure.
+  for (const edge of blockEdges) {
+    const beadFrom = beadIds.get(edge.from);
+    const beadTo = beadIds.get(edge.to);
+    if (!beadFrom || !beadTo) continue;
+    const key = `${beadTo}|${beadFrom}`;
+    if (!actualDepSet.has(key)) {
+      errors.push(`Dependency edge ${edge.from} -> ${edge.to} still missing after repair`);
+    }
+  }
+
+  return { success: errors.length === 0, errors };
+}
+
+/**
+ * Delete a single bead, treating "issue not found" as success. Under contention
+ * a delete can time out client-side while committing server-side; a retry then
+ * sees the bead as already gone. Catching that case makes deletion idempotent.
+ */
+async function deleteBead(workspacePath: string, id: string, timeoutMs: number): Promise<void> {
+  try {
     await execFileAsync('bd', ['delete', id, '--force'], {
-      encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+      encoding: 'utf-8',
+      cwd: workspacePath,
+      timeout: timeoutMs,
     });
-  };
-  return runBdWithRetry(`delete bead ${id} for ${issueLabel}`, deleteBead, { ...options, workspacePath });
+  } catch (error: any) {
+    const message = execFileErrorMessage(error).toLowerCase();
+    if (message.includes('not found')) {
+      return;
+    }
+    throw error;
+  }
 }
 
-export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, options: ClearBeadsOptions = {}): Promise<ClearBeadsResult> {
+export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
   let existingBeads: any[];
   try {
-    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
   } catch (error: any) {
     return {
       cleared: 0,
@@ -124,7 +313,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   let cleared = 0;
   for (const id of beadIdsFromList(existingBeads)) {
     try {
-      await deleteBeadForIssue(workspacePath, issueLabel, id, options);
+      await retryBd(() => deleteBead(workspacePath, id, timeoutMs));
       cleared++;
     } catch (error: any) {
       errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
@@ -133,7 +322,7 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
 
   let residualBeads: any[];
   try {
-    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
   } catch (error: any) {
     errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
     return { cleared, errors, transientFailure: error instanceof BdTransientFailure ? error : undefined };
@@ -207,11 +396,11 @@ async function createBeadsFromVBriefPromise(
       // No main .beads/ and no local .beads/ — fall back to bd init
       const prefix = deriveProjectPrefix(workspacePath);
       try {
-        await execFileAsync('bd', ['init', '--prefix', prefix], { encoding: 'utf-8', cwd: workspacePath, timeout: 15000 });
+        await execFileAsync('bd', ['init', '--prefix', prefix], { encoding: 'utf-8', cwd: workspacePath, timeout: BD_TIMEOUT_FLOOR_MS });
         await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
         // Disable beads' auto-export git-add to prevent "git add failed" warnings in worktrees
         await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-          encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+          encoding: 'utf-8', cwd: workspacePath, timeout: BD_TIMEOUT_FLOOR_MS,
         }).catch(() => {});
         console.log(`[beads] Initialized beads database in ${workspacePath} (prefix: ${prefix})`);
       } catch (initErr: any) {
@@ -230,12 +419,16 @@ async function createBeadsFromVBriefPromise(
   const planEdges = plan.edges ?? [];
   const inspectionPolicy = doc.vBRIEFInfo.inspectionPolicy ?? 'auto';
 
+  // Resolve the operational timeout once per finalize. The probe itself uses a
+  // fixed bootstrap timeout; every other bd call uses the resolved value.
+  const bdTimeoutMs = await resolveBdTimeout(workspacePath);
+
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
   try {
-    await execFileAsync('bd', ['ping', '--json'], {
-      encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
-    });
+    await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
+      encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
+    }));
   } catch (connectErr: any) {
     const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
     const firstLine = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
@@ -248,7 +441,7 @@ async function createBeadsFromVBriefPromise(
     console.warn(`[beads] bd ping failed (${firstLine}); running bd doctor --fix before retry`);
     try {
       await execFileAsync('bd', ['doctor', '--fix'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 30000,
+        encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
       });
     } catch (doctorErr: any) {
       const doctorErrMsg = String(doctorErr?.message ?? doctorErr?.stderr ?? '');
@@ -257,20 +450,20 @@ async function createBeadsFromVBriefPromise(
     }
 
     try {
-      await execFileAsync('bd', ['ping', '--json'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
-      });
+      await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
+      }));
     } catch (retryErr: any) {
       if (!redirectExists && !existsSync(mainBeadsDir)) {
         const prefix = deriveProjectPrefix(workspacePath);
         console.log(`[beads] No redirect and no main beads — bd init --prefix ${prefix}`);
         try {
           await execFileAsync('bd', ['init', '--prefix', prefix], {
-            encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
+            encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
           });
           await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
           await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-            encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+            encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
           }).catch(() => {});
           console.log(`[beads] bd init succeeded for prefix ${prefix}`);
         } catch (initErr: any) {
@@ -290,7 +483,7 @@ async function createBeadsFromVBriefPromise(
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, { ...retryOptions, lockAlreadyHeld: true });
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, bdTimeoutMs);
   if (clearResult.errors.length > 0) {
     return {
       success: false,
@@ -407,31 +600,58 @@ async function createBeadsFromVBriefPromise(
 
     console.log(`[beads] (${i + 1}/${orderedIds.length}) creating "${item.title}"`);
 
+    let capturedBeadId: string | null = null;
+    let createFailureMessage: string | null = null;
+
     try {
       const { stdout } = await execFileAsync('bd', args, {
         encoding: 'utf-8',
         cwd: workspacePath,
-        timeout: 30000,
+        timeout: bdTimeoutMs,
       });
-      const beadId = stdout.trim();
-
-      if (beadId) {
-        beadIds.set(itemId, beadId);
-        created.push(fullTitle);
-      } else {
-        errors.push(`Created "${item.title}" but could not capture bead ID`);
-        created.push(fullTitle);
+      capturedBeadId = stdout.trim() || null;
+      if (!capturedBeadId) {
+        createFailureMessage = `Created "${item.title}" but could not capture bead ID`;
       }
     } catch (error: any) {
       // killed === true means execFile hit the timeout — surface that specifically
       // so hangs don't look like generic failures.
       const timedOut = error?.killed === true || /ETIMEDOUT/i.test(String(error?.code ?? ''));
       const errMsg = error?.stderr?.toString() || error?.message || String(error);
-      const prefix = timedOut ? 'timed out after 30s' : errMsg.split('\n')[0];
-      errors.push(`Failed to create "${item.title}": ${prefix}`);
-      console.warn(`[beads] (${i + 1}/${orderedIds.length}) FAILED "${item.title}": ${prefix}`);
+      const prefix = timedOut ? `timed out after ${Math.round(bdTimeoutMs / 1000)}s` : errMsg.split('\n')[0];
+      createFailureMessage = `Failed to create "${item.title}": ${prefix}`;
+    }
+
+    if (capturedBeadId) {
+      beadIds.set(itemId, capturedBeadId);
+      created.push(fullTitle);
+    } else {
+      // A timeout or empty stdout usually means the bead was created server-side
+      // but we lost the ID. Re-query by exact title before giving up.
+      console.warn(`[beads] (${i + 1}/${orderedIds.length}) FAILED/EMPTY "${item.title}"; attempting title-based recovery`);
+      const recovered = await recoverBeadIdByTitle(workspacePath, issueLabel, fullTitle, bdTimeoutMs);
+      if (recovered.ambiguity) {
+        errors.push(`${createFailureMessage}; recovery found multiple beads titled "${fullTitle}"`);
+      } else if (recovered.id) {
+        beadIds.set(itemId, recovered.id);
+        created.push(fullTitle);
+        console.log(`[beads] (${i + 1}/${orderedIds.length}) RECOVERED "${item.title}" as ${recovered.id}`);
+      } else {
+        errors.push(createFailureMessage ?? `Failed to create "${item.title}"`);
+      }
     }
   }
+
+  // Verify dependency edges as a post-condition. A create that timed out and was
+  // recovered, or contention that dropped the --deps argument, can leave the DAG
+  // incomplete. Repair any missing edges before declaring success.
+  const edgeVerification = await verifyAndRepairDependencyEdges(
+    workspacePath,
+    planEdges,
+    beadIds,
+    bdTimeoutMs,
+  );
+  errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
     },

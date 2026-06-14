@@ -65,7 +65,10 @@ vi.mock('../cloister/config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})),
 vi.mock('../providers.js', () => ({ getProviderForModel: vi.fn(() => ({ name: 'anthropic', compatibility: 'direct' })), getProviderEnv: vi.fn(() => ({})), setupCredentialFileAuth: vi.fn(), clearCredentialFileAuth: vi.fn() }));
 vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), isClaudeCodeChannelsMcpEnabled: vi.fn(() => false), resolveModel: vi.fn(), NormalizedCavemanConfig: {} }));
 vi.mock('../caveman/workspace.js', () => ({ readCavemanVariant: vi.fn() }));
-vi.mock('../config.js', () => ({ loadConfig: vi.fn(() => ({})) }));
+vi.mock('../config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../config.js')>()),
+  loadConfig: vi.fn(() => ({})),
+}));
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));
 vi.mock('../cliproxy.js', () => ({ CLIPROXY_BASE_URL: 'http://127.0.0.1:8317', getCliproxyClientEnv: vi.fn(() => ({})), bridgeGeminiAuthToCliproxy: vi.fn(() => ({})) }));
 vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), createTracker: vi.fn() }));
@@ -80,7 +83,7 @@ vi.mock('../paths.js', () => ({
   getPanopticonHome: () => '/tmp/test',
 }));
 
-import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
+import { getAgentStateSync, listRunningAgentsSync, resolveAgentTargetSync } from '../agents.js';
 
 describe('agent ID normalization (PAN-871)', () => {
   beforeEach(() => {
@@ -100,6 +103,31 @@ describe('agent ID normalization (PAN-871)', () => {
     expect(agents).toHaveLength(1);
     expect(agents[0].id).toBe('agent-pan-871');
     expect(agents[0].tmuxActive).toBe(true);
+  });
+
+  it('resolves issue IDs to the single registered strike agent when no work agent exists', async () => {
+    const { existsSync, readFileSync, readdirSync } = await import('fs');
+    vi.mocked(existsSync).mockImplementation((path: string) =>
+      String(path) === '/tmp/test/agents' ||
+      String(path).includes('strike-pan-1820/state.json')
+    );
+    vi.mocked(readdirSync).mockImplementation(((_path: string, opts?: any) => {
+      if (opts && typeof opts === 'object' && 'withFileTypes' in opts) {
+        return [{ name: 'strike-pan-1820', isDirectory: () => true }];
+      }
+      return [];
+    }) as typeof readdirSync);
+    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
+      issueId: 'PAN-1820',
+      workspace: '/tmp/workspace',
+      harness: 'codex',
+      role: 'strike',
+      model: 'gpt-5',
+      status: 'running',
+      startedAt: '2026-06-13T00:00:00.000Z',
+    }));
+
+    expect(resolveAgentTargetSync('PAN-1820')).toBe('strike-pan-1820');
   });
 
   it('treats corrupted state.json as missing', async () => {

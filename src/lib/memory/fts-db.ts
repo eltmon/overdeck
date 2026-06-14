@@ -1,391 +1,182 @@
-import type Database from 'better-sqlite3';
-import { createRequire } from 'module';
-import { Worker } from 'worker_threads';
-import { fileURLToPath } from 'node:url';
-import { ensureParentDir, resolveFtsDbPath } from './paths.js';
+import { Worker } from 'node:worker_threads';
+import type { SqliteBindParams, SqliteRunResult } from '../database/driver.js';
+import {
+  closeMemoryFtsDatabasesInProcess,
+  getMemoryFtsDatabaseSync,
+  runMemoryFtsStatementSync,
+  runMemoryFtsTransactionSync,
+  type MemoryFtsStatement,
+} from './fts-operations.js';
 
-declare const Bun: unknown;
+export type { MemoryFtsStatement };
 
-const _require = createRequire(import.meta.url);
-const betterSqlite3Path = resolveBetterSqlite3Path();
-const databases = new Map<string, Database.Database>();
-
-function resolveBetterSqlite3Path(): string {
-  try {
-    return _require.resolve('better-sqlite3');
-  } catch (cause) {
-    const error = new Error(
-      `Cannot find better-sqlite3 from ${fileURLToPath(import.meta.url)}; run bun install in the workspace before starting Panopticon.`,
-    );
-    error.cause = cause;
-    throw error;
-  }
+export interface MemoryFtsPreparedStatement {
+  run(...params: SqliteBindParams[]): Promise<SqliteRunResult>;
+  get<TRow = unknown>(...params: SqliteBindParams[]): Promise<TRow | undefined>;
+  all<TRow = unknown>(...params: SqliteBindParams[]): Promise<TRow[]>;
 }
-const openingDatabases = new Map<string, Promise<Database.Database>>();
+
+export interface MemoryFtsDatabaseClient {
+  exec(sql: string): Promise<void>;
+  prepare(sql: string): MemoryFtsPreparedStatement;
+}
+
+interface MemoryFtsWorkerResponse {
+  id: number;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+}
+
+type MemoryFtsWorkerOperation = 'initialize' | 'statement' | 'transaction' | 'close';
+
 let worker: Worker | null = null;
 let nextRequestId = 1;
-const pendingWorkerRequests = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const pendingRequests = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+const clients = new Map<string, MemoryFtsDatabaseClient>();
 
-export interface MemoryFtsStatement {
-  sql: string;
-  params?: unknown[];
-  method: 'all' | 'get' | 'run' | 'exec';
-}
-
-
-function isBunRuntime(): boolean {
-  return typeof Bun !== 'undefined';
-}
-
-export async function getMemoryFtsDatabase(projectId: string): Promise<Database.Database> {
-  const cached = databases.get(projectId);
+export async function getMemoryFtsDatabase(projectId: string): Promise<MemoryFtsDatabaseClient> {
+  const cached = clients.get(projectId);
   if (cached) return cached;
 
-  const opening = openingDatabases.get(projectId);
-  if (opening) return opening;
-
-  const promise = openMemoryFtsDatabase(projectId).finally(() => {
-    openingDatabases.delete(projectId);
-  });
-  openingDatabases.set(projectId, promise);
-  return promise;
+  await postMemoryFtsRequest('initialize', projectId);
+  const client = createClient(projectId);
+  clients.set(projectId, client);
+  return client;
 }
 
-export async function withMemoryFtsDatabase<T>(projectId: string, operation: (db: Database.Database) => T): Promise<T> {
+export async function withMemoryFtsDatabase<T>(
+  projectId: string,
+  operation: (db: MemoryFtsDatabaseClient) => T | Promise<T>,
+): Promise<T> {
   const db = await getMemoryFtsDatabase(projectId);
-  return deferSqliteWork(() => operation(db));
+  return operation(db);
 }
 
-export async function runMemoryFtsStatement<T = unknown>(projectId: string, statement: MemoryFtsStatement): Promise<T> {
-  return await postWorkerRequest<T>({ projectId, statements: [statement], transaction: false });
+export function runMemoryFtsStatement<T = unknown>(projectId: string, statement: MemoryFtsStatement): Promise<T> {
+  return postMemoryFtsRequest<T>('statement', projectId, { statement });
 }
 
-export async function runMemoryFtsTransaction(projectId: string, statements: MemoryFtsStatement[]): Promise<unknown[]> {
-  return await postWorkerRequest<unknown[]>({ projectId, statements, transaction: true });
+export function runMemoryFtsTransaction(projectId: string, statements: MemoryFtsStatement[]): Promise<unknown[]> {
+  return postMemoryFtsRequest<unknown[]>('transaction', projectId, { statements });
 }
 
 export function closeMemoryFtsDatabases(): void {
-  for (const db of databases.values()) {
-    db.close();
-  }
-  databases.clear();
-  openingDatabases.clear();
-  for (const request of pendingWorkerRequests.values()) request.reject(new Error('Memory FTS worker closed'));
-  pendingWorkerRequests.clear();
-  void worker?.terminate();
+  clients.clear();
+  closeMemoryFtsDatabasesInProcess();
+  if (!worker) return;
+
+  const closing = worker;
   worker = null;
+  pendingRequests.forEach((request) => request.reject(new Error('Memory FTS worker closed')));
+  pendingRequests.clear();
+  closing.postMessage({ id: nextRequestId++, operation: 'close' });
+  void closing.terminate();
 }
 
-async function openMemoryFtsDatabase(projectId: string): Promise<Database.Database> {
-  const dbPath = resolveFtsDbPath(projectId);
-  await ensureParentDir(dbPath);
-
-  return deferSqliteWork(() => {
-    const cached = databases.get(projectId);
-    if (cached) return cached;
-
-    const db = createDatabase(dbPath);
-    configureDatabase(db);
-    initializeMemoryFtsSchema(db);
-    databases.set(projectId, db);
-    return db;
-  });
+function createClient(projectId: string): MemoryFtsDatabaseClient {
+  return {
+    exec: async (sql: string) => {
+      await runMemoryFtsStatement(projectId, { sql, method: 'exec' });
+    },
+    prepare: (sql: string) => ({
+      run: (...params: SqliteBindParams[]) => runMemoryFtsStatement<SqliteRunResult>(projectId, { sql, params, method: 'run' }),
+      get: <TRow = unknown>(...params: SqliteBindParams[]) => runMemoryFtsStatement<TRow | undefined>(projectId, { sql, params, method: 'get' }),
+      all: <TRow = unknown>(...params: SqliteBindParams[]) => runMemoryFtsStatement<TRow[]>(projectId, { sql, params, method: 'all' }),
+    }),
+  };
 }
 
-function createDatabase(dbPath: string): Database.Database {
-  if (isBunRuntime()) {
-    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
-    const bunDb = new BunDatabase(dbPath);
-    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): unknown {
-      if (options?.simple) {
-        const key = sql.trim();
-        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
-        return row?.[key] ?? null;
-      }
-      bunDb.exec(`PRAGMA ${sql}`);
-      return undefined;
-    };
-    return bunDb as Database.Database;
+function postMemoryFtsRequest<T = unknown>(operation: MemoryFtsWorkerOperation, projectId?: string, payload: Record<string, unknown> = {}): Promise<T> {
+  if (shouldRunInline()) {
+    return Promise.resolve().then(() => runInline<T>(operation, projectId, payload));
   }
 
-  const BetterSqlite3 = _require('better-sqlite3');
-  return new BetterSqlite3(dbPath) as Database.Database;
-}
-
-function configureDatabase(db: Database.Database): void {
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('journal_size_limit = 67108864');
-}
-
-function initializeMemoryFtsSchema(db: Database.Database): void {
-  migrateMemoryFtsBranchColumn(db);
-  db.exec(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
-      content,
-      display_content UNINDEXED,
-      source,
-      branch UNINDEXED,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags UNINDEXED,
-      doc_type UNINDEXED,
-      scope UNINDEXED,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      tokenize = 'porter unicode61'
-    );
-
-    CREATE TABLE IF NOT EXISTS reset_markers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      scope TEXT NOT NULL,
-      scope_id TEXT NOT NULL,
-      from_timestamp TEXT NOT NULL,
-      reason TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_reset_markers_scope
-      ON reset_markers(scope, scope_id, from_timestamp);
-
-    CREATE INDEX IF NOT EXISTS idx_reset_markers_created_at
-      ON reset_markers(created_at);
-
-    CREATE TABLE IF NOT EXISTS observation_index (
-      id TEXT PRIMARY KEY,
-      observation_path_jsonl TEXT NOT NULL,
-      byte_offset INTEGER NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_observation_index_path_offset
-      ON observation_index(observation_path_jsonl, byte_offset);
-  `);
-}
-
-function migrateMemoryFtsBranchColumn(db: Database.Database): void {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memory_fts'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes('branch UNINDEXED')) return;
-
-  db.exec(`
-    CREATE VIRTUAL TABLE memory_fts_rebuild USING fts5(
-      content,
-      display_content UNINDEXED,
-      source,
-      branch UNINDEXED,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags UNINDEXED,
-      doc_type UNINDEXED,
-      scope UNINDEXED,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      tokenize = 'porter unicode61'
-    );
-    INSERT INTO memory_fts_rebuild(rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness)
-    SELECT rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness
-    FROM memory_fts;
-    DROP TABLE memory_fts;
-    ALTER TABLE memory_fts_rebuild RENAME TO memory_fts;
-  `);
-}
-
-function postWorkerRequest<T>(payload: { projectId: string; statements: MemoryFtsStatement[]; transaction: boolean }): Promise<T> {
-  const requestId = nextRequestId++;
-  const activeWorker = getMemoryFtsWorker();
+  const id = nextRequestId++;
   return new Promise<T>((resolve, reject) => {
-    pendingWorkerRequests.set(requestId, { resolve: (value) => resolve(value as T), reject });
-    activeWorker.postMessage({ id: requestId, ...payload });
+    pendingRequests.set(id, { resolve: resolve as (value: unknown) => void, reject });
+    const currentWorker = getMemoryFtsWorker();
+    currentWorker.ref();
+    currentWorker.postMessage({ id, operation, projectId, ...payload });
   });
+}
+
+function runInline<T>(operation: MemoryFtsWorkerOperation, projectId?: string, payload: Record<string, unknown> = {}): T {
+  switch (operation) {
+    case 'initialize':
+      getMemoryFtsDatabaseSync(requireProjectId(projectId));
+      return null as T;
+    case 'statement':
+      return runMemoryFtsStatementSync<T>(requireProjectId(projectId), payload.statement as MemoryFtsStatement);
+    case 'transaction':
+      return runMemoryFtsTransactionSync(requireProjectId(projectId), payload.statements as MemoryFtsStatement[]) as T;
+    case 'close':
+      closeMemoryFtsDatabasesInProcess();
+      return null as T;
+  }
+}
+
+function shouldRunInline(): boolean {
+  // Source-mode workers cannot reliably resolve this repo's .js TypeScript import specifiers.
+  // The supported dashboard runtime is the built Node bundle, which always takes the worker path.
+  return import.meta.url.endsWith('.ts');
+}
+
+function requireProjectId(projectId: string | undefined): string {
+  if (!projectId) throw new Error('Memory FTS request missing projectId');
+  return projectId;
 }
 
 function getMemoryFtsWorker(): Worker {
   if (worker) return worker;
-  worker = new Worker(memoryFtsWorkerSource(), { eval: true, workerData: { betterSqlite3Path } });
-  const activeWorker = worker;
-  worker.on('message', (message: { id: number; ok: boolean; result?: unknown; error?: string }) => {
-    const request = pendingWorkerRequests.get(message.id);
+
+  const nextWorker = new Worker(memoryFtsWorkerUrl(), {
+    type: 'module',
+    execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
+  } as ConstructorParameters<typeof Worker>[1]);
+
+  nextWorker.on('message', (message: MemoryFtsWorkerResponse) => {
+    const request = pendingRequests.get(message.id);
     if (!request) return;
-    pendingWorkerRequests.delete(message.id);
-    if (message.ok) request.resolve(message.result);
-    else request.reject(new Error(message.error ?? 'Memory FTS worker failed'));
+    pendingRequests.delete(message.id);
+    if (message.ok) {
+      request.resolve(message.result);
+    } else {
+      request.reject(new Error(message.error ?? 'Memory FTS worker failed'));
+    }
+    if (pendingRequests.size === 0) nextWorker.unref();
   });
-  worker.on('error', (error) => {
-    if (worker !== activeWorker) return;
-    for (const request of pendingWorkerRequests.values()) request.reject(error);
-    pendingWorkerRequests.clear();
-    worker = null;
+
+  nextWorker.on('error', (err) => {
+    failPendingRequests(err);
+    if (worker === nextWorker) worker = null;
   });
-  worker.on('exit', (code) => {
-    if (worker !== activeWorker) return;
-    worker = null;
-    if (code === 0) return;
-    for (const request of pendingWorkerRequests.values()) request.reject(new Error(`Memory FTS worker exited with code ${code}`));
-    pendingWorkerRequests.clear();
+
+  nextWorker.on('exit', (code) => {
+    if (worker === nextWorker) worker = null;
+    if (code !== 0) failPendingRequests(new Error(`Memory FTS worker exited with code ${code}`));
   });
+
+  worker = nextWorker;
   return worker;
 }
 
-function deferSqliteWork<T>(operation: () => T): Promise<T> {
-  return new Promise((resolve, reject) => {
-    setImmediate(() => {
-      try {
-        resolve(operation());
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
+function failPendingRequests(error: Error): void {
+  pendingRequests.forEach((request) => request.reject(error));
+  pendingRequests.clear();
 }
 
-function memoryFtsWorkerSource(): string {
-  return `
-const { parentPort, workerData } = require('node:worker_threads');
-const { dirname } = require('node:path');
-const { mkdirSync } = require('node:fs');
-const BetterSqlite3 = require(workerData.betterSqlite3Path);
-const databases = new Map();
-
-parentPort.on('message', (message) => {
-  try {
-    const db = databaseForProject(message.projectId);
-    const execute = () => message.statements.map((statement) => runStatement(db, statement));
-    const results = message.transaction ? db.transaction(execute)() : execute();
-    parentPort.postMessage({ id: message.id, ok: true, result: message.transaction ? results : results[0] });
-  } catch (error) {
-    parentPort.postMessage({ id: message.id, ok: false, error: error && error.message ? error.message : String(error) });
+function memoryFtsWorkerUrl(): URL {
+  if (import.meta.url.endsWith('/dist/cli/index.js')) {
+    return new URL('../lib/memory/fts-worker.js', import.meta.url);
   }
-});
-
-function databaseForProject(projectId) {
-  const dbPath = resolveFtsDbPath(projectId);
-  const cached = databases.get(dbPath);
-  if (cached) return cached;
-  mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new BetterSqlite3(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
-  db.pragma('journal_size_limit = 67108864');
-  initializeMemoryFtsSchema(db);
-  databases.set(dbPath, db);
-  return db;
-}
-
-function runStatement(db, statement) {
-  if (statement.method === 'exec') {
-    db.exec(statement.sql);
-    return null;
+  if (import.meta.url.endsWith('/dist/index.js') || /\/dist\/fts-db-[^/]+\.js$/.test(import.meta.url)) {
+    return new URL('./lib/memory/fts-worker.js', import.meta.url);
   }
-  const prepared = db.prepare(statement.sql);
-  return prepared[statement.method](...(statement.params || []));
-}
-
-function resolveFtsDbPath(projectId) {
-  const home = process.env.PANOPTICON_HOME || require('node:path').join(require('node:os').homedir(), '.panopticon');
-  return require('node:path').join(home, 'memory', assertSafeSegment(projectId), 'memory-search.db');
-}
-
-function assertSafeSegment(value) {
-  if (!/^[A-Za-z0-9._-]{1,128}$/.test(value) || value === '.' || value === '..') throw new Error('Invalid memory projectId');
-  return value;
-}
-
-function initializeMemoryFtsSchema(db) {
-  migrateMemoryFtsBranchColumn(db);
-  db.exec(\`
-    CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
-      content,
-      display_content UNINDEXED,
-      source,
-      branch UNINDEXED,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags UNINDEXED,
-      doc_type UNINDEXED,
-      scope UNINDEXED,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      tokenize = 'porter unicode61'
-    );
-
-    CREATE TABLE IF NOT EXISTS reset_markers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      scope TEXT NOT NULL,
-      scope_id TEXT NOT NULL,
-      from_timestamp TEXT NOT NULL,
-      reason TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_reset_markers_scope
-      ON reset_markers(scope, scope_id, from_timestamp);
-
-    CREATE INDEX IF NOT EXISTS idx_reset_markers_created_at
-      ON reset_markers(created_at);
-
-    CREATE TABLE IF NOT EXISTS observation_index (
-      id TEXT PRIMARY KEY,
-      observation_path_jsonl TEXT NOT NULL,
-      byte_offset INTEGER NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_observation_index_path_offset
-      ON observation_index(observation_path_jsonl, byte_offset);
-  \`);
-}
-
-function migrateMemoryFtsBranchColumn(db) {
-  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memory_fts'").get();
-  if (!row || !row.sql || row.sql.includes('branch UNINDEXED')) return;
-
-  db.exec(\`
-    CREATE VIRTUAL TABLE memory_fts_rebuild USING fts5(
-      content,
-      display_content UNINDEXED,
-      source,
-      branch UNINDEXED,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags UNINDEXED,
-      doc_type UNINDEXED,
-      scope UNINDEXED,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      tokenize = 'porter unicode61'
-    );
-    INSERT INTO memory_fts_rebuild(rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness)
-    SELECT rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness
-    FROM memory_fts;
-    DROP TABLE memory_fts;
-    ALTER TABLE memory_fts_rebuild RENAME TO memory_fts;
-  \`);
-}
-`;
+  if (import.meta.url.endsWith('/dist/dashboard/server.js') || /\/dist\/dashboard\/fts-db-[^/]+\.js$/.test(import.meta.url)) {
+    return new URL('./memory-fts-worker.js', import.meta.url);
+  }
+  return import.meta.url.endsWith('.ts')
+    ? new URL('./fts-worker.ts', import.meta.url)
+    : new URL('./fts-worker.js', import.meta.url);
 }

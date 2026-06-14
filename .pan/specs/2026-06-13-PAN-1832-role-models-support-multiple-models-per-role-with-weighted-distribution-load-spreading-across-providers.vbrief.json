@@ -1,0 +1,676 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T07:55:42.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1832: Role Models — support multiple models per role with weighted distribution (load-spreading across providers)",
+    "updated": "2026-06-13T08:02:51.889Z"
+  },
+  "plan": {
+    "id": "pan-1832",
+    "title": "Role Models: support multiple models per role with weighted distribution (load-spreading across providers)",
+    "status": "proposed",
+    "uid": "141a851e-4f3a-49d5-8098-b0f17d3767eb",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T07:55:42.000Z",
+    "updated": "2026-06-13T08:02:51.889Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1832",
+        "label": "PAN-1832",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1830",
+        "label": "PAN-1830 (rate-limit stalls)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1787",
+        "label": "PAN-1787 (provider→harness resolution)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "roles",
+      "model-routing",
+      "config",
+      "settings-ui",
+      "load-balancing"
+    ],
+    "narratives": {
+      "Problem": "Each pipeline role (and sub-role) binds to a SINGLE model in Settings → Roles. When a fleet runs many agents of one role they all hit one provider and exhaust its rate limits (repeated gpt-5.5 rate-limit modals stalling reviewers — PAN-1830). The team hand-splits the fleet ~30/70 gpt-5.5/kimi to spread load. This makes that split first-class.",
+      "Proposal": "Let a role/sub-role 'model' field be EITHER a scalar ref (unchanged) OR a list of {model, weight}. A new seeded resolver, resolveModelForSpawn(role, subRole, seed, config), samples the distribution per-spawn using a deterministic hash of the agent id (no Math.random), normalizing weights. resolveModel() stays deterministic (primary = first entry) for static/display callers. Every pipeline spawn site routes through the seeded resolver; harness still follows the chosen model via resolveHarness(). Settings-API + config-load validation accept and check the list form; the Settings → Roles picker gains a distribution editor; and a realized-split view shows live agent model counts vs the configured target.",
+      "NonGoals": "- No flywheel governor per-model slot accounting / per-model maxAgents (deferred to a follow-up per the issue).\n- No per-model effort settings — a role keeps ONE effort that must be valid for every model in its list.\n- No sum-to-100 weight requirement — weights are normalized.\n- resolveModel() is NOT made non-deterministic for static/display callers (router-config CCR map, effort deref, specialists status map, planning-continuation launcher, specialist digest generation).\n- No new GET endpoint for the realized split — it aggregates the existing /api/agents response client-side.\n- No change to scalar-model behavior (full back-compat).\n- No changes to the canUseHarnessSync ToS gate or resolveHarness precedence."
+    },
+    "autoDecisions": [],
+    "items": [
+      {
+        "id": "role-model-types",
+        "title": "Add RoleModelConfig list type and keep resolveModel deterministic",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1832",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "weighted-sampler",
+            "settings-api-validation",
+            "config-load-validation",
+            "work-spawn-wiring",
+            "review-spawn-wiring",
+            "inspect-plan-flywheel-wiring",
+            "distribution-editor-ui",
+            "realized-split-view"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/config-yaml.ts add the distribution types and helpers, widen the role model field, and keep resolveModel() deterministic so all existing static callers are unaffected. Add: interface RoleModelWeight { model: ModelRef; weight: number }; type RoleModelDistribution = RoleModelWeight[]; type RoleModelConfig = ModelRef | RoleModelDistribution. Change RoleConfig.model and RoleSubConfig.model from ModelRef to RoleModelConfig. Add isModelDistribution(m): m is RoleModelDistribution (Array.isArray) and primaryModelRef(m): ModelRef (returns m when string, else m[0].model). Update resolveModel() (config-yaml.ts:1576) so that after picking the chosen ref-config (sub/role/default) it passes primaryModelRef(chosenConfig) into derefWorkhorse — scalar configs resolve byte-for-byte as before. Fix any type errors at scalar-assuming sites (DEFAULT_ROLES/DEFAULT_MODEL_REFS stay scalar). NO sampling here."
+        },
+        "items": [
+          {
+            "id": "role-model-types.ac1",
+            "title": "RoleConfig.model and RoleSubConfig.model each accepts either a scalar ref or a {model, weight} list; the RoleModelWeight/RoleModelDistribution/RoleModelConfig types exist and the project typecheck succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-model-types.ac2",
+            "title": "resolveModel('work', undefined, config) returns the identical ModelId for a scalar config as before this change (back-compat preserved by an existing-behavior test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-model-types.ac3",
+            "title": "Given a role configured with [{model:'kimi-k2.7-code',weight:70},{model:'gpt-5.5',weight:30}], resolveModel returns the first entry deref'd (kimi-k2.7-code) deterministically — proving static callers stay deterministic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-model-types.ac4",
+            "title": "primaryModelRef returns the scalar for a scalar input and list[0].model for a list input; isModelDistribution returns true only for an array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "weighted-sampler",
+        "title": "Add deterministic hash + weighted sampler + resolveModelForSpawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1832",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "work-spawn-wiring",
+            "review-spawn-wiring",
+            "inspect-plan-flywheel-wiring"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/config-yaml.ts (or a new src/lib/role-model-distribution.ts imported by config-yaml) add: hashStringToUint32(seed: string): number — a pure FNV-1a 32-bit string hash (NO Math.random, NO Date). sampleModelRef(dist: RoleModelDistribution, seed: string): ModelRef — totalWeight = Σ positive weights; idx = hashStringToUint32(seed) % totalWeight; walk cumulative weights, return the matched entry.model (return last entry as a defensive fallback). resolveModelForSpawn(role: Role, subRole: string | undefined, seed: string, config): ModelId — mirror resolveModel's precedence: chosenConfig = (subModel !== 'parent' ? subModel : undefined) ?? roleModel ?? DEFAULT_MODEL_REFS[role]; if isModelDistribution(chosenConfig) → derefWorkhorse(sampleModelRef(chosenConfig, seed)) else derefWorkhorse(chosenConfig). When subModel==='parent' the chosen config naturally falls through to the parent role.model (which may itself be a list and gets sampled with the same seed). For a scalar config resolveModelForSpawn is a no-op equal to resolveModel."
+        },
+        "items": [
+          {
+            "id": "weighted-sampler.ac1",
+            "title": "hashStringToUint32 is pure and deterministic: the same string returns the same uint32 across calls, and the implementation contains no Math.random/Date usage (asserted by a source-level test or grep in the unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "weighted-sampler.ac2",
+            "title": "sampleModelRef returns the same model for the same (dist, seed) every call; across 1000 distinct seeds with weights [70,30] the realized split is within ±5 percentage points of 70/30",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "weighted-sampler.ac3",
+            "title": "sampleModelRef normalizes weights and produces identical picks for [{a,70},{b,30}] and [{a,7},{b,3}] over the same seed set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "weighted-sampler.ac4",
+            "title": "resolveModelForSpawn('work', undefined, seed, config) equals resolveModel for a scalar work config (no-op), and for a list config returns a deref'd ModelId drawn from the list; workhorse refs inside list entries deref correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "weighted-sampler.ac5",
+            "title": "When a sub-role model is the scalar 'parent' and the parent role.model is a list, resolveModelForSpawn samples the parent's list with the given seed (inheritance + sampling)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-load-validation",
+        "title": "Validate the list form at config-load (fail fast on bad yaml)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend config-yaml.ts load-time validation (validateRoleModelRefs at :1672 and validateRoleFields at :1647) so a list-form model is checked: non-empty; each entry has a string model and an integer weight > 0; each model ref derefs via derefWorkhorse (workhorse refs allowed); reject 'parent' as a list entry; total weight > 0. Apply to both roles[role].model and roles[role].sub[subRole].model. Throw a precise field-path error (e.g. 'config.yaml: roles.work.model[1].weight must be a positive integer') consistent with existing messages. Scalar validation path unchanged."
+        },
+        "items": [
+          {
+            "id": "config-load-validation.ac1",
+            "title": "config-load accepts roles.work.model = [{model:'kimi-k2.7-code',weight:70},{model:'gpt-5.5',weight:30}] and the loaded config preserves the list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-load-validation.ac2",
+            "title": "Loading a config whose list contains a weight of 0, a negative weight, a non-integer weight, or an empty list throws a field-path error at load time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-load-validation.ac3",
+            "title": "Loading a config whose list contains an unknown/invalid model ref or a 'parent' entry throws at load time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-load-validation.ac4",
+            "title": "A scalar roles.work.model still resolves exactly as before (preserves prior behavior; existing config-yaml-roles tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-validation",
+        "title": "Validate the list form + effort-vs-list in the Settings API",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/settings-api.ts add validateRoleModelConfig(fieldPath, model, effectiveWorkhorses, errors, warnings, allowWorkhorseRef, allowParentRef): if model is a string, delegate to the existing validateModelRef; if it is an array, require non-empty, each entry an object with a string model and integer weight > 0, total > 0, reject 'parent' as a list entry, and validate each model via validateModelRef (workhorse refs allowed). Call it where validateModelRef is currently called for roles.<role>.model (:517) and roles.<role>.sub.<subRole>.model (:549). Extend the effort check (:521-533): when the role model is a list, every model in the list must support the role's effort (getModelEffortLevelsSync) — push an error naming the offending model otherwise. Weights are NORMALIZED, so do NOT require a sum of 100. seededRoles() (:301) already passes the model field verbatim, so the GET round-trip needs no change — add a test confirming a list survives GET."
+        },
+        "items": [
+          {
+            "id": "settings-api-validation.ac1",
+            "title": "PUT /api/settings validation ACCEPTS roles.work.model as a non-empty list of {model:<valid ref>, weight:<positive int>} (including workhorse refs), with no sum-to-100 requirement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-validation.ac2",
+            "title": "Validation REJECTS a list with an invalid model ref, a non-positive or non-integer weight, an empty list, a zero total weight, or a 'parent' entry — each with a field-path error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-validation.ac3",
+            "title": "When roles.review.effort is set and one model in roles.review.model's list does not support that effort, validation rejects with an error naming the offending model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-validation.ac4",
+            "title": "A scalar model still validates as before, and a saved list survives the GET /api/settings round-trip (seededRoles emits it verbatim)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-spawn-wiring",
+        "title": "Seed determineModel and thread it through work/test/ship/strike spawns",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Give determineModel a seed and route every work-class spawn through the seeded resolver. In src/lib/agents.ts change determineModel({model, role}) → determineModel({model, role, seed}): when there is no explicit modelOverride, resolve via resolveModelForSpawn(role ?? 'work', undefined, seed ?? '', loadYamlConfig().config) (a missing seed deterministically yields the primary). Keep the WORK_AGENT_BROKEN_MODELS safety net. Thread the stable agent id as seed at: spawnAgent (:3469, agentId = `agent-<issue>` already computed at :3449); spawnRun (:3133 — reorder so the role-run agentId/`agent-<issue>` is computed before determineModel, then pass it); the dashboard start route routes/agents.ts (:2792, seed `agent-<issueId.toLowerCase()>`); and runtimes/claude-code.ts (:350, seed: config.agentId). After resolution, the EXISTING resolveHarness({explicit, role, model: selectedModel}) call must receive the sampled model so harness follows it. Do NOT make resolveModel sample."
+        },
+        "items": [
+          {
+            "id": "work-spawn-wiring.ac1",
+            "title": "Re-spawning the work agent for the same issue id preserves the same sampled model from a list config (idempotent); state.model returns unchanged on the second spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-spawn-wiring.ac2",
+            "title": "Across many issue ids, work spawns from a [70,30] list realize ≈70/30 (statistical test over generated agent ids)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-spawn-wiring.ac3",
+            "title": "An explicit per-spawn model override (options.model) still wins over the distribution; a seedless determineModel returns the primary (first) entry deterministically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-spawn-wiring.ac4",
+            "title": "The spawned agent's state.model records the sampled model and resolveHarness is called with that sampled model (harness follows the chosen model)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-spawn-wiring.ac5",
+            "title": "A spawn via routes/agents.ts:2792 and a spawn via runtimes/claude-code.ts:350 each produces a sampled, non-primary model across many issue ids, confirming both call sites thread a seed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-spawn-wiring",
+        "title": "Sample review-convoy models seeded by reviewer agent id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/review-agent.ts (:236) replace `opts.model ?? resolveModel('review', opts.subRole, cfg)` with `opts.model ?? resolveModelForSpawn('review', opts.subRole, reviewerAgentId(opts.issueId, opts.subRole), cfg)` so each review sub-role (security/correctness/performance/requirements) samples by its own stable reviewer agent id. The explicit opts.model override path is unchanged."
+        },
+        "items": [
+          {
+            "id": "review-spawn-wiring.ac1",
+            "title": "Each review sub-role resolves its model via resolveModelForSpawn seeded by reviewerAgentId(issueId, subRole); a list config produces a deref'd ModelId from the list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-spawn-wiring.ac2",
+            "title": "Re-running the same issue + sub-role preserves the same sampled review model (idempotent); different sub-roles/issues produce different models to spread load",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-spawn-wiring.ac3",
+            "title": "An explicit opts.model still wins over the distribution for the reviewer spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-plan-flywheel-wiring",
+        "title": "Seed inspect, plan, and flywheel model resolution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Route the remaining pipeline spawn sites through the seeded resolver, each seeded by its own stable agent id. (1) src/lib/cloister/inspect-agent.ts (:176): resolveModel('work', subRole, config) → resolveModelForSpawn('work', subRole, <inspect agent id, e.g. tmuxSession>, config). (2) src/lib/planning/spawn-planning-session.ts (:556): resolveModel('plan', undefined, ...) → resolveModelForSpawn('plan', undefined, <plan agent id>, ...). (3) Flywheel (singleton): src/dashboard/server/services/flywheel-actions.ts (:126) and src/cli/commands/flywheel.ts (:260): resolveModel('flywheel', ...) → resolveModelForSpawn('flywheel', undefined, <flywheel agent id>, config) — note in a code comment that flywheel is a singleton so a list resolves to a single deterministic pick, not a real split. Leave the STATIC/display callers (router-config.ts, routes/specialists.ts:1662, routes/misc.ts:1227 continuation launcher, specialist-context.ts:128 digest) on the deterministic resolveModel — do not reroute them."
+        },
+        "items": [
+          {
+            "id": "inspect-plan-flywheel-wiring.ac1",
+            "title": "inspect-agent.ts resolves its model via resolveModelForSpawn('work', subRole, <inspect agent id>, config); a list config yields a sampled deref'd model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-plan-flywheel-wiring.ac2",
+            "title": "spawn-planning-session.ts resolves the plan model via resolveModelForSpawn('plan', undefined, <plan agent id>, config)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-plan-flywheel-wiring.ac3",
+            "title": "Both flywheel callers (flywheel-actions.ts:126, cli/commands/flywheel.ts:260) use resolveModelForSpawn('flywheel', ...) and carry a comment that a singleton resolves a list to one deterministic pick",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-plan-flywheel-wiring.ac4",
+            "title": "The static/display callers (router-config.ts, routes/specialists.ts:1662, routes/misc.ts:1227, specialist-context.ts:128) each preserves deterministic resolution — a list config resolves to the primary there, unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "distribution-editor-ui",
+        "title": "Settings → Roles distribution editor (add/remove models + weights)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx widen the local types (RoleConfig.model?: ModelRef | Array<{model: ModelRef; weight: number}>; same for RoleSubConfig). Extend ModelPicker (:321) with a distribution mode: a toggle/button 'Split across models' that switches a row between the single <select> (today) and a distribution editor — N rows, each = the existing model <select> + an integer weight number input + a remove button, plus an 'Add model' button. Show the live effective % per row (weight / Σweights). getRoleModel/getSubRoleModel/saveRoleConfig (:169/:173/:271) must read and write the union and POST the list verbatim in the same /api/settings PUT shape settings-api validation expects (array of {model, weight}). Follow pan-style-guide (no pill badges, muted text, existing input classes). When a distribution has a single entry, saving may collapse it back to a scalar (optional)."
+        },
+        "items": [
+          {
+            "id": "distribution-editor-ui.ac1",
+            "title": "Toggling a role to 'split' mode renders one row per model with a model <select>, an integer weight input, a remove button, and an 'Add model' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "distribution-editor-ui.ac2",
+            "title": "Adding/removing rows and editing a weight updates the displayed effective % (weight/Σ) live without a page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "distribution-editor-ui.ac3",
+            "title": "Saving a distribution emits a PUT with roles.<role>.model as an array of {model, weight} matching the settings-api shape; the editor renders the saved value on refetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "distribution-editor-ui.ac4",
+            "title": "A role still configured with a single model renders the existing single <select> (scalar UX unchanged) and saves a scalar ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "realized-split-view",
+        "title": "Show realized model split per role from live agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx add a read-only 'Realized split' display per role. Add a react-query hook fetching GET /api/agents (which already returns per-agent role + model + status); filter to live/running agents, group by role then count by model. Render under each role's picker: the live counts per model (e.g. 'live: kimi-k2.7-code ×18, gpt-5.5 ×7') next to the configured target derived from that role's distribution (e.g. 'target 70 / 30'). Reuse displayModelRef and existing styling; poll on the same staleTime/refetch pattern the panel already uses (no new endpoint, no blocking server work). Show nothing (or 'no live agents') when a role has zero running agents."
+        },
+        "items": [
+          {
+            "id": "realized-split-view.ac1",
+            "title": "For each role the panel renders live agent counts grouped by state.model, aggregated client-side from GET /api/agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "realized-split-view.ac2",
+            "title": "The panel renders the realized counts alongside the configured target distribution for that role (counts vs target %)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "realized-split-view.ac3",
+            "title": "A role with zero running agents renders an empty/'no live agents' state rather than an error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "realized-split-view.ac4",
+            "title": "The realized-split view produces its data from the existing /api/agents response and adds no new server endpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-and-example",
+        "title": "Document the weighted role-model distribution + config example",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-13T07:55:42.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1832",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Document the feature where role/model configuration is described (the role-models / Settings → Roles configuration doc under docs/ and/or the Mintlify configuration pages). Cover: the list form {model, weight}; normalized weights; deterministic hash-of-agent-id sampling (same agent ⇒ same model, fleet realizes the split); per-model harness mixing via resolveHarness; the flywheel-singleton caveat; and the realized-split view. Include a config.yaml example (e.g. roles.work.model = 70% kimi-k2.7-code / 30% gpt-5.5). Confirm no `pan` CLI verb/flag changed, so skills lint is unaffected — if any referenced help text changed, update the matching skills/pan-*/SKILL.md in the same bead."
+        },
+        "items": [
+          {
+            "id": "docs-and-example.ac1",
+            "title": "The configuration doc contains the {model, weight} list form, the normalized-weights rule, deterministic agent-id sampling, and a config.yaml example (70% kimi / 30% gpt-5.5)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-example.ac2",
+            "title": "The configuration doc covers the flywheel-singleton caveat and the realized-split view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-and-example.ac3",
+            "title": "npm run lint (incl. scripts/lint-skills.sh) passes — no skills drift introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "role-model-types",
+        "to": "weighted-sampler",
+        "type": "blocks"
+      },
+      {
+        "from": "role-model-types",
+        "to": "config-load-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "role-model-types",
+        "to": "settings-api-validation",
+        "type": "blocks"
+      },
+      {
+        "from": "weighted-sampler",
+        "to": "work-spawn-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "weighted-sampler",
+        "to": "review-spawn-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "weighted-sampler",
+        "to": "inspect-plan-flywheel-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api-validation",
+        "to": "distribution-editor-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "role-model-types",
+        "to": "distribution-editor-ui",
+        "type": "informs"
+      },
+      {
+        "from": "distribution-editor-ui",
+        "to": "realized-split-view",
+        "type": "informs"
+      },
+      {
+        "from": "work-spawn-wiring",
+        "to": "docs-and-example",
+        "type": "informs"
+      },
+      {
+        "from": "distribution-editor-ui",
+        "to": "docs-and-example",
+        "type": "informs"
+      },
+      {
+        "from": "realized-split-view",
+        "to": "docs-and-example",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1832-role-models-support-multiple-models-per-role-with-weighted-distribution-load-spreading-across-providers.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

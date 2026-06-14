@@ -7,17 +7,17 @@
  *   - sqlite-vec vec0 virtual table for cosine ANN search
  *   - file_cursors for idempotent incremental indexing
  *
- * Only safe to call from the Node 22 dashboard server — uses better-sqlite3
- * and sqlite-vec native extensions, both incompatible with Bun.
+ * Only safe to call from the Node 22 dashboard server — uses the shared SQLite
+ * adapter plus the sqlite-vec native extension.
  *
  * Fail-closed: if sqlite-vec cannot be loaded, open() returns { available: false }
  * and no embeddings or vector search are performed.
  */
 
-import type Database from 'better-sqlite3';
-import { createRequire } from 'module';
-import { mkdirSync, existsSync } from 'fs';
-import { dirname } from 'path';
+import { createRequire } from 'node:module';
+import { mkdirSync, existsSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { openDatabase, type SqliteDatabase, type SqliteStatement } from './driver.js';
 
 const _require = createRequire(import.meta.url);
 
@@ -109,19 +109,19 @@ export interface OpenEmbeddingsDbOptions {
 
 const SCHEMA_VERSION = 1;
 
-function tableExists(db: Database.Database, tableName: string): boolean {
+function tableExists(db: SqliteDatabase, tableName: string): boolean {
   const row = db
     .prepare(`SELECT 1 FROM sqlite_master WHERE type IN ('table', 'virtual table') AND name = ?`)
     .get(tableName) as { 1: number } | undefined;
   return row !== undefined;
 }
 
-function getConfigValue(db: Database.Database, key: string): string | undefined {
+function getConfigValue(db: SqliteDatabase, key: string): string | undefined {
   if (!tableExists(db, 'db_config')) return undefined;
   return (db.prepare('SELECT value FROM db_config WHERE key = ?').get(key) as { value: string } | undefined)?.value;
 }
 
-function initSchema(db: Database.Database, dimensions: number): void {
+function initSchema(db: SqliteDatabase, dimensions: number): void {
   db.exec(`
     -- Source of truth: one row per indexed chunk, rowid shared with FTS + vec
     CREATE TABLE IF NOT EXISTS chunks (
@@ -189,16 +189,16 @@ function initSchema(db: Database.Database, dimensions: number): void {
 // ─── Prepared statement cache ─────────────────────────────────────────────────
 
 interface Stmts {
-  upsertChunk: Database.Statement;
-  deleteEmbeddingByRowid: Database.Statement;
-  upsertEmbedding: Database.Statement;
-  getCursor: Database.Statement;
-  setCursor: Database.Statement;
-  deleteChunksBySession: Database.Statement;
-  deleteEmbeddingsBySession: Database.Statement;
+  upsertChunk: SqliteStatement;
+  deleteEmbeddingByRowid: SqliteStatement;
+  upsertEmbedding: SqliteStatement;
+  getCursor: SqliteStatement;
+  setCursor: SqliteStatement;
+  deleteChunksBySession: SqliteStatement;
+  deleteEmbeddingsBySession: SqliteStatement;
 }
 
-function prepareStmts(db: Database.Database): Stmts {
+function prepareStmts(db: SqliteDatabase): Stmts {
   return {
     upsertChunk: db.prepare(`
       INSERT INTO chunks(session_id, project_id, role, ts, byte_offset, char_length, text, token_count, indexed_at)
@@ -300,13 +300,11 @@ export function openEmbeddingsDb(
     return unavailable(`Invalid embedding dimensions: ${dimensions}`);
   }
 
-  let db: Database.Database;
+  let db: SqliteDatabase;
   try {
     const dir = dirname(dbPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-
-    const BetterSqlite3 = _require('better-sqlite3');
-    db = new BetterSqlite3(dbPath) as Database.Database;
+    db = openDatabase(dbPath, { allowExtension: true });
   } catch (err) {
     return unavailable(`Failed to open DB at ${dbPath}: ${err instanceof Error ? err.message : String(err)}`);
   }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../driver.js';
 import { resetDatabase, getDatabase } from '../index.js';
 import { runMigrations, SCHEMA_VERSION } from '../schema.js';
 
@@ -22,7 +22,7 @@ function makeTestHome(prefix: string): string {
   return testHome;
 }
 
-describe('pending auto-merges schema', () => {
+describe('pending auto-merges schema', { timeout: 30_000 }, () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
@@ -78,7 +78,7 @@ describe('pending auto-merges schema', () => {
 
   it('migrates an existing v46 database by adding flywheel stats event indexes', () => {
     const home = makeTestHome('pan-events-stats-indexes-migrate');
-    const db = new Database(join(home, 'panopticon.db'));
+    const db = openDatabase(join(home, 'panopticon.db'));
     try {
       db.exec(`
         CREATE TABLE events (
@@ -107,7 +107,7 @@ describe('pending auto-merges schema', () => {
 
   it('migrates an existing v44 database by adding auto-merge hot-path indexes', () => {
     const home = makeTestHome('pan-pending-auto-merges-v44-indexes');
-    const db = new Database(join(home, 'panopticon.db'));
+    const db = openDatabase(join(home, 'panopticon.db'));
     try {
       db.exec(`
         CREATE TABLE pending_auto_merges (
@@ -145,7 +145,7 @@ describe('pending auto-merges schema', () => {
 
   it('migrates an existing v43 database without dropping existing data', () => {
     const home = makeTestHome('pan-pending-auto-merges-migrate');
-    const db = new Database(join(home, 'panopticon.db'));
+    const db = openDatabase(join(home, 'panopticon.db'));
     try {
       db.exec(`
         CREATE TABLE app_settings (

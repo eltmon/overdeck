@@ -24,10 +24,11 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveClaudeSessionId } from './jsonl-resolver.js';
+import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
+import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import {
@@ -94,6 +95,7 @@ import {
   setOption,
   exactPaneTarget,
   listSessionNames,
+  findManagedServerPidSync,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, injectPiConversationMemory, waitForReadySignal, clearReadySignal } from '../../../lib/agents.js';
 import { markRespawnPending } from '../services/pending-respawn.js';
@@ -119,6 +121,7 @@ function configuredTitleModel(): string {
 import { isBackgroundFeatureEnabled } from '../../../lib/background-ai/features.js';
 import { writePtyToken } from '../../../lib/pty-token.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
+import { resolveHarness } from '../../../lib/harness-resolve.js';
 import { getProviderForModelSync, piProviderForModel } from '../../../lib/providers.js';
 import { getPiCodexAuthStatus } from '../../../lib/pi-codex-auth.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -140,7 +143,7 @@ import { resolveConversationGitInfo } from '../services/git-info.js';
 import { resolveConversationMessageLocator } from '../services/conversation-message-resolver.js';
 import { watchForEatenConversationMessage } from '../services/conversation-eaten-message-watcher.js';
 import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-landing.js';
-import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
+import { isPiSessionFile, parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../services/codex-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
@@ -148,7 +151,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir, packageRoot } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getPanopticonHome } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import {
@@ -275,14 +278,22 @@ async function terminatePids(pids: number[]): Promise<void> {
   }
 }
 
-function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
-  const launcherScript = join(homedir(), '.panopticon', 'conversations', conv.tmuxSession, 'launcher.sh');
+export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
+  const launcherScript = join(getPanopticonHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
+  // PAN-1798: never let conversation cmdline matching catch the shared tmux
+  // server. If the server was founded implicitly by a conversation, its
+  // cmdline embeds that conversation's session name and a pkill/pgrep-style
+  // match would destroy every session on the socket. Exclude the live server
+  // PID explicitly; teardown already starts with tmux kill-session on the
+  // target session, so this cleanup only mops up orphan runtime processes.
+  const serverPid = findManagedServerPidSync();
 
   return rows
     .filter((row) => {
       if (row.pid === process.pid) return false;
+      if (serverPid !== undefined && row.pid === serverPid) return false;
       if (row.args.includes(launcherScript)) return true;
       return sessionNeedles.some((needle) => row.args.includes(needle));
     })
@@ -408,15 +419,19 @@ async function waitForModelStatusline(tmuxSession: string, targetModel: string):
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
-async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
-  const harness: RuntimeName = requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : 'claude-code';
+export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   // Conversation runtime only honors non-default harnesses when a concrete model is
   // passed through to getAgentRuntimeBaseCommand(). Without a model,
   // spawnConversationSession() intentionally launches the default Claude Code
   // command, so persist the matching default harness as the effective value.
   if (!model) return 'claude-code';
-  const decision = canUseHarnessSync(harness, model, await getProviderAuthMode(model));
-  return decision.allowed ? harness : 'claude-code';
+  const explicit: RuntimeName | undefined =
+    requested === 'pi' || requested === 'claude-code' || requested === 'codex' ? requested : undefined;
+  try {
+    return await resolveHarness({ model, explicit });
+  } catch {
+    return 'claude-code';
+  }
 }
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -743,7 +758,7 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
   // The thread-id stored in codex-thread-id is the session identifier.
   if (conv.harness === 'codex') {
-    return resolveCodexSessionFile(conv.tmuxSession);
+    return resolveCodexRolloutPath(conv.tmuxSession);
   }
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
@@ -757,7 +772,7 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
  * The dashboard chat panel uses this to render Pi conversation history.
  */
 async function resolvePiSessionFile(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(homedir(), '.panopticon', 'agents', tmuxSession, 'sessions');
+  const sessionDir = join(getPanopticonHome(), 'agents', tmuxSession, 'sessions');
   if (!existsSync(sessionDir)) return null;
   try {
     const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
@@ -770,11 +785,6 @@ async function resolvePiSessionFile(tmuxSession: string): Promise<string | null>
   }
 }
 
-/** Detect whether a session file path is a Pi conversation JSONL. */
-function isPiSessionFile(sessionFile: string): boolean {
-  return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
-}
-
 /**
  * Detect whether a session file path is a Codex rollout JSONL. Codex writes
  * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Panopticon the per-agent
@@ -785,30 +795,9 @@ function isCodexSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
-async function resolveCodexSessionFile(tmuxSession: string): Promise<string | null> {
-  const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
-  const threadIdPath = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-thread-id');
-  const { findRolloutPath, findLatestRollout } = await import('../../../lib/runtimes/codex.js');
-
-  // Fast path: a persisted thread-id resolves directly to its rollout.
-  if (existsSync(threadIdPath)) {
-    try {
-      const threadId = readFileSync(threadIdPath, 'utf-8').trim();
-      if (threadId) {
-        const path = findRolloutPath(codexHome, threadId);
-        if (path) return path;
-      }
-    } catch { /* fall through to the lazy fallback */ }
-  }
-
-  // PAN-1690 — lazy fallback. The spawn-time thread-id capture is a one-shot
-  // 120s wait, but Codex only writes its rollout on the first turn, so a
-  // conversation whose first message lands later never gets a persisted
-  // thread-id and the transcript stays empty. The per-conversation CODEX_HOME
-  // holds only this conversation's rollouts, so the newest one is its current
-  // thread — resolve it directly so the view works regardless of spawn timing.
-  return findLatestRollout(codexHome);
-}
+// Codex rollout resolution (thread-id fast path + PAN-1690 latest-rollout
+// fallback) lives in ./jsonl-resolver.ts as resolveCodexRolloutPath, shared
+// with the work-agent transcript resolver (PAN-1805).
 
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
   const claudeSessionFile = await resolveSessionFile(conv);
@@ -1269,7 +1258,7 @@ function resolvePtySupervisorScriptPath(): string {
 }
 
 function getPtySupervisorSocketPath(agentId: string): string {
-  return join(process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'), 'sockets', `pty-${agentId}.sock`);
+  return join(getPanopticonHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
 async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
@@ -1426,7 +1415,7 @@ export async function spawnConversationSession(
   harness: RuntimeName = 'claude-code',
   plainFork = false,
 ): Promise<void> {
-  const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
+  const stateDir = join(getPanopticonHome(), 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
 
   // PAN-1596: clear any stale ready.json before launch so waitForReadySignal()
@@ -1453,6 +1442,7 @@ export async function spawnConversationSession(
     codexMode: 'tui';
     codexHome: string;
     codexSessionDir: string;
+    resumeSessionId?: string;
   } | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
@@ -1528,7 +1518,7 @@ export async function spawnConversationSession(
       //   full-access → approval_policy=never + sandbox_mode=danger-full-access
       // This is the Codex analog of preTrustDirectory(cwd) below, which only
       // pre-accepts Claude Code trust.
-      const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
+      const codexHome = join(getPanopticonHome(), 'agents', tmuxSession, 'codex-home');
       const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
       const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
       const codexSandboxMode =
@@ -1536,18 +1526,23 @@ export async function spawnConversationSession(
         : codexPermMode === 'read-only' ? 'read-only'
         : 'workspace-write';
       const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
-      const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
+      const { initCodexHome, extractThreadIdFromRollout } = await import('../../../lib/runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
       });
+      const resumeSessionId = resume
+        ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getPanopticonHome(), 'agents') })
+          .then((rollout) => rollout ? extractThreadIdFromRollout(rollout) ?? undefined : undefined)
+        : undefined;
       codexFields = {
         harness: 'codex',
         codexMode: 'tui',
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
+        resumeSessionId,
       };
     }
   }
@@ -2138,12 +2133,23 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
               // transcript scan for sessions whose hooks predate the auth fix
               // and so have no mirror state yet.
               const rt = getAgentRuntimeStateSync(conv.tmuxSession);
-              if (rt && rt.state !== 'uninitialized') {
+              if (conv.harness === 'codex' && convSf && existsSync(convSf)) {
+                try {
+                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
+                  isWorking = summary.isWorking;
+                  currentTool = summary.currentTool;
+                } catch {
+                  if (rt && rt.state !== 'uninitialized') {
+                    isWorking = rt.state === 'active';
+                    currentTool = rt.currentTool ?? null;
+                  }
+                }
+              } else if (rt && rt.state !== 'uninitialized') {
                 isWorking = rt.state === 'active';
                 currentTool = rt.currentTool ?? null;
               } else if (convSf && existsSync(convSf)) {
                 try {
-                  const summary = await summarizeConversationActivity(convSf);
+                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
                   isWorking = summary.isWorking;
                   currentTool = summary.currentTool;
                 } catch {
@@ -3023,41 +3029,54 @@ const getConversationMessagesRoute = HttpRouter.add(
           if (cached) {
             sessionFile = cached;
           } else if (/^(specialist-|agent-|planning-)/.test(name)) {
+            // Codex agents (PAN-1805): no Claude session exists — the
+            // transcript is the rollout JSONL under the per-agent CODEX_HOME.
+            try {
+              if (await resolveAgentHarness(name) === 'codex') {
+                const rollout = await resolveCodexRolloutPath(name);
+                if (rollout) {
+                  sessionFile = rollout;
+                  setSpecialistSessionCache(name, rollout);
+                }
+              }
+            } catch { /* fall through to the Claude lookup */ }
             // Resolve JSONL via the unified session-id lookup chain
             // (session.id file → sessions.json → runtime state) in
             // ~/.panopticon/agents/<name>/. Covers work agents, planning
             // agents, and all specialist types (reviewers, test, merge).
-            try {
-              const claudeSessionId = await resolveClaudeSessionId(name);
-              if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
-                const claudeProjects = join(homedir(), '.claude', 'projects');
-                const dirs = await readdir(claudeProjects);
-                const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-                const candidates = dirs
-                  .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-                  .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
-                const STAT_BATCH_SIZE = 50;
-                let found: string | null = null;
-                for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
-                  const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-                  const checks = await Promise.all(
-                    batch.map(async (candidate) => {
-                      try {
-                        await stat(candidate);
-                        return candidate;
-                      } catch {
-                        return null;
-                      }
-                    }),
-                  );
-                  found = checks.find((c): c is string => c !== null) ?? null;
+            if (!sessionFile) {
+              try {
+                const claudeSessionId = await resolveClaudeSessionId(name);
+                if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
+                  const claudeProjects = join(homedir(), '.claude', 'projects');
+                  const dirs = await readdir(claudeProjects);
+                  const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+                  const candidates = dirs
+                    .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+                    .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
+                  const STAT_BATCH_SIZE = 50;
+                  let found: string | null = null;
+                  for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
+                    const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+                    const checks = await Promise.all(
+                      batch.map(async (candidate) => {
+                        try {
+                          await stat(candidate);
+                          return candidate;
+                        } catch {
+                          return null;
+                        }
+                      }),
+                    );
+                    found = checks.find((c): c is string => c !== null) ?? null;
+                  }
+                  if (found) {
+                    sessionFile = found;
+                    setSpecialistSessionCache(name, found);
+                  }
                 }
-                if (found) {
-                  sessionFile = found;
-                  setSpecialistSessionCache(name, found);
-                }
-              }
-            } catch { /* session resolution failed */ }
+              } catch { /* session resolution failed */ }
+            }
           }
           if (!sessionFile) {
             return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
@@ -3791,7 +3810,7 @@ export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDo
   return readFile(conv.handoffDocPath, 'utf-8');
 }
 
-async function ensureForkSessionReady(
+export async function ensureForkSessionReady(
   conv: Conversation,
   sessionId: string,
   resume: boolean,
@@ -3821,7 +3840,7 @@ async function ensureForkSessionReady(
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
 
-async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
+export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
 
@@ -3856,6 +3875,13 @@ async function injectForkSummary(conv: Conversation, summary: string, caller: st
       console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
     }
   }
+}
+
+export function handleForkPipelineFailure(name: string, err: unknown): void {
+  console.error(`[fork-pipeline] Failed for ${name}:`, err);
+  const msg = err instanceof Error ? err.message : String(err);
+  updateForkStatus(name, 'failed', msg);
+  markConversationEnded(name);
 }
 
 export async function runForkPipeline(
@@ -3920,10 +3946,40 @@ export async function runForkPipeline(
 
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
-      return Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      try {
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      } catch (error) {
+        console.warn(
+          `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return '';
+      }
     }
-    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, parentConv.harness ?? undefined);
-    return result.summary;
+    try {
+      const result = await generateSummaryForFork(
+        parentSessionFile,
+        summaryModel,
+        includeThinkingInSummary,
+        summaryHarness,
+        parentConv.harness ?? undefined,
+      );
+      return result.summary;
+    } catch (error) {
+      if (!forkFallbackReason) {
+        forkFallbackReason = `LLM summary failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      console.warn(
+        `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      } catch (heuristicError) {
+        console.warn(
+          `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
+        );
+        return '';
+      }
+    }
   };
 
   if (forkMode === 'handoff') {
@@ -3988,9 +4044,9 @@ export async function runForkPipeline(
   }
 
   updateForkStatus(convName, 'spawning');
-  await ensureForkSessionReady(conv, sessionId, false);
+  await self.ensureForkSessionReady(conv, sessionId, false);
 
-  await injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
+  await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
@@ -4285,8 +4341,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         registerInFlightForkPipeline(
           runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
         ).catch((err) => {
-          console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
-          updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
+          handleForkPipelineFailure(newConv.name, err);
         });
 
         return jsonResponse({

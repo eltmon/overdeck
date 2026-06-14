@@ -25,6 +25,7 @@ import { existsSync } from 'fs';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
+import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
 
 import {
   openDashboardLogStdio,
@@ -48,6 +49,8 @@ export interface RestartOptions {
   force?: boolean;
   healthTimeout?: string;
   deacon?: boolean;
+  resume?: boolean;
+  noResume?: boolean;
 }
 
 function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'traefik' | 'full' {
@@ -113,7 +116,7 @@ function searchedBundlePaths(): string[] {
   return uniqueBundleCandidates().map(candidate => candidate.path);
 }
 
-export function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
+export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOptions): void {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
@@ -121,16 +124,16 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: { disableD
       reason: `Dashboard bundle not found. Run \`npm run build\`. Searched: ${searchedBundlePaths().join(', ')}`,
     });
   }
+  const env = applyBootGateEnv({ ...process.env }, opts);
   const child = spawn(resolveNode22(), [serverPath], {
     detached: true,
     stdio: openDashboardLogStdio(),
     env: {
-      ...process.env,
+      ...env,
       DASHBOARD_PORT: String(config.dashboardPort),
       API_PORT: String(config.dashboardApiPort),
       PORT: String(config.dashboardApiPort),
       PANOPTICON_MODE: 'production',
-      ...(opts?.disableDeacon ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
     },
   });
   child.unref();
@@ -167,10 +170,8 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     ? parseInt(options.healthTimeout, 10)
     : undefined;
 
-  const disableDeacon = options.deacon === false;
-  if (disableDeacon) {
-    console.log(chalk.yellow('  Deacon auto-start disabled for this restart (--no-deacon)'));
-  }
+  const bootGates = resolveBootGates(options);
+  console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
   console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
 
@@ -209,7 +210,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
           } catch { /* non-fatal */ }
         }
 
-        await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
+        await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
         }));
         await recordRestartStatus(startedAt, true);
@@ -240,7 +241,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         break;
       }
       case 'full': {
-        await runFullRestart(config, { healthTimeoutMs, disableDeacon });
+        await runFullRestart(config, { healthTimeoutMs, bootGateOptions: options });
         break;
       }
     }
@@ -277,7 +278,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
  */
 async function runFullRestart(
   config: PlatformConfig,
-  opts: { healthTimeoutMs?: number; disableDeacon?: boolean },
+  opts: { healthTimeoutMs?: number; bootGateOptions?: BootGateOptions },
 ): Promise<void> {
   const projectRoot = process.cwd();
   const venvPath = join(projectRoot, '.venv');
@@ -324,7 +325,7 @@ async function runFullRestart(
     installCliproxy: cliproxy.installCliproxySync,
   }));
 
-  spawnDashboardDetached(config, { disableDeacon: opts.disableDeacon });
+  spawnDashboardDetached(config, opts.bootGateOptions);
   await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
   }));

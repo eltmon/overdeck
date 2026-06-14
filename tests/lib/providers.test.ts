@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, piProviderForModel, qualifyPiModel, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
@@ -46,6 +46,15 @@ describe('providers', () => {
       ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2',
       CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2',
     });
+  });
+
+  it('resolves the kimi provider for the kimi-k2.7-code coding model', () => {
+    expect(getProviderForModelSync('kimi-k2.7-code').name).toBe('kimi');
+  });
+
+  it('qualifies kimi-k2.7-code under the pi kimi-coding provider', () => {
+    expect(piProviderForModel('kimi-k2.7-code')).toBe('kimi-coding');
+    expect(qualifyPiModel('kimi-k2.7-code')).toBe('kimi-coding/kimi-k2.7-code');
   });
 
   it('routes MiniMax through its direct Anthropic-compatible endpoint', () => {
@@ -119,6 +128,29 @@ describe('providers', () => {
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-plus',
       ANTHROPIC_SMALL_FAST_MODEL: 'qwen3-plus',
       CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3-plus',
+    });
+  });
+
+  it('resolves the xai provider for grok-build-0.1', () => {
+    expect(getProviderForModelSync('grok-build-0.1').name).toBe('xai');
+  });
+
+  it('qualifies grok-build-0.1 under the pi xai provider', () => {
+    expect(piProviderForModel('grok-build-0.1')).toBe('xai');
+    expect(qualifyPiModel('grok-build-0.1')).toBe('xai/grok-build-0.1');
+  });
+
+  it('routes xAI through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.xai.compatibility).toBe('direct');
+    expect(getProviderEnvSync(PROVIDERS.xai, 'xai-test-key')).toEqual({
+      ANTHROPIC_BASE_URL: 'https://api.x.ai/v1',
+      ANTHROPIC_AUTH_TOKEN: 'xai-test-key',
+      XAI_API_KEY: 'xai-test-key',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'grok-build-0.1',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'grok-build-0.1',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'grok-build-0.1',
+      ANTHROPIC_SMALL_FAST_MODEL: 'grok-build-0.1',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'grok-build-0.1',
     });
   });
 });

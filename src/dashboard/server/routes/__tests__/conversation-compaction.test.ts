@@ -23,15 +23,14 @@ vi.mock('../../../../lib/conversations/smart-compaction.js', async () => {
   };
 });
 
-vi.mock('../../../../lib/conversations/summary-fork.js', async () => {
-  const { Effect } = await import('effect');
-  return {
-    generateFallbackSummary: vi.fn(() => Effect.succeed('Fallback compact bug summary.')),
-  };
-});
+vi.mock('../../../../lib/agents.js', () => ({
+  getAgentRuntimeBaseCommand: vi.fn(async () => 'claude'),
+  getProviderExportsForModel: vi.fn(async () => ''),
+}));
 
 let TEST_HOME: string;
 let CONFIG_HOME: string;
+const ORIGINAL_HOME = process.env.HOME;
 
 beforeEach(() => {
   mockGenerateSmartSummary.mockClear();
@@ -55,6 +54,11 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.PANOPTICON_HOME;
+  if (ORIGINAL_HOME) {
+    process.env.HOME = ORIGINAL_HOME;
+  } else {
+    delete process.env.HOME;
+  }
   rmSync(TEST_HOME, { recursive: true, force: true });
   rmSync(CONFIG_HOME, { recursive: true, force: true });
 });

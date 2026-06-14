@@ -7,18 +7,15 @@
  * IMPORTANT: This module is safe to import in both server and CLI contexts.
  * Never use execSync here — this is synchronous SQLite, not a subprocess.
  *
- * Dual-runtime (PAN-428):
- *   - Bun: uses bun:sqlite (better-sqlite3 is a native addon — ERR_DLOPEN_FAILED in Bun)
- *   - Node: uses better-sqlite3
- * In both cases the external API is identical: pragma(), exec(), prepare(), close().
+ * Dual-runtime (PAN-1579): uses the shared SQLite driver adapter, which selects
+ * bun:sqlite under Bun and node:sqlite under Node.
  */
 
-import type Database from 'better-sqlite3';
 import { Data, Effect } from 'effect';
-import { createRequire } from 'module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { getPanopticonHome } from '../paths.js';
+import { openDatabase, type SqliteDatabase } from './driver.js';
 import { runMigrations } from './schema.js';
 
 /**
@@ -31,16 +28,7 @@ export class DatabaseError extends Data.TaggedError('DatabaseError')<{
   readonly cause?: unknown;
 }> {}
 
-declare const Bun: unknown;
-
-function isBunRuntime(): boolean {
-  return typeof Bun !== 'undefined';
-}
-
-// createRequire allows synchronous require() in ESM — works in both Bun and Node
-const _require = createRequire(import.meta.url);
-
-let _db: Database.Database | null = null;
+let _db: SqliteDatabase | null = null;
 
 /**
  * Get the path to panopticon.db (dynamic, respects PANOPTICON_HOME override for tests)
@@ -53,7 +41,7 @@ export function getDatabasePath(): string {
  * Initialize and return the singleton database connection.
  * Safe to call multiple times — returns the existing connection after first call.
  */
-export function getDatabase(): Database.Database {
+export function getDatabase(): SqliteDatabase {
   if (_db) {
     return _db;
   }
@@ -64,32 +52,7 @@ export function getDatabase(): Database.Database {
   }
 
   const dbPath = getDatabasePath();
-
-  if (isBunRuntime()) {
-    // better-sqlite3 is a native Node.js addon that fails in Bun with ERR_DLOPEN_FAILED.
-    // Use bun:sqlite instead, with a pragma() shim for API compatibility.
-    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
-    const bunDb = new BunDatabase(dbPath);
-
-    // bun:sqlite has no pragma() method — shim it using exec() and query().get()
-    bunDb.pragma = function (sql: string, options?: { simple?: boolean }): any {
-      if (options?.simple) {
-        // Read-only: return the scalar value directly (e.g. db.pragma('user_version', { simple: true }))
-        const key = sql.trim();
-        const row = bunDb.query(`PRAGMA ${key}`).get() as Record<string, unknown> | null;
-        return row?.[key] ?? null;
-      }
-      // Set or no-return pragma (e.g. 'journal_mode = WAL', 'foreign_keys = ON')
-      bunDb.exec(`PRAGMA ${sql}`);
-      return undefined;
-    };
-
-    _db = bunDb as Database.Database;
-  } else {
-    // Node.js path: load better-sqlite3 lazily (avoids import-time native addon load)
-    const BetterSqlite3 = _require('better-sqlite3');
-    _db = new BetterSqlite3(dbPath) as Database.Database;
-  }
+  _db = openDatabase(dbPath);
 
   // Enable WAL mode for concurrent readers + single writer
   _db.pragma('journal_mode = WAL');
@@ -121,7 +84,7 @@ export function getDatabase(): Database.Database {
   //
   // Switching auto_vacuum modes requires VACUUM to take effect. We run it
   // once on startup if the DB is still in NONE mode. VACUUM blocks the
-  // event loop (better-sqlite3 is synchronous) but this happens BEFORE the
+  // event loop (SQLite driver is synchronous) but this happens BEFORE the
   // HTTP server starts, so no in-flight requests are affected.
   const currentVacuum = _db.pragma('auto_vacuum', { simple: true }) as number;
   if (currentVacuum !== 2) {

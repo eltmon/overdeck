@@ -9,14 +9,16 @@
 import { Effect } from 'effect';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { homedir } from 'os';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import type { ReviewStatus } from './review-status.js';
 import { FsError } from './errors.js';
+import { getPanopticonHome } from './paths.js';
 
-const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
+function defaultStatusFile(): string {
+  return join(getPanopticonHome(), 'review-status.json');
+}
 
-export function loadReviewStatusesSync(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
+export function loadReviewStatusesSync(filePath = defaultStatusFile()): Record<string, ReviewStatus> {
   try {
     if (existsSync(filePath)) {
       return JSON.parse(readFileSync(filePath, 'utf-8'));
@@ -27,7 +29,7 @@ export function loadReviewStatusesSync(filePath = DEFAULT_STATUS_FILE): Record<s
   return {};
 }
 
-export function saveReviewStatusesSync(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {
+export function saveReviewStatusesSync(statuses: Record<string, ReviewStatus>, filePath = defaultStatusFile()): void {
   try {
     const dir = dirname(filePath);
     if (!existsSync(dir)) {
@@ -42,7 +44,7 @@ export function saveReviewStatusesSync(statuses: Record<string, ReviewStatus>, f
 export function setReviewStatusSync(
   issueId: string,
   update: Partial<ReviewStatus>,
-  filePath = DEFAULT_STATUS_FILE,
+  filePath = defaultStatusFile(),
 ): ReviewStatus {
   const statuses = loadReviewStatusesSync(filePath);
   const existing = statuses[issueId] || {
@@ -113,12 +115,12 @@ export function setReviewStatusSync(
   return updated;
 }
 
-export function getReviewStatusSync(issueId: string, filePath = DEFAULT_STATUS_FILE): ReviewStatus | null {
+export function getReviewStatusSync(issueId: string, filePath = defaultStatusFile()): ReviewStatus | null {
   const statuses = loadReviewStatusesSync(filePath);
   return statuses[issueId] || null;
 }
 
-export function clearReviewStatusSync(issueId: string, filePath = DEFAULT_STATUS_FILE): void {
+export function clearReviewStatusSync(issueId: string, filePath = defaultStatusFile()): void {
   const statuses = loadReviewStatusesSync(filePath);
   delete statuses[issueId];
   saveReviewStatusesSync(statuses, filePath);
@@ -131,14 +133,14 @@ export function clearReviewStatusSync(issueId: string, filePath = DEFAULT_STATUS
 
 /** Load all statuses from disk. Pure (logs but does not throw). */
 export const loadReviewStatuses = (
-  filePath: string = DEFAULT_STATUS_FILE,
+  filePath: string = defaultStatusFile(),
 ): Effect.Effect<Record<string, ReviewStatus>> =>
   Effect.sync(() => loadReviewStatusesSync(filePath));
 
 /** Persist all statuses to disk; surfaces FsError on failure. */
 export const saveReviewStatuses = (
   statuses: Record<string, ReviewStatus>,
-  filePath: string = DEFAULT_STATUS_FILE,
+  filePath: string = defaultStatusFile(),
 ): Effect.Effect<void, FsError> =>
   Effect.try({
     try: () => saveReviewStatusesSync(statuses, filePath),
@@ -150,7 +152,7 @@ export const saveReviewStatuses = (
 export const setReviewStatus = (
   issueId: string,
   update: Partial<ReviewStatus>,
-  filePath: string = DEFAULT_STATUS_FILE,
+  filePath: string = defaultStatusFile(),
 ): Effect.Effect<ReviewStatus, FsError> =>
   Effect.try({
     try: () => setReviewStatusSync(issueId, update, filePath),
@@ -161,14 +163,14 @@ export const setReviewStatus = (
 /** Read one issue's status. Pure. */
 export const getReviewStatus = (
   issueId: string,
-  filePath: string = DEFAULT_STATUS_FILE,
+  filePath: string = defaultStatusFile(),
 ): Effect.Effect<ReviewStatus | null> =>
   Effect.sync(() => getReviewStatusSync(issueId, filePath));
 
 /** Remove one issue's status from disk. */
 export const clearReviewStatus = (
   issueId: string,
-  filePath: string = DEFAULT_STATUS_FILE,
+  filePath: string = defaultStatusFile(),
 ): Effect.Effect<void, FsError> =>
   Effect.try({
     try: () => clearReviewStatusSync(issueId, filePath),
