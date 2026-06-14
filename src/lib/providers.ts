@@ -124,9 +124,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'pi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
-    models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
+    models: ['glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
     haikuModel: 'glm-4.7-flash',
-    tierModels: { opus: 'glm-5.1', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
+    tierModels: { opus: 'glm-5.2', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
     tested: true,
     description: 'Route directly to Z.AI Anthropic-compatible endpoint using ZHIPU_API_KEY.',
   },
@@ -254,7 +254,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
 
   // Check Z.AI models
-  if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
+  if (['glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
   }
 

@@ -4,17 +4,17 @@
     "created": "2026-06-13T23:54:52.014Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1862: cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review",
-    "updated": "2026-06-14T00:03:32.065Z"
+    "updated": "2026-06-14T20:03:01.636Z"
   },
   "plan": {
     "id": "pan-1862",
     "title": "feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review",
-    "status": "proposed",
+    "status": "running",
     "uid": "aee18359-8d82-4670-8717-14d671d009b6",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-13T23:54:52.014Z",
-    "updated": "2026-06-14T00:03:32.065Z",
+    "updated": "2026-06-14T20:03:01.636Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1862",
@@ -845,5 +845,5 @@
       "canonicalFilename": "2026-06-14-PAN-1862-feat-review-cache-sharing-review-convoy-warm-parent-fork-model-uniformity-guard-and-resumable-selective-re-review.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

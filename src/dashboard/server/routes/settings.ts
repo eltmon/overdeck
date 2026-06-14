@@ -131,6 +131,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'minimax-m2.7-highspeed': { apiModel: 'minimax-m2.7-highspeed' },
   'MiniMax-M3': { apiModel: 'MiniMax-M3' },
   // Z.AI models
+  'glm-5.2': { apiModel: 'glm-5.2' },
   'glm-5.1': { apiModel: 'glm-5.1' },
   'glm-4.7': { apiModel: 'glm-4.7' },
   'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
@@ -374,7 +375,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         }
 
         case 'zai': {
-          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-5.1') : 'glm-5.1';
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'glm-5.2') : 'glm-5.2';
           try {
             const resp = await fetch('https://api.z.ai/api/anthropic/v1/messages', {
               method: 'POST',
@@ -635,7 +636,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['glm-5.1'];
+              models = data.data?.map(m => m.id) || ['glm-5.2'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {

@@ -40,7 +40,12 @@ export interface FlyProviderConfig {
   image?: string;
   /** API token (falls back to FLY_API_TOKEN env var) */
   apiToken?: string;
+  /** Durability/resiliency tier (default: ephemeral) */
+  resiliencyTier?: 'ephemeral' | 'durable';
 }
+
+const DURABLE_VOLUME_SIZE_GB = 10;
+const DURABLE_MAX_RETRIES = 3;
 
 function mapFlyStateToVmStatus(state: string): VmStatus {
   switch (state) {
@@ -91,7 +96,12 @@ export class FlyProvider implements RemoteProvider {
       vmMemory: config.vmMemory ?? 1024,
       image: config.image ?? 'registry.fly.io/pan-workspace:latest',
       apiToken: config.apiToken ?? process.env.FLY_API_TOKEN ?? '',
+      resiliencyTier: config.resiliencyTier ?? 'ephemeral',
     };
+  }
+
+  getResiliencyTier(): 'ephemeral' | 'durable' {
+    return this.config.resiliencyTier;
   }
 
   private getApi(): FlyApiClient {
@@ -168,7 +178,52 @@ export class FlyProvider implements RemoteProvider {
       // Adopt it instead — rootfs resets from the image on start, so a
       // restarted leftover is indistinguishable from a fresh machine for
       // the provisioning steps that follow.
-      const existing = (await api.listMachines(this.config.app)).find((m) => m.name === name && m.state !== 'destroyed');
+      const existing = (await api.listMachines(this.config.app)).find(
+        (m) => m.name === name && m.state !== 'destroyed',
+      );
+      const isDurable = this.config.resiliencyTier === 'durable';
+      const expectedVolumeName = `${name}-workspace`;
+      let volumeId: string | undefined;
+
+      if (isDurable) {
+        const volumes = await api.listVolumes(this.config.app);
+
+        if (existing) {
+          // Adopted machine: require a volume already attached to it. Do not
+          // create a new volume here — doing so would orphan it when we throw.
+          const attached = volumes.find(
+            (v) =>
+              v.name === expectedVolumeName &&
+              v.region === this.config.region &&
+              v.state !== 'destroyed' &&
+              v.attached_machine_id === existing.id,
+          );
+          if (!attached) {
+            throw new Error(
+              `Durable tier requires a /workspace volume for '${name}', but the existing machine ` +
+                `'${existing.id}' does not have volume '${expectedVolumeName}' attached. ` +
+                `Destroy the existing machine or choose a different name.`,
+            );
+          }
+          volumeId = attached.id;
+        } else {
+          // Fresh machine: reuse an unattached volume in this region, or create one.
+          const available = volumes.find(
+            (v) =>
+              v.name === expectedVolumeName &&
+              v.region === this.config.region &&
+              v.state !== 'destroyed' &&
+              !v.attached_machine_id,
+          );
+          volumeId = available?.id ??
+            (await api.createVolume(this.config.app, {
+              name: expectedVolumeName,
+              region: this.config.region,
+              sizeGb: DURABLE_VOLUME_SIZE_GB,
+            })).id;
+        }
+      }
+
       if (existing) {
         if (existing.state !== 'started') {
           await api.startMachine(this.config.app, existing.id);
@@ -190,8 +245,11 @@ export class FlyProvider implements RemoteProvider {
         size: this.config.vmSize,
         memory: this.config.vmMemory,
         region: this.config.region,
-        restart: { policy: 'no' },
+        restart: isDurable
+          ? { policy: 'on-failure', max_retries: DURABLE_MAX_RETRIES }
+          : { policy: 'no' },
         auto_destroy: false,
+        ...(volumeId ? { mounts: [{ volume: volumeId, path: '/workspace' }] } : {}),
       });
 
       // Wait for machine to start. This must be fatal: callers exec commands
@@ -221,7 +279,29 @@ export class FlyProvider implements RemoteProvider {
   deleteVm(name: string): Effect.Effect<void, RemoteError> {
     return effFromPromise('deleteVm', async () => {
       const { appName, machineId } = await this.resolveVm(name);
-      await this.getApi().destroyMachine(appName, machineId);
+      const api = this.getApi();
+      await api.destroyMachine(appName, machineId);
+
+      // Best-effort teardown of the associated durable-tier volume. An
+      // ephemeral machine has no such volume, so this is a no-op there.
+      const expectedVolumeName = `${name}-workspace`;
+      try {
+        const volumes = await api.listVolumes(appName);
+        const volume = volumes.find(
+          (v) =>
+            v.name === expectedVolumeName &&
+            v.state !== 'destroyed' &&
+            (v.attached_machine_id === machineId ||
+              v.attached_machine_id === null ||
+              v.attached_machine_id === undefined),
+        );
+        if (volume) {
+          await api.deleteVolume(appName, volume.id);
+        }
+      } catch {
+        // Don't fail teardown because the volume delete didn't succeed;
+        // the machine is already gone and the caller has what it needs.
+      }
     });
   }
 

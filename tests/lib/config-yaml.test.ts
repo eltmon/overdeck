@@ -231,6 +231,36 @@ api_keys:
         perDayCostCapUsd: 0.25,
       });
     });
+
+    it('normalizes remote tier and concurrency settings', () => {
+      expect(mergeConfigs().config.remote).toBeUndefined();
+
+      const { config } = mergeConfigs({
+        remote: {
+          resiliency_tier: 'durable',
+          max_concurrent_agents: 5,
+        },
+      });
+
+      expect(config.remote).toEqual({
+        resiliencyTier: 'durable',
+        maxConcurrentAgents: 5,
+      });
+    });
+
+    it('rejects invalid remote settings', () => {
+      expect(() => mergeConfigs({
+        remote: { resiliency_tier: 'permanent' },
+      } as never)).toThrow('config.yaml: remote.resiliency_tier must be one of ephemeral, durable');
+
+      expect(() => mergeConfigs({
+        remote: { max_concurrent_agents: -1 },
+      } as never)).toThrow('config.yaml: remote.max_concurrent_agents must be a non-negative integer');
+
+      expect(() => mergeConfigs({
+        remote: { max_concurrent_agents: 1.5 },
+      } as never)).toThrow('config.yaml: remote.max_concurrent_agents must be a non-negative integer');
+    });
   });
 
   describe('hasGlobalConfig', () => {

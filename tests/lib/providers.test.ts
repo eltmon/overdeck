@@ -52,6 +52,10 @@ describe('providers', () => {
     expect(getProviderForModelSync('kimi-k2.7-code').name).toBe('kimi');
   });
 
+  it('resolves the zai provider for glm-5.2', () => {
+    expect(getProviderForModelSync('glm-5.2').name).toBe('zai');
+  });
+
   it('qualifies kimi-k2.7-code under the pi kimi-coding provider', () => {
     expect(piProviderForModel('kimi-k2.7-code')).toBe('kimi-coding');
     expect(qualifyPiModel('kimi-k2.7-code')).toBe('kimi-coding/kimi-k2.7-code');
@@ -79,7 +83,7 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-zai-test',
       ZAI_API_KEY: 'sk-zai-test',
       API_TIMEOUT_MS: '300000',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.1',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.2',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-4.7',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'glm-4.7-flash',
       ANTHROPIC_SMALL_FAST_MODEL: 'glm-4.7-flash',

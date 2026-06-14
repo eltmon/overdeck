@@ -30,6 +30,7 @@ import {
   killRemoteAgent,
   getRemoteAgentOutput,
   sendToRemoteAgent,
+  checkRemoteSpendCap,
 } from '../../../lib/remote/index.js';
 import { loadConfigSync as loadPanConfig } from '../../../lib/config.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -264,10 +265,15 @@ const startRemoteAgentRoute = HttpRouter.add(
 
     const fly = createFlyProviderFromConfig(loadPanConfig().remote);
 
+    const spendCap = checkRemoteSpendCap(loadPanConfig());
+    if (!spendCap.allowed) {
+      return jsonResponse({ error: spendCap.message }, { status: 429 });
+    }
+
     const state = yield* Effect.tryPromise({
       try: async () => {
         await fly.syncAllCredentials(metadata.vmName!);
-        return spawnRemoteAgent({ issueId, workspace: metadata as unknown as Parameters<typeof spawnRemoteAgent>[0]['workspace'], prompt, model });
+        return spawnRemoteAgent({ issueId, workspace: metadata as unknown as Parameters<typeof spawnRemoteAgent>[0]['workspace'], prompt, model, tier: fly.getResiliencyTier() });
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });

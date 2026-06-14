@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { Effect } from 'effect';
 import { FlyApiClient, FlyApiError, createFlyApiClientSync } from '../../../src/lib/remote/fly-api.js';
 
 // Mock global fetch
@@ -51,6 +52,30 @@ describe('FlyApiClient', () => {
         expect.objectContaining({ method: 'POST' })
       );
       expect(result.id).toBe('m1');
+    });
+
+    it('includes mounts and restart.max_retries in config body when provided', async () => {
+      const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
+      mockOk(machine);
+      await client.createMachine('my-app', 'ws-123', {
+        image: 'registry.fly.io/pan-workspace:latest',
+        restart: { policy: 'on-failure', max_retries: 3 },
+        mounts: [{ volume: 'vol_123', path: '/workspace' }],
+      });
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body as string);
+      expect(body.config.restart).toEqual({ policy: 'on-failure', max_retries: 3 });
+      expect(body.config.mounts).toEqual([{ volume: 'vol_123', path: '/workspace' }]);
+    });
+
+    it('omits mounts and max_retries when not provided, keeping policy:no', async () => {
+      const machine = { id: 'm1', name: 'ws-123', state: 'started', region: 'iad' };
+      mockOk(machine);
+      await client.createMachine('my-app', 'ws-123', { image: 'registry.fly.io/pan-workspace:latest' });
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body as string);
+      expect(body.config.restart).toEqual({ policy: 'no' });
+      expect(body.config).not.toHaveProperty('mounts');
     });
   });
 
@@ -112,6 +137,97 @@ describe('FlyApiClient', () => {
       mockOk(machines);
       const result = await client.listMachines('my-app');
       expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('createVolume', () => {
+    it('POSTs to /apps/{app}/volumes and returns the created volume', async () => {
+      const volume = {
+        id: 'vol_123',
+        name: 'ws-vol',
+        state: 'created',
+        size_gb: 10,
+        region: 'iad',
+      };
+      mockOk(volume);
+      const result = await client.createVolume('my-app', {
+        name: 'ws-vol',
+        region: 'iad',
+        sizeGb: 10,
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.machines.dev/v1/apps/my-app/volumes',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"size_gb":10'),
+        })
+      );
+      expect(result.id).toBe('vol_123');
+    });
+
+    it('includes explicit encrypted flag when provided', async () => {
+      mockOk({ id: 'vol_456', name: 'ws-vol2', state: 'created', size_gb: 5, region: 'ord' });
+      await client.createVolume('my-app', {
+        name: 'ws-vol2',
+        region: 'ord',
+        sizeGb: 5,
+        encrypted: false,
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.machines.dev/v1/apps/my-app/volumes',
+        expect.objectContaining({
+          body: expect.stringContaining('"encrypted":false'),
+        })
+      );
+    });
+  });
+
+  describe('getVolume', () => {
+    it('GETs the volume by ID', async () => {
+      const volume = { id: 'vol_123', name: 'ws-vol', state: 'created', size_gb: 10, region: 'iad' };
+      mockOk(volume);
+      const result = await client.getVolume('my-app', 'vol_123');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.machines.dev/v1/apps/my-app/volumes/vol_123',
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(result.id).toBe('vol_123');
+    });
+  });
+
+  describe('listVolumes', () => {
+    it('returns empty array when API returns null', async () => {
+      mockOk(null);
+      const result = await client.listVolumes('my-app');
+      expect(result).toEqual([]);
+    });
+
+    it('returns volumes array', async () => {
+      const volumes = [{ id: 'vol_1', name: 'ws-vol', state: 'created', size_gb: 10, region: 'iad' }];
+      mockOk(volumes);
+      const result = await client.listVolumes('my-app');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('vol_1');
+    });
+  });
+
+  describe('deleteVolume', () => {
+    it('DELETEs the volume by ID', async () => {
+      mockOk('');
+      await client.deleteVolume('my-app', 'vol_123');
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.machines.dev/v1/apps/my-app/volumes/vol_123',
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
+  });
+
+  describe('volume Effect wrappers', () => {
+    it('createVolume wrapper fails with FlyApiError on HTTP error', async () => {
+      const { createVolume } = await import('../../../src/lib/remote/fly-api.js');
+      mockError(422, 'unprocessable');
+      const program = createVolume(client, 'my-app', { name: 'v', region: 'iad', sizeGb: 1 });
+      await expect(Effect.runPromise(program)).rejects.toBeInstanceOf(FlyApiError);
     });
   });
 
