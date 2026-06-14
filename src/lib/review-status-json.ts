@@ -88,7 +88,7 @@ export function setReviewStatusSync(
   // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
   const gatesPassed =
-    merged.reviewStatus === 'passed' &&
+    (merged.reviewStatus === 'passed' || merged.reviewStatus === 'skipped') &&
     (merged.testStatus === 'passed' || merged.testStatus === 'skipped') &&
     merged.verificationStatus !== 'failed' &&
     (merged.uatStatus === undefined || merged.uatStatus === 'passed') &&

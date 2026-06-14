@@ -41,7 +41,7 @@ export interface BlockerReason {
 
 export interface ReviewStatus {
   issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
@@ -145,7 +145,7 @@ export function mergeGateEligibility(
   status: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'mergeStatus'> | null,
 ): MergeGateEligibility {
   if (!status) return { eligible: false, reason: 'no review record' };
-  if (status.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${status.reviewStatus}` };
+  if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') return { eligible: false, reason: `review is ${status.reviewStatus}` };
   if (status.testStatus !== 'passed' && status.testStatus !== 'skipped') {
     return { eligible: false, reason: `test is ${status.testStatus}` };
   }
@@ -284,7 +284,7 @@ export function setReviewStatusSync(
   // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
   const gatesPassed =
-    merged.reviewStatus === 'passed' &&
+    (merged.reviewStatus === 'passed' || merged.reviewStatus === 'skipped') &&
     (merged.testStatus === 'passed' || merged.testStatus === 'skipped') &&
     verificationSatisfied(merged) &&
     (merged.uatStatus === undefined || merged.uatStatus === 'passed') &&
@@ -487,7 +487,7 @@ export function clearStuckMergeStatuses(): void {
     // Reset to pending so MERGE button reappears — the in-memory queue was lost on restart.
     // Preserve readyForMerge if review+test both passed — the merge just needs to be retried.
     const shouldBeReady =
-      s.reviewStatus === 'passed' &&
+      (s.reviewStatus === 'passed' || s.reviewStatus === 'skipped') &&
       (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
       verificationSatisfied(s) &&
       (s.uatStatus === undefined || s.uatStatus === 'passed');
@@ -515,7 +515,7 @@ export function fixStuckReadyForMerge(): void {
   const statuses = loadReviewStatuses();
   const stuck = Object.values(statuses).filter(s =>
     s.readyForMerge === false &&
-    s.reviewStatus === 'passed' &&
+    (s.reviewStatus === 'passed' || s.reviewStatus === 'skipped') &&
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     verificationSatisfied(s) &&
     // Only fix 'pending'/'queued' merge states — not 'failed' ones.
