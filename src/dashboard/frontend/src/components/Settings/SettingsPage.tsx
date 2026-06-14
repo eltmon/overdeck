@@ -29,6 +29,7 @@ import {
   Volume2,
   Mic,
   Gauge,
+  Globe,
 } from 'lucide-react';
 import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
@@ -429,6 +430,7 @@ export function buildMiniMaxFormData(
     tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
     openrouter: { ...(formData?.openrouter || miniMaxDefaults.openrouter || {}) },
     tts: { ...(formData?.tts || miniMaxDefaults.tts || {}) },
+    remote: { ...(formData?.remote || miniMaxDefaults.remote || {}) },
   };
 }
 
@@ -562,6 +564,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
   { id: 'cloister', label: 'Cloister', icon: Flag },
+  { id: 'remote', label: 'Remote', icon: Globe },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'memory', label: 'Memory', icon: Brain },
@@ -1168,6 +1171,27 @@ export function SettingsPage() {
         config_mode: configMode,
       },
     });
+  };
+
+  const handleRemoteResiliencyTierChange = (tier: 'ephemeral' | 'durable') => {
+    applySettings({
+      ...formData,
+      remote: {
+        ...formData.remote,
+        resiliency_tier: tier,
+      },
+    });
+  };
+
+  const handleRemoteMaxConcurrentAgentsChange = (value: string) => {
+    const num = value === '' ? undefined : Number(value);
+    applySettings({
+      ...formData,
+      remote: {
+        ...formData.remote,
+        max_concurrent_agents: num,
+      },
+    }, { debounce: true });
   };
 
   const handleTtsConfigChange = (patch: Partial<TtsConfig>, options: { debounce?: boolean } = {}) => {
@@ -2259,6 +2283,52 @@ export function SettingsPage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* Remote */}
+      <section id="remote" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-muted-foreground" />
+          Remote
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Provisioning defaults for Fly.io remote work agents.
+        </p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Resiliency tier</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Durable machines keep a persistent workspace volume; ephemeral machines are cheaper but lose state on crash.
+              </p>
+            </div>
+            <select
+              value={formData.remote?.resiliency_tier ?? 'ephemeral'}
+              onChange={(e) => handleRemoteResiliencyTierChange(e.target.value as 'ephemeral' | 'durable')}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            >
+              <option value="ephemeral">Ephemeral</option>
+              <option value="durable">Durable</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Max concurrent remote agents</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                0 means unlimited.
+              </p>
+            </div>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={formData.remote?.max_concurrent_agents ?? 0}
+              onChange={(e) => handleRemoteMaxConcurrentAgentsChange(e.target.value)}
+              className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        </div>
       </section>
 
       {/* Voice */}

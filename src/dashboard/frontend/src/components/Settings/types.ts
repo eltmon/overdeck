@@ -214,4 +214,8 @@ export interface SettingsConfig {
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
   };
+  remote?: {
+    resiliency_tier?: 'ephemeral' | 'durable';
+    max_concurrent_agents?: number;
+  };
 }

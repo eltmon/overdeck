@@ -129,5 +129,30 @@ describe('config', () => {
       expect(config.remote?.max_concurrent_agents).toBe(7);
       vi.doUnmock('../../src/lib/paths.js');
     });
+
+    it('lets config.yaml remote settings override config.toml values', async () => {
+      const configPath = join(tempDir, 'config.toml');
+      writeFileSync(
+        configPath,
+        `[remote]\nenabled = true\nresiliency_tier = "ephemeral"\nmax_concurrent_agents = 3\n`,
+      );
+      vi.resetModules();
+      vi.doMock('../../src/lib/paths.js', () => ({ CONFIG_FILE: configPath }));
+      vi.doMock('../../src/lib/config-yaml.js', () => ({
+        loadConfigSync: () => ({
+          config: {
+            remote: { resiliencyTier: 'durable', maxConcurrentAgents: 10 },
+          },
+          migration: null,
+        }),
+      }));
+      const { loadConfigSync } = await import('../../src/lib/config.js');
+      const config = loadConfigSync();
+      expect(config.remote?.enabled).toBe(true);
+      expect(config.remote?.resiliency_tier).toBe('durable');
+      expect(config.remote?.max_concurrent_agents).toBe(10);
+      vi.doUnmock('../../src/lib/paths.js');
+      vi.doUnmock('../../src/lib/config-yaml.js');
+    });
   });
 });
