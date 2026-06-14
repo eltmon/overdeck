@@ -95,6 +95,12 @@ Each is a **singleton on its port.** A second instance that tries to bind an alr
 
 **Workspace-container peers are not duplicates.** Every running workspace devcontainer runs its own `dist/dashboard/server.js` (cwd `/workspaces/...`, parent `containerd-shim`, `PANOPTICON_DISABLE_DEACON=1`). Seeing N+1 dashboard processes with N containers up is healthy. Only the **host** process whose cwd is the primary repo counts.
 
+### Deacon and Flywheel startup order
+
+Deacon/Cloister should be running before starting or resuming the Flywheel. `pan up` starts the dashboard first, then auto-starts Cloister/Deacon when the Deacon boot gate is enabled. Deacon immediately runs startup recovery, stopped-work-agent auto-resume, and a patrol.
+
+Flywheel is not auto-started by dashboard boot. It is a singleton agent session started or resumed explicitly through `pan flywheel start`, `pan flywheel resume`, or the dashboard Flywheel controls. Deacon only auto-resumes stopped `role: work` agents, so it does not resume the `role: flywheel` singleton.
+
 ### Boot env gates (read once, at dashboard/supervisor start)
 
 | Env var | Set by | Effect |
