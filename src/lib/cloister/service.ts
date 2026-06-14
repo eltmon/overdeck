@@ -770,7 +770,17 @@ export class CloisterService {
           // (loads roles/review.md → Agent tool fans out to convoy reviewers)
           // instead of the legacy `pan review run` coordinator.
           const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-          await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
+          const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
+          if (dispatchResult.gated) {
+            console.log(`  → Deferred recovery review for ${issueId}: ${dispatchResult.message}`);
+            emitActivityEntrySync({ source: 'cloister', level: 'info', message: `Deferred recovery review for ${issueId}: ${dispatchResult.message}`, issueId });
+            continue;
+          }
+          if (!dispatchResult.success) {
+            console.log(`  ⚠ Failed to re-dispatch recovery review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
+            emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Failed to re-dispatch recovery review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`, issueId });
+            continue;
+          }
           // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally
           console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
           emitActivityEntrySync({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });

@@ -46,6 +46,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
+import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
@@ -292,7 +293,7 @@ function buildReviewRolePrompt(opts: {
   }
 }async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
-): Promise<{ success: boolean; message: string; error?: string }> {
+): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
   // Idempotency: if a review role agent for this issue already has an alive
@@ -363,6 +364,38 @@ function buildReviewRolePrompt(opts: {
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
+  }
+
+  // Fast synchronous cache check for the gated case. If the probe cache says
+  // the branch has conflicts (or we cannot verify mergeability), fail fast
+  // without shelling out to git on the awaited request path.
+  const cachedMergeability = getCachedConflictGateMergeability(opts.issueId);
+  if (cachedMergeability === 'conflicts' || cachedMergeability === 'unknown') {
+    const targetBranch = 'main';
+    const reason = cachedMergeability === 'conflicts'
+      ? `merge conflict with ${targetBranch} must be resolved before review dispatch`
+      : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
+    const message = `Review dispatch deferred: ${reason}`;
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'pending',
+      reviewNotes: message,
+    });
+    return { success: false, gated: true, message };
+  }
+
+  const gate = await resolveConflictGate(
+    opts.issueId,
+    opts.workspace,
+    'main',
+    buildRealConflictGateDeps(),
+  );
+  if (gate.gated) {
+    const message = `Review dispatch deferred: ${gate.reason ?? 'merge conflict must be resolved first'}`;
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'pending',
+      reviewNotes: message,
+    });
+    return { success: false, gated: true, message };
   }
 
   // Clear feedback from any previous review cycle so the work agent only
@@ -646,7 +679,7 @@ export const spawnReviewSubRoleForIssue = (opts: {
  */
 export const spawnReviewRoleForIssue = (
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
-): Effect.Effect<{ success: boolean; message: string; error?: string }> =>
+): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
   Effect.promise(() => spawnReviewRoleForIssuePromise(opts));
 
 /**

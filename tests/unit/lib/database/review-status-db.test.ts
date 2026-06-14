@@ -97,6 +97,15 @@ describe('upsertReviewStatus', () => {
     expect(getReviewStatusFromDbSync('PAN-AM-4')?.autoMerge).toBe(true);
   });
 
+  it('round-trips conflictResolutionDispatchedAt', () => {
+    const dispatchedAt = '2026-06-11T08:30:00.000Z';
+    upsertReviewStatusSync(makeStatus({ issueId: 'PAN-CRD-1', conflictResolutionDispatchedAt: dispatchedAt }));
+
+    const row = testDb.prepare('SELECT conflict_resolution_dispatched_at FROM review_status WHERE issue_id = ?').get('PAN-CRD-1') as any;
+    expect(row.conflict_resolution_dispatched_at).toBe(dispatchedAt);
+    expect(getReviewStatusFromDbSync('PAN-CRD-1')?.conflictResolutionDispatchedAt).toBe(dispatchedAt);
+  });
+
   it('setAutoMerge sets/clears the tri-state flag and creates a row if absent', () => {
     setAutoMerge('PAN-SAM-1', true);
     expect(getReviewStatusFromDbSync('PAN-SAM-1')?.autoMerge).toBe(true);
