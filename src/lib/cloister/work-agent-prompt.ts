@@ -592,9 +592,11 @@ export async function readBeadsTasks(
 
   const acByTitle = buildACLookupByTitle(workspacePath);
 
-  let beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+  let queryResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+  let beads = queryResult.beads;
   if (beads.length === 0) {
-    beads = await Effect.runPromise(queryBeadsForIssue(projectRoot, issueId));
+    queryResult = await Effect.runPromise(queryBeadsForIssue(projectRoot, issueId));
+    beads = queryResult.beads;
   }
 
   for (const bead of beads) {
