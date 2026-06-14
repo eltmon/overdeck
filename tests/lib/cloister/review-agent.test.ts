@@ -103,6 +103,8 @@ vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
+  resolveReviewMode: vi.fn(() => 'full'),
+  resolveReReviewScope: vi.fn(() => 'changed'),
 }));
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({

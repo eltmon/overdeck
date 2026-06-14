@@ -59,6 +59,8 @@ vi.mock('../../config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: vi.fn(() => ({ config: {} })),
   resolveModel: vi.fn(() => 'sonnet'),
+  resolveReviewMode: vi.fn(() => 'full'),
+  resolveReReviewScope: vi.fn(() => 'changed'),
 }));
 
 vi.mock('../review-context.js', () => ({

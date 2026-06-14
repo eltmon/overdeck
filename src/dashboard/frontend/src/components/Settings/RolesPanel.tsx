@@ -10,6 +10,8 @@ type ModelRef = string;
 type Harness = 'claude-code' | 'pi' | 'codex';
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 type FlywheelScope = 'pan-only' | 'all-tracked-projects';
+type ReviewMode = 'full' | 'quick' | 'none';
+type ReReviewScope = 'all' | 'changed' | 'blockers';
 
 interface RoleSubConfig {
   model?: ModelRef;
@@ -21,6 +23,8 @@ interface RoleConfig {
   effort?: Effort;
   maxAgents?: number;
   scope?: FlywheelScope;
+  mode?: ReviewMode;
+  reReviewScope?: ReReviewScope;
   sub?: Record<string, RoleSubConfig>;
 }
 
@@ -600,6 +604,51 @@ export function RolesPanel() {
                   </div>
                 )}
 
+                {role.id === 'review' && (
+                  <div className="mt-4 border-t border-border pt-3">
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-foreground">Review mode</span>
+                        <select
+                          aria-label="Review mode"
+                          value={settings?.roles?.review?.mode ?? 'full'}
+                          onChange={(e) => saveMutation.mutate({ role: 'review', patch: { mode: e.target.value as ReviewMode } })}
+                          disabled={saveMutation.isPending}
+                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                        >
+                          <option value="full">Full convoy (default)</option>
+                          <option value="quick">Quick (single reviewer)</option>
+                          <option value="none">Skip review</option>
+                        </select>
+                        <p className="text-[11px] leading-snug text-muted-foreground">
+                          {(settings?.roles?.review?.mode ?? 'full') === 'full' && 'Four sub-role convoy with discovery fork and cache sharing.'}
+                          {settings?.roles?.review?.mode === 'quick' && 'Single reviewer: correctness + security + requirements, no synthesis.'}
+                          {settings?.roles?.review?.mode === 'none' && 'Review is skipped; reviewStatus is set to skipped and the pipeline advances to test.'}
+                        </p>
+                      </label>
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-foreground">Re-review scope</span>
+                        <select
+                          aria-label="Re-review scope"
+                          value={settings?.roles?.review?.reReviewScope ?? 'changed'}
+                          onChange={(e) => saveMutation.mutate({ role: 'review', patch: { reReviewScope: e.target.value as ReReviewScope } })}
+                          disabled={saveMutation.isPending}
+                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                        >
+                          <option value="changed">Changed files (default)</option>
+                          <option value="all">All reviewers</option>
+                          <option value="blockers">Blockers only</option>
+                        </select>
+                        <p className="text-[11px] leading-snug text-muted-foreground">
+                          {(settings?.roles?.review?.reReviewScope ?? 'changed') === 'changed' && 'Re-run reviewers whose domain matches changed files; always re-run blockers.'}
+                          {settings?.roles?.review?.reReviewScope === 'all' && 'Re-run all four sub-role reviewers on every re-review.'}
+                          {settings?.roles?.review?.reReviewScope === 'blockers' && 'Re-run only the sub-roles that blocked the previous cycle.'}
+                        </p>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
                 {canExpand && isExpanded && (
                   <div id={`${role.id}-subroles`} className="mt-4 border-t border-border pt-3">
                     <div className="grid gap-3 md:grid-cols-2">
@@ -634,7 +683,7 @@ export function RolesPanel() {
                         );
                       })}
                     </div>
-                    {role.id === 'review' && (() => {
+                    {role.id === 'review' && (settings?.roles?.review?.mode ?? 'full') === 'full' && (() => {
                       const convoy = ['security', 'correctness', 'performance', 'requirements', 'synthesis'];
                       const pairs = (role.subRoles ?? [])
                         .filter(sr => convoy.includes(sr.id))
