@@ -79,7 +79,6 @@ projects:
         command: npm run build
         required: true
       test:
-<<<<<<< HEAD
         # PAN-666 change-scoped gate (activated 2026-06-13, PAN-1848). Runs only
         # tests affected by the work agent's diff since {{CHANGED_BASE}} (=origin/main),
         # so unrelated pre-existing reds don't fail every gate. The running build
