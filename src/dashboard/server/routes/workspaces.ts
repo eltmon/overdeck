@@ -79,7 +79,7 @@ import {
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../lib/git-activity.js';
 import {
-  getCachedConflictGateResultSync,
+  getCachedConflictGateMergeability,
 } from '../../../lib/cloister/conflict-gate.js';
 import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
@@ -3711,9 +3711,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     // the branch is not mergeable, return 409 immediately. When the cache is
     // absent/stale, fall through to the background block below, which runs the
     // async probe inside spawnReviewRoleForIssue without holding the HTTP response.
-    const cachedGate = getCachedConflictGateResultSync(issueId, 'main');
-    if (cachedGate?.gated) {
-      const message = cachedGate.reason ?? `Review deferred: merge conflict with main must be resolved first`;
+    const cachedMergeability = getCachedConflictGateMergeability(issueId);
+    if (cachedMergeability === 'conflicts' || cachedMergeability === 'unknown') {
+      const message = cachedMergeability === 'conflicts'
+        ? `Review deferred: merge conflict with main must be resolved before review dispatch`
+        : `Review deferred: mergeability against main could not be verified; deferring review conservatively`;
       setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
       completePendingOperation(issueId, message);
       return jsonResponse({

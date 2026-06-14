@@ -36,6 +36,7 @@ const {
   mockGetAgentState,
   mockResolveConflictGate,
   mockBuildRealConflictGateDeps,
+  mockGetCachedConflictGateMergeability,
   mockSetReviewStatus,
   mockGetReviewStatus,
   mockArchiveFeedbackFiles,
@@ -48,6 +49,7 @@ const {
   mockGetAgentState: vi.fn(() => null),
   mockResolveConflictGate: vi.fn().mockResolvedValue({ gated: false }),
   mockBuildRealConflictGateDeps: vi.fn(() => ({ real: true })),
+  mockGetCachedConflictGateMergeability: vi.fn(() => undefined),
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
   mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
@@ -97,6 +99,7 @@ vi.mock('../../../src/lib/review-status.js', () => ({
 vi.mock('../../../src/lib/cloister/conflict-gate.js', () => ({
   buildRealConflictGateDeps: mockBuildRealConflictGateDeps,
   resolveConflictGate: mockResolveConflictGate,
+  getCachedConflictGateMergeability: mockGetCachedConflictGateMergeability,
 }));
 
 vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -113,6 +116,7 @@ beforeEach(() => {
   mockGetReviewStatus.mockReturnValue(null);
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
+  mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
 });
 

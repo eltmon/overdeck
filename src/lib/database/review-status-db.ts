@@ -8,7 +8,7 @@
 
 import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
-import type { ReviewStatus, StatusHistoryEntry } from '../review-status.js';
+import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 
 /**
@@ -209,6 +209,60 @@ export const getReviewStatusFromDb = (
       }),
     catch: (cause) => new DatabaseError({ operation: 'getReviewStatusFromDb', cause }),
   });
+
+// ============== Merge-blocker reconcile candidates ==============
+
+export interface MergeBlockerReconcileCandidate {
+  issueId: string;
+  prUrl: string | undefined;
+  blockerReasons: BlockerReason[] | undefined;
+  readyForMerge: boolean;
+}
+
+/**
+ * Selective query for the merge-blocker reconcile service.
+ * Returns only rows that are either ready for merge or carry mergeability
+ * blockers, avoiding a full-table scan and history hydration.
+ */
+export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileCandidate[] {
+  const db = getDatabase();
+
+  const rows = db.prepare(`
+    SELECT issue_id, pr_url, blocker_reasons, ready_for_merge
+    FROM review_status
+    WHERE ready_for_merge = 1
+      OR blocker_reasons LIKE '%merge_conflict%'
+      OR blocker_reasons LIKE '%not_mergeable%'
+  `).all() as Array<{
+    issue_id: string;
+    pr_url: string | null;
+    blocker_reasons: string | null;
+    ready_for_merge: number;
+  }>;
+
+  return rows.map((row) => ({
+    issueId: row.issue_id.toUpperCase(),
+    prUrl: row.pr_url ?? undefined,
+    blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
+    readyForMerge: row.ready_for_merge === 1,
+  }));
+}
+
+export const getMergeBlockerReconcileCandidates =
+  (): Effect.Effect<MergeBlockerReconcileCandidate[], DatabaseError> =>
+    Effect.tryPromise({
+      try: () =>
+        new Promise<MergeBlockerReconcileCandidate[]>((resolve, reject) => {
+          setImmediate(() => {
+            try {
+              resolve(getMergeBlockerReconcileCandidatesSync());
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }),
+      catch: (cause) => new DatabaseError({ operation: 'getMergeBlockerReconcileCandidates', cause }),
+    });
 
 
 // ============== Read operations ==============

@@ -3,25 +3,12 @@ import {
   __resetConflictGateProbeCacheForTests,
   buildRealConflictGateDeps,
   checkBranchMergeability,
-  getCachedConflictGateResultSync,
+  getCachedConflictGateMergeability,
   resolveConflictGate,
   type ExecRunner,
   type ResolveConflictGateDeps,
 } from '../../../../src/lib/cloister/conflict-gate.js';
 import type { BlockerReason, ReviewStatus } from '../../../../src/lib/review-status.js';
-
-vi.mock('../../../../src/lib/review-status.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../../src/lib/review-status.js')>(
-    '../../../../src/lib/review-status.js',
-  );
-  return {
-    ...actual,
-    getReviewStatusSync: vi.fn(),
-    setReviewStatusSync: vi.fn(),
-  };
-});
-
-import { getReviewStatusSync, setReviewStatusSync } from '../../../../src/lib/review-status.js';
 
 function makeRunner(results: Array<{ stdout?: string; stderr?: string } | Error>): ExecRunner {
   return vi.fn(async () => {
@@ -387,16 +374,11 @@ describe('buildRealConflictGateDeps', () => {
   });
 });
 
-describe('getCachedConflictGateResultSync', () => {
-  const mockedGetReviewStatusSync = vi.mocked(getReviewStatusSync);
-  const mockedSetReviewStatusSync = vi.mocked(setReviewStatusSync);
-
+describe('getCachedConflictGateMergeability', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-11T08:30:00.000Z'));
     __resetConflictGateProbeCacheForTests();
-    mockedGetReviewStatusSync.mockReset();
-    mockedSetReviewStatusSync.mockReset();
   });
 
   afterEach(() => {
@@ -404,73 +386,44 @@ describe('getCachedConflictGateResultSync', () => {
     __resetConflictGateProbeCacheForTests();
   });
 
-  it('returns undefined when there are no merge blockers', () => {
-    mockedGetReviewStatusSync.mockReturnValue(makeStatus({ blockerReasons: [nonMergeBlocker] }));
-
-    expect(getCachedConflictGateResultSync('PAN-1765', 'main')).toBeUndefined();
+  it('returns undefined when the probe cache is empty', () => {
+    expect(getCachedConflictGateMergeability('PAN-1765')).toBeUndefined();
   });
 
-  it('returns undefined when merge blockers exist but the probe cache is empty', () => {
-    mockedGetReviewStatusSync.mockReturnValue(makeStatus({ blockerReasons: [mergeBlocker] }));
-
-    expect(getCachedConflictGateResultSync('PAN-1765', 'main')).toBeUndefined();
-  });
-
-  it('returns gated=true when the cached probe reports conflicts', async () => {
+  it('returns the cached result after resolveConflictGate populates the cache', async () => {
     const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    mockedGetReviewStatusSync.mockReturnValue(status);
     const deps = makeGateDeps(status, 'conflicts');
 
-    // Populate the cache.
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
 
-    const cached = getCachedConflictGateResultSync('PAN-1765', 'main');
-    expect(cached).toEqual({
-      gated: true,
-      reason: expect.stringContaining('merge conflict with main'),
-    });
-    expect(mockedSetReviewStatusSync).not.toHaveBeenCalled();
+    expect(getCachedConflictGateMergeability('PAN-1765')).toBe('conflicts');
   });
 
-  it('returns gated=false and clears stale blockers when the cached probe is clean', async () => {
-    const probeStatus = makeStatus({ blockerReasons: [mergeBlocker, nonMergeBlocker] });
-    const deps = makeGateDeps(probeStatus, 'clean');
+  it('returns clean when the cached probe is clean', async () => {
+    const status = makeStatus({ blockerReasons: [mergeBlocker] });
+    const deps = makeGateDeps(status, 'clean');
 
-    // Populate the cache with a clean result.
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
 
-    // Simulate a caller whose status still carries the now-stale merge blocker.
-    const staleStatus = makeStatus({ blockerReasons: [mergeBlocker, nonMergeBlocker] });
-    mockedGetReviewStatusSync.mockReturnValue(staleStatus);
-
-    const cached = getCachedConflictGateResultSync('PAN-1765', 'main');
-    expect(cached).toEqual({ gated: false, clearedStaleBlocker: true });
-    expect(mockedSetReviewStatusSync).toHaveBeenCalledWith(
-      'PAN-1765',
-      { blockerReasons: [nonMergeBlocker] },
-      staleStatus,
-    );
+    expect(getCachedConflictGateMergeability('PAN-1765')).toBe('clean');
   });
 
   it('returns undefined when the cached probe has expired', async () => {
     const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    mockedGetReviewStatusSync.mockReturnValue(status);
     const deps = makeGateDeps(status, 'conflicts');
 
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
     vi.advanceTimersByTime(3 * 60 * 1000 + 1);
 
-    expect(getCachedConflictGateResultSync('PAN-1765', 'main')).toBeUndefined();
+    expect(getCachedConflictGateMergeability('PAN-1765')).toBeUndefined();
   });
 
   it('is case-insensitive for issue id cache keys', async () => {
     const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    mockedGetReviewStatusSync.mockReturnValue(status);
     const deps = makeGateDeps(status, 'conflicts');
 
     await resolveConflictGate('pan-1765', '/workspace', 'main', deps);
 
-    const cached = getCachedConflictGateResultSync('PAN-1765', 'main');
-    expect(cached?.gated).toBe(true);
+    expect(getCachedConflictGateMergeability('PAN-1765')).toBe('conflicts');
   });
 });

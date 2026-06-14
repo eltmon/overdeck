@@ -46,7 +46,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
-import { buildRealConflictGateDeps, resolveConflictGate } from './conflict-gate.js';
+import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
@@ -364,6 +364,23 @@ function buildReviewRolePrompt(opts: {
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
+  }
+
+  // Fast synchronous cache check for the gated case. If the probe cache says
+  // the branch has conflicts (or we cannot verify mergeability), fail fast
+  // without shelling out to git on the awaited request path.
+  const cachedMergeability = getCachedConflictGateMergeability(opts.issueId);
+  if (cachedMergeability === 'conflicts' || cachedMergeability === 'unknown') {
+    const targetBranch = 'main';
+    const reason = cachedMergeability === 'conflicts'
+      ? `merge conflict with ${targetBranch} must be resolved before review dispatch`
+      : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
+    const message = `Review dispatch deferred: ${reason}`;
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'pending',
+      reviewNotes: message,
+    });
+    return { success: false, gated: true, message };
   }
 
   const gate = await resolveConflictGate(

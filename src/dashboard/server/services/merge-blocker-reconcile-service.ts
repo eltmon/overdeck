@@ -14,7 +14,8 @@
  * Bounded + cheap: each issue has a throttle. Ready/no-blocker rows use the PAN-1620
  * 3-minute cadence; already-blocked mergeability rows use a 10-minute cadence.
  */
-import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
+import { Effect } from 'effect';
+import { getMergeBlockerReconcileCandidates } from '../../../lib/database/review-status-db.js';
 import type { BlockerReason } from '../../../lib/review-status.js';
 import { refreshMergeStateFromGitHub } from '../../../lib/webhook-handlers.js';
 
@@ -63,34 +64,39 @@ function hasMergeabilityBlocker(blockers: BlockerReason[] | undefined): boolean 
 }
 
 async function reconcileOnce(state: ServiceState): Promise<void> {
-  const statuses = getAllReviewStatusesFromDb();
+  // Fetch candidates off the main event loop via the async wrapper; the
+  // selective query avoids hydrating the full table and history.
+  const candidates = await Effect.runPromise(getMergeBlockerReconcileCandidates());
   const now = Date.now();
-  for (const [issueId, status] of Object.entries(statuses)) {
-    const ref = parsePrUrl(status.prUrl);
+
+  for (const candidate of candidates) {
+    const ref = parsePrUrl(candidate.prUrl);
     if (!ref) continue;
 
-    if (hasMergeabilityBlocker(status.blockerReasons)) {
-      const last = state.blockerLastChecked.get(issueId) ?? 0;
+    if (hasMergeabilityBlocker(candidate.blockerReasons)) {
+      const last = state.blockerLastChecked.get(candidate.issueId) ?? 0;
       if (now - last < STALE_BLOCKER_RECHECK_INTERVAL_MS) continue;
-      state.blockerLastChecked.set(issueId, now);
-      enqueueRefresh(state, { issueId, repo: ref.repo, number: ref.number });
+      state.blockerLastChecked.set(candidate.issueId, now);
+      enqueueRefresh(state, { issueId: candidate.issueId, repo: ref.repo, number: ref.number });
       continue;
     }
 
-    if (!status.readyForMerge) continue;
-    if ((status.blockerReasons?.length ?? 0) > 0) continue; // non-mergeability blockers stay skipped
-    const last = state.lastChecked.get(issueId) ?? 0;
+    if (!candidate.readyForMerge) continue;
+    if ((candidate.blockerReasons?.length ?? 0) > 0) continue; // non-mergeability blockers stay skipped
+    const last = state.lastChecked.get(candidate.issueId) ?? 0;
     if (now - last < RECHECK_INTERVAL_MS) continue;
-    state.lastChecked.set(issueId, now);
-    enqueueRefresh(state, { issueId, repo: ref.repo, number: ref.number });
+    state.lastChecked.set(candidate.issueId, now);
+    enqueueRefresh(state, { issueId: candidate.issueId, repo: ref.repo, number: ref.number });
   }
+
   // Prune throttle entries for issues that are no longer in the population each map tracks.
+  const candidateById = new Map(candidates.map((c) => [c.issueId, c]));
   for (const id of [...state.lastChecked.keys()]) {
-    const status = statuses[id];
-    if (!status?.readyForMerge || (status.blockerReasons?.length ?? 0) > 0) state.lastChecked.delete(id);
+    const candidate = candidateById.get(id);
+    if (!candidate?.readyForMerge || (candidate.blockerReasons?.length ?? 0) > 0) state.lastChecked.delete(id);
   }
   for (const id of [...state.blockerLastChecked.keys()]) {
-    if (!hasMergeabilityBlocker(statuses[id]?.blockerReasons)) state.blockerLastChecked.delete(id);
+    if (!hasMergeabilityBlocker(candidateById.get(id)?.blockerReasons)) state.blockerLastChecked.delete(id);
   }
 }
 
