@@ -790,3 +790,13 @@ red-main strike.
 - **PAN-1711** plan finalized but `pan start` work-start TIMED OUT on workspace prep (>120s) — same as PAN-1827. **Filed PAN-1897** (pan start workspace-prep hangs on re-entry, no spawn/no error; blocks 1711+1827). The `--auto-start` non-chain (1887, 1711) is a separate pattern to watch.
 - **No merge this tick** (cross-check: only PAN-1242 mergeable, held). 8 active agents; serialized. strike-pan-1711 reaped.
 - **NEXT:** watch conv/2920 push → deploy PAN-1614 + rebase 1242/1775/1845; PAN-1887 GitLab PR; PAN-1845 fix→re-review; PAN-1897 (prep hang) candidate plan/strike; MIN-831 awaits PAN-1887.
+
+### RUN-35 tick 10 (2026-06-14 ~20:15Z) — GATES CLEARED: conv/2920 landed, PAN-1614 deployed, PAN-1845 closed out, PAN-1242 merging
+
+- **Operator-directed integration (between ticks):** conv/2920 finished → operator said "commit everything." Deployed PAN-1614 via `pan reload` (built 3.23s, healthy). Committed conv/2920's finished work (`feat: add GLM-5.2/5.1 Z.AI models`, 3a237ebbf). **PAN-1845 (#1886) had merged to origin concurrently and both touch settings-api.ts** — backed up, `git merge origin/main` (recoverable, not rebase) → **auto-merged CLEAN** (PAN-1845's +49 remote block vs conv/2920's +2 were different sections), typecheck PASSED, pushed. Committed untracked continue-state. Left stray debug PNGs/.map uncommitted (junk — recommend gitignore/delete).
+- **PAN-1845 CLOSED OUT** (the critical v1.0 Fly work-loss fix) — verify-merged ✓, vBRIEF→completed, issue #1845 closed, archived. v1.0 win complete.
+- **PAN-1242 (#1516) AUTO-MERGE SCHEDULED** — cross-checked MERGEABLE/CLEAN + no conv/2920 overlap (conv/2920's actual work was GLM models, not FeatureItem — so PAN-1242 was never really conflicting with it). Pending in auto-merge queue (~20:19). First clean drain merge.
+- **PAN-1887 (GitLab wiring) pushed PR #1898** — in review; its landing unblocks MIN-831 auto-merge.
+- **PAN-1711 work-start retried 3rd time** (background) — if it hangs again on prep, PAN-1897 confirmed a real hang. agent-pan-1862 (review cache sharing) newly active (operator/auto).
+- **Run tally:** PAN-1614 + PAN-1845 merged+complete, conv/2920 GLM merged; PAN-1242 merging. Remaining drain (1775/1491/1827) blocked on conflicts/PAN-1893 crash/PAN-1897 prep-hang.
+- **LESSON:** when committing one agent's work, ALWAYS fetch first — a concurrent merge (PAN-1845) can collide; back up + `git merge` (not rebase) + typecheck before push is the safe integration.
