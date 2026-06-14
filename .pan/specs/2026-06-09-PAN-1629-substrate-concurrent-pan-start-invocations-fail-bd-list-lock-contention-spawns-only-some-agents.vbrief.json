@@ -60,7 +60,7 @@
       {
         "id": "transient-bd-classifier",
         "title": "Add a conservative transient/lock bd-error classifier",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -76,7 +76,7 @@
           {
             "id": "transient-bd-classifier.ac1",
             "title": "isTransientBdError returns true for confirmed Dolt lock-contention stderr signatures",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -84,7 +84,7 @@
           {
             "id": "transient-bd-classifier.ac2",
             "title": "isTransientBdError returns false for a successful-but-empty bd list result and for genuine fatal errors (corrupt db, command-not-found)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -92,7 +92,7 @@
           {
             "id": "transient-bd-classifier.ac3",
             "title": "Unit tests cover execFile error shapes (stderr string, message, code) and the empty-result false case",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -100,7 +100,7 @@
           {
             "id": "transient-bd-classifier.ac4",
             "title": "The confirmed Dolt lock stderr text is documented in a code comment citing how it was reproduced",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -110,7 +110,7 @@
       {
         "id": "cross-process-bd-lock",
         "title": "Add a cross-process bd lock + bounded-retry wrapper (mirroring restart-lock.ts)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -131,7 +131,7 @@
           {
             "id": "cross-process-bd-lock.ac1",
             "title": "withBdProcessLock serializes across SEPARATE processes (two concurrent acquirers do not both hold it); proven by a test that forks/simulates two holders",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -139,7 +139,7 @@
           {
             "id": "cross-process-bd-lock.ac2",
             "title": "Lockfile path is derived from the resolved shared Dolt `.beads` dir so two worktrees of the same project share one lock",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -147,7 +147,7 @@
           {
             "id": "cross-process-bd-lock.ac3",
             "title": "A stale lock (dead PID or age beyond bound) is reclaimed; a live holder is respected; the lock is always released in finally",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -155,7 +155,7 @@
           {
             "id": "cross-process-bd-lock.ac4",
             "title": "runBdWithRetry retries on isTransientBdError with bounded backoff and stops after the bound, surfacing a typed transient failure (tests use vi.useFakeTimers — no real backoff sleeps)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -163,7 +163,7 @@
           {
             "id": "cross-process-bd-lock.ac5",
             "title": "Acquisition wait is bounded so a wedged holder degrades to a typed transient failure rather than hanging forever",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -173,7 +173,7 @@
       {
         "id": "wire-create-beads-path",
         "title": "Route create-beads/dedup (`clearBeadsForIssue` → `bd list`) through the cross-process lock + retry",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -189,7 +189,7 @@
           {
             "id": "wire-create-beads-path.ac1",
             "title": "listBeadsForIssue/clearBeadsForIssue retry on transient lock errors instead of immediately returning 'list failed'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -197,7 +197,7 @@
           {
             "id": "wire-create-beads-path.ac2",
             "title": "createBeadsFromVBrief holds the cross-process lock for its bd-touching section, composed with (not replacing) the existing in-process mutex",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -205,7 +205,7 @@
           {
             "id": "wire-create-beads-path.ac3",
             "title": "Existing src/lib/vbrief/__tests__/create-beads.test.ts stays green (dedup-failure-on-genuine-error cases still abort)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -215,7 +215,7 @@
       {
         "id": "wire-start-gate-query",
         "title": "Route the `pan start` beads-gate query and `beads-query.ts` through lock + retry (get the LIVE count, not stale JSONL)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -231,7 +231,7 @@
           {
             "id": "wire-start-gate-query.ac1",
             "title": "Under simulated lock contention, the start gate retries `bd list` and returns the true live count (>0 when beads exist) instead of falling back to a stale/empty JSONL",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -239,7 +239,7 @@
           {
             "id": "wire-start-gate-query.ac2",
             "title": "queryBeadsForIssuePromise in beads-query.ts retries on transient lock errors before the JSONL fallback",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -247,7 +247,7 @@
           {
             "id": "wire-start-gate-query.ac3",
             "title": "No signature change leaks beyond start.ts callers; existing start.ts tests stay green",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -257,7 +257,7 @@
       {
         "id": "honest-transient-error-messaging",
         "title": "Never report 'planning must create beads' on a transient bd failure; emit an honest locked-retry message",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -273,7 +273,7 @@
           {
             "id": "honest-transient-error-messaging.ac1",
             "title": "A transient/lock failure during gate or recovery prints a 'temporarily locked — retry' message, NOT 'Planning must create a task breakdown'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -281,7 +281,7 @@
           {
             "id": "honest-transient-error-messaging.ac2",
             "title": "A transient read failure does NOT trigger destructive vBRIEF re-materialization (no bead deletion on a lock error)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -289,7 +289,7 @@
           {
             "id": "honest-transient-error-messaging.ac3",
             "title": "'planning must create beads' guidance still appears only when beads are genuinely absent (live query returned empty AND JSONL empty)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -297,7 +297,7 @@
           {
             "id": "honest-transient-error-messaging.ac4",
             "title": "The transient-failure exit code is distinct from the genuine-no-beads exit code so callers/Flywheel can distinguish retryable from re-plan",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -307,7 +307,7 @@
       {
         "id": "verify-host-yes-prompt-return",
         "title": "Verify `pan start --host --yes` returns promptly after spawn (the Related note)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -323,7 +323,7 @@
           {
             "id": "verify-host-yes-prompt-return.ac1",
             "title": "N parallel `pan start --host --yes` invocations each return within a bounded time and all N work agents are spawned",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -331,7 +331,7 @@
           {
             "id": "verify-host-yes-prompt-return.ac2",
             "title": "The cause of any residual delay is identified as bd-lock blocking (now bounded) — or a separate bug is fixed; the finding is documented",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -341,7 +341,7 @@
       {
         "id": "concurrency-regression-test",
         "title": "Regression test: N concurrent beads operations all succeed (reproduces the RUN-14 failure)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-06-09T23:44:24.000Z",
         "metadata": {
@@ -357,7 +357,7 @@
           {
             "id": "concurrency-regression-test.ac1",
             "title": "Test fires >=5 concurrent start-path beads operations and all succeed (no 'list failed', no spurious 'no beads')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -365,7 +365,7 @@
           {
             "id": "concurrency-regression-test.ac2",
             "title": "Test injects transient lock errors on early attempts and asserts retry recovers (deterministic, fake timers)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -373,7 +373,7 @@
           {
             "id": "concurrency-regression-test.ac3",
             "title": "Test fails against the pre-fix code path (guards the regression) and passes after the fix",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -441,58 +441,60 @@
     "metadata": {
       "canonicalFilename": "2026-06-09-PAN-1629-substrate-concurrent-pan-start-invocations-fail-bd-list-lock-contention-spawns-only-some-agents.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "test",
         "issueId": "PAN-1629",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-11T00:26:21.865Z",
+        "updatedAt": "2026-06-10T13:23:24.576Z",
         "work": {
-          "updatedAt": "2026-06-11T00:26:21.865Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-06-11T00:26:21.865Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
           "history": [
             {
               "status": "passed",
-              "at": "2026-06-11T00:26:21.865Z",
+              "at": "2026-06-10T13:23:24.576Z",
               "notes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-06-11T00:26:21.865Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
+          "notes": "Approved; only correctness finding was demoted by cycle-3 convergence gate because src/lib/bd-process-lock.ts was unchanged since prior synthesis",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-11T00:26:21.865Z"
+              "status": "passed",
+              "at": "2026-06-10T13:23:24.576Z",
+              "notes": "Approved; only correctness finding was demoted by cycle-3 convergence gate because src/lib/bd-process-lock.ts was unchanged since prior synthesis"
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-11T00:26:21.865Z",
+          "status": "passed",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-06-11T00:26:21.865Z"
+              "status": "passed",
+              "at": "2026-06-10T13:23:24.576Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-06-11T00:26:21.865Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-06-11T00:26:21.865Z",
+          "updatedAt": "2026-06-10T13:23:24.576Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-06-11T00:26:21.865Z"
+              "at": "2026-06-10T13:23:24.576Z"
             }
           ],
           "readyForMerge": false,
