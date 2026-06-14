@@ -1,6 +1,8 @@
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { isFlywheelGloballyPaused } from '../../../lib/database/app-settings.js';
 import {
+  deferPendingAutoMerge,
+  incrementAttempts,
   listDuePendingAutoMerges,
   markBlocked,
   markFailed,
@@ -9,7 +11,7 @@ import {
   transitionToMerging,
   type PendingAutoMerge,
 } from '../../../lib/database/pending-auto-merges-db.js';
-import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { classifyAutoMergeIneligibility, isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
 
@@ -31,12 +33,18 @@ export interface AutoMergeExecutorDeps {
   markMerged?: (id: number) => boolean;
   markFailed?: (id: number, reason: string) => boolean;
   requeueToPending?: (id: number, nextScheduledMergeAt: string) => boolean;
+  deferPendingAutoMerge?: (id: number, nextScheduledMergeAt: string) => boolean;
+  incrementAttempts?: (id: number) => boolean;
   mergeIssue?: (issueId: string) => Promise<MergeResult>;
   announceFailure?: (issueId: string, reason: string) => void;
   log?: (message: string) => void;
 }
 
 const REQUEUE_BACKOFF_MS = 60_000;
+const DEFER_BACKOFF_MS = 60_000;
+const RECOVERABLE_BACKOFF_MS = 60_000;
+const STALE_CEILING_MS = 2 * 60 * 60 * 1000;
+const MAX_MERGE_ATTEMPTS = 3;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let activeTick: Promise<void> | null = null;
@@ -91,8 +99,30 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
     const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
     if (!eligibility.eligible) {
-      if (!(deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
-        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      const classification = classifyAutoMergeIneligibility(eligibility.code);
+      if (classification === 'retryable') {
+        const entryAgeMs = nowDate.getTime() - Date.parse(entry.scheduledAt);
+        if (entryAgeMs > STALE_CEILING_MS) {
+          const reason = `stuck: ineligible over ${STALE_CEILING_MS / 60 / 60 / 1000}h`;
+          if ((deps.markBlocked ?? markBlocked)(entry.id, reason)) {
+            log(`[auto-merge] ${entry.issueId} (#${entry.id}) ineligible past staleness ceiling, marked blocked`);
+          } else {
+            log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+          }
+        } else {
+          const retryAt = new Date(nowDate.getTime() + DEFER_BACKOFF_MS).toISOString();
+          if ((deps.deferPendingAutoMerge ?? deferPendingAutoMerge)(entry.id, retryAt)) {
+            log(`[auto-merge] ${entry.issueId} (#${entry.id}) transiently ineligible, deferred to ${retryAt}`);
+          } else {
+            log(`[auto-merge] lost defer race for ${entry.issueId} (#${entry.id}), skipping`);
+          }
+        }
+      } else {
+        if ((deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
+          log(`[auto-merge] ${entry.issueId} (#${entry.id}) terminally ineligible, marked blocked`);
+        } else {
+          log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+        }
       }
       continue;
     }
@@ -125,12 +155,34 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
       }
 
       const reason = failureReason(result);
-      (deps.markFailed ?? markFailed)(entry.id, reason);
-      (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
+      const incremented = (deps.incrementAttempts ?? incrementAttempts)(entry.id);
+      const nextAttempts = incremented ? entry.attempts + 1 : entry.attempts;
+      if (nextAttempts < MAX_MERGE_ATTEMPTS) {
+        const retryAt = new Date(nowDate.getTime() + RECOVERABLE_BACKOFF_MS * 2 ** (nextAttempts - 1)).toISOString();
+        if ((deps.requeueToPending ?? requeueToPending)(entry.id, retryAt)) {
+          log(`[auto-merge] ${entry.issueId} (#${entry.id}) merge attempt ${nextAttempts} failed, requeued for ${retryAt}`);
+        } else {
+          log(`[auto-merge] lost requeue race for ${entry.issueId} (#${entry.id}) after failed merge`);
+        }
+      } else {
+        (deps.markFailed ?? markFailed)(entry.id, reason);
+        (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
+      }
     } catch (error) {
       const reason = errorMessage(error);
-      (deps.markFailed ?? markFailed)(entry.id, reason);
-      (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
+      const incremented = (deps.incrementAttempts ?? incrementAttempts)(entry.id);
+      const nextAttempts = incremented ? entry.attempts + 1 : entry.attempts;
+      if (nextAttempts < MAX_MERGE_ATTEMPTS) {
+        const retryAt = new Date(nowDate.getTime() + RECOVERABLE_BACKOFF_MS * 2 ** (nextAttempts - 1)).toISOString();
+        if ((deps.requeueToPending ?? requeueToPending)(entry.id, retryAt)) {
+          log(`[auto-merge] ${entry.issueId} (#${entry.id}) merge attempt ${nextAttempts} threw, requeued for ${retryAt}`);
+        } else {
+          log(`[auto-merge] lost requeue race for ${entry.issueId} (#${entry.id}) after merge exception`);
+        }
+      } else {
+        (deps.markFailed ?? markFailed)(entry.id, reason);
+        (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
+      }
     }
   }
 }

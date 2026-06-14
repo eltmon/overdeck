@@ -73,7 +73,7 @@ describe('auto-merge executor', () => {
     expect(transition).not.toHaveBeenCalled();
   });
 
-  it('marks due entries blocked when fire-time eligibility fails', async () => {
+  it('marks due entries blocked when fire-time eligibility fails with a terminal reason', async () => {
     const markBlocked = vi.fn();
     const transition = vi.fn();
 
@@ -81,12 +81,12 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
-      isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
+      isEligible: async () => ({ eligible: false, reason: 'PR is closed', code: 'pr_closed' }),
       markBlocked,
       transition,
     });
 
-    expect(markBlocked).toHaveBeenCalledWith(1, 'CI checks failing on PR HEAD abc123');
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PR is closed');
     expect(transition).not.toHaveBeenCalled();
   });
 
@@ -161,21 +161,141 @@ describe('auto-merge executor', () => {
     );
   });
 
-  it('marks failed merges as failed and announces the failure', async () => {
+  it('marks failed merges as failed and announces the failure when attempts are already exhausted', async () => {
     const markFailed = vi.fn();
     const announceFailure = vi.fn();
+    const requeueToPending = vi.fn();
+    const incrementAttempts = vi.fn().mockReturnValue(true);
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ attempts: 2 })],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue: async () => ({ success: false, statusCode: 500, error: 'merge exploded' }),
+      incrementAttempts,
+      requeueToPending,
+      markFailed,
+      announceFailure,
+    });
+
+    expect(requeueToPending).not.toHaveBeenCalled();
+    expect(markFailed).toHaveBeenCalledWith(1, 'merge exploded');
+    expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge exploded');
+  });
+
+  it('defers transiently-ineligible entries with backoff instead of blocking', async () => {
+    const deferPendingAutoMerge = vi.fn().mockReturnValue(true);
+    const markBlocked = vi.fn();
 
     await tickAutoMergeExecutor({
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      isEligible: async () => ({ eligible: false, reason: 'CI checks still pending', code: 'checks_pending' }),
+      deferPendingAutoMerge,
+      markBlocked,
+    });
+
+    expect(deferPendingAutoMerge).toHaveBeenCalledWith(1, new Date(NOW.getTime() + 60_000).toISOString());
+    expect(markBlocked).not.toHaveBeenCalled();
+  });
+
+  it('blocks terminally-ineligible entries', async () => {
+    const markBlocked = vi.fn().mockReturnValue(true);
+    const deferPendingAutoMerge = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: false, reason: 'PR is closed', code: 'pr_closed' }),
+      markBlocked,
+      deferPendingAutoMerge,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PR is closed');
+    expect(deferPendingAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('blocks transiently-ineligible entries past the staleness ceiling', async () => {
+    const markBlocked = vi.fn().mockReturnValue(true);
+    const deferPendingAutoMerge = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ scheduledAt: '2026-05-25T07:00:00.000Z' })],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: false, reason: 'PR is not mergeable', code: 'not_mergeable' }),
+      markBlocked,
+      deferPendingAutoMerge,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'stuck: ineligible over 2h');
+    expect(deferPendingAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('caps recoverable merge failures at 3 attempts and announces the final failure', async () => {
+    const incrementAttempts = vi.fn().mockReturnValue(true);
+    const requeueToPending = vi.fn().mockReturnValue(true);
+    const markFailed = vi.fn();
+    const announceFailure = vi.fn();
+    const mergeIssue = vi.fn().mockResolvedValue({ success: false, statusCode: 500, error: 'merge exploded' });
+
+    // First failure: attempts 0 -> 1, requeue
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry({ attempts: 0 })],
+      isPaused: () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
-      mergeIssue: async () => ({ success: false, statusCode: 500, error: 'merge exploded' }),
+      mergeIssue,
+      incrementAttempts,
+      requeueToPending,
       markFailed,
       announceFailure,
     });
 
+    expect(incrementAttempts).toHaveBeenCalledTimes(1);
+    expect(requeueToPending).toHaveBeenCalledWith(1, new Date(NOW.getTime() + 60_000).toISOString());
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(announceFailure).not.toHaveBeenCalled();
+
+    // Second failure: attempts 1 -> 2, requeue
+    await tickAutoMergeExecutor({
+      now: () => new Date(NOW.getTime() + 60_000),
+      listEntries: () => [pendingEntry({ attempts: 1 })],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue,
+      incrementAttempts,
+      requeueToPending,
+      markFailed,
+      announceFailure,
+    });
+
+    expect(incrementAttempts).toHaveBeenCalledTimes(2);
+    expect(requeueToPending).toHaveBeenLastCalledWith(1, new Date(NOW.getTime() + 60_000 + 120_000).toISOString());
+    expect(markFailed).not.toHaveBeenCalled();
+    expect(announceFailure).not.toHaveBeenCalled();
+
+    // Third failure: attempts 2 -> 3, mark failed + announce
+    await tickAutoMergeExecutor({
+      now: () => new Date(NOW.getTime() + 60_000 + 120_000),
+      listEntries: () => [pendingEntry({ attempts: 2 })],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue,
+      incrementAttempts,
+      requeueToPending,
+      markFailed,
+      announceFailure,
+    });
+
+    expect(incrementAttempts).toHaveBeenCalledTimes(3);
     expect(markFailed).toHaveBeenCalledWith(1, 'merge exploded');
     expect(announceFailure).toHaveBeenCalledWith('PAN-1486', 'merge exploded');
   });

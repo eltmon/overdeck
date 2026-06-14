@@ -46,7 +46,7 @@ describe('auto-merge eligibility', () => {
     const getIssueLabels = vi.fn(async () => []);
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
-      .resolves.toEqual({ eligible: false, reason: 'review status is not readyForMerge' });
+      .resolves.toEqual(expect.objectContaining({ eligible: false, reason: 'review status is not readyForMerge' }));
     expect(getPullRequestState).not.toHaveBeenCalled();
     expect(getIssueLabels).not.toHaveBeenCalled();
   });
@@ -57,7 +57,7 @@ describe('auto-merge eligibility', () => {
     const getIssueLabels = vi.fn(async () => []);
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
-      .resolves.toEqual({ eligible: false, reason: 'held for UAT (auto-merge toggled off)' });
+      .resolves.toEqual(expect.objectContaining({ eligible: false, reason: 'held for UAT (auto-merge toggled off)' }));
     expect(getPullRequestState).not.toHaveBeenCalled();
   });
 
@@ -77,7 +77,7 @@ describe('auto-merge eligibility', () => {
     const getIssueLabels = vi.fn(async () => []);
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
-      .resolves.toEqual({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' });
+      .resolves.toEqual(expect.objectContaining({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' }));
     expect(getPullRequestState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 1486);
     expect(getIssueLabels).not.toHaveBeenCalled();
   });
@@ -88,7 +88,7 @@ describe('auto-merge eligibility', () => {
     const getIssueLabels = vi.fn(async () => []);
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
-      .resolves.toEqual({ eligible: false, reason: 'PR is already merged' });
+      .resolves.toEqual(expect.objectContaining({ eligible: false, reason: 'PR is already merged' }));
     expect(getIssueLabels).not.toHaveBeenCalled();
   });
 
@@ -98,7 +98,7 @@ describe('auto-merge eligibility', () => {
     const getIssueLabels = vi.fn(async () => ['enhancement', 'do-not-merge']);
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
-      .resolves.toEqual({ eligible: false, reason: 'issue carries blocker label: do-not-merge' });
+      .resolves.toEqual(expect.objectContaining({ eligible: false, reason: 'issue carries blocker label: do-not-merge' }));
     expect(getIssueLabels).toHaveBeenCalledWith('PAN-1486');
   });
 
@@ -155,7 +155,7 @@ describe('auto-merge eligibility', () => {
       getReviewStatus,
       getGitLabMrState,
       getIssueLabels,
-    })).resolves.toEqual({ eligible: false, reason: overrides.reason });
+    })).resolves.toEqual(expect.objectContaining({ eligible: false, reason: overrides.reason }));
   });
 
   it('falls back to merge_status when detailed_merge_status is absent', async () => {
@@ -187,7 +187,7 @@ describe('auto-merge eligibility', () => {
       getReviewStatus,
       getGitLabMrState,
       getIssueLabels,
-    })).resolves.toEqual({ eligible: false, reason: 'GitLab MR state lookup failed: glab not found' });
+    })).resolves.toEqual(expect.objectContaining({ eligible: false, reason: 'GitLab MR state lookup failed: glab not found' }));
   });
 
   it('self-hosted GitLab MRs are detected by path and parsed for project path', async () => {
