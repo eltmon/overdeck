@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -56,13 +56,15 @@ describe('queryBeadsForIssuePromise', () => {
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
-  it('propagates exhausted transient bd failures instead of falling back to jsonl', async () => {
+  it('falls back to jsonl after exhausted transient bd failures', async () => {
     vi.useFakeTimers();
     childProcessMocks.execFile.mockImplementation((_file: string, _args: string[], _options: unknown, callback: Function) => {
       callback(new Error('database is locked'), '', 'database is locked');
     });
-    const { BdTransientFailure } = await import('../../../src/lib/bd-process-lock.js');
     const { queryBeadsForIssuePromise } = await import('../../../src/lib/beads-query.js');
+
+    const fallback = { id: 'jsonl-1', title: 'PAN-1094: JSONL task', status: 'open', labels: ['pan-1094'] };
+    writeFileSync(join(workspacePath, '.beads', 'issues.jsonl'), JSON.stringify(fallback) + '\n');
 
     await expect(queryBeadsForIssuePromise(workspacePath, 'PAN-1094', {
       maxAttempts: 2,
@@ -70,7 +72,7 @@ describe('queryBeadsForIssuePromise', () => {
       maxDelayMs: 100,
       random: () => 0,
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
-    })).rejects.toBeInstanceOf(BdTransientFailure);
+    })).resolves.toEqual([expect.objectContaining(fallback)]);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 });

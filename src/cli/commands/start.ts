@@ -31,7 +31,7 @@ import {
   type RunBdWithRetryOptions,
 } from '../../lib/bd-process-lock.js';
 
-export const RETRYABLE_BD_LOCK_EXIT_CODE = 13;
+export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)

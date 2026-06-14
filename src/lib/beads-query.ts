@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
-import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
+import { runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -69,10 +69,7 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
     );
     const parsed = JSON.parse(stdout || '[]');
     return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    if (error instanceof BdTransientFailure) {
-      throw error;
-    }
+  } catch {
     return await readBeadsFromJsonl(workspacePath, issueId);
   }
 }async function assertIssueHasBeadsPromise(workspacePath: string, issueId: string): Promise<void> {
@@ -104,18 +101,14 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
- * Query beads for an issue. Effect-native. Falls back to JSONL for ordinary bd
- * failures, but preserves exhausted transient lock contention as a retryable
- * failure instead of converting it into "missing beads".
+ * Query beads for an issue. Effect-native. Never fails: falls back to the
+ * workspace JSONL bead store when bd is unavailable or transiently locked.
  */
 export const queryBeadsForIssue = (
   workspacePath: string,
   issueId: string,
-): Effect.Effect<readonly BeadEntry[], BdTransientFailure> =>
-  Effect.tryPromise({
-    try: () => queryBeadsForIssuePromise(workspacePath, issueId),
-    catch: (error) => error as BdTransientFailure,
-  });
+): Effect.Effect<readonly BeadEntry[]> =>
+  Effect.promise(() => queryBeadsForIssuePromise(workspacePath, issueId));
 
 /**
  * Assert the issue has beads. Effect-native. Fails with BeadsMissingError if
@@ -124,7 +117,7 @@ export const queryBeadsForIssue = (
 export const assertIssueHasBeads = (
   workspacePath: string,
   issueId: string,
-): Effect.Effect<void, BeadsMissingError | BdTransientFailure> =>
+): Effect.Effect<void, BeadsMissingError> =>
   Effect.gen(function* () {
     const beads = yield* queryBeadsForIssue(workspacePath, issueId);
     if (beads.length === 0) {
