@@ -37,6 +37,7 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
       'prUrl',
       'prNumber',
       'projectKey',
+      'forge',
       'status',
       'scheduledMergeAt',
       'scheduledAt',

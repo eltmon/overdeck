@@ -4853,6 +4853,7 @@ function initSchema(db) {
       prUrl            TEXT NOT NULL,
       prNumber         INTEGER,
       projectKey       TEXT NOT NULL,
+      forge            TEXT NOT NULL DEFAULT 'github',
       "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
       scheduledMergeAt TEXT NOT NULL,
       scheduledAt      TEXT NOT NULL,
@@ -5654,6 +5655,7 @@ function runMigrations(db) {
 	}
 	if (currentVersion < 54) try {
 		db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
+		db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
 	} catch {}
 	db.pragma(`user_version = 54`);
 }
