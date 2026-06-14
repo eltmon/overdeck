@@ -78,6 +78,10 @@ import {
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../lib/git-activity.js';
+import {
+  buildRealConflictGateDeps,
+  resolveConflictGate,
+} from '../../../lib/cloister/conflict-gate.js';
 import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
   computeQueuePositionFromStatusSync,
@@ -3676,6 +3680,25 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       reviewReset.testNotes = undefined;
     }
     setReviewStatus(issueId, reviewReset);
+
+    // PAN-1765: short-circuit conflict-gated dispatches before responding so the
+    // HTTP client gets a 409 with the deferral message instead of a false 200.
+    const gate = yield* Effect.promise(() => resolveConflictGate(
+      issueId,
+      workspacePath,
+      'main',
+      buildRealConflictGateDeps(),
+    ));
+    if (gate.gated) {
+      const message = gate.reason ?? `Review deferred: merge conflict with main must be resolved first`;
+      setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
+      return jsonResponse({
+        success: false,
+        gated: true,
+        message,
+        pipeline: 'deferred',
+      }, { status: 409 });
+    }
 
     // Respond immediately
     // Run pipeline in background

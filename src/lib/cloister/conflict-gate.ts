@@ -64,7 +64,10 @@ interface RealConflictGateDepsOverrides {
   log?: (message: string) => void;
 }
 
+const PROBE_CACHE_MAX_ENTRIES = 256;
+
 const probeCache = new Map<string, { checkedAtMs: number; result: BranchMergeability }>();
+const probeInFlight = new Map<string, Promise<BranchMergeability>>();
 
 /**
  * Non-destructively checks whether HEAD can merge with origin/<targetBranch>.
@@ -199,6 +202,7 @@ export async function resolveConflictGate(
 
 export function __resetConflictGateProbeCacheForTests(): void {
   probeCache.clear();
+  probeInFlight.clear();
 }
 
 async function getCachedMergeability(
@@ -213,9 +217,24 @@ async function getCachedMergeability(
   const cached = probeCache.get(key);
   if (cached && nowMs - cached.checkedAtMs < PROBE_CACHE_MS) return cached.result;
 
-  const result = await (deps.probeMergeability ?? checkBranchMergeability)(workspacePath, targetBranch);
-  probeCache.set(key, { checkedAtMs: nowMs, result });
-  return result;
+  const existing = probeInFlight.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const result = await (deps.probeMergeability ?? checkBranchMergeability)(workspacePath, targetBranch);
+      // Move to end for LRU ordering, then enforce size cap.
+      probeCache.delete(key);
+      probeCache.set(key, { checkedAtMs: nowMs, result });
+      enforceProbeCacheSizeLimit();
+      return result;
+    } finally {
+      probeInFlight.delete(key);
+    }
+  })();
+
+  probeInFlight.set(key, promise);
+  return promise;
 }
 
 function isResolverDispatchThrottled(
@@ -251,6 +270,13 @@ function formatResolverDispatchState(state: ResolverDispatchState): string {
 function sweepExpiredProbeCache(nowMs: number): void {
   for (const [key, cached] of probeCache.entries()) {
     if (nowMs - cached.checkedAtMs >= PROBE_CACHE_MS) probeCache.delete(key);
+  }
+}
+
+function enforceProbeCacheSizeLimit(): void {
+  while (probeCache.size > PROBE_CACHE_MAX_ENTRIES) {
+    const first = probeCache.keys().next().value;
+    if (first) probeCache.delete(first);
   }
 }
 

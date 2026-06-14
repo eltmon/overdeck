@@ -222,6 +222,67 @@ describe('resolveConflictGate', () => {
 
     expect(deps.probeMergeability).toHaveBeenCalledTimes(2);
   });
+
+  it('deduplicates concurrent probe calls for the same issue', async () => {
+    const status = makeStatus({ blockerReasons: [mergeBlocker] });
+    let callCount = 0;
+    const deps = makeGateDeps(status, 'conflicts');
+    deps.probeMergeability.mockImplementation(async () => {
+      callCount += 1;
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      return 'conflicts';
+    });
+
+    const promiseA = resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
+    const promiseB = resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
+    await vi.advanceTimersByTimeAsync(1000);
+    const [a, b] = await Promise.all([promiseA, promiseB]);
+
+    expect(a.gated).toBe(true);
+    expect(b.gated).toBe(true);
+    expect(callCount).toBe(1);
+    expect(deps.probeMergeability).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps the probe cache at 256 entries and evicts oldest first', async () => {
+    const baseStatus = makeStatus({ blockerReasons: [mergeBlocker] });
+    let counter = 0;
+
+    for (let i = 0; i < 260; i += 1) {
+      const status = { ...baseStatus, issueId: `PAN-${1000 + i}` };
+      const deps = makeGateDeps(status, 'conflicts');
+      deps.probeMergeability.mockImplementation(async () => {
+        counter += 1;
+        return 'conflicts';
+      });
+      await resolveConflictGate(`PAN-${1000 + i}`, '/workspace', 'main', deps);
+    }
+
+    // 260 probes were issued, but cache retains only the last 256.
+    expect(counter).toBe(260);
+
+    // Re-probe the oldest issue: cache miss means a new probe.
+    const oldestStatus = { ...baseStatus, issueId: 'PAN-1000' };
+    const oldestDeps = makeGateDeps(oldestStatus, 'conflicts');
+    let oldestReprobed = false;
+    oldestDeps.probeMergeability.mockImplementation(async () => {
+      oldestReprobed = true;
+      return 'conflicts';
+    });
+    await resolveConflictGate('PAN-1000', '/workspace', 'main', oldestDeps);
+    expect(oldestReprobed).toBe(true);
+
+    // Re-probe the most recent issue within the cache window: cache hit.
+    const newestStatus = { ...baseStatus, issueId: 'PAN-1259' };
+    const newestDeps = makeGateDeps(newestStatus, 'conflicts');
+    let newestReprobed = false;
+    newestDeps.probeMergeability.mockImplementation(async () => {
+      newestReprobed = true;
+      return 'conflicts';
+    });
+    await resolveConflictGate('PAN-1259', '/workspace', 'main', newestDeps);
+    expect(newestReprobed).toBe(false);
+  });
 });
 
 describe('buildRealConflictGateDeps', () => {
