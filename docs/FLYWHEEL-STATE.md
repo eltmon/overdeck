@@ -800,3 +800,10 @@ red-main strike.
 - **PAN-1711 work-start retried 3rd time** (background) — if it hangs again on prep, PAN-1897 confirmed a real hang. agent-pan-1862 (review cache sharing) newly active (operator/auto).
 - **Run tally:** PAN-1614 + PAN-1845 merged+complete, conv/2920 GLM merged; PAN-1242 merging. Remaining drain (1775/1491/1827) blocked on conflicts/PAN-1893 crash/PAN-1897 prep-hang.
 - **LESSON:** when committing one agent's work, ALWAYS fetch first — a concurrent merge (PAN-1845) can collide; back up + `git merge` (not rebase) + typecheck before push is the safe integration.
+
+### RUN-35 — MODE CHANGE: Require-UAT toggled back ON (operator, ~20:30Z)
+
+- **`require_uat_before_merge=true` again** (operator flipped it to stop re-backing-up via rolling conflicts). **Flywheel mode change:** each tick now **`assemble-uat`** (build the disjoint, serialized UAT candidate batch) and surface it — do NOT direct-schedule auto-merges. Operator merges the ready UAT train. (PAN-1242's in-flight direct auto-merge was scheduled under UAT-off; let it complete or fold into the batch.)
+- **Launched `pan plan PAN-1758 --auto --auto-start`** (planning-pan-1758) — the continuous-readiness-train design (captured on PAN-1758; folds in PAN-1240). Full pipeline (merge-lane core, not a strike). Operator's plan: when PAN-1758 lands, flip Require-UAT back OFF safely.
+- **Coordinating with PAN-1899** (another conversation agent's plan): "retire repo-tracked `.panopticon/` — untrack machine-local projects.yaml." COMPLEMENTARY — it removes the `.panopticon/projects.yaml` sync-main conflict source (was 1 of the 9 conflict files in PAN-1629's drain), while PAN-1758 builds the continuous train. Low file-overlap (config/context vs merge-lane). Do NOT touch `.panopticon/` (its in-flight work).
+- **NEXT:** assemble UAT candidate batch each tick; track planning-pan-1758 + PAN-1899; PAN-1887 #1898 review (→ MIN-831); confirm PAN-1242 merged; conflict cluster (1775/1491/1827) feeds the UAT batch once rebased/ready.

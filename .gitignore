@@ -132,6 +132,8 @@ temp/
 .pan/followup-issues.txt
 .pan/spec.vbrief.json
 .pan/agent-mcp.json
+# Machine-local Panopticon config (config.yaml, projects.yaml, settings.json) —
+# copied into workspaces by copyPanopticonSettingsToWorkspaceSync, never committed.
 .panopticon/
 # Spec-writer crash debris — the writer should self-clean these on dead-PID detection.
 # Tracking them lets stale locks contaminate fresh worktrees.
@@ -167,7 +169,6 @@ packages/moonshine-linux-x64/bin/moonshine-sidecar
 # Sibling projects sometimes cloned into working tree (separate repos)
 multica/
 *.log.1
-.panopticon/config.yaml
 .cache/
 .tldr/
 .claude/mcp.json
