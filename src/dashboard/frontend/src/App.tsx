@@ -477,6 +477,23 @@ export default function App() {
     }
   }, [queryClient, recentActivity]);
 
+  // PAN-1862: fire a desktop notification for activity entries flagged with desktop:true
+  const seenDesktopActivityIds = useRef(new Set<string>());
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
+    for (const entry of recentActivity.slice(0, 20)) {
+      const id = typeof entry['id'] === 'string' ? entry['id'] : null;
+      const isDesktop = entry['desktop'] === true;
+      if (!id || !isDesktop || seenDesktopActivityIds.current.has(id)) continue;
+      seenDesktopActivityIds.current.add(id);
+      const message = typeof entry['message'] === 'string' ? entry['message'] : 'Panopticon alert';
+      const issueId = typeof entry['issueId'] === 'string' ? entry['issueId'] : undefined;
+      try {
+        new Notification(issueId ? `${issueId} — Panopticon` : 'Panopticon', { body: message, tag: id });
+      } catch { /* ignore */ }
+    }
+  }, [recentActivity]);
+
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);

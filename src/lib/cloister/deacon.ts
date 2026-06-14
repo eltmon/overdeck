@@ -168,6 +168,11 @@ import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
+import { detectForkCacheMiss } from './fork-cache-miss-detector.js';
+
+// Reviewer agentIds for which cache-miss notification has already been emitted.
+// Prevents duplicate notifications on repeated patrol ticks.
+const _cacheMissNotified = new Set<string>();
 
 // ============================================================================
 // Configuration
@@ -6061,6 +6066,33 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     if (state.role !== 'review') continue;
     reviewStates.push(state);
     if (!state.reviewSubRole || !state.reviewSynthesisAgentId) continue;
+
+    // PAN-1862: check for fork cache miss on sub-role reviewers, once per agent.
+    if (!_cacheMissNotified.has(agentId)) {
+      const parentState = getAgentStateSync(state.reviewSynthesisAgentId);
+      const outcome = detectForkCacheMiss(
+        agentId,
+        state.harness ?? 'claude-code',
+        parentState?.discoveryReadyAt,
+        parentState?.convoyLaunchedAt,
+      );
+      if (outcome.detected) {
+        _cacheMissNotified.add(agentId);
+        emitActivityEntrySync({
+          source: 'review',
+          level: 'warn',
+          message: `Review cache miss for ${state.issueId ?? 'unknown'} — convoy did not reuse the warm cache (TTL/model). Reviews proceed at full cost.`,
+          issueId: state.issueId,
+          details: outcome.detail,
+          desktop: true,
+        });
+      } else if (!outcome.detail.includes('unknown')) {
+        // Hit confirmed — mark checked so we don't recheck on every tick.
+        _cacheMissNotified.add(agentId);
+      }
+      // else: no cost events yet — will recheck next patrol tick.
+    }
+
     if (state.reviewMonitorSignaled) continue;
 
     const startedMs = Date.parse(state.startedAt);

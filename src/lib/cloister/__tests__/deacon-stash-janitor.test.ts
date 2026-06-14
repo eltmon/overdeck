@@ -50,6 +50,7 @@ vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), resolveP
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logDeaconEventSync: vi.fn(), logAgentLifecycle: vi.fn() }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityEntrySync: vi.fn(), emitActivityTts: vi.fn(), emitActivityTtsSync: vi.fn() }));
+vi.mock('../fork-cache-miss-detector.js', () => ({ detectForkCacheMiss: vi.fn(() => ({ detected: false, detail: 'mocked' })) }));
 vi.mock('../../config.js', async (importActual) => ({
   ...(await importActual<typeof import('../../config.js')>()),
   loadConfig: vi.fn(() => ({ trackers: { primary: 'linear', linear: { type: 'linear', api_key_env: 'LINEAR_API_KEY' } } })),

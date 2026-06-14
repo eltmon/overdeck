@@ -42,6 +42,8 @@ export interface EmitActivityOptions {
   issueId?: string;
   /** Dashboard route the feed navigates to on click (e.g. /conv/<name>, /flywheel). */
   link?: string;
+  /** PAN-1862: when true, App.tsx fires a desktop Notification for this entry. */
+  desktop?: boolean;
 }
 
 export interface EmitDetailedOptions {
@@ -116,6 +118,7 @@ export function emitActivityEntrySync(options: EmitActivityOptions): void {
       details: options.details,
       issueId: options.issueId,
       link: options.link,
+      ...(options.desktop ? { desktop: true } : {}),
     },
   });
 }
