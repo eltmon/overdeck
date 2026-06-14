@@ -24,6 +24,14 @@ import { findPlanSync } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import {
+  BdTransientFailure,
+  isTransientBdError,
+  runBdWithRetry,
+  type RunBdWithRetryOptions,
+} from '../../lib/bd-process-lock.js';
+
+export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -583,12 +591,37 @@ import {
   readBeadsTasks,
 } from '../../lib/cloister/work-agent-prompt.js';
 
+export type BeadsTaskCountResult = {
+  count: number;
+  source: 'bd' | 'jsonl-fallback';
+  transientFailure?: unknown;
+};
+
+function countBeadsTasksFromJsonl(workspacePath: string, label?: string): number {
+  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+  if (!existsSync(jsonlPath)) return 0;
+  if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
+
+  let count = 0;
+  for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
+      if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
+        count += 1;
+      }
+    } catch { /* skip malformed lines */ }
+  }
+  return count;
+}
+
 /**
  * Check whether a workspace has beads tasks (planning must create them before work begins).
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function countBeadsTasks(workspacePath: string, issueId?: string): number {
+export function countBeadsTasksDetailed(workspacePath: string, issueId?: string): BeadsTaskCountResult {
   const label = issueId?.toLowerCase();
   try {
     const args = label
@@ -601,24 +634,47 @@ export function countBeadsTasks(workspacePath: string, issueId?: string): number
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const tasks = JSON.parse(output.trim() || '[]');
-    return Array.isArray(tasks) ? tasks.length : 0;
-  } catch {
-    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return 0;
-    if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
+    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
+  } catch (error) {
+    return {
+      count: countBeadsTasksFromJsonl(workspacePath, label),
+      source: 'jsonl-fallback',
+      transientFailure: isTransientBdError(error) ? error : undefined,
+    };
+  }
+}
 
-    let count = 0;
-    for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
-        if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
-          count += 1;
-        }
-      } catch { /* skip malformed lines */ }
-    }
-    return count;
+export function countBeadsTasks(workspacePath: string, issueId?: string): number {
+  return countBeadsTasksDetailed(workspacePath, issueId).count;
+}
+
+export async function countBeadsTasksDetailedWithRetry(
+  workspacePath: string,
+  issueId?: string,
+  retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
+): Promise<BeadsTaskCountResult> {
+  const label = issueId?.toLowerCase();
+  try {
+    const args = label
+      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
+      : ['list', '--json', '--limit', '0'];
+    const { stdout } = await runBdWithRetry(
+      `pan start beads count ${issueId ?? 'all'}`,
+      () => execFileAsync('bd', args, {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }),
+      { ...retryOptions, workspacePath },
+    );
+    const tasks = JSON.parse(stdout.trim() || '[]');
+    return { count: Array.isArray(tasks) ? tasks.length : 0, source: 'bd' };
+  } catch (error) {
+    return {
+      count: countBeadsTasksFromJsonl(workspacePath, label),
+      source: 'jsonl-fallback',
+      transientFailure: error instanceof BdTransientFailure || isTransientBdError(error) ? error : undefined,
+    };
   }
 }
 
@@ -652,20 +708,38 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
   return { valid: true };
 }
 
-export function validateBeadsMatchPlan(workspacePath: string, issueId: string): { valid: boolean; beadCount: number; planItemCount: number } {
+function withTransientFailure<T extends object>(result: T, transientFailure: unknown): T & { transientFailure?: unknown } {
+  if (transientFailure === undefined) return result;
+  return { ...result, transientFailure };
+}
+
+type BeadsPlanValidation = { valid: boolean; beadCount: number; planItemCount: number; transientFailure?: unknown };
+
+function validateBeadsMatchPlanFromCount(workspacePath: string, beadCountResult: BeadsTaskCountResult): BeadsPlanValidation {
   const planPath = findPlanSync(workspacePath);
-  const beadCount = countBeadsTasks(workspacePath, issueId);
-  if (!planPath) return { valid: true, beadCount, planItemCount: 0 };
+  const beadCount = beadCountResult.count;
+  if (!planPath) return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
 
   try {
     const raw = readFileSync(planPath, 'utf-8');
     const parsed = JSON.parse(raw);
     const planItemCount = Array.isArray(parsed?.plan?.items) ? parsed.plan.items.length : 0;
-    if (planItemCount === 0) return { valid: true, beadCount, planItemCount };
-    return { valid: beadCount === planItemCount, beadCount, planItemCount };
+    if (planItemCount === 0) return withTransientFailure({ valid: true, beadCount, planItemCount }, beadCountResult.transientFailure);
+    return withTransientFailure({ valid: beadCount === planItemCount, beadCount, planItemCount }, beadCountResult.transientFailure);
   } catch {
-    return { valid: true, beadCount, planItemCount: 0 };
+    return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
   }
+}
+
+export function validateBeadsMatchPlan(workspacePath: string, issueId: string): BeadsPlanValidation {
+  return validateBeadsMatchPlanFromCount(workspacePath, countBeadsTasksDetailed(workspacePath, issueId));
+}
+
+async function validateBeadsMatchPlanWithRetry(
+  workspacePath: string,
+  issueId: string,
+): Promise<BeadsPlanValidation> {
+  return validateBeadsMatchPlanFromCount(workspacePath, await countBeadsTasksDetailedWithRetry(workspacePath, issueId));
 }
 
 /**
@@ -731,6 +805,21 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
   }
 
   process.exit(1);
+}
+
+function transientBeadsFailureMessage(issueId: string, cause?: unknown): string {
+  if (cause instanceof BdTransientFailure) {
+    return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times`;
+  }
+  return `Beads database was temporarily locked while checking ${issueId}`;
+}
+
+function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unknown): never {
+  spinner.fail(transientBeadsFailureMessage(issueId, cause));
+  console.log('');
+  console.log(chalk.yellow('The beads database is being used by another Panopticon process.'));
+  console.log(chalk.dim(`This is retryable; re-run ${chalk.cyan(`pan start ${issueId}`)} shortly.`));
+  process.exit(RETRYABLE_BD_LOCK_EXIT_CODE);
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
@@ -1056,7 +1145,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
-    if (!hasBeadsTasks(workspace, id)) {
+    const beadsTaskCount = await countBeadsTasksDetailedWithRetry(workspace, id);
+    if (beadsTaskCount.transientFailure && beadsTaskCount.count === 0) {
+      failTransientBeadsValidation(spinner, id, beadsTaskCount.transientFailure);
+    }
+    if (beadsTaskCount.count === 0) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
       const hasPlanningState = findPlanSync(workspace) !== null;
       if (!hasPlanningState) {
@@ -1087,6 +1180,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
           if (recovery.created.length > 0) {
             spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
+          } else if (recovery.transientFailure) {
+            failTransientBeadsValidation(spinner, id, recovery.transientFailure);
           } else {
             await failPostCreateValidation({
               spinner,
@@ -1125,7 +1220,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
-    let beadCoverage = validateBeadsMatchPlan(workspace, id);
+    let beadCoverage = await validateBeadsMatchPlanWithRetry(workspace, id);
+    if (beadCoverage.transientFailure) {
+      failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
+    }
     if (!beadCoverage.valid) {
       // PAN-1512: partial materialization recovery. createBeadsFromVBrief clears
       // existing beads for the issue before recreating from spec, so it's safe to
@@ -1136,7 +1234,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
         if (recovery.success && recovery.created.length > 0) {
           spinner.succeed(`Rematerialized ${recovery.created.length} beads from vBRIEF plan`);
-          beadCoverage = validateBeadsMatchPlan(workspace, id);
+          beadCoverage = await validateBeadsMatchPlanWithRetry(workspace, id);
+          if (beadCoverage.transientFailure) {
+            failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
+          }
         }
       } catch (recoveryErr) {
         // Fall through to the existing failure path below
@@ -1163,6 +1264,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.text = 'Spawning agent...';
 
+    // `pan start --host --yes` does not attach to the work-agent tmux session.
+    // After spawnAgent finishes session creation, this command only prints the
+    // details below and exits; any remaining pre-spawn delay is bd/tracker/prompt
+    // work, with bd contention now bounded by the retry/lock helpers above.
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }
@@ -1249,5 +1354,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
 export const __testInternals = {
   failPostCreateValidation,
+  failTransientBeadsValidation,
   resolveExplicitHarnessFlag,
 };
