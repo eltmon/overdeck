@@ -634,6 +634,30 @@ export function RolesPanel() {
                         );
                       })}
                     </div>
+                    {role.id === 'review' && (() => {
+                      const convoy = ['security', 'correctness', 'performance', 'requirements', 'synthesis'];
+                      const pairs = (role.subRoles ?? [])
+                        .filter(sr => convoy.includes(sr.id))
+                        .map(sr => ({ name: sr.name, model: resolveModelRef(getSubRoleModel(settings, role, sr), workhorses, roleModel) }));
+                      const uniqueModels = new Set(pairs.map(p => p.model));
+                      if (uniqueModels.size <= 1) return null;
+                      const reference = [...uniqueModels].reduce((a, b) =>
+                        pairs.filter(p => p.model === a).length >= pairs.filter(p => p.model === b).length ? a : b
+                      );
+                      const differing = pairs.filter(p => p.model !== reference);
+                      return (
+                        <div className="mt-3 rounded-md border border-destructive bg-destructive/10 p-3">
+                          <p className="text-xs font-semibold text-destructive">
+                            Reviewer model mismatch — prompt-cache sharing is disabled
+                          </p>
+                          <p className="mt-1 text-[11px] leading-snug text-destructive/80">
+                            {differing.map(p => `${p.name} → ${p.model}`).join(', ')} differ from the convoy.
+                            Each reviewer re-reads the full diff at full cost (~{pairs.length}× the input tokens per review).
+                            Assign all five review roles the same model to enable cache sharing.
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
