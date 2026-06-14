@@ -51,7 +51,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       { action: { key: 'tell', label: 'Tell agent', group: 'agent', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
       { action: { key: 'wipe', label: 'Wipe', group: 'danger', kind: 'destructive' }, enabled: true, isPending: false, invoke: actionInvoke },
     ],
-    state: { hasPlan: true },
+    state: { hasPlan: true, hasBeads: true },
     activeDialog: null,
   }),
 }))
@@ -97,14 +97,15 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
 }
 
 describe('IssueMissionControl', () => {
-  it('renders the mission header, pipeline lane, and top tabs', () => {
+  it('renders the mission header, issue tree, and persistent top tabs', () => {
     renderMissionControl()
 
     expect(screen.getByText('Issue Cockpit · Mission Control')).toBeTruthy()
-    expect(screen.getByText('PAN-1661')).toBeTruthy()
-    expect(screen.getByText('◢ Pipeline · live')).toBeTruthy()
+    expect(screen.getAllByText('PAN-1661').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('Issue tree')).toBeTruthy()
+    expect(screen.getByText('Work agent')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /PR & CI/ })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /PR & CI/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
   })
 
@@ -120,7 +121,7 @@ describe('IssueMissionControl', () => {
     // primary merge CTA reflects the blocking reason
     expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
     // breadcrumb context
-    expect(screen.getByText('Issues')).toBeTruthy()
+    expect(screen.getAllByText('Issues').length).toBeGreaterThan(0)
   })
 
   it('keeps the Overview faithful to the mockup: spotlight + Now / Issue cards', () => {
@@ -142,6 +143,22 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText('Action dock')).toBeTruthy()
   })
 
+  it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
+    renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: /Work agent/ }))
+
+    expect(screen.getByTestId('issue-tree-context-panel')).toBeTruthy()
+    expect(screen.getByText('Launch')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('false')
+    expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-selected')).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
+
+    expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByTestId('issue-tree-context-panel')).toBeNull()
+  })
+
   it('groups all issue actions in the mega-menu', () => {
     renderMissionControl()
 
@@ -158,7 +175,9 @@ describe('IssueMissionControl', () => {
   it('shows first-class CI checks from the PR & CI tab', () => {
     renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: /PR & CI/ }))
+    const prCiTab = screen.getAllByRole('button', { name: /PR & CI/ }).at(-1)
+    expect(prCiTab).toBeTruthy()
+    fireEvent.click(prCiTab!)
 
     expect(screen.getAllByText('GitHub CI/CD').length).toBeGreaterThan(0)
     expect(screen.getByText('lint')).toBeTruthy()

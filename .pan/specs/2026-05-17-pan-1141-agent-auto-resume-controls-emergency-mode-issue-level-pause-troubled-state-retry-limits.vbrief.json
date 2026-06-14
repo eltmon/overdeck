@@ -4,17 +4,17 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T20:34:53.384Z"
+    "updated": "2026-06-14T22:51:09.109Z"
   },
   "plan": {
     "id": "pan-1141",
     "title": "Agent auto-resume controls: emergency mode, issue-level pause, troubled-state retry limits",
-    "status": "proposed",
+    "status": "completed",
     "uid": "a3f7c2d9-1b4e-4a8f-9c2d-7f5b8e1c3d4a",
     "author": "agent:claude-opus-4-7",
-    "sequence": 80,
+    "sequence": 81,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T20:34:53.384Z",
+    "updated": "2026-06-14T22:51:09.109Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -1279,5 +1279,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

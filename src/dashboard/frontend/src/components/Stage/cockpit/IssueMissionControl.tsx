@@ -19,7 +19,6 @@ import {
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
-import DrawerReviewSpecialists from '../../drawer/DrawerReviewSpecialists'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -64,6 +63,8 @@ type MissionTab =
 type PipelineState = 'done' | 'active' | 'fail' | 'todo'
 
 type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
+
+type IssueTreeContext = 'issue' | 'work' | 'review' | 'test' | 'ci' | 'plan' | 'beads' | 'activity'
 
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -145,13 +146,6 @@ function pipelineGlyph(state: PipelineState): string {
   if (state === 'fail') return '✕'
   if (state === 'active') return '◆'
   return '○'
-}
-
-function pipelineTone(state: PipelineState): string {
-  if (state === 'done') return 'border-success/40 bg-success/10 text-success-foreground'
-  if (state === 'fail') return 'border-destructive/40 bg-destructive/10 text-destructive-foreground'
-  if (state === 'active') return 'border-signal-review/40 bg-signal-review/10 text-signal-review-foreground'
-  return 'border-border bg-muted/30 text-muted-foreground'
 }
 
 function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): string {
@@ -481,102 +475,159 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
   )
 }
 
-function PipelineNode({
-  label,
-  state,
-  summary,
-  children,
+function IssueTreeLane({
+  issueId,
+  title,
+  projectName,
+  selected,
+  onSelect,
 }: {
-  label: string
-  state: PipelineState
-  summary: string
-  children?: ReactNode
+  issueId: string
+  title: string
+  projectName?: string
+  selected: IssueTreeContext | null
+  onSelect: (context: IssueTreeContext) => void
 }) {
-  const [open, setOpen] = useState(state === 'active' || state === 'fail')
-  return (
-    <div className="rounded-[16px] border border-border bg-card/70">
-      <button
-        type="button"
-        className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-accent/50"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-[9px] border text-[12px] ${pipelineTone(state)}`}>
-          {pipelineGlyph(state)}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[12.5px] font-semibold text-foreground">{label}</span>
-          <span className="block truncate text-[11px] text-muted-foreground">{summary}</span>
-        </span>
-        <span className={`text-[10px] text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
-      </button>
-      {open && children && (
-        <div className="border-t border-border px-3 py-3 text-[12px] text-muted-foreground">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function PipelineLane({ issueId }: { issueId: string }) {
   const review = useReviewStatusQuery(issueId)
   const activity = useActivityQuery(issueId)
-  const ci = useIssueCheckRunsQuery(issueId)
   const actions = useIssueActions(issueId)
-  const rs = review.data
+  const checks = useIssueCheckRunsQuery(issueId)
   const sections = activity.data?.sections ?? []
   const work = sections.find((section) => section.type === 'work')
   const test = sections.find((section) => section.type === 'test')
   const ship = sections.find((section) => section.type === 'ship')
-  const states = computePipelineStates({ hasPlan: actions.state.hasPlan, rs, ci: ci.data, work })
+  const reviewerCount = sections.filter((section) => section.type === 'review' || section.type === 'reviewer').length
+  const hasPlan = actions.state.hasPlan
+  const hasBeads = actions.state.hasBeads
+  const issueActive = selected === 'issue'
 
-  const smallActions = ['restartReview', 'recoverReview', 'reviewTest', 'viewPr']
-    .map((key) => actions.all.find((view) => view.action.key === key))
-    .filter((view): view is IssueActionView => Boolean(view && view.enabled))
+  const childClass = (context: IssueTreeContext) => `grid w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12px] transition-colors ${
+    selected === context ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
+  }`
 
   return (
-    <aside className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-card/50 p-3">
-      <div className="flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        <span>◢ Pipeline · live</span>
-        <span>stage details</span>
+    <aside className="min-w-0 rounded-[20px] border border-border bg-card/50 p-3" aria-label="Issue tree">
+      <div className="mb-3 flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <span>Issues</span>
+        <span>current</span>
       </div>
-      <PipelineNode label="Plan" state={states.plan} summary={states.plan === 'done' ? 'plan artifacts present' : 'not planned'}>
-        <div>vBRIEF and beads state are sourced from the plan and workspace panels.</div>
-      </PipelineNode>
-      <PipelineNode label="Work" state={states.work} summary={work ? `${work.sessionId} · ${work.status}` : 'no work session'}>
-        {work ? <div className="font-mono text-[11px]">{work.sessionId} · {work.model}</div> : <div>No work agent session found.</div>}
-      </PipelineNode>
-      <PipelineNode label="Review" state={states.review} summary={rs?.reviewStatus ?? 'pending'}>
-        <DrawerReviewSpecialists issueId={issueId} />
-        {rs?.reviewNotes && <div className="mt-2 rounded-[10px] border-l-2 border-destructive/60 bg-destructive/[0.06] px-3 py-2 text-foreground/85">{rs.reviewNotes}</div>}
-      </PipelineNode>
-      <PipelineNode label="Test" state={states.test} summary={rs?.testStatus ?? 'pending'}>
-        <div className="space-y-1">
-          <div>testStatus: <span className="text-foreground">{rs?.testStatus ?? 'pending'}</span></div>
-          {test && <div className="font-mono text-[11px]">{test.sessionId} · {test.status}</div>}
-          {rs?.testNotes && <div>{rs.testNotes}</div>}
+      <div className="mb-2 flex items-center gap-2 px-1 text-[12px] font-semibold text-foreground">
+        <span>⌄</span>
+        <span className="min-w-0 truncate">{projectName ?? 'Project'}</span>
+      </div>
+      <section className="border-l-2 border-primary bg-primary/[0.07] pl-2">
+        <button
+          type="button"
+          onClick={() => onSelect('issue')}
+          className={`grid w-full gap-1 rounded-r-[10px] px-2 py-2 text-left transition-colors ${issueActive ? 'bg-card shadow-sm' : 'hover:bg-card/70'}`}
+        >
+          <span className="flex items-center justify-between gap-2">
+            <span className="font-mono text-[11px] text-muted-foreground">{issueId}</span>
+            <span className="font-mono text-[11px] text-muted-foreground">{review.data?.readyForMerge ? 'ready' : review.data?.reviewStatus ?? 'open'}</span>
+          </span>
+          <span className="line-clamp-2 text-[12px] font-semibold leading-snug text-foreground">{title}</span>
+          <span className="flex flex-wrap gap-1.5">
+            <CockpitPill tone={statusToTone(review.data?.reviewStatus)} className="px-1.5 py-0 text-[9px]">{review.data?.reviewStatus ?? 'status'}</CockpitPill>
+            {review.data?.readyForMerge && <CockpitPill tone="success" className="px-1.5 py-0 text-[9px]">merge ready</CockpitPill>}
+          </span>
+        </button>
+        <div className="mt-1 grid gap-0.5 pb-2 pl-4">
+          <button type="button" onClick={() => onSelect('work')} className={childClass('work')}>
+            <span>⌘</span>
+            <span className="min-w-0 truncate">Work agent</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{work?.status ?? 'none'}</span>
+          </button>
+          <button type="button" onClick={() => onSelect('review')} className={childClass('review')}>
+            <span>◇</span>
+            <span className="min-w-0 truncate">Review</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{reviewerCount || review.data?.reviewStatus || 'pending'}</span>
+          </button>
+          <button type="button" onClick={() => onSelect('test')} className={childClass('test')}>
+            <span>⚗</span>
+            <span className="min-w-0 truncate">Test</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{test?.status ?? review.data?.testStatus ?? 'pending'}</span>
+          </button>
+          <button type="button" onClick={() => onSelect('ci')} className={childClass('ci')}>
+            <span>◉</span>
+            <span className="min-w-0 truncate">PR & CI</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{checks.data?.summary.total ? `${checks.data.summary.passed}/${checks.data.summary.total}` : 'none'}</span>
+          </button>
+          <button type="button" onClick={() => onSelect('plan')} className={childClass('plan')}>
+            <span>☷</span>
+            <span className="min-w-0 truncate">Planning state</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{hasPlan ? 'ready' : 'missing'}</span>
+          </button>
+          <button type="button" onClick={() => onSelect('beads')} className={childClass('beads')}>
+            <span>▦</span>
+            <span className="min-w-0 truncate">Beads</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{hasBeads ? 'present' : 'none'}</span>
+          </button>
+          <button type="button" onClick={() => onSelect('activity')} className={childClass('activity')}>
+            <span>↯</span>
+            <span className="min-w-0 truncate">Activity</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{sections.length}</span>
+          </button>
+          {ship && (
+            <div className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground">
+              <span>⇡</span>
+              <span className="min-w-0 truncate">Ship agent</span>
+              <span className="font-mono text-[10px]">{ship.status}</span>
+            </div>
+          )}
         </div>
-      </PipelineNode>
-      <PipelineNode label="GitHub CI/CD" state={states.ci} summary={ci.data?.summary.total ? `${ci.data.summary.passed}/${ci.data.summary.total} pass` : 'no checks'}>
-        <CheckRunList checkRuns={ci.data?.checkRuns ?? []} compact />
-      </PipelineNode>
-      <PipelineNode label="Ship" state={states.ship} summary={rs?.mergeStatus ?? 'waiting'}>
-        {ship ? <div className="font-mono text-[11px]">{ship.sessionId} · {ship.status}</div> : <div>Rebase, verify, and push after review/test gates pass.</div>}
-      </PipelineNode>
-      <PipelineNode label="Merge" state={states.merge} summary={rs?.mergeStatus === 'merged' ? 'merged' : rs?.readyForMerge ? 'ready for human merge' : 'gated'}>
-        <div>Merge is gated on Panopticon review/test plus GitHub PR state.</div>
-      </PipelineNode>
-      {smallActions.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-2 px-1">
-          {smallActions.map((view) => (
-            <button key={view.action.key} type="button" disabled={view.isPending} onClick={view.invoke} className="rounded-[var(--radius-sm)] border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent disabled:opacity-50">
-              {view.action.label}
-            </button>
-          ))}
-        </div>
-      )}
-      <IssueActionDialogHost issueId={issueId} actions={actions} />
+      </section>
     </aside>
+  )
+}
+
+function IssueTreeContextPanel({
+  context,
+  issueId,
+  launcher,
+  agentDock,
+  actionDock,
+  timeline,
+}: {
+  context: IssueTreeContext
+  issueId: string
+  launcher: ReactNode
+  agentDock: ReactNode
+  actionDock: ReactNode
+  timeline: ReactNode
+}) {
+  const review = useReviewStatusQuery(issueId)
+  const activity = useActivityQuery(issueId)
+  const work = activity.data?.sections.find((section) => section.type === 'work')
+  const copy: Record<IssueTreeContext, { title: string; summary: string }> = {
+    issue: { title: issueId, summary: 'Issue detail from the tree. Workspace tabs stay visible above this pane.' },
+    work: { title: 'Work agent', summary: work ? `${work.sessionId} · ${work.status}` : 'No work agent session is attached to this issue.' },
+    review: { title: 'Review', summary: `Review status: ${review.data?.reviewStatus ?? 'pending'}.` },
+    test: { title: 'Test', summary: `Test status: ${review.data?.testStatus ?? 'pending'}.` },
+    ci: { title: 'PR & CI', summary: 'GitHub pull request and check run state for this issue.' },
+    plan: { title: 'Planning state', summary: 'vBRIEF, PRD, and planning state for this issue.' },
+    beads: { title: 'Beads', summary: 'Implementation beads generated from the finalized plan.' },
+    activity: { title: 'Activity', summary: 'Issue activity feed and recent pipeline events.' },
+  }
+
+  const body = (() => {
+    if (context === 'issue') return <OverviewTab issueId={issueId} />
+    if (context === 'work') return <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />
+    if (context === 'review') return <ReviewVerificationCard issueId={issueId} />
+    if (context === 'test') return <TestPanel issueId={issueId} />
+    if (context === 'ci') return <GitHubCiPanel issueId={issueId} />
+    if (context === 'plan') return <PlanMissionTab issueId={issueId} />
+    if (context === 'beads') return <BeadsTab issueId={issueId} />
+    return <ActivityTab issueId={issueId} />
+  })()
+
+  return (
+    <div className="space-y-3.5" data-testid="issue-tree-context-panel">
+      <div className="rounded-[16px] border border-border bg-card px-4 py-3">
+        <h2 className="text-[16px] font-semibold text-foreground">{copy[context].title}</h2>
+        <p className="mt-1 text-[12px] text-muted-foreground">{copy[context].summary}</p>
+      </div>
+      {body}
+    </div>
   )
 }
 
@@ -811,13 +862,22 @@ function tabBadge(tab: MissionTab, rs: ReviewStatusData | undefined, checks: Ret
 }
 
 export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline, onOpenPane }: IssueMissionControlProps) {
-  const [activeTab, setActiveTab] = useState<MissionTab>('overview')
+  const [activeTab, setActiveTab] = useState<MissionTab | null>('overview')
+  const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const review = useReviewStatusQuery(issueId)
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const selectTab = (tab: MissionTab) => {
+    setActiveTab(tab)
+    setTreeContext(null)
+  }
+  const selectTreeContext = (context: IssueTreeContext) => {
+    setTreeContext(context)
+    setActiveTab(null)
+  }
 
   return (
     <div className={styles.missionWrap}>
@@ -852,7 +912,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       </header>
 
       <div className={styles.missionBody}>
-        <PipelineLane issueId={issueId} />
+        <IssueTreeLane issueId={issueId} title={title} projectName={projectName} selected={treeContext} onSelect={selectTreeContext} />
         <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
           <nav className="flex gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
             {TABS.map((tab) => {
@@ -861,7 +921,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => selectTab(tab.id)}
                   className={`relative top-px flex shrink-0 items-center gap-1.5 rounded-t-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors ${
                     activeTab === tab.id
                       ? 'border-border border-b-card bg-card text-foreground'
@@ -875,6 +936,16 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             })}
           </nav>
           <div className="p-4">
+            {treeContext && (
+              <IssueTreeContextPanel
+                context={treeContext}
+                issueId={issueId}
+                launcher={launcher}
+                agentDock={agentDock}
+                actionDock={actionDock}
+                timeline={timeline}
+              />
+            )}
             {activeTab === 'overview' && <OverviewTab issueId={issueId} />}
             {activeTab === 'review' && <ReviewVerificationCard issueId={issueId} />}
             {activeTab === 'test' && <TestPanel issueId={issueId} />}
