@@ -2750,3 +2750,77 @@ NOT memory — it's (a) auto_pickup_backlog=false restricting inventory to in-fl
 work, and (b) that in-flight set being stalled-needing-resume which the Flywheel
 can't action. So "prefer over-saturation" had nothing legal to launch beyond the
 red-main strike.
+
+## RUN-35 tick 1 (2026-06-14) — pipeline unfrozen; re-rebase recovery (PAN-1240) is the live blocker
+
+### State change vs RUN-34: deacon RUNNING + boot --no-resume gates CLEARED
+
+Big improvement over RUN-34's frozen state. Cloister watchdog `Status: Running`;
+stopped agents now show `gate: none` (RUN-34 had 160 boot --no-resume gates). The
+pipeline CAN move autonomously again. Main GREEN (`76d67be`, CI run 27504164328
+`success`). 1 live agent: `agent-pan-1845` (operator-started, `flywheelRunId: null`,
+kimi-k2.7-code/pi, working the CRITICAL Fly-remote-work-loss issue) — watchdog flags
+it Stuck but kimi/pi renders raw JSON (see project_kimi_pane_raw_json); exempt from
+governor reaping. Did NOT touch it.
+
+### THE blocker: review-passed PRs stranded on stale (red-main-era) bases; nothing re-rebases them
+
+9 in-review PRs (PAN-1498 + 1827/1629/1614/1242/1491/1775/1641/1765, all author=eltmon,
+none parked) are stranded. Two independent deacon paths each decline to recover them:
+
+1. `autoResumeStoppedWorkAgents` (runs every cycle) only resumes a stopped WORK agent
+   that has **pending review feedback** — every candidate is skipped "idle / no review
+   feedback", so it resumes NOTHING. A review-passed PR with a stale base / failing
+   inherited check generates no "review feedback", so its work agent is never
+   re-dispatched.
+2. The merge-train reconciler (merge_train_enabled=true) only re-rebases PRs already in
+   the **ready queue**. A blocked-but-recoverable PR is not in the queue, so it is never
+   rebased onto green main to BECOME ready. No reconciler/rebase activity in the deacon log;
+   `/api/flywheel/auto-merge/pending` is `[]`.
+
+Net: PRs built on a then-red main inherit that failure forever. PAN-1498's base is
+`8d838d9c` (not current `76d67be`); it is flagged `failing_checks` (NOT merge_conflict)
+— the only one in the set whose `pan start` would NOT hit the PAN-1872 sync-main-conflict
+crash. The other 8 show GitHub `mergeable: UNKNOWN` (GitHub hasn't recomputed since main
+moved; the merge-blockers API "merge_conflict" is partly stale per PAN-1620).
+
+**Canonical fix = PAN-1240** (ship-complete PRs go CONFLICTING after main moves → need
+review-preserving auto re-rebase recovery). Family: PAN-1758 (ship lane can't converge on
+moving main; readyForMerge only flips via the **startup repair sweep** → a dashboard
+restart is an operator lever that may flip stranded PRs to ready), PAN-1560 (re-review
+status not reposted after head moves), PAN-1213/1215/1620/1765. All OPEN. auto_pickup_backlog
+=false forbids the Flywheel from launching PAN-1240 itself.
+
+### Held launches (correct, not passive) — minAgents=2 vs auto_pickup_backlog=false
+
+Only 1 live agent (operator's) vs minAgents=2. But there is NO clean launch: the in-review
+set needs a server-side review-preserving re-rebase that doesn't exist; `pan start` on a
+conflict-flagged branch risks the PAN-1872 crash + PAN-1765 review-churn — forcing an
+ill-fitting launch papers over the missing reconciler (violates No-Bandaids). Re-entering
+in-flight issues is NOT forbidden by auto_pickup_backlog=false (that only gates fresh
+backlog), but no verb cleanly advances them. Surfaced the tension as a non-blocking
+openQuestion: operator can (a) flip auto_pickup_backlog so the Flywheel builds PAN-1240/1758,
+or (b) restart the dashboard to fire the PAN-1758 startup repair sweep.
+
+### Filed this tick
+
+- **PAN-1887** (enhancement,substrate): Flywheel auto-merge path is GitHub-only — ready
+  GitLab MRs strand under all-tracked-projects scope. Exposed by **MIN-831** (GitLab MR #62,
+  review=passed test=passed, ready) which the Flywheel cannot auto-merge; needs operator
+  manual GitLab merge. Sibling review-side gap = PAN-933. Route GitLab via `glab mr merge`.
+- **PAN-1888** (substrate): finish the PAN-1883 SQLite-truth migration — `work-agent-stop-hook`
+  still reads legacy `review-status.json` (the follow-up PAN-1883's closure comment flagged).
+  Surgical scope: stop-hook only; close-out/deacon/lifecycle JSON reads may be the
+  merge-specialist completion signal (intentional) — audit before touching.
+
+### Closure review (operator-shared): PAN-1883 + PAN-1884 verified clean
+
+- **PAN-1883** CLOSED/closed-out: orchestrator + UI now read pipeline truth from SQLite/API
+  (commits `4de55ab88`, `a1fbe1687`), CI green at run 27493486855. Confirms my RUN-34 RCA was
+  right — the legacy `review-status.json` IS scratch for pipeline-state judgment. (The
+  `a1cec7da8 ... JSON-authoritative target` commit was an intermediate audit-doc stage, NOT
+  the final design — don't be misled by that subject line.) My RUN-35 tick already complied
+  (used `pan review pending --ready`, `/api/flywheel/merge-blockers`, deacon log, state.json).
+- **PAN-1884** CLOSED/closed-out: operational agent rules promoted into bundled `scope: dev`
+  files under `sync-sources/rules/` (commit `c4d15e6b`), conversation-memory reduced to
+  pointers, lint:skills green.
