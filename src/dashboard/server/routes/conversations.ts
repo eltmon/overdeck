@@ -28,6 +28,7 @@ import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath } 
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
+import * as self from './conversations.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { MODEL_CAPABILITIES, modelSupportsImagesSync, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import {
@@ -150,7 +151,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir, packageRoot } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getPanopticonHome } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import {
@@ -278,7 +279,7 @@ async function terminatePids(pids: number[]): Promise<void> {
 }
 
 export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
-  const launcherScript = join(homedir(), '.panopticon', 'conversations', conv.tmuxSession, 'launcher.sh');
+  const launcherScript = join(getPanopticonHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
   // PAN-1798: never let conversation cmdline matching catch the shared tmux
@@ -771,7 +772,7 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
  * The dashboard chat panel uses this to render Pi conversation history.
  */
 async function resolvePiSessionFile(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(homedir(), '.panopticon', 'agents', tmuxSession, 'sessions');
+  const sessionDir = join(getPanopticonHome(), 'agents', tmuxSession, 'sessions');
   if (!existsSync(sessionDir)) return null;
   try {
     const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
@@ -1257,7 +1258,7 @@ function resolvePtySupervisorScriptPath(): string {
 }
 
 function getPtySupervisorSocketPath(agentId: string): string {
-  return join(process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'), 'sockets', `pty-${agentId}.sock`);
+  return join(getPanopticonHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
 async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
@@ -1414,7 +1415,7 @@ export async function spawnConversationSession(
   harness: RuntimeName = 'claude-code',
   plainFork = false,
 ): Promise<void> {
-  const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
+  const stateDir = join(getPanopticonHome(), 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
 
   // PAN-1596: clear any stale ready.json before launch so waitForReadySignal()
@@ -1441,6 +1442,7 @@ export async function spawnConversationSession(
     codexMode: 'tui';
     codexHome: string;
     codexSessionDir: string;
+    resumeSessionId?: string;
   } | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
@@ -1516,7 +1518,7 @@ export async function spawnConversationSession(
       //   full-access → approval_policy=never + sandbox_mode=danger-full-access
       // This is the Codex analog of preTrustDirectory(cwd) below, which only
       // pre-accepts Claude Code trust.
-      const codexHome = join(homedir(), '.panopticon', 'agents', tmuxSession, 'codex-home');
+      const codexHome = join(getPanopticonHome(), 'agents', tmuxSession, 'codex-home');
       const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
       const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
       const codexSandboxMode =
@@ -1524,18 +1526,23 @@ export async function spawnConversationSession(
         : codexPermMode === 'read-only' ? 'read-only'
         : 'workspace-write';
       const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
-      const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
+      const { initCodexHome, extractThreadIdFromRollout } = await import('../../../lib/runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
       });
+      const resumeSessionId = resume
+        ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getPanopticonHome(), 'agents') })
+          .then((rollout) => rollout ? extractThreadIdFromRollout(rollout) ?? undefined : undefined)
+        : undefined;
       codexFields = {
         harness: 'codex',
         codexMode: 'tui',
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
+        resumeSessionId,
       };
     }
   }
@@ -2126,12 +2133,23 @@ async function enrichConversationList(limit: number, offset: number): Promise<un
               // transcript scan for sessions whose hooks predate the auth fix
               // and so have no mirror state yet.
               const rt = getAgentRuntimeStateSync(conv.tmuxSession);
-              if (rt && rt.state !== 'uninitialized') {
+              if (conv.harness === 'codex' && convSf && existsSync(convSf)) {
+                try {
+                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
+                  isWorking = summary.isWorking;
+                  currentTool = summary.currentTool;
+                } catch {
+                  if (rt && rt.state !== 'uninitialized') {
+                    isWorking = rt.state === 'active';
+                    currentTool = rt.currentTool ?? null;
+                  }
+                }
+              } else if (rt && rt.state !== 'uninitialized') {
                 isWorking = rt.state === 'active';
                 currentTool = rt.currentTool ?? null;
               } else if (convSf && existsSync(convSf)) {
                 try {
-                  const summary = await summarizeConversationActivity(convSf);
+                  const summary = await summarizeConversationActivity(convSf, { harness: conv.harness });
                   isWorking = summary.isWorking;
                   currentTool = summary.currentTool;
                 } catch {
@@ -3792,7 +3810,7 @@ export async function readExistingHandoffDoc(conv: Pick<Conversation, 'handoffDo
   return readFile(conv.handoffDocPath, 'utf-8');
 }
 
-async function ensureForkSessionReady(
+export async function ensureForkSessionReady(
   conv: Conversation,
   sessionId: string,
   resume: boolean,
@@ -3822,7 +3840,7 @@ async function ensureForkSessionReady(
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
 
-async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
+export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
 
@@ -3857,6 +3875,13 @@ async function injectForkSummary(conv: Conversation, summary: string, caller: st
       console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
     }
   }
+}
+
+export function handleForkPipelineFailure(name: string, err: unknown): void {
+  console.error(`[fork-pipeline] Failed for ${name}:`, err);
+  const msg = err instanceof Error ? err.message : String(err);
+  updateForkStatus(name, 'failed', msg);
+  markConversationEnded(name);
 }
 
 export async function runForkPipeline(
@@ -3921,10 +3946,40 @@ export async function runForkPipeline(
 
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
-      return Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      try {
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      } catch (error) {
+        console.warn(
+          `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return '';
+      }
     }
-    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, parentConv.harness ?? undefined);
-    return result.summary;
+    try {
+      const result = await generateSummaryForFork(
+        parentSessionFile,
+        summaryModel,
+        includeThinkingInSummary,
+        summaryHarness,
+        parentConv.harness ?? undefined,
+      );
+      return result.summary;
+    } catch (error) {
+      if (!forkFallbackReason) {
+        forkFallbackReason = `LLM summary failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      console.warn(
+        `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        return await Effect.runPromise(generateFallbackSummary(parentSessionFile));
+      } catch (heuristicError) {
+        console.warn(
+          `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
+        );
+        return '';
+      }
+    }
   };
 
   if (forkMode === 'handoff') {
@@ -3989,9 +4044,9 @@ export async function runForkPipeline(
   }
 
   updateForkStatus(convName, 'spawning');
-  await ensureForkSessionReady(conv, sessionId, false);
+  await self.ensureForkSessionReady(conv, sessionId, false);
 
-  await injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
+  await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
@@ -4286,8 +4341,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         registerInFlightForkPipeline(
           runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
         ).catch((err) => {
-          console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
-          updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
+          handleForkPipelineFailure(newConv.name, err);
         });
 
         return jsonResponse({

@@ -8,6 +8,15 @@ by implementation agents that may run on cheaper or smaller models than the one
 that wrote the plan. Ambiguity in the spec becomes wrong guesses in the diff.
 Author every plan so it can be executed without re-research or judgment calls:
 
+- **Implementation detail belongs in the PRD — this is deliberate.** Conventional
+  PRDs stop at the *what* and *why* and leave the *how* to an engineer. Panopticon
+  PRDs are also the implementation brief: they carry the chosen approach, exact file
+  paths, and before/after code. The downstream executor is a model, not a senior
+  engineer who can fill gaps from taste and tribal knowledge — so the *how* must be
+  on the page. Specifying the implementation is required, not scope-creep. (`pan
+  plan` then mechanically lowers the PRD into a vBRIEF; the richer the PRD, the
+  less the planner has to invent.)
+
 - **Glossary first.** Define every term of art the document uses before using it.
 - **Verified references.** Exact file paths and line numbers for every claim,
   checked against the codebase at writing time — never cited from memory. Where a

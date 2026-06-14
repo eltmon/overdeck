@@ -79,17 +79,28 @@ export function applyConversationMessagesEvent(
   // events are message/tool deltas from appended JSONL bytes. Merge deltas
   // locally so the hot path does not ship the full transcript on every append.
   const isSnapshot = event.snapshot !== false;
+  // A snapshot is meant to be the authoritative full transcript, but the server
+  // can transiently emit an empty/partial snapshot (WS reconnect, session
+  // re-resolve, or a brief read failure) that would blank or truncate a
+  // populated conversation mid-view ("How can I help you?" / only-last-parts).
+  // Live Claude transcripts are append-only — compaction is recorded as
+  // boundaries, not message removal — so never let a snapshot SHRINK what we
+  // already have; merge instead, preserving history while still adopting any
+  // new records the snapshot carries.
+  const snapshotShrinks =
+    isSnapshot && event.messages.length < (previous?.messages.length ?? 0);
+  const replaceFromSnapshot = isSnapshot && !snapshotShrinks;
   return {
     ...previous,
-    messages: isSnapshot
+    messages: replaceFromSnapshot
       ? event.messages
       : mergeById(previous?.messages ?? [], event.messages),
-    workLog: isSnapshot
+    workLog: replaceFromSnapshot
       ? event.workLog
       : mergeById(previous?.workLog ?? [], event.workLog),
     streaming: event.streaming,
     proposedPlan: event.proposedPlan ?? previous?.proposedPlan,
-    compactBoundaries: isSnapshot
+    compactBoundaries: replaceFromSnapshot
       ? event.compactBoundaries
       : mergeById(previous?.compactBoundaries ?? [], event.compactBoundaries ?? []),
     contextUsage: 'contextUsage' in event ? event.contextUsage : previous?.contextUsage,

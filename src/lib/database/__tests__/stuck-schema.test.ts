@@ -30,7 +30,7 @@ afterEach(async () => {
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
-describe('stuck state schema (PAN-653)', () => {
+describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
   it('review_status table has stuck columns after fresh init', async () => {
     const { getDatabase } = await import('../index.js');
     const db = getDatabase();

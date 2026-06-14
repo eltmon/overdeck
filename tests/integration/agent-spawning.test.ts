@@ -15,7 +15,7 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { chmodSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, delimiter } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
 import {
@@ -287,6 +287,17 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     mkdirSync(testWorkspace, { recursive: true });
     process.env.PANOPTICON_HOME = testPanopticonHome;
     process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = '1';
+    // The pi harness is normally guarded by `command -v pi`. Several tests
+    // exercise the pi resume/delivery path, so provide a harmless stub binary
+    // on PATH for the duration of this test. This keeps harness resolution
+    // deterministic regardless of whether the real `pi` CLI is installed on
+    // the runner (PAN-1859).
+    const piBinDir = join(testPanopticonHome, 'bin');
+    mkdirSync(piBinDir, { recursive: true });
+    const piStub = join(piBinDir, 'pi');
+    writeFileSync(piStub, '#!/bin/sh\nexit 0\n');
+    chmodSync(piStub, 0o755);
+    process.env.PATH = `${piBinDir}${delimiter}${process.env.PATH}`;
     transcriptLandingMocks.snapshotCount = 0;
     transcriptLandingMocks.landed = false;
     transcriptLandingMocks.useLandedFlag = false;
@@ -434,7 +445,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     it('records a kickoff delivery failure and leaves kickoffDelivered false when readiness times out twice', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const tmux = await import('../../src/lib/tmux.js');
-      vi.mocked(tmux.createSession).mockImplementation(() => Effect.void);
+      let sessionCreated = false;
+      vi.mocked(tmux.createSession).mockImplementation(() => Effect.sync(() => {
+        sessionCreated = true;
+      }));
+      vi.mocked(tmux.sessionExists).mockImplementation(() => Effect.succeed(sessionCreated));
 
       try {
         const state = await spawnAgent({
@@ -456,19 +471,46 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       }
     });
 
-    it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', async () => {
+    it('fails spawn fast when the work-agent session exits before kickoff delivery', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const tmux = await import('../../src/lib/tmux.js');
+      vi.mocked(tmux.createSession).mockImplementation(() => Effect.void);
+      vi.mocked(tmux.sessionExists).mockReturnValue(Effect.succeed(false));
+
+      try {
+        await expect(spawnAgent({
+          issueId: 'PAN-KICKOFF-EXIT',
+          workspace: testWorkspace,
+          role: 'work',
+          prompt: 'do the work',
+        })).rejects.toThrow('Agent agent-pan-kickoff-exit exited before kickoff could be delivered');
+
+        const reloaded = getAgentStateSync('agent-pan-kickoff-exit');
+        expect(reloaded?.status).toBe('stopped');
+        expect(reloaded?.kickoffDelivered).toBe(false);
+        expect(reloaded?.lastFailureReason).toBe('session-exited-before-kickoff');
+        expect(tmux.sendKeys).not.toHaveBeenCalledWith('agent-pan-kickoff-exit', expect.stringContaining('do the work'));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('covers the ghost lifecycle: failed kickoff becomes stalled, then resume re-delivers kickoff', { timeout: 30_000 }, async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(new Date('2026-06-05T21:00:00.000Z'));
       const tmux = await import('../../src/lib/tmux.js');
       const workspace = join(testPanopticonHome, 'ghost-workspace');
       mkdirSync(workspace, { recursive: true });
       let createCount = 0;
+      let sessionAlive = false;
       let firstCreated!: () => void;
       let secondCreated!: () => void;
       const firstCreatedPromise = new Promise<void>((resolve) => { firstCreated = resolve; });
       const secondCreatedPromise = new Promise<void>((resolve) => { secondCreated = resolve; });
+      vi.mocked(tmux.sessionExists).mockImplementation(() => Effect.succeed(sessionAlive));
       vi.mocked(tmux.createSession).mockImplementation((agentId: string) => Effect.sync(() => {
         createCount += 1;
+        sessionAlive = true;
         if (createCount === 1) {
           firstCreated();
           return;
@@ -487,6 +529,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
           prompt: 'original ghost kickoff',
         });
         await firstCreatedPromise;
+        sessionAlive = false;
 
         writeFileSync(join(getAgentDir('agent-pan-ghost-life'), 'session.id'), 'agent-pan-ghost-life-session');
 
@@ -532,7 +575,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
     });
 
-    it('resumeAgent marks kickoff redelivered only after the redelivery lands', async () => {
+    it('resumeAgent marks kickoff redelivered only after the redelivery lands', { timeout: 30_000 }, async () => {
       vi.useFakeTimers();
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-redeliver-second';
@@ -572,6 +615,56 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
       expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining(`original kickoff for ${agentId}`));
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
+    });
+
+    it('resumeAgent delivers the continue prompt through the Pi FIFO for pi work agents', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      const agentId = 'agent-pan-resume-pi-continue';
+      writeResumableWorkAgent(agentId, true);
+      const statePath = join(getAgentDir(agentId), 'state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      state.harness = 'pi';
+      writeFileSync(statePath, JSON.stringify(state));
+      setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
+      vi.mocked(tmux.createSession).mockImplementationOnce((createdAgentId: string) => Effect.sync(() => {
+        const agentDir = getAgentDir(createdAgentId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+      }));
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      expect(piFifoMocks.writePiCommand).toHaveBeenCalledWith(
+        agentId,
+        expect.objectContaining({
+          type: 'prompt',
+          message: expect.stringContaining('Read .pan/continue.json'),
+        }),
+      );
+      expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+    });
+
+    it('resumeAgent preserves failure counters until deacon can classify rapid post-resume deaths', async () => {
+      const agentId = 'agent-pan-resume-preserve-failures';
+      writeResumableWorkAgent(agentId, true);
+      const statePath = join(getAgentDir(agentId), 'state.json');
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      state.consecutiveFailures = 2;
+      state.firstFailureInRunAt = '2026-06-13T00:00:00.000Z';
+      state.lastFailureAt = '2026-06-13T00:01:00.000Z';
+      state.lastFailureReason = 'rapid post-resume death: tmux session missing within 120s (patrol)';
+      state.lastFailureNextRetryAt = '2026-06-13T00:03:00.000Z';
+      writeFileSync(statePath, JSON.stringify(state));
+
+      const result = await resumeAgent(agentId);
+
+      expect(result).toEqual({ success: true, messageDelivered: true });
+      const reloaded = getAgentStateSync(agentId);
+      expect(reloaded?.status).toBe('running');
+      expect(reloaded?.consecutiveFailures).toBe(2);
+      expect(reloaded?.firstFailureInRunAt).toBe('2026-06-13T00:00:00.000Z');
+      expect(reloaded?.lastFailureReason).toContain('rapid post-resume death');
     });
 
     it('resumeAgent keeps --resume when session origin model and harness are unchanged', async () => {

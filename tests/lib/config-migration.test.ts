@@ -241,7 +241,7 @@ describe('config-migration', () => {
 
       // Create a Panopticon-managed symlink (target contains '.panopticon')
       const panSymlinkPath = join(tmpDir, 'pan-skill');
-      const panTarget = join(homedir(), '.panopticon', 'skills', 'pan-skill');
+      const panTarget = join(process.env.PANOPTICON_HOME ?? join(process.cwd(), '.test-migration-pan-home'), '.panopticon', 'skills', 'pan-skill');
       symlinkSync(panTarget, panSymlinkPath);
 
       // Create a non-Panopticon symlink (user-managed)

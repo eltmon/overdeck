@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { getPanopticonHome } from '../../../../../src/lib/paths.js';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
@@ -129,15 +129,15 @@ describe('fetchProjectSessionTree', () => {
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/continue.json',
-      join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
-      join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
+      join(getPanopticonHome(), 'agents', 'agent-pan-539'),
+      join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-821', isDirectory: () => true },
       { name: 'feature-pan-539', isDirectory: () => true },
     ]);
     (readFile as any).mockImplementation((p: string) => {
-      if (p === join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json')) {
+      if (p === join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json')) {
         return Promise.resolve(JSON.stringify({
           model: 'gpt-4',
           startedAt: '2026-01-01T00:00:00Z',
@@ -243,10 +243,10 @@ describe('fetchProjectSessionTree', () => {
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    const agentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-1762');
+    const agentDir = join(getPanopticonHome(), 'agents', 'agent-pan-1762');
     mockAccess(new Set([agentDir]));
     (readdir as any).mockImplementation((p: string) => {
-      if (p === join(homedir(), '.panopticon', 'agents')) {
+      if (p === join(getPanopticonHome(), 'agents')) {
         return Promise.resolve([]);
       }
       const err = new Error('ENOENT');
@@ -298,7 +298,7 @@ describe('fetchProjectSessionTree', () => {
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    const agentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-1762');
+    const agentDir = join(getPanopticonHome(), 'agents', 'agent-pan-1762');
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       agentDir,
@@ -316,7 +316,7 @@ describe('fetchProjectSessionTree', () => {
       if (p === '/tmp/panopticon-cli/workspaces') {
         return Promise.resolve([{ name: 'feature-pan-1762', isDirectory: () => true }]);
       }
-      if (p === join(homedir(), '.panopticon', 'agents')) {
+      if (p === join(getPanopticonHome(), 'agents')) {
         return Promise.resolve([]);
       }
       return Promise.resolve([]);
@@ -378,14 +378,14 @@ describe('fetchProjectSessionTree', () => {
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan',
       '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan/continue.json',
-      join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
-      join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
+      join(getPanopticonHome(), 'agents', 'agent-pan-539'),
+      join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-539', isDirectory: () => true },
     ]);
     (readFile as any).mockImplementation((p: string) => {
-      if (p === join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json')) {
+      if (p === join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json')) {
         return Promise.resolve(JSON.stringify({
           model: 'gpt-4',
           startedAt: '2026-01-01T00:00:00Z',
@@ -420,14 +420,14 @@ describe('fetchProjectSessionTree', () => {
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan',
       '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan/continue.json',
-      join(homedir(), '.panopticon', 'agents', 'strike-pan-539'),
-      join(homedir(), '.panopticon', 'agents', 'strike-pan-539', 'state.json'),
+      join(getPanopticonHome(), 'agents', 'strike-pan-539'),
+      join(getPanopticonHome(), 'agents', 'strike-pan-539', 'state.json'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-539', isDirectory: () => true },
     ]);
     (readFile as any).mockImplementation((p: string) => {
-      if (p === join(homedir(), '.panopticon', 'agents', 'strike-pan-539', 'state.json')) {
+      if (p === join(getPanopticonHome(), 'agents', 'strike-pan-539', 'state.json')) {
         return Promise.resolve(JSON.stringify({
           model: 'gpt-4',
           startedAt: '2026-01-01T00:00:00Z',
@@ -462,7 +462,7 @@ describe('fetchProjectSessionTree', () => {
     (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'completed' }));
     const startedAt = '2026-01-01T00:00:00Z';
     const endedAt = '2026-01-01T01:30:00Z';
-    const slotAgentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-539-1');
+    const slotAgentDir = join(getPanopticonHome(), 'agents', 'agent-pan-539-1');
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-539/.pan',
@@ -474,7 +474,7 @@ describe('fetchProjectSessionTree', () => {
       if (p === '/tmp/panopticon-cli/workspaces') {
         return Promise.resolve([{ name: 'feature-pan-539', isDirectory: () => true }]);
       }
-      if (p === join(homedir(), '.panopticon', 'agents')) {
+      if (p === join(getPanopticonHome(), 'agents')) {
         return Promise.resolve([{ name: 'agent-pan-539-1', isDirectory: () => true }]);
       }
       return Promise.resolve([]);
@@ -521,7 +521,7 @@ describe('fetchProjectSessionTree', () => {
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    const agentDir = join(homedir(), '.panopticon', 'agents', 'agent-pan-1762');
+    const agentDir = join(getPanopticonHome(), 'agents', 'agent-pan-1762');
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       agentDir,
@@ -530,7 +530,7 @@ describe('fetchProjectSessionTree', () => {
       if (p === '/tmp/panopticon-cli/workspaces') {
         return Promise.resolve([{ name: 'feature-pan-1762', isDirectory: () => true }]);
       }
-      if (p === join(homedir(), '.panopticon', 'agents')) {
+      if (p === join(getPanopticonHome(), 'agents')) {
         return Promise.resolve([]);
       }
       return Promise.resolve([]);

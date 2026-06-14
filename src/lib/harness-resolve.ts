@@ -85,18 +85,38 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
       throw new HarnessResolutionError(decision.reason ?? `Harness ${winner} is not allowed for ${input.model}`);
     }
 
+    // PAN-1871 — only fall back to claude-code when it is the model's NATIVE
+    // harness (Anthropic). For CLIProxy-routed models (kimi, gpt-5.5, …) the
+    // provider default is pi/codex; claude-code would route them through
+    // CLIProxy and hit the 200k-window-illusion deadlock. Silently degrading
+    // there is worse than failing, so refuse it loudly.
+    if (builtInHarness && builtInHarness !== 'claude-code') {
+      throw new HarnessResolutionError(
+        `Harness ${winner} denied for ${input.model} (${decision.reason ?? 'policy denied'}); ${input.model} is not native to claude-code (provider default is ${builtInHarness}), so refusing to silently fall back to claude-code/CLIProxy. Resolve ${winner} availability/auth and retry.`,
+      );
+    }
+
     const fallbackDecision = canUseHarnessSync('claude-code', input.model, authMode);
     if (!fallbackDecision.allowed) {
       throw new HarnessResolutionError(decision.reason ?? fallbackDecision.reason ?? `Harness ${winner} is not allowed for ${input.model}`);
     }
 
-    console.warn(`harness ${winner} denied for ${provider}: ${decision.reason ?? 'policy denied'} — falling back to claude-code`);
+    console.warn(`harness ${winner} denied for ${provider}: ${decision.reason ?? 'policy denied'} — falling back to native claude-code`);
     return 'claude-code';
   }
 
   if (!(await hasHarnessBinary(winner))) {
     const binary = BINARY_BY_HARNESS[winner];
-    console.warn(`harness ${winner} requested for ${provider}, but ${binary} is not installed — falling back to claude-code`);
+    // PAN-1871 — never silently fall back to claude-code from (a) an
+    // explicitly-requested harness, or (b) a non-native (CLIProxy) model whose
+    // own binary is missing at spawn. Silently routing kimi onto claude-code is
+    // what leaked PAN-1845. Fail loudly so the cause is visible and recoverable.
+    if (winnerIsExplicit || (builtInHarness && builtInHarness !== 'claude-code')) {
+      throw new HarnessResolutionError(
+        `Harness ${winner} (${winnerIsExplicit ? 'explicitly requested' : `provider default for ${input.model}`}) has no installed ${binary} binary at spawn — refusing to silently fall back to claude-code. Install ${binary} (check its PATH) and retry.`,
+      );
+    }
+    console.warn(`harness ${winner} requested for ${provider}, but ${binary} is not installed — falling back to native claude-code`);
     return 'claude-code';
   }
 

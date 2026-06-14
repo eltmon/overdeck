@@ -205,13 +205,15 @@ export function ConversationPanel({
     queryFn: async ({ signal }) => {
       const fetched = await fetchMessages(conversation.name, signal);
       // If the WS subscription became active while this HTTP request was in
-      // flight, the subscription (not this older HTTP response) is the
-      // authoritative cache writer for live Claude conversations. Return the
-      // existing cache value instead so newer streamed state is never
-      // overwritten by stale HTTP data.
+      // flight, prefer the streamed cache ONLY when it is at least as complete
+      // as this HTTP backfill. When the WS snapshot has not arrived yet (or was
+      // partial), this HTTP response is the authoritative full history — use it
+      // rather than returning empty/truncated state. (PAN-1642 regression: the
+      // old `cached ?? empty` rendered "How can I help you?" / only-last-parts
+      // whenever the snapshot lost the race, worsening under load.)
       if (streamActiveRef.current) {
         const cached = queryClient.getQueryData<MessagesResponse>(messagesQueryKey);
-        return cached ?? { messages: [], workLog: [], streaming: false };
+        if (cached && cached.messages.length >= fetched.messages.length) return cached;
       }
       return fetched;
     },
@@ -652,6 +654,17 @@ export function ConversationPanel({
                 <span>About</span>
               </button>
 
+              <button
+                className={`${styles.conversationAboutToggle} ${hideToolCalls ? styles.conversationAboutToggleActive : ''}`}
+                onClick={toggleHideToolCalls}
+                title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+                aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+                aria-pressed={hideToolCalls}
+              >
+                <Wrench size={14} />
+                <span>Tools</span>
+              </button>
+
               {/* Copy link */}
               <button
                 className={styles.copyLinkButton}
@@ -697,16 +710,6 @@ export function ConversationPanel({
                           ? <Loader2 size={14} className={styles.spinnerIcon} />
                           : <Sparkles size={14} />}
                         Regenerate title
-                      </button>
-
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${hideToolCalls ? styles.headerMenuItemActive : ''}`}
-                        onClick={() => { toggleHideToolCalls(); setMenuOpen(false); }}
-                      >
-                        <Wrench size={14} />
-                        Hide tool calls
-                        {hideToolCalls && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
                       </button>
 
                       {conversation.harness === 'claude-code' && (

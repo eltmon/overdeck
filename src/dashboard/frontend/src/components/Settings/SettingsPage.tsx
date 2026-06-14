@@ -219,6 +219,15 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
+interface CloisterConfig {
+  concurrency?: {
+    max_work_agents?: number;
+    reserved_advancing_slots?: number;
+    exempt_operator_started?: boolean;
+  };
+  [key: string]: unknown;
+}
+
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   // PAN-1048 review feedback 004 (C4): WorkhorsePanel and RolesPanel save
   // workhorses + roles via their own PUTs. SettingsPage's parent formData is
@@ -299,6 +308,26 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
     throw new Error(error || 'Failed to save settings');
   }
   return res.json();
+}
+
+async function fetchCloisterConfig(): Promise<CloisterConfig> {
+  const res = await fetch('/api/cloister/config', { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to fetch Cloister config');
+  return res.json();
+}
+
+async function saveCloisterConfig(config: CloisterConfig): Promise<void> {
+  await ensureDashboardSession();
+  const res = await fetch('/api/cloister/config', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error ?? `Failed to save Cloister config (${res.status})`);
+  }
 }
 
 interface VoiceSettings {
@@ -532,6 +561,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+  { id: 'cloister', label: 'Cloister', icon: Flag },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'memory', label: 'Memory', icon: Brain },
@@ -564,6 +594,13 @@ export function SettingsPage() {
     queryFn: fetchConversationSearchStatus,
     refetchInterval: 30_000,
   });
+  const {
+    data: cloisterConfig,
+    error: cloisterConfigError,
+  } = useQuery({
+    queryKey: ['cloister-config'],
+    queryFn: fetchCloisterConfig,
+  });
   // Last-24h spend per background-AI source, for the Background AI section (PAN-1589).
   const { data: backgroundCost } = useQuery({
     queryKey: ['costs-background'],
@@ -590,6 +627,7 @@ export function SettingsPage() {
   });
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
+  const [cloisterFormData, setCloisterFormData] = useState<CloisterConfig | null>(null);
   const [voiceFormData, setVoiceFormData] = useState<VoiceSettings | null>(null);
   const [voiceHardwareSettings, setVoiceHardwareSettings] = useState<VoiceHardwareSettings>(loadVoiceHardwareSettings);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -622,6 +660,7 @@ export function SettingsPage() {
   const pendingSaveRef = useRef<AutosavePayload | null>(null);
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cloisterSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveOkRef = useRef(true);
   const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -817,6 +856,12 @@ export function SettingsPage() {
       }
     }
   }, [settings, formData]);
+
+  useEffect(() => {
+    if (cloisterConfig && !cloisterFormData) {
+      setCloisterFormData(cloisterConfig);
+    }
+  }, [cloisterConfig, cloisterFormData]);
 
   useEffect(() => {
     if (voiceSettings && !voiceFormData) {
@@ -1326,6 +1371,49 @@ export function SettingsPage() {
     value: string,
   ) => {
     updateMemorySettings({ [key]: value === '' ? undefined : Number(value) }, { debounce: true });
+  };
+
+  const saveCloisterSnapshot = async (snapshot: CloisterConfig) => {
+    setSaveStatus('saving');
+    try {
+      await saveCloisterConfig(snapshot);
+      lastSaveOkRef.current = true;
+      queryClient.setQueryData(['cloister-config'], snapshot);
+      queryClient.invalidateQueries({ queryKey: ['cloister-config'] });
+      setSaveStatus('saved');
+      if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
+      savedStatusResetRef.current = setTimeout(() => {
+        savedStatusResetRef.current = null;
+        setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
+      }, 2500);
+    } catch (error) {
+      lastSaveOkRef.current = false;
+      setSaveStatus('error');
+      toast.error(`Failed to save Cloister settings: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const updateCloisterConcurrency = (
+    key: 'max_work_agents' | 'reserved_advancing_slots',
+    rawValue: string,
+  ) => {
+    if (!cloisterFormData) return;
+    const next: CloisterConfig = {
+      ...cloisterFormData,
+      concurrency: {
+        ...cloisterFormData.concurrency,
+        [key]: rawValue === '' ? undefined : Number(rawValue),
+      },
+    };
+    setCloisterFormData(next);
+    if (cloisterSaveDebounceRef.current) {
+      clearTimeout(cloisterSaveDebounceRef.current);
+      cloisterSaveDebounceRef.current = null;
+    }
+    cloisterSaveDebounceRef.current = setTimeout(() => {
+      cloisterSaveDebounceRef.current = null;
+      void saveCloisterSnapshot(next);
+    }, AUTOSAVE_DEBOUNCE_MS);
   };
 
   // Background AI toggles persist immediately (one-click low-cost mode).
@@ -2117,6 +2205,60 @@ export function SettingsPage() {
             })}
           </div>
         </div>
+      </section>
+
+      {/* Cloister */}
+      <section id="cloister" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Flag className="w-4 h-4 text-muted-foreground" />
+          Cloister
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Deacon dispatch limits for automatically resumed work agents and review, test, and ship specialists.
+        </p>
+        {cloisterConfigError ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+            Failed to load Cloister settings: {cloisterConfigError instanceof Error ? cloisterConfigError.message : String(cloisterConfigError)}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Max work agents</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Running work-agent ceiling used by auto-resume before the deacon defers more work.
+                </p>
+              </div>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                disabled={!cloisterFormData}
+                value={cloisterFormData?.concurrency?.max_work_agents ?? 6}
+                onChange={(e) => updateCloisterConcurrency('max_work_agents', e.target.value)}
+                className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Reserved advancing slots</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Extra slots above the work cap reserved for review, test, and ship dispatch.
+                </p>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                disabled={!cloisterFormData}
+                value={cloisterFormData?.concurrency?.reserved_advancing_slots ?? 3}
+                onChange={(e) => updateCloisterConcurrency('reserved_advancing_slots', e.target.value)}
+                className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Voice */}

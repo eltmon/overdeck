@@ -28,7 +28,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { getAgentRuntimeState } from '../../../lib/agents.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, getPanopticonHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 
 export interface ResolveJsonlPathOptions {
@@ -117,7 +117,7 @@ export async function resolveClaudeSessionId(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
 
   // 1. session.id — single UUID written by auto-suspend. Authoritative when
@@ -155,7 +155,7 @@ export async function resolveAgentHarness(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
   const stateRaw = await readOptional(join(agentsRoot, agentId, 'state.json'));
   if (!stateRaw) return null;
   try {
@@ -179,7 +179,7 @@ export async function resolveCodexRolloutPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
   const codexHome = join(agentDir, 'codex-home');
   if (!(await pathExists(codexHome))) return null;

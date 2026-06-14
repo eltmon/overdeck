@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // default 5s timeout even though each assertion path is fast once loaded.
 vi.setConfig({ testTimeout: 20_000 });
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 let panopticonHome: string;
@@ -78,7 +78,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
 }));
 
 function conversationDir(session: string): string {
-  return join(homedir(), '.panopticon', 'conversations', session);
+  return join(panopticonHome, 'conversations', session);
 }
 
 function launcherFor(session: string): string {
@@ -87,7 +87,6 @@ function launcherFor(session: string): string {
 
 function cleanupSession(session: string): void {
   rmSync(conversationDir(session), { recursive: true, force: true });
-  rmSync(join(homedir(), '.panopticon', 'agents', session), { recursive: true, force: true });
   rmSync(join(panopticonHome, 'agents', session), { recursive: true, force: true });
   rmSync(join(panopticonHome, 'sockets', `pty-${session}.sock`), { force: true });
 }
@@ -153,12 +152,39 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-codex-supervisor-test');
     expect(launcher).toContain("export PANOPTICON_AGENT_ID='conv-codex-supervisor-test'");
-    expect(launcher).toContain(`export CODEX_HOME='${join(homedir(), '.panopticon', 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
+    expect(launcher).toContain(`export CODEX_HOME='${join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' codex");
     expect(existsSync(join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(true);
     expect((statSync(join(panopticonHome, 'sockets', 'pty-conv-codex-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
+  });
+
+  it('resumes Codex TUI conversations with the persisted thread id', async () => {
+    createSupervisorSocket = true;
+    const session = 'conv-codex-resume-supervisor-test';
+    const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
+    const agentDir = join(panopticonHome, 'agents', session);
+    const dayDir = join(agentDir, 'codex-home', 'sessions', '2026', '06', '14');
+    mkdirSync(dayDir, { recursive: true });
+    writeFileSync(join(dayDir, `rollout-2026-06-14T10-00-00-${threadId}.jsonl`), '{"type":"session_meta"}\n');
+
+    const { spawnConversationSession } = await import('../conversations.js');
+
+    await spawnConversationSession(
+      session,
+      tmpdir(),
+      'ignored-claude-session-id',
+      'gpt-5.5',
+      undefined,
+      'PAN-1405',
+      true,
+      'codex',
+    );
+
+    const launcher = launcherFor(session);
+    expect(launcher).toContain(`/dist/pty-supervisor.js' codex resume -c project_doc_max_bytes=0 '${threadId}'`);
+    expect(launcher).not.toContain('codex exec resume');
   });
 
   it('keeps plain forks off Channels MCP while routing them through the supervisor', async () => {

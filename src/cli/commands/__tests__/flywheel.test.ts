@@ -112,6 +112,7 @@ import {
   flywheelPauseCommand,
   flywheelReportCommand,
   flywheelResumeCommand,
+  flywheelStopCommand,
   formatFlywheelStateReport,
   flywheelStartCommand,
   flywheelStatsCommand,
@@ -755,6 +756,7 @@ describe('flywheel CLI commands', () => {
     const pause = flywheel?.commands.find(command => command.name() === 'pause');
     const resume = flywheel?.commands.find(command => command.name() === 'resume');
     const report = flywheel?.commands.find(command => command.name() === 'report');
+    const stop = flywheel?.commands.find(command => command.name() === 'stop');
     const abort = flywheel?.commands.find(command => command.name() === 'abort');
     expect(start?.options.map(option => option.long)).toContain('--brief');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
@@ -764,6 +766,32 @@ describe('flywheel CLI commands', () => {
     expect(pause).toBeDefined();
     expect(resume).toBeDefined();
     expect(report).toBeDefined();
+    expect(stop).toBeDefined();
     expect(abort).toBeDefined();
+  });
+
+  it('stops a live orchestrator session even when paused and writes the report', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = true;
+    flywheelLifecycleMocks.sessionExists = true;
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelStopCommand();
+
+    expect(flywheelLifecycleMocks.stoppedAgents).toContain('flywheel-orchestrator');
+    const runReport = await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'report.md'), 'utf8');
+    expect(runReport).toContain('# Flywheel Run 1 Report');
+    expect(flywheelLifecycleMocks.activeRunId).toBeNull();
+    expect(flywheelLifecycleMocks.paused).toBe(false);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('treats stop with nothing active as an idempotent notice', async () => {
+    await flywheelStopCommand();
+
+    expect(flywheelLifecycleMocks.stoppedAgents).toEqual([]);
+    expect(logSpy).toHaveBeenCalledWith('No flywheel run is active and nothing is left to report.');
+    expect(process.exitCode).toBeUndefined();
   });
 });

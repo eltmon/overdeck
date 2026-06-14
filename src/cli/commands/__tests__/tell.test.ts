@@ -9,11 +9,13 @@ const remoteMocks = vi.hoisted(() => ({
   sendToRemoteAgent: vi.fn(async () => {}),
 }));
 
-// Keep a focused normalizeAgentId implementation for the PAN-1749 regression:
-// singleton IDs and known prefixes must not get a naive `agent-` prefix.
+// Keep a focused resolver implementation for the PAN-1749/PAN-1820 regressions:
+// singleton IDs and known prefixes must not get a naive `agent-` prefix, and
+// issue IDs can resolve to non-work agents when that is the registered run.
 vi.mock('../../../lib/agents.js', () => ({
-  normalizeAgentId: (id: string) => {
+  resolveAgentTargetSync: (id: string) => {
     const lower = id.toLowerCase();
+    if (lower === 'pan-1820') return 'strike-pan-1820';
     if (
       lower === 'flywheel-orchestrator' ||
       lower.startsWith('agent-') ||
@@ -54,6 +56,12 @@ describe('tellCommand agent ID resolution (PAN-1749)', () => {
     const { tellCommand } = await import('../tell.js');
     await tellCommand('PAN-123', 'hello');
     expect(agentMocks.messageAgent).toHaveBeenCalledWith('agent-pan-123', 'hello', 'pan-tell');
+  });
+
+  it('can resolve an issue ID to its registered strike agent', async () => {
+    const { tellCommand } = await import('../tell.js');
+    await tellCommand('PAN-1820', 'hello strike');
+    expect(agentMocks.messageAgent).toHaveBeenCalledWith('strike-pan-1820', 'hello strike', 'pan-tell');
   });
 
   it('preserves known agent prefixes like planning-', async () => {

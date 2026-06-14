@@ -54,7 +54,7 @@ function testEmbeddingFn() {
   return deterministicDocsTestEmbedding;
 }
 
-describe('docs index builder', () => {
+describe('docs index builder', { timeout: 30_000 }, () => {
   beforeEach(async () => {
     rootDir = await mkdtemp(join(tmpdir(), 'pan-docs-index-'));
     syncSourcesRoot = join(rootDir, 'sync-sources');

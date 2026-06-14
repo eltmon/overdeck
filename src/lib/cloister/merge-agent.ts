@@ -28,6 +28,19 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
   '.claude/skills/',
 ];
 
+const SYNC_MAIN_MAIN_PREFERRED_PATHS = [
+  '.pan/continues',
+  '.pan/specs',
+  '.beads',
+];
+
+export function isSyncMainMainPreferredPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  return SYNC_MAIN_MAIN_PREFERRED_PATHS.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
+  );
+}
+
 function isAutoCommitExcludedPath(relativePath: string): boolean {
   const normalized = relativePath.replace(/\\/g, '/');
   for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
@@ -823,6 +836,54 @@ async function getConflictFiles(projectPath: string): Promise<string[]> {
   }
 }
 
+async function resolveMainPreferredSyncConflicts(
+  projectPath: string,
+  conflictFiles: string[],
+): Promise<{ success: boolean; reason?: string }> {
+  if (conflictFiles.length === 0 || !conflictFiles.every(isSyncMainMainPreferredPath)) {
+    return { success: false, reason: 'conflicts include non-pipeline-owned files' };
+  }
+
+  try {
+    for (const path of SYNC_MAIN_MAIN_PREFERRED_PATHS) {
+      await execAsync(`git rm -r --quiet --ignore-unmatch -- ${path}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      await execAsync(`git checkout origin/main -- ${path}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      }).catch(() => {
+        // The path may not exist on origin/main. In that case, the preceding
+        // git rm records main's deletion for this pipeline-owned path.
+      });
+      await execAsync(`git add -A -- ${path}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+    }
+
+    const remainingConflicts = await getConflictFiles(projectPath);
+    if (remainingConflicts.length > 0) {
+      return {
+        success: false,
+        reason: `Unresolved conflicts remain: ${remainingConflicts.join(', ')}`,
+      };
+    }
+
+    await execAsync('git commit --no-edit', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      reason: `Failed to auto-resolve pipeline-owned conflicts: ${error.message}`,
+    };
+  }
+}
+
 /**
  * Log merge to history
  */
@@ -1238,6 +1299,31 @@ export async function syncMainIntoWorkspace(
   // delegating to an LLM ship role. Abort the merge so the working tree is
   // clean, then return the conflict files for the caller to display.
   const conflictFiles = await getConflictFiles(projectPath);
+  const mainPreferredResolution = await resolveMainPreferredSyncConflicts(projectPath, conflictFiles);
+  if (mainPreferredResolution.success) {
+    console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
+    logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
+
+    let changedFiles: string[] = [];
+    let commitCount = 0;
+    try {
+      const { stdout: diffFiles } = await execAsync(
+        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
+    } catch { /* non-fatal */ }
+    try {
+      const { stdout: logOut } = await execAsync(
+        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
+    } catch { /* non-fatal */ }
+
+    return { success: true, commitCount, changedFiles };
+  }
+
   console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
   logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
 

@@ -970,6 +970,21 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).not.toMatch(/codex exec/);
   });
 
+  it('codex conversation (tui) resume uses interactive codex resume', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'tui',
+      spawnMode: 'conversation',
+      resumeSessionId: '019eaaec-4dfa-7ab1-90ba-9104d16534d1',
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+    expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' codex resume -c project_doc_max_bytes=0 '019eaaec-4dfa-7ab1-90ba-9104d16534d1'$/m);
+    expect(script).not.toMatch(/codex exec/);
+  });
+
   it('codex exec mode stays off the PTY supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,

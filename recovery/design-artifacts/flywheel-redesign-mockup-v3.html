@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Flywheel redesign — v3</title>
+<style>
+  :root{
+    --bg:#0a0e13;--panel:#10151c;--panel2:#141b24;--line:#1e2731;--line2:#28323e;
+    --text:#cdd9e5;--muted:#7d8997;--faint:#566270;
+    --teal:#2dd4bf;--blue:#4a9eff;--green:#3fb950;--amber:#d6a429;--red:#f0625a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:ui-monospace,Menlo,monospace}
+  .wrap{max-width:1320px;margin:0 auto;padding:20px 22px 60px}
+  h1.top{font-size:18px;margin:0 0 4px;font-weight:650}
+  p.sub{margin:0 0 14px;color:var(--muted);max-width:920px}
+  .changes{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:16px}
+  .changes b{color:var(--teal)}
+  .app{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+
+  /* flywheel header */
+  .bar{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#131a23,#10151c);flex-wrap:wrap}
+  .bar .title{font-weight:650;font-size:14px;display:flex;align-items:center;gap:8px}
+  .runpill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--green);border:1px solid rgba(63,185,80,.4);background:rgba(63,185,80,.08);border-radius:20px;padding:2px 9px}
+  .dotg{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .fbtn{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text);border:1px solid var(--line2);background:#121922;border-radius:7px;padding:4px 9px}
+  .bar .spacer{flex:1}
+  .switches{display:flex;gap:12px;align-items:center}
+  .sw{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+  .sw .knob{width:28px;height:16px;border-radius:20px;background:#222c37;border:1px solid var(--line2);position:relative}
+  .sw.on .knob{background:rgba(45,212,191,.18);border-color:var(--teal)}
+  .sw .knob::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#8794a2}
+  .sw.on .knob::after{left:14px;background:var(--teal)}
+  .stat{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+  .stat .v{font-weight:700;font-size:13px}.stat .k{font-size:9px;color:var(--faint);text-transform:uppercase}
+
+  .body{display:grid;grid-template-columns:330px 1fr;min-height:500px}
+  @media(max-width:960px){.body{grid-template-columns:1fr}}
+  .rail{border-right:1px solid var(--line);background:var(--panel2);overflow:auto}
+
+  .card{border-bottom:1px solid var(--line)}
+  .card > .chead{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;cursor:pointer}
+  .card > .chead:hover{background:#11171f}
+  .chead .lbl{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.4px}
+  .chead .count{font-size:10px;color:var(--muted);font-weight:600}
+  .chead .chev{color:var(--faint)}
+  .card.collapsed .cbody{display:none}.card.collapsed .chev{transform:rotate(-90deg)}
+  .cbody{padding:4px 12px 11px}
+
+  /* merge policy row: real Auto/Hold segmented toggle */
+  .prow{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:12px;border-top:1px solid var(--line)}
+  .prow:first-child{border-top:0}
+  .prow .id{color:var(--blue);font-family:ui-monospace,monospace;font-size:11px;width:70px;flex:0 0 auto}
+  .prow .t{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden;flex:0 0 auto}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--muted);font:600 10px/1 inherit;padding:4px 7px;cursor:pointer;display:flex;align-items:center;gap:3px}
+  .seg button+button{border-left:1px solid var(--line2)}
+  .seg button.on.auto{color:var(--teal);background:rgba(45,212,191,.12)}
+  .seg button.on.hold{color:var(--amber);background:rgba(214,164,41,.12)}
+
+  /* merge queue with grouped UAT candidate (no duplicate list) */
+  .uatgroup{border:1px solid rgba(45,212,191,.35);background:rgba(45,212,191,.04);border-radius:8px;padding:6px 8px;margin:6px 0}
+  .uathead{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;margin-bottom:3px}
+  .uathead .nm{color:var(--teal);font-weight:700}
+  .uathead .br{font-family:ui-monospace,monospace;color:var(--muted);font-size:10.5px}
+  .uathead .ct{color:var(--faint);font-size:10px}
+  .member{display:flex;align-items:center;gap:7px;font-size:11.5px;padding:3px 0 3px 12px;border-left:2px solid rgba(45,212,191,.3);margin-left:2px}
+  .member .id{color:var(--blue);font-family:ui-monospace,monospace;font-size:11px}
+  .member .pr{color:var(--faint);font-size:10.5px}
+  .qserial{display:flex;align-items:center;gap:7px;font-size:11.5px;padding:5px 2px;border-top:1px solid var(--line)}
+  .qserial .id{color:var(--blue);font-family:ui-monospace,monospace;font-size:11px;width:70px}
+  .qserial .t{flex:1;color:var(--muted)}
+  .chip.serial{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;color:var(--amber);background:rgba(214,164,41,.1)}
+  .mergeN{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted)}
+  .stepper{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+  .stepper b{padding:0 9px;display:inline-flex;align-items:center;font-weight:700}
+  .stepper span{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;background:#121922;cursor:pointer}
+  .mbtn{margin-left:auto;background:var(--teal);color:#062;border:0;border-radius:6px;padding:4px 10px;font-weight:700;font-size:11px;cursor:pointer}
+
+  /* conversation column */
+  .conv{display:flex;flex-direction:column;min-width:0}
+  .convbar{border-bottom:1px solid var(--line);background:#0e131a;padding:7px 10px;display:flex;flex-direction:column;gap:7px}
+  .crow1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ctabs{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+  .ctabs span{padding:5px 11px;font-size:11.5px;color:var(--muted);cursor:pointer}
+  .ctabs span.on{background:#11171f;color:var(--text)}
+  .meta{font-size:11px;color:var(--faint)}
+  .meta b{color:var(--muted);font-weight:600}
+  .crow1 .spacer{flex:1}
+  .acts{display:flex;align-items:center;gap:6px}
+  .ab{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text);border:1px solid var(--line2);background:#121922;border-radius:7px;padding:4px 9px;cursor:pointer}
+  .ab.primary{color:var(--amber);border-color:rgba(214,164,41,.4)}
+  .ab.danger{color:var(--red);border-color:rgba(240,98,90,.4)}
+  .more{position:relative}
+  .moremenu{position:absolute;top:28px;right:0;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:4px;width:160px;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .moremenu div{padding:6px 9px;font-size:11.5px;color:var(--muted);border-radius:5px}
+  .moremenu div:hover{background:#11171f;color:var(--text)}
+
+  .chat{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--panel)}
+  .bub{max-width:78%;border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.5}
+  .bub.fly{align-self:flex-start;background:#0e141c;border:1px solid var(--line)}
+  .bub.you{align-self:flex-end;background:rgba(74,158,255,.12);border:1px solid rgba(74,158,255,.35)}
+  .bub .who{font-size:10px;font-weight:700;margin-bottom:4px;text-transform:lowercase;color:var(--teal)}
+  .bub.you .who{color:var(--blue)}
+  .bub a{color:var(--blue);text-decoration:none}.bub ul{margin:6px 0 0;padding-left:16px;color:var(--muted)}
+  .composer{border-top:1px solid var(--line);padding:10px 12px;background:#0e131a}
+  .cbox{display:flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:9px;background:#121922;padding:7px 10px}
+  .cbox input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:inherit}
+  .cbox input::placeholder{color:var(--faint)}
+  .send{background:var(--blue);color:#04263a;border:0;border-radius:7px;width:26px;height:26px;font-weight:800;cursor:pointer}
+  .addctx{margin-top:8px;font-size:11px;color:var(--faint)}
+  .rolechip{font-size:10px;padding:1px 7px;border-radius:5px;border:1px solid var(--line2);color:var(--muted);margin-left:5px}
+
+  .callout{margin-top:10px;font-size:12px;color:var(--muted)}.callout .arrow{color:var(--teal);font-weight:700}
+  .naming{margin-top:20px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--panel2)}
+  .naming h3{margin:0 0 8px;font-size:13px}
+  .naming table{width:100%;border-collapse:collapse;font-size:12px}
+  .naming td{padding:5px 8px;border-top:1px solid var(--line);vertical-align:top}
+  .naming td.opt{font-family:ui-monospace,monospace;color:var(--teal);width:230px}
+  .naming .pick{color:var(--green);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="top">Flywheel redesign · v3</h1>
+  <p class="sub">Addressing your notes: the full run-control set, Auto/Hold as a real toggle, the UAT bundle shown once (grouped under its candidate), and a naming proposal.</p>
+  <div class="changes">
+    <span><b>1</b> all run controls placed</span><span><b>2</b> Auto/Hold = real toggle</span><span><b>3</b> UAT bundle listed once</span><span><b>4</b> candidate naming ↓</span>
+  </div>
+
+  <div class="app">
+    <div class="bar">
+      <span class="title">⚙️ Fix-All Flywheel <span class="runpill"><span class="dotg"></span>running</span></span>
+      <span class="fbtn">⏸ Pause flywheel</span>
+      <span class="spacer"></span>
+      <div class="switches">
+        <span class="sw on"><span class="knob"></span>Auto-pickup</span>
+        <span class="sw on"><span class="knob"></span>Require UAT</span>
+        <span class="sw"><span class="knob"></span>Merge train</span>
+      </div>
+      <div style="display:flex;gap:14px;margin-left:6px">
+        <div class="stat"><span class="v">5</span><span class="k">agents</span></div>
+        <div class="stat"><span class="v">11</span><span class="k">in&nbsp;flight</span></div>
+        <div class="stat"><span class="v">$0.27</span><span class="k">spend</span></div>
+      </div>
+    </div>
+
+    <div class="body">
+      <div class="rail">
+        <div class="card">
+          <div class="chead"><span class="lbl">⚡ Merge policy <span class="count">3 auto · 2 hold</span></span><span class="chev">▾</span></div>
+          <div class="cbody">
+            <div class="prow"><span class="id">PAN-1685</span><span class="t">guard image attachments</span>
+              <span class="seg"><button class="on auto">⚡Auto</button><button>🔒Hold</button></span></div>
+            <div class="prow"><span class="id">PAN-1520</span><span class="t">terminal theme</span>
+              <span class="seg"><button>⚡Auto</button><button class="on hold">🔒Hold</button></span></div>
+            <div class="prow"><span class="id">PAN-1455</span><span class="t">codex auth dist fix</span>
+              <span class="seg"><button class="on auto">⚡Auto</button><button>🔒Hold</button></span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="chead"><span class="lbl">⛙ Merge queue <span class="count">3 ready</span></span><span class="chev">▾</span></div>
+          <div class="cbody">
+            <!-- ONE list: the bundle is the candidate's members, grouped -->
+            <div class="uatgroup">
+              <div class="uathead"><span class="nm">⚡ UAT candidate</span><span class="br">uat/pan-otter-0609</span><span class="ct">2 batch-safe</span></div>
+              <div class="member"><span class="id">PAN-1685</span><span class="pr">#1690</span></div>
+              <div class="member"><span class="id">PAN-1455</span><span class="pr">#1672</span></div>
+            </div>
+            <div class="qserial"><span class="id">PAN-1520</span><span class="t">#1655 · conflicts with a queued change</span><span class="chip serial">serial</span></div>
+            <div class="mergeN">Merge next
+              <span class="stepper"><span>−</span><b>2</b><span>+</span></span> of the candidate
+              <button class="mbtn">Ship batch</button>
+            </div>
+          </div>
+        </div>
+        <div class="card collapsed"><div class="chead"><span class="lbl">◷ Pending auto-merges <span class="count">1</span></span><span class="chev">▾</span></div><div class="cbody"></div></div>
+        <div class="card collapsed"><div class="chead"><span class="lbl">💡 Suggestions <span class="count">4</span></span><span class="chev">▾</span></div><div class="cbody"></div></div>
+      </div>
+
+      <div class="conv">
+        <!-- full run control set -->
+        <div class="convbar">
+          <div class="crow1">
+            <span class="ctabs"><span class="on">Conversation</span><span>Terminal</span></span>
+            <span class="meta"><b>RUN-16</b> · opus-4-8 · xhigh · ctx&nbsp;99%</span>
+            <span class="spacer"></span>
+            <div class="acts">
+              <button class="ab primary">⏸ Pause</button>
+              <button class="ab">↻ Resume</button>
+              <div class="more">
+                <button class="ab">⋯ More ▾</button>
+                <div class="moremenu">
+                  <div>＋ New Run</div><div>📄 Write Report</div><div>🔗 Open Run Report</div><div>⤢ Pop out</div><div>⚙ Configure</div>
+                </div>
+              </div>
+              <button class="ab danger">⊘ Abort</button>
+            </div>
+          </div>
+        </div>
+        <div class="chat">
+          <div class="bub fly"><div class="who">flywheel</div>Tick 64 — frozen, no change. All static (PAN-1455 ready-1/unmerged, 3 idle-at-prompt agents <a href="#">PAN-1242</a>/<a href="#">PAN-1686</a>).</div>
+          <div class="bub fly"><div class="who">flywheel</div>PAN-1685 + PAN-1455 are disjoint → bundled onto <span class="mono" style="color:var(--teal)">uat/pan-otter-0609</span>. PAN-1520 conflicts → serial.</div>
+          <div class="bub you"><div class="who">you</div>ship the candidate</div>
+        </div>
+        <div class="composer">
+          <div class="cbox"><span style="color:var(--faint)">📎</span><input placeholder="Message the agent…"/><button class="send">↑</button></div>
+          <div class="addctx">+ Add Context<span class="rolechip">plan</span><span class="rolechip">work</span><span class="rolechip">review</span><span class="rolechip">test</span><span class="rolechip">ship</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout"><span class="arrow">→</span> Run controls: <b>Pause/Resume</b> primary; <b>New Run / Write Report / Open Report / Pop out / Configure</b> tucked under <b>⋯ More</b>; <b>Abort</b> red + isolated so it's hard to misclick. Auto/Hold is the same segmented toggle as everywhere else. The UAT bundle appears <b>once</b> — as the indented members under its candidate header — and the serial item sits below it, not re-listed.</div>
+
+  <div class="naming">
+    <h3>UAT candidate naming — likely several per day, so the date alone isn't unique</h3>
+    <table>
+      <tr><td class="opt">uat/pan-2026-06-09-1430</td><td>Date + <b>time</b> (HH:MM). Unique, sorts chronologically, machine-clean. Downside: a mouthful to say out loud.</td></tr>
+      <tr><td class="opt pick">uat/pan-otter-0609 ✓</td><td><span class="pick">Recommended.</span> Random <b>codename</b> + short date. Memorable and easy to refer to verbally ("ship the otter candidate"), still dated. Needs a small wordlist; collision-checked.</td></tr>
+      <tr><td class="opt">uat/pan-2026-06-09-a / -b</td><td>Date + letter. Clean, but letters reset daily so "candidate B" is ambiguous when you look back days later.</td></tr>
+      <tr><td class="opt">uat/pan-c42</td><td>Monotonic counter. Shortest + globally unique + sortable, but opaque — tells you nothing about when or what.</td></tr>
+      <tr><td class="opt">uat/pan-1685+1455</td><td>Names its contents (lead issues). Self-describing, but grows long and changes if the bundle changes.</td></tr>
+    </table>
+    <div style="margin-top:8px;color:var(--faint);font-size:11.5px">My pick: <b style="color:var(--green)">codename + date</b> — you'll be saying these names to me and to each other; "the otter candidate" beats "uat-2026-06-09-1430". If you'd rather it be machine-sortable above all, date+time is the safe second.</div>
+  </div>
+
+  <div style="margin-top:18px;color:var(--faint);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px">Mockup · static · <code>.tmp/flywheel-redesign-mockup-v3.html</code> · PAN-1694</div>
+</div>
+</body>
+</html>

@@ -601,13 +601,41 @@ export function isQualifiedAgentId(input: string): boolean {
  * Resolve a CLI-supplied agent target to an on-disk agent ID (PAN-1760).
  * Accepts bare numerics ("1148"), issue IDs ("PAN-1148"), and fully-qualified
  * agent IDs ("agent-pan-1148-ship", "strike-pan-1723", "inspect-pan-1744-x",
- * "flywheel-orchestrator"). Returns null when a bare numeric can't be resolved
- * to exactly one agent state dir.
+ * "flywheel-orchestrator"). For issue IDs, prefers the canonical work-agent
+ * directory when present, then falls back to the single registered agent state
+ * for that issue. If no single fallback exists, preserves the historical
+ * canonical agent-* target.
  */
 export function resolveAgentTargetSync(input: string): string | null {
   if (isQualifiedAgentId(input)) return input.toLowerCase();
   const issueId = resolveBareNumericIdSync(input);
-  return issueId ? normalizeAgentId(issueId) : null;
+  if (!issueId) return null;
+
+  const canonicalAgentId = normalizeAgentId(issueId);
+  if (getAgentStateSync(canonicalAgentId)) return canonicalAgentId;
+
+  try {
+    if (!existsSync(AGENTS_DIR)) return canonicalAgentId;
+    const wantedIssueId = issueId.toUpperCase();
+    const matches: string[] = [];
+    for (const entry of readdirSync(AGENTS_DIR, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const stateFile = join(AGENTS_DIR, entry.name, 'state.json');
+      if (!existsSync(stateFile)) continue;
+      try {
+        const parsed = JSON.parse(readFileSync(stateFile, 'utf-8')) as { issueId?: string };
+        if (parsed.issueId?.toUpperCase() === wantedIssueId) {
+          matches.push(entry.name);
+        }
+      } catch {
+        // Skip unreadable state files.
+      }
+    }
+    if (matches.length === 1) return matches[0].toLowerCase();
+    return canonicalAgentId;
+  } catch {
+    return canonicalAgentId;
+  }
 }
 
 /**
@@ -847,6 +875,8 @@ export type DeliveryResult = {
   failure?: string;
 };
 
+const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
+
 export interface AgentState {
   id: string;
   issueId: string;
@@ -935,6 +965,9 @@ export interface AgentState {
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
   hostOverride?: boolean;
+
+  /** Inspect sub-role for inspect-* agents (PAN-1834). */
+  inspectSubRole?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -990,6 +1023,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
+    inspectSubRole: raw.inspectSubRole,
   };
 }
 
@@ -1682,8 +1716,10 @@ async function deliverInitialPromptWithRetry(
     const readyTimeoutSeconds = promptReadyTimeoutSeconds();
     const ready = await waitForPromptReady(agentId, harness, readyTimeoutSeconds);
     if (!ready) {
-      lastFailure = 'ready-signal-timeout';
+      const alive = await Effect.runPromise(sessionExists(normalizeAgentId(agentId)));
+      lastFailure = alive ? 'ready-signal-timeout' : SESSION_EXITED_BEFORE_KICKOFF;
       console.error(`[${agentId}] ${harness === 'codex' ? 'Codex' : 'Claude'} did not become ready within ${readyTimeoutSeconds}s (kickoff attempt ${attempt}/2)`);
+      if (!alive) break;
       continue;
     }
 
@@ -1699,6 +1735,29 @@ async function deliverInitialPromptWithRetry(
   }
 
   return { ok: false, path: 'tmux', failure: lastFailure };
+}
+
+async function recordStartupSessionExit(state: AgentState, issueId: string, source: Role | 'work-agent'): Promise<never> {
+  await Effect.runPromise(recordAgentFailure(state.id, SESSION_EXITED_BEFORE_KICKOFF));
+  const failedState = await Effect.runPromise(getAgentState(state.id));
+  if (failedState) {
+    failedState.status = 'stopped';
+    failedState.stoppedAt = new Date().toISOString();
+    failedState.kickoffDelivered = false;
+    failedState.lastFailureReason = SESSION_EXITED_BEFORE_KICKOFF;
+    await Effect.runPromise(saveAgentState(failedState));
+  }
+  state.status = 'stopped';
+  state.stoppedAt = new Date().toISOString();
+  state.kickoffDelivered = false;
+  state.lastFailureReason = SESSION_EXITED_BEFORE_KICKOFF;
+  emitActivityEntrySync({
+    source,
+    level: 'error',
+    message: `${state.id}: session exited before kickoff could be delivered`,
+    issueId,
+  });
+  throw new Error(`Agent ${state.id} exited before kickoff could be delivered`);
 }
 
 export function buildDefaultResumeContinueMessage(issueId: string): string {
@@ -2086,12 +2145,14 @@ function assertAgentCanTransitionToRunning(state: AgentState): void {
   }
 }
 
-function markAgentRunning(state: AgentState): void {
+function markAgentRunning(state: AgentState, options?: { preserveFailureTracking?: boolean }): void {
   assertAgentCanTransitionToRunning(state);
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
-  clearFailureTrackingFields(state);
+  if (options?.preserveFailureTracking !== true) {
+    clearFailureTrackingFields(state);
+  }
   delete state.stoppedAt;
   // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
@@ -2987,7 +3048,10 @@ export async function assertWorkspaceStackHealthyForSpawn(
 ): Promise<void> {
   if (role === 'plan') return;
 
-  const normalizedIssue = issueId.toUpperCase();
+  // PAN-1872: guard against an undefined issueId so workspace health checks do
+  // not crash with `Cannot read properties of undefined (reading 'toUpperCase')`
+  // while pan start is recovering from a sync-main conflict.
+  const normalizedIssue = (issueId ?? '').toUpperCase();
 
   // PAN-1746: absence of a workspace must be a HARDER failure than an unhealthy
   // one. The host-fallback path below lets advancing roles (review/test/ship)
@@ -3745,6 +3809,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         saveAgentStateSync(state);
       }
     } else if (role === 'work') {
+      if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
+        await recordStartupSessionExit(state, options.issueId, role);
+      }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       return state;
     }
@@ -4849,7 +4916,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Update agent state
     if (agentState) {
       agentState.lastResumeAt = resumeStartedAt;
-      markAgentRunning(agentState);
+      markAgentRunning(agentState, { preserveFailureTracking: true });
       saveAgentStateSync(agentState);
     }
 

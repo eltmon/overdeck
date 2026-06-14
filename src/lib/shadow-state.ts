@@ -4,18 +4,19 @@
  * Manages shadow state for issues - tracking status locally without updating
  * the issue tracker until explicitly synced.
  *
- * Storage Location: ~/.panopticon/shadow-state/
+ * Storage Location: ${PANOPTICON_HOME:-~/.panopticon}/shadow-state/
  */
 
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { readFile, writeFile, readdir } from 'fs/promises';
 import { join } from 'path';
-import { homedir } from 'os';
 import { Data, Effect } from 'effect';
 import type { IssueState } from './tracker/interface.js';
+import { getPanopticonHome } from './paths.js';
 
-// Storage directory for shadow state files
-const SHADOW_STATE_DIR = join(homedir(), '.panopticon', 'shadow-state');
+function shadowStateDir(): string {
+  return join(getPanopticonHome(), 'shadow-state');
+}
 
 /**
  * Shadow history entry - tracks state transitions
@@ -79,8 +80,9 @@ export interface SyncResult {
  * Ensure the shadow state directory exists
  */
 function ensureShadowStateDir(): void {
-  if (!existsSync(SHADOW_STATE_DIR)) {
-    mkdirSync(SHADOW_STATE_DIR, { recursive: true });
+  const dir = shadowStateDir();
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -90,7 +92,7 @@ function ensureShadowStateDir(): void {
 function getShadowStatePath(issueId: string): string {
   // Normalize issue ID for filename (uppercase, replace special chars)
   const normalizedId = issueId.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-  return join(SHADOW_STATE_DIR, `${normalizedId}.json`);
+  return join(shadowStateDir(), `${normalizedId}.json`);
 }async function getShadowStatePromise(issueId: string): Promise<ShadowState | null> {
   const filePath = getShadowStatePath(issueId);
 
@@ -232,18 +234,19 @@ function getShadowStatePath(issueId: string): string {
     entriesSynced,
   };
 }async function listShadowedIssuesPromise(): Promise<ShadowState[]> {
-  if (!existsSync(SHADOW_STATE_DIR)) {
+  const dir = shadowStateDir();
+  if (!existsSync(dir)) {
     return [];
   }
 
-  const files = await readdir(SHADOW_STATE_DIR);
+  const files = await readdir(dir);
   const states: ShadowState[] = [];
 
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
 
     try {
-      const content = await readFile(join(SHADOW_STATE_DIR, file), 'utf-8');
+      const content = await readFile(join(dir, file), 'utf-8');
       const state = JSON.parse(content) as ShadowState;
       states.push(state);
     } catch (error) {
@@ -509,4 +512,3 @@ export const getPendingSyncCount = (): Effect.Effect<number, ShadowStateError> =
         cause,
       }),
   });
-

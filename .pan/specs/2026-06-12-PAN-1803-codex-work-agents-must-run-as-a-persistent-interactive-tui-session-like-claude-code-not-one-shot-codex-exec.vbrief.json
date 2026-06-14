@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-12T14:43:26.782Z",
-    "updated": "2026-06-12T14:43:26.782Z",
+    "updated": "2026-06-14T04:46:09.114Z",
     "author": "panopticon-cli/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1803: Codex work agents must run as a persistent interactive TUI session (like claude-code), not one-shot 'codex exec'",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-1803",
     "title": "Codex work agents must run as a persistent interactive TUI session (like claude-code), not one-shot 'codex exec'",
-    "status": "proposed",
+    "status": "completed",
     "uid": "53dc0e35-fa11-488e-b910-e234fdccbdae",
     "author": "panopticon-cli/auto-start",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-06-12T14:43:26.782Z",
-    "updated": "2026-06-12T14:43:26.782Z",
+    "updated": "2026-06-14T04:46:09.114Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1803",
@@ -90,5 +90,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "completed"
 }

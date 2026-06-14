@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseCodexConversationMessages } from '../codex-conversation-parser.js';
+import { summarizeConversationActivity } from '../conversation-service.js';
 
 /**
  * Minimal Codex rollout fixture (cli ≥ 0.137.0 nested schema). Covers the
@@ -81,5 +82,26 @@ describe('codex conversation parser', () => {
     // A single shared counter across messages + workLog yields contiguous 1..N,
     // so re-sorting by sequence reconstructs original file order in the UI.
     expect(sorted).toEqual(Array.from({ length: seqs.length }, (_, i) => i + 1));
+  });
+
+  it('summarizes a completed Codex turn as not working even when the tmux session is alive', async () => {
+    const result = await summarizeConversationActivity(file, { harness: 'codex' });
+
+    expect(result.isWorking).toBe(false);
+    expect(result.currentTool).toBeNull();
+  });
+
+  it('summarizes an unmatched Codex tool call as the current tool while fresh', async () => {
+    const pendingToolFile = join(dir, 'rollout-pending-tool.jsonl');
+    const lines = [
+      { type: 'event_msg', timestamp: '2026-06-09T00:10:50.152Z', payload: { type: 'user_message', message: 'run tests' } },
+      { type: 'response_item', timestamp: '2026-06-09T00:10:57.707Z', payload: { type: 'function_call', name: 'exec_command', arguments: JSON.stringify({ cmd: 'npm test' }), call_id: 'call_pending' } },
+    ];
+    await writeFile(pendingToolFile, lines.map((l) => JSON.stringify(l)).join('\n') + '\n', 'utf-8');
+
+    const result = await summarizeConversationActivity(pendingToolFile, { harness: 'codex' });
+
+    expect(result.isWorking).toBe(true);
+    expect(result.currentTool).toBe('Shell');
   });
 });

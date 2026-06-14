@@ -14,7 +14,9 @@ import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogE
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
+import { isPiSessionFile, parsePiConversationMessages } from './pi-conversation-parser.js';
 
 type ModelCapability = (typeof MODEL_CAPABILITIES)[keyof typeof MODEL_CAPABILITIES];
 
@@ -881,21 +883,28 @@ const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; su
 
 export async function summarizeConversationActivity(
   sessionFile: string,
+  options: { harness?: string | null } = {},
 ): Promise<ConversationActivitySummary> {
   const fileStats = await stat(sessionFile);
-  const cached = activitySummaryCache.get(sessionFile);
+  const cacheKey = `${options.harness ?? 'claude-code'}:${sessionFile}`;
+  const cached = activitySummaryCache.get(cacheKey);
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
     return cached.summary;
   }
 
-  // Parse from the last compact boundary instead of the full file — avoids
-  // re-reading potentially megabytes of history on every list enrichment tick.
-  // Pass an empty priorState so pendingToolUse stays populated rather than being
-  // flushed into workLog. This lets us detect genuinely pending tools.
-  const { messages, streaming, pendingToolUse, mtimeMs } = await parseFromLastCompactBoundary(
-    sessionFile,
-    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
-  );
+  const parsed = options.harness === 'codex'
+    ? await parseCodexConversationMessages(sessionFile)
+    : options.harness === 'pi' || isPiSessionFile(sessionFile)
+      ? await parsePiConversationMessages(sessionFile)
+      // Parse from the last compact boundary instead of the full file — avoids
+      // re-reading potentially megabytes of history on every list enrichment tick.
+      // Pass an empty priorState so pendingToolUse stays populated rather than being
+      // flushed into workLog. This lets us detect genuinely pending tools.
+      : await parseFromLastCompactBoundary(
+          sessionFile,
+          { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+        );
+  const { messages, streaming, pendingToolUse, workLog, mtimeMs } = parsed;
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
@@ -932,10 +941,18 @@ export async function summarizeConversationActivity(
         currentTool = entry.toolTitle;
       }
     }
+    if (!currentTool && options.harness === 'codex') {
+      for (const entry of workLog) {
+        if (entry.tone === 'tool' && !entry.result && (entry.sequence ?? -1) > maxSequence) {
+          maxSequence = entry.sequence ?? -1;
+          currentTool = entry.label;
+        }
+      }
+    }
   }
 
   const summary: ConversationActivitySummary = { messages, streaming, isWorking, currentTool };
-  activitySummaryCache.set(sessionFile, { mtimeMs, size: fileStats.size, summary });
+  activitySummaryCache.set(cacheKey, { mtimeMs, size: fileStats.size, summary });
   if (activitySummaryCache.size > ACTIVITY_SUMMARY_CACHE_MAX) {
     const firstKey = activitySummaryCache.keys().next().value;
     if (firstKey !== undefined) {
@@ -1309,6 +1326,52 @@ export async function parseFromLastCompactBoundary(
 ): Promise<ParseResult> {
   const boundaryOffset = await findLastCompactBoundary(sessionFile);
   return parseConversationMessages(sessionFile, boundaryOffset, priorState);
+}
+
+// ─── Append-only snapshot guard (PAN-1642) ───────────────────────────────────
+
+/**
+ * Decide whether a live-stream emission may be sent as an authoritative
+ * `snapshot:true` (full transcript replace) or must be downgraded to a
+ * non-destructive merge (`snapshot:false`).
+ *
+ * Root-cause context: claude-code session transcripts are **append-only at a
+ * fixed path**. `claude --resume <id>` reuses the same session UUID/file
+ * (PAN-830), and both claude-native and Panopticon-native compaction *append*
+ * a `compact_boundary` marker rather than truncating. A read that shows the
+ * file SHRINK is therefore never a real content reset — it is a transient
+ * truncate-rewrite window (a respawn re-writing the resumed file, a read that
+ * landed mid-write, or a partial read under load). Emitting that smaller read
+ * as `snapshot:true` makes the client replace its populated transcript with the
+ * partial/empty one, blanking the view to "How can I help you?" or only the
+ * last few messages even while the operator is just reading (PAN-1642).
+ *
+ * The watcher only sets `fileWasReset` when it observed the file shrink and
+ * re-parsed from byte 0, so `newMessageCount` here is a FULL transcript count.
+ * We keep a per-subscription high-water mark of the largest full transcript we
+ * have emitted and only allow a snapshot that does not shrink it. A shrinking
+ * reset is suppressed to a merge; the subsequent appends re-flow normally and
+ * `mergeById` on the client dedupes the overlap. Erring toward merge can never
+ * lose history — the only failure mode it forgoes is replacing on a genuine
+ * smaller session, which cannot happen for an append-only claude-code file on a
+ * stable subscription.
+ */
+export function gateSnapshotEmission(
+  fileWasReset: boolean,
+  newMessageCount: number,
+  highWaterCount: number,
+): { snapshot: boolean; highWaterCount: number; suppressedShrink: boolean } {
+  if (!fileWasReset) {
+    // Normal incremental delta — always a merge, never touches the high-water mark.
+    return { snapshot: false, highWaterCount, suppressedShrink: false };
+  }
+  if (newMessageCount < highWaterCount) {
+    // Transient truncate-rewrite read — downgrade to merge so the client keeps
+    // its history. Do not lower the high-water mark.
+    return { snapshot: false, highWaterCount, suppressedShrink: true };
+  }
+  // A genuine, non-shrinking full re-parse — safe to assert as the snapshot.
+  return { snapshot: true, highWaterCount: newMessageCount, suppressedShrink: false };
 }
 
 // ─── File watcher ─────────────────────────────────────────────────────────────
