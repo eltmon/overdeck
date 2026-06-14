@@ -10,14 +10,12 @@ import {
   Eye,
   Zap,
   CheckCircle,
-  Globe,
   Terminal,
   Brain,
   SplitSquareVertical,
   BarChart3,
   Route,
   MessageCircle,
-  Lightbulb,
   AlertTriangle,
   Key,
   GitBranch,
@@ -32,7 +30,7 @@ import {
   Mic,
   Gauge,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId, type Harness, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
+import { SettingsConfig, Provider, ModelId, type Harness, type HarnessOverride, type TtsConfig, type BackgroundAiConfig, type BackgroundAiFeature, type ConversationSearchConfig, BACKGROUND_AI_FEATURE_META } from './types';
 import { consumePendingSettingsSection, SETTINGS_SECTION_EVENT } from '../../lib/settingsSection';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
@@ -52,6 +50,7 @@ import { ReindexConfirmDialog } from './ReindexConfirmDialog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
 import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
+import { HarnessLogo, ProviderLogo } from '../shared/branding';
 import {
   SettingsLayout,
   SettingsHeader,
@@ -77,6 +76,16 @@ interface OpenRouterModelCatalog {
 interface OpenRouterCatalogResponse {
   models: OpenRouterModelCatalog[];
   favorites: string[];
+}
+
+const HARNESS_LABELS: Record<Harness, string> = {
+  'claude-code': 'Claude Code',
+  pi: 'Pi',
+  codex: 'Codex',
+};
+
+function harnessLabel(harness: Harness): string {
+  return HARNESS_LABELS[harness];
 }
 
 async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | null> {
@@ -210,6 +219,15 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
+interface CloisterConfig {
+  concurrency?: {
+    max_work_agents?: number;
+    reserved_advancing_slots?: number;
+    exempt_operator_started?: boolean;
+  };
+  [key: string]: unknown;
+}
+
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   // PAN-1048 review feedback 004 (C4): WorkhorsePanel and RolesPanel save
   // workhorses + roles via their own PUTs. SettingsPage's parent formData is
@@ -290,6 +308,26 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
     throw new Error(error || 'Failed to save settings');
   }
   return res.json();
+}
+
+async function fetchCloisterConfig(): Promise<CloisterConfig> {
+  const res = await fetch('/api/cloister/config', { credentials: 'include' });
+  if (!res.ok) throw new Error('Failed to fetch Cloister config');
+  return res.json();
+}
+
+async function saveCloisterConfig(config: CloisterConfig): Promise<void> {
+  await ensureDashboardSession();
+  const res = await fetch('/api/cloister/config', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: await dashboardMutationJsonHeaders(),
+    body: JSON.stringify(config),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error ?? `Failed to save Cloister config (${res.status})`);
+  }
 }
 
 interface VoiceSettings {
@@ -420,16 +458,16 @@ function formatCodexExpiry(expiresAt?: string): string | null {
 }
 
 // Provider definitions
-const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[] = [
-  { id: 'anthropic', name: 'Anthropic', icon: Code, placeholder: 'sk-ant-...' },
-  { id: 'openai', name: 'OpenAI', icon: Lightbulb, placeholder: 'sk-...' },
-  { id: 'google', name: 'Google', icon: Globe, placeholder: 'AIza...' },
-  { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
-  { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
-  { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
-  { id: 'mimo', name: 'Xiaomi MiMo', icon: Zap, placeholder: 'sk-... or tp-...' },
-  { id: 'nous', name: 'Nous Portal', icon: Globe, placeholder: 'ns-...' },
-  { id: 'dashscope', name: 'Alibaba DashScope', icon: Globe, placeholder: 'sk-...' },
+const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
+  { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
+  { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
+  { id: 'google', name: 'Google', placeholder: 'AIza...' },
+  { id: 'kimi', name: 'Kimi (Moonshot)', placeholder: 'sk-kimi-...' },
+  { id: 'zai', name: 'Zhipu (GLM)', placeholder: 'sk-zai-...' },
+  { id: 'minimax', name: 'MiniMax', placeholder: 'eyJ...' },
+  { id: 'mimo', name: 'Xiaomi MiMo', placeholder: 'sk-... or tp-...' },
+  { id: 'nous', name: 'Nous Portal', placeholder: 'ns-...' },
+  { id: 'dashscope', name: 'Alibaba DashScope', placeholder: 'sk-...' },
 ];
 
 const TTS_EVENT_KEYS = [
@@ -523,6 +561,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+  { id: 'cloister', label: 'Cloister', icon: Flag },
   { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'memory', label: 'Memory', icon: Brain },
@@ -555,6 +594,13 @@ export function SettingsPage() {
     queryFn: fetchConversationSearchStatus,
     refetchInterval: 30_000,
   });
+  const {
+    data: cloisterConfig,
+    error: cloisterConfigError,
+  } = useQuery({
+    queryKey: ['cloister-config'],
+    queryFn: fetchCloisterConfig,
+  });
   // Last-24h spend per background-AI source, for the Background AI section (PAN-1589).
   const { data: backgroundCost } = useQuery({
     queryKey: ['costs-background'],
@@ -581,6 +627,7 @@ export function SettingsPage() {
   });
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
+  const [cloisterFormData, setCloisterFormData] = useState<CloisterConfig | null>(null);
   const [voiceFormData, setVoiceFormData] = useState<VoiceSettings | null>(null);
   const [voiceHardwareSettings, setVoiceHardwareSettings] = useState<VoiceHardwareSettings>(loadVoiceHardwareSettings);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -613,6 +660,7 @@ export function SettingsPage() {
   const pendingSaveRef = useRef<AutosavePayload | null>(null);
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cloisterSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSaveOkRef = useRef(true);
   const savedStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -808,6 +856,12 @@ export function SettingsPage() {
       }
     }
   }, [settings, formData]);
+
+  useEffect(() => {
+    if (cloisterConfig && !cloisterFormData) {
+      setCloisterFormData(cloisterConfig);
+    }
+  }, [cloisterConfig, cloisterFormData]);
 
   useEffect(() => {
     if (voiceSettings && !voiceFormData) {
@@ -1079,15 +1133,19 @@ export function SettingsPage() {
     }, { debounce: true });
   };
 
-  const handleProviderHarnessChange = (provider: Provider, harness: Harness) => {
+  const handleProviderHarnessChange = (provider: Provider, harness: HarnessOverride) => {
+    const nextProviderHarnesses = { ...formData.models.provider_harnesses };
+    if (harness === '') {
+      delete nextProviderHarnesses[provider];
+    } else {
+      nextProviderHarnesses[provider] = harness;
+    }
+
     applySettings({
       ...formData,
       models: {
         ...formData.models,
-        provider_harnesses: {
-          ...formData.models.provider_harnesses,
-          [provider]: harness,
-        },
+        provider_harnesses: nextProviderHarnesses,
       },
     });
   };
@@ -1315,6 +1373,49 @@ export function SettingsPage() {
     updateMemorySettings({ [key]: value === '' ? undefined : Number(value) }, { debounce: true });
   };
 
+  const saveCloisterSnapshot = async (snapshot: CloisterConfig) => {
+    setSaveStatus('saving');
+    try {
+      await saveCloisterConfig(snapshot);
+      lastSaveOkRef.current = true;
+      queryClient.setQueryData(['cloister-config'], snapshot);
+      queryClient.invalidateQueries({ queryKey: ['cloister-config'] });
+      setSaveStatus('saved');
+      if (savedStatusResetRef.current) clearTimeout(savedStatusResetRef.current);
+      savedStatusResetRef.current = setTimeout(() => {
+        savedStatusResetRef.current = null;
+        setSaveStatus((s) => (s === 'saved' ? 'idle' : s));
+      }, 2500);
+    } catch (error) {
+      lastSaveOkRef.current = false;
+      setSaveStatus('error');
+      toast.error(`Failed to save Cloister settings: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  const updateCloisterConcurrency = (
+    key: 'max_work_agents' | 'reserved_advancing_slots',
+    rawValue: string,
+  ) => {
+    if (!cloisterFormData) return;
+    const next: CloisterConfig = {
+      ...cloisterFormData,
+      concurrency: {
+        ...cloisterFormData.concurrency,
+        [key]: rawValue === '' ? undefined : Number(rawValue),
+      },
+    };
+    setCloisterFormData(next);
+    if (cloisterSaveDebounceRef.current) {
+      clearTimeout(cloisterSaveDebounceRef.current);
+      cloisterSaveDebounceRef.current = null;
+    }
+    cloisterSaveDebounceRef.current = setTimeout(() => {
+      cloisterSaveDebounceRef.current = null;
+      void saveCloisterSnapshot(next);
+    }, AUTOSAVE_DEBOUNCE_MS);
+  };
+
   // Background AI toggles persist immediately (one-click low-cost mode).
   const updateBackgroundAi = (patch: BackgroundAiConfig) => {
     if (!formData) return;
@@ -1425,6 +1526,16 @@ export function SettingsPage() {
       experimental: {
         ...formData.experimental,
         claudeCodeChannels: enabled,
+      },
+    });
+  };
+
+  const handleStreamdownToggle = (enabled: boolean) => {
+    applySettings({
+      ...formData,
+      experimental: {
+        ...formData.experimental,
+        streamdownRenderer: enabled,
       },
     });
   };
@@ -1606,7 +1717,8 @@ export function SettingsPage() {
             const isEnabled = formData.models.providers[provider.id];
             const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
             const isExpanded = expandedProviders[provider.id] || false;
-            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? 'claude-code';
+            const providerHarness = formData.models.provider_harnesses?.[provider.id] ?? '';
+            const builtInHarness = formData.models.provider_default_harnesses?.[provider.id] ?? 'claude-code';
 
             const getAuthSummary = () => {
               if (isDefault) {
@@ -1629,7 +1741,7 @@ export function SettingsPage() {
               <div key={provider.id} className="border border-transparent rounded-lg hover:border-border transition-colors">
                 {/* Summary row */}
                 <div className="flex items-center gap-3 px-3 py-2.5">
-                  <provider.icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <ProviderLogo provider={provider.id} label={provider.name} className="w-4 h-4 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium text-foreground flex-1 min-w-0">{provider.name}</span>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -1820,15 +1932,19 @@ export function SettingsPage() {
                     )}
                     <label className="block space-y-1.5">
                       <span className="text-xs font-medium text-foreground">Default harness</span>
-                      <select
-                        value={providerHarness}
-                        onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as Harness)}
-                        className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                      >
-                        <option value="claude-code">Claude Code</option>
-                        <option value="pi">Pi</option>
-                        <option value="codex">Codex</option>
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <HarnessLogo harness={(providerHarness || builtInHarness) as Harness} className="w-4 h-4 shrink-0" />
+                        <select
+                          value={providerHarness}
+                          onChange={(event) => handleProviderHarnessChange(provider.id, event.target.value as HarnessOverride)}
+                          className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">Default ({harnessLabel(builtInHarness)})</option>
+                          <option value="claude-code">Claude Code</option>
+                          <option value="pi">Pi</option>
+                          <option value="codex">Codex</option>
+                        </select>
+                      </div>
                     </label>
                     {/* Action buttons for non-default providers */}
                     {!isDefault && apiKey && !apiKey.startsWith('$') && (
@@ -1866,7 +1982,7 @@ export function SettingsPage() {
           {/* OpenRouter as part of providers */}
           <div className="border border-transparent rounded-lg hover:border-border transition-colors">
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+              <ProviderLogo provider="openrouter" label="OpenRouter" className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm font-medium text-foreground flex-1">OpenRouter</span>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
@@ -1903,15 +2019,22 @@ export function SettingsPage() {
               <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
                 <label className="block space-y-1.5">
                   <span className="text-xs font-medium text-foreground">Default harness</span>
-                  <select
-                    value={formData.models.provider_harnesses?.openrouter ?? 'claude-code'}
-                    onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as Harness)}
-                    className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="claude-code">Claude Code</option>
-                    <option value="pi">Pi</option>
-                    <option value="codex">Codex</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <HarnessLogo
+                      harness={(formData.models.provider_harnesses?.openrouter || formData.models.provider_default_harnesses?.openrouter || 'claude-code') as Harness}
+                      className="w-4 h-4 shrink-0"
+                    />
+                    <select
+                      value={formData.models.provider_harnesses?.openrouter ?? ''}
+                      onChange={(event) => handleProviderHarnessChange('openrouter', event.target.value as HarnessOverride)}
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
+                      <option value="claude-code">Claude Code</option>
+                      <option value="pi">Pi</option>
+                      <option value="codex">Codex</option>
+                    </select>
+                  </div>
                 </label>
                 <OpenRouterPage
                   apiKey={formData.api_keys.openrouter}
@@ -2082,6 +2205,60 @@ export function SettingsPage() {
             })}
           </div>
         </div>
+      </section>
+
+      {/* Cloister */}
+      <section id="cloister" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Flag className="w-4 h-4 text-muted-foreground" />
+          Cloister
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          Deacon dispatch limits for automatically resumed work agents and review, test, and ship specialists.
+        </p>
+        {cloisterConfigError ? (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+            Failed to load Cloister settings: {cloisterConfigError instanceof Error ? cloisterConfigError.message : String(cloisterConfigError)}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Max work agents</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Running work-agent ceiling used by auto-resume before the deacon defers more work.
+                </p>
+              </div>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                disabled={!cloisterFormData}
+                value={cloisterFormData?.concurrency?.max_work_agents ?? 6}
+                onChange={(e) => updateCloisterConcurrency('max_work_agents', e.target.value)}
+                className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Reserved advancing slots</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Extra slots above the work cap reserved for review, test, and ship dispatch.
+                </p>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                disabled={!cloisterFormData}
+                value={cloisterFormData?.concurrency?.reserved_advancing_slots ?? 3}
+                onChange={(e) => updateCloisterConcurrency('reserved_advancing_slots', e.target.value)}
+                className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Voice */}
@@ -3565,10 +3742,11 @@ export function SettingsPage() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-3">
-                {(() => {
-                  const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
-                  return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
-                })()}
+                <ProviderLogo
+                  provider={modelsModalProvider}
+                  label={PROVIDERS.find(p => p.id === modelsModalProvider)?.name}
+                  className="w-5 h-5 shrink-0"
+                />
                 <h3 className="text-foreground text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
                 </h3>
@@ -3807,6 +3985,30 @@ export function SettingsPage() {
             >
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
                 formData.experimental?.claudeCodeChannels ? 'translate-x-[18px]' : 'translate-x-[3px]'
+              }`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Streamdown renderer</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Render chat markdown with Streamdown — research preview
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.experimental?.streamdownRenderer)}
+              aria-label="Render chat markdown with Streamdown"
+              data-testid="experimental-streamdown-toggle"
+              onClick={() => handleStreamdownToggle(!formData.experimental?.streamdownRenderer)}
+              disabled={saveStatus === 'saving'}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+                formData.experimental?.streamdownRenderer ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                formData.experimental?.streamdownRenderer ? 'translate-x-[18px]' : 'translate-x-[3px]'
               }`} />
             </button>
           </div>

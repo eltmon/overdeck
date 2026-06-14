@@ -18,6 +18,7 @@ import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from
 import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
+import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
@@ -52,6 +53,27 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
     prev.resolution !== next.resolution ||
     prev.resolutionCount !== next.resolutionCount
   )
+}
+
+// PAN-1834 — detect the first moment an agent becomes blocked on input and
+// build human-readable activity / TTS messages.
+export function isAwaitingInputRisingEdge(
+  previous: AgentEnrichment | undefined,
+  current: AgentEnrichment,
+): boolean {
+  const previousCount = previous?.pendingInputCount ?? 0
+  return previousCount === 0 && current.pendingInputCount > 0
+}
+
+export function buildAwaitingInputActivityMessage(
+  agentId: string,
+  issueId: string | undefined,
+  kinds: readonly string[],
+): string {
+  const kindList = kinds.length > 0 ? kinds.join(', ') : 'input'
+  return issueId
+    ? `${agentId} on ${issueId} is waiting for ${kindList}`
+    : `${agentId} is waiting for ${kindList}`
 }
 
 // ─── Poller ───────────────────────────────────────────────────────────────────
@@ -167,7 +189,16 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         return
       }
 
-      if (!enrichmentChanged(state.lastEnrichment.get(agentId), enrichment)) {
+      // PAN-1834 — on the rising edge of an agent becoming blocked on input,
+      // emit an activity entry + TTS so the operator is notified loudly.
+      if (isAwaitingInputRisingEdge(previousEnrichment, enrichment)) {
+        const message = buildAwaitingInputActivityMessage(agentId, issueId, enrichment.pendingInputKinds)
+        const source = toRole(agent.role) ?? 'work'
+        emitActivityEntrySync({ source, level: 'warn', message, issueId })
+        emitActivityTtsSync({ utterance: message, priority: 1, issueId, source, eventType: 'awaiting_input' })
+      }
+
+      if (!enrichmentChanged(previousEnrichment, enrichment)) {
         return
       }
 

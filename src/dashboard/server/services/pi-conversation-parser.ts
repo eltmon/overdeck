@@ -24,6 +24,11 @@ import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@panctl/contracts';
 import type { ParseResult } from './conversation-service.js';
 
+export function isPiSessionFile(sessionFile: string): boolean {
+  const normalized = sessionFile.replace(/\\/g, '/');
+  return /\/\.panopticon\/agents\/[^/]+\/sessions\//.test(normalized);
+}
+
 interface PiUsage {
   input?: number;
   output?: number;
@@ -222,6 +227,9 @@ export async function parsePiConversationMessages(sessionFile: string): Promise<
     streaming,
     totalCost,
     totalTokens,
+    latestAssistantUsage: null,
+    contextBoundaryOffset: 0,
+    contextActiveBytes: fileStats.size,
     pendingToolUse: new Map(),
     unresolvedResults: new Map(),
     lastSequence: sequence,

@@ -36,6 +36,19 @@ describe('ConversationFeedCard', () => {
     expect(screen.getByText('Side thread')).toBeTruthy();
   });
 
+  it('renders the pi harness mark for pi conversation entries', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({ agent: 'pi' })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
+    expect(screen.getByText('π')).toBeInTheDocument();
+  });
+
   it('shows relative timestamp in a time element with dateTime set to the ISO timestamp', () => {
     render(
       <ConversationFeedCard

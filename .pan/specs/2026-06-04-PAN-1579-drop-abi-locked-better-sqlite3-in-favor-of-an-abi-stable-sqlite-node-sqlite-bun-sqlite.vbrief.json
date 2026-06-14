@@ -4,17 +4,17 @@
     "created": "2026-06-04T06:10:35.762Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1579: Drop ABI-locked better-sqlite3 in favor of an ABI-stable SQLite (node:sqlite / bun:sqlite)",
-    "updated": "2026-06-08T15:34:31.513Z"
+    "updated": "2026-06-12T20:21:53.848Z"
   },
   "plan": {
     "id": "pan-1579",
     "title": "Drop ABI-locked better-sqlite3 in favor of an ABI-stable SQLite (node:sqlite / bun:sqlite)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "f2d47439-4aa7-413e-983c-926543b7cb8e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 48,
+    "sequence": 3,
     "created": "2026-06-04T06:10:35.762Z",
-    "updated": "2026-06-08T15:34:31.513Z",
+    "updated": "2026-06-12T20:21:53.848Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1579",
@@ -665,69 +665,8 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-06-04-PAN-1579-drop-abi-locked-better-sqlite3-in-favor-of-an-abi-stable-sqlite-node-sqlite-bun-sqlite.vbrief.json",
-      "pipeline": {
-        "phase": "review",
-        "issueId": "PAN-1579",
-        "sqliteAuthoritative": true,
-        "updatedAt": "2026-06-08T15:34:31.508Z",
-        "work": {
-          "updatedAt": "2026-06-08T15:34:31.508Z",
-          "history": []
-        },
-        "verification": {
-          "status": "failed",
-          "updatedAt": "2026-06-08T15:34:31.508Z",
-          "notes": "Verification FAILED at test (30475ms):\n\nanch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:1432068) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/integration/agent-spawning.test.ts > PAN-1048 role primitive — agent spawning > harness policy gate at the spawn entry points > downgrades pi → claude-code for spawnAgent work when canUseHarness denies the combo\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ prepareSupervisorForFreshLaunch src/lib/agents.ts:1624:11\n    1622|   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    1623|   if (!existsSync(supervisorScriptPath)) {\n    1624|     throw new Error('pty-supervisor build artifact missing — run `npm …\n       |           ^\n    1625|   }\n    1626|   await writePtyToken(agentId);\n ❯ Module.spawnAgent src/lib/agents.ts:3198:34\n ❯ tests/integration/agent-spawning.test.ts:754:21\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
-          "history": [
-            {
-              "status": "failed",
-              "at": "2026-06-08T15:34:31.508Z",
-              "notes": "Verification FAILED at test (30475ms):\n\nanch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n(node:1432068) ExperimentalWarning: Some other experimental feature\n(Use `node --trace-warnings ...` to show where the warning was created)\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/integration/agent-spawning.test.ts > PAN-1048 role primitive — agent spawning > harness policy gate at the spawn entry points > downgrades pi → claude-code for spawnAgent work when canUseHarness denies the combo\nError: pty-supervisor build artifact missing — run `npm run build`.\n ❯ prepareSupervisorForFreshLaunch src/lib/agents.ts:1624:11\n    1622|   const supervisorScriptPath = resolvePtySupervisorScriptPath();\n    1623|   if (!existsSync(supervisorScriptPath)) {\n    1624|     throw new Error('pty-supervisor build artifact missing — run `npm …\n       |           ^\n    1625|   }\n    1626|   await writePtyToken(agentId);\n ❯ Module.spawnAgent src/lib/agents.ts:3198:34\n ❯ tests/integration/agent-spawning.test.ts:754:21\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n"
-            }
-          ]
-        },
-        "review": {
-          "status": "blocked",
-          "updatedAt": "2026-06-08T15:34:31.508Z",
-          "notes": "Memory FTS statements now block the dashboard event loop",
-          "history": [
-            {
-              "status": "blocked",
-              "at": "2026-06-08T15:34:31.508Z",
-              "notes": "Memory FTS statements now block the dashboard event loop"
-            }
-          ],
-          "approval": "changes_requested"
-        },
-        "test": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T15:34:31.508Z",
-          "history": [
-            {
-              "status": "pending",
-              "at": "2026-06-08T15:34:31.508Z"
-            }
-          ]
-        },
-        "uat": {
-          "updatedAt": "2026-06-08T15:34:31.508Z",
-          "history": []
-        },
-        "merge": {
-          "status": "pending",
-          "updatedAt": "2026-06-08T15:34:31.508Z",
-          "history": [
-            {
-              "status": "pending",
-              "at": "2026-06-08T15:34:31.508Z"
-            }
-          ],
-          "readyForMerge": false,
-          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1677"
-        }
-      }
+      "canonicalFilename": "2026-06-04-PAN-1579-drop-abi-locked-better-sqlite3-in-favor-of-an-abi-stable-sqlite-node-sqlite-bun-sqlite.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

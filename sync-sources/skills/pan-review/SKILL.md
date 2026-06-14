@@ -24,6 +24,8 @@ abandon the review/test/ship pass.
 
 ```
 pan review pending                                 # List completed work awaiting review
+pan review pending --ready                         # List issues ready for merge
+pan review pending --blocked                       # List blocked review/test/merge issues
 pan review request <id>                            # Re-request review after fixing feedback
 pan review reset <id> [--session]                  # Reset review/test/merge cycles (human override)
 pan review abort <id>                              # Kill all running reviewers, leave worker idle
@@ -35,7 +37,9 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 - **`pending`** — Lists every issue whose work agent has signaled `done` but
   whose review pipeline hasn't completed (in-flight, blocked, or stalled).
   This is the first command to run when you want to know "what's waiting on
-  me right now?"
+  me right now?" `--ready` lists SQLite-backed issues ready for merge;
+  `--blocked` lists SQLite-backed review/test/merge blockers with their
+  blocker kind.
 - **`request <id>`** — After fixing the issues a reviewer flagged, this
   re-triggers the review pipeline against the current branch state. Use this
   when the worker has committed fixes and you want the existing review pass
@@ -61,6 +65,8 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 | Situation | Command |
 |---|---|
 | "What's waiting on me?" | `pan review pending` |
+| "What's ready to merge?" | `pan review pending --ready` |
+| "What's blocked in review/test/merge?" | `pan review pending --blocked` |
 | Worker pushed a fix, want re-review | `pan review request <id>` |
 | Pipeline state is inconsistent, need a clean slate | `pan review reset <id>` |
 | Same as above plus reviewer Claude sessions are bad | `pan review reset <id> --session` |

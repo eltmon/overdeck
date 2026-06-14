@@ -13,7 +13,7 @@
  * kill-agent, cost-parser, notify-heartbeat).
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -261,38 +261,15 @@ export function toCodexSandboxValue(mode: string | undefined): string {
 /**
  * Poll $CODEX_HOME/sessions/**\/*.jsonl for a new rollout file.
  * Returns the rollout path once one appears, or null on timeout.
+ * Prefers the user thread over subagent (guardian) rollouts so the captured
+ * thread-id always identifies the main conversation (PAN-1805).
  */
 export async function waitForCodexRollout(codexHomeDir: string, timeoutMs: number): Promise<string | null> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    const rollout = findAnyRollout(join(codexHomeDir, 'sessions'))
+    const rollout = findLatestRollout(codexHomeDir)
     if (rollout) return rollout
     await new Promise(r => setTimeout(r, 200))
-  }
-  return null
-}
-
-function findAnyRollout(dir: string): string | null {
-  let entries: string[]
-  try {
-    entries = readdirSync(dir)
-  } catch {
-    return null
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry)
-    let isDir = false
-    try {
-      isDir = statSync(full).isDirectory()
-    } catch {
-      continue
-    }
-    if (isDir) {
-      const hit = findAnyRollout(full)
-      if (hit) return hit
-    } else if (entry.startsWith('rollout-') && entry.endsWith('.jsonl')) {
-      return full
-    }
   }
   return null
 }
@@ -314,11 +291,57 @@ export function extractThreadIdFromRollout(rolloutPath: string): string | null {
 }
 
 /**
- * Return the most-recently-modified rollout JSONL under <codexHomeDir>/sessions,
- * or null. A per-conversation/-agent CODEX_HOME holds only that session's
- * rollouts, so the newest one is its current thread. Used to resolve the
- * transcript when no thread-id was persisted — the spawn-time capture is a
- * one-shot window, but Codex only writes its rollout on the first turn.
+ * Read the first line (the session_meta record) of a rollout file without
+ * loading the whole multi-megabyte JSONL.
+ */
+function readRolloutMetaLine(path: string, maxBytes = 131072): string | null {
+  let fd: number
+  try {
+    fd = openSync(path, 'r')
+  } catch {
+    return null
+  }
+  try {
+    const buf = Buffer.alloc(maxBytes)
+    const n = readSync(fd, buf, 0, maxBytes, 0)
+    const text = buf.subarray(0, n).toString('utf-8')
+    const nl = text.indexOf('\n')
+    return nl === -1 ? text : text.slice(0, nl)
+  } catch {
+    return null
+  } finally {
+    closeSync(fd)
+  }
+}
+
+/**
+ * True when a rollout belongs to a Codex-internal subagent thread (e.g. the
+ * guardian approval supervisor), per the session_meta `thread_source` field.
+ * Subagent rollouts live in the same per-agent CODEX_HOME as the main thread
+ * and are written concurrently, so raw mtime cannot tell them apart
+ * (PAN-1805). Unknown/unparseable meta is treated as a user thread — older
+ * Codex versions predate `thread_source`.
+ */
+function isSubagentRollout(path: string): boolean {
+  const line = readRolloutMetaLine(path)
+  if (!line) return false
+  try {
+    const meta = JSON.parse(line) as { payload?: { thread_source?: unknown } }
+    return meta.payload?.thread_source === 'subagent'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Return the most-recently-modified *user-thread* rollout JSONL under
+ * <codexHomeDir>/sessions, or null. A per-conversation/-agent CODEX_HOME holds
+ * only that session's rollouts, so the newest user thread is its current
+ * conversation. Subagent (guardian) rollouts are skipped — they interleave
+ * writes with the main thread and would otherwise win the mtime race
+ * (PAN-1805). Used to resolve the transcript when no thread-id was persisted —
+ * the spawn-time capture is a one-shot window, but Codex only writes its
+ * rollout on the first turn.
  */
 export function findLatestRollout(codexHomeDir: string): string | null {
   const sessionsRoot = join(codexHomeDir, 'sessions')
@@ -335,15 +358,17 @@ export function findLatestRollout(codexHomeDir: string): string | null {
     }
   }
   walk(sessionsRoot)
-  let latest: string | null = null
-  let latestMtime = -1
-  for (const p of paths) {
-    try {
-      const m = statSync(p).mtimeMs
-      if (m > latestMtime) { latestMtime = m; latest = p }
-    } catch { /* skip unreadable */ }
+  const byMtimeDesc = paths
+    .map((p) => {
+      try { return { p, mtimeMs: statSync(p).mtimeMs } } catch { return null }
+    })
+    .filter((e): e is { p: string; mtimeMs: number } => e !== null)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+  for (const { p } of byMtimeDesc) {
+    if (!isSubagentRollout(p)) return p
   }
-  return latest
+  // All rollouts are subagent threads — better to show one than nothing.
+  return byMtimeDesc[0]?.p ?? null
 }
 
 // ─── Sync runtime ─────────────────────────────────────────────────────────────

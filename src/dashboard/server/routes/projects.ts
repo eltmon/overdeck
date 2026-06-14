@@ -7,7 +7,6 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { access, readFile, readdir, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { Effect, Layer } from 'effect';
@@ -31,6 +30,7 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
+import { getPanopticonHome } from '../../../lib/paths.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -55,7 +55,7 @@ async function readOptional(p: string): Promise<string | null> {
 
 function mapSessionType(type: string): SessionNodeType {
   const validTypes: SessionNodeType[] = [
-    'planning', 'work', 'review', 'reviewer', 'test', 'merge', 'legacy',
+    'planning', 'work', 'strike', 'review', 'reviewer', 'test', 'merge', 'legacy',
   ];
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
@@ -154,7 +154,7 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
 async function readSessionPauseFields(
   sessionId: string,
 ): Promise<{ paused?: true; pausedReason?: string; pausedAt?: string }> {
-  const stateText = await readOptional(join(homedir(), '.panopticon', 'agents', sessionId, 'state.json'));
+  const stateText = await readOptional(join(getPanopticonHome(), 'agents', sessionId, 'state.json'));
   if (!stateText) return {};
   try {
     const s = JSON.parse(stateText) as { paused?: boolean; pausedReason?: string; pausedAt?: string };
@@ -171,14 +171,15 @@ async function collectSessionTreeNodes(
 ): Promise<SessionNode[]> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-  const agentsDir = join(homedir(), '.panopticon', 'agents');
+  const agentsDir = join(getPanopticonHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const strikeAgentId = `strike-${issueLower}`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId]);
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -203,7 +204,8 @@ async function collectSessionTreeNodes(
     try {
       const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string };
       const isPlanning = checkId.startsWith('planning-');
-      const sectionType = isPlanning ? 'planning' : 'work';
+      const isStrike = checkId.startsWith('strike-');
+      const sectionType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = await Effect.runPromise(getAgentRuntimeState(checkId));
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
@@ -218,7 +220,7 @@ async function collectSessionTreeNodes(
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: sectionType === 'work' || sectionType === 'planning' ? checkId : undefined,
+        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' ? checkId : undefined,
         model: state.model || 'unknown',
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         endedAt: undefined,
@@ -488,7 +490,7 @@ export async function fetchProjectSessionTree(
 
     const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => Effect.promise(async () => {
-        const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
+        const agentDir = join(getPanopticonHome(), 'agents', `agent-${c.issueLower}`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const [hasAgent, hasPlanning] = await Promise.all([
           pathExists(agentDir),

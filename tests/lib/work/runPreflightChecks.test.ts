@@ -170,31 +170,28 @@ describe('runPreflightChecks', () => {
     expect(mockSyncBeadStatusToVBrief).toHaveBeenCalledWith('bead-c2', tempDir, 'completed', 'Task two');
   });
 
-  it('uses live bd status instead of stale issues.jsonl records', async () => {
+  it('uses workspace beads DB (issues.jsonl) as authoritative when present (PAN-1812)', async () => {
     mkdirSync(join(tempDir, '.beads'));
     writeFileSync(join(tempDir, '.beads', 'issues.jsonl'), JSON.stringify({
-      id: 'bead-stale',
-      title: 'pan-714: Stale task',
-      status: 'in_progress',
+      id: 'bead-jsonl',
+      title: 'pan-714: JSONL task',
+      status: 'closed',
       labels: ['pan-714'],
     }) + '\n');
 
-    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
-      if (args.includes('closed')) {
-        cb(null, { stdout: JSON.stringify([{ id: 'bead-stale', title: 'pan-714: Stale task' }]), stderr: '' });
-      } else {
-        cb(null, { stdout: '[]', stderr: '' });
-      }
+    mockExecFileFn.mockImplementation((_file: string, _args: string[], _opts: unknown, cb: Function) => {
+      // bd should not be invoked when the workspace beads DB is available
+      cb(null, { stdout: '[]', stderr: '' });
     });
     mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
       cb(null, { stdout: '', stderr: '' });
     });
     mockGetVBriefACStatus.mockReturnValue(null);
-    mockSyncBeadStatusToVBrief.mockReturnValue(Effect.succeed('item-stale'));
+    mockSyncBeadStatusToVBrief.mockReturnValue(Effect.succeed('item-jsonl'));
 
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     await Effect.runPromise(runPreflightChecks(tempDir, 'PAN-714'));
 
-    expect(mockSyncBeadStatusToVBrief).toHaveBeenCalledWith('bead-stale', tempDir, 'completed', 'pan-714: Stale task');
+    expect(mockSyncBeadStatusToVBrief).toHaveBeenCalledWith('bead-jsonl', tempDir, 'completed', 'pan-714: JSONL task');
   });
 });

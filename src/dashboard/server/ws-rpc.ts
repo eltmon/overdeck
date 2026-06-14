@@ -6,7 +6,7 @@
  * are implemented via TerminalService (dual-runtime PTY, B20).
  */
 
-import { Effect, Layer, Queue, Stream } from 'effect';
+import { Effect, Layer, Queue, Schedule, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
@@ -15,7 +15,8 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { getConversationByName } from '../../lib/database/conversations-db.js';
-import { computeContextUsage, parseConversationMessages, watchConversation } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState } from './services/conversation-service.js';
+import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNames } from '../../lib/tmux.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -64,6 +65,12 @@ type AgentIssueRecord = {
   id?: unknown;
   issueId?: unknown;
 };
+
+export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent> {
+  return Stream.succeed({ kind: 'discovering' } as ConversationEvent).pipe(
+    Stream.repeat(Schedule.fixed('2 seconds')),
+  );
+}
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
   const lookup = new Map<string, string>();
@@ -605,53 +612,124 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Effect.gen(function* () {
             const conv = getConversationByName(input.conversationName);
 
-            const sessionFile = conv?.claudeSessionId
-              ? sessionFilePath(conv.cwd, conv.claudeSessionId)
-              : null;
-            const model = conv?.model ?? null;
-
-            if (!sessionFile) {
-              // Session file not yet discovered — emit a single discovering event
-              return Stream.succeed({ kind: 'discovering' } as ConversationEvent);
+            if (!conv || (conv.harness !== 'claude-code' && conv.harness != null)) {
+              return conversationDiscoveringStream();
             }
 
-            const readContextUsage = async () => {
-              try {
-                return await computeContextUsage(sessionFile, model);
-              } catch {
-                return null;
-              }
-            };
+            const sessionFile = conv.claudeSessionId
+              ? sessionFilePath(conv.cwd, conv.claudeSessionId)
+              : null;
+            const model = conv.model ?? null;
+
+            if (!sessionFile) {
+              // Session file not yet discovered — keep the subscription alive
+              // without causing the client to reconnect in a tight loop.
+              return conversationDiscoveringStream();
+            }
+
+            if (isPiSessionFile(sessionFile)) {
+              // Pi session files use a different JSONL schema and must not be
+              // routed through the Claude-only incremental watcher.
+              return conversationDiscoveringStream();
+            }
 
             return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
               Effect.acquireRelease(
                 Effect.promise(async () => {
-                  // Emit current state immediately on subscribe
-                  const initial = await parseConversationMessages(sessionFile, 0);
-                  Queue.offerUnsafe(queue, {
+                  const offer = (event: ConversationEvent) => {
+                    try {
+                      Queue.offerUnsafe(queue, event);
+                    } catch {
+                      // The queue may be shut down if the client disconnected
+                      // while an async file watcher callback was still running.
+                    }
+                  };
+
+                  // Pass an explicit empty ParseState so pending tool_use entries
+                  // remain in parser state for the watcher instead of being flushed
+                  // and cleared by the non-incremental display path.
+                  const initialState: ParseState = {
+                    pendingToolUse: new Map(),
+                    unresolvedResults: new Map(),
+                    lastSequence: 0,
+                  };
+                  const initial = await parseConversationMessages(sessionFile, 0, initialState);
+                  let currentByteOffset = initial.byteOffset;
+                  let currentContextUsage = contextUsageFromParseResult(initial, model);
+                  // Per-subscription high-water mark of the largest full transcript
+                  // we have emitted as an authoritative snapshot. The append-only
+                  // guard (gateSnapshotEmission) uses it to refuse any later
+                  // reset-snapshot that would shrink the transcript. See PAN-1642.
+                  let highWaterCount = initial.messages.length;
+                  if (initial.messages.length === 0 && currentByteOffset > 0) {
+                    // The file has complete lines on disk yet parsed to zero
+                    // messages — a transient read during a respawn rewrite, or a
+                    // transcript shape we failed to parse. Logged (not fatal) so a
+                    // recurring blank-on-subscribe can be correlated with respawns.
+                    console.warn(
+                      `[conv-stream] initial parse of ${input.conversationName} yielded 0 messages ` +
+                      `despite byteOffset=${currentByteOffset} — emitting empty snapshot (client HTTP backfill covers this)`,
+                    );
+                  }
+                  const priorState: ParseState = {
+                    pendingToolUse: initial.pendingToolUse,
+                    unresolvedResults: initial.unresolvedResults,
+                    lastSequence: initial.lastSequence,
+                    planToolUseIds: initial.planToolUseIds,
+                    proposedPlan: initial.proposedPlan,
+                    latestAssistantUsage: initial.latestAssistantUsage,
+                    contextBoundaryOffset: initial.contextBoundaryOffset,
+                    permissionMode: initial.permissionMode,
+                    countedUsageIds: initial.countedUsageIds,
+                    fileEditsByAssistantId: initial.fileEditsByAssistantId,
+                    pendingAssistantId: initial.pendingAssistantId,
+                    orphanToolUseIds: initial.orphanToolUseIds,
+                  };
+
+                  offer({
                     kind: 'messages' as const,
                     messages: initial.messages,
-                    workLog: initial.workLog,
+                    workLog: [...initial.workLog, ...initial.pendingToolUse.values()],
                     streaming: initial.streaming,
+                    snapshot: true,
                     proposedPlan: initial.proposedPlan,
                     compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
-                    contextUsage: await readContextUsage(),
+                    contextUsage: currentContextUsage,
                   });
 
-                  // Watch for new content and stream incremental updates
-                  let byteOffset = initial.byteOffset;
-                  const handle = watchConversation(sessionFile, async (result) => {
-                    byteOffset = result.byteOffset;
-                    Queue.offerUnsafe(queue, {
+                  // Watch only bytes written after the initial full parse. Subsequent
+                  // events are deltas; the client merges them into its cache.
+                  const handle = watchConversation(sessionFile, (result) => {
+                    const fileWasReset = result.byteOffset < currentByteOffset;
+                    // Append-only guard: a watcher reset fires only when the file
+                    // shrank and was re-parsed from byte 0, so result.messages is a
+                    // full transcript. claude-code transcripts never legitimately
+                    // shrink on a stable subscription (resume reuses the same file;
+                    // compaction appends), so a smaller full re-parse is a transient
+                    // rewrite window — downgrade it to a merge instead of letting it
+                    // wipe the reader's view to "How can I help you?" (PAN-1642).
+                    const gate = gateSnapshotEmission(fileWasReset, result.messages.length, highWaterCount);
+                    highWaterCount = gate.highWaterCount;
+                    currentByteOffset = result.byteOffset;
+                    currentContextUsage = contextUsageFromParseResult(result, model);
+                    if (gate.suppressedShrink) {
+                      console.warn(
+                        `[conv-stream] suppressed shrinking reset for ${input.conversationName}: ` +
+                        `byteOffset ${currentByteOffset} (re-parsed ${result.messages.length} msgs) < ` +
+                        `high-water ${highWaterCount} — treating as transient rewrite, merging instead of replacing`,
+                      );
+                    }
+                    offer({
                       kind: 'messages' as const,
                       messages: result.messages,
                       workLog: result.workLog,
                       streaming: result.streaming,
+                      snapshot: gate.snapshot,
                       proposedPlan: result.proposedPlan,
                       compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
-                      contextUsage: await readContextUsage(),
+                      contextUsage: currentContextUsage,
                     });
-                  });
+                  }, { byteOffset: initial.byteOffset, priorState });
 
                   return handle;
                 }),

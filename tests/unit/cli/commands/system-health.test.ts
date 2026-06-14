@@ -13,7 +13,8 @@ vi.mock('node:fs', () => ({
 global.fetch = mockFetch as unknown as typeof fetch;
 
 const mockGetDashboardApiUrl = vi.fn(() => 'http://localhost:3011');
-vi.mock('../../../../src/lib/config.js', () => ({
+vi.mock('../../../../src/lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../src/lib/config.js')>()),
   getDashboardApiUrl: (...args: Parameters<typeof mockGetDashboardApiUrl>) =>
     mockGetDashboardApiUrl(...args),
   getDashboardApiUrlSync: (...args: Parameters<typeof mockGetDashboardApiUrl>) =>

@@ -16,7 +16,8 @@ vi.mock('../../../src/lib/paths.js', () => ({
   },
 }));
 
-vi.mock('../../../src/lib/config.js', () => ({
+vi.mock('../../../src/lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../src/lib/config.js')>()),
   loadConfig: vi.fn().mockReturnValue({
     sync: {
       strategy: 'symlink',

@@ -7,11 +7,14 @@ const STATIC_VARIANTS = [
   'WORK RUNNING',
   'REVIEW RUNNING',
   'SHIP RUNNING',
+  'STRIKE RUNNING',
   'PLANNING',
   'INPUT',
   'READY TO MERGE',
   'MERGED',
   'CHANGES REQUESTED',
+  'MERGE BLOCKED',
+  'CI BLOCKED',
   'QUEUED FOR PLAN',
 ] satisfies Exclude<VerbBadgeVariant, 'STUCK · Nh'>[];
 
@@ -19,6 +22,7 @@ const PULSING_VARIANTS = new Set<VerbBadgeVariant>([
   'WORK RUNNING',
   'REVIEW RUNNING',
   'SHIP RUNNING',
+  'STRIKE RUNNING',
   'PLANNING',
   'INPUT',
 ]);
@@ -76,6 +80,19 @@ describe('VerbBadge', () => {
           </span>
         </span>
         <span
+          class="inline-flex items-center gap-[5px] rounded-[var(--radius-sm)] border px-[6px] py-[2px] text-[10px] font-medium uppercase leading-none tracking-[0.05em] border-[#ff6a00] bg-[#ff6a00]/15 text-[#ff6a00]"
+          data-component="verb-badge"
+          data-variant="STRIKE RUNNING"
+        >
+          <span
+            aria-hidden="true"
+            class="h-[6px] w-[6px] rounded-full bg-current pulse"
+          />
+          <span>
+            STRIKE RUNNING
+          </span>
+        </span>
+        <span
           class="inline-flex items-center gap-[5px] rounded-[var(--radius-sm)] border px-[6px] py-[2px] text-[10px] font-medium uppercase leading-none tracking-[0.05em] badge-bg-signal-review badge-border-signal-review text-signal-review-foreground"
           data-component="verb-badge"
           data-variant="PLANNING"
@@ -126,6 +143,24 @@ describe('VerbBadge', () => {
         >
           <span>
             CHANGES REQUESTED
+          </span>
+        </span>
+        <span
+          class="inline-flex items-center gap-[5px] rounded-[var(--radius-sm)] border px-[6px] py-[2px] text-[10px] font-medium uppercase leading-none tracking-[0.05em] badge-bg-destructive badge-border-destructive text-destructive-foreground"
+          data-component="verb-badge"
+          data-variant="MERGE BLOCKED"
+        >
+          <span>
+            MERGE BLOCKED
+          </span>
+        </span>
+        <span
+          class="inline-flex items-center gap-[5px] rounded-[var(--radius-sm)] border px-[6px] py-[2px] text-[10px] font-medium uppercase leading-none tracking-[0.05em] badge-bg-warning badge-border-warning text-warning-foreground"
+          data-component="verb-badge"
+          data-variant="CI BLOCKED"
+        >
+          <span>
+            CI BLOCKED
           </span>
         </span>
         <span

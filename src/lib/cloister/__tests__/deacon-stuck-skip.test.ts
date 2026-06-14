@@ -333,4 +333,25 @@ describe('checkApiErrorAgents context overflow recovery', () => {
       mechanism: 'harness-compact',
     });
   });
+
+  it('does not recover convoy reviewer sub-role sessions — they are owned by monitorReviewConvoySignals (PAN-1818)', async () => {
+    mockListSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1815-review-correctness']));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockCapturePane).not.toHaveBeenCalledWith('agent-pan-1815-review-correctness', expect.any(Number));
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(mockSendKeysAsync).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
+  });
+
+  it('still recovers a normal work agent with context overflow (PAN-1818 regression guard)', async () => {
+    mockListSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1815']));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockCapturePane).toHaveBeenCalledWith('agent-pan-1815', 100);
+    expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1815', undefined, { compact: true });
+    expect(actions).toContain('Context overflow recovery: compact-respawned agent-pan-1815 (attempt 1)');
+  });
 });

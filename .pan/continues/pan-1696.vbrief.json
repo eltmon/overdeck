@@ -1,0 +1,142 @@
+{
+  "version": "1",
+  "issueId": "PAN-1696",
+  "created": "2026-06-12T20:30:48.443Z",
+  "updated": "2026-06-13T00:29:13.165Z",
+  "gitState": {
+    "branch": "feature/pan-1696",
+    "sha": "bff3036ec",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Flag rename is a fallback read: isMergeTrainEnabled() reads merge_train.enabled, falls back to legacy flywheel.merge_train_enabled when unset; setMergeTrainEnabled() writes only the new key. No data migration — the flag is ON in production and must survive deploy.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Per-project override merge_train?: 'enabled'|'disabled' on ProjectConfig (absent = follow global), mirroring auto_merge_default. Resolution helper isMergeTrainEnabledForProject(projectKey) lives in src/lib/cloister/auto-merge-policy.ts and gates BOTH the UAT train reconciler and the post-merge sibling reconciler (runMergeTrainReconcile).",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Ready set sources from getAllReviewStatusesFromDb() filtered by mergeGateEligibility().eligible && deaconIgnored !== true (the readyForMerge boolean can be stale; the predicate is authoritative per PAN-1759), grouped via resolveProjectFromIssueSync. The MERGE_GATE_VERBS verb filter is dropped; the verb-based computeMergeQueue wrapper and MERGE_GATE_VERBS are deleted in remove-legacy-routes IF grep -rn MERGE_GATE_VERBS src/ shows only test references remaining.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "No module file renames — src/lib/flywheel-merge-order.ts keeps its path (surgical-changes rule; the issue's coupling list is flag/data-source/UI, not file names).",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "New API is the aggregate /api/merge-train/* namespace (queues/generations return all projects; mutations take project or generation-name params). Legacy /api/flywheel merge-train routes are removed in the final remove-legacy-routes bead AFTER the frontend beads migrate — no aliases (dashboard frontend is the only consumer), and every intermediate bead leaves a working tree.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Multi-project view hosts on the Awaiting Merge page; the Flywheel page stays one viewer; no new top-level page. Project cockpit gets the per-project segmented control plus a compact summary (ready count + current generation name/status) linking to Awaiting Merge.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Generation label stays the project issue prefix (codenameLabel) — uat_generations.name is a global PRIMARY KEY and prefix-distinct labels make cross-project name collisions structurally impossible. Keep an invariant comment at codenameLabel.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "UAT stack frontend host resolves from the project's dns domain config (dns lives on WorkspaceConfig, src/lib/projects.ts:32-52) with pan.localhost fallback; non-PAN stack support beyond URL resolution is best-effort.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Scope is baked into the flywheel run prompt at start/resume (flywheel-actions.ts:223,294). Persist effective scope on the run record; all UI copy states scope changes apply at the next run start or resume; configured-vs-run mismatch is made visible.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "The pure reconciler (reconcileUatGenerations) keeps its existing per-projectRoot interface; multi-project iteration happens only in the service wiring (uat-train.ts). Everything below the service layer is already multi-project-capable.",
+      "recordedAt": "2026-06-12T20:55:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Production currently runs with the merge-train flag ON under the legacy key; the rename must not flip it off.",
+      "mitigation": "Fallback read in isMergeTrainEnabled() (flag-rename.ac1 tests an ON value stored only under the old key). Verify live after merge."
+    },
+    {
+      "id": "H2",
+      "summary": "Blast radius: after decoupling, the global flag reaches every tracked project with ready work — git fetch/worktree/branch-push in THEIR repos every 60s tick.",
+      "mitigation": "Per-project 'disabled' override is the safety valve; the idle-skip rule (zero git calls when ready set empty AND no live generations) is the noise guard — but a project with live generations and an empty ready set MUST still proceed so invalidation runs (reconciler-decouple.ac3)."
+    },
+    {
+      "id": "H3",
+      "summary": "The post-merge path must stay idempotent (PAN-328 infinite-loop history, 24k tracker calls).",
+      "mitigation": "tests/unit/lib/cloister/in-flight-guard.test.ts must stay green; promote keeps firing post-merge through the in-flight guard exactly once per member."
+    },
+    {
+      "id": "H4",
+      "summary": "Stale/cancelled tracker issues can linger in review-status records looking eligible.",
+      "mitigation": "deaconIgnored exclusion + the branch-existence check inside computeMergeQueueFromCandidates are the backstops. Do NOT add tracker API calls to the ready-set hot path (it runs every 60s)."
+    },
+    {
+      "id": "H5",
+      "summary": "uat_generations.name is a global PK; two projects could theoretically collide on a generation name.",
+      "mitigation": "Label = issue prefix makes names prefix-distinct per project (uat/pan-* vs uat/min-*). Invariant comment required at codenameLabel (D7)."
+    },
+    {
+      "id": "H6",
+      "summary": "Browser-based verification is required for the dashboard beads (Awaiting Merge view, cockpit control, Flywheel viewer, settings scope select).",
+      "mitigation": "Playwright must use an isolated browser instance/profile; never depend on another agent's session or shared browser state; any login/setup must be reproducible inside the isolated session."
+    },
+    {
+      "id": "H7",
+      "summary": "A prior planning session (2026-06-11) left a sequence-2 workspace spec that was never promoted (no main-side spec existed).",
+      "mitigation": "This session superseded it with sequence 3, incorporating its route-removal-as-final-bead ordering and empty-ready-set invalidation AC. No beads existed from the prior session."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-fable-5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1696: feat: decouple merge-train from the Flywheel — per-project pipeline feature + multi-project view",
+      "timestamp": "2026-06-12T20:30:48.443Z"
+    },
+    {
+      "timestamp": "2026-06-12T20:55:00.000Z",
+      "reason": "planning",
+      "note": "Auto planning complete: PRD at .pan/drafts/PAN-1696.md (FR-1..15, NFR-1..4, D1-D10), vBRIEF sequence 3 with 17 beads (2 inspection gates: ready-set-source deep, merge-train-routes fast). Key discovery: everything below the service layer is already multi-project-capable; coupling concentrates in uat-train.ts wiring, flywheel routes, the flag key, and UI placement.",
+      "agentModel": "agent:claude-fable-5"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-13T00:27Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-13T00:27:40.008Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-13T00:29Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-13T00:29:13.165Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-13T00:27:39Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1696 (attempt 1/10):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 48/48 AC incomplete:\n\n### Move flag to merge_train.enabled with legacy fallback read (3/3 incomplete)\n  - [ ] isMergeTrainEnabled() returns the value stored under merge_train.enabled when that key exists, and falls back to flywheel.merge_train_enabled when the new key is absent (unit test covers an ON value stored only under the old key)\n  - [ ] setMergeTrainEnabled(true) persists 'true' under merge_train.enabled, leaves the legacy key untouched, and the flywheel config GET/POST endpoints round-trip the toggle\n  - [ ] A grep for the legacy key string returns no hits outside the fallback site, its constant, and tests\n\n### Per-project merge_train override in projects.yaml + resolution helper + sibling-reconciler gate (3/3 incomplete)\n  - [ ] Resolver precedence (unit-tested): project 'disabled' wins over global ON; project 'enabled' wins over global OFF; an absent override falls back to the global flag\n  - [ ] setProjectMergeTrainSync persists 'enabled'/'disabled' to projects.yaml and removes the field when passed null\n  - [ ] runMergeTrainReconcile returns [] without loading git deps when the merged issue's project carries merge_train: 'disabled', even with the global flag on\n\n### Pipeline-sourced per-project ready set (review-status DB, no flywheel run) (4/4 incomplete)\n  - [ ] computeMergeQueueFromCandidates produces the same conflict-aware ordering, conflictsWith sets, and batchGroup values as the previous implementation for equivalent inputs (adapted tests preserve all ordering assertions)\n  - [ ] listEligibleCandidatesByProject returns only records passing mergeGateEligibility with deaconIgnored !== true — review-not-passed, test-failed, verification-failed, already-merged, and deacon-ignored records are excluded even when their readyForMerge bit is stale\n  - [ ] Given eligible records spanning two projects, each project's group contains only its own issues, and issues resolving to no registered project are dropped\n  - [ ] Candidates carry title from the injected titleFor resolver, fall back to the issue ID when it returns undefined, and the call chain never reads flywheel run state or activePipeline\n\n### Multi-project UAT train service: iterate tracked projects, no flywheel dependency (4/4 incomplete)\n  - [ ] Given no flywheel run is active and merge-train is effectively enabled, a tick produces a uat/* generation for a ready non-PAN issue in that issue's own project (test with fake deps simulating two projects)\n  - [ ] When a project has an empty ready set and no live generations, the tick invokes zero git operations (spy deps record no calls)\n  - [ ] When a project's ready set goes empty while live generations exist, the next tick marks them invalidated and tears down their stacks\n  - [ ] A project carrying merge_train: 'disabled' is skipped while other enabled projects still reconcile in the same tick, and getUatGenerationsPayload() returns per-project chains tagged with projectKey/projectName while no flywheel run is active\n\n### New /api/merge-train/* routes (aggregate, per-project payloads) (3/3 incomplete)\n  - [ ] GET /api/merge-train/queues returns one entry per tracked project with projectKey, effective enabled flag, and that project's queue — with no flywheel run active\n  - [ ] GET /api/merge-train/generations returns per-project generation chains, and POST stack/promote/assemble reproduce the existing flywheel routes' behaviors under the same auth guards\n  - [ ] POST /api/merge-train/merge-next { n, project } merges from the named project's ready set (not the flywheel pipeline) and rejects an unknown project key with a 4xx error body\n\n### GET/POST /api/projects/:key/merge-train override endpoint (2/2 incomplete)\n  - [ ] GET returns { value, effective } reflecting projects.yaml and the resolved global fallback; POST persists 'enabled'/'disabled' and rejects any other non-null value with 400\n  - [ ] POSTing { value: null } deletes the override so the project falls back to the global flag, and the next GET returns the updated effective field\n\n### UAT stack frontend URL honors per-project DNS domain (2/2 incomplete)\n  - [ ] The frontend URL renders as <folder>.<domain> when the generation's project config defines a dns domain\n  - [ ] The frontend URL falls back to <folder>.pan.localhost when no project domain is configured (existing behavior preserved)\n\n### pan flywheel status merge queue sourced from the pipeline ready set (2/2 incomplete)\n  - [ ] pan flywheel status prints the merge-queue section from the cwd project's ready set when eligible issues exist and no flywheel run is active\n  - [ ] The command exits 0 and renders an empty queue (not an error) when no issues are eligible\n\n### Multi-project merge-train view component with persisted project filter (4/4 incomplete)\n  - [ ] The view renders one section per project with batches, ready features, and the escape hatch, fetching only /api/merge-train/* endpoints with zero flywheel-state inputs\n  - [ ] Project filter chips toggle section visibility and the selection survives reload via localStorage 'merge-train.projectFilter'\n  - [ ] Stack, promote, rebuild, and merge-next actions POST to the new endpoints behind confirmation dialogs that name the exact members\n  - [ ] When no flywheel run is active, the view still renders live generations (verified in browser via isolated Playwright instance)\n\n### Awaiting Merge page hosts the multi-project merge-train view (3/3 incomplete)\n  - [ ] The Awaiting Merge page renders the multi-project merge-train view above the per-issue rows, populated with no flywheel run active\n  - [ ] The page's merge-train toggle reflects the current enabled state and persists changes through the config endpoint\n  - [ ] The page preserves existing per-row actions (merge, approve, auto-merge toggle, open UAT workspace) after the change\n\n### Flywheel page becomes one viewer of the shared merge-train view (2/2 incomplete)\n  - [ ] The Flywheel page rail renders the shared merge-train view fed by /api/merge-train/* data\n  - [ ] Card data renders on the Flywheel page when no run is active, and the Merge train ToggleSwitch still flips the flag\n\n### Project cockpit: per-project merge-train control + compact summary (3/3 incomplete)\n  - [ ] The cockpit settings section renders a merge-train segmented control whose selected option reflects GET /api/projects/:key/merge-train, with the resolved effective state shown for 'Global default'\n  - [ ] Selecting Enabled/Disabled/Global default persists via POST and the selection survives a reload\n  - [ ] The cockpit shows the project's ready-feature count and current generation status, linking to the Awaiting Merge view\n\n### Persist and display the active run's effective scope (3/3 incomplete)\n  - [ ] Starting or resuming a flywheel run persists the effective scope on the run record and the run detail/status payload exposes it\n  - [ ] The Flywheel page renders the active run's persisted scope (not the live settings value) while a run is live, with the apply-timing note visible and a configured-vs-run mismatch made visible\n  - [ ] With no active run, the pane falls back to displaying the configured scope from settings\n\n### Settings scope select: discoverability, help text, accurate apply-timing copy (3/3 incomplete)\n  - [ ] The scope select renders in Settings → Roles without any expansion interaction, with plain-language help text describing both values (asserted by component test and verified in browser via isolated Playwright instance)\n  - [ ] The panel copy states that scope applies at the next run start or resume\n  - [ ] A settings save of roles.flywheel.scope='all-tracked-projects' persists, and the subsequent settings GET returns it (asserted by test)\n\n### roles/flywheel.md defines scope semantics for the orchestrator (2/2 incomplete)\n  - [ ] roles/flywheel.md contains definitions of pan-only and all-tracked-projects at the point where the Scope: config line is interpreted, including the per-tracker author/assignee safety gates for multi-project inventory\n  - [ ] The role prompt contains an explicit statement that merge/UAT trains assemble per project regardless of run scope\n\n### Remove legacy /api/flywheel merge-train routes after frontend migration (2/2 incomplete)\n  - [ ] The removed /api/flywheel merge-train endpoints return 404 while GET /api/flywheel/config still returns merge_train_enabled\n  - [ ] A grep for the removed paths returns no frontend or server hits, and the D3 rule deletes orphaned helpers (verb-based computeMergeQueue wrapper, MERGE_GATE_VERBS) with the contracts comment revised accordingly\n\n### Docs sweep: UAT-BATCH-TRAINS, MERGE-TRAIN §7, FLYWHEEL scope disambiguation (3/3 incomplete)\n  - [ ] docs/UAT-BATCH-TRAINS.md covers the review-status-sourced per-project ready set, the /api/merge-train/* API, and the per-project override, and no longer contains the 'requires an active flywheel run' language\n  - [ ] docs/MERGE-TRAIN.md §7 contains a resolved-by-PAN-1696 note\n  - [ ] docs/FLYWHEEL.md contains a section distinguishing orchestrator scope from per-project batch-train independence, stating cross-project batches remain out of scope\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with `bd close` — AC statuses sync from closed beads automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-1696 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-13T00:29:13Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1696 (attempt 1/10):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 48/48 AC incomplete:\n\n### Move flag to merge_train.enabled with legacy fallback read (3/3 incomplete)\n  - [ ] isMergeTrainEnabled() returns the value stored under merge_train.enabled when that key exists, and falls back to flywheel.merge_train_enabled when the new key is absent (unit test covers an ON value stored only under the old key)\n  - [ ] setMergeTrainEnabled(true) persists 'true' under merge_train.enabled, leaves the legacy key untouched, and the flywheel config GET/POST endpoints round-trip the toggle\n  - [ ] A grep for the legacy key string returns no hits outside the fallback site, its constant, and tests\n\n### Per-project merge_train override in projects.yaml + resolution helper + sibling-reconciler gate (3/3 incomplete)\n  - [ ] Resolver precedence (unit-tested): project 'disabled' wins over global ON; project 'enabled' wins over global OFF; an absent override falls back to the global flag\n  - [ ] setProjectMergeTrainSync persists 'enabled'/'disabled' to projects.yaml and removes the field when passed null\n  - [ ] runMergeTrainReconcile returns [] without loading git deps when the merged issue's project carries merge_train: 'disabled', even with the global flag on\n\n### Pipeline-sourced per-project ready set (review-status DB, no flywheel run) (4/4 incomplete)\n  - [ ] computeMergeQueueFromCandidates produces the same conflict-aware ordering, conflictsWith sets, and batchGroup values as the previous implementation for equivalent inputs (adapted tests preserve all ordering assertions)\n  - [ ] listEligibleCandidatesByProject returns only records passing mergeGateEligibility with deaconIgnored !== true — review-not-passed, test-failed, verification-failed, already-merged, and deacon-ignored records are excluded even when their readyForMerge bit is stale\n  - [ ] Given eligible records spanning two projects, each project's group contains only its own issues, and issues resolving to no registered project are dropped\n  - [ ] Candidates carry title from the injected titleFor resolver, fall back to the issue ID when it returns undefined, and the call chain never reads flywheel run state or activePipeline\n\n### Multi-project UAT train service: iterate tracked projects, no flywheel dependency (4/4 incomplete)\n  - [ ] Given no flywheel run is active and merge-train is effectively enabled, a tick produces a uat/* generation for a ready non-PAN issue in that issue's own project (test with fake deps simulating two projects)\n  - [ ] When a project has an empty ready set and no live generations, the tick invokes zero git operations (spy deps record no calls)\n  - [ ] When a project's ready set goes empty while live generations exist, the next tick marks them invalidated and tears down their stacks\n  - [ ] A project carrying merge_train: 'disabled' is skipped while other enabled projects still reconcile in the same tick, and getUatGenerationsPayload() returns per-project chains tagged with projectKey/projectName while no flywheel run is active\n\n### New /api/merge-train/* routes (aggregate, per-project payloads) (3/3 incomplete)\n  - [ ] GET /api/merge-train/queues returns one entry per tracked project with projectKey, effective enabled flag, and that project's queue — with no flywheel run active\n  - [ ] GET /api/merge-train/generations returns per-project generation chains, and POST stack/promote/assemble reproduce the existing flywheel routes' behaviors under the same auth guards\n  - [ ] POST /api/merge-train/merge-next { n, project } merges from the named project's ready set (not the flywheel pipeline) and rejects an unknown project key with a 4xx error body\n\n### GET/POST /api/projects/:key/merge-train override endpoint (2/2 incomplete)\n  - [ ] GET returns { value, effective } reflecting projects.yaml and the resolved global fallback; POST persists 'enabled'/'disabled' and rejects any other non-null value with 400\n  - [ ] POSTing { value: null } deletes the override so the project falls back to the global flag, and the next GET returns the updated effective field\n\n### UAT stack frontend URL honors per-project DNS domain (2/2 incomplete)\n  - [ ] The frontend URL renders as <folder>.<domain> when the generation's project config defines a dns domain\n  - [ ] The frontend URL falls back to <folder>.pan.localhost when no project domain is configured (existing behavior preserved)\n\n### pan flywheel status merge queue sourced from the pipeline ready set (2/2 incomplete)\n  - [ ] pan flywheel status prints the merge-queue section from the cwd project's ready set when eligible issues exist and no flywheel run is active\n  - [ ] The command exits 0 and renders an empty queue (not an error) when no issues are eligible\n\n### Multi-project merge-train view component with persisted project filter (4/4 incomplete)\n  - [ ] The view renders one section per project with batches, ready features, and the escape hatch, fetching only /api/merge-train/* endpoints with zero flywheel-state inputs\n  - [ ] Project filter chips toggle section visibility and the selection survives reload via localStorage 'merge-train.projectFilter'\n  - [ ] Stack, promote, rebuild, and merge-next actions POST to the new endpoints behind confirmation dialogs that name the exact members\n  - [ ] When no flywheel run is active, the view still renders live generations (verified in browser via isolated Playwright instance)\n\n### Awaiting Merge page hosts the multi-project merge-train view (3/3 incomplete)\n  - [ ] The Awaiting Merge page renders the multi-project merge-train view above the per-issue rows, populated with no flywheel run active\n  - [ ] The page's merge-train toggle reflects the current enabled state and persists changes through the config endpoint\n  - [ ] The page preserves existing per-row actions (merge, approve, auto-merge toggle, open UAT workspace) after the change\n\n### Flywheel page becomes one viewer of the shared merge-train view (2/2 incomplete)\n  - [ ] The Flywheel page rail renders the shared merge-train view fed by /api/merge-train/* data\n  - [ ] Card data renders on the Flywheel page when no run is active, and the Merge train ToggleSwitch still flips the flag\n\n### Project cockpit: per-project merge-train control + compact summary (3/3 incomplete)\n  - [ ] The cockpit settings section renders a merge-train segmented control whose selected option reflects GET /api/projects/:key/merge-train, with the resolved effective state shown for 'Global default'\n  - [ ] Selecting Enabled/Disabled/Global default persists via POST and the selection survives a reload\n  - [ ] The cockpit shows the project's ready-feature count and current generation status, linking to the Awaiting Merge view\n\n### Persist and display the active run's effective scope (3/3 incomplete)\n  - [ ] Starting or resuming a flywheel run persists the effective scope on the run record and the run detail/status payload exposes it\n  - [ ] The Flywheel page renders the active run's persisted scope (not the live settings value) while a run is live, with the apply-timing note visible and a configured-vs-run mismatch made visible\n  - [ ] With no active run, the pane falls back to displaying the configured scope from settings\n\n### Settings scope select: discoverability, help text, accurate apply-timing copy (3/3 incomplete)\n  - [ ] The scope select renders in Settings → Roles without any expansion interaction, with plain-language help text describing both values (asserted by component test and verified in browser via isolated Playwright instance)\n  - [ ] The panel copy states that scope applies at the next run start or resume\n  - [ ] A settings save of roles.flywheel.scope='all-tracked-projects' persists, and the subsequent settings GET returns it (asserted by test)\n\n### roles/flywheel.md defines scope semantics for the orchestrator (2/2 incomplete)\n  - [ ] roles/flywheel.md contains definitions of pan-only and all-tracked-projects at the point where the Scope: config line is interpreted, including the per-tracker author/assignee safety gates for multi-project inventory\n  - [ ] The role prompt contains an explicit statement that merge/UAT trains assemble per project regardless of run scope\n\n### Remove legacy /api/flywheel merge-train routes after frontend migration (2/2 incomplete)\n  - [ ] The removed /api/flywheel merge-train endpoints return 404 while GET /api/flywheel/config still returns merge_train_enabled\n  - [ ] A grep for the removed paths returns no frontend or server hits, and the D3 rule deletes orphaned helpers (verb-based computeMergeQueue wrapper, MERGE_GATE_VERBS) with the contracts comment revised accordingly\n\n### Docs sweep: UAT-BATCH-TRAINS, MERGE-TRAIN §7, FLYWHEEL scope disambiguation (3/3 incomplete)\n  - [ ] docs/UAT-BATCH-TRAINS.md covers the review-status-sourced per-project ready set, the /api/merge-train/* API, and the per-project override, and no longer contains the 'requires an active flywheel run' language\n  - [ ] docs/MERGE-TRAIN.md §7 contains a resolved-by-PAN-1696 note\n  - [ ] docs/FLYWHEEL.md contains a section distinguishing orchestrator scope from per-project batch-train independence, stating cross-project batches remain out of scope\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with `bd close` — AC statuses sync from closed beads automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-1696 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
+    }
+  ]
+}

@@ -136,6 +136,7 @@ function renderPanel(
 describe('ConversationPanel rename flow', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     vi.stubGlobal('navigator', {
       clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
     });
@@ -143,6 +144,7 @@ describe('ConversationPanel rename flow', () => {
 
   afterEach(() => {
     window.history.replaceState(null, '', '/');
+    localStorage.clear();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
@@ -170,6 +172,16 @@ describe('ConversationPanel rename flow', () => {
 
     expect(screen.getByRole('button', { name: 'Hide about this conversation' })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByText('This conversation is about tightening dashboard behavior.')).toBeInTheDocument();
+  });
+
+  it('shows Hide tool calls as a visible pressed-state toggle', () => {
+    renderPanel();
+    const toggle = screen.getByRole('button', { name: 'Hide tool calls' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(screen.getByRole('button', { name: 'Show tool calls' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('closes the About drawer when switching conversations', () => {

@@ -9,6 +9,7 @@ import { Effect } from 'effect';
 import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReason, type ReviewStatus } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
+import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
 
 export interface WebhookPayload {
   action?: string;
@@ -79,6 +80,12 @@ export function isTrackedRepositorySync(fullName: string | undefined): boolean {
 function getRepoFromPrUrl(prUrl: string): string | null {
   const m = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/i);
   return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
+}
+
+function parseGitHubPrUrl(prUrl: string): { owner: string; repo: string; number: number } | null {
+  const m = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
+  if (!m) return null;
+  return { owner: m[1]!, repo: m[2]!, number: Number.parseInt(m[3]!, 10) };
 }
 
 async function loadAndValidateStatus(
@@ -171,7 +178,7 @@ const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
 const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
 
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
-const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
+export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
 const pendingReconciliation = new Set<string>();
 const reconciliationTimeouts = new Map<string, NodeJS.Timeout>();
@@ -270,9 +277,20 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
     if (suite.conclusion === 'success') {
       blockers = removeFailingSource(blockers, 'check_suite');
-    } else if (suite.conclusion) {
-      // Any terminal conclusion other than success is blocking
+    } else if (suite.conclusion && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion.toUpperCase())) {
+      // Any terminal failure conclusion is blocking
       blockers = addFailingSource(blockers, 'check_suite', `CI check suite ${suite.conclusion}`);
+      if (pr.head.sha && pr.number != null) {
+        await Effect.runPromise(relayCiFailureFeedback({
+          issueId,
+          repo,
+          prNumber: pr.number,
+          headSha: pr.head.sha,
+          headRef: pr.head.ref,
+          prUrl: status.prUrl,
+          source: 'check_suite',
+        }));
+      }
     }
 
     const update: Partial<ReviewStatus> = {};
@@ -303,8 +321,19 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
     if (run.conclusion === 'success') {
       blockers = removeFailingSource(blockers, sourceKey);
-    } else if (run.conclusion) {
+    } else if (run.conclusion && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase())) {
       blockers = addFailingSource(blockers, sourceKey, `CI check run ${run.conclusion}: ${run.name ?? 'unknown'}`);
+      if (pr.head.sha && pr.number != null) {
+        await Effect.runPromise(relayCiFailureFeedback({
+          issueId,
+          repo,
+          prNumber: pr.number,
+          headSha: pr.head.sha,
+          headRef: pr.head.ref,
+          prUrl: status.prUrl,
+          source: sourceKey,
+        }));
+      }
     }
 
     const update: Partial<ReviewStatus> = {};
@@ -533,6 +562,20 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
         blockers = removeFailingSource(blockers, sourceKey);
       } else if (state === 'failure' || state === 'error') {
         blockers = addFailingSource(blockers, sourceKey, `Commit status: ${state}`);
+        if (payload.sha && status.prNumber != null && status.prUrl) {
+          const parsed = parseGitHubPrUrl(status.prUrl);
+          if (parsed) {
+            await Effect.runPromise(relayCiFailureFeedback({
+              issueId,
+              repo,
+              prNumber: status.prNumber,
+              headSha: payload.sha,
+              headRef: branch.name,
+              prUrl: status.prUrl,
+              source: sourceKey,
+            }));
+          }
+        }
       }
 
       const update: Partial<ReviewStatus> = {};

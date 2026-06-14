@@ -52,6 +52,48 @@ export interface GitHubPullRequestState extends GitHubPullRequestRef {
   checksFailed: boolean;
 }
 
+export interface GitHubPullRequestHeadState extends GitHubPullRequestRef {
+  url?: string;
+  state: 'OPEN' | 'CLOSED';
+  merged: boolean;
+  headSha: string;
+}
+
+export type GitHubCiCheckRunsVerdict = 'green' | 'pending' | 'red';
+
+export interface GitHubCiCheckRunSummary {
+  id?: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  htmlUrl?: string;
+}
+
+export interface GitHubCiCheckRunsState {
+  verdict: GitHubCiCheckRunsVerdict;
+  green: boolean;
+  pending: boolean;
+  failed: boolean;
+  total: number;
+  successCount: number;
+  pendingCount: number;
+  failedCount: number;
+  checkRuns: GitHubCiCheckRunSummary[];
+  successfulRuns: GitHubCiCheckRunSummary[];
+  pendingRuns: GitHubCiCheckRunSummary[];
+  failedRuns: GitHubCiCheckRunSummary[];
+}
+
+type GitHubCheckRunApiResponse = {
+  check_runs?: Array<{
+    id?: number;
+    name?: string;
+    status?: string;
+    conclusion?: string | null;
+    html_url?: string;
+  }>;
+};
+
 /**
  * Check if the GitHub App is configured (credentials exist)
  */
@@ -139,12 +181,12 @@ async function getInstallationAccessToken(): Promise<string> {
   return token;
 }
 
-async function githubApi<T>(
+async function githubApiWithToken<T>(
+  token: string,
   path: string,
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
-): Promise<T> {
-  const token = await getInstallationAccessToken();
+): Promise<{ data: T; headers: Headers; status: number }> {
   const response = await fetch(`https://api.github.com${path}`, {
     ...init,
     headers: {
@@ -161,11 +203,48 @@ async function githubApi<T>(
     throw new Error(`GitHub API ${init.method || 'GET'} ${path} failed: ${response.status} ${text}`);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
+  const data = response.status === 204 ? undefined as T : await response.json() as T;
+  return { data, headers: response.headers, status: response.status };
+}
+
+async function githubApi<T>(
+  path: string,
+  init: RequestInit = {},
+  extraHeaders: Record<string, string> = {}
+): Promise<T> {
+  const token = await getInstallationAccessToken();
+  const { data } = await githubApiWithToken<T>(token, path, init, extraHeaders);
+  return data;
+}
+
+function withPerPage(path: string, perPage: number): string {
+  const [pathname, query = ''] = path.split('?');
+  const params = new URLSearchParams(query);
+  if (!params.has('per_page')) params.set('per_page', String(perPage));
+  return `${pathname}?${params.toString()}`;
+}
+
+function nextPathFromLinkHeader(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+  const match = linkHeader.split(',').map(part => part.trim()).find(part => part.endsWith('rel="next"'))?.match(/^<([^>]+)>/);
+  if (!match) return null;
+  const url = new URL(match[1]);
+  if (url.hostname !== 'api.github.com') return null;
+  return `${url.pathname}${url.search}`;
+}
+
+async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitHubCheckRunApiResponse['check_runs']>> {
+  const token = await getInstallationAccessToken();
+  const allRuns: NonNullable<GitHubCheckRunApiResponse['check_runs']> = [];
+  let nextPath: string | null = withPerPage(path, 100);
+
+  while (nextPath) {
+    const { data, headers } = await githubApiWithToken<GitHubCheckRunApiResponse>(token, nextPath);
+    allRuns.push(...(data.check_runs || []));
+    nextPath = nextPathFromLinkHeader(headers.get('link'));
   }
 
-  return await response.json() as T;
+  return allRuns;
 }
 
 export function parsePullRequestRef(input: {
@@ -196,6 +275,58 @@ export function parsePullRequestRef(input: {
   throw new Error('GitHub PR reference requires either a PR URL or repository + numeric id');
 }
 
+function summarizeCiCheckRuns(
+  runs: NonNullable<GitHubCheckRunApiResponse['check_runs']>,
+): GitHubCiCheckRunsState {
+  const checkRuns = runs.map((run) => ({
+    id: run.id,
+    name: run.name || 'GitHub check run',
+    status: run.status || 'unknown',
+    conclusion: run.conclusion ?? null,
+    htmlUrl: run.html_url,
+  }));
+
+  const pendingRuns = checkRuns.filter((run) => run.status !== 'completed');
+  const successfulRuns = checkRuns.filter(
+    (run) => run.status === 'completed' && run.conclusion === 'success',
+  );
+  const failedRuns = checkRuns.filter((run) => {
+    if (run.status !== 'completed') return false;
+    return !['success', 'neutral', 'skipped'].includes(run.conclusion || '');
+  });
+
+  const pending = pendingRuns.length > 0 || successfulRuns.length === 0;
+  const failed = failedRuns.length > 0;
+  const green = checkRuns.length > 0 && successfulRuns.length > 0 && !pending && !failed;
+  const verdict: GitHubCiCheckRunsVerdict = failed ? 'red' : green ? 'green' : 'pending';
+
+  return {
+    verdict,
+    green,
+    pending: verdict === 'pending',
+    failed,
+    total: checkRuns.length,
+    successCount: successfulRuns.length,
+    pendingCount: pendingRuns.length,
+    failedCount: failedRuns.length,
+    checkRuns,
+    successfulRuns,
+    pendingRuns,
+    failedRuns,
+  };
+}
+
+async function getCiCheckRunsStatePromise(
+  owner: string,
+  repo: string,
+  sha: string,
+): Promise<GitHubCiCheckRunsState> {
+  const checkRuns = await githubApiAllCheckRunPages(
+    `/repos/${owner}/${repo}/commits/${sha}/check-runs`
+  );
+  return summarizeCiCheckRuns(checkRuns);
+}
+
 async function getCommitCheckState(
   owner: string,
   repo: string,
@@ -203,7 +334,7 @@ async function getCommitCheckState(
 ): Promise<{ pending: boolean; failed: boolean }> {
   const [combinedStatus, checkRuns] = await Promise.all([
     githubApi<{ state?: string }>(`/repos/${owner}/${repo}/commits/${sha}/status`),
-    githubApi<{ check_runs?: Array<{ status?: string; conclusion?: string | null }> }>(
+    githubApi<GitHubCheckRunApiResponse>(
       `/repos/${owner}/${repo}/commits/${sha}/check-runs`
     ),
   ]);
@@ -211,17 +342,11 @@ async function getCommitCheckState(
   const statusState = combinedStatus.state || '';
   const pendingStatus = statusState === 'pending';
   const failedStatus = statusState === 'failure' || statusState === 'error';
-
-  const runs = checkRuns.check_runs || [];
-  const pendingChecks = runs.some((run) => run.status !== 'completed');
-  const failedChecks = runs.some((run) => {
-    if (run.status !== 'completed') return false;
-    return !['success', 'neutral', 'skipped'].includes(run.conclusion || '');
-  });
+  const ciState = summarizeCiCheckRuns(checkRuns.check_runs || []);
 
   return {
-    pending: pendingStatus || pendingChecks,
-    failed: failedStatus || failedChecks,
+    pending: pendingStatus || ciState.pendingRuns.length > 0,
+    failed: failedStatus || ciState.failed,
   };
 }async function getPullRequestStatePromise(
   owner: string,
@@ -258,6 +383,29 @@ async function getCommitCheckState(
     baseBranch: pull.base?.ref || 'main',
     checksPending: checkState.pending,
     checksFailed: checkState.failed,
+  };
+}
+
+async function getPullRequestHeadStatePromise(
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<GitHubPullRequestHeadState> {
+  const pull = await githubApi<{
+    html_url?: string;
+    state: 'open' | 'closed';
+    merged?: boolean;
+    head?: { sha?: string };
+  }>(`/repos/${owner}/${repo}/pulls/${number}`);
+
+  return {
+    owner,
+    repo,
+    number,
+    url: pull.html_url,
+    state: pull.state === 'open' ? 'OPEN' : 'CLOSED',
+    merged: pull.merged === true,
+    headSha: pull.head?.sha || '',
   };
 }async function mergePullRequestWithAppPromise(
   owner: string,
@@ -501,6 +649,31 @@ export const getPullRequestState = (
   Effect.tryPromise({
     try: () => getPullRequestStatePromise(owner, repo, number),
     catch: apiCatch('getPullRequestState'),
+  });
+
+/** Effect-native lightweight PR state fetch without commit status/check aggregation. */
+export const getPullRequestHeadState = (
+  owner: string,
+  repo: string,
+  number: number,
+): Effect.Effect<GitHubPullRequestHeadState, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => getPullRequestHeadStatePromise(owner, repo, number),
+    catch: apiCatch('getPullRequestHeadState'),
+  });
+
+/**
+ * Effect-native check-runs-only CI verdict for one commit SHA.
+ * Unlike getPullRequestState(), this intentionally ignores commit statuses.
+ */
+export const getCiCheckRunsState = (
+  owner: string,
+  repo: string,
+  sha: string,
+): Effect.Effect<GitHubCiCheckRunsState, GitHubApiError> =>
+  Effect.tryPromise({
+    try: () => getCiCheckRunsStatePromise(owner, repo, sha),
+    catch: apiCatch('getCiCheckRunsState'),
   });
 
 /** Effect-native mergePullRequestWithApp — typed-error merge call. */

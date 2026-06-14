@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1614",
   "created": "2026-06-05T18:53:09.021Z",
-  "updated": "2026-06-11T13:03:07.032Z",
+  "updated": "2026-06-12T18:34:46.204Z",
   "gitState": {
     "branch": "feature/pan-1614",
     "sha": "ff30c9259",
@@ -111,6 +111,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-06-11T13:03:07.032Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-11T13:44Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-11T13:44:24.339Z"
     }
   ],
   "feedback": []

@@ -1,6 +1,7 @@
 import { Bot } from 'lucide-react'
-import { ProviderIcon } from '../../chat/ProviderIcons'
+import { HarnessLogo } from '../../shared/branding'
 import styles from '../stage.module.css'
+import type { Harness } from '../../Settings/types'
 
 export interface AgentIconProps {
   /** Agent/harness id, e.g. 'claude-code', 'codex'. */
@@ -10,26 +11,25 @@ export interface AgentIconProps {
   size?: number
 }
 
-/** Map a harness/agent id to a model-picker provider key. */
-function providerForAgent(id: string): string | null {
+function harnessForAgent(id: string): Harness | null {
   const key = id.toLowerCase()
-  if (key.includes('claude') || key.includes('anthropic')) return 'anthropic'
-  if (key.includes('codex') || key.includes('openai') || key.includes('gpt')) return 'openai'
+  if (key === 'pi' || key.includes('pi-')) return 'pi'
+  if (key.includes('claude') || key.includes('anthropic')) return 'claude-code'
+  if (key.includes('codex') || key.includes('openai') || key.includes('gpt')) return 'codex'
   return null
 }
 
 /**
- * AgentIcon — brand mark for an agent pill (PAN-1561). Reuses the model/harness
- * selector's `ProviderIcon`, so Claude Code / Codex render with the same
- * full-color official logos (Anthropic, OpenAI) used everywhere else. Falls back
- * to the generic lucide Bot glyph for agents without a provider mapping.
+ * AgentIcon — brand mark for an agent pill (PAN-1561). Uses harness branding
+ * for known harness ids and falls back to the generic lucide Bot glyph for
+ * unknown agents.
  */
-export function AgentIcon({ id, label, size = 14 }: AgentIconProps) {
-  const provider = providerForAgent(id)
-  if (!provider) return <Bot size={size} />
+export function AgentIcon({ id, size = 14 }: AgentIconProps) {
+  const harness = harnessForAgent(id)
+  if (!harness) return <Bot data-testid="agent-icon-bot" size={size} />
   return (
     <span className={styles.agentLogo} style={{ width: size, height: size }}>
-      <ProviderIcon provider={provider} label={label ?? id} className={styles.agentLogoSvg} />
+      <HarnessLogo harness={harness} className={styles.agentLogoSvg} />
     </span>
   )
 }

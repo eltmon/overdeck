@@ -142,7 +142,7 @@ curl -s -X POST {{API_URL}}/api/specialists/done \
 - **NEVER use `git push --force` or `--force-with-lease`** — never force-push under any circumstances.
 - **NEVER delete the feature branch** (locally or remotely).
 - **NEVER use `HEAD~1` for rollback** — use `ORIG_HEAD` which git sets automatically at merge time.
-- **NEVER run `git stash`** — the TypeScript layer handles stash/restore automatically.
+- **NEVER run `git stash`** — commit, explicitly discard, or surface dirty state to the operator.
 {{#DO_PUSH}}
 - **DO NOT** clean up workspaces or do anything beyond the sync, merge, build, test, and push steps above.
 {{/DO_PUSH}}

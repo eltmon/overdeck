@@ -103,6 +103,17 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
         type: <go|vitest|maven|pytest|cargo>
         path: .
         command: <test command>
+    quality_gates:
+      typecheck:
+        command: <typecheck command>
+        required: true
+      lint:
+        command: <lint command>
+        required: true
+      test:
+        # Keep this change-scoped and fast; e2e/Playwright belongs in CI-only or @slow tiers.
+        command: npx vitest run --changed {{CHANGED_BASE}}
+        required: true
 ```
 
 **Full config** (for projects with services, Docker, DNS):
@@ -143,6 +154,16 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
         type: <type>
         path: .
         command: <cmd>
+    quality_gates:
+      typecheck:
+        command: <cmd>
+        required: true
+      lint:
+        command: <cmd>
+        required: true
+      test:
+        command: npx vitest run --changed {{CHANGED_BASE}}
+        required: true
 ```
 
 ### Step 4: Add to Dashboard Tracker Config
@@ -302,3 +323,7 @@ Next steps:
    worktrees, `polyrepo` = multiple repos under one parent dir.
 6. **Missing `workspaces/` directory** — Git worktree creation fails.
 7. **Missing `.gitignore` entry** — `workspaces/` gets committed accidentally.
+8. **Full-suite per-change gates** — `quality_gates.test` should use changed-file
+   scoping such as `npx vitest run --changed {{CHANGED_BASE}}`. Put Playwright,
+   e2e, and other heavy suites in CI-only or `@slow` tiers so unrelated red tests
+   do not block every work agent.

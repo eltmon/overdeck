@@ -34,13 +34,14 @@ import { runQualityGates, DEFAULT_GATES } from '../../src/lib/cloister/validatio
 const workspacePath = '/tmp/test-workspace';
 
 describe('DEFAULT_GATES', () => {
-  it('defines typecheck and lint gates (tests handled by test specialist)', () => {
-    expect(Object.keys(DEFAULT_GATES)).toEqual(['typecheck', 'lint']);
+  it('defines typecheck, lint, and change-scoped test gates', () => {
+    expect(Object.keys(DEFAULT_GATES)).toEqual(['typecheck', 'lint', 'test']);
   });
 
   it('uses npm commands matching the verification gate defaults', () => {
     expect(DEFAULT_GATES.typecheck.command).toContain('npm run typecheck');
     expect(DEFAULT_GATES.lint.command).toContain('npm run lint');
+    expect(DEFAULT_GATES.test.command).toContain('npx vitest run --changed {{CHANGED_BASE}}');
   });
 });
 
@@ -182,13 +183,13 @@ describe('runQualityGates — DEFAULT_GATES fallback behavior', () => {
     execMock.mockResolvedValue({ stdout: 'ok', stderr: '' });
   });
 
-  it('runs all 2 default gates when all pass', async () => {
+  it('runs all 3 default gates when all pass', async () => {
     const results = await Effect.runPromise(runQualityGates(DEFAULT_GATES, workspacePath));
 
-    expect(execMock).toHaveBeenCalledTimes(2);
-    expect(results).toHaveLength(2);
+    expect(execMock).toHaveBeenCalledTimes(3);
+    expect(results).toHaveLength(3);
     expect(results.every(r => r.passed)).toBe(true);
-    expect(results.map(r => r.name)).toEqual(['typecheck', 'lint']);
+    expect(results.map(r => r.name)).toEqual(['typecheck', 'lint', 'test']);
   });
 
   it('stops at first failing gate (bail-on-failure)', async () => {

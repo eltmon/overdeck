@@ -47,7 +47,7 @@ export {
 export type { VBriefReadError } from './io.js';
 
 // Beads integration
-export { createBeadsFromVBrief, clearBeadsForIssue, syncBeadStatusToVBrief, getVBriefACStatusSync } from './beads.js';
+export { createBeadsFromVBrief, clearBeadsForIssue, syncBeadStatusToVBrief, getVBriefACStatusSync, getVBriefACStatus } from './beads.js';
 export type { CreateBeadsResult, ClearBeadsResult, VBriefACStatus, ItemACStatus } from './beads.js';
 
 // Acceptance Criteria

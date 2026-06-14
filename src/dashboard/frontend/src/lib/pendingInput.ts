@@ -14,7 +14,8 @@ export type PendingInputKind =
   | 'permissionRequest'
   | 'exitPlanMode'
   | 'enterPlanMode'
-  | 'sessionResume';
+  | 'sessionResume'
+  | 'rateLimit';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -23,6 +24,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   exitPlanMode: 'Plan approval pending',
   enterPlanMode: 'Plan being drafted',
   sessionResume: 'Session resume waiting',
+  rateLimit: 'Rate-limit modal — pick a model',
 };
 
 /**

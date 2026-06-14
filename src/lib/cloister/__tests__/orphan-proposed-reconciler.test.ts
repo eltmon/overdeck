@@ -429,6 +429,40 @@ describe('orphan proposed spec reconciler', () => {
     expect(messages.some((m) => m.startsWith('orphan-proposed-reconciler.'))).toBe(false);
   });
 
+  it('treats closed-issue spawn refusals as terminal and does not warn repeatedly', async () => {
+    const projectPath = join(testDir, 'project');
+    mkdirSync(projectPath, { recursive: true });
+    writeSpec(projectPath, 'PAN-3153', 'proposed');
+    writeBeads(projectPath, 'PAN-3153');
+
+    const spawnWorkAgent = vi.fn(async () => ({
+      spawned: false,
+      skippedReason: 'closed-issue',
+      error: 'Issue PAN-3153 is already closed (done). Cannot start an agent for a closed issue.',
+    }));
+    const baseOpts = {
+      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      tmuxSessionNames: [] as string[],
+      getAgentStateForIssue: async () => null,
+      closedIssueIds: new Set<string>(),
+      config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
+      spawnWorkAgent,
+    };
+
+    await expect(reconcileOrphanProposedSpecs({
+      ...baseOpts,
+      now: new Date('2026-05-25T20:00:00.000Z'),
+    })).resolves.toEqual(['Skipped orphan proposed spec PAN-3153: closed-issue']);
+
+    await expect(reconcileOrphanProposedSpecs({
+      ...baseOpts,
+      now: new Date('2026-05-25T20:06:00.000Z'),
+    })).resolves.toEqual([]);
+
+    expect(spawnWorkAgent).toHaveBeenCalledTimes(1);
+    expect(activityLogger.emitActivityEntrySync).not.toHaveBeenCalled();
+  });
+
   it('emits no activity-feed events for an orphan sitting in attempt cooldown (PAN-1626)', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });

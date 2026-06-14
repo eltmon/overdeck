@@ -24,7 +24,7 @@ import { readCavemanVariant } from '../caveman/workspace.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScriptSync, generateLauncherWrapperSync } from '../launcher-generator.js';
-import { getSpecialistHarness } from './router.js';
+import { resolveHarness } from '../harness-resolve.js';
 import { killSession, listPaneValues, sessionExists } from '../tmux.js';
 import { notifyPipelineSync } from '../pipeline-notifier.js';
 import { isTaskReadySync } from './task-readiness.js';
@@ -132,22 +132,14 @@ function buildTmuxEnvFlags(env: Record<string, string>): string {
 }
 
 
-async function buildSpecialistBaseCommand(
+export async function buildSpecialistBaseCommand(
   specialistType: string,
   model: string,
   sessionName?: string,
 ): Promise<string> {
-  const { canUseHarnessSync } = await import('../harness-policy.js');
-  const { getAgentRuntimeBaseCommand, getProviderAuthMode } = await import('../agents.js');
-  const requestedHarness = getSpecialistHarness(specialistType);
-  const authMode = await getProviderAuthMode(model);
-  const decision = canUseHarnessSync(requestedHarness, model, authMode);
-  const harness = decision.allowed ? requestedHarness : 'claude-code';
-  if (!decision.allowed) {
-    console.warn(
-      `[specialist] ${specialistType}: canUseHarness(${requestedHarness},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
-    );
-  }
+  const { getAgentRuntimeBaseCommand } = await import('../agents.js');
+  const role = roleForSpecialistModel(specialistType).role;
+  const harness = await resolveHarness({ model, role });
   const agentDefinition = specialistType.startsWith('pan-')
     ? specialistType
     : `pan-${specialistType.endsWith('-agent')

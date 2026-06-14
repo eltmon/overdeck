@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
+import { getPanopticonHome } from '../../../src/lib/paths.js';
 
 // ---------------------------------------------------------------------------
 // Mock review-status before importing deacon
@@ -186,7 +186,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
   afterEach(() => {
     // Clean up agent state dirs and completed.processed markers created by tests
-    rmSync(join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`), { recursive: true, force: true });
+    rmSync(join(getPanopticonHome(), 'agents', `agent-${ISSUE_ID.toLowerCase()}`), { recursive: true, force: true });
   });
 
   it('skips review and test re-dispatch when the issue is closed', async () => {
@@ -442,7 +442,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   it('(d) re-dispatches pending review via spawnReviewRoleForIssue and sets reviewStatus=reviewing', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
     const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
-    const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+    const agentDir = join(getPanopticonHome(), 'agents', agentId);
     completedProcessedPath = join(agentDir, 'completed.processed');
 
     mockLoadReviewStatuses.mockReturnValue({
@@ -484,7 +484,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   it('(d-fail) does not mark reviewing when spawnReviewRoleForIssue rejects', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
     const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
-    const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+    const agentDir = join(getPanopticonHome(), 'agents', agentId);
     completedProcessedPath = join(agentDir, 'completed.processed');
 
     mockLoadReviewStatuses.mockReturnValue({
@@ -513,7 +513,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
   });
 
   it('re-dispatches pending review after completed handoff even when the work agent is stopped', async () => {
-    const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`);
+    const agentDir = join(getPanopticonHome(), 'agents', `agent-${ISSUE_ID.toLowerCase()}`);
     mkdirSync(agentDir, { recursive: true });
     writeFileSync(join(agentDir, 'completed.processed'), 'done\n', 'utf-8');
     completedProcessedPath = join(agentDir, 'completed.processed');

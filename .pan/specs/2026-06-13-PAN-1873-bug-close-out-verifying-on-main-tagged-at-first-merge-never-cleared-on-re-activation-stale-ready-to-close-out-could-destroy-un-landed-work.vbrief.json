@@ -1,0 +1,393 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T23:46:51Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1873: close-out re-verifies merge + refuses re-activated work (on the LIVE workflows.ts path), clears the stale verifying_on_main tag at the re-activation source, and makes readiness reflect computed safety",
+    "updated": "2026-06-13T23:54:15.866Z"
+  },
+  "plan": {
+    "id": "pan-1873",
+    "title": "bug(close-out): verifying_on_main tagged at first merge, never cleared on re-activation — stale 'ready to close out' could destroy un-landed work",
+    "status": "proposed",
+    "uid": "90fa1d19-3692-42a2-9dfc-f3403ef167bd",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T23:46:51Z",
+    "updated": "2026-06-13T23:54:15.866Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1873",
+        "label": "PAN-1873",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "cloister",
+      "lifecycle",
+      "bug",
+      "safety"
+    ],
+    "narratives": {
+      "Problem": "verifying_on_main is set at first PR merge and never cleared when an issue is re-activated (work agent restarts, new commits accrue). The tag goes stale, so an issue can wear 'merged / ready to close out' while it has a running work agent + N commits not in main. Close-out then tears down the workspace and kills the agent, destroying un-landed work. CRITICAL planning finding: the two guards the issue claims were 'Fixed (this commit)' (1f60ca8a2) landed on DEAD code — src/lib/close-out.ts has zero importers. The live close-out path is closeOut() in src/lib/lifecycle/workflows.ts (used by the dashboard single+bulk routes, `pan close`, and the Deacon autoCloseOut), where verifyBranchMergedImpl (workflows.ts:400) still trusts a stale mergeStatus:'merged' over git, and closeOut() has no live-agent refusal (teardownWorkspace kills the agent-<issue> session unconditionally).",
+      "Proposal": "Port both guards to the LIVE path and lock them with the requested regression tests: (1) verifyBranchMergedImpl re-checks `git log main..feature/<issue>` and only honors mergeStatus:'merged' when nothing is ahead of main; (2) closeOut() hard-fails with a close-out:active-agent step before any archive/teardown when a live agent-<issue> session exists. Remove the dead duplicate src/lib/close-out.ts. Clear the tag at the re-activation source: the GitHub in_progress transition removes verifying-on-main/needs-close-out/merged labels, and spawnAgent resets a stale mergeStatus on work-agent (re)start. Make readiness reflect computed safety: frontend canCloseOut requires no live agent; the Deacon autoCloseOut skips candidates with a live agent session. The 'no unmerged commits' half of safety is enforced authoritatively inside closeOut() (guard 1) and tested, not re-checked in render/patrol paths.",
+      "NonGoals": "- Do NOT add a per-issue git unmerged-commit check to the frontend render path or the Deacon patrol — guard 1 inside closeOut() is the authoritative enforcement.\n- Do NOT change postMergeLifecycle's merge-time behavior (setting verifying-on-main + pausing the agent is correct).\n- Do NOT weaken the in-flight-guard (postMergeLifecycle idempotency) test.\n- Do NOT rework the bulk-close-out route's allowPausedMerged pre-filter; the live-path guards backstop it (follow-up smell only).\n- Linear/Rally label semantics are out of scope — only the GitHub tracker carries the stale-label bug.\n- No change to the `pan close` CLI surface or flags.\n- Do NOT add real setTimeout waits in new tests (no retry/delay logic is introduced)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat the issue's 'Fixed (this commit)' guards as landing on dead code; re-implement both on the live workflows.ts path rather than trusting close-out.ts.",
+        "rationale": "Verified src/lib/close-out.ts has zero importers; `pan close`, both dashboard close-out routes, and the Deacon all call closeOut from lib/lifecycle/index.js (=workflows.ts). Fixing the live path protects every caller with one change."
+      },
+      {
+        "summary": "Bundle each guard's regression test into the same bead as the guard (write-test-then-make-pass), rather than a separate 'all tests' bead.",
+        "rationale": "A guard without its locking test is incomplete and a test without its fix fails; together they form one independently-reviewable, independently-mergeable unit that leaves a green tree. The issue's 'TOP priority regression tests' are satisfied as NFR-1 by these bundled tests."
+      },
+      {
+        "summary": "Delete src/lib/close-out.ts outright instead of leaving it or reverting only the 1f60ca8a2 lines.",
+        "rationale": "It is fully dead and its existence is the recurrence trap that caused the misdirected fix. Removing it (zero importers) is the root-cause / pick-up-the-trash move; gated behind the two guard beads so the live-path guards land first."
+      },
+      {
+        "summary": "For 'clear the tag at source', clear BOTH the GitHub labels (tracker in_progress transition) and the review-status mergeStatus (spawnAgent), as two beads.",
+        "rationale": "The canonical verifying_on_main state derives from labels (primary tag), but isMerged()/autoCloseOut candidacy read mergeStatus; clearing both keeps the tag AND the count honest after the re-activated agent later stops."
+      },
+      {
+        "summary": "Reset a stale mergeStatus to { mergeStatus: 'pending', readyForMerge: false } on re-activation.",
+        "rationale": "A re-activated issue is back in progress; the prior merge is stale and the pipeline re-populates merge state on the next done→review→merge. 'pending' is the neutral non-terminal value already used by clearStuckMergeStatuses."
+      },
+      {
+        "summary": "Define computed close-out safety as (no live agent) + (no unmerged commits), with the unmerged-commits half enforced only inside closeOut() (guard 1).",
+        "rationale": "Per-issue git checks in the frontend/patrol would be expensive and racy; the server-side guard is authoritative and tested, so the UI/Deacon only need the cheap no-live-agent signal."
+      }
+    ],
+    "items": [
+      {
+        "id": "wf-merge-guard",
+        "title": "Live-path merge gate re-checks git instead of trusting a stale mergeStatus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In verifyBranchMergedImpl (src/lib/lifecycle/workflows.ts:~400), when loadReviewStatuses() reports mergeStatus:'merged', run `git log main..feature/<issue> --oneline` and only return stepOk when it is empty; otherwise fall through to the existing git checks (which return stepFailed for genuinely-unmerged commits and still recognise squash-merges via the code-diff check). Add the regression test FIRST in tests/unit/lib/lifecycle/workflows.test.ts: extend the review-status.js mock to export loadReviewStatuses returning { 'PAN-100': { mergeStatus: 'merged' } }, sequence mockExecAsync so the branch exists and has an unmerged commit, and assert __testInternals.verifyBranchMerged(ctx) fails and closeOut() aborts before any teardown step."
+        },
+        "items": [
+          {
+            "id": "wf-merge-guard.ac1",
+            "title": "Given mergeStatus:'merged' and `git log main..feature/pan-100` returning a commit, __testInternals.verifyBranchMerged(ctx) returns { success:false, step:'close-out:verify-merged' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wf-merge-guard.ac2",
+            "title": "Under the same scenario, closeOut(ctx,{tracker}) returns result.success===false and no step whose id starts with 'teardown:' or 'archive:' is present in result.steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wf-merge-guard.ac3",
+            "title": "When mergeStatus:'merged' and `git log main..feature/pan-100` is empty, verifyBranchMerged still returns stepOk('Merge specialist confirmed merge completed') — the happy path is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wf-live-agent-guard",
+        "title": "closeOut() refuses (hard-fail) while a live agent-<issue> session exists",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In closeOut() (src/lib/lifecycle/workflows.ts:~166), AFTER the verifyBranchMerged step and BEFORE archivePlanning, add a hard-fail step: if `sessionExists('agent-' + ctx.issueId.toLowerCase())` (Effect variant from src/lib/tmux.js) is true, push stepFailed('close-out:active-agent', '<session> is still running — pause/stop it before close-out (re-activated after merge; closing now would kill in-progress work).') and return buildResult early. Add the import for sessionExists. Add the regression test in workflows.test.ts: set the tmux.js mock sessionExists to Effect.succeed(true) for agent-pan-100 and assert closeOut returns success:false with a failed close-out:active-agent step and no archive/teardown step; a second test with sessionExists→false confirms the normal path still tears down."
+        },
+        "items": [
+          {
+            "id": "wf-live-agent-guard.ac1",
+            "title": "Given tmux sessionExists('agent-pan-100')===true, closeOut(ctx,{tracker}) returns result.success===false and result.steps contains a failed step with id 'close-out:active-agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wf-live-agent-guard.ac2",
+            "title": "Under the same scenario closeOut refuses before destruction: no step whose id starts with 'archive:' or 'teardown:' is present in result.steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wf-live-agent-guard.ac3",
+            "title": "When sessionExists('agent-pan-100')===false, closeOut proceeds past the guard and reaches a teardown step — the normal flow is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-dead-close-out",
+        "title": "Delete the dead duplicate src/lib/close-out.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete src/lib/close-out.ts (executeCloseOut/executeCloseOutPromise/isBranchMerged/CloseOutError/CloseOutContext/findWorkspacePath) — all dead, zero importers (the live path is workflows.ts closeOut). This removes the misdirected 1f60ca8a2 guards (now relocated to the live path) and prevents future agents from patching the wrong file. Confirm no references remain (`grep -rn \"close-out\\.js\\|/close-out'\" src/` returns no import of the module; the similarly-named buildCloseOutContext/sanitizeCloseOutError in routes/issues.ts are unrelated and use LifecycleContext). Depends on wf-merge-guard and wf-live-agent-guard landing first."
+        },
+        "items": [
+          {
+            "id": "delete-dead-close-out.ac1",
+            "title": "Given the change, src/lib/close-out.ts is deleted and a tree listing no longer shows it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-close-out.ac2",
+            "title": "When the file is removed, `npm run typecheck` and `npm run build` both pass (proving zero importers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-dead-close-out.ac3",
+            "title": "A grep for imports of the deleted module across src/ returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tracker-clear-postmerge-labels",
+        "title": "GitHub in_progress transition clears stale verifying-on-main/needs-close-out/merged labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In the GitHub tracker transitionIssue 'in_progress' branch (src/lib/tracker/github.ts:~307), after addLabels(['in-progress']), add Effect.forEach over ['verifying-on-main','needs-close-out','merged'] calling removeLabelSilent (which already swallows 404s, so it is a no-op on first start). This makes a re-activated issue leave the verifying_on_main canonical state (which is label-derived in mapGitHubStateToCanonical) and matches the canonical LIFECYCLE_LABELS map for in_progress. Add a co-located test (src/lib/tracker/__tests__/in-progress-clears-postmerge-labels.test.ts) asserting the octokit mock received removeLabel for the three labels and addLabels/create for in-progress."
+        },
+        "items": [
+          {
+            "id": "tracker-clear-postmerge-labels.ac1",
+            "title": "When transitionIssue('PAN-100','in_progress') runs, removeLabel is called for 'verifying-on-main', 'needs-close-out', and 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-clear-postmerge-labels.ac2",
+            "title": "Then the same call still adds the 'in-progress' label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-clear-postmerge-labels.ac3",
+            "title": "When the stale labels are absent the call succeeds without error (removeLabelSilent swallows the 404) — first-start flow unaffected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-reset-merge-status",
+        "title": "Reset a stale mergeStatus:'merged' when a work agent (re)starts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add export function clearStalePostMergeStatus(issueId) to src/lib/review-status.ts: read getReviewStatusSync(issueId); if mergeStatus==='merged', call setReviewStatusSync(issueId,{ mergeStatus:'pending', readyForMerge:false }); else no-op. Call it from spawnAgent (src/lib/agents.ts:~3584) inside the existing `if (role === 'work')` branch, alongside transitionIssueToInProgress (best-effort try/catch dynamic import). Unit-test the helper directly in a review-status test: seed a merged status and assert setReviewStatusSync is called with { mergeStatus:'pending', readyForMerge:false }; seed a non-merged status and assert it is a no-op."
+        },
+        "items": [
+          {
+            "id": "spawn-reset-merge-status.ac1",
+            "title": "clearStalePostMergeStatus('PAN-100') calls setReviewStatusSync with { mergeStatus:'pending', readyForMerge:false } when the stored mergeStatus is 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-reset-merge-status.ac2",
+            "title": "clearStalePostMergeStatus is a no-op (no setReviewStatusSync call) when the stored status is absent or mergeStatus !== 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-reset-merge-status.ac3",
+            "title": "When role==='work', spawnAgent calls clearStalePostMergeStatus(options.issueId) in the work-role branch before/alongside transitionIssueToInProgress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-canCloseOut-agent-guard",
+        "title": "Frontend canCloseOut requires no live work agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/lib/issueActions.ts, change canCloseOut (~:168) to `const merged = canonical==='verifying_on_main' || canonical==='verifying' || isMerged(state); return merged && !hasLiveAgent(state);` (hasLiveAgent already exists at ~:137). This makes the single close-out action honest about a re-activated agent; the bulk flow already filters active agents. Add a case to src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts."
+        },
+        "items": [
+          {
+            "id": "frontend-canCloseOut-agent-guard.ac1",
+            "title": "Given a verifying_on_main issue with agent.status:'running', canCloseOut returns false (the closeOut action is unavailable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-canCloseOut-agent-guard.ac2",
+            "title": "Given a verifying_on_main issue with no agent or a stopped agent, canCloseOut returns true (the closeOut action is available)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-autocloseout-agent-skip",
+        "title": "Deacon autoCloseOut skips candidates with a live agent-<issue> session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:46:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1873",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In autoCloseOut (src/lib/cloister/deacon.ts:~4122), inside the candidate loop after the mergeStatus==='merged' filter and before pushing to candidates, add `if (sessionExistsSync('agent-' + issueId.toLowerCase())) continue;` (sessionExistsSync is already imported in deacon.ts). This stops the autonomous patrol from selecting a re-activated issue (the closeOut guard would refuse anyway; this avoids per-patrol failed-closeout noise) and makes backend readiness reflect no-live-agent. Add a case to src/lib/cloister/__tests__/deacon-auto-closeout.test.ts: seed a merged + stale-updatedAt status, mock sessionExistsSync to return true for agent-pan-100, and assert autoCloseOut() returns no action for PAN-100 and closeOut was not invoked for it."
+        },
+        "items": [
+          {
+            "id": "deacon-autocloseout-agent-skip.ac1",
+            "title": "autoCloseOut() returns no close-out action for a merged, past-cutoff issue whose `agent-<issue>` tmux session exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-autocloseout-agent-skip.ac2",
+            "title": "Then the closeOut workflow is not run for an issue skipped because its agent session is live",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-autocloseout-agent-skip.ac3",
+            "title": "When there is no live agent session, a merged past-cutoff issue is still selected and the closeOut workflow runs (the existing happy path is preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wf-merge-guard",
+        "to": "delete-dead-close-out",
+        "type": "blocks"
+      },
+      {
+        "from": "wf-live-agent-guard",
+        "to": "delete-dead-close-out",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-13-PAN-1873-bug-close-out-verifying-on-main-tagged-at-first-merge-never-cleared-on-re-activation-stale-ready-to-close-out-could-destroy-un-landed-work.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

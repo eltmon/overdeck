@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
-import { existsSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,6 +10,9 @@ const CLI_DIST = join(ROOT, 'dist/cli/index.js');
 const CONTRACTS_DIST = join(ROOT, 'packages/contracts/dist/index.mjs');
 
 export default function setup() {
+  const panopticonTestRoot = mkdtempSync(join(tmpdir(), 'pan-test-root-'));
+  process.env.PANOPTICON_TEST_HOME_ROOT = panopticonTestRoot;
+
   if (!existsSync(CONTRACTS_DIST)) {
     console.log('[global-setup] packages/contracts/dist/index.mjs missing — building contracts...');
     execSync('npm run build:contracts', { cwd: ROOT, stdio: 'inherit' });
@@ -18,4 +22,8 @@ export default function setup() {
     console.log('[global-setup] dist/cli/index.js missing — building CLI...');
     execSync('npm run build:cli', { cwd: ROOT, stdio: 'inherit' });
   }
+
+  return () => {
+    rmSync(panopticonTestRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  };
 }

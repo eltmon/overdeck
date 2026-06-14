@@ -151,6 +151,54 @@ Match the **`button[title="Re-open this question"]`** specifically — a loose
 text match also hits the phantom issue card the fake agent spawns and will
 navigate to `/board` instead.
 
+## Blocked-agent surfaces beyond AskUserQuestion (PAN-1834)
+
+Not every stall is an AUQ. A convoy sub-reviewer blocked on an interactive harness
+modal (e.g. the gpt-5.5 rate-limit / model-switch dialog) never writes an AUQ to
+the JSONL, so the pipeline above cannot detect it. PAN-1834 adds three additional
+visibility surfaces:
+
+### 1. Pane-detected rate-limit / model-switch modal
+
+`detectAwaitingInputFromPaneSync` (`src/lib/agent-input-detection.ts`) recognizes
+a conservative signature for the harness rate-limit dialog: the pane must contain
+both a `Keep current model` option line and a `Switch to <model>` option line near
+the bottom. A pane that merely mentions a rate limit in prose, or a modal that has
+scrolled out of the recent window, does **not** match.
+
+When matched, the detection returns reason `'rate_limit'`, which
+`computeAgentEnrichmentPromise` promotes into the `pendingInputKinds` array as the
+`'rateLimit'` kind. That kind drives the **Needs you** triangle and list with the
+label *"Rate-limit modal — pick a model"*.
+
+### 2. Active specialists are no longer suppressed
+
+`computeAgentEnrichmentPromise` historically skipped all pending-input population
+when `hasActiveSpecialist` was true. That guard was meant to silence the parked
+work/plan agent while a review/test/ship specialist runs on the same issue, but
+it also silenced the specialist itself. PAN-1834 narrows the guard: suppression
+applies only when the agent is **not** itself the active specialist. Agents with
+`role ∈ {review, test, ship}` still surface their own pending input even when
+another specialist is active.
+
+Inspect agents (`inspect-<issue>-<bead>`) are now enumerable by writing a minimal
+`state.json` at spawn (`src/lib/cloister/inspect-agent.ts`). The enrichment poller
+sees them the same way it sees sub-reviewers, so a blocked inspector also raises
+a Needs you row. Deacon orphan-recovery ignores the `inspect-` prefix, so the new
+state.json does not make inspect agents auto-resumable.
+
+### 3. Rising-edge activity-feed + TTS notification
+
+The enrichment poller (`src/dashboard/server/services/agent-enrichment-service.ts`)
+tracks the previous `pendingInputCount` per agent. When an agent transitions from
+`pendingInputCount === 0` to `pendingInputCount > 0`, the poller emits one
+`activity.entry` naming the agent, its issue, and the pending kind(s), plus one
+`activity.tts` utterance at priority 1 (warn). While the agent stays blocked across
+subsequent polls, no further activity or TTS events fire.
+
+This is kind-agnostic: it fires for AUQ, plan-mode approval, session-resume, and
+the new rate-limit modal.
+
 ## Gotchas for future debugging
 
 - Dashboard runs under `pan dev`: the **frontend is Vite HMR** (source changes

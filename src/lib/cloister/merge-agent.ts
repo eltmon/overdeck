@@ -14,6 +14,109 @@ import { emitActivityEntrySync, emitActivityTtsSync, emitDashboardLifecycleSync 
 
 const execAsync = promisify(exec);
 
+/**
+ * Paths that must never enter a pipeline auto-commit, regardless of gitignore
+ * state. These are workspace-local or machine-local state files and sync-target
+ * directories; committing them pollutes feature branches and main.
+ */
+export const AUTO_COMMIT_EXCLUDED_PATHS = [
+  '.pan/kickoff.md',
+  '.pan/continue.json',
+  '.pan/handoff-*.md',
+  '.pan/spec.vbrief.json',
+  '.claude/rules/',
+  '.claude/skills/',
+];
+
+const SYNC_MAIN_MAIN_PREFERRED_PATHS = [
+  '.pan/continues',
+  '.pan/specs',
+  '.beads',
+];
+
+export function isSyncMainMainPreferredPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  return SYNC_MAIN_MAIN_PREFERRED_PATHS.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
+  );
+}
+
+function isAutoCommitExcludedPath(relativePath: string): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+  for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
+    if (pattern.endsWith('/')) {
+      if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) {
+        return true;
+      }
+    } else if (pattern.includes('*')) {
+      const regex = new RegExp(
+        '^' + pattern.replace(/\./g, '\\.').replace(/\*/g, '[^/]*') + '$'
+      );
+      if (regex.test(normalized)) return true;
+    } else if (normalized === pattern) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function parseStatusPath(line: string): string {
+  // git status --porcelain lines are "XY PATH" or "XY ORIG -> DEST" for renames.
+  const body = line.slice(3);
+  if (line[0] === 'R' || line[1] === 'R') {
+    const parts = body.split(' -> ');
+    return parts[parts.length - 1];
+  }
+  return body;
+}
+
+/**
+ * Auto-commit non-excluded workspace changes before a sync-main merge.
+ * Respects .gitignore (no -f), unstages excluded paths, and leaves excluded
+ * paths dirty so the sync can proceed. Returns success=false on git errors.
+ */
+export async function autoCommitWorkspaceChangesBeforeSync(
+  projectPath: string,
+): Promise<{ success: boolean; committed: boolean; reason?: string }> {
+  try {
+    const { stdout: statusOut } = await execAsync('git status --porcelain', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (!statusOut.trim()) {
+      return { success: true, committed: false, reason: 'no uncommitted changes' };
+    }
+
+    // PAN-1819: plain `git add -A` respects .gitignore; never use -f.
+    await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8' });
+
+    // Belt-and-suspenders: unstage excluded paths regardless of ignore state.
+    const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS.map((p) =>
+      p.endsWith('/') ? p.slice(0, -1) : p
+    ).join(' ');
+    await execAsync(`git reset HEAD -- ${resetPaths}`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+
+    const { stdout: diffStat } = await execAsync('git diff --cached --stat', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (!diffStat.trim()) {
+      return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
+    }
+
+    await execAsync('git commit -m "chore: auto-commit before sync with main"', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    return { success: true, committed: true };
+  } catch (error: any) {
+    return { success: false, committed: false, reason: `Failed to auto-commit: ${error.message}` };
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import {
@@ -733,6 +836,54 @@ async function getConflictFiles(projectPath: string): Promise<string[]> {
   }
 }
 
+async function resolveMainPreferredSyncConflicts(
+  projectPath: string,
+  conflictFiles: string[],
+): Promise<{ success: boolean; reason?: string }> {
+  if (conflictFiles.length === 0 || !conflictFiles.every(isSyncMainMainPreferredPath)) {
+    return { success: false, reason: 'conflicts include non-pipeline-owned files' };
+  }
+
+  try {
+    for (const path of SYNC_MAIN_MAIN_PREFERRED_PATHS) {
+      await execAsync(`git rm -r --quiet --ignore-unmatch -- ${path}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+      await execAsync(`git checkout origin/main -- ${path}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      }).catch(() => {
+        // The path may not exist on origin/main. In that case, the preceding
+        // git rm records main's deletion for this pipeline-owned path.
+      });
+      await execAsync(`git add -A -- ${path}`, {
+        cwd: projectPath,
+        encoding: 'utf-8',
+      });
+    }
+
+    const remainingConflicts = await getConflictFiles(projectPath);
+    if (remainingConflicts.length > 0) {
+      return {
+        success: false,
+        reason: `Unresolved conflicts remain: ${remainingConflicts.join(', ')}`,
+      };
+    }
+
+    await execAsync('git commit --no-edit', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    return { success: true };
+  } catch (error: any) {
+    return {
+      success: false,
+      reason: `Failed to auto-resolve pipeline-owned conflicts: ${error.message}`,
+    };
+  }
+}
+
 /**
  * Log merge to history
  */
@@ -1038,33 +1189,31 @@ export async function syncMainIntoWorkspace(
   await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
 
   // Pre-flight: auto-commit uncommitted changes before merge
+  console.log(`[sync-main] Checking for uncommitted changes...`);
+  logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
+  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath);
+  if (!autoCommit.success) {
+    const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
+    console.error(`[sync-main] ${message}`);
+    logActivity('sync_main_blocked', message);
+    return { success: false, reason: message };
+  }
+  if (autoCommit.committed) {
+    console.log(`[sync-main] Auto-commit successful`);
+  }
+
+  // Verify no non-excluded uncommitted changes remain.
   try {
-    const { stdout: statusOut } = await execAsync('git status --porcelain', {
+    const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
     });
-    if (statusOut.trim()) {
-      console.log(`[sync-main] Uncommitted changes detected, auto-committing...`);
-      logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-      try {
-        await execAsync('git add -A && git commit -m "chore: auto-commit before sync with main"', {
-          cwd: projectPath,
-          encoding: 'utf-8',
-        });
-        console.log(`[sync-main] Auto-commit successful`);
-      } catch (commitErr: any) {
-        const message = `Failed to auto-commit uncommitted changes: ${commitErr.message}`;
-        console.error(`[sync-main] ${message}`);
-        logActivity('sync_main_blocked', message);
-        return { success: false, reason: message };
-      }
-
-      // Verify commit succeeded — abort if uncommitted changes still exist
-      const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
-      if (postCommitStatus.trim()) {
+    if (postCommitStatus.trim()) {
+      const remainingNonExcluded = postCommitStatus
+        .trim()
+        .split('\n')
+        .filter((line) => !isAutoCommitExcludedPath(parseStatusPath(line)));
+      if (remainingNonExcluded.length > 0) {
         const message = 'Uncommitted changes remain after auto-commit — aborting sync';
         console.error(`[sync-main] ${message}`);
         logActivity('sync_main_blocked', message);
@@ -1150,6 +1299,31 @@ export async function syncMainIntoWorkspace(
   // delegating to an LLM ship role. Abort the merge so the working tree is
   // clean, then return the conflict files for the caller to display.
   const conflictFiles = await getConflictFiles(projectPath);
+  const mainPreferredResolution = await resolveMainPreferredSyncConflicts(projectPath, conflictFiles);
+  if (mainPreferredResolution.success) {
+    console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
+    logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
+
+    let changedFiles: string[] = [];
+    let commitCount = 0;
+    try {
+      const { stdout: diffFiles } = await execAsync(
+        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
+    } catch { /* non-fatal */ }
+    try {
+      const { stdout: logOut } = await execAsync(
+        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
+    } catch { /* non-fatal */ }
+
+    return { success: true, commitCount, changedFiles };
+  }
+
   console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
   logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
 
