@@ -1,0 +1,417 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-14T20:52:13.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1758: UAT-off merge lane — continuous, deterministic convergence",
+    "updated": "2026-06-14T21:11:17.020Z"
+  },
+  "plan": {
+    "id": "pan-1758",
+    "title": "bug(cloister): UAT-off merge lane cannot converge on a continuously-moving main",
+    "status": "proposed",
+    "uid": "bda0fd21-5fcc-4bbe-a6ad-34cd084df768",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-14T20:52:13.000Z",
+    "updated": "2026-06-14T21:11:17.020Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1758",
+        "label": "PAN-1758",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1691",
+        "label": "PAN-1691 merge order (reused)",
+        "type": "related"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1240",
+        "label": "PAN-1240 conflict rebase (out of scope)",
+        "type": "related"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "flywheel",
+      "merge-train",
+      "auto-merge",
+      "convergence"
+    ],
+    "narratives": {
+      "Problem": "The UAT-off auto-merge lane cannot converge while main moves continuously. A ready PR is scheduled into pending_auto_merges; when the 30s executor tick fires, isAutoMergeEligible can transiently fail (CI re-running after a main move, GitHub mergeable still computing, momentary not-mergeable) and the executor calls markBlocked. Nothing ever moves a blocked/failed row back to pending (requeueToPending only does merging->pending; listDuePendingAutoMerges only selects pending), so the row STRANDS. Recovery is non-deterministic: the LLM flywheel re-POSTs schedule, or the server restarts and the startup fixStuckReadyForMerge sweep + a re-schedule resurrect it — hence 'readyForMerge only flips via the startup repair sweep'. UAT-on does not have this problem because the uat-reconciler continuously rebuilds the batch branch onto current main.",
+      "Proposal": "Make the auto-merge executor (src/dashboard/server/services/auto-merge-executor.ts) self-heal so UAT-off convergence is continuous and deterministic, reusing the existing engine (no new subsystem). (1) A pure classifier labels each ineligibility reason retryable or terminal. (2) A schema migration adds an attempts counter to pending_auto_merges plus defer/resurrect DB primitives. (3) On transient ineligibility the executor DEFERS the still-pending row with backoff (cheap GitHub re-check, not counted against the cap); on terminal ineligibility it markBlocked as today; expensive failed triggerMerge attempts are hard-capped at 3 then surfaced stuck (mirroring checkPendingTestDispatch). (4) Each tick resurrects stranded blocked/failed rows that are eligible again (respecting operator-cancelled + the cap). (5) Multiple due rows are processed in PAN-1691 order (orderMergeCandidates) instead of FIFO. (6) roles/flywheel.md carves the server/LLM boundary so they never double-act. The convergence-vs-churn trap is avoided structurally: the executor never spawns a review convoy; triggerMerge already rebases + re-verifies at merge time and preserves verification across a clean rebase.",
+      "NonGoals": "- Active rebasing of genuinely-CONFLICTING ready PRs — owned by PAN-1240 (the recovery half).\n- Conflict-flagged churn handling — owned by PAN-1765.\n- Decoupling the merge train into a per-project pipeline feature — owned by PAN-1696.\n- The agent-based ship lane / roles/ship.md — owned by PAN-1747 (already removed in 30f545272 / completed).\n- UAT-on (require_uat_before_merge) convergence — already handled by the uat-reconciler; this issue is UAT-off only.\n- Changing triggerMerge's rebase or quality-gate behavior.\n- Auto-clearing operator-cancelled entries.\n- A continuous fixStuckReadyForMerge sweep — dropped as a no-op in the current event-driven architecture (see autoDecisions)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope is the operator's RUN-35 continuous-convergence direction, not the issue body's layered fixes #1-#3.",
+        "rationale": "Git proves the agent-based ship lane that caused the 37 re-dispatches was removed (30f545272, 2026-06-10) and PAN-1747 is completed (a6410d602); the operator launched this --auto plan AFTER writing the RUN-35 comment (962e6e0b7). The forward-looking, still-live problem is UAT-off continuous convergence."
+      },
+      {
+        "summary": "Extend the existing auto-merge-executor; add no new reconciler subsystem.",
+        "rationale": "The lifecycle trace shows the strand is a queue-entry problem, and triggerMerge already rebases at merge time. Extending the executor is the root-cause fix and the simplest one (Simplicity First)."
+      },
+      {
+        "summary": "Dropped the 'continuous fixStuckReadyForMerge' idea as a no-op.",
+        "rationale": "readyForMerge is event-driven (PAN-1650); markBlocked never touches review_status; genuine-conflict failures set mergeStatus='failed' + blockerReasons, which the sweep deliberately excludes (review-status.ts:520) and hasBlockers forces false anyway. A continuous sweep would change nothing in scope."
+      },
+      {
+        "summary": "Two cap regimes: backoff for cheap eligibility re-checks, hard cap of 3 only for expensive failed merge attempts.",
+        "rationale": "Cheap GitHub re-checks must back off generously so convergence is patient; only the expensive triggerMerge (rebase+gate) path is hard-capped, honoring issue fix #2 ('cap re-dispatches like the 3-retry test dispatch') without recreating 37 attempts."
+      },
+      {
+        "summary": "Issue fix #1 ('do not require exact main-currency') requires no change.",
+        "rationale": "triggerMerge already rebases onto current main + re-runs gates at merge time, and isAutoMergeEligible keys on GitHub mergeable (clean-behind => mergeable=true), not exact-currency."
+      }
+    ],
+    "items": [
+      {
+        "id": "classifier",
+        "title": "Classify auto-merge ineligibility reasons retryable vs terminal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T20:52:13.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1758",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/auto-merge-eligibility.ts, give the ineligible AutoMergeEligibility variant a stable `code` field (a string-literal union, e.g. 'not_ready' | 'held_for_uat' | 'missing_pr_url' | 'pr_merged' | 'pr_closed' | 'pr_draft' | 'checks_failing' | 'checks_pending' | 'not_mergeable' | 'blocker_label') set on every existing return branch (lines 55-100), keeping the human `reason` string. Add a pure exported function classifyAutoMergeIneligibility(code): 'retryable' | 'terminal'. retryable: checks_pending, not_mergeable, pr_draft, checks_failing, not_ready. terminal: pr_merged, pr_closed, held_for_uat, missing_pr_url, blocker_label. Unit test the mapping; no I/O. This is the foundation the executor uses to decide defer-vs-block."
+        },
+        "items": [
+          {
+            "id": "classifier.ac1",
+            "title": "Given a retryable code (checks_pending, not_mergeable, pr_draft, checks_failing, not_ready), classifyAutoMergeIneligibility returns 'retryable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classifier.ac2",
+            "title": "Given a terminal code (pr_merged, pr_closed, held_for_uat, missing_pr_url, blocker_label), classifyAutoMergeIneligibility returns 'terminal'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "classifier.ac3",
+            "title": "isAutoMergeEligible's ineligible result contains a stable `code` for each rejection branch (a unit test asserts the code per branch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schema-attempts",
+        "title": "Add attempts column + defer/resurrect primitives to pending_auto_merges",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T20:52:13.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1758",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "executor-retry-cap",
+            "executor-resurrect"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Schema + DB layer for retry/backoff/resurrect. In src/lib/database/schema.ts add `attempts INTEGER NOT NULL DEFAULT 0` to the pending_auto_merges CREATE TABLE (line 508) AND add an idempotent ALTER TABLE migration step following the existing column-add pattern (verify the current top schema version at implementation time and bump consistently; the table is also created in the migration blocks near lines 1315/1338 — keep them consistent). In src/lib/database/pending-auto-merges-db.ts: surface `attempts` in PendingAutoMergeRow + toPendingAutoMerge (line 48); add deferPendingAutoMerge(id, nextScheduledMergeAt) [UPDATE scheduledMergeAt WHERE id=? AND status='pending', returns changes===1]; add resurrectStrandedAutoMerge(id, nextScheduledMergeAt) [UPDATE status='pending', scheduledMergeAt=? WHERE id=? AND status IN ('blocked','failed'), returns changes===1]; add a way to increment attempts on an expensive failure (e.g. markFailed variant or incrementAttempts(id) used before markFailed). Use the same guarded-CAS UPDATE...WHERE status pattern as the existing transitionToMerging/markBlocked (H4)."
+        },
+        "items": [
+          {
+            "id": "schema-attempts.ac1",
+            "title": "A freshly scheduled pending_auto_merge persists attempts=0, and re-running the migration on an existing DB preserves data (idempotent ALTER)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-attempts.ac2",
+            "title": "deferPendingAutoMerge updates scheduledMergeAt for a 'pending' row and rejects (returns false) any non-pending row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-attempts.ac3",
+            "title": "resurrectStrandedAutoMerge marks a 'blocked' or 'failed' row 'pending' with a new scheduledMergeAt and rejects (returns false) 'pending'/'merging'/'merged'/'cancelled' rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-attempts.ac4",
+            "title": "Incrementing attempts persists and the new count is readable through the PendingAutoMerge mapping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "executor-retry-cap",
+        "title": "Executor: defer transient ineligibility with backoff; cap expensive merge failures at 3",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T20:52:13.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1758",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In tickAutoMergeExecutor (src/dashboard/server/services/auto-merge-executor.ts:68): when isAutoMergeEligible is ineligible, classify the code (classifier bead). If retryable: if the entry's age (now - scheduledAt) exceeds a staleness ceiling (e.g. STALE_CEILING_MS = 2h) markBlocked('stuck: ineligible over 2h') + surface stuck; otherwise deferPendingAutoMerge(now + DEFER_BACKOFF_MS) and DO NOT count it against the merge cap. If terminal: markBlocked(reason) as today. On the merge path, when triggerMerge returns success=false for a recoverable failure: increment attempts; if attempts < 3 requeueToPending(now + backoff); if attempts >= 3 markFailed + emit a 'stuck' activity entry (the announceFailure TTS already exists). Keep the executor single-flight; never spawn a review/test convoy (NFR-1). Inject deps for tests; per the repo rule ALL retry/backoff tests MUST use vi.useFakeTimers() + vi.advanceTimersByTimeAsync() (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "executor-retry-cap.ac1",
+            "title": "Given a due pending entry that is transiently ineligible (e.g. checks_pending), when the tick runs the entry stays 'pending' with scheduledMergeAt pushed out and is not marked 'blocked' (fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-retry-cap.ac2",
+            "title": "Given a due pending entry with a terminal ineligibility (e.g. pr_closed), when the tick runs the entry is marked 'blocked'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-retry-cap.ac3",
+            "title": "Given an entry whose triggerMerge attempt fails recoverably, when the tick runs three times attempts reaches 3 and the entry is marked 'failed' and emits a stuck activity entry on the third failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-retry-cap.ac4",
+            "title": "Given a transiently-ineligible entry older than the staleness ceiling, when the tick runs it is marked 'blocked' with a stuck reason (cheap retries are bounded)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "executor-resurrect",
+        "title": "Executor: resurrect stranded blocked/failed entries that are eligible again",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T20:52:13.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1758",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In the executor tick, before/alongside processing due entries, scan listProblemAutoMerges (status IN 'blocked','failed'). For each: skip if attempts >= the cap (genuinely stuck — leave for the LLM/PAN-1240 via auto-merge/problems); re-check isAutoMergeEligible; if eligible call resurrectStrandedAutoMerge(id, now) so this or the next tick merges it. Never touch 'cancelled' or 'merged'. This makes convergence deterministic and server-side, removing the dependence on a server restart or an LLM re-schedule (NFR-4). Use injected deps + fake timers in tests."
+        },
+        "items": [
+          {
+            "id": "executor-resurrect.ac1",
+            "title": "Given a 'blocked' entry whose issue is eligible again, when the tick runs the entry is resurrected to 'pending' and becomes due",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-resurrect.ac2",
+            "title": "Given a 'failed' entry at the attempt cap (attempts>=3), when the tick runs it is not resurrected and survives in the auto-merge/problems list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-resurrect.ac3",
+            "title": "Given an operator-'cancelled' entry, when the tick runs it is never resurrected (cancel is preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-resurrect.ac4",
+            "title": "Given a 'blocked' entry that is still ineligible, when the tick runs it stays 'blocked' (no resurrection)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "executor-order",
+        "title": "Executor: process multiple due entries in PAN-1691 merge order",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T20:52:13.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1758",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "When two or more entries are due in one tick, replace the current FIFO sort (auto-merge-executor.ts:74, scheduledMergeAt then id) with PAN-1691 ordering: build a MergeCandidateMeta { issueId, footprint, conflictCount } per due entry — footprint = files changed vs main on feature/<issue>; conflictCount = how many other due branches it overlaps changed files with — reusing the changedFilesVsMain git pattern at src/lib/flywheel-merge-order.ts:105, then call orderMergeCandidates (flywheel-merge-order.ts:39) and process in that order. Disjoint candidates flow first; conflicting ones serialize broadest-footprint first. No-op (no branch-diff git work) for 0 or 1 due entries. Inject the diff/order deps for tests."
+        },
+        "items": [
+          {
+            "id": "executor-order.ac1",
+            "title": "Given three due entries where two share changed files and one is disjoint, when the tick runs the disjoint entry is attempted before the conflicting pair (ordering asserted via injected deps)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-order.ac2",
+            "title": "Given two conflicting due entries with different footprints, when the tick runs the broadest-footprint entry is attempted first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "executor-order.ac3",
+            "title": "Given zero or one due entries, ordering is a no-op and no branch-diff git work runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "role-doc-boundary",
+        "title": "Document the server/LLM auto-merge convergence boundary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T20:52:13.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1758",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update roles/flywheel.md (the auto-merge problems section ~line 88, the merge-blockers section ~line 96, and the schedule note ~line 163) to reflect the new deterministic behavior: the SERVER now retries transient auto-merge ineligibility with backoff and resurrects recoverable blocked/failed entries automatically; the LLM flywheel must act ONLY on genuinely-stuck entries (attempt-capped / terminally blocked) surfaced by GET /api/flywheel/auto-merge/problems, and must NOT re-POST /api/flywheel/auto-merge/schedule for a transient block nor launch a rebase strike on an entry the server is still retrying (hazard H1, double-acting). Preserve the operator-cancellable cooldown and the PAN-1620 merge-blockers loop for genuinely-stuck PRs. No `pan <verb>` flag or help string changes, so scripts/lint-skills.sh is unaffected — confirm npm run lint stays green."
+        },
+        "items": [
+          {
+            "id": "role-doc-boundary.ac1",
+            "title": "roles/flywheel.md contains a statement that the server retries transient ineligibility and resurrects recoverable blocked/failed entries, and that the LLM acts only on attempt-capped / terminally-stuck entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-doc-boundary.ac2",
+            "title": "The auto-merge problems guidance in roles/flywheel.md covers only genuinely-stuck entries and no longer directs the LLM to re-schedule or rebase-strike every blocked/failed entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "role-doc-boundary.ac3",
+            "title": "roles/flywheel.md preserves the operator-cancellable cooldown and the PAN-1620 merge-blockers loop for genuinely-stuck PRs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "classifier",
+        "to": "executor-retry-cap",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-attempts",
+        "to": "executor-retry-cap",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-attempts",
+        "to": "executor-resurrect",
+        "type": "blocks"
+      },
+      {
+        "from": "executor-retry-cap",
+        "to": "executor-resurrect",
+        "type": "blocks"
+      },
+      {
+        "from": "executor-retry-cap",
+        "to": "executor-order",
+        "type": "blocks"
+      },
+      {
+        "from": "executor-resurrect",
+        "to": "role-doc-boundary",
+        "type": "blocks"
+      },
+      {
+        "from": "executor-order",
+        "to": "role-doc-boundary",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-14-PAN-1758-bug-cloister-uat-off-merge-lane-cannot-converge-on-a-continuously-moving-main.vbrief.json"
+    }
+  }
+}
