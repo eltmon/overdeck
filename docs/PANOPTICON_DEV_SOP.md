@@ -83,3 +83,49 @@ The dashboard log contains startup failures, runtime exceptions, and health-chec
 ## Known limitations
 
 The supervisor can still die. This issue adds dashboard watchdog behavior inside the supervisor, but it does not add a separate process manager that restarts the supervisor itself. If both dashboard and supervisor are unreachable, recover from the CLI with `pan up` or `pan restart --full` after checking the logs above.
+
+## Process and port topology
+
+The local stack is two long-lived Node 22 processes, on two ports:
+
+- **Dashboard** — `node dist/dashboard/server.js`, binds the API/frontend port (`process.env.PORT`, default **3011**; frontend 3010). This is what the browser and agents talk to. It hosts the **Deacon** (Cloister watchdog) in-process.
+- **Supervisor** — `node dist/supervisor/server.js`, binds **3012**. It is the dashboard's keep-alive watchdog (polls `/api/health` every 10s; see "Restart behavior guarantees"). It does **not** host a Deacon.
+
+Each is a **singleton on its port.** A second instance that tries to bind an already-owned port fails and exits — so "the process that owns the port" is always the live one.
+
+**Workspace-container peers are not duplicates.** Every running workspace devcontainer runs its own `dist/dashboard/server.js` (cwd `/workspaces/...`, parent `containerd-shim`, `PANOPTICON_DISABLE_DEACON=1`). Seeing N+1 dashboard processes with N containers up is healthy. Only the **host** process whose cwd is the primary repo counts.
+
+### Boot env gates (read once, at dashboard/supervisor start)
+
+| Env var | Set by | Effect |
+| --- | --- | --- |
+| `PANOPTICON_NO_RESUME=1` | `pan up --no-resume` | Deacon runs but does **not** auto-resume stopped/orphaned agents (orphan recovery off). Use after a reboot — stale `agent-*` `state.json` with `status:running` would otherwise mass-resume. |
+| `PANOPTICON_DISABLE_DEACON=1` | `pan up --no-deacon` / `pan restart --no-deacon` | Deacon auto-start is **skipped entirely** (no patrols, no recovery). Also set on container peers. |
+
+**Partial-restart env hazard.** `spawnDashboardDetached` (in `restart.ts`) spawns the new dashboard with `{ ...process.env }` — i.e. it **inherits the env of whatever shell ran the `pan` command**. Conversation/agent shells inherit the *original boot's* gates. So `pan restart --dashboard` from such a shell silently **re-applies the old `--no-resume`/`--no-deacon` state**, even if you meant to change it. To change a gate:
+
+- Set it explicitly for the command: `env -u PANOPTICON_DISABLE_DEACON pan restart --dashboard` (enable the deacon), or `PANOPTICON_NO_RESUME=1 pan up`.
+- Or do a full `pan down` + `pan up` with the env you want, which also resets the supervisor singleton.
+
+The deacon can additionally be paused at runtime via the SQLite flag `deacon.globally_paused` (`pan admin cloister freeze` / `unfreeze`), which **persists across restarts** and is independent of the boot gates — a useful belt-and-suspenders while settling the field.
+
+## Diagnosing process state — and the `pgrep` self-match trap
+
+**The trap (this has burned multi-hour investigations):** `pgrep -f 'dashboard/server.js'` (or `pkill -f`, or any `-f` match on these paths) **also matches your own diagnostic command**, because your shell's argv contains that literal string. The result is phantom "extra dashboards / dueling supervisors" that are really just your own `bash`/`pgrep` subshells. Symptoms: ever-changing PIDs that vanish instantly, parents that are your own `claude`/`bash`/shell-snapshot, `etimes=0s`.
+
+**Always filter to real `node` processes** and use the container-aware census:
+
+```bash
+# Real host dashboard(s): comm must be 'node', cwd must be the primary repo, not a container
+for pid in $(pgrep -f 'dashboard/server\.js'); do
+  [ "$(cat /proc/$pid/comm 2>/dev/null)" = node ] || continue          # drop bash/pgrep self-matches
+  grep -qE 'docker|containerd|kubepods|libpod' /proc/$pid/cgroup 2>/dev/null \
+    && continue                                                        # drop container peers
+  echo "HOST dashboard $pid cwd=$(readlink /proc/$pid/cwd)"
+done
+ss -ltnp | grep -E ':(3011|3012)\b'        # the port owners are the live singletons
+```
+
+Exactly **one** HOST dashboard (owns 3011) and **one** supervisor (owns 3012), with cwd = primary repo, is the healthy state. Trust the **port owner**, not raw `pgrep` counts.
+
+**`watchdog: dashboard slow but alive … deferring restart` in `supervisor.log` is correct behavior, not churn.** It means the health probe timed out but the dashboard is still serving, so the supervisor deferred restarting it (dead-vs-busy classification, PAN-1714). The usual cause is a bloated `panopticon.db` slowing the event-store bootstrap and health endpoint (PAN-1876) — fix the database size, not the watchdog. A genuine restart loop instead shows repeated `received SIGTERM` + `Dashboard listening` pairs with no "slow but alive" deferral.
