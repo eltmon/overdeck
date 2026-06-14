@@ -309,7 +309,7 @@ export function checkTrackerQuota(): CheckResult {
 
     const ghLimit = cache.getRateLimit('github');
     const resetMs = ghLimit ? new Date(ghLimit.resetAt).getTime() : NaN;
-    const resetInFuture = Number.isNaN(resetMs) || resetMs > Date.now();
+    const resetInFuture = Number.isNaN(resetMs) || resetMs > nowMs;
     if (ghLimit && ghLimit.remaining <= 0 && resetInFuture) {
       warnings.push(`GitHub rate limit exhausted (${ghLimit.remaining}/${ghLimit.total} until ${ghLimit.resetAt})`);
     }

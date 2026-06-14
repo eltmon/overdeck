@@ -836,7 +836,8 @@ export class IssueDataService {
           typeof error === 'object' && error !== null && 'message' in error
             ? String(error.message)
             : String(error ?? '');
-        const rank = statusRank(/rate.?limit/i.test(msg) ? 'quota_exhausted' : 'error');
+        const isRateLimit = /rate.?limit|\b429\b/i.test(msg);
+        const rank = statusRank(isRateLimit ? 'quota_exhausted' : 'error');
         if (rank > worstStatusRank) {
           worstStatusRank = rank;
           worstError = error;
@@ -852,7 +853,12 @@ export class IssueDataService {
 
     this.trackers.github.lastFetchedIssues = allIssues;
     this.trackers.github.lastFetchedAt = new Date().toISOString();
-    this.trackers.github.lastError = null;
+    this.trackers.github.lastError =
+      worstError && typeof worstError === 'object' && 'message' in worstError
+        ? String(worstError.message)
+        : worstError
+          ? String(worstError)
+          : null;
 
     // Persist to cache
     this.cache.set('github', 'issues', allIssues, { ttlSeconds: DEFAULT_TTLS.github });
