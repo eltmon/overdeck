@@ -179,9 +179,18 @@ describe('IssueDataService poll-outcome recording (PAN-1817)', () => {
     });
   });
 
-  it('does NOT call updateRateLimit for linear (rate_limits table stays GitHub-only)', async () => {
+  it('does NOT call updateRateLimit for linear on error (rate_limits table stays GitHub-only)', async () => {
     const { svc, cache } = makeServiceWithRecording();
     vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('API rate-limit exceeded'));
+
+    await (svc as any).pollLinear();
+
+    expect(cache.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('does NOT call updateRateLimit for linear on success (rate_limits table stays GitHub-only)', async () => {
+    const { svc, cache } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockResolvedValue([]);
 
     await (svc as any).pollLinear();
 
