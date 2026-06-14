@@ -12,7 +12,7 @@ import {
   getAvailableModelsSync,
 } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
-import { hasModelCapabilitySync } from '../../src/lib/model-capabilities.js';
+import { hasModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync } from '../../src/lib/model-capabilities.js';
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -456,6 +456,7 @@ describe('model-fallback', () => {
 
     it('glm-4.7 appears in getModelsByProvider for zai', () => {
       const zaiModels = getModelsByProviderSync('zai');
+      expect(zaiModels).toContain('glm-5.2');
       expect(zaiModels).toContain('glm-4.7');
       expect(zaiModels).toContain('glm-4.7-flash');
       expect(zaiModels).toContain('glm-5.1');
@@ -497,6 +498,34 @@ describe('model-fallback', () => {
       expect(hasModelCapabilitySync('kimi-k2.7-code')).toBe(true);
     });
 
+    it('glm-5.2 is recognized as zai provider', () => {
+      expect(getModelProviderSync('glm-5.2' as ModelId)).toBe('zai');
+      expect(requiresExternalKeySync('glm-5.2' as ModelId)).toBe(true);
+    });
+
+    it('glm-5.2 falls back to Sonnet when zai is disabled', () => {
+      const anthropicOnly = new Set<ModelProvider>(['anthropic']);
+      expect(applyFallbackSync('glm-5.2' as ModelId, anthropicOnly)).toBe('claude-sonnet-4-6');
+    });
+
+    it('glm-5.2 stays when zai is enabled', () => {
+      const zaiEnabled = new Set<ModelProvider>(['zai']);
+      expect(applyFallbackSync('glm-5.2' as ModelId, zaiEnabled)).toBe('glm-5.2');
+    });
+
+    it('glm-5.2 is a known model capability', () => {
+      expect(hasModelCapabilitySync('glm-5.2')).toBe(true);
+    });
+
+    it('glm-5.2 exposes only high and max effort levels', () => {
+      expect(getModelEffortLevelsSync('glm-5.2')).toEqual(['high', 'max']);
+      expect(modelSupportsEffortSync('glm-5.2', 'high')).toBe(true);
+      expect(modelSupportsEffortSync('glm-5.2', 'max')).toBe(true);
+      expect(modelSupportsEffortSync('glm-5.2', 'low')).toBe(false);
+      expect(modelSupportsEffortSync('glm-5.2', 'medium')).toBe(false);
+      expect(modelSupportsEffortSync('glm-5.2', 'xhigh')).toBe(false);
+    });
+
     it('claude-opus-4-7 is recognized as anthropic provider', () => {
       expect(getModelProviderSync('claude-opus-4-7')).toBe('anthropic');
       expect(requiresExternalKeySync('claude-opus-4-7')).toBe(false);
@@ -505,6 +534,7 @@ describe('model-fallback', () => {
     it('glm-4.7 and glm-4.7-flash appear in getAvailableModels when zai is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'zai']);
       const models = getAvailableModelsSync(enabled);
+      expect(models).toContain('glm-5.2');
       expect(models).toContain('glm-4.7');
       expect(models).toContain('glm-4.7-flash');
       expect(models).toContain('glm-5.1');

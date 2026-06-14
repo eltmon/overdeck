@@ -1,0 +1,873 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Issue Workspace Compact Pipeline Mockup</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #fafafa;
+      --foreground: #262626;
+      --card: #ffffff;
+      --muted: rgba(0, 0, 0, 0.04);
+      --muted-foreground: #737373;
+      --border: rgba(0, 0, 0, 0.08);
+      --input: rgba(0, 0, 0, 0.10);
+      --primary: oklch(0.488 0.217 264);
+      --primary-foreground: #ffffff;
+      --success: #10b981;
+      --success-foreground: #047857;
+      --warning: #f59e0b;
+      --warning-foreground: #b45309;
+      --destructive: #ef4444;
+      --destructive-foreground: #b91c1c;
+      --info: #3b82f6;
+      --info-foreground: #1d4ed8;
+      --signal-review: #a855f7;
+      --signal-review-foreground: #7e22ce;
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 48px rgba(0, 0, 0, 0.04);
+      font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--background);
+      color: var(--foreground);
+      overflow: hidden;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .shell {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr);
+    }
+
+    .app-nav {
+      border-right: 1px solid var(--border);
+      background: #f5f5f4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 8px;
+    }
+
+    .nav-dot,
+    .nav-icon {
+      width: 34px;
+      height: 34px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--muted-foreground);
+      background: transparent;
+    }
+
+    .nav-dot {
+      color: var(--primary);
+      background: rgba(59, 130, 246, 0.10);
+      border-color: rgba(59, 130, 246, 0.20);
+    }
+
+    .nav-icon.active {
+      color: var(--primary);
+      background: var(--card);
+      border-color: var(--border);
+      box-shadow: var(--shadow-card);
+    }
+
+    .workspace {
+      min-width: 0;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 22px 14px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .header-top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .issue-title {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .issue-button {
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid rgba(59, 130, 246, 0.26);
+      color: var(--primary);
+      background: rgba(59, 130, 246, 0.08);
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .issue-button:hover {
+      border-color: rgba(59, 130, 246, 0.42);
+      background: rgba(59, 130, 246, 0.12);
+    }
+
+    .issue-name {
+      font-size: 17px;
+      line-height: 1.2;
+      font-weight: 500;
+      min-width: min(420px, 100%);
+    }
+
+    .ready-pill {
+      height: 22px;
+      border-radius: 7px;
+      border: 1px solid rgba(16, 185, 129, 0.30);
+      color: var(--success-foreground);
+      background: rgba(16, 185, 129, 0.08);
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .metric {
+      min-width: 72px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      text-align: right;
+      background: var(--card);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted-foreground);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 2px;
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .btn {
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--foreground);
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .btn.primary {
+      border-color: transparent;
+      background: var(--success);
+      color: var(--primary-foreground);
+    }
+
+    .summary-line {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .stage-chip {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      border-radius: 8px;
+      color: var(--muted-foreground);
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .stage-chip .mark {
+      width: 17px;
+      height: 17px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      font-size: 10px;
+      color: var(--muted-foreground);
+      background: var(--card);
+    }
+
+    .stage-chip.done .mark {
+      border-color: rgba(16, 185, 129, 0.24);
+      color: var(--success-foreground);
+      background: rgba(16, 185, 129, 0.06);
+    }
+
+    .stage-chip.merge .mark {
+      border-color: rgba(168, 85, 247, 0.26);
+      color: var(--signal-review-foreground);
+      background: rgba(168, 85, 247, 0.08);
+    }
+
+    .stage-chip .bar {
+      height: 4px;
+      border-radius: 999px;
+      margin-top: 5px;
+      background: var(--muted);
+      overflow: hidden;
+    }
+
+    .stage-chip.done .bar::before,
+    .stage-chip.merge .bar::before {
+      content: "";
+      display: block;
+      height: 100%;
+      width: 100%;
+      background: var(--success);
+    }
+
+    .stage-chip.merge .bar::before {
+      background: var(--signal-review);
+    }
+
+    .content {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr);
+      transition: grid-template-columns 160ms ease;
+    }
+
+    .content.pipeline-open {
+      grid-template-columns: 280px minmax(0, 1fr);
+    }
+
+    .pipeline {
+      min-width: 0;
+      border-right: 1px solid var(--border);
+      background: var(--card);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pipeline-head {
+      height: 52px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .pipeline-title {
+      display: none;
+      min-width: 0;
+      color: var(--muted-foreground);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+    }
+
+    .content.pipeline-open .pipeline-title {
+      display: block;
+    }
+
+    .icon-button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--muted-foreground);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+
+    .stage-list {
+      padding: 10px;
+      overflow: auto;
+      display: grid;
+      gap: 7px;
+    }
+
+    .stage-row {
+      min-width: 0;
+      height: 54px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px;
+      color: var(--muted-foreground);
+      background: transparent;
+    }
+
+    .stage-row.active {
+      border-color: rgba(168, 85, 247, 0.22);
+      background: rgba(168, 85, 247, 0.06);
+      color: var(--foreground);
+    }
+
+    .stage-row .stage-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      background: var(--card);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .stage-row.done .stage-icon {
+      color: var(--success-foreground);
+      border-color: rgba(16, 185, 129, 0.24);
+      background: rgba(16, 185, 129, 0.06);
+    }
+
+    .stage-row.active .stage-icon {
+      color: var(--signal-review-foreground);
+      border-color: rgba(168, 85, 247, 0.26);
+      background: rgba(168, 85, 247, 0.08);
+    }
+
+    .stage-copy {
+      display: none;
+      min-width: 0;
+    }
+
+    .content.pipeline-open .stage-copy {
+      display: block;
+    }
+
+    .stage-copy strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.2;
+      font-weight: 500;
+      color: var(--foreground);
+    }
+
+    .stage-copy span {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      line-height: 1.2;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stage-caret {
+      display: none;
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .content.pipeline-open .stage-caret {
+      display: block;
+    }
+
+    .pipeline-actions {
+      margin-top: auto;
+      padding: 10px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 7px;
+    }
+
+    .content:not(.pipeline-open) .pipeline-actions .btn {
+      width: 36px;
+      padding: 0;
+      justify-content: center;
+    }
+
+    .content:not(.pipeline-open) .pipeline-actions .btn span {
+      display: none;
+    }
+
+    .main-panel {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 52px minmax(0, 1fr);
+      background: #fcfcfb;
+    }
+
+    .tabs {
+      min-width: 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: end;
+      gap: 2px;
+      padding: 0 16px;
+      overflow-x: auto;
+      background: var(--card);
+    }
+
+    .tab {
+      height: 40px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0 13px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      color: var(--foreground);
+      border-bottom-color: var(--primary);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .stage-area {
+      min-height: 0;
+      overflow: auto;
+      padding: 24px;
+    }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+      gap: 14px;
+      align-items: start;
+      max-width: 1120px;
+    }
+
+    .banner {
+      grid-column: 1 / -1;
+      border: 1px solid rgba(16, 185, 129, 0.24);
+      border-radius: 8px;
+      background: linear-gradient(90deg, rgba(16, 185, 129, 0.10), rgba(16, 185, 129, 0.03));
+      padding: 14px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .banner .ok {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(16, 185, 129, 0.32);
+      display: grid;
+      place-items: center;
+      color: var(--success-foreground);
+      background: rgba(255,255,255,0.54);
+    }
+
+    .banner strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--success-foreground);
+    }
+
+    .banner span {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      color: var(--foreground);
+    }
+
+    .card {
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+      padding: 16px;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--success);
+      display: inline-block;
+      margin-right: 8px;
+    }
+
+    .kv {
+      display: grid;
+      gap: 0;
+    }
+
+    .kv-row {
+      min-height: 33px;
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      align-items: center;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .kv-row:first-child {
+      border-top: 0;
+    }
+
+    .kv-row span:first-child {
+      color: var(--muted-foreground);
+    }
+
+    .kv-row span:last-child {
+      text-align: right;
+    }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100vh;
+      width: min(420px, calc(100vw - 72px));
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      box-shadow: -20px 0 70px rgba(0, 0, 0, 0.12);
+      transform: translateX(102%);
+      transition: transform 180ms ease;
+      z-index: 20;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-head {
+      padding: 18px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      gap: 10px;
+    }
+
+    .drawer-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .drawer-title strong {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .drawer-body {
+      overflow: auto;
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .drawer-card {
+      border-radius: 8px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+      padding: 14px;
+    }
+
+    .drawer-card h3 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .drawer-card p {
+      margin: 0;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.12);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+    }
+
+    .scrim.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @media (max-width: 980px) {
+      .header-top {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-line {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .stage-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="app-nav" aria-label="Global navigation">
+      <div class="nav-dot">◦</div>
+      <div class="nav-icon active">◆</div>
+      <div class="nav-icon">⌘</div>
+      <div class="nav-icon">▣</div>
+      <div class="nav-icon">↯</div>
+    </aside>
+
+    <main class="workspace">
+      <header class="header">
+        <div class="header-top">
+          <div class="issue-title">
+            <button class="issue-button" id="openIssue" type="button" aria-label="Open MIN-832 issue drawer">
+              MIN-832 <span>›</span>
+            </button>
+            <div class="issue-name">Fix notification tray account switching edge case</div>
+            <div class="ready-pill">READY</div>
+          </div>
+          <div class="header-actions">
+            <div class="metric"><span>Branch</span><strong>feature/min-832</strong></div>
+            <div class="metric"><span>PR / CI</span><strong>no PR</strong></div>
+            <div class="metric"><span>Cost</span><strong>$226.40</strong></div>
+            <button class="btn primary" type="button">✓ Merge</button>
+            <button class="btn" type="button">⌘ Actions</button>
+          </div>
+        </div>
+
+        <section class="summary-line" aria-label="Pipeline summary">
+          <div class="stage-chip done"><span class="mark">✓</span><span>Plan approved<div class="bar"></div></span></div>
+          <div class="stage-chip done"><span class="mark">✓</span><span>Work done<div class="bar"></div></span></div>
+          <div class="stage-chip done"><span class="mark">✓</span><span>Review passed<div class="bar"></div></span></div>
+          <div class="stage-chip done"><span class="mark">✓</span><span>Test passed<div class="bar"></div></span></div>
+          <div class="stage-chip"><span class="mark">◦</span><span>CI/CD<div class="bar"></div></span></div>
+          <div class="stage-chip"><span class="mark">◦</span><span>Ship<div class="bar"></div></span></div>
+          <div class="stage-chip merge"><span class="mark">◆</span><span>Merge ready<div class="bar"></div></span></div>
+        </section>
+      </header>
+
+      <section class="content" id="content">
+        <aside class="pipeline">
+          <div class="pipeline-head">
+            <div class="pipeline-title">Pipeline · Live</div>
+            <button class="icon-button" id="togglePipeline" type="button" aria-label="Toggle pipeline details">⇥</button>
+          </div>
+
+          <div class="stage-list">
+            <div class="stage-row done">
+              <div class="stage-icon">✓</div>
+              <div class="stage-copy"><strong>Plan</strong><span>plan artifacts present</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+            <div class="stage-row done">
+              <div class="stage-icon">✓</div>
+              <div class="stage-copy"><strong>Work</strong><span>agent-min-832 · stopped</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+            <div class="stage-row done">
+              <div class="stage-icon">✓</div>
+              <div class="stage-copy"><strong>Review</strong><span>passed · cycle 1</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+            <div class="stage-row done">
+              <div class="stage-icon">✓</div>
+              <div class="stage-copy"><strong>Test</strong><span>passed</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-icon">◦</div>
+              <div class="stage-copy"><strong>GitHub CI/CD</strong><span>no checks</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+            <div class="stage-row">
+              <div class="stage-icon">◦</div>
+              <div class="stage-copy"><strong>Ship</strong><span>pending</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+            <div class="stage-row active">
+              <div class="stage-icon">◆</div>
+              <div class="stage-copy"><strong>Merge</strong><span>ready for human merge</span></div>
+              <div class="stage-caret">›</div>
+            </div>
+          </div>
+
+          <div class="pipeline-actions">
+            <button class="btn" type="button">↻ <span>Review &amp; test</span></button>
+            <button class="btn" type="button">↗ <span>View PR</span></button>
+          </div>
+        </aside>
+
+        <section class="main-panel">
+          <nav class="tabs" aria-label="Issue workspace tabs">
+            <button class="tab active" type="button">Overview</button>
+            <button class="tab" type="button">Review</button>
+            <button class="tab" type="button">Test</button>
+            <button class="tab" type="button">PR &amp; CI</button>
+            <button class="tab" type="button">Conversation</button>
+            <button class="tab" type="button">Diff</button>
+            <button class="tab" type="button">Files</button>
+            <button class="tab" type="button">Terminal</button>
+            <button class="tab" type="button">PRD / Plan</button>
+          </nav>
+
+          <div class="stage-area">
+            <div class="stage-grid">
+              <div class="banner">
+                <div class="ok">✓</div>
+                <div>
+                  <strong>Ready to merge</strong>
+                  <span>Review and tests passed. Merge is blocked only by explicit human action.</span>
+                </div>
+                <button class="btn" type="button">View PR</button>
+              </div>
+
+              <section class="card">
+                <div class="card-title"><span><span class="dot"></span>Now</span><span class="ready-pill">READY</span></div>
+                <div class="kv">
+                  <div class="kv-row"><span>Phase</span><span>Merge</span></div>
+                  <div class="kv-row"><span>Review</span><span>passed</span></div>
+                  <div class="kv-row"><span>Test</span><span>passed</span></div>
+                  <div class="kv-row"><span>Blocker</span><span style="color: var(--warning-foreground)">human merge approval</span></div>
+                  <div class="kv-row"><span>Next action</span><span>merge to main</span></div>
+                </div>
+              </section>
+
+              <section class="card">
+                <div class="card-title"><span>Issue</span><button class="btn" id="openIssueSecondary" type="button">Open drawer</button></div>
+                <div class="kv">
+                  <div class="kv-row"><span>Issue</span><span>MIN-832</span></div>
+                  <div class="kv-row"><span>Pull request</span><span>no PR</span></div>
+                  <div class="kv-row"><span>CI checks</span><span>no checks</span></div>
+                  <div class="kv-row"><span>Verification</span><span>passed · 1 cycle</span></div>
+                  <div class="kv-row"><span>Merge-ready</span><span>yes</span></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Issue drawer">
+    <div class="drawer-head">
+      <div class="drawer-title">
+        <strong>MIN-832</strong>
+        <button class="icon-button" id="closeIssue" type="button" aria-label="Close issue drawer">×</button>
+      </div>
+      <div class="issue-name">Fix notification tray account switching edge case</div>
+      <div><span class="ready-pill">READY</span></div>
+    </div>
+    <div class="drawer-body">
+      <section class="drawer-card">
+        <h3>Issue Summary</h3>
+        <p>The header issue key is a primary navigation affordance. Clicking it opens this drawer without changing tabs or hiding the current workspace context.</p>
+      </section>
+      <section class="drawer-card">
+        <h3>Pipeline</h3>
+        <p>Plan, work, review, and test are complete. CI/CD has no checks. Merge is ready for explicit human approval.</p>
+      </section>
+      <section class="drawer-card">
+        <h3>UAT / Workspace</h3>
+        <p>Container and UAT state can live here as persistent issue metadata while the main panel remains focused on the selected workspace tab.</p>
+      </section>
+      <section class="drawer-card">
+        <h3>Actions</h3>
+        <p>Future actions can include start agent, finalize planning, rebuild UAT, review/test, and merge controls with the same gating rules as the main surface.</p>
+      </section>
+    </div>
+  </aside>
+
+  <script>
+    const content = document.getElementById('content');
+    const togglePipeline = document.getElementById('togglePipeline');
+    const drawer = document.getElementById('drawer');
+    const scrim = document.getElementById('scrim');
+    const openIssue = document.getElementById('openIssue');
+    const openIssueSecondary = document.getElementById('openIssueSecondary');
+    const closeIssue = document.getElementById('closeIssue');
+
+    togglePipeline.addEventListener('click', () => {
+      content.classList.toggle('pipeline-open');
+      togglePipeline.textContent = content.classList.contains('pipeline-open') ? '⇤' : '⇥';
+    });
+
+    function setDrawer(open) {
+      drawer.classList.toggle('open', open);
+      scrim.classList.toggle('open', open);
+    }
+
+    openIssue.addEventListener('click', () => setDrawer(true));
+    openIssueSecondary.addEventListener('click', () => setDrawer(true));
+    closeIssue.addEventListener('click', () => setDrawer(false));
+    scrim.addEventListener('click', () => setDrawer(false));
+  </script>
+</body>
+</html>

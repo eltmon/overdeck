@@ -4,17 +4,17 @@
     "created": "2026-06-13T15:10:25.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1845: remote Fly work-agent durability & resiliency tiers",
-    "updated": "2026-06-13T15:19:27.907Z"
+    "updated": "2026-06-14T20:15:24.625Z"
   },
   "plan": {
     "id": "pan-1845",
     "title": "CRITICAL: remote Fly work agents lose ALL work on crash — durability + resiliency tiers",
-    "status": "proposed",
+    "status": "completed",
     "uid": "5a5fae6c-fd71-4ff6-bc5e-4938019e3416",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T15:10:25.000Z",
-    "updated": "2026-06-13T15:19:27.907Z",
+    "updated": "2026-06-14T20:15:24.625Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1845",
@@ -958,5 +958,5 @@
       "canonicalFilename": "2026-06-13-PAN-1845-critical-remote-fly-work-agents-lose-all-work-on-crash-durability-resiliency-tiers.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

@@ -563,7 +563,7 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
       BEAD_ID: workspaceBeadId,
     };
 
-    const claudeMd = generateClaudeMdSync(projectRoot, variables);
+    const claudeMd = generateClaudeMdSync(variables);
     writeFileSync(join(workspacePath, 'CLAUDE.md'), claudeMd);
 
     // PAN-1201: assemble the workspace context layer. The bundle composes the

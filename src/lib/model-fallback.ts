@@ -70,6 +70,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'MiniMax-M3': 'minimax',
 
   // Z.AI models
+  'glm-5.2': 'zai',
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
   'glm-4.7-flash': 'zai',
@@ -143,7 +144,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'MiniMax-M3': 'claude-sonnet-4-6', // Top-tier coding → Sonnet
 
   // Z.AI → Anthropic
-  'glm-5.1': 'claude-sonnet-4-6', // Current GLM flagship → Sonnet
+  'glm-5.2': 'claude-sonnet-4-6', // Current GLM flagship → Sonnet
+  'glm-5.1': 'claude-sonnet-4-6', // Previous GLM flagship → Sonnet
   // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of
   // MODEL_DEPRECATIONS resolution order (both resolve glm-4.7→glm-5.1 then FALLBACK_MAP,
   // and direct FALLBACK_MAP lookup; explicit entries make the result deterministic).
