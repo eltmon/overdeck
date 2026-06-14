@@ -260,7 +260,9 @@ export function initSchema(db: SqliteDatabase): void {
       -- PAN-938: current merge pipeline step
       merge_step              TEXT,
       -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
-      auto_merge              INTEGER
+      auto_merge              INTEGER,
+      -- PAN-1862: per-sub-role reviewer verdicts from discovery-fork convoy (JSON)
+      reviewer_verdicts       TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -1477,12 +1479,14 @@ export function runMigrations(db: SqliteDatabase): void {
   }
 
   // v53 → v54: persist conflict-resolution dispatch throttles (PAN-1765)
-  //             and add forge column to pending_auto_merges (PAN-1887)
+  //             add forge column to pending_auto_merges (PAN-1887)
+  //             add per-sub-role reviewer verdicts to review_status (PAN-1862)
   if (currentVersion < 54) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`); } catch { /* already exists */ }
     try {
       db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
     } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN reviewer_verdicts TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

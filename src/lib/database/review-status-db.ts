@@ -58,7 +58,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons,
         last_verified_commit,
         merge_step,
-        auto_merge
+        auto_merge,
+        reviewer_verdicts
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
@@ -100,7 +101,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons       = excluded.blocker_reasons,
         last_verified_commit  = excluded.last_verified_commit,
         merge_step            = excluded.merge_step,
-        auto_merge            = excluded.auto_merge
+        auto_merge            = excluded.auto_merge,
+        reviewer_verdicts     = excluded.reviewer_verdicts
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -141,6 +143,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.lastVerifiedCommit ?? null,
       s.mergeStep ?? null,
       s.autoMerge === undefined ? null : (s.autoMerge ? 1 : 0),
+      s.reviewerVerdicts ? JSON.stringify(s.reviewerVerdicts) : null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -438,6 +441,8 @@ interface DbReviewStatusRow {
   merge_step: string | null;
   // PAN-1691: per-issue auto-merge routing key (null=project default, 1=auto, 0=hold-for-UAT)
   auto_merge: number | null;
+  // PAN-1862: per-sub-role reviewer verdicts (JSON)
+  reviewer_verdicts: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -481,6 +486,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     lastVerifiedCommit: row.last_verified_commit ?? undefined,
     mergeStep: row.merge_step ?? undefined,
     autoMerge: row.auto_merge === null || row.auto_merge === undefined ? undefined : row.auto_merge === 1,
+    reviewerVerdicts: row.reviewer_verdicts ? JSON.parse(row.reviewer_verdicts) : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }

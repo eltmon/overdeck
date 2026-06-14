@@ -110,6 +110,8 @@ export interface ReviewStatus {
   deaconIgnoredReason?: string;
   /** Commits at time of review request — used to detect new commits after review */
   lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
+  /** PAN-1862: per-sub-role reviewer verdicts from the discovery-fork convoy */
+  reviewerVerdicts?: Partial<Record<'security' | 'correctness' | 'performance' | 'requirements', { status: 'passed' | 'blocked'; atCommit: string; findingsPath?: string }>>;
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
