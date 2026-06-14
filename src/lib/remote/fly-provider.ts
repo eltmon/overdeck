@@ -187,30 +187,41 @@ export class FlyProvider implements RemoteProvider {
 
       if (isDurable) {
         const volumes = await api.listVolumes(this.config.app);
-        let volume = volumes.find(
-          (v) =>
-            v.name === expectedVolumeName &&
-            v.region === this.config.region &&
-            v.state !== 'destroyed',
-        );
 
-        if (!volume) {
-          volume = await api.createVolume(this.config.app, {
-            name: expectedVolumeName,
-            region: this.config.region,
-            sizeGb: DURABLE_VOLUME_SIZE_GB,
-          });
-        }
-
-        if (existing && volume.attached_machine_id !== existing.id) {
-          throw new Error(
-            `Durable tier requires a /workspace volume for '${name}', but the existing machine ` +
-              `'${existing.id}' does not have volume '${expectedVolumeName}' attached. ` +
-              `Destroy the existing machine or choose a different name.`,
+        if (existing) {
+          // Adopted machine: require a volume already attached to it. Do not
+          // create a new volume here — doing so would orphan it when we throw.
+          const attached = volumes.find(
+            (v) =>
+              v.name === expectedVolumeName &&
+              v.region === this.config.region &&
+              v.state !== 'destroyed' &&
+              v.attached_machine_id === existing.id,
           );
+          if (!attached) {
+            throw new Error(
+              `Durable tier requires a /workspace volume for '${name}', but the existing machine ` +
+                `'${existing.id}' does not have volume '${expectedVolumeName}' attached. ` +
+                `Destroy the existing machine or choose a different name.`,
+            );
+          }
+          volumeId = attached.id;
+        } else {
+          // Fresh machine: reuse an unattached volume in this region, or create one.
+          const available = volumes.find(
+            (v) =>
+              v.name === expectedVolumeName &&
+              v.region === this.config.region &&
+              v.state !== 'destroyed' &&
+              !v.attached_machine_id,
+          );
+          volumeId = available?.id ??
+            (await api.createVolume(this.config.app, {
+              name: expectedVolumeName,
+              region: this.config.region,
+              sizeGb: DURABLE_VOLUME_SIZE_GB,
+            })).id;
         }
-
-        volumeId = volume.id;
       }
 
       if (existing) {
