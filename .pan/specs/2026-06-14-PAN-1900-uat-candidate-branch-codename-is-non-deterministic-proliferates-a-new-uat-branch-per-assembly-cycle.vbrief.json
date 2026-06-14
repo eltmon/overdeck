@@ -4,17 +4,17 @@
     "created": "2026-06-14T21:14:39.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1900: bug(flywheel): UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle",
-    "updated": "2026-06-14T21:22:55.651Z"
+    "updated": "2026-06-14T21:52:08.948Z"
   },
   "plan": {
     "id": "pan-1900",
     "title": "UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle",
-    "status": "proposed",
+    "status": "running",
     "uid": "f42368ab-cea9-485a-8b54-89f59f3acdc6",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-14T21:14:39.000Z",
-    "updated": "2026-06-14T21:22:55.651Z",
+    "updated": "2026-06-14T21:52:08.948Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1900",
@@ -212,5 +212,5 @@
       "canonicalFilename": "2026-06-14-PAN-1900-uat-candidate-branch-codename-is-non-deterministic-proliferates-a-new-uat-branch-per-assembly-cycle.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
