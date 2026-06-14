@@ -47,7 +47,8 @@ async function defaultGetGitLabMrState(projectPath: string, iid: number): Promis
   return JSON.parse(stdout) as GitLabMrState;
 }
 
-function parseGitLabProjectPath(prUrl: string): string | null {
+function parseGitLabProjectPath(prUrl: string | undefined): string | null {
+  if (!prUrl) return null;
   const match = prUrl.match(/:\/\/[^/]+\/(.+?)\/-\/merge_requests\/\d+/);
   return match ? match[1] : null;
 }
