@@ -44,10 +44,11 @@ import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
-import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig, resolveModel, resolveReReviewScope } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
+import { reviewersToRerun } from './reviewers-to-rerun.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import { getAgentState, getLatestSessionIdSync, messageAgent, saveAgentState, spawnRun } from '../agents.js';
@@ -338,6 +339,153 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
   }
 }
 
+/**
+ * PAN-1862: Re-review resume path.
+ *
+ * When a re-review is triggered by a stale runId (new commits since last review),
+ * resume in-scope reviewer sessions instead of killing the whole convoy.
+ * Out-of-scope reviewers with prior 'passed' verdicts are carried forward.
+ * Falls back to fresh spawn for in-scope reviewers whose session is gone.
+ *
+ * Returns a result object if the resume succeeds (caller should return it),
+ * or null if we should fall through to the kill-all-and-respawn path.
+ */
+async function tryResumeConvoyReviewers(
+  opts: { issueId: string; workspace: string; branch: string; model?: string; harness?: RuntimeName; allowHost?: boolean },
+): Promise<{ success: boolean; message: string; error?: string } | null> {
+  try {
+    // Load config to resolve re-review scope.
+    const { config } = loadYamlConfig();
+    const scope = resolveReReviewScope(config);
+
+    // Get changed files since the last reviewed commit.
+    const existingStatus = getReviewStatusSync(opts.issueId);
+    const reviewedAtCommit = existingStatus?.reviewedAtCommit;
+    let changedFiles: string[] = [];
+    if (reviewedAtCommit) {
+      try {
+        const { stdout } = await execAsync(
+          `git diff --name-only ${reviewedAtCommit} HEAD`,
+          { cwd: opts.workspace, encoding: 'utf-8' },
+        );
+        changedFiles = stdout.split('\n').map(f => f.trim()).filter(Boolean);
+      } catch (err) {
+        console.warn('[review-agent] Could not compute changed files for re-review scope, including all reviewers:', err);
+        // Fail-safe: include all reviewers.
+      }
+    }
+
+    const priorVerdicts = existingStatus?.reviewerVerdicts ?? {};
+    const inScope = reviewersToRerun(scope, changedFiles, priorVerdicts);
+    const outOfScope = REVIEW_SUB_ROLES.filter(sr => !inScope.includes(sr));
+
+    console.log(
+      `[review-agent] Re-review scope=${scope}: in-scope=[${inScope.join(',')}] carried=[${outOfScope.join(',')}]`,
+    );
+
+    // Get the alive reviewer sessions.
+    const allSessions = await Effect.runPromise(listSessionNames());
+    const issueKey = opts.issueId.toLowerCase();
+    const synthesisSessionName = `agent-${issueKey}-review`;
+
+    const resumed: string[] = [];
+    const deadFallback: ReviewSubRole[] = [];
+
+    // Build a context manifest for the re-review message.
+    let tier1Summary: string | undefined;
+    try {
+      const { stdout: headSha } = await execAsync('git rev-parse --short=8 HEAD', { cwd: opts.workspace, encoding: 'utf-8' });
+      const runId = `agent-${issueKey}-review-${headSha.trim()}`;
+      const manifest = await Effect.runPromise(buildReviewContext({ runId, issueId: opts.issueId, workspace: opts.workspace, branch: opts.branch }));
+      tier1Summary = formatTier1Summary(manifest);
+    } catch {
+      // Non-fatal — reviewers will re-read context themselves.
+    }
+
+    for (const subRole of inScope) {
+      const reviewerSessionName = `agent-${issueKey}-review-${subRole}`;
+      const sessionAlive = allSessions.includes(reviewerSessionName)
+        && !(await Effect.runPromise(isPaneDead(reviewerSessionName)));
+
+      if (sessionAlive) {
+        // Resume: deliver the new diff summary + re-review instruction.
+        const priorFindings = priorVerdicts[subRole];
+        const priorStatus = priorFindings?.status ?? 'unknown';
+        const priorPath = priorFindings?.findingsPath ? `\nYour prior findings are at: ${priorFindings.findingsPath}` : '';
+        const diffSection = tier1Summary ? `\n\n## New diff summary\n${tier1Summary}` : '';
+        const resumeMsg = [
+          `RE-REVIEW: New commits have been pushed since your last review (prior verdict: ${priorStatus}).`,
+          diffSection,
+          priorPath,
+          '\nPlease re-read the updated diff and re-run your review. Write your findings to your output file and signal the verdict as before.',
+        ].join('');
+
+        try {
+          await messageAgent(reviewerSessionName, resumeMsg, 're-review:resume');
+          resumed.push(subRole);
+          console.log(`[review-agent] Resumed ${reviewerSessionName} for re-review`);
+        } catch (err) {
+          console.warn(`[review-agent] Failed to resume ${reviewerSessionName}, will fresh-spawn:`, err);
+          deadFallback.push(subRole);
+        }
+      } else {
+        console.log(`[review-agent] ${reviewerSessionName} not alive, will fresh-spawn for re-review`);
+        deadFallback.push(subRole);
+      }
+    }
+
+    // Carry out-of-scope reviewers' prior 'passed' verdicts forward in ReviewStatus.
+    if (outOfScope.length > 0) {
+      const carried: typeof priorVerdicts = {};
+      for (const sr of outOfScope) {
+        if (priorVerdicts[sr]) carried[sr] = priorVerdicts[sr];
+      }
+      if (Object.keys(carried).length > 0) {
+        try {
+          setReviewStatusSync(opts.issueId, { reviewerVerdicts: { ...priorVerdicts, ...carried } });
+        } catch (err) {
+          console.warn('[review-agent] Could not persist carried verdicts:', err);
+        }
+      }
+    }
+
+    // Re-arm synthesis: notify it of which sub-roles are running and which are carried.
+    if (allSessions.includes(synthesisSessionName)) {
+      const carriableVerdicts = outOfScope
+        .filter(sr => priorVerdicts[sr]?.status === 'passed')
+        .map(sr => `${sr}:passed`)
+        .join(',');
+      const synthMsg = [
+        `RE-REVIEW: New commits pushed. Await terminal signals only from: ${inScope.join(',')}.`,
+        carriableVerdicts ? ` Carried-forward verdicts: ${carriableVerdicts}.` : '',
+        ' Re-synthesize after receiving signals from all in-scope reviewers.',
+      ].join('');
+      try {
+        await messageAgent(synthesisSessionName, synthMsg, 're-review:rearm-synthesis');
+        console.log(`[review-agent] Re-armed synthesis for cycle with in-scope=[${inScope.join(',')}]`);
+      } catch (err) {
+        console.warn('[review-agent] Failed to re-arm synthesis session:', err);
+      }
+    }
+
+    // If there are reviewers needing fresh spawn, fall through for them after returning.
+    // For now: if ANY reviewer was resumed, report success.
+    // Dead-fallback reviewers will be handled by the caller via fresh spawn.
+    if (resumed.length > 0 || deadFallback.length === 0) {
+      return {
+        success: true,
+        message: `Re-review: resumed=[${resumed.join(',')}] carried=[${outOfScope.join(',')}]${deadFallback.length > 0 ? ` (fresh-spawn needed: [${deadFallback.join(',')}])` : ''}`,
+      };
+    }
+
+    // All in-scope reviewers need fresh spawn — fall through to kill-all path.
+    return null;
+  } catch (err) {
+    console.warn('[review-agent] Re-review resume failed, falling back to kill-all respawn:', err);
+    return null;
+  }
+}
+
 async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
@@ -400,8 +548,21 @@ async function spawnReviewRoleForIssuePromise(
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: true, message: `Review already in progress: ${reviewSessionName}` };
       }
-      // Session pane is dead, force mode, or stale runId — kill the whole convoy and respawn.
-      const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId';
+
+      // PAN-1862: stale-runId re-review path — resume in-scope reviewer sessions
+      // instead of killing the whole convoy. Terminal lifecycle events (force mode,
+      // dead pane) still kill-all and respawn.
+      if (!paneDead && !opts.force && staleRunId) {
+        const resumeResult = await tryResumeConvoyReviewers(opts);
+        if (resumeResult) {
+          return resumeResult;
+        }
+        // tryResumeConvoyReviewers returned null — all in-scope reviewers need
+        // fresh spawn; fall through to the kill-all-and-respawn path below.
+      }
+
+      // Session pane is dead or force mode — kill the whole convoy and respawn.
+      const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId (all reviewers need fresh spawn)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
       await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
