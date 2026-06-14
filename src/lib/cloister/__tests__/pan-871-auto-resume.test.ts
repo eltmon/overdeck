@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    cpus: vi.fn(() => Array.from({ length: 8 }, () => ({}) as any)),
+    loadavg: vi.fn(() => [0, 0, 0]),
+  };
+});
+
 vi.mock('../../../lib/agents.js', async () => {
   const { Effect } = await import('effect');
   const effectMock = (initial?: unknown) => {

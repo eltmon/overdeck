@@ -95,24 +95,24 @@
     .header {
       background: var(--card);
       border-bottom: 1px solid var(--border);
-      padding: 16px 22px 14px;
+      padding: 14px 22px 12px;
       display: grid;
-      gap: 14px;
+      gap: 12px;
     }
 
     .header-top {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 16px;
+      gap: 12px;
       align-items: start;
     }
 
     .issue-title {
       min-width: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr);
+      align-items: start;
+      gap: 8px;
     }
 
     .issue-button {
@@ -128,6 +128,7 @@
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
+      white-space: nowrap;
     }
 
     .issue-button:hover {
@@ -136,10 +137,12 @@
     }
 
     .issue-name {
-      font-size: 17px;
+      font-size: 16px;
       line-height: 1.2;
       font-weight: 500;
-      min-width: min(420px, 100%);
+      min-width: 0;
+      max-width: 520px;
+      grid-column: 1 / -1;
     }
 
     .ready-pill {
@@ -160,13 +163,16 @@
       display: flex;
       gap: 8px;
       align-items: center;
+      position: relative;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .metric {
-      min-width: 72px;
+      min-width: 66px;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 6px 10px;
+      padding: 5px 9px;
       text-align: right;
       background: var(--card);
     }
@@ -194,10 +200,10 @@
       border: 1px solid var(--border);
       background: var(--card);
       color: var(--foreground);
-      padding: 0 12px;
+      padding: 0 10px;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
@@ -209,78 +215,241 @@
       color: var(--primary-foreground);
     }
 
-    .summary-line {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 6px;
+    .btn.subtle {
+      background: rgba(0, 0, 0, 0.03);
     }
 
-    .stage-chip {
-      min-width: 0;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 7px;
-      align-items: center;
-      border-radius: 8px;
+    .btn.pending {
       color: var(--muted-foreground);
-      font-size: 11px;
+      background: var(--muted);
+      cursor: default;
+    }
+
+    .action-menu {
+      position: absolute;
+      top: 42px;
+      right: 0;
+      width: 330px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.14);
+      padding: 8px;
+      display: none;
+      z-index: 30;
+    }
+
+    .action-menu.open {
+      display: block;
+    }
+
+    .menu-section {
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .menu-section:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .menu-label {
+      padding: 6px 8px 4px;
+      color: var(--muted-foreground);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .menu-item {
+      min-height: 34px;
+      width: 100%;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--foreground);
+      padding: 7px 8px;
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .menu-item:hover {
+      background: var(--muted);
+    }
+
+    .menu-item.danger {
+      color: var(--destructive-foreground);
+    }
+
+    .menu-item[disabled] {
+      color: var(--muted-foreground);
+      opacity: 0.48;
+      cursor: not-allowed;
+    }
+
+    .menu-item[disabled]:hover {
+      background: transparent;
+    }
+
+    .menu-item small {
+      color: var(--muted-foreground);
+      font-size: 10px;
       font-weight: 500;
     }
 
-    .stage-chip .mark {
-      width: 17px;
-      height: 17px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      border: 1px solid var(--border);
-      font-size: 10px;
-      color: var(--muted-foreground);
-      background: var(--card);
+    .status-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
     }
 
-    .stage-chip.done .mark {
-      border-color: rgba(16, 185, 129, 0.24);
+    .status-chip {
+      min-width: 0;
+      min-height: 24px;
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      padding: 0 8px;
+      color: var(--muted-foreground);
+      font-size: 10.5px;
+      font-weight: 500;
+    }
+
+    .status-chip .mark {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--muted-foreground);
+    }
+
+    .status-chip.ready {
       color: var(--success-foreground);
+      border-color: rgba(16, 185, 129, 0.22);
       background: rgba(16, 185, 129, 0.06);
     }
 
-    .stage-chip.merge .mark {
-      border-color: rgba(168, 85, 247, 0.26);
-      color: var(--signal-review-foreground);
-      background: rgba(168, 85, 247, 0.08);
-    }
-
-    .stage-chip .bar {
-      height: 4px;
-      border-radius: 999px;
-      margin-top: 5px;
-      background: var(--muted);
-      overflow: hidden;
-    }
-
-    .stage-chip.done .bar::before,
-    .stage-chip.merge .bar::before {
-      content: "";
-      display: block;
-      height: 100%;
-      width: 100%;
+    .status-chip.ready .mark {
       background: var(--success);
     }
 
-    .stage-chip.merge .bar::before {
+    .status-chip.review {
+      color: var(--signal-review-foreground);
+      border-color: rgba(168, 85, 247, 0.22);
+      background: rgba(168, 85, 247, 0.06);
+    }
+
+    .status-chip.review .mark {
+      background: var(--signal-review);
+    }
+
+    .status-chip.warning .mark {
+      background: var(--warning);
+    }
+
+    .workflow-line {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 7px;
+      align-items: start;
+    }
+
+    .workflow-step {
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 7px;
+      align-items: start;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .workflow-step .mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--muted-foreground);
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    .workflow-step .copy {
+      min-width: 0;
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .workflow-step .bar {
+      grid-column: 2;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--muted);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+
+    .workflow-step.done .mark {
+      border-color: rgba(16, 185, 129, 0.28);
+      background: rgba(16, 185, 129, 0.07);
+      color: var(--success-foreground);
+    }
+
+    .workflow-step.done .bar::before,
+    .workflow-step.active .bar::before {
+      content: "";
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--success);
+    }
+
+    .workflow-step.active {
+      color: var(--foreground);
+    }
+
+    .workflow-step.active .mark {
+      border-color: rgba(168, 85, 247, 0.30);
+      background: rgba(168, 85, 247, 0.10);
+      color: var(--signal-review-foreground);
+    }
+
+    .workflow-step.active .bar::before {
       background: var(--signal-review);
     }
 
     .content {
       min-height: 0;
       display: grid;
-      grid-template-columns: 76px minmax(0, 1fr);
+      grid-template-columns: 64px minmax(0, 1fr);
       transition: grid-template-columns 160ms ease;
     }
 
     .content.pipeline-open {
-      grid-template-columns: 280px minmax(0, 1fr);
+      grid-template-columns: 244px minmax(0, 1fr);
     }
 
     .pipeline {
@@ -293,7 +462,7 @@
 
     .pipeline-head {
       height: 52px;
-      padding: 0 12px;
+      padding: 0 8px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -328,22 +497,22 @@
     }
 
     .stage-list {
-      padding: 10px;
+      padding: 8px;
       overflow: auto;
       display: grid;
-      gap: 7px;
+      gap: 6px;
     }
 
     .stage-row {
       min-width: 0;
-      height: 54px;
+      height: 50px;
       border: 1px solid transparent;
       border-radius: 8px;
       display: grid;
-      grid-template-columns: 36px minmax(0, 1fr) auto;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
       align-items: center;
-      gap: 8px;
-      padding: 0 8px;
+      gap: 7px;
+      padding: 0 6px;
       color: var(--muted-foreground);
       background: transparent;
     }
@@ -355,8 +524,8 @@
     }
 
     .stage-row .stage-icon {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 8px;
       border: 1px solid var(--border);
       display: grid;
@@ -416,24 +585,6 @@
       display: block;
     }
 
-    .pipeline-actions {
-      margin-top: auto;
-      padding: 10px;
-      border-top: 1px solid var(--border);
-      display: grid;
-      gap: 7px;
-    }
-
-    .content:not(.pipeline-open) .pipeline-actions .btn {
-      width: 36px;
-      padding: 0;
-      justify-content: center;
-    }
-
-    .content:not(.pipeline-open) .pipeline-actions .btn span {
-      display: none;
-    }
-
     .main-panel {
       min-width: 0;
       min-height: 0;
@@ -484,6 +635,123 @@
       gap: 14px;
       align-items: start;
       max-width: 1120px;
+    }
+
+    .stage-inspector {
+      display: grid;
+      gap: 14px;
+      max-width: 1120px;
+    }
+
+    .inspector-head {
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .inspector-head h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 500;
+    }
+
+    .inspector-head p {
+      margin: 5px 0 0;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .mode-toggle {
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--muted);
+      padding: 2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .mode-toggle button {
+      height: 26px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .mode-toggle button.active {
+      background: var(--card);
+      color: var(--foreground);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .activity-panel {
+      border-radius: 8px;
+      background: var(--card);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .conversation-view,
+    .terminal-view {
+      display: none;
+      min-height: 360px;
+      padding: 16px;
+    }
+
+    .conversation-view.active,
+    .terminal-view.active {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .message {
+      max-width: 780px;
+      border-radius: 8px;
+      padding: 11px 12px;
+      background: #fafafa;
+      border: 1px solid var(--border);
+    }
+
+    .message.agent {
+      margin-left: 34px;
+      background: rgba(59, 130, 246, 0.04);
+    }
+
+    .message strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted-foreground);
+    }
+
+    .message p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .terminal-view {
+      background: #101113;
+      color: #e5e5e5;
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
     }
 
     .banner {
@@ -662,10 +930,6 @@
         grid-template-columns: 1fr;
       }
 
-      .summary-line {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
       .stage-grid {
         grid-template-columns: 1fr;
       }
@@ -696,19 +960,41 @@
             <div class="metric"><span>Branch</span><strong>feature/min-832</strong></div>
             <div class="metric"><span>PR / CI</span><strong>no PR</strong></div>
             <div class="metric"><span>Cost</span><strong>$226.40</strong></div>
-            <button class="btn primary" type="button">✓ Merge</button>
-            <button class="btn" type="button">⌘ Actions</button>
+            <button class="btn subtle" type="button">↻ Review &amp; test</button>
+            <button class="btn subtle" type="button">↗ View PR</button>
+            <button class="btn pending" type="button">⊖ Merge — test pending</button>
+            <button class="btn" id="actionsButton" type="button" aria-expanded="false" aria-controls="actionsMenu">⌘ Actions ▾</button>
+            <div class="action-menu" id="actionsMenu" role="menu" aria-label="Issue actions">
+              <div class="menu-section">
+                <div class="menu-label">Next actions</div>
+                <button class="menu-item" type="button"><span>↻</span><span>Review &amp; test</span><small>rerun gates</small></button>
+                <button class="menu-item" type="button"><span>↗</span><span>View PR</span><small>opens GitHub</small></button>
+                <button class="menu-item" id="openIssueFromMenu" type="button"><span>▣</span><span>Open issue drawer</span><small>MIN-832</small></button>
+              </div>
+              <div class="menu-section">
+                <div class="menu-label">Agent</div>
+                <button class="menu-item" type="button"><span>✎</span><span>Tell agent</span><small>send instruction</small></button>
+                <button class="menu-item" type="button"><span>◐</span><span>Switch model</span><small>new session</small></button>
+                <button class="menu-item danger" type="button"><span>↯</span><span>Restart agent</span><small>requires confirm</small></button>
+              </div>
+              <div class="menu-section">
+                <div class="menu-label">Workspace</div>
+                <button class="menu-item" type="button"><span>⇣</span><span>Sync main</span><small>rebase workspace</small></button>
+                <button class="menu-item" type="button"><span>⌘</span><span>Copy settings</span><small>clipboard</small></button>
+                <button class="menu-item" type="button" disabled><span>＋</span><span>Create workspace</span><small>already exists</small></button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <section class="summary-line" aria-label="Pipeline summary">
-          <div class="stage-chip done"><span class="mark">✓</span><span>Plan approved<div class="bar"></div></span></div>
-          <div class="stage-chip done"><span class="mark">✓</span><span>Work done<div class="bar"></div></span></div>
-          <div class="stage-chip done"><span class="mark">✓</span><span>Review passed<div class="bar"></div></span></div>
-          <div class="stage-chip done"><span class="mark">✓</span><span>Test passed<div class="bar"></div></span></div>
-          <div class="stage-chip"><span class="mark">◦</span><span>CI/CD<div class="bar"></div></span></div>
-          <div class="stage-chip"><span class="mark">◦</span><span>Ship<div class="bar"></div></span></div>
-          <div class="stage-chip merge"><span class="mark">◆</span><span>Merge ready<div class="bar"></div></span></div>
+        <section class="workflow-line" aria-label="Issue workflow">
+          <button class="workflow-step done" type="button" data-stage="Plan"><span class="mark">✓</span><span><span class="copy">Plan approved</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Work"><span class="mark">✓</span><span><span class="copy">Work done</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Review"><span class="mark">✓</span><span><span class="copy">Review passed</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Test"><span class="mark">✓</span><span><span class="copy">Test passed</span><span class="bar"></span></span></button>
+          <button class="workflow-step" type="button" data-stage="CI/CD"><span class="mark">◦</span><span><span class="copy">CI/CD</span><span class="bar"></span></span></button>
+          <button class="workflow-step" type="button" data-stage="Ship"><span class="mark">◦</span><span><span class="copy">Ship</span><span class="bar"></span></span></button>
+          <button class="workflow-step active" type="button" data-stage="Merge"><span class="mark">◆</span><span><span class="copy">Merge ready</span><span class="bar"></span></span></button>
         </section>
       </header>
 
@@ -756,11 +1042,6 @@
               <div class="stage-caret">›</div>
             </div>
           </div>
-
-          <div class="pipeline-actions">
-            <button class="btn" type="button">↻ <span>Review &amp; test</span></button>
-            <button class="btn" type="button">↗ <span>View PR</span></button>
-          </div>
         </aside>
 
         <section class="main-panel">
@@ -777,7 +1058,48 @@
           </nav>
 
           <div class="stage-area">
-            <div class="stage-grid">
+            <div class="stage-inspector">
+              <section class="inspector-head">
+                <div>
+                  <h2><span id="stageTitle">Merge</span> activity</h2>
+                  <p id="stageSummary">Ready for human merge. Review the conversation or switch to terminal output without leaving the stage context.</p>
+                </div>
+                <div class="mode-toggle" aria-label="Activity view">
+                  <button class="active" type="button" data-mode="conversation">Conversation</button>
+                  <button type="button" data-mode="terminal">Terminal</button>
+                </div>
+              </section>
+
+              <section class="activity-panel">
+                <div class="conversation-view active" id="conversationView">
+                  <div class="message">
+                    <strong>operator</strong>
+                    <p>Check the merge gate for MIN-832 and confirm what remains before we move this to main.</p>
+                  </div>
+                  <div class="message agent">
+                    <strong>merge-agent</strong>
+                    <p>Review and test gates are passing. GitHub CI has no checks for this branch. The remaining blocker is explicit human approval.</p>
+                  </div>
+                  <div class="message">
+                    <strong>operator</strong>
+                    <p>Keep the PR link and rerun controls close to this state so I do not need the left pipeline expanded.</p>
+                  </div>
+                </div>
+                <pre class="terminal-view" id="terminalView">agent-min-832 $ pan status MIN-832
+Issue: MIN-832
+Stage: Merge
+Review: passed
+Test: passed
+CI/CD: no checks
+Merge: waiting for human approval
+
+agent-min-832 $ git status --short
+# clean
+</pre>
+              </section>
+            </div>
+
+            <div class="stage-grid" style="margin-top: 14px;">
               <div class="banner">
                 <div class="ok">✓</div>
                 <div>
@@ -832,7 +1154,7 @@
       </section>
       <section class="drawer-card">
         <h3>Pipeline</h3>
-        <p>Plan, work, review, and test are complete. CI/CD has no checks. Merge is ready for explicit human approval.</p>
+        <p>Plan and work are visible in the rail. The header carries the current gate state, including blocked merge reasons such as pending tests.</p>
       </section>
       <section class="drawer-card">
         <h3>UAT / Workspace</h3>
@@ -852,22 +1174,118 @@
     const scrim = document.getElementById('scrim');
     const openIssue = document.getElementById('openIssue');
     const openIssueSecondary = document.getElementById('openIssueSecondary');
+    const openIssueFromMenu = document.getElementById('openIssueFromMenu');
     const closeIssue = document.getElementById('closeIssue');
+    const actionsButton = document.getElementById('actionsButton');
+    const actionsMenu = document.getElementById('actionsMenu');
+    const stageTitle = document.getElementById('stageTitle');
+    const stageSummary = document.getElementById('stageSummary');
+    const conversationView = document.getElementById('conversationView');
+    const terminalView = document.getElementById('terminalView');
+
+    const stageSummaries = {
+      Plan: 'Planning artifacts are present. Review the planning discussion or inspect the plan generation terminal output.',
+      Work: 'Work agent completed and stopped. Review the implementation conversation or terminal session inline.',
+      Review: 'Review passed. The conversation captures reviewer findings and final approval.',
+      Test: 'Tests passed. Use the terminal view to inspect command output without switching tabs.',
+      'CI/CD': 'No GitHub checks are attached to this branch. This stage stays visible but inactive.',
+      Ship: 'Ship is pending. This will show release/ship activity when the stage starts.',
+      Merge: 'Ready for human merge. Review the conversation or switch to terminal output without leaving the stage context.',
+    };
+
+    const terminalSamples = {
+      Plan: `planning-min-832 $ pan plan MIN-832
+Plan artifacts: present
+Beads: generated
+Status: approved`,
+      Work: `agent-min-832 $ git status --short
+# clean
+
+agent-min-832 $ npm test
+Review handoff complete.`,
+      Review: `review-min-832 $ pan review MIN-832
+Correctness: passed
+Requirements: passed
+Security: passed`,
+      Test: `test-min-832 $ npm run test -- --run
+tests passed
+
+test-min-832 $ npm run typecheck
+clean`,
+      'CI/CD': `github $ gh pr checks
+No checks found for feature/min-832`,
+      Ship: `ship-min-832 $ pan ship status
+Pending: waiting for merge readiness`,
+      Merge: `agent-min-832 $ pan status MIN-832
+Issue: MIN-832
+Stage: Merge
+Review: passed
+Test: passed
+CI/CD: no checks
+Merge: waiting for human approval
+
+agent-min-832 $ git status --short
+# clean`,
+    };
 
     togglePipeline.addEventListener('click', () => {
       content.classList.toggle('pipeline-open');
       togglePipeline.textContent = content.classList.contains('pipeline-open') ? '⇤' : '⇥';
     });
 
+    function setActionsMenu(open) {
+      actionsMenu.classList.toggle('open', open);
+      actionsButton.setAttribute('aria-expanded', String(open));
+    }
+
     function setDrawer(open) {
       drawer.classList.toggle('open', open);
       scrim.classList.toggle('open', open);
+      if (open) setActionsMenu(false);
     }
 
     openIssue.addEventListener('click', () => setDrawer(true));
     openIssueSecondary.addEventListener('click', () => setDrawer(true));
+    openIssueFromMenu.addEventListener('click', () => setDrawer(true));
     closeIssue.addEventListener('click', () => setDrawer(false));
     scrim.addEventListener('click', () => setDrawer(false));
+    actionsButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      setActionsMenu(!actionsMenu.classList.contains('open'));
+    });
+    document.addEventListener('click', (event) => {
+      if (!actionsMenu.contains(event.target) && event.target !== actionsButton) setActionsMenu(false);
+    });
+
+    function setStage(stage) {
+      document.querySelectorAll('.workflow-step').forEach((step) => {
+        step.classList.toggle('active', step.dataset.stage === stage);
+      });
+      stageTitle.textContent = stage;
+      stageSummary.textContent = stageSummaries[stage] || stageSummaries.Merge;
+      terminalView.textContent = terminalSamples[stage] || terminalSamples.Merge;
+      conversationView.querySelectorAll('.message').forEach((message, index) => {
+        const paragraphs = [
+          `Open the ${stage} stage context for MIN-832.`,
+          `${stageSummaries[stage] || stageSummaries.Merge}`,
+          `Keep ${stage} conversation and terminal output available in-place so the workflow remains visible.`,
+        ];
+        message.querySelector('p').textContent = paragraphs[index] || paragraphs[0];
+      });
+    }
+
+    document.querySelectorAll('.workflow-step').forEach((step) => {
+      step.addEventListener('click', () => setStage(step.dataset.stage));
+    });
+
+    document.querySelectorAll('.mode-toggle button').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.mode-toggle button').forEach((item) => item.classList.toggle('active', item === button));
+        const terminal = button.dataset.mode === 'terminal';
+        conversationView.classList.toggle('active', !terminal);
+        terminalView.classList.toggle('active', terminal);
+      });
+    });
   </script>
 </body>
 </html>

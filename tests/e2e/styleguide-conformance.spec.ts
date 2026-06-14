@@ -78,6 +78,7 @@ const snapshot = {
   sequence: 1,
   timestamp: now,
   agents: [agent],
+  specialists: [],
   agentRuntimeById: {},
   reviewStatuses: [],
   resources: null,
@@ -208,7 +209,7 @@ beforeAll(async () => {
       name: 'styleguide-mock-ws-transport',
       enforce: 'pre',
       transform(_code: string, id: string) {
-        if (!id.endsWith('/src/lib/wsTransport.ts')) return null;
+        if (!id.includes('/src/lib/wsTransport.ts')) return null;
         return {
           code: `
             import { Effect, Stream } from 'effect';
