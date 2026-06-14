@@ -205,6 +205,45 @@ export function __resetConflictGateProbeCacheForTests(): void {
   probeInFlight.clear();
 }
 
+/**
+ * Synchronous, non-blocking check of the conflict-gate probe cache.
+ * Returns a cached result only when there are merge blockers AND a fresh
+ * cached mergeability value is available. Returns undefined when there are no
+ * merge blockers or the cache is absent/stale, signalling that the caller
+ * should run the full async resolveConflictGate path instead.
+ */
+export function getCachedConflictGateResultSync(
+  issueId: string,
+  targetBranch: string,
+): ConflictGateResult | undefined {
+  const status = getReviewStatusSync(issueId);
+  const mergeBlockers = (status?.blockerReasons ?? []).filter(isMergeBlocker);
+  if (!status || mergeBlockers.length === 0) return undefined;
+
+  const nowMs = Date.now();
+  sweepExpiredProbeCache(nowMs);
+  const key = issueId.toUpperCase();
+  const cached = probeCache.get(key);
+  if (!cached || nowMs - cached.checkedAtMs >= PROBE_CACHE_MS) return undefined;
+
+  if (cached.result === 'clean') {
+    const remainingBlockers = (status.blockerReasons ?? []).filter(
+      (blocker) => !isMergeBlocker(blocker),
+    );
+    setReviewStatusSync(
+      issueId,
+      { blockerReasons: remainingBlockers.length > 0 ? remainingBlockers : undefined },
+      status,
+    );
+    return { gated: false, clearedStaleBlocker: true };
+  }
+
+  const reason = cached.result === 'conflicts'
+    ? `merge conflict with ${targetBranch} must be resolved before review dispatch`
+    : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
+  return { gated: true, reason };
+}
+
 async function getCachedMergeability(
   issueId: string,
   nowMs: number,
