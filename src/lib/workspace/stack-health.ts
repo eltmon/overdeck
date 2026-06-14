@@ -54,7 +54,10 @@ interface DockerPsJson {
 const lastHealthByIssue = new Map<string, boolean>();
 
 function normalizeIssue(issueId: string): string {
-  return parseIssueIdSync(issueId)?.normalized ?? issueId.toLowerCase();
+  // PAN-1872: tolerate an undefined issueId defensively so callers that forward
+  // an optional value do not crash with `Cannot read properties of undefined
+  // (reading 'toLowerCase')`.
+  return parseIssueIdSync(issueId)?.normalized ?? (issueId ?? '').toLowerCase();
 }
 
 function resolveStackProject(issueId: string): WorkspaceStackProject | null {
