@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
-import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
+import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type BdProcessLockOptions, type RunBdWithRetryOptions } from '../bd-process-lock.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -187,9 +187,14 @@ async function recoverBeadIdByTitle(
   return { id: null, ambiguity: false };
 }
 
+async function defaultBdSleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 interface RetryBdOptions {
   attempts?: number;
   baseDelayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -203,6 +208,7 @@ interface RetryBdOptions {
 export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions = {}): Promise<T> {
   const attempts = options.attempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 500;
+  const sleep = options.sleep ?? defaultBdSleep;
 
   let lastError: unknown;
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -212,7 +218,7 @@ export async function retryBd<T>(fn: () => Promise<T>, options: RetryBdOptions =
       lastError = error;
       if (attempt < attempts) {
         const delay = baseDelayMs * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await sleep(delay);
       }
     }
   }
@@ -405,22 +411,21 @@ export interface CreateBeadsOptions extends BdRetryOptions {
    * resolves main-first, which is correct everywhere EXCEPT mid-finalize.
    */
   planPath?: string;
+  /**
+   * Optional lock acquisition tuning. Tests pass fake-timer-compatible sleep
+   * and now so the cross-process lock advances deterministically.
+   */
+  lockOptions?: BdProcessLockOptions;
 }
 
 async function createBeadsFromVBriefPromise(
   workspacePath: string,
   options: CreateBeadsOptions = {},
 ): Promise<CreateBeadsResult> {
-  const { planPath, ...retryOptions } = options;
-  // In Vitest, mocked execFileAsync and vi.useFakeTimers() interact badly with
-  // the real file lock (its polling sleep does not advance under fake timers).
-  // The cross-process lock behavior is covered by dedicated tests in
-  // tests/unit/lib/bd-process-lock.test.ts; skip it here so bead-creation
-  // logic tests remain deterministic and fast.
-  const runUnderCrossProcessLock = process.env.VITEST === 'true'
-    ? <T>(fn: () => Promise<T>) => fn()
-    : <T>(fn: () => Promise<T>) => withBdProcessLock('create beads from vBRIEF', fn, { workspacePath });
-  return runUnderCrossProcessLock(async () => withBdMutexPromise(async () => {
+  const { planPath, lockOptions, ...retryOptions } = options;
+  return withBdProcessLock(
+    'create beads from vBRIEF',
+    async () => withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -483,7 +488,7 @@ async function createBeadsFromVBriefPromise(
   try {
     await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-    }));
+    }), { sleep: retryOptions.sleep });
   } catch (connectErr: any) {
     const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
     const firstLine = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
@@ -507,7 +512,7 @@ async function createBeadsFromVBriefPromise(
     try {
       await retryBd(() => execFileAsync('bd', ['ping', '--json'], {
         encoding: 'utf-8', cwd: workspacePath, timeout: bdTimeoutMs,
-      }));
+      }), { sleep: retryOptions.sleep });
     } catch (retryErr: any) {
       if (!redirectExists && !existsSync(mainBeadsDir)) {
         const prefix = deriveProjectPrefix(workspacePath);
@@ -713,7 +718,7 @@ async function createBeadsFromVBriefPromise(
   errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
-  }));
+  }), { workspacePath, ...lockOptions });
 }
 
 /**

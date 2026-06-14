@@ -50,9 +50,9 @@ describe('queryBeadsForIssuePromise', () => {
       maxDelayMs: 100,
       random: () => 0,
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
-    })).resolves.toEqual([
-      { id: 'panopticon-1', title: 'PAN-1094: Task', status: 'open', labels: ['pan-1094'] },
-    ]);
+    })).resolves.toEqual({
+      beads: [{ id: 'panopticon-1', title: 'PAN-1094: Task', status: 'open', labels: ['pan-1094'] }],
+    });
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 
@@ -62,17 +62,20 @@ describe('queryBeadsForIssuePromise', () => {
       callback(new Error('database is locked'), '', 'database is locked');
     });
     const { queryBeadsForIssuePromise } = await import('../../../src/lib/beads-query.js');
+    const { BdTransientFailure } = await import('../../../src/lib/bd-process-lock.js');
 
     const fallback = { id: 'jsonl-1', title: 'PAN-1094: JSONL task', status: 'open', labels: ['pan-1094'] };
     writeFileSync(join(workspacePath, '.beads', 'issues.jsonl'), JSON.stringify(fallback) + '\n');
 
-    await expect(queryBeadsForIssuePromise(workspacePath, 'PAN-1094', {
+    const result = await queryBeadsForIssuePromise(workspacePath, 'PAN-1094', {
       maxAttempts: 2,
       initialDelayMs: 100,
       maxDelayMs: 100,
       random: () => 0,
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
-    })).resolves.toEqual([expect.objectContaining(fallback)]);
+    });
+    expect(result.beads).toEqual([expect.objectContaining(fallback)]);
+    expect(result.transientFailure).toBeInstanceOf(BdTransientFailure);
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });
 });

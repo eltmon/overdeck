@@ -289,13 +289,8 @@ function matchesHolder(actual: BdProcessLockHolder | null, expected: BdProcessLo
  */
 const heldBdProcessLocks = new Map<string, { holder: BdProcessLockHolder; count: number }>();
 
-async function isLockHeldByCurrentProcess(path: string): Promise<boolean> {
-  const held = heldBdProcessLocks.get(path);
-  if (!held) return false;
-  // Defensive: if the on-disk lock was stolen/reclaimed by another process,
-  // do not treat it as held by us even if our map says so.
-  const onDisk = await readHolderFromPath(path);
-  return matchesHolder(onDisk, held.holder);
+function isLockHeldByCurrentProcess(path: string): boolean {
+  return heldBdProcessLocks.has(path);
 }
 
 async function acquireStaleBreaker(
@@ -365,7 +360,7 @@ export async function acquireBdProcessLock(
   await mkdir(dirname(path), { recursive: true });
 
   // Reentrant acquisition: if this process already holds the lock, reuse it.
-  if (await isLockHeldByCurrentProcess(path)) {
+  if (isLockHeldByCurrentProcess(path)) {
     const held = heldBdProcessLocks.get(path)!;
     held.count += 1;
     let released = false;

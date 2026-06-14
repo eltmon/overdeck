@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
-import { runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
+import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from './bd-process-lock.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -18,10 +18,14 @@ export interface BeadEntry {
   [key: string]: unknown;
 }
 
-/** Thrown when an issue has no beads — the typed signal that work-agent gating fails. */
+/** Thrown when an issue has no beads — the typed signal that work-agent gating fails.
+ *  If the live bd query failed with a transient lock error, `transientFailure`
+ *  carries that cause so callers can emit a retryable "temporarily locked"
+ *  message instead of "Planning must create beads". */
 export class BeadsMissingError extends Data.TaggedError('BeadsMissingError')<{
   readonly issueId: string;
   readonly workspacePath: string;
+  readonly transientFailure?: unknown;
 }> {}
 
 async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
@@ -52,11 +56,16 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
   } catch {
     return [];
   }
-}export async function queryBeadsForIssuePromise(
+}export interface BeadsQueryResult {
+  readonly beads: BeadEntry[];
+  readonly transientFailure?: unknown;
+}
+
+export async function queryBeadsForIssuePromise(
   workspacePath: string,
   issueId: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
-): Promise<BeadEntry[]> {
+): Promise<BeadsQueryResult> {
   try {
     const { stdout } = await runBdWithRetry(
       `query beads for ${issueId}`,
@@ -68,21 +77,26 @@ async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promi
       { ...retryOptions, workspacePath },
     );
     const parsed = JSON.parse(stdout || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return await readBeadsFromJsonl(workspacePath, issueId);
+    return { beads: Array.isArray(parsed) ? parsed : [] };
+  } catch (error) {
+    const beads = await readBeadsFromJsonl(workspacePath, issueId);
+    return {
+      beads,
+      transientFailure: error instanceof BdTransientFailure ? error : undefined,
+    };
   }
 }async function assertIssueHasBeadsPromise(
   workspacePath: string,
   issueId: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
 ): Promise<void> {
-  const beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId, retryOptions));
-  if (beads.length === 0) {
-    const label = issueId.toLowerCase();
-    throw new Error(
-      `No beads tasks found for ${issueId}. Planning must create beads labeled "${label}" before a work agent can start.`
-    );
+  const result = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId, retryOptions));
+  if (result.beads.length === 0) {
+    throw new BeadsMissingError({
+      issueId,
+      workspacePath,
+      transientFailure: result.transientFailure,
+    });
   }
 }async function queryBeadByIdPromise(
   workspacePath: string,
@@ -116,12 +130,13 @@ export const queryBeadsForIssue = (
   workspacePath: string,
   issueId: string,
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
-): Effect.Effect<readonly BeadEntry[]> =>
+): Effect.Effect<BeadsQueryResult> =>
   Effect.promise(() => queryBeadsForIssuePromise(workspacePath, issueId, retryOptions));
 
 /**
  * Assert the issue has beads. Effect-native. Fails with BeadsMissingError if
- * no beads are found.
+ * no beads are found; the error carries `transientFailure` when the live bd
+ * query exhausted its retries under lock contention.
  */
 export const assertIssueHasBeads = (
   workspacePath: string,
@@ -129,9 +144,13 @@ export const assertIssueHasBeads = (
   retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
 ): Effect.Effect<void, BeadsMissingError> =>
   Effect.gen(function* () {
-    const beads = yield* queryBeadsForIssue(workspacePath, issueId, retryOptions);
-    if (beads.length === 0) {
-      return yield* Effect.fail(new BeadsMissingError({ issueId, workspacePath }));
+    const result = yield* queryBeadsForIssue(workspacePath, issueId, retryOptions);
+    if (result.beads.length === 0) {
+      return yield* Effect.fail(new BeadsMissingError({
+        issueId,
+        workspacePath,
+        transientFailure: result.transientFailure,
+      }));
     }
   });
 

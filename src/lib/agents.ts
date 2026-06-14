@@ -43,7 +43,8 @@ import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommandSync, PiNotReady } from './runtimes/pi-fifo.js';
 import { Effect } from 'effect';
 import { FsError, TmuxError } from './errors.js';
-import { assertIssueHasBeads } from './beads-query.js';
+import { assertIssueHasBeads, BeadsMissingError } from './beads-query.js';
+import { BdTransientFailure } from './bd-process-lock.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelIdSync } from './model-validation.js';
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
@@ -3529,9 +3530,21 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     // requests fail fast to the JSONL fallback instead of blocking behind CLI
     // processes that hold the cross-process bd lock. The CLI `pan start` path
     // already performs a long-timeout live query before reaching spawnAgent.
-    await Effect.runPromise(
-      assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 500 }),
-    );
+    try {
+      await Effect.runPromise(
+        assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 500 }),
+      );
+    } catch (error) {
+      if (error instanceof BeadsMissingError && error.transientFailure !== undefined) {
+        const attempts = error.transientFailure instanceof BdTransientFailure
+          ? ` after ${error.transientFailure.attempts} attempts`
+          : '';
+        throw new Error(
+          `Beads database was temporarily locked while checking ${options.issueId}${attempts}; re-run shortly.`
+        );
+      }
+      throw error;
+    }
   }
 
   // Determine model based on role configuration

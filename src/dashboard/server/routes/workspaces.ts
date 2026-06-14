@@ -1042,9 +1042,10 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
     // Use a short lock timeout so PR-body generation does not block behind CLI
     // processes that hold the cross-process bd lock. queryBeadsForIssue already
     // falls back to JSONL on failure, so the explicit fallback here is a safety net.
-    let beads = await Effect.runPromise(
+    const queryResult = await Effect.runPromise(
       queryBeadsForIssue(workspacePath, issueId, { acquisitionTimeoutMs: 500 }),
     );
+    let beads = queryResult.beads;
     if (beads.length === 0) {
       // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
       beads = await readBeadsFromJsonl(workspacePath, issueId);
