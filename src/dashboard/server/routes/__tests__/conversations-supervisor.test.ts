@@ -160,6 +160,33 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 
+  it('resumes Codex TUI conversations with the persisted thread id', async () => {
+    createSupervisorSocket = true;
+    const session = 'conv-codex-resume-supervisor-test';
+    const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
+    const agentDir = join(panopticonHome, 'agents', session);
+    const dayDir = join(agentDir, 'codex-home', 'sessions', '2026', '06', '14');
+    mkdirSync(dayDir, { recursive: true });
+    writeFileSync(join(dayDir, `rollout-2026-06-14T10-00-00-${threadId}.jsonl`), '{"type":"session_meta"}\n');
+
+    const { spawnConversationSession } = await import('../conversations.js');
+
+    await spawnConversationSession(
+      session,
+      tmpdir(),
+      'ignored-claude-session-id',
+      'gpt-5.5',
+      undefined,
+      'PAN-1405',
+      true,
+      'codex',
+    );
+
+    const launcher = launcherFor(session);
+    expect(launcher).toContain(`/dist/pty-supervisor.js' codex resume -c project_doc_max_bytes=0 '${threadId}'`);
+    expect(launcher).not.toContain('codex exec resume');
+  });
+
   it('keeps plain forks off Channels MCP while routing them through the supervisor', async () => {
     channelsEnabled = true;
     createSupervisorSocket = true;

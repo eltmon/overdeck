@@ -1442,6 +1442,7 @@ export async function spawnConversationSession(
     codexMode: 'tui';
     codexHome: string;
     codexSessionDir: string;
+    resumeSessionId?: string;
   } | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
@@ -1525,18 +1526,23 @@ export async function spawnConversationSession(
         : codexPermMode === 'read-only' ? 'read-only'
         : 'workspace-write';
       const codexApprovalsReviewer = codexPermMode === 'auto-review' ? 'auto_review' : undefined;
-      const { initCodexHome } = await import('../../../lib/runtimes/codex.js');
+      const { initCodexHome, extractThreadIdFromRollout } = await import('../../../lib/runtimes/codex.js');
       initCodexHome(codexHome, {
         trustedDir: cwd,
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
       });
+      const resumeSessionId = resume
+        ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getPanopticonHome(), 'agents') })
+          .then((rollout) => rollout ? extractThreadIdFromRollout(rollout) ?? undefined : undefined)
+        : undefined;
       codexFields = {
         harness: 'codex',
         codexMode: 'tui',
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
+        resumeSessionId,
       };
     }
   }
