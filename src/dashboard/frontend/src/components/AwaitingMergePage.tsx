@@ -16,13 +16,18 @@ import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
 import { AutoMergeToggle } from './AutoMergeToggle';
+import { UatStackStatus } from './CommandDeck/UatStackStatus';
+import type { WorkspaceContainerStatus, WorkspacePendingOperation, WorkspaceStackHealth } from './CommandDeck/ZoneCOverviewTabs/queries';
 import type { Issue } from '../types';
 
 interface WorkspaceInfo {
   exists?: boolean;
   frontendUrl?: string;
+  apiUrl?: string;
   mrUrl?: string;
-  stackHealth?: { healthy?: boolean; reasons?: string[] };
+  stackHealth?: WorkspaceStackHealth;
+  containers?: Record<string, WorkspaceContainerStatus> | null;
+  pendingOperation?: WorkspacePendingOperation | null;
 }
 
 interface UatContext {
@@ -199,8 +204,12 @@ export function AwaitingMergePage() {
                   identifier={issue?.identifier ?? rs.issueId}
                   trackerUrl={issue?.url}
                   frontendUrl={ws?.frontendUrl}
+                  apiUrl={ws?.apiUrl}
                   stackHealthy={ws?.stackHealth?.healthy}
+                  stackHealth={ws?.stackHealth}
                   stackReason={ws?.stackHealth?.reasons?.[0]}
+                  containers={ws?.containers}
+                  pendingOperation={ws?.pendingOperation}
                   prUrl={rs.prUrl ?? ws?.mrUrl}
                   updatedAt={rs.updatedAt}
                   mergeStatus={rs.mergeStatus}
@@ -284,8 +293,12 @@ interface RowProps {
   description?: string;
   trackerUrl?: string;
   frontendUrl?: string;
+  apiUrl?: string;
   stackHealthy?: boolean;
+  stackHealth?: WorkspaceInfo['stackHealth'];
   stackReason?: string;
+  containers?: Record<string, WorkspaceContainerStatus> | null;
+  pendingOperation?: WorkspacePendingOperation | null;
   prUrl?: string;
   updatedAt?: string;
   mergeStatus?: string;
@@ -357,8 +370,12 @@ export function AwaitingMergeRow({
   description,
   trackerUrl,
   frontendUrl,
+  apiUrl,
   stackHealthy,
+  stackHealth,
   stackReason,
+  containers,
+  pendingOperation,
   prUrl,
   updatedAt,
   mergeStatus,
@@ -369,6 +386,7 @@ export function AwaitingMergeRow({
   uatNotes,
   onMerged,
 }: RowProps) {
+  const queryClient = useQueryClient();
   const mergeMutation = useMutation({
     mutationFn: () => mergeIssue(issueId),
     onSuccess: () => {
@@ -383,7 +401,8 @@ export function AwaitingMergeRow({
   const rebuildMutation = useMutation({
     mutationFn: () => rebuildStack(issueId),
     onSuccess: () => {
-      toast.success(`Rebuilding stack for ${identifier}`, { description: 'Watch the activity feed; the UAT link works once it is healthy.' });
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      toast.success(`Rebuilding stack for ${identifier}`, { description: 'UAT environment status is now shown in this row, the issue tree, and the issue slide-out.' });
     },
     onError: (err: Error) => {
       toast.error(`Stack rebuild failed for ${identifier}`, { description: err.message });
@@ -392,6 +411,12 @@ export function AwaitingMergeRow({
 
   const isMerging = mergeStatus === 'merging' || mergeStatus === 'queued' || mergeStatus === 'verifying' || mergeMutation.isPending;
   const isFailed = mergeStatus === 'failed';
+  const rebuildFailed = pendingOperation?.type === 'rebuild-stack' && pendingOperation.status === 'failed';
+  const stackPending = rebuildMutation.isPending || (pendingOperation?.status === 'running' && (
+    pendingOperation.type === 'containerize' ||
+    pendingOperation.type === 'start' ||
+    pendingOperation.type === 'rebuild-stack'
+  ));
   const [uatExpanded, setUatExpanded] = useState(false);
   const fetchedUatContext = useQuery({
     queryKey: ['uat-context', issueId],
@@ -466,7 +491,7 @@ export function AwaitingMergeRow({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
           {stackHealthy === false ? (
             // Stack is down — a UAT link would just 404. Offer a rebuild instead.
             <button
@@ -515,6 +540,24 @@ export function AwaitingMergeRow({
           </button>
         </div>
       </div>
+
+      {(stackPending || stackHealthy === false || containers) && (
+        <div className="mt-3" data-testid={`merge-uat-stack-${identifier}`}>
+          <UatStackStatus
+            containers={containers}
+            stackHealth={stackHealth}
+            frontendUrl={frontendUrl}
+            apiUrl={apiUrl}
+            pending={stackPending}
+            density="compact"
+          />
+          {rebuildFailed && pendingOperation?.error ? (
+            <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive">
+              Rebuild failed: {pendingOperation.error}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       <button
         type="button"

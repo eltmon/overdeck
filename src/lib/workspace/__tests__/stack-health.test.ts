@@ -104,6 +104,24 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(health.reasons).toEqual([]);
   });
 
+  it('keeps successful one-shot test containers from breaking the UAT stack', () => {
+    const health = evaluateWorkspaceStackHealth('MIN-831', dockerProject, [
+      container({
+        name: 'myn-feature-min-831-test-unit-1',
+        status: 'Exited (0) 2 minutes ago',
+        state: 'exited',
+      }),
+      container({
+        name: 'myn-feature-min-831-api-1',
+        status: 'Up 2 minutes',
+        state: 'running',
+      }),
+    ], { now });
+
+    expect(health.healthy).toBe(true);
+    expect(health.reasons).toEqual([]);
+  });
+
   it('marks service containers unhealthy when they exit zero', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({

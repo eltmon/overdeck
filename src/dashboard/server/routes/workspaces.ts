@@ -120,6 +120,7 @@ import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from '../../..
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
+import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleStateSync } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -373,7 +374,7 @@ function appendActivityOutput(id: string, line: string): void {
 // ─── Pending operations (in-memory) ──────────────────────────────────────────
 
 interface PendingOperation {
-  type: 'review' | 'merge' | 'approve' | 'start' | 'clean' | 'containerize' | 'refresh-db';
+  type: 'review' | 'merge' | 'approve' | 'start' | 'clean' | 'containerize' | 'refresh-db' | 'rebuild-stack';
   status: 'running' | 'completed' | 'failed';
   startedAt: string;
   error?: string;
@@ -618,8 +619,22 @@ function isGitHubIssue(issueId: string): {
   return { isGitHub: false };
 }
 
-function spawnPanCommand(args: string[], description: string, cwd?: string): string {
+function spawnPanCommand(
+  args: string[],
+  description: string,
+  cwd?: string,
+  options?: { issueId?: string; pendingOperation?: PendingOperation['type'] },
+): string {
   const activityId = Date.now().toString();
+  if (options?.issueId && options.pendingOperation) {
+    setPendingOperation(options.issueId, options.pendingOperation);
+    emitActivityEntrySync({
+      source: 'dashboard',
+      level: 'info',
+      issueId: options.issueId.toUpperCase(),
+      message: `${description} started`,
+    });
+  }
   logActivity({
     id: activityId,
     timestamp: new Date().toISOString(),
@@ -646,6 +661,15 @@ function spawnPanCommand(args: string[], description: string, cwd?: string): str
   });
   child.on('close', (code) => {
     updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
+    if (options?.issueId && options.pendingOperation) {
+      completePendingOperation(options.issueId, code === 0 ? null : `pan ${args.join(' ')} exited ${code ?? 'unknown'}`);
+      emitActivityEntrySync({
+        source: 'dashboard',
+        level: code === 0 ? 'success' : 'error',
+        issueId: options.issueId.toUpperCase(),
+        message: `${description} ${code === 0 ? 'completed' : 'failed'}`,
+      });
+    }
   });
 
   return activityId;
@@ -1773,6 +1797,7 @@ const postWorkspaceRebuildRoute = HttpRouter.add(
       ['workspace', 'rebuild', issueId],
       `Rebuild stack for ${issueId}`,
       projectPath,
+      { issueId, pendingOperation: 'rebuild-stack' },
     );
     return jsonResponse({
       success: true,

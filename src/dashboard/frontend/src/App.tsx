@@ -462,6 +462,20 @@ export default function App() {
 
 
   const queryClient = useQueryClient();
+  const recentActivity = useDashboardStore((state) => state.recentActivity as Array<Record<string, unknown>>);
+  const seenWorkspaceActivityIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    for (const entry of recentActivity.slice(0, 10)) {
+      const id = typeof entry['id'] === 'string' ? entry['id'] : null;
+      const issueId = typeof entry['issueId'] === 'string' ? entry['issueId'] : null;
+      const message = typeof entry['message'] === 'string' ? entry['message'] : '';
+      if (!id || !issueId || seenWorkspaceActivityIds.current.has(id)) continue;
+      if (!/^Rebuild stack for\b/.test(message)) continue;
+      seenWorkspaceActivityIds.current.add(id);
+      void queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+    }
+  }, [queryClient, recentActivity]);
 
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);

@@ -1599,6 +1599,40 @@ const testStackRebuildState: Map<string, { lastAttempt: number; attempts: number
 const TEST_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
 const TEST_STACK_REBUILD_MAX_ATTEMPTS = 3;
 
+export const stalledReviewConvoyRecoveryState: Map<string, { lastAttempt: number; attempts: number; escalated: boolean }> =
+  new Map();
+const STALLED_REVIEW_CONVOY_RECOVERY_COOLDOWN_MS = 15 * 60 * 1000;
+const STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS = 3;
+
+export interface ReviewConvoyLiveness {
+  anyLive: boolean;
+  anyGated: boolean;
+  agentIds: string[];
+}
+
+export function reviewConvoyLiveness(issueId: string): ReviewConvoyLiveness {
+  const normalizedIssueId = issueId.toLowerCase();
+  const agentIds = [
+    `agent-${normalizedIssueId}`,
+    `agent-${normalizedIssueId}-review`,
+    ...REVIEW_SUB_ROLES.map((subRole) => `agent-${normalizedIssueId}-review-${subRole}`),
+  ];
+
+  let anyLive = false;
+  let anyGated = false;
+
+  for (const agentId of agentIds) {
+    const agentState = getAgentStateSync(agentId);
+    if (!agentState) {
+      continue;
+    }
+    anyLive ||= agentState.status === 'running' || agentState.status === 'starting';
+    anyGated ||= agentState.paused === true || agentState.troubled === true;
+  }
+
+  return { anyLive, anyGated, agentIds };
+}
+
 /**
  * Outcome of an orphan-test stack-health recovery attempt:
  * - `healthy`   — stack is already fine; dispatch can proceed.
@@ -2083,6 +2117,141 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error checking orphaned review statuses:', msg);
+  }
+
+  return actions;
+}
+
+export async function recoverStalledReviewConvoys(
+  getCanonicalState: (issueId: string) => Promise<string | null> = getAutoCloseOutCanonicalState,
+): Promise<string[]> {
+  const actions: string[] = [];
+
+  let statuses: Record<string, ReviewStatus>;
+  try {
+    statuses = loadReviewStatuses();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error loading review statuses for stalled convoy recovery:', message);
+    return actions;
+  }
+
+  for (const [issueId, status] of Object.entries(statuses)) {
+    try {
+      if (status.reviewStatus !== 'reviewing' && status.reviewStatus !== 'pending') continue;
+      if (status.stuck || status.deaconIgnored) continue;
+
+      const canonicalState = await getCanonicalState(issueId);
+      if (canonicalState !== 'in_review') continue;
+
+      const liveness = reviewConvoyLiveness(issueId);
+      if (liveness.anyLive || liveness.anyGated) continue;
+
+      const issueLower = issueId.toLowerCase();
+      const resolved = resolveProjectFromIssueSync(issueId);
+      if (!resolved) {
+        actions.push(`Skipped stalled review convoy recovery for ${issueId}: no project configured`);
+        continue;
+      }
+
+      const workspace = findWorkspacePath(resolved.projectPath, issueLower);
+      if (!workspace) {
+        actions.push(`Skipped stalled review convoy recovery for ${issueId}: workspace unavailable`);
+        continue;
+      }
+
+      const key = issueId.toUpperCase();
+      let record = stalledReviewConvoyRecoveryState.get(key) ?? { lastAttempt: 0, attempts: 0, escalated: false };
+      const now = Date.now();
+
+      // If a human un-stuck the issue, grant a fresh recovery budget.
+      if (record.escalated && !status.stuck) {
+        stalledReviewConvoyRecoveryState.delete(key);
+        record = { lastAttempt: 0, attempts: 0, escalated: false };
+      }
+
+      if (record.attempts >= STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS) {
+        if (!record.escalated) {
+          record.escalated = true;
+          stalledReviewConvoyRecoveryState.set(key, record);
+          const stuckDetails = JSON.stringify({
+            attempts: record.attempts,
+            agentIds: liveness.agentIds,
+            canonicalState,
+          });
+          setReviewStatusSync(issueId, {
+            stuck: true,
+            stuckReason: 'review_convoy_unrecoverable',
+            stuckAt: new Date(now).toISOString(),
+            stuckDetails,
+          });
+          status.stuck = true;
+          status.stuckReason = 'review_convoy_unrecoverable';
+          status.stuckAt = new Date(now).toISOString();
+          status.stuckDetails = stuckDetails;
+          emitActivityEntrySync({
+            source: 'cloister',
+            level: 'error',
+            issueId: key,
+            message: `stalled-review-convoy-unrecoverable: ${key}`,
+            details: `Review convoy fully stopped after ${record.attempts} recovery attempts; marked stuck for human intervention. Agents: ${liveness.agentIds.join(', ')}`,
+          });
+          actions.push(
+            `Stalled review convoy for ${issueId}: recovery cap reached after ${record.attempts} attempts — marked stuck`,
+          );
+        } else {
+          actions.push(
+            `Stalled review convoy for ${issueId}: recovery cap already escalated after ${record.attempts} attempts`,
+          );
+        }
+        continue;
+      }
+
+      if (now - record.lastAttempt < STALLED_REVIEW_CONVOY_RECOVERY_COOLDOWN_MS) {
+        actions.push(
+          `Stalled review convoy for ${issueId}: deferring — cooldown active after attempt ${record.attempts}/${STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS}`,
+        );
+        continue;
+      }
+
+      // PAN-1665: honor advancing-role concurrency budget before dispatch.
+      if (!tryReserveAdvancingSlot()) {
+        actions.push(
+          `Stalled review convoy for ${issueId}: deferring — advancing-role concurrency ceiling reached`,
+        );
+        continue;
+      }
+
+      record.lastAttempt = now;
+      record.attempts += 1;
+      stalledReviewConvoyRecoveryState.set(key, record);
+
+      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+      try {
+        const result = await Effect.runPromise(spawnReviewRoleForIssue({
+          issueId,
+          workspace,
+          branch: `feature/${issueLower}`,
+          force: true,
+        }));
+        if (!result.success) {
+          throw new Error(result.error ?? result.message);
+        }
+        stalledReviewConvoyRecoveryState.delete(key);
+        status.reviewStatus = 'reviewing';
+        actions.push(
+          `Re-dispatched stalled review convoy for ${issueId} (attempt ${record.attempts}/${STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS})`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        actions.push(`Failed to re-dispatch stalled review convoy for ${issueId}: ${message}`);
+        console.error(`[deacon] Failed to re-dispatch stalled review convoy for ${issueId}:`, message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      actions.push(`Failed stalled review convoy recovery for ${issueId}: ${message}`);
+      console.error(`[deacon] Failed stalled review convoy recovery for ${issueId}:`, message);
+    }
   }
 
   return actions;
@@ -4919,6 +5088,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const postReviewActions = await checkPostReviewCommits();
   actions.push(...postReviewActions);
   for (const a of postReviewActions) addLog('action', a, state.patrolCycle);
+
+  const stalledConvoyActions = await recoverStalledReviewConvoys();
+  actions.push(...stalledConvoyActions);
+  for (const a of stalledConvoyActions) addLog('action', a, state.patrolCycle);
 
   // Check for completed work with no review status entry at all (PAN-699)
   const missingStatusActions = await checkMissingReviewStatuses();

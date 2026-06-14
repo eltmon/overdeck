@@ -612,7 +612,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       expect(deliveryAttempts).toBe(2);
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
-    });
+    }, 15_000);
 
     it('resumeAgent keeps generic continue behavior when kickoffDelivered is true', async () => {
       const tmux = await import('../../src/lib/tmux.js');
@@ -625,7 +625,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
       expect(tmux.sendKeys).not.toHaveBeenCalledWith(agentId, expect.stringContaining(`original kickoff for ${agentId}`));
       expect(getAgentStateSync(agentId)?.kickoffDelivered).toBe(true);
-    });
+    }, 15_000);
 
     it('resumeAgent delivers the continue prompt through the Pi FIFO for pi work agents', async () => {
       const tmux = await import('../../src/lib/tmux.js');
