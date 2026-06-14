@@ -1328,7 +1328,8 @@ export function runMigrations(db: SqliteDatabase): void {
         mergedAt         TEXT,
         failureReason    TEXT,
         cancelledAt      TEXT,
-        cancelledBy      TEXT
+        cancelledBy      TEXT,
+        attempts         INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
@@ -1351,7 +1352,8 @@ export function runMigrations(db: SqliteDatabase): void {
         mergedAt         TEXT,
         failureReason    TEXT,
         cancelledAt      TEXT,
-        cancelledBy      TEXT
+        cancelledBy      TEXT,
+        attempts         INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
