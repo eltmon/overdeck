@@ -188,8 +188,7 @@ export function parseStashListLine(line: string): ParsedStashEntry | null {
 }
 
 async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?: string): Promise<string> {
-  // PAN-879 assumes stash janitor / merge / review flows are serialized within a single
-  // workspace. Per-workspace stash operations must not run concurrently; callers may
+  // Per-workspace stash operations must not run concurrently; callers may
   // resolve a stack slot and immediately consume it, but another stash mutation in between
   // can still shift indices. The rev-parse checks below re-validate the resolved slot
   // against the expected SHA immediately before use.

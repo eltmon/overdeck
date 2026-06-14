@@ -1,0 +1,12 @@
+{
+  "init": {},
+  "guest": {
+    "cpu_kind": "shared",
+    "cpus": 4,
+    "memory_mb": 4096
+  },
+  "image": "registry.fly.io/pan-workspaces:latest",
+  "restart": {
+    "policy": "no"
+  }
+}

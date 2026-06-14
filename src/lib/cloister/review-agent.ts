@@ -20,8 +20,8 @@
  * their tests went with them.
  *
  * Every active review surface — POST /api/review/:issueId/trigger, the
- * reactive scheduler review branch, the dashboard kanban "Review again"
- * button, postMergeLifecycle's review-temp stash drop — flows through
+ * reactive scheduler review branch, and the dashboard kanban "Review again"
+ * button — flows through
  * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The review role
  * launches four isolated review sub-role sessions via `pan review spawn-reviewer`,
  * then writes the report and signals the verdict via Panopticon's CLI inside
@@ -29,9 +29,6 @@
  *
  * Surface area kept:
  *   - spawnReviewRoleForIssue       — the only review entry point
- *   - cleanupReviewTempStash        — drop the review-temp stash on terminal
- *                                     lifecycle events (postMergeLifecycle,
- *                                     workspaces.ts review-reset paths)
  *   - killAllReviewerSessions       — kill the canonical reviewer sessions
  *                                     for one issue (merge-agent +
  *                                     dashboard cancel/abort routes)
@@ -81,7 +78,7 @@ function reviewerAgentOutputPath(workspace: string, runId: string, subRole: Revi
   return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
 }
 
-// PAN-1531: ensureReviewTempStash / cleanupReviewTempStashPromise removed.
+// PAN-1531: review-temp stash helpers removed.
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.

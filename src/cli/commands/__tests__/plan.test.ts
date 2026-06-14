@@ -11,7 +11,8 @@ vi.mock('ora', () => ({
   default: vi.fn(() => spinner),
 }));
 
-vi.mock('../../../lib/config.js', () => ({
+vi.mock('../../../lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/config.js')>()),
   getDashboardApiUrlSync: () => 'http://pan.test',
 }));
 

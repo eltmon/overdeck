@@ -4,12 +4,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
+import * as self from './smart-compaction.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FsError, ProcessSpawnError } from '../errors.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
 import type { AIProvider } from '../cost.js';
+import { isContextOverflowError } from '../context-overflow.js';
 
 /** Record summary-fork/compaction spend from a `claude -p --output-format json`
  * envelope. Best-effort; never throws into the caller (PAN-1589). */
@@ -788,7 +790,16 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   });
 }
 
-async function generateSummaryFromPrompt(
+export function truncateHeadTail(input: string, ceilingChars: number): string {
+  if (input.length <= ceilingChars) return input;
+  const truncatedCount = input.length - ceilingChars;
+  const marker = `[... ${truncatedCount} characters truncated ...]`;
+  const headLength = Math.ceil(ceilingChars / 2);
+  const tailLength = Math.floor(ceilingChars / 2);
+  return `${input.slice(0, headLength)}${marker}${input.slice(input.length - tailLength)}`;
+}
+
+export async function generateSummaryFromPrompt(
   serialized: string,
   previousSummary: string | undefined,
   model: string | undefined,
@@ -817,7 +828,26 @@ async function generateSummaryFromPrompt(
 
   // Wrap in system prompt via claude -p
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${messages[0].content[0].text}`;
-  return (await Effect.runPromise(runModelSummary(fullPrompt, model, timeoutMs, harness)));
+
+  try {
+    return (await Effect.runPromise(self.runModelSummary(fullPrompt, model, timeoutMs, harness)));
+  } catch (err) {
+    if (!isContextOverflowError(err)) throw err;
+
+    const ceiling = getChunkBudgetChars(model);
+    const truncatedSerialized = truncateHeadTail(serialized, ceiling);
+    const truncatedPrevious = previousSummary ? truncateHeadTail(previousSummary, ceiling) : undefined;
+
+    const truncatedConversationText = `<conversation>\n${truncatedSerialized}\n</conversation>`;
+    let retryPromptText = `${truncatedConversationText}\n\n`;
+    if (truncatedPrevious) {
+      retryPromptText += `<previous-summary>\n${truncatedPrevious}\n</previous-summary>\n\n${updatePrompt}`;
+    } else {
+      retryPromptText += initPrompt;
+    }
+    const retryFullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${retryPromptText}`;
+    return (await Effect.runPromise(self.runModelSummary(retryFullPrompt, model, timeoutMs, harness)));
+  }
 }
 
 async function generateTurnPrefixSummary(
@@ -828,7 +858,7 @@ async function generateTurnPrefixSummary(
 ): Promise<string> {
   const promptText = `<conversation>\n${serialized}\n</conversation>\n\n${TURN_PREFIX_PROMPT}`;
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${promptText}`;
-  return (await Effect.runPromise(runModelSummary(fullPrompt, model, timeoutMs, harness)));
+  return (await Effect.runPromise(self.runModelSummary(fullPrompt, model, timeoutMs, harness)));
 }
 
 // ============================================================================

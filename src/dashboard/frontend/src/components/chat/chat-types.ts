@@ -74,7 +74,7 @@ export interface ContextUsage {
 }
 
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; snapshot?: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[]; contextUsage?: ContextUsage | null }
   | { kind: 'discovering' };
 
 // ─── Turn Diff Types ─────────────────────────────────────────────────────────

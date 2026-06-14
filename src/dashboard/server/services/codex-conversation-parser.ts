@@ -170,7 +170,7 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
         const output = extractToolOutput(payload.output);
         const wl = callId ? toolCallsByCallId.get(callId) : undefined;
         if (wl) {
-          if (output) wl.result = output;
+          if (output) (wl as { result?: string }).result = output;
           if (callId) toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
@@ -209,6 +209,9 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
     streaming,
     totalCost,
     totalTokens,
+    latestAssistantUsage: null,
+    contextBoundaryOffset: 0,
+    contextActiveBytes: fileStats.size,
     pendingToolUse: new Map(),
     unresolvedResults: new Map(),
     lastSequence: sequence,

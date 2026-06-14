@@ -25,7 +25,6 @@
 
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
-import { homedir } from 'node:os'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
@@ -47,14 +46,19 @@ import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
+import { getPanopticonHome } from '../paths.js'
 
 const execAsync = promisify(exec)
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
 
 const ACTIVE_HEARTBEAT_TTL_MS = 60_000
 const SPAWN_READY_TIMEOUT_MS = 30_000
 
 function panopticonDir(): string {
-  return join(homedir(), '.panopticon')
+  return getPanopticonHome()
 }
 function heartbeatsDir(): string {
   return join(panopticonDir(), 'heartbeats')
@@ -264,8 +268,18 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     } catch {
       // ignore
     }
+    // PAN-1798: never use cmdline-match kills (pkill -f) here. If the shared
+    // tmux server was founded implicitly by this agent/conversation, its
+    // cmdline embeds the session name and pkill would destroy the entire
+    // server. Resolve the pane PID and signal only that process group.
     try {
-      await execAsync(`pkill -TERM -f "agent-id=${agentId}" 2>/dev/null || true`)
+      const { stdout } = await execAsync(
+        `tmux -L panopticon list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
+      )
+      const pid = stdout.trim()
+      if (pid) {
+        await execAsync(`kill -TERM -- -${pid} 2>/dev/null || kill -TERM ${pid} 2>/dev/null || true`)
+      }
     } catch {
       // ignore
     }

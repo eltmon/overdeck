@@ -23,7 +23,7 @@ allowed-tools:
 ## Available commands
 
 ```bash
-pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi] [--effort low|medium|high] [--local|--remote]
+pan plan <id> [--auto] [--auto-start] [--probe] [--model <model>] [--harness claude-code|pi|codex] [--effort low|medium|high] [--local|--remote]
 pan plan finalize [-w <path>] [--json] [--no-promote] [--no-quality-lint]
 pan plan done <id>
 ```

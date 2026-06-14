@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { createRequire } from 'node:module';
-import { join } from 'node:path';
-import { Worker } from 'node:worker_threads';
-import { fileURLToPath } from 'node:url';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { openDatabase, type SqliteDatabase, type SqliteBindValue } from '../database/driver.js';
 import { getPanopticonHome } from '../paths.js';
 import type {
   FeatureRegistryEntry,
@@ -28,29 +27,23 @@ type FeatureRegistryOperation =
   | 'untag'
   | 'updateOwnership';
 
-interface FeatureRegistryWorkerResponse {
-  id: string;
-  ok: boolean;
-  result?: unknown;
-  error?: { name?: string; message?: string; stack?: string };
+type FeatureRegistryStatus = FeatureRegistryEntry['status'];
+
+interface FeatureRegistryRow {
+  feature_id: string;
+  feature_name: string;
+  description: string | null;
+  owning_workspace_id: string | null;
+  owning_issue_id: string | null;
+  owning_agent_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  tags: string | null;
 }
 
-let worker: Worker | null = null;
-const pending = new Map<string, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
-const betterSqlite3Path = resolveBetterSqlite3Path();
-
-function resolveBetterSqlite3Path(): string {
-  const requireFromModule = createRequire(import.meta.url);
-  try {
-    return requireFromModule.resolve('better-sqlite3');
-  } catch (cause) {
-    const error = new Error(
-      `Cannot find better-sqlite3 from ${fileURLToPath(import.meta.url)}; run bun install in the workspace before starting Panopticon.`,
-    );
-    error.cause = cause;
-    throw error;
-  }
-}
+const databases = new Map<string, SqliteDatabase>();
+const STATUSES = new Set<FeatureRegistryStatus>(['active', 'archived', 'merged', 'deferred']);
 
 export function resolveFeatureRegistryDbPath(): string {
   return join(getPanopticonHome(), 'registry', 'features.sqlite');
@@ -81,95 +74,21 @@ export function updateFeatureRegistryOwnership(input: FeatureRegistryOwnershipUp
 }
 
 export async function closeFeatureRegistryStorage(): Promise<void> {
-  for (const request of pending.values()) request.reject(new Error('Feature registry worker closed'));
-  pending.clear();
-  const activeWorker = worker;
-  worker = null;
-  if (activeWorker) await activeWorker.terminate();
+  for (const database of databases.values()) database.close();
+  databases.clear();
 }
 
-function runFeatureRegistryJob<T>(operation: FeatureRegistryOperation, payload: unknown): Promise<T> {
-  const id = randomUUID();
-  const activeWorker = getFeatureRegistryWorker();
-  return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: (value) => resolve(value as T), reject });
-    activeWorker.postMessage({ id, operation, payload, dbPath: resolveFeatureRegistryDbPath() });
-  });
+async function runFeatureRegistryJob<T>(operation: FeatureRegistryOperation, payload: unknown): Promise<T> {
+  const db = databaseForPath(resolveFeatureRegistryDbPath());
+  return runOperation(db, operation, payload) as T;
 }
 
-function getFeatureRegistryWorker(): Worker {
-  if (worker) return worker;
-
-  worker = new Worker(featureRegistryWorkerSource(), { eval: true, workerData: { betterSqlite3Path } });
-  const activeWorker = worker;
-
-  worker.on('message', (message: FeatureRegistryWorkerResponse) => {
-    const request = pending.get(message.id);
-    if (!request) return;
-    pending.delete(message.id);
-    if (message.ok) {
-      request.resolve(message.result);
-      return;
-    }
-
-    const error = new Error(message.error?.message ?? 'Feature registry worker failed');
-    error.name = message.error?.name ?? 'FeatureRegistryWorkerError';
-    error.stack = message.error?.stack;
-    request.reject(error);
-  });
-
-  worker.on('error', (error) => {
-    if (worker !== activeWorker) return;
-    worker = null;
-    for (const request of pending.values()) request.reject(error);
-    pending.clear();
-  });
-
-  worker.on('exit', (code) => {
-    if (worker !== activeWorker) return;
-    worker = null;
-    if (code === 0) return;
-    for (const request of pending.values()) request.reject(new Error(`Feature registry worker exited with code ${code}`));
-    pending.clear();
-  });
-
-  return worker;
-}
-
-function featureRegistryWorkerSource(): string {
-  return String.raw`
-const { parentPort, workerData } = require('node:worker_threads');
-const { dirname } = require('node:path');
-const { mkdirSync } = require('node:fs');
-const { randomUUID } = require('node:crypto');
-const BetterSqlite3 = require(workerData.betterSqlite3Path);
-
-const databases = new Map();
-const STATUSES = new Set(['active', 'archived', 'merged', 'deferred']);
-
-parentPort.on('message', (message) => {
-  try {
-    const db = databaseForPath(message.dbPath);
-    const result = runOperation(db, message.operation, message.payload);
-    parentPort.postMessage({ id: message.id, ok: true, result });
-  } catch (error) {
-    parentPort.postMessage({
-      id: message.id,
-      ok: false,
-      error: {
-        name: error && error.name ? error.name : 'Error',
-        message: error && error.message ? error.message : String(error),
-        stack: error && error.stack ? error.stack : undefined,
-      },
-    });
-  }
-});
-
-function databaseForPath(dbPath) {
+function databaseForPath(dbPath: string): SqliteDatabase {
   const cached = databases.get(dbPath);
   if (cached) return cached;
+
   mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new BetterSqlite3(dbPath);
+  const db = openDatabase(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('journal_size_limit = 67108864');
@@ -178,7 +97,7 @@ function databaseForPath(dbPath) {
   return db;
 }
 
-function initializeSchema(db) {
+function initializeSchema(db: SqliteDatabase): void {
   db.exec([
     'CREATE TABLE IF NOT EXISTS features (',
     '  feature_id TEXT PRIMARY KEY,',
@@ -200,29 +119,27 @@ function initializeSchema(db) {
   ].join('\n'));
 }
 
-function runOperation(db, operation, payload) {
+function runOperation(db: SqliteDatabase, operation: FeatureRegistryOperation, payload: unknown): unknown {
   switch (operation) {
     case 'initialize':
       initializeSchema(db);
-      return null;
+      return undefined;
     case 'list':
-      return listFeatures(db, payload || {});
+      return listFeatures(db, (payload || {}) as FeatureRegistryListFilter);
     case 'show':
-      return showFeature(db, requireFeatureName(payload && payload.featureName));
+      return showFeature(db, requireFeatureName((payload as { featureName?: unknown } | undefined)?.featureName));
     case 'tag':
-      return tagIssue(db, payload || {});
+      return tagIssue(db, (payload || {}) as Partial<FeatureRegistryTagInput>);
     case 'untag':
-      return untagIssue(db, payload || {});
+      return untagIssue(db, (payload || {}) as Partial<FeatureRegistryUntagInput>);
     case 'updateOwnership':
-      return updateOwnership(db, payload || {});
-    default:
-      throw new Error('Unknown feature registry operation: ' + operation);
+      return updateOwnership(db, (payload || {}) as Partial<FeatureRegistryOwnershipUpdate>);
   }
 }
 
-function listFeatures(db, filter) {
-  const clauses = [];
-  const params = [];
+function listFeatures(db: SqliteDatabase, filter: FeatureRegistryListFilter): FeatureRegistryEntry[] {
+  const clauses: string[] = [];
+  const params: SqliteBindValue[] = [];
 
   if (filter.featureName) {
     clauses.push('feature_name = ? COLLATE NOCASE');
@@ -245,7 +162,9 @@ function listFeatures(db, filter) {
     params.push(normalizeStatus(filter.status));
   }
 
-  const limit = Number.isInteger(filter.limit) && filter.limit > 0 ? Math.min(filter.limit, 500) : 500;
+  const limit = typeof filter.limit === 'number' && Number.isInteger(filter.limit) && filter.limit > 0
+    ? Math.min(filter.limit, 500)
+    : 500;
   const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
   const rows = db.prepare([
     'SELECT feature_id, feature_name, description, owning_workspace_id, owning_issue_id, owning_agent_id, status, created_at, updated_at, tags',
@@ -253,7 +172,7 @@ function listFeatures(db, filter) {
     where,
     'ORDER BY updated_at DESC, feature_name ASC',
     'LIMIT ?',
-  ].join('\n')).all(...params, limit);
+  ].join('\n')).all(...params, limit) as unknown as FeatureRegistryRow[];
 
   const entries = rows.map(rowToEntry);
   if (!Array.isArray(filter.tags) || filter.tags.length === 0) return entries;
@@ -261,16 +180,16 @@ function listFeatures(db, filter) {
   return entries.filter((entry) => requiredTags.every((tag) => entry.tags.includes(tag)));
 }
 
-function showFeature(db, featureName) {
+function showFeature(db: SqliteDatabase, featureName: string): FeatureRegistryEntry | null {
   const row = db.prepare([
     'SELECT feature_id, feature_name, description, owning_workspace_id, owning_issue_id, owning_agent_id, status, created_at, updated_at, tags',
     'FROM features',
     'WHERE feature_name = ? COLLATE NOCASE',
-  ].join('\n')).get(featureName);
+  ].join('\n')).get(featureName) as unknown as FeatureRegistryRow | undefined;
   return row ? rowToEntry(row) : null;
 }
 
-function tagIssue(db, input) {
+function tagIssue(db: SqliteDatabase, input: Partial<FeatureRegistryTagInput>): FeatureRegistryEntry {
   const featureName = requireFeatureName(input.featureName);
   const issueId = normalizeIssueId(input.issueId);
   const now = input.now || new Date().toISOString();
@@ -307,10 +226,12 @@ function tagIssue(db, input) {
     JSON.stringify(tags),
   );
 
-  return showFeature(db, featureName);
+  const tagged = showFeature(db, featureName);
+  if (!tagged) throw new Error(`Feature registry tag failed for ${featureName}`);
+  return tagged;
 }
 
-function untagIssue(db, input) {
+function untagIssue(db: SqliteDatabase, input: Partial<FeatureRegistryUntagInput>): boolean {
   const featureName = requireFeatureName(input.featureName);
   const issueId = normalizeIssueId(input.issueId);
   const result = db.prepare([
@@ -321,9 +242,9 @@ function untagIssue(db, input) {
   return result.changes > 0;
 }
 
-function updateOwnership(db, input) {
-  const where = [];
-  const whereParams = [];
+function updateOwnership(db: SqliteDatabase, input: Partial<FeatureRegistryOwnershipUpdate>): FeatureRegistryEntry[] {
+  const where: string[] = [];
+  const whereParams: SqliteBindValue[] = [];
   if (input.featureName !== undefined) {
     where.push('feature_name = ? COLLATE NOCASE');
     whereParams.push(requireFeatureName(input.featureName));
@@ -342,10 +263,10 @@ function updateOwnership(db, input) {
 
   const now = input.now || new Date().toISOString();
   const updates = ['updated_at = ?'];
-  const updateParams = [now];
+  const updateParams: SqliteBindValue[] = [now];
   if (Object.prototype.hasOwnProperty.call(input, 'issueId')) {
     updates.push('owning_issue_id = ?');
-    updateParams.push(input.issueId === null ? null : normalizeIssueId(input.issueId));
+    updateParams.push(input.issueId === null || input.issueId === undefined ? null : normalizeIssueId(input.issueId));
   }
   if (Object.prototype.hasOwnProperty.call(input, 'workspaceId')) {
     updates.push('owning_workspace_id = ?');
@@ -368,7 +289,7 @@ function updateOwnership(db, input) {
   return listFeatures(db, whereToFilter(input));
 }
 
-function whereToFilter(input) {
+function whereToFilter(input: Partial<FeatureRegistryOwnershipUpdate>): FeatureRegistryListFilter {
   if (input.featureName !== undefined) return { featureName: input.featureName };
   if (input.issueId !== undefined && input.issueId !== null) return { issueId: input.issueId };
   if (input.workspaceId !== undefined && input.workspaceId !== null) return { workspaceId: input.workspaceId };
@@ -376,7 +297,7 @@ function whereToFilter(input) {
   return {};
 }
 
-function rowToEntry(row) {
+function rowToEntry(row: FeatureRegistryRow): FeatureRegistryEntry {
   return {
     featureId: row.feature_id,
     featureName: row.feature_name,
@@ -391,33 +312,36 @@ function rowToEntry(row) {
   };
 }
 
-function requireFeatureName(value) {
+function requireFeatureName(value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) throw new Error('featureName is required');
   return value.trim();
 }
 
-function normalizeIssueId(value) {
+function normalizeIssueId(value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) throw new Error('issueId is required');
   return value.trim().toUpperCase();
 }
 
-function normalizeStatus(value) {
-  if (!STATUSES.has(value)) throw new Error('Invalid feature registry status: ' + value);
-  return value;
+function normalizeStatus(value: unknown): FeatureRegistryStatus {
+  if (!STATUSES.has(value as FeatureRegistryStatus)) throw new Error('Invalid feature registry status: ' + String(value));
+  return value as FeatureRegistryStatus;
 }
 
-function normalizeNullableString(value) {
+function normalizeNullableString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = String(value).trim();
   return trimmed.length === 0 ? null : trimmed;
 }
 
-function fieldOrNull(input, field) {
+function fieldOrNull<T extends 'workspaceId' | 'agentId'>(
+  input: Partial<Pick<FeatureRegistryTagInput, T>>,
+  field: T,
+): string | null {
   if (!Object.prototype.hasOwnProperty.call(input, field)) return null;
-  return input[field] === undefined ? null : input[field];
+  return input[field] === undefined ? null : input[field] ?? null;
 }
 
-function parseTags(value) {
+function parseTags(value: string | null): string[] {
   if (!value) return [];
   try {
     return normalizeTags(JSON.parse(value));
@@ -426,10 +350,10 @@ function parseTags(value) {
   }
 }
 
-function normalizeTags(value) {
+function normalizeTags(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  const seen = new Set();
-  const tags = [];
+  const seen = new Set<string>();
+  const tags: string[] = [];
   for (const item of value) {
     const tag = String(item).trim();
     if (!tag || seen.has(tag)) continue;
@@ -439,8 +363,6 @@ function normalizeTags(value) {
   return tags;
 }
 
-function mergeTags(existing, incoming) {
-  return normalizeTags([...(existing || []), ...(incoming || [])]);
-}
-`;
+function mergeTags(existing: readonly string[] | undefined, incoming: unknown): string[] {
+  return normalizeTags([...(existing || []), ...normalizeTags(incoming)]);
 }

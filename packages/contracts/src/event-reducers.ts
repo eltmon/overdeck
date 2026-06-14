@@ -1085,13 +1085,15 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'agent.model_set': {
-      const { agentId, model, claudeSessionId } = event.payload
+      const { agentId, model, claudeSessionId, sessionModel, sessionHarness } = event.payload
       const prev = state.agentRuntimeById[agentId]
         ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
       const next: AgentRuntimeSnapshot = {
         ...prev,
         model,
         claudeSessionId: claudeSessionId ?? prev.claudeSessionId,
+        sessionModel: sessionModel ?? prev.sessionModel,
+        sessionHarness: sessionHarness ?? prev.sessionHarness,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }

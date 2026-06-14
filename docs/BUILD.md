@@ -34,7 +34,7 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 - **Format**: ESM, platform: node
 - **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname`
 - **`deps.alwaysBundle`**: `@panopticon/*` workspace packages
-- **`deps.neverBundle`**: Native bindings (`node-pty`, `better-sqlite3`, `ssh2`) and Bun-specific modules (`bun:*`, `@effect/platform-bun/*`)
+- **`deps.neverBundle`**: Native bindings (`node-pty`, `ssh2`) and Bun-specific modules (`bun:*`, `@effect/platform-bun/*`)
 - **`clean: false`**: Preserves `dist/dashboard/public/` (frontend build output)
 - **Code-split**: Rolldown produces multiple chunks (entry + shared modules)
 
@@ -47,7 +47,7 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 
 **Cost Script** — `scripts/tsdown.config.ts`
 - **Entry point**: `record-cost-event.ts` → `scripts/record-cost-event.js`
-- **Standalone**: Bundles everything (including `better-sqlite3` JS wrapper) for deployment to `~/.panopticon/bin/`
+- **Standalone**: Bundles the script and shared SQLite driver adapter for deployment to `~/.panopticon/bin/`
 
 ### Vite (Dashboard Frontend)
 
@@ -181,7 +181,7 @@ Run all commands from `apps/desktop/` (or use workspace syntax: `bun run --cwd a
 
 ### Native Addon Rebuild
 
-After packaging, `scripts/afterPack.cjs` runs `electron-rebuild` to recompile native addons (`node-pty`, `better-sqlite3`) against the Electron Node.js version. This is required because these addons are compiled for the system Node.js version during `bun install`, which differs from Electron's embedded Node.js ABI.
+After packaging, `scripts/afterPack.cjs` runs `electron-rebuild` to recompile `node-pty` against the Electron Node.js version. This is required because the addon is compiled for the system Node.js version during `bun install`, which differs from Electron's embedded Node.js ABI.
 
 The `postinstall` script in `apps/desktop/package.json` also runs `electron-rebuild` after `bun install`.
 
@@ -218,6 +218,6 @@ In dev mode, the `BrowserWindow` loads from `VITE_DEV_SERVER_URL` (Vite HMR). In
 
 **"Template not found" errors**: The prompt `.md` files are missing from `dist/dashboard/prompts/`. Run `npm run build:dashboard:server` to copy them, or do a full `npm run build`.
 
-**"Module not found" for native modules**: `better-sqlite3`, `node-pty`, and `ssh2` are marked as external in the tsdown config (`deps.neverBundle`) and must be installed as runtime dependencies. Run `npm rebuild better-sqlite3` after Node.js version changes.
+**"Module not found" for native modules**: `node-pty` and `ssh2` are marked as external in the tsdown config (`deps.neverBundle`) and must be installed as runtime dependencies. Run `npm rebuild node-pty` after Node.js version changes.
 
 **Frontend not updating**: Vite builds to `dist/dashboard/public/`. If changes don't appear, clear browser cache or check that `build:dashboard:frontend` ran.

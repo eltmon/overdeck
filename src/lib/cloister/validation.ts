@@ -325,12 +325,15 @@ export interface QualityGateRunOptions {
 
 /**
  * Default quality gates used when no quality_gates config exists in projects.yaml.
- * Runs typecheck → lint sequentially (bail on first failure).
- * Tests are handled by the test specialist with baseline comparison, not verification.
+ * Runs typecheck → lint → changed-file tests sequentially (bail on first failure).
+ * Heavy e2e/browser suites belong in project-specific CI-only or @slow tiers.
  */
 export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   typecheck: { command: 'npm run typecheck 2>&1' },
   lint: { command: 'npm run lint 2>&1' },
+  test: {
+    command: 'npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
+  },
 };async function runQualityGatesPromise(
   gates: Record<string, QualityGateConfig>,
   projectPath: string,

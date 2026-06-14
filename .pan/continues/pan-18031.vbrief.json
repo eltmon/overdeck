@@ -1,0 +1,44 @@
+{
+  "version": "1",
+  "issueId": "PAN-18031",
+  "created": "2026-06-12T16:54:07.013Z",
+  "updated": "2026-06-12T22:56:37.731Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T16:54Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-12T16:54:07.013Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T16:55Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-12T16:55:04.086Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:09Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-12T17:09:59.039Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:16Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-12T17:16:21.350Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:20Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-06-12T17:20:25.445Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-12T17:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-12T17:31:11.882Z"
+    }
+  ]
+}

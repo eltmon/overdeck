@@ -108,6 +108,8 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Panopticon home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
 
+For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`PANOPTICON_DEV_SOP.md`](./PANOPTICON_DEV_SOP.md#deacon-and-flywheel-startup-order).
+
 Run artifacts live under the Flywheel home:
 
 ```text

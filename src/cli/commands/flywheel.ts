@@ -790,6 +790,32 @@ function clearFlywheelRunGate(runId: string): void {
   }
 }
 
+// Gracefully stop the Flywheel orchestrator: kill any live session, write the
+// per-run report, commit any FLYWHEEL-STATE.md changes, and clear the active-run
+// gate. Idempotent: a no-op when nothing is running and nothing is left to
+// report.
+export async function flywheelStopCommand(): Promise<void> {
+  try {
+    const sessionAlive = await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+    if (sessionAlive) {
+      await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+    }
+
+    const status = await loadReportFlywheelStatus();
+    if (!status) {
+      console.log('No flywheel run is active and nothing is left to report.');
+      return;
+    }
+
+    // The orchestrator has already been stopped, so force the report path to
+    // bypass its alive-session guard and finalize the run.
+    await flywheelReportCommand({ force: true });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 export async function flywheelReportCommand(options: ReportOptions = {}): Promise<void> {
   try {
     const cwd = options.cwd ?? process.cwd();
@@ -957,6 +983,11 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Finalize the active Flywheel run: write report.md, commit FLYWHEEL-STATE.md changes, and clear the active-run gate. Refuses to run while the orchestrator session is alive (pause or abort first).')
     .option('--force', 'Bypass the orchestrator-alive guard. Intended for the orchestrator role\'s own end-of-run call.')
     .action(flywheelReportCommand);
+
+  flywheel
+    .command('stop')
+    .description('Stop the Flywheel orchestrator gracefully: kill any live session, write report.md, commit FLYWHEEL-STATE.md changes, and clear the active-run gate')
+    .action(flywheelStopCommand);
 
   flywheel
     .command('abort')

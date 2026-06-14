@@ -1,5 +1,5 @@
-import Database from 'better-sqlite3';
-import { mkdir, mkdtemp, readFile, rename, rm, stat } from 'fs/promises';
+import { openDatabase, type SqliteDatabase } from '../database/driver.js';
+import { mkdir, readFile, rename, rm, stat } from 'fs/promises';
 import { dirname, join } from 'path';
 import { createHash } from 'crypto';
 
@@ -89,14 +89,16 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   const config = resolveBuildConfig(options.config);
   const embeddingFn = options.embeddingFn ?? createDocsEmbeddingFunction(config.embedding);
   const outputDir = dirname(outputPath);
+  const buildDir = join(outputDir, '..', '.pan-docs-index-tmp');
+  const buildPath = join(buildDir, `docs-index.${process.pid}.${Date.now()}.tmp.sqlite`);
   let embeddingProvider: DocsEmbeddingProvider = config.embedding.provider;
   let embeddingModel = config.embedding.model;
 
   await mkdir(outputDir, { recursive: true });
-  const buildDir = await mkdtemp(join(dirname(outputDir), '.pan-docs-index-'));
-  const buildPath = join(buildDir, 'docs-index.tmp.sqlite');
+  await mkdir(buildDir, { recursive: true });
+  await removeSqliteFiles(buildPath);
 
-  const db = new Database(buildPath);
+  const db = openDatabase(buildPath);
   let sourceCount = 0;
   let chunkCount = 0;
   let embeddingCount = 0;
@@ -209,6 +211,7 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
 
     await mkdir(outputDir, { recursive: true });
     await rename(buildPath, outputPath);
+    await removeSqliteFiles(buildPath);
 
     return {
       outputPath,
@@ -224,12 +227,10 @@ export async function buildDocsIndex(options: BuildDocsIndexOptions = {}): Promi
   } catch (error) {
     await removeSqliteFiles(buildPath);
     throw error;
-  } finally {
-    await rm(buildDir, { recursive: true, force: true });
   }
 }
 
-export function createDocsIndexSchema(db: Database.Database): void {
+export function createDocsIndexSchema(db: SqliteDatabase): void {
   db.exec(`
     CREATE TABLE docs_chunks (
       chunk_id INTEGER PRIMARY KEY,
@@ -266,7 +267,7 @@ export function createDocsIndexSchema(db: Database.Database): void {
   `);
 }
 
-export function readDocsIndexMetadata(db: Database.Database): DocsIndexMetadata {
+export function readDocsIndexMetadata(db: SqliteDatabase): DocsIndexMetadata {
   const rows = db.prepare('SELECT key, value FROM docs_index_metadata').all() as Array<{ key: string; value: string }>;
   const metadata = Object.fromEntries(rows.map((row) => [row.key, row.value]));
   return {
@@ -281,7 +282,7 @@ export function readDocsIndexMetadata(db: Database.Database): DocsIndexMetadata 
   };
 }
 
-export function validateDocsIndex(db: Database.Database): DocsIndexMetadata {
+export function validateDocsIndex(db: SqliteDatabase): DocsIndexMetadata {
   const metadata = readDocsIndexMetadata(db);
   if (metadata.schemaVersion !== DOCS_INDEX_SCHEMA_VERSION) {
     throw new Error(`unsupported docs index schema version: ${metadata.schemaVersion}`);
@@ -375,14 +376,14 @@ export function float32ArrayToBuffer(embedding: Float32Array): Buffer {
   return Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
 }
 
-export function bufferToFloat32Array(buffer: Buffer, dimensions: number): Float32Array {
+export function bufferToFloat32Array(buffer: Uint8Array, dimensions: number): Float32Array {
   if (buffer.byteLength !== dimensions * Float32Array.BYTES_PER_ELEMENT) {
     throw new Error(`embedding blob dimension mismatch: expected ${dimensions} floats, got ${buffer.byteLength} bytes`);
   }
   return new Float32Array(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
 }
 
-export function deterministicDocsHashEmbedding(input: DocsEmbeddingInput): Float32Array {
+export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float32Array {
   const values = new Float32Array(input.dimensions);
   let seed = `${input.model}\n${input.chunk.docPath}\n${input.chunk.sectionAnchor ?? ''}\n${input.chunk.content}`;
 
@@ -395,10 +396,6 @@ export function deterministicDocsHashEmbedding(input: DocsEmbeddingInput): Float
   }
 
   return normalizeFloat32Embedding(values, input.dimensions);
-}
-
-export function deterministicDocsTestEmbedding(input: DocsEmbeddingInput): Float32Array {
-  return deterministicDocsHashEmbedding(input);
 }
 
 function resolveDocsEmbeddingOutput(output: Float32Array | DocsEmbeddingOutput): DocsEmbeddingOutput {
@@ -424,7 +421,7 @@ async function getLocalEmbeddingPipeline(modelId: string): Promise<FeatureExtrac
   return pipelinePromise;
 }
 
-function writeDocsIndexMetadata(db: Database.Database, metadata: DocsIndexMetadata): void {
+function writeDocsIndexMetadata(db: SqliteDatabase, metadata: DocsIndexMetadata): void {
   const insert = db.prepare('INSERT INTO docs_index_metadata(key, value) VALUES (?, ?)');
   insert.run('schema_version', String(metadata.schemaVersion));
   insert.run('built_at', metadata.builtAt);

@@ -51,6 +51,7 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^1.7.4",
+    "streamdown": "2.5.0",
     "zustand": "^4.5.0"
   },
   "devDependencies": {

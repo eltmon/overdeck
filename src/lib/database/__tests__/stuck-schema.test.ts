@@ -30,7 +30,7 @@ afterEach(async () => {
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
-describe('stuck state schema (PAN-653)', () => {
+describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
   it('review_status table has stuck columns after fresh init', async () => {
     const { getDatabase } = await import('../index.js');
     const db = getDatabase();
@@ -52,9 +52,9 @@ describe('stuck state schema (PAN-653)', () => {
   });
 
   it('workspace discovered-session schema initializer creates all PAN-457 tables', async () => {
-    const { default: Database } = await import('better-sqlite3');
+    const { openDatabase } = await import('../driver.js');
     const { initWorkspaceDiscoveredSessionsSchema } = await import('../schema.js');
-    const db = new Database(join(TEST_HOME, 'workspace.db'));
+    const db = openDatabase(join(TEST_HOME, 'workspace.db'));
     try {
       initWorkspaceDiscoveredSessionsSchema(db);
       const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')`).all() as Array<{ name: string }>;

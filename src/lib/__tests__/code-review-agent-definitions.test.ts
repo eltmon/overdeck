@@ -48,4 +48,27 @@ describe('code review convoy sub-role prompt templates', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/code-review-synthesis.md'))).toBe(false);
     expect(existsSync(join(process.cwd(), 'roles/review-synthesis.md'))).toBe(false);
   });
+
+  it('includes the PAN-1500 Stub UI BLOCKING rule landmarks in roles/review-requirements.md', () => {
+    const content = readRepoFile('roles/review-requirements.md');
+
+    // Scope-list anchor
+    expect(content).toContain('Stub UI scope creep');
+    expect(content).toContain('feature flag check gating them off');
+    expect(content).toContain('removal from the user-facing surface');
+    expect(content).toContain('non-stub implementation calling real data');
+
+    // Method subsection anchor
+    expect(content).toContain('### Stub UI BLOCKING rule');
+    expect(content).toContain('`stubUiFindings`');
+    expect(content).toContain('`!` BLOCKING');
+
+    // Coverage Matrix example row anchor
+    expect(content).toContain('Stub UI: <patternLabel> @ <file>:<line>');
+    expect(content).toContain('stubUiFindings (manifest)');
+
+    // Mitigation downgrade rule
+    expect(content).toContain('Non-blocking Notes');
+    expect(content).toMatch(/one-line explanation of which mitigation applies/i);
+  });
 });

@@ -13,17 +13,25 @@ import { appendFileSync, mkdirSync } from 'fs';
 import { appendFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { LOGS_DIR, AGENTS_DIR } from './paths.js';
+import { getPanopticonHome } from './paths.js';
+
+function logsDir(): string {
+  return join(getPanopticonHome(), 'logs');
+}
+
+function agentDir(agentId: string): string {
+  return join(getPanopticonHome(), 'agents', agentId);
+}
 
 function ensureLogsDir(): void {
   try {
-    mkdirSync(LOGS_DIR, { recursive: true });
+    mkdirSync(logsDir(), { recursive: true });
   } catch { /* non-fatal */ }
 }
 
 function ensureAgentDir(agentId: string): void {
   try {
-    mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
+    mkdirSync(agentDir(agentId), { recursive: true });
   } catch { /* non-fatal */ }
 }
 
@@ -35,7 +43,7 @@ function timestamp(): string {
 export function logDeaconEventSync(message: string): void {
   ensureLogsDir();
   try {
-    appendFileSync(join(LOGS_DIR, 'deacon.log'), `[${timestamp()}] ${message}\n`);
+    appendFileSync(join(logsDir(), 'deacon.log'), `[${timestamp()}] ${message}\n`);
   } catch {
     // Non-fatal — logging must never break recovery logic
   }
@@ -46,7 +54,7 @@ export function logAgentLifecycleSync(agentId: string, message: string): void {
   ensureAgentDir(agentId);
   try {
     appendFileSync(
-      join(AGENTS_DIR, agentId, 'lifecycle.log'),
+      join(agentDir(agentId), 'lifecycle.log'),
       `[${timestamp()}] ${message}\n`,
     );
   } catch {
@@ -63,8 +71,9 @@ export function logAgentLifecycleSync(agentId: string, message: string): void {
 export const logDeaconEvent = (message: string): Effect.Effect<void, never> =>
   Effect.promise(async () => {
     try {
-      await mkdir(LOGS_DIR, { recursive: true });
-      await appendFile(join(LOGS_DIR, 'deacon.log'), `[${timestamp()}] ${message}\n`);
+      const dir = logsDir();
+      await mkdir(dir, { recursive: true });
+      await appendFile(join(dir, 'deacon.log'), `[${timestamp()}] ${message}\n`);
     } catch {
       // Non-fatal
     }
@@ -74,9 +83,10 @@ export const logDeaconEvent = (message: string): Effect.Effect<void, never> =>
 export const logAgentLifecycle = (agentId: string, message: string): Effect.Effect<void, never> =>
   Effect.promise(async () => {
     try {
-      await mkdir(join(AGENTS_DIR, agentId), { recursive: true });
+      const dir = agentDir(agentId);
+      await mkdir(dir, { recursive: true });
       await appendFile(
-        join(AGENTS_DIR, agentId, 'lifecycle.log'),
+        join(dir, 'lifecycle.log'),
         `[${timestamp()}] ${message}\n`,
       );
     } catch {

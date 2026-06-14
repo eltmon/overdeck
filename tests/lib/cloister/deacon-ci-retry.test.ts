@@ -15,8 +15,9 @@ import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
-import { homedir, tmpdir } from 'os';
+import { tmpdir } from 'os';
 import { execSync } from 'child_process';
+import { getPanopticonHome } from '../../../src/lib/paths.js';
 
 // ── Module-level mocks ──────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 // ── Test constants ──────────────────────────────────────────────────────────
 
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
+const REVIEW_STATUS_FILE = join(getPanopticonHome(), 'review-status.json');
 const ISSUE_ID = 'PAN-714-CI-TEST';
 // Status entry that represents a CI check failure (review + test passed, but
 // the merge blocked due to "failing required checks")
@@ -114,7 +115,7 @@ const CI_FAILED_STATUS = {
 };
 
 function writeStatusFile(statuses: Record<string, unknown>): void {
-  mkdirSync(join(homedir(), '.panopticon'), { recursive: true });
+  mkdirSync(getPanopticonHome(), { recursive: true });
   writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
 }
 

@@ -14,7 +14,11 @@ import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogE
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
+import { isPiSessionFile, parsePiConversationMessages } from './pi-conversation-parser.js';
+
+type ModelCapability = (typeof MODEL_CAPABILITIES)[keyof typeof MODEL_CAPABILITIES];
 
 /** Detect AI provider from model name */
 function providerFromModel(model: string): AIProvider {
@@ -37,6 +41,12 @@ export interface ParseResult {
   totalCost: number;
   /** Total token throughput (input + output + cache read + cache write) across assistant messages. */
   totalTokens: number;
+  /** Last assistant usage observed after the active compact boundary. */
+  latestAssistantUsage: LatestAssistantUsage | null;
+  /** Byte offset of the active compact boundary used for context-window usage. */
+  contextBoundaryOffset: number;
+  /** Bytes from the active compact boundary through EOF. */
+  contextActiveBytes: number;
   /** Unpaired tool_use entries waiting for tool_result (persist across incremental calls). */
   pendingToolUse: Map<string, WorkLogEntry>;
   /** Pre-arrived tool_result entries waiting for tool_use (persist across incremental calls). */
@@ -75,6 +85,10 @@ export interface ParseState {
   lastSequence: number;
   planToolUseIds?: Set<string>;
   proposedPlan?: ProposedPlan;
+  /** Latest assistant usage observed after the active compact boundary. */
+  latestAssistantUsage?: LatestAssistantUsage | null;
+  /** Byte offset of the active compact boundary used for context-window usage. */
+  contextBoundaryOffset?: number;
   /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
   permissionMode?: string;
   /** Map assistant message ID → file paths touched by file-modifying tool_use calls in that turn. */
@@ -259,6 +273,9 @@ export async function parseConversationMessages(
       streaming: false,
       totalCost: 0,
       totalTokens: 0,
+      latestAssistantUsage: null,
+      contextBoundaryOffset: 0,
+      contextActiveBytes: fileStats.size,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
@@ -317,12 +334,15 @@ export async function parseConversationMessages(
     }
   }
 
-  const lines = newText.split('\n').filter((l) => l.trim());
+  const lines = newText.split('\n');
 
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   let totalCost = 0;
   let totalTokens = 0;
+  let latestAssistantUsage = priorState?.latestAssistantUsage ?? null;
+  let maxObservedInputTokens = latestAssistantUsage?.maxObservedInputTokens ?? 0;
+  let contextBoundaryOffset = priorState?.contextBoundaryOffset ?? 0;
 
   // Pending assistant message being assembled from content blocks
   let pendingAssistant: ChatMessage | null = null;
@@ -353,12 +373,18 @@ export async function parseConversationMessages(
   // Request/message IDs whose usage has already been counted, so a response spread across
   // multiple JSONL lines (or across incremental read boundaries) is counted exactly once.
   const countedUsageIds = priorState?.countedUsageIds ?? new Set<string>();
-  // Restore pendingAssistant ID from prior incremental parse for correct file-edit tracking
-  if (priorState?.pendingAssistantId && !pendingAssistant) {
-    pendingAssistant = { id: priorState.pendingAssistantId } as ChatMessage;
-  }
+  // Carry the prior assistant ID for file-edit association only. Do not
+  // materialize it as a ChatMessage: a later flush before user/tool-result lines
+  // would emit an invalid ID-only assistant delta.
+  const pendingAssistantIdForEdits = priorState?.pendingAssistantId;
 
-  for (const line of lines) {
+  let lineByteOffset = fromByteOffset;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const currentLineByteOffset = lineByteOffset;
+    lineByteOffset += Buffer.byteLength(line, 'utf-8') + (i < lines.length - 1 ? 1 : 0);
+    if (!line.trim()) continue;
+
     let entry: JsonlEntry;
     try {
       entry = JSON.parse(line.replace(/\r$/, '')) as JsonlEntry;
@@ -460,6 +486,22 @@ export async function parseConversationMessages(
       const msg = entry.message;
       const content = Array.isArray(msg.content) ? msg.content : [];
 
+      if (msg.usage) {
+        const input = msg.usage.input_tokens ?? 0;
+        const cacheRead = msg.usage.cache_read_input_tokens ?? 0;
+        const cacheCreate = msg.usage.cache_creation_input_tokens ?? 0;
+        const turnInput = input + cacheRead + cacheCreate;
+        if (turnInput > maxObservedInputTokens) maxObservedInputTokens = turnInput;
+        latestAssistantUsage = {
+          lastInputTokens: input,
+          lastCacheReadTokens: cacheRead,
+          lastCacheCreationTokens: cacheCreate,
+          maxObservedInputTokens,
+          lastModel: msg.model ?? null,
+          lastTimestamp: entry.timestamp ?? null,
+        };
+      }
+
       // Accumulate cost and token throughput from usage data.
       // Claude Code repeats the same `usage` on every JSONL line of one API response
       // (the text line, each tool_use line, …); dedup on requestId/message.id so each
@@ -530,7 +572,7 @@ export async function parseConversationMessages(
               const input = block.input as Record<string, unknown>;
               const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
               if (filePath) {
-                const asstId = pendingAssistant?.id ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
+                const asstId = pendingAssistant?.id ?? pendingAssistantIdForEdits ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
                 // If no pendingAssistant, this tool_use UUID is orphaned — the text entry
                 // will merge it into the final message with a different UUID.
                 if (!pendingAssistant) {
@@ -636,6 +678,9 @@ export async function parseConversationMessages(
         };
       }
     } else if (entry.type === 'system' && (entry as Record<string, unknown>).subtype === 'compact_boundary') {
+      contextBoundaryOffset = currentLineByteOffset;
+      latestAssistantUsage = null;
+      maxObservedInputTokens = 0;
       const meta = (entry as Record<string, unknown>).compactMetadata as Record<string, unknown> | undefined;
       compactBoundaries.push({
         id: (entry as Record<string, unknown>).uuid as string ?? `compact-${lineSequence}`,
@@ -805,6 +850,9 @@ export async function parseConversationMessages(
     streaming,
     totalCost,
     totalTokens,
+    latestAssistantUsage,
+    contextBoundaryOffset,
+    contextActiveBytes: Math.max(0, fileStats.size - contextBoundaryOffset),
     pendingToolUse,
     unresolvedResults,
     lastSequence: sequence,
@@ -814,7 +862,7 @@ export async function parseConversationMessages(
     compactBoundaries,
     permissionMode,
     fileEditsByAssistantId,
-    pendingAssistantId: pendingAssistant?.id,
+    pendingAssistantId: pendingAssistant?.id ?? pendingAssistantIdForEdits,
     orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,
     countedUsageIds,
   };
@@ -835,21 +883,28 @@ const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; su
 
 export async function summarizeConversationActivity(
   sessionFile: string,
+  options: { harness?: string | null } = {},
 ): Promise<ConversationActivitySummary> {
   const fileStats = await stat(sessionFile);
-  const cached = activitySummaryCache.get(sessionFile);
+  const cacheKey = `${options.harness ?? 'claude-code'}:${sessionFile}`;
+  const cached = activitySummaryCache.get(cacheKey);
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
     return cached.summary;
   }
 
-  // Parse from the last compact boundary instead of the full file — avoids
-  // re-reading potentially megabytes of history on every list enrichment tick.
-  // Pass an empty priorState so pendingToolUse stays populated rather than being
-  // flushed into workLog. This lets us detect genuinely pending tools.
-  const { messages, streaming, pendingToolUse, mtimeMs } = await parseFromLastCompactBoundary(
-    sessionFile,
-    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
-  );
+  const parsed = options.harness === 'codex'
+    ? await parseCodexConversationMessages(sessionFile)
+    : options.harness === 'pi' || isPiSessionFile(sessionFile)
+      ? await parsePiConversationMessages(sessionFile)
+      // Parse from the last compact boundary instead of the full file — avoids
+      // re-reading potentially megabytes of history on every list enrichment tick.
+      // Pass an empty priorState so pendingToolUse stays populated rather than being
+      // flushed into workLog. This lets us detect genuinely pending tools.
+      : await parseFromLastCompactBoundary(
+          sessionFile,
+          { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+        );
+  const { messages, streaming, pendingToolUse, workLog, mtimeMs } = parsed;
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
@@ -886,10 +941,18 @@ export async function summarizeConversationActivity(
         currentTool = entry.toolTitle;
       }
     }
+    if (!currentTool && options.harness === 'codex') {
+      for (const entry of workLog) {
+        if (entry.tone === 'tool' && !entry.result && (entry.sequence ?? -1) > maxSequence) {
+          maxSequence = entry.sequence ?? -1;
+          currentTool = entry.label;
+        }
+      }
+    }
   }
 
   const summary: ConversationActivitySummary = { messages, streaming, isWorking, currentTool };
-  activitySummaryCache.set(sessionFile, { mtimeMs, size: fileStats.size, summary });
+  activitySummaryCache.set(cacheKey, { mtimeMs, size: fileStats.size, summary });
   if (activitySummaryCache.size > ACTIVITY_SUMMARY_CACHE_MAX) {
     const firstKey = activitySummaryCache.keys().next().value;
     if (firstKey !== undefined) {
@@ -1102,24 +1165,24 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
  * content in the JSONL, which routinely overshoots actual `input_tokens` by
  * 4-10x. Removed.
  *
- * Returns null when we can't compute a meaningful value (unknown model, no
- * assistant messages with usage yet, stat failure).
+ * Returns null when the model is unknown. Returns a zero-token snapshot when
+ * the active window has no assistant usage yet.
  */
-export async function computeContextUsage(sessionFile: string, model: string | null): Promise<ContextUsage | null> {
+function resolveContextCapability(model: string | null): ModelCapability | null {
   const normalizedModel = model?.trim();
   if (!normalizedModel) return null;
 
   const resolvedModel = resolveModelIdSync(normalizedModel);
-  const capability = Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
+  return Object.prototype.hasOwnProperty.call(MODEL_CAPABILITIES, resolvedModel)
     ? MODEL_CAPABILITIES[resolvedModel as keyof typeof MODEL_CAPABILITIES]
-    : undefined;
-  if (!capability) return null;
+    : null;
+}
 
-  const boundaryOffset = await findLastCompactBoundary(sessionFile);
-  const fileStats = await stat(sessionFile);
-  const activeBytes = Math.max(0, fileStats.size - boundaryOffset);
-
-  const usageSummary = await readLatestAssistantUsage(sessionFile, boundaryOffset, activeBytes);
+function buildContextUsage(
+  capability: ModelCapability,
+  activeBytes: number,
+  usageSummary: LatestAssistantUsage | null,
+): ContextUsage {
   if (!usageSummary) {
     // No assistant message with usage yet — return zeros against the
     // declared window so the meter renders an empty ring instead of nothing.
@@ -1170,7 +1233,28 @@ export async function computeContextUsage(sessionFile: string, model: string | n
   };
 }
 
-interface LatestAssistantUsage {
+export function contextUsageFromParseResult(
+  result: Pick<ParseResult, 'contextActiveBytes' | 'latestAssistantUsage'>,
+  model: string | null,
+): ContextUsage | null {
+  const capability = resolveContextCapability(model);
+  if (!capability) return null;
+  return buildContextUsage(capability, result.contextActiveBytes, result.latestAssistantUsage);
+}
+
+export async function computeContextUsage(sessionFile: string, model: string | null): Promise<ContextUsage | null> {
+  const capability = resolveContextCapability(model);
+  if (!capability) return null;
+
+  const boundaryOffset = await findLastCompactBoundary(sessionFile);
+  const fileStats = await stat(sessionFile);
+  const activeBytes = Math.max(0, fileStats.size - boundaryOffset);
+
+  const usageSummary = await readLatestAssistantUsage(sessionFile, boundaryOffset, activeBytes);
+  return buildContextUsage(capability, activeBytes, usageSummary);
+}
+
+export interface LatestAssistantUsage {
   lastInputTokens: number;
   lastCacheReadTokens: number;
   lastCacheCreationTokens: number;
@@ -1244,6 +1328,52 @@ export async function parseFromLastCompactBoundary(
   return parseConversationMessages(sessionFile, boundaryOffset, priorState);
 }
 
+// ─── Append-only snapshot guard (PAN-1642) ───────────────────────────────────
+
+/**
+ * Decide whether a live-stream emission may be sent as an authoritative
+ * `snapshot:true` (full transcript replace) or must be downgraded to a
+ * non-destructive merge (`snapshot:false`).
+ *
+ * Root-cause context: claude-code session transcripts are **append-only at a
+ * fixed path**. `claude --resume <id>` reuses the same session UUID/file
+ * (PAN-830), and both claude-native and Panopticon-native compaction *append*
+ * a `compact_boundary` marker rather than truncating. A read that shows the
+ * file SHRINK is therefore never a real content reset — it is a transient
+ * truncate-rewrite window (a respawn re-writing the resumed file, a read that
+ * landed mid-write, or a partial read under load). Emitting that smaller read
+ * as `snapshot:true` makes the client replace its populated transcript with the
+ * partial/empty one, blanking the view to "How can I help you?" or only the
+ * last few messages even while the operator is just reading (PAN-1642).
+ *
+ * The watcher only sets `fileWasReset` when it observed the file shrink and
+ * re-parsed from byte 0, so `newMessageCount` here is a FULL transcript count.
+ * We keep a per-subscription high-water mark of the largest full transcript we
+ * have emitted and only allow a snapshot that does not shrink it. A shrinking
+ * reset is suppressed to a merge; the subsequent appends re-flow normally and
+ * `mergeById` on the client dedupes the overlap. Erring toward merge can never
+ * lose history — the only failure mode it forgoes is replacing on a genuine
+ * smaller session, which cannot happen for an append-only claude-code file on a
+ * stable subscription.
+ */
+export function gateSnapshotEmission(
+  fileWasReset: boolean,
+  newMessageCount: number,
+  highWaterCount: number,
+): { snapshot: boolean; highWaterCount: number; suppressedShrink: boolean } {
+  if (!fileWasReset) {
+    // Normal incremental delta — always a merge, never touches the high-water mark.
+    return { snapshot: false, highWaterCount, suppressedShrink: false };
+  }
+  if (newMessageCount < highWaterCount) {
+    // Transient truncate-rewrite read — downgrade to merge so the client keeps
+    // its history. Do not lower the high-water mark.
+    return { snapshot: false, highWaterCount, suppressedShrink: true };
+  }
+  // A genuine, non-shrinking full re-parse — safe to assert as the snapshot.
+  return { snapshot: true, highWaterCount: newMessageCount, suppressedShrink: false };
+}
+
 // ─── File watcher ─────────────────────────────────────────────────────────────
 
 export interface ConversationWatchHandle {
@@ -1258,10 +1388,11 @@ export interface ConversationWatchHandle {
  */
 export function watchConversation(
   sessionFile: string,
-  callback: (result: ParseResult) => void,
+  callback: (result: ParseResult) => void | Promise<void>,
+  options: { byteOffset?: number; priorState?: ParseState } = {},
 ): ConversationWatchHandle {
-  let byteOffset = 0;
-  let priorState: ParseState | undefined;
+  let byteOffset = options.byteOffset ?? 0;
+  let priorState: ParseState | undefined = options.priorState;
   let stopped = false;
   let isParsing = false;
   let abortController: AbortController | null = null;
@@ -1285,12 +1416,17 @@ export function watchConversation(
             lastSequence: fullResult.lastSequence,
             planToolUseIds: fullResult.planToolUseIds,
             proposedPlan: fullResult.proposedPlan,
+            latestAssistantUsage: fullResult.latestAssistantUsage,
+            contextBoundaryOffset: fullResult.contextBoundaryOffset,
             permissionMode: fullResult.permissionMode,
             countedUsageIds: fullResult.countedUsageIds,
+            fileEditsByAssistantId: fullResult.fileEditsByAssistantId,
+            pendingAssistantId: fullResult.pendingAssistantId,
+            orphanToolUseIds: fullResult.orphanToolUseIds,
           };
           // Include in-flight tools so the live view shows pending work
           const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];
-          callback({ ...fullResult, workLog });
+          await callback({ ...fullResult, workLog });
         }
       } else if (result.byteOffset > byteOffset) {
         byteOffset = result.byteOffset;
@@ -1300,11 +1436,17 @@ export function watchConversation(
           lastSequence: result.lastSequence,
           planToolUseIds: result.planToolUseIds,
           proposedPlan: result.proposedPlan,
+          latestAssistantUsage: result.latestAssistantUsage,
+          contextBoundaryOffset: result.contextBoundaryOffset,
+          permissionMode: result.permissionMode,
           countedUsageIds: result.countedUsageIds,
+          fileEditsByAssistantId: result.fileEditsByAssistantId,
+          pendingAssistantId: result.pendingAssistantId,
+          orphanToolUseIds: result.orphanToolUseIds,
         };
         // Include in-flight tools so the live view shows pending work
         const workLog = [...result.workLog, ...result.pendingToolUse.values()];
-        callback({ ...result, workLog });
+        await callback({ ...result, workLog });
       }
     } catch {
       // File may have been rotated or is temporarily unavailable
@@ -1341,19 +1483,12 @@ export function watchConversation(
     pollInterval = setTimeout(poll, 500);
   }
 
-  // Start watch and fall back to polling if watch fails after 1s
+  // Start watch; polling is only a fallback when fs.watch itself fails.
   startWatch();
-  const watchTimeout = setTimeout(() => {
-    // If watch hasn't reported any changes by now, also start polling as backup
-    if (!stopped && pollInterval === null) {
-      startPolling();
-    }
-  }, 1000);
 
   return {
     stop() {
       stopped = true;
-      clearTimeout(watchTimeout);
       if (abortController) {
         abortController.abort();
         abortController = null;

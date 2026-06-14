@@ -25,7 +25,7 @@ import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCirc
 import type { WorkingPhase } from '../../lib/workingPhase';
 import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
-import { ChatMarkdown } from './ChatMarkdown';
+import { ChatMarkdown, ChatMarkdownSettingsProvider } from './ChatMarkdown';
 import { ChangedFilesTree } from './ChangedFilesTree';
 import { DiffStatLabel } from './DiffStatLabel';
 import { summarizeTurnDiffStats } from '../../lib/turnDiffTree';
@@ -604,7 +604,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   })();
 
   return (
-    <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <ChatMarkdownSettingsProvider>
+      <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div
         ref={scrollContainerRef}
         className={styles.messagesTimeline}
@@ -843,7 +844,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         Bottom
       </button>
     )}
-    </div>
+      </div>
+    </ChatMarkdownSettingsProvider>
   );
 });
 
@@ -1156,10 +1158,21 @@ function WorkLogGroup({ entries, hideToolCalls, cwd, issueId }: { entries: WorkL
   );
 }
 
-const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
+const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'Shell', 'terminal', 'shell']);
+const WORK_LOG_DETAIL_MAX = 80;
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function firstLine(value: string): string {
+  const idx = value.indexOf('\n');
+  return idx >= 0 ? value.slice(0, idx) : value;
+}
+
+function getWorkLogDisplayDetail(entry: WorkLogEntry): string | undefined {
+  const detail = entry.detail ?? entry.command;
+  return detail ? firstLine(detail) : undefined;
 }
 
 /**
@@ -1324,6 +1337,7 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
   const hasResult = !!entry.result;
   const hasToolBody = !!entry.toolInput && entry.tone === 'tool';
   const isExpandable = hasResult || hasToolBody || (isThinking && !!entry.detail);
+  const displayDetail = getWorkLogDisplayDetail(entry);
 
   return (
     <div>
@@ -1351,10 +1365,10 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
           />
         )}
         <span className={styles.workLogLabel}>{entry.toolTitle ?? entry.label}</span>
-        {entry.detail && (
-          <span className={styles.workLogDetail} title={entry.detail}>
-            {entry.detail.slice(0, 80)}
-            {entry.detail.length > 80 ? '…' : ''}
+        {displayDetail && (
+          <span className={styles.workLogDetail} title={displayDetail}>
+            {displayDetail.slice(0, WORK_LOG_DETAIL_MAX)}
+            {displayDetail.length > WORK_LOG_DETAIL_MAX ? '…' : ''}
           </span>
         )}
         {isExpandable && (

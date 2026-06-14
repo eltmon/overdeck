@@ -2,8 +2,7 @@
 
 /**
  * electron-builder afterPack hook.
- * Runs electron-rebuild to recompile native addons (node-pty, better-sqlite3)
- * for Electron's bundled Node version.
+ * Runs electron-rebuild to recompile node-pty for Electron's bundled Node version.
  */
 const { execSync } = require("node:child_process");
 const path = require("node:path");

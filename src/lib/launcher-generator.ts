@@ -602,7 +602,15 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   // not let repo AGENTS.md turn a normal dashboard conversation into a work
   // agent with project-level task-tracker rules.
   if (codexMode === 'tui') {
-    const cmd = wrapWithSupervisor(config, 'codex -c project_doc_max_bytes=0');
+    const tokens: string[] = ['codex'];
+    if (config.resumeSessionId) {
+      tokens.push('resume');
+    }
+    tokens.push('-c', 'project_doc_max_bytes=0');
+    if (config.resumeSessionId) {
+      tokens.push(shellQuote(config.resumeSessionId));
+    }
+    const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];
   }
 

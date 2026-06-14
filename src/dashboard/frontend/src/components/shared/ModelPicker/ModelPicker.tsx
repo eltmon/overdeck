@@ -6,6 +6,7 @@ import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
 } from '../../chat/defaultConversationModel';
 import { CostWarningBadge, costWarningLevel } from '../costWarning';
+import { HarnessLogo, PROVIDER_BRANDS, ProviderLogo } from '../branding';
 import styles from './ModelPicker.module.css';
 
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
@@ -56,17 +57,6 @@ export interface ModelGroup {
   models: PickerModel[];
 }
 
-export const PROVIDER_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  google: 'Google',
-  minimax: 'MiniMax',
-  zai: 'Z.AI',
-  kimi: 'Kimi',
-  nous: 'Nous Portal',
-  openrouter: 'OpenRouter',
-};
-
 export const FALLBACK_GROUPS: ModelGroup[] = [
   {
     provider: 'anthropic',
@@ -83,6 +73,11 @@ export function formatCost(costPer1M: number): string {
   if (costPer1M === 0) return 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
   return `$${Math.round(costPer1M)}/1M`;
+}
+
+function providerLabel(provider: string): string {
+  const registryProvider = provider === 'glm' ? 'zai' : provider;
+  return PROVIDER_BRANDS[registryProvider as keyof typeof PROVIDER_BRANDS]?.label ?? provider;
 }
 
 type AvailableModelsState = {
@@ -149,7 +144,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
         if (!Array.isArray(models) || models.length === 0) continue;
         newGroups.push({
           provider: prov,
-          label: PROVIDER_LABELS[prov] ?? prov,
+          label: providerLabel(prov),
           models: models.map((m) => ({
             id: m.id,
             label: m.name,
@@ -165,7 +160,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
       if (orFavoriteModels.length > 0) {
         newGroups.push({
           provider: 'openrouter',
-          label: 'OpenRouter',
+          label: providerLabel('openrouter'),
           models: orFavoriteModels.map((m) => ({
             id: m.id,
             label: m.name,
@@ -268,7 +263,10 @@ export function ModelSelect({
             {groups.map((group) => (
               <div key={group.provider}>
                 {groups.length > 1 && (
-                  <div className={styles.pickerGroupHeader}>{group.label}</div>
+                  <div className={styles.pickerGroupHeader}>
+                    <ProviderLogo provider={group.provider} label={group.label} className={styles.providerLogo} />
+                    <span>{group.label}</span>
+                  </div>
                 )}
                 {group.models.map((model) => {
                   const lvl = costWarningLevel(model.costPer1MTokens);
@@ -366,6 +364,7 @@ export function HarnessSelect({
       <div ref={ref} className={styles.pickerWrap}>
         <button type="button" className={styles.pickerBtn} onClick={() => setOpen((o) => !o)}>
           <span className={styles.pickerValue}>{selected.label}</span>
+          <HarnessLogo harness={selected.id} className={styles.harnessLogo} />
           <ChevronDown size={12} className={styles.pickerChevron} />
         </button>
         {open && (
@@ -384,7 +383,10 @@ export function HarnessSelect({
                   title={titleText}
                   onClick={() => handlePick(harness.id)}
                 >
-                  <span className={styles.pickerOptionLabel}>{harness.label}</span>
+                  <span className={styles.pickerOptionLabelWithIcon}>
+                    <HarnessLogo harness={harness.id} className={styles.harnessLogo} />
+                    <span>{harness.label}</span>
+                  </span>
                   {willAutoFlip && !onModelChange && <span className={styles.pickerOptionCost}>ToS gated</span>}
                 </button>
               );

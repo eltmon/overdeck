@@ -190,6 +190,7 @@ export const ConversationEvent = Schema.Union([
     messages: Schema.Array(ChatMessage),
     workLog: Schema.Array(WorkLogEntry),
     streaming: Schema.Boolean,
+    snapshot: Schema.optional(Schema.Boolean),
     proposedPlan: Schema.optional(ProposedPlan),
     compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
     contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),

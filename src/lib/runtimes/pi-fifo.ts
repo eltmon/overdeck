@@ -4,7 +4,7 @@
  * Pi runs in `--mode rpc` and reads JSONL commands from stdin. We feed Pi by
  * redirecting its stdin from a per-agent fifo at:
  *
- *   ~/.panopticon/agents/<agentId>/rpc.in
+ *   $PANOPTICON_HOME/agents/<agentId>/rpc.in
  *
  * The launcher script creates the fifo, then `exec pi --mode rpc ... < <fifo>`.
  * The runtime adapter (PiRuntime.sendMessage) writes JSONL lines to the fifo.
@@ -18,7 +18,7 @@
  * Ordering invariant (hazard H1):
  *   - The launcher creates the fifo BEFORE spawning Pi.
  *   - Pi's first stdout event is `session_start` which the extension turns
- *     into ready.json under ~/.panopticon/agents/<agentId>/.
+ *     into ready.json under $PANOPTICON_HOME/agents/<agentId>/.
  *   - Adapter MUST wait for ready.json before opening the writer side of
  *     the fifo. Opening for write before a reader exists would block
  *     indefinitely (or, with O_NONBLOCK, fail fast with ENXIO). We use
@@ -30,11 +30,11 @@
  */
 
 import { existsSync, mkdirSync, openSync, writeSync, closeSync, unlinkSync, constants as fsConstants } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Data, Effect } from 'effect'
+import { getPanopticonHome } from '../paths.js'
 
 const execAsync = promisify(exec)
 
@@ -52,8 +52,9 @@ export class PiNotReady extends Error {
   }
 }
 
-export function piFifoPaths(agentId: string, home: string = homedir()): PiFifoPaths {
-  const agentDir = join(home, '.panopticon', 'agents', agentId)
+export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
+  const panopticonHome = home === undefined ? getPanopticonHome() : join(home, '.panopticon')
+  const agentDir = join(panopticonHome, 'agents', agentId)
   return {
     agentDir,
     readyPath: join(agentDir, 'ready.json'),

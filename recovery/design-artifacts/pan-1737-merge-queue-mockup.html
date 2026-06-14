@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<title>PAN-1737 — UAT batch trains mockup (v3)</title>
+<style>
+  :root {
+    --background: #080b10;
+    --foreground: #e5e7eb;
+    --card: #0c1018;
+    --muted-foreground: #9ca3af;
+    --border: rgba(255,255,255,0.06);
+    --accent: rgba(255,255,255,0.08);
+    --primary: #7c86ff;
+    --emerald: #34d399;
+    --emerald-dim: rgba(52,211,153,0.35);
+    --emerald-bg: rgba(52,211,153,0.04);
+    --amber: #fbbf24;
+    --violet: #a78bfa;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #04060a;
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 28px;
+  }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .sub { color: var(--muted-foreground); font-size: 13px; margin-bottom: 24px; max-width: 1080px; line-height: 1.55; }
+  .sub b { color: var(--foreground); }
+  .panels { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .panel-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-foreground); margin-bottom: 8px; }
+  .panel-note { font-size: 11.5px; color: var(--muted-foreground); margin-top: 10px; max-width: 390px; line-height: 1.5; }
+  .panel-note b { color: var(--foreground); }
+
+  .rail {
+    width: 390px;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .chead {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 10px 16px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .chead .left { display: flex; align-items: center; gap: 8px; }
+  .chead .count { font-size: 10px; color: var(--muted-foreground); }
+  .chev { color: var(--muted-foreground); font-size: 10px; }
+  .gitmerge { color: var(--emerald); font-size: 13px; }
+  .cbody { padding: 0 12px 12px; }
+
+  .intro { font-size: 11px; color: var(--muted-foreground); padding: 2px 4px 8px; line-height: 1.45; }
+  .intro b { color: var(--foreground); font-weight: 600; }
+
+  .zone-h {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted-foreground);
+    margin: 12px 0 6px;
+  }
+  .zone-h::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+
+  /* ── Feature rows ── */
+  .row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    column-gap: 8px; row-gap: 1px;
+    padding: 5px 2px;
+    font-size: 11.5px;
+    border-top: 1px solid var(--border);
+  }
+  .row:first-of-type { border-top: none; }
+  .row .ord { color: var(--muted-foreground); font-size: 10.5px; font-weight: 700; padding-top: 1px; }
+  .row .id { font-family: ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 600; color: var(--primary); cursor: pointer; }
+  .row .id:hover { text-decoration: underline; }
+  .row .title { grid-column: 2 / 4; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+  .row .meta { grid-column: 2 / 4; display: flex; align-items: center; gap: 10px; margin-top: 2px; flex-wrap: wrap; }
+  .row .br { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--muted-foreground); background: var(--accent); border-radius: 4px; padding: 1px 5px; }
+  .row a.pr { font-size: 10px; color: var(--primary); text-decoration: none; font-weight: 600; }
+  .row a.pr:hover { text-decoration: underline; }
+  .chip { font-size: 9.5px; font-weight: 700; border-radius: 4px; padding: 1.5px 6px; cursor: help; grid-row: 1; grid-column: 3; align-self: start; }
+  .chip.resolved { background: rgba(52,211,153,.1); color: var(--emerald); }
+  .chip.heldout { background: rgba(251,191,36,.1); color: var(--amber); }
+
+  /* ── Batch (generation) cards ── */
+  .batch {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 10px;
+    margin-bottom: 7px;
+  }
+  .batch.ready { border-color: var(--emerald-dim); background: var(--emerald-bg); }
+  .batch.assembling { border-color: rgba(167,139,250,.4); background: rgba(167,139,250,.05); }
+  .batch.superseded { opacity: .72; }
+  .batch .bhead { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .batch .bhead .dot { font-size: 9px; }
+  .batch.ready .dot { color: var(--emerald); }
+  .batch.assembling .dot { color: var(--violet); }
+  .batch.superseded .dot { color: var(--muted-foreground); }
+  .batch .name { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; font-weight: 700; }
+  .batch.ready .name { color: var(--emerald); }
+  .batch.assembling .name { color: var(--violet); }
+  .batch .bstatus { font-size: 10px; color: var(--muted-foreground); margin-left: auto; }
+  .batch .contents { font-size: 10.5px; color: var(--muted-foreground); line-height: 1.5; margin-bottom: 6px; }
+  .batch .contents .id { color: var(--primary); font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+  .batch .note { font-size: 10px; color: var(--muted-foreground); line-height: 1.45; margin-bottom: 6px; }
+  .batch .note b { color: var(--foreground); }
+  .batch .actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .agentline { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--violet); margin-bottom: 6px; }
+  .spinner { display: inline-block; width: 9px; height: 9px; border: 1.5px solid rgba(167,139,250,.3); border-top-color: var(--violet); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  button { font-family: inherit; cursor: pointer; }
+  .btn-open {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--emerald-dim); background: transparent; color: var(--emerald);
+    font-size: 10.5px; font-weight: 600; border-radius: 6px; padding: 3.5px 10px;
+    text-decoration: none;
+  }
+  .btn-open:hover { background: rgba(52,211,153,.1); }
+  .btn-promote {
+    background: var(--emerald); color: #022c22; border: none;
+    font-size: 10.5px; font-weight: 700; border-radius: 6px; padding: 4.5px 11px;
+  }
+  .btn-promote:hover { filter: brightness(1.1); }
+  .btn-quiet { background: transparent; border: 1px solid var(--border); color: var(--muted-foreground); font-size: 10px; border-radius: 6px; padding: 3.5px 9px; }
+  .btn-quiet:hover { background: var(--accent); color: var(--foreground); }
+  .hint { font-size: 9.5px; color: var(--muted-foreground); line-height: 1.4; }
+
+  /* ── What to UAT ── */
+  .uat { border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 10px; }
+  .uat .head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 5px; }
+  .uat .src { font-size: 9.5px; color: var(--muted-foreground); font-weight: 400; }
+  .uat .grp { font-size: 10.5px; font-weight: 700; margin-top: 4px; }
+  .uat .grp .id { color: var(--primary); font-family: ui-monospace, Menlo, monospace; }
+  .uat ul { list-style: none; margin: 2px 0 6px; }
+  .uat li { display: flex; gap: 7px; font-size: 11px; color: var(--foreground); padding: 2px 0; line-height: 1.45; }
+  .uat li::before { content: "☐"; color: var(--muted-foreground); }
+
+  /* ── Escape hatch controls ── */
+  .controls { border-top: 1px dashed var(--border); margin-top: 12px; padding-top: 10px; }
+  .controls .line { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted-foreground); }
+  .controls .hint { margin-top: 6px; }
+
+  /* ── Confirm dialog ── */
+  .dialog-stage { position: relative; width: 390px; }
+  .dim { position: absolute; inset: 0; background: rgba(0,0,0,.55); border-radius: 8px; z-index: 2; }
+  .dialog {
+    position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+    width: 345px; z-index: 3;
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6);
+  }
+  .dialog h3 { font-size: 13.5px; margin-bottom: 8px; }
+  .dialog h3 .name { font-family: ui-monospace, Menlo, monospace; color: var(--emerald); }
+  .dialog p { font-size: 11.5px; color: var(--muted-foreground); line-height: 1.5; margin-bottom: 8px; }
+  .dialog p b { color: var(--foreground); }
+  .dialog ol { margin: 0 0 8px 18px; font-size: 11.5px; line-height: 1.7; }
+  .dialog ol .id { color: var(--primary); font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+  .dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--foreground); font-size: 11px; border-radius: 6px; padding: 5px 12px; }
+  .btn-ghost:hover { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>PAN-1737 v3 — UAT batch trains: always one batch ready, generations build forever</h1>
+<p class="sub">
+  The model: every feature that passes review joins the queue. An <b>assembly agent</b> builds UAT batches —
+  throwaway branches off main containing <b>as many ready features as possible, in merge order, with cross-feature
+  conflicts resolved inside the batch</b>. When a new feature becomes ready, the <b>next generation</b>
+  (<span style="font-family:ui-monospace,monospace">brass-donkey</span> ⊃ <span style="font-family:ui-monospace,monospace">sea-monkey</span>)
+  assembles in the background while the current one stays fully testable — testing is never put on hold.
+  Generations accumulate; you can UAT an older batch if the newest isn't what you want.
+  <b>Merging = promoting the batch you tested</b> — main gets exactly the tree you exercised, conflict resolutions included.
+  Merging a single feature out-of-band still works, but it invalidates the live batches and reassembly starts automatically.
+</p>
+
+<div class="panels">
+
+  <!-- ════════ PANEL 1: steady state ════════ -->
+  <div>
+    <div class="panel-label">① Steady state — newest batch ready, older one still available</div>
+    <div class="rail">
+      <div class="chead">
+        <span class="left"><span class="chev">▼</span><span class="gitmerge">⎇</span> UAT BATCHES</span>
+        <span class="count">3 features · 2 batches</span>
+      </div>
+      <div class="cbody">
+
+        <div class="intro">
+          <b>3 features</b> passed review &amp; tests. They're assembled into the test batches below —
+          open a batch's frontend, run its checklist, then merge that batch to main.
+        </div>
+
+        <div class="zone-h">Batches — newest first</div>
+
+        <div class="batch ready">
+          <div class="bhead">
+            <span class="dot">●</span>
+            <span class="name">uat/brass-donkey-0610</span>
+            <span class="bstatus">ready · built 6 min ago</span>
+          </div>
+          <div class="contents">
+            <span class="id">PAN-1704</span> + <span class="id">PAN-1712</span> + <span class="id">PAN-1686</span>
+            &nbsp;·&nbsp; 1 conflict (<span class="id">PAN-1686</span> ↔ <span class="id">PAN-1704</span>) resolved by the assembly agent
+          </div>
+          <div class="actions">
+            <a class="btn-open" href="#">▶ Open UAT frontend</a>
+            <button class="btn-promote">Merge batch (3) to main</button>
+            <button class="btn-quiet" title="Discard and reassemble this generation from scratch">↻</button>
+          </div>
+        </div>
+
+        <div class="batch superseded">
+          <div class="bhead">
+            <span class="dot">○</span>
+            <span class="name">uat/sea-monkey-0610</span>
+            <span class="bstatus">superseded · still testable</span>
+          </div>
+          <div class="contents"><span class="id">PAN-1704</span> + <span class="id">PAN-1712</span></div>
+          <div class="actions">
+            <a class="btn-open" href="#">▶ Open</a>
+            <button class="btn-promote" style="opacity:.85">Merge batch (2) to main</button>
+          </div>
+        </div>
+
+        <div class="zone-h">What to UAT — brass-donkey</div>
+        <div class="uat">
+          <div class="head"><span>3 features on this batch</span><span class="src">from each issue's plan</span></div>
+          <div class="grp"><span class="id">PAN-1704</span> · Loading-wedge fix</div>
+          <ul>
+            <li>Click any issue card — inspector opens in &lt;1s, no “Loading…” wedge.</li>
+          </ul>
+          <div class="grp"><span class="id">PAN-1712</span> · conv transcript paths</div>
+          <ul>
+            <li>Open a conversation from the palette — transcript loads, no “session not found”.</li>
+          </ul>
+          <div class="grp"><span class="id">PAN-1686</span> · UAT plan on cards <span class="chip resolved" style="margin-left:4px">conflict resolved — verify both</span></div>
+          <ul>
+            <li>Awaiting-Merge card shows a “UAT plan” section with test steps.</li>
+            <li>Because this overlapped PAN-1704's files: re-check the inspector still opens instantly.</li>
+          </ul>
+        </div>
+
+        <div class="zone-h">Ready features (merge order)</div>
+        <div class="row">
+          <span class="ord">1</span><span class="id">PAN-1704</span>
+          <span class="title">Fix Loading-wedge on issue card click</span>
+          <span class="meta"><span class="br">feature/pan-1704</span><a class="pr" href="#">PR #1745 ↗</a></span>
+        </div>
+        <div class="row">
+          <span class="ord">2</span><span class="id">PAN-1712</span>
+          <span class="title">conv JSONL: transcript path resolution</span>
+          <span class="meta"><span class="br">feature/pan-1712</span><a class="pr" href="#">PR #1747 ↗</a></span>
+        </div>
+        <div class="row">
+          <span class="ord">3</span><span class="id">PAN-1686</span>
+          <span class="title">UAT test plan on Awaiting Merge cards</span>
+          <span class="chip resolved" title="Edits files PAN-1704 also edits; the assembly agent resolved the overlap inside brass-donkey">✓ resolved in batch</span>
+          <span class="meta"><span class="br">feature/pan-1686</span><a class="pr" href="#">PR #1740 ↗</a></span>
+        </div>
+
+        <div class="controls">
+          <div class="line">
+            <span>Escape hatch:</span>
+            <button class="btn-quiet">Merge one feature to main…</button>
+          </div>
+          <div class="hint">Merging a single feature invalidates the live batches — a fresh generation reassembles automatically. Prefer merging a tested batch.</div>
+        </div>
+
+      </div>
+    </div>
+    <p class="panel-note">
+      <b>Key inversions vs today:</b> conflicts no longer exclude a feature from the bundle — the assembly agent resolves them
+      <i>inside</i> the batch and the checklist tells you to verify the touchpoint · batches are the primary object, the queue is
+      reference info · the primary merge action is <b>promote the batch you tested</b>.
+    </p>
+  </div>
+
+  <!-- ════════ PANEL 2: assembling + held-out ════════ -->
+  <div>
+    <div class="panel-label">② PAN-1629 just became ready — next generation assembling</div>
+    <div class="rail">
+      <div class="chead">
+        <span class="left"><span class="chev">▼</span><span class="gitmerge">⎇</span> UAT BATCHES</span>
+        <span class="count">4 features · 2 batches +1 building</span>
+      </div>
+      <div class="cbody">
+
+        <div class="intro"><b>4 features</b> ready. A new batch including <b>PAN-1629</b> is assembling — the current batch stays testable until it's replaced.</div>
+
+        <div class="zone-h">Batches — newest first</div>
+
+        <div class="batch assembling">
+          <div class="bhead">
+            <span class="dot">◌</span>
+            <span class="name">uat/copper-fox-0610</span>
+            <span class="bstatus">assembling…</span>
+          </div>
+          <div class="contents"><span class="id">PAN-1704</span> + <span class="id">PAN-1712</span> + <span class="id">PAN-1686</span> + <span class="id">PAN-1629</span></div>
+          <div class="agentline"><span class="spinner"></span> assembly agent resolving conflict: <b>PAN-1629 ↔ PAN-1686</b> (3 files)</div>
+          <div class="note">Will replace brass-donkey when ready. If the conflict can't be resolved confidently, <b>PAN-1629 is held out</b> and copper-fox ships without it.</div>
+        </div>
+
+        <div class="batch ready">
+          <div class="bhead">
+            <span class="dot">●</span>
+            <span class="name">uat/brass-donkey-0610</span>
+            <span class="bstatus">ready · current</span>
+          </div>
+          <div class="contents"><span class="id">PAN-1704</span> + <span class="id">PAN-1712</span> + <span class="id">PAN-1686</span></div>
+          <div class="actions">
+            <a class="btn-open" href="#">▶ Open UAT frontend</a>
+            <button class="btn-promote">Merge batch (3) to main</button>
+          </div>
+        </div>
+
+        <div class="zone-h">Ready features (merge order)</div>
+        <div class="row">
+          <span class="ord">4</span><span class="id">PAN-1629</span>
+          <span class="title">Workspace stack health surfaces</span>
+          <span class="chip heldout" title="Conflicts with PAN-1686 — the assembly agent is attempting resolution; if it fails, this feature waits for the next generation">⏳ resolving…</span>
+          <span class="meta"><span class="br">feature/pan-1629</span><a class="pr" href="#">PR #1733 ↗</a></span>
+        </div>
+        <div class="row" style="opacity:.6">
+          <span class="ord"></span><span class="title" style="grid-column: 2/4">…rows 1-3 as in panel ①…</span>
+        </div>
+
+      </div>
+    </div>
+    <p class="panel-note">
+      <b>Never on hold:</b> brass-donkey keeps its frontend and merge button the whole time copper-fox assembles.
+      If assembly hits an unresolvable conflict, the feature is <b>held out with a visible reason</b> — the batch ships without it
+      rather than blocking everything.
+    </p>
+  </div>
+
+  <!-- ════════ PANEL 3: promote confirm ════════ -->
+  <div>
+    <div class="panel-label">③ After clicking “Merge batch (3) to main”</div>
+    <div class="dialog-stage">
+      <div class="rail" style="filter: blur(.4px);">
+        <div class="chead">
+          <span class="left"><span class="chev">▼</span><span class="gitmerge">⎇</span> UAT BATCHES</span>
+          <span class="count">3 features · 2 batches</span>
+        </div>
+        <div class="cbody" style="height: 400px;"></div>
+      </div>
+      <div class="dim"></div>
+      <div class="dialog">
+        <h3>Merge batch <span class="name">brass-donkey</span> to main?</h3>
+        <p>Lands <b>exactly the tree you tested</b> — 3 features plus the conflict resolution between PAN-1686 and PAN-1704:</p>
+        <ol>
+          <li><span class="id">PAN-1704</span> Loading-wedge fix</li>
+          <li><span class="id">PAN-1712</span> conv transcript paths</li>
+          <li><span class="id">PAN-1686</span> UAT plan on cards</li>
+        </ol>
+        <p>One merge to main. The three issues close out through the normal post-merge flow, and remaining ready features reassemble into a fresh batch.</p>
+        <div class="actions">
+          <button class="btn-ghost">Cancel</button>
+          <button class="btn-promote">Merge batch to main</button>
+        </div>
+      </div>
+    </div>
+    <p class="panel-note">
+      Promoting the batch is <b>the</b> merge — no per-feature re-merge, no redoing conflict resolutions you already validated.
+      Promoting an <i>older</i> generation (e.g. sea-monkey) works the same; features it didn't contain go into the next assembly.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>

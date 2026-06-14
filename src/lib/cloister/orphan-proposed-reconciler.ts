@@ -16,6 +16,7 @@ import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
 const execAsync = promisify(exec);
 const attemptCooldowns = new Map<string, number>();
+const terminalClosedIssueIds = new Set<string>();
 let scanInFlight = false;
 
 export interface OrphanProposedReconcilerConfig {
@@ -198,6 +199,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
         logReconcilerDiagnostic('candidate-excluded', { issueId, reason: 'review-pipeline-presence' });
         continue;
       }
+      if (terminalClosedIssueIds.has(issueId)) continue;
       if (await isIssueClosed(issueId, options.closedIssueIds)) continue;
 
       const planItems = Array.isArray(spec.plan.items) ? spec.plan.items : [];
@@ -232,6 +234,7 @@ function classifySpawnSkip(status: number, body: Record<string, unknown>): strin
   if (body['troubled'] === true) return 'troubled';
   if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';
   if (body['providerHealth']) return 'provider-down';
+  if (status === 422 && /already closed|closed issue|cannot start an agent for a closed issue/i.test(error)) return 'closed-issue';
   return 'spawn-failed';
 }
 
@@ -360,6 +363,12 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
           actions.push(`Spawned work agent for orphan proposed spec ${candidate.issueId}`);
         } else {
           const reason = spawn.skippedReason ?? 'spawn-failed';
+          if (reason === 'closed-issue') {
+            terminalClosedIssueIds.add(candidate.issueId);
+            logReconcilerDiagnostic('spawn-skipped', { ...candidate, reason, error: spawn.error });
+            actions.push(`Skipped orphan proposed spec ${candidate.issueId}: ${reason}`);
+            continue;
+          }
           emitReconcilerActivity(
             'warn',
             `Couldn't start work agent for ${candidate.issueId}: ${reason}`,
@@ -388,6 +397,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
 
 export function clearOrphanProposedAttemptCooldowns(): void {
   attemptCooldowns.clear();
+  terminalClosedIssueIds.clear();
   clearIssueClosedCache();
   scanInFlight = false;
 }

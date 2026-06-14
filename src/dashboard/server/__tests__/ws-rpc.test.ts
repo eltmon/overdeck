@@ -1,7 +1,31 @@
-import { describe, expect, it } from 'vitest';
-import { buildEnrichSessionsJobPayload, filterDomainEventForIssue } from '../ws-rpc.js';
+import { describe, expect, it, vi } from 'vitest';
+import { Effect, Stream } from 'effect';
+import { buildEnrichSessionsJobPayload, conversationDiscoveringStream, filterDomainEventForIssue } from '../ws-rpc.js';
 import type { DomainEvent } from '@panctl/contracts';
 import type { RuntimeConversationsConfig } from '../../../lib/config-yaml.js';
+
+describe('conversationDiscoveringStream', () => {
+  it('keeps discovering subscriptions alive on a fixed cadence', async () => {
+    vi.useFakeTimers();
+    try {
+      const eventsPromise = Effect.runPromise(
+        conversationDiscoveringStream().pipe(
+          Stream.take(2),
+          Stream.runCollect,
+        ),
+      );
+
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(Array.from(await eventsPromise)).toEqual([
+        { kind: 'discovering' },
+        { kind: 'discovering' },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
 
 describe('ws-rpc enrichSessions payload', () => {
   it('forwards fullTranscript to the dashboard DB worker payload', () => {

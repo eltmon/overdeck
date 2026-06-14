@@ -48,8 +48,6 @@ export interface StuckRemediationConfig {
 export interface MonitoringConfig {
   check_interval: number; // seconds between health checks
   heartbeat_sources: ('jsonl_mtime' | 'tmux_activity' | 'git_activity' | 'active_heartbeat')[];
-  /** Patrol cycles between stash janitor sweeps. Default: hourly based on patrol cadence. */
-  stash_janitor_every_cycles?: number;
 }
 
 /**
@@ -71,6 +69,12 @@ export interface ConcurrencyConfig {
    * ceiling for any auto-dispatch is `max_work_agents + reserved_advancing_slots`.
    */
   reserved_advancing_slots: number;
+  /**
+   * When true, operator-started work agents (no flywheelRunId) are exempt from
+   * the emergency brake/governor reaping so the operator's deliberate spawns are
+   * not trimmed to satisfy the cap. Defaults to true (PAN-1812).
+   */
+  exempt_operator_started?: boolean;
 }
 
 /**
@@ -150,9 +154,9 @@ export interface ModelSelectionConfig {
     uat_agent?: 'opus' | 'sonnet' | 'haiku';
   };
   /**
-   * PAN-636 — per-role coding-agent harness override. Defaults to
-   * 'claude-code' for every role when unset. Absent keys are normal
-   * (forward compat with config files written before harness existed).
+   * PAN-636 legacy coding-agent harness override. PAN-1787 treats this as a
+   * deprecated alias for roles.<role>.harness; roles.<role>.harness wins when
+   * both are set. Absent keys are normal for older config files.
    */
   specialist_harnesses?: {
     merge_agent?: 'claude-code' | 'pi';
@@ -304,6 +308,7 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   concurrency: {
     max_work_agents: 6,
     reserved_advancing_slots: 3,
+    exempt_operator_started: true,
   },
   notifications: {
     slack_webhook: undefined,
@@ -345,9 +350,9 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       // Resolution falls through to role model config, then to the global fallback model.
     },
     specialist_harnesses: {
-      // PAN-636: every role defaults to 'claude-code' when not overridden in
-      // config.yaml. Reads through ModelRouter.getSpecialistHarness which
-      // returns 'claude-code' for missing keys.
+      // PAN-1787/PAN-1842: removed. Harness resolution for all spawn paths
+      // now flows through resolveHarness(), which consults explicit, role,
+      // providerHarnesses, and built-in provider defaults in order.
     },
   },
   handoffs: {
@@ -436,23 +441,6 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
   return result;
 }
 
-function applyEnvironmentOverrides(config: CloisterConfig): CloisterConfig {
-  const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
-  if (stashJanitorEnv === undefined) return config;
-
-  const parsed = Number.parseInt(stashJanitorEnv, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) return config;
-
-  return {
-    ...config,
-    monitoring: {
-      ...config.monitoring,
-      stash_janitor_every_cycles: parsed,
-    },
-  };
-}
-
-
 /**
  * Load Cloister configuration
  *
@@ -484,7 +472,7 @@ export function loadCloisterConfigSync(): CloisterConfig {
     }
   }
 
-  return applyEnvironmentOverrides(config);
+  return config;
 }
 
 
@@ -591,20 +579,6 @@ export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | Co
           console.error('Using default configuration');
           config = DEFAULT_CLOISTER_CONFIG;
         }
-      }
-    }
-
-    const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
-    if (stashJanitorEnv !== undefined) {
-      const parsedEnv = Number.parseInt(stashJanitorEnv, 10);
-      if (Number.isFinite(parsedEnv) && parsedEnv >= 0) {
-        config = {
-          ...config,
-          monitoring: {
-            ...config.monitoring,
-            stash_janitor_every_cycles: parsedEnv,
-          },
-        };
       }
     }
 
