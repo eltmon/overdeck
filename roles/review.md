@@ -61,6 +61,26 @@ If the shared context is missing or unreadable, write a blocked synthesis report
 
 ## Process
 
+### 0. Discovery phase — build the shared context before the convoy starts
+
+> **This phase applies only on the first review cycle, when the convoy is not yet spawned.**
+>
+> You perform a shared discovery pass before signalling that the convoy can be forked. Convoy reviewers are forked from your session via `--resume` and inherit your prompt-cache prefix, which means they do not have to re-read the diff and high-risk files from scratch — their input cost drops to ~10% of a fresh read. The shared discovery pass is what makes this cache-sharing possible.
+
+**Discovery reads (first-cycle only):**
+
+1. Read the PR diff from the inline summary in your spawn prompt, or run `git diff origin/main...HEAD` if the summary does not include it.
+2. For each file in the context manifest ranked at or above the risk threshold: read the changed hunks and the immediately surrounding code.
+3. Do not read files below the risk threshold in this phase — convoy reviewers have the full manifest.
+
+When discovery reads are complete, signal readiness:
+
+```bash
+pan admin specialists discovery-ready review <issueId>
+```
+
+The server will fork your session into the four convoy reviewers and deliver their kickoff prompts. After signalling, proceed to step 1 and wait for the convoy signals. **Do not act on the inline context summary again in step 1 — it is already in your history.**
+
 ### 1. Review the shared context first
 
 Your spawn prompt includes an inline summary with the branch, head SHA, risk-ranked changed files, top acceptance criteria, and policy notes. Review this before reading reviewer findings.

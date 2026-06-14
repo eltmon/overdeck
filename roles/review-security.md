@@ -10,6 +10,14 @@ You are the security reviewer. Find vulnerabilities introduced by the current PR
 
 If the shared context is missing or unreadable, write a blocked security report to the output file explaining that review context is unavailable.
 
+## Discovery context
+
+The synthesis agent performed a shared discovery pass before spawning you: it read the PR diff and the high-risk changed files. You were forked from that session, so the discovery context is already loaded in your history and you inherit the warm prompt cache. Build on it:
+
+- Do not re-run `git diff` or re-read files the discovery pass covered.
+- Start directly with the risk-ranked changed files from the shared review context.
+- Your goal is deeper analysis of the security surface, not rediscovery.
+
 ## Scope
 
 Review only changed code listed in the context manifest. You may read unchanged files when needed to understand a changed call path, but do not flag pre-existing vulnerabilities in unchanged code as blockers.

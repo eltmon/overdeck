@@ -604,6 +604,30 @@ describe('template/output contract', () => {
         expect(content).not.toMatch(/exit Claude Code cleanly/i);
         expect(content).toMatch(/launcher .* signals the synthesis agent/i);
       });
+
+      it(`${role}: contains 'context already loaded' framing for cache-sharing convoy (PAN-1862)`, () => {
+        const content = readTemplate(role);
+        expect(content).toContain('discovery context is already loaded');
+        expect(content).toMatch(/do not re-run.*git diff/i);
+      });
+    }
+  });
+
+  describe('assembled convoy prompt contains discovery framing for all sub-roles (PAN-1862)', () => {
+    for (const role of reviewerSubRoles) {
+      it(`${role}: assembled prompt contains 'context already loaded' framing`, async () => {
+        const prompt = await Effect.runPromise(buildConvoyPrompt({
+          issueId: 'PAN-1862',
+          subRole: role,
+          outputPath: `/tmp/pan-test/.pan/review/run-1/${role}.md`,
+          synthesisAgentId: 'agent-pan-1862-review',
+          contextManifestPath: '/tmp/pan-test/.pan/review/run-1/context.json',
+          tier1Summary: 'summary of changes',
+        }));
+
+        expect(prompt).toContain('discovery context is already loaded');
+        expect(prompt).toMatch(/do not re-run.*git diff/i);
+      });
     }
   });
 });
