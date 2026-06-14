@@ -158,7 +158,6 @@ import {
   generateSummaryForFork,
   generateFallbackSummary,
   reserveSummaryForkSession,
-  copySessionFromCompactBoundary,
   requestHandoffFromAgent,
   authorHandoffExternal,
   handoffPreconditionFallbackReason,
@@ -168,6 +167,7 @@ import {
   type SummaryForkMode,
   type HandoffAuthor,
 } from '../../../lib/conversations/summary-fork.js';
+import { forkSession } from '../../../lib/conversations/fork-session.js';
 import { getTranscriptAdapter } from '../../../lib/conversations/transcript-adapter.js';
 import {
   CONVERSATION_TITLE_MODEL,
@@ -3919,9 +3919,13 @@ export async function runForkPipeline(
       // session file, then spawn with --resume so Claude Code loads the history
       // directly. A tmux keep-alive corpse is not reusable; ensureForkSessionReady()
       // will recreate it, so refresh the session file before respawning.
-      const forkSessionFile = await resolveSessionFile(conv);
-      if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-      await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+      if (!conv.claudeSessionId) throw new Error(`Fork conversation ${convName} has no session file`);
+      await forkSession({
+        sourceSessionFile: parentSessionFile,
+        destCwd: conv.cwd,
+        destSessionId: conv.claudeSessionId,
+        fullHistory: false,
+      });
     }
 
     updateForkStatus(convName, 'spawning');

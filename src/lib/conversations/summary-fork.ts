@@ -600,7 +600,7 @@ async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number>
  * This prevents API errors when resuming a session cross-model/provider,
  * since thinking block signatures are bound to the original API request.
  */
-function sanitizeEntryForPlainFork(entry: any): any {
+export function sanitizeEntryForPlainFork(entry: any): any {
   if (entry.type !== 'assistant' || !entry.message || !Array.isArray(entry.message.content)) {
     return entry;
   }
