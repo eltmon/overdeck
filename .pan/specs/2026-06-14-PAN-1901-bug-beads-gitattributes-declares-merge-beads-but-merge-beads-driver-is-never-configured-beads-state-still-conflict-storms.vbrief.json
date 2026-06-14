@@ -1,0 +1,168 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-14T22:15:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1901: replace the inert `.beads/issues.jsonl merge=beads` attribute with the built-in `union` driver so beads state merges conflict-free with zero git config",
+    "updated": "2026-06-14T22:05:12.522Z"
+  },
+  "plan": {
+    "id": "pan-1901",
+    "title": "bug(beads): .gitattributes declares 'merge=beads' but merge.beads.driver is never configured — .beads state still conflict-storms",
+    "status": "proposed",
+    "uid": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-14T22:15:00.000Z",
+    "updated": "2026-06-14T22:05:12.522Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1901",
+        "label": "PAN-1901",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "beads",
+      "git",
+      "state-merge",
+      "gitattributes",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "`.gitattributes` declares `.beads/issues.jsonl merge=beads`, but `merge.beads.driver` is never configured anywhere (verified unset on both this workspace and the primary main repo; no code/script/bd subcommand sets it — `bd merge` does not exist). Git ignores the inert attribute and falls back to the default conflict merge, so `.beads/issues.jsonl` conflict-storms on essentially every divergent merge/rebase (e.g. Flywheel RUN-35 tick-12 `git merge origin/main` had to be hand-resolved). Accuracy note: the `merge=beads` line predates PAN-1841 (beads-init commit 7e3d6f68d8); PAN-1841's real fix (e236b02ffa) is the code-level resolveMainPreferredSyncConflicts in merge-agent.ts, scoped to the sync-main path only — which is why other merge paths still conflict.",
+      "Proposal": "Replace the inert attribute with the git BUILT-IN `union` driver, which needs no `.git/config` and therefore cannot go inert on any clone, worktree, or CI checkout — the fix ships in the committed `.gitattributes` and protects EVERY merge/rebase path (Flywheel raw merge, sync-main, UAT assembly, verification, feature-branch rebase), unlike the sync-main-only code resolver. `union` keeps both sides' JSONL lines; `bd` reconciles duplicate IDs on load. Verified empirically this session: divergent appends merge clean under union, conflict under the default driver. Add a focused test that proves the union merge and mechanically guards the tight `.gitattributes` invariant.",
+      "NonGoals": "- Does NOT wire `merge.beads.driver` or any custom git merge driver (bd has none; config-based drivers reproduce the inert bug this issue reports).\n- Does NOT add a content-merge driver to single-JSON `.pan/specs/*.vbrief.json` or `.pan/continues/*.vbrief.json` (union corrupts single JSON; an ours/theirs driver cannot express 'main-preferred' because ours/theirs flip between merge-into-branch and rebase). Their conflict handling stays with resolveMainPreferredSyncConflicts + PAN-1124 immutability.\n- Does NOT make '.pan state fully safe': single-JSON `.pan` files remain unprotected in non-sync-main merge paths (Flywheel raw merge, uat-assemble-deps.ts:48, verification-runner.ts:92), and the PAN-1124 immutability this leans on is itself violated today (PAN-1728). This issue fixes ONLY the beads half. See PAN-1728, PAN-1650, PAN-1758, PAN-1770.\n- Does NOT change readyForMerge / rebase-reset behavior (PAN-1650/PAN-1758).\n- Does NOT modify or remove the existing resolveMainPreferredSyncConflicts sync-main resolver.\n- Does NOT add a `pan doctor` check (the test guard is cheaper and stays in scope)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use the built-in `union` driver for `.beads/issues.jsonl` rather than wiring `merge.beads.driver` to a real driver.",
+        "rationale": "bd exposes no merge driver (`bd merge` does not exist; only merge-slot/duplicates), and ANY `merge.<x>.driver` config is the exact inert-fix failure mode PAN-1901 reports (verified unset on the primary repo). `union` is built-in, needs no config, and so can never go inert."
+      },
+      {
+        "summary": "Do NOT add a content-merge driver for single-JSON `.pan/specs`/`.pan/continues` `*.vbrief.json` files.",
+        "rationale": "union corrupts single JSON objects, and an ours/theirs driver cannot express 'main-preferred' because ours/theirs flip between `git merge origin/main` (ours=branch) and rebase (ours=main). Their conflicts stay with resolveMainPreferredSyncConflicts (sync-main) + PAN-1124 immutability."
+      },
+      {
+        "summary": "Scope PAN-1901 to the beads half only; defer the single-JSON half in non-sync-main paths.",
+        "rationale": "The observed pain (tick-12) is `.beads/issues.jsonl`; single-JSON corruption is theoretical and structurally bounded. The broader 'safe .pan state' work is tracked by PAN-1728/PAN-1650/PAN-1758/PAN-1770."
+      },
+      {
+        "summary": "Guard the fix with a focused test, not a `pan doctor` check, and assert the tight invariant.",
+        "rationale": "A test is cheaper and stays in scope; asserting 'only beads->union, no content driver on any *.vbrief.json path' mechanically blocks both regression classes per the repo's enforce-mechanically rule (advisor-confirmed)."
+      },
+      {
+        "summary": "Do not bootstrap or expand `.pan/context/codebase/`.",
+        "rationale": "The four context files already exist and are current (last-verified 2026-06-12/13); a one-line `.gitattributes` change plus a test needs no architecture-doc delta."
+      }
+    ],
+    "items": [
+      {
+        "id": "gitattributes-union",
+        "title": "Switch `.beads/issues.jsonl` from the inert `merge=beads` to the built-in `merge=union` driver",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T22:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1901",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit the repo-root `.gitattributes`: change the line `.beads/issues.jsonl merge=beads` to `.beads/issues.jsonl merge=union`, and update the surrounding comments to (a) explain `union` is a git built-in driver that needs no `merge.<name>.driver` config (so it can never go inert like `merge=beads`) and that `bd` reconciles duplicate IDs on load, and (b) warn that the single-JSON `.pan/specs/*.vbrief.json` and `.pan/continues/*.vbrief.json` files must NOT receive a content-merge driver (union would interleave hunks into invalid JSON). Do not attribute any other path. See the before/after block in .pan/drafts/PAN-1901.md."
+        },
+        "items": [
+          {
+            "id": "gitattributes-union.ac1",
+            "title": "`git check-attr merge -- .beads/issues.jsonl` returns `merge: union` (the built-in union driver now applies to the beads JSONL file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-union.ac2",
+            "title": "`grep -c 'merge=beads' .gitattributes` returns 0 — the inert custom-driver attribute no longer exists in the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-union.ac3",
+            "title": "`git check-attr merge` returns `merge: unspecified` for `.pan/specs/x.vbrief.json` and `.pan/continues/x.vbrief.json` — no content-merge driver is applied to single-JSON state files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitattributes-merge-tests",
+        "title": "Add tests proving union merges divergent `.beads/issues.jsonl` clean and guarding the tight `.gitattributes` invariant",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T22:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1901",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `src/lib/pan-dir/__tests__/gitattributes-merge.test.ts` (Vitest), mirroring the temp-git-repo scaffolding in `src/lib/pan-dir/__tests__/auto-commit.test.ts`. Each test creates an isolated temp git repo (never the live workspace). No fake timers needed (git operations, not delays)."
+        },
+        "items": [
+          {
+            "id": "gitattributes-merge-tests.ac1",
+            "title": "A test creates a temp repo with `.beads/issues.jsonl merge=union`, appends a different line on two branches, runs `git merge`, and asserts the merge exits 0, the file contains no `<<<<<<<` conflict marker, and both sides' unique lines are present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-merge-tests.ac2",
+            "title": "A control test runs the identical divergent-append scenario WITHOUT the union attribute and asserts the merge produces a `<<<<<<<` conflict marker — proving union is load-bearing, not incidental",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-merge-tests.ac3",
+            "title": "A test reads the repo's real `.gitattributes` and fails if any `merge=` attribute names a non-built-in driver (e.g. re-introduced `merge=beads`) OR if any `*.vbrief.json`, `.pan/specs/`, or `.pan/continues/` path carries a content-merge driver",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gitattributes-union",
+        "to": "gitattributes-merge-tests",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-14-PAN-1901-bug-beads-gitattributes-declares-merge-beads-but-merge-beads-driver-is-never-configured-beads-state-still-conflict-storms.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
