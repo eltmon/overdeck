@@ -165,6 +165,7 @@ import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-r
 import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
 import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
+import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact } from './test-verdict.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
@@ -4938,6 +4939,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const closedIssueAgentActions = await reconcileClosedIssueAgents();
   actions.push(...closedIssueAgentActions);
   for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1882: strikes bypass close-out, so their merged `strike/<id>` worktrees
+  // + branches pile up forever. Reap any whose branch is fully merged into
+  // origin/main with no live strike session (never touches feature/* or unmerged work).
+  const strikeWorkspaceActions = await reapMergedStrikeWorkspaces();
+  actions.push(...strikeWorkspaceActions);
+  for (const a of strikeWorkspaceActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1817: stop the server+frontend UI containers of workspaces whose agent
   // has been idle (no agent, no tmux) past the grace window. Light-touch and
