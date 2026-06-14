@@ -351,6 +351,59 @@ describe('auto-merge executor', () => {
     expect(resurrectStrandedAutoMerge).not.toHaveBeenCalled();
   });
 
+  it('orders multiple due entries by PAN-1691 conflict-aware order', async () => {
+    const entries = [
+      pendingEntry({ id: 1, issueId: 'PAN-1' }),
+      pendingEntry({ id: 2, issueId: 'PAN-2' }),
+      pendingEntry({ id: 3, issueId: 'PAN-3' }),
+    ];
+    const mergeIssue = vi.fn().mockResolvedValue({ success: true, mergeStatus: 'merged' });
+    const markMerged = vi.fn();
+
+    const computeMergeOrderMeta = vi.fn().mockResolvedValue([
+      { ...entries[0], footprint: 2, conflictCount: 1 }, // conflicts with PAN-2
+      { ...entries[1], footprint: 5, conflictCount: 1 }, // conflicts with PAN-1, broader footprint
+      { ...entries[2], footprint: 1, conflictCount: 0 }, // disjoint
+    ]);
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => entries,
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue,
+      markMerged,
+      computeMergeOrderMeta,
+    });
+
+    expect(computeMergeOrderMeta).toHaveBeenCalled();
+    // Disjoint PAN-3 should be attempted first, then broader-footprint PAN-2, then PAN-1.
+    expect(mergeIssue).toHaveBeenNthCalledWith(1, 'PAN-3');
+    expect(mergeIssue).toHaveBeenNthCalledWith(2, 'PAN-2');
+    expect(mergeIssue).toHaveBeenNthCalledWith(3, 'PAN-1');
+  });
+
+  it('skips merge-order computation for zero or one due entries', async () => {
+    const mergeIssue = vi.fn().mockResolvedValue({ success: true, mergeStatus: 'merged' });
+    const markMerged = vi.fn();
+    const computeMergeOrderMeta = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      isEligible: async () => ({ eligible: true }),
+      transition: () => true,
+      mergeIssue,
+      markMerged,
+      computeMergeOrderMeta,
+    });
+
+    expect(computeMergeOrderMeta).not.toHaveBeenCalled();
+    expect(mergeIssue).toHaveBeenCalledWith('PAN-1486');
+  });
+
   it('ticks every 30 seconds when started', async () => {
     const listEntries = vi.fn(() => []);
 

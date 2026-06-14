@@ -14,6 +14,7 @@ import {
   type PendingAutoMerge,
 } from '../../../lib/database/pending-auto-merges-db.js';
 import { classifyAutoMergeIneligibility, isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { orderMergeCandidates, type MergeCandidateMeta } from '../../../lib/flywheel-merge-order.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
 
@@ -29,6 +30,11 @@ export interface AutoMergeExecutorDeps {
   now?: () => Date;
   listEntries?: () => PendingAutoMerge[];
   listProblemEntries?: () => PendingAutoMerge[];
+  projectRoot?: string;
+  computeMergeOrderMeta?: (
+    entries: PendingAutoMerge[],
+    projectRoot: string,
+  ) => Promise<Array<PendingAutoMerge & MergeCandidateMeta>>;
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
   transition?: (id: number) => boolean;
@@ -60,6 +66,50 @@ function errorMessage(error: unknown): string {
 
 function failureReason(result: MergeResult): string {
   return result.error ?? result.message ?? `merge returned status ${result.statusCode ?? 'unknown'}`;
+}
+
+async function defaultComputeMergeOrderMeta(
+  entries: PendingAutoMerge[],
+  projectRoot: string,
+): Promise<Array<PendingAutoMerge & MergeCandidateMeta>> {
+  if (entries.length <= 1) {
+    return entries.map((entry) => ({ ...entry, issueId: entry.issueId, footprint: 0, conflictCount: 0 }));
+  }
+
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execFileAsync = promisify(execFile);
+
+  const fileSets = await Promise.all(
+    entries.map(async (entry) => {
+      const branch = `feature/${entry.issueId.toLowerCase()}`;
+      try {
+        const { stdout } = await execFileAsync('git', ['diff', '--name-only', `main...${branch}`], { cwd: projectRoot });
+        return new Set(stdout.trim().split('\n').filter(Boolean));
+      } catch {
+        return new Set<string>();
+      }
+    }),
+  );
+
+  const conflictsMap = new Map<number, Set<number>>();
+  for (let i = 0; i < entries.length; i++) {
+    for (let j = i + 1; j < entries.length; j++) {
+      if ([...fileSets[i]!].some((f) => fileSets[j]!.has(f))) {
+        if (!conflictsMap.has(i)) conflictsMap.set(i, new Set());
+        if (!conflictsMap.has(j)) conflictsMap.set(j, new Set());
+        conflictsMap.get(i)!.add(j);
+        conflictsMap.get(j)!.add(i);
+      }
+    }
+  }
+
+  return entries.map((entry, i) => ({
+    ...entry,
+    issueId: entry.issueId,
+    footprint: fileSets[i]!.size,
+    conflictCount: conflictsMap.get(i)?.size ?? 0,
+  }));
 }
 
 async function defaultMergeIssue(issueId: string): Promise<MergeResult> {
@@ -109,13 +159,24 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     }
   }
 
-  const entries = deps.listEntries
+  let entries = deps.listEntries
     ? deps.listEntries()
       .filter((entry) => entry.status === 'pending' && Date.parse(entry.scheduledMergeAt) <= nowDate.getTime())
       .sort((a, b) => a.scheduledMergeAt.localeCompare(b.scheduledMergeAt) || a.id - b.id)
     : listDuePendingAutoMerges(nowDate.toISOString());
 
   if (entries.length === 0) return;
+
+  // PAN-1691: when multiple entries are due, order by conflict-aware merge
+  // order (disjoint first, then conflicting broadest-footprint first).
+  if (entries.length >= 2) {
+    const projectRoot = deps.projectRoot ?? process.cwd();
+    const metas = await (deps.computeMergeOrderMeta ?? defaultComputeMergeOrderMeta)(entries, projectRoot);
+    const ordered = orderMergeCandidates(
+      metas.map((m) => ({ issueId: m.issueId, footprint: m.footprint, conflictCount: m.conflictCount })),
+    );
+    entries = ordered.map((candidate) => metas.find((m) => m.issueId === candidate.issueId)!);
+  }
 
   for (const entry of entries) {
     if (isPaused()) {
