@@ -25,12 +25,255 @@ const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
 const REMOTE_PAN_DIR = '/workspace/.pan';
 const REMOTE_TMUX_DIR = `${REMOTE_PAN_DIR}/tmux`;
 const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/panopticon.tmux.conf`;
+const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
 const REMOTE_TMUX_CONFIG_CONTENT = [
   '# Panopticon-managed tmux config',
   '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
   'set -g mouse on',
   '',
 ].join('\n');
+
+const PUSH_DAEMON_INTERVAL_SECONDS = 300;
+const EPHEMERAL_WATCHDOG_INTERVAL_SECONDS = 60;
+const EPHEMERAL_HEARTBEAT_STALE_THRESHOLD_SECONDS = 5 * 60;
+
+export interface PushDaemonOptions {
+  issueId: string;
+  branch: string;
+  intervalSeconds?: number;
+  logFile?: string;
+}
+
+/**
+ * Generate a self-contained Node.js heartbeat script that commits and pushes
+ * /workspace changes on an interval. The script reads config from environment
+ * variables when run directly, and exports `runHeartbeat` for testing.
+ */
+export function generatePushDaemonScript(options: PushDaemonOptions): string {
+  const intervalSeconds = options.intervalSeconds ?? PUSH_DAEMON_INTERVAL_SECONDS;
+  const logFile = options.logFile ?? `${REMOTE_PAN_DIR}/push-daemon.log`;
+  const issueIdLiteral = JSON.stringify(options.issueId);
+  const branchLiteral = JSON.stringify(options.branch);
+
+  return [
+    "const { execFile } = require('child_process');",
+    "const fs = require('fs');",
+    "const path = require('path');",
+    '',
+    'function log(message) {',
+    '  try {',
+    `    fs.appendFileSync(${JSON.stringify(logFile)}, '[' + new Date().toISOString() + '] ' + message + '\\n');`,
+    '  } catch {}',
+    '}',
+    '',
+    'function runOnce() {',
+    "  const cwd = '/workspace';",
+    '  try {',
+    `    if (!fs.existsSync(path.join(cwd, '.git'))) {`,
+    "      log('Not a git repository; skipping heartbeat');",
+    '      return;',
+    '    }',
+    '  } catch (err) {',
+    `    log('Error checking repository: ' + (err && err.message ? err.message : String(err)));`,
+    '    return;',
+    '  }',
+    '',
+    "  execFile('git', ['-C', cwd, 'add', '-A'], (err) => {",
+    '    if (err) {',
+    "      log('git add failed: ' + (err.message || String(err)));",
+    '      return;',
+    '    }',
+    "    execFile('git', ['-C', cwd, 'diff', '--cached', '--quiet'], (err) => {",
+    '      if (!err) {',
+    '        return;',
+    '      }',
+    `      const message = 'wip(remote): heartbeat for ' + ${issueIdLiteral};`,
+    '      execFile(',
+    "        'git',",
+    `        ['-C', cwd, '-c', 'user.name=Panopticon Remote', '-c', 'user.email=remote@panopticon.local', 'commit', '-m', message],`,
+    '        (err) => {',
+    '          if (err) {',
+    "            log('git commit failed: ' + (err.message || String(err)));",
+    '            return;',
+    '          }',
+    `          execFile('git', ['-C', cwd, 'push', 'origin', ${branchLiteral}], (err) => {`,
+    '            if (err) {',
+    "              log('git push failed: ' + (err.message || String(err)));",
+    '            }',
+    '          });',
+    '        }',
+    '      );',
+    '    });',
+    '  });',
+    '}',
+    '',
+    'function runHeartbeat(config) {',
+    '  runOnce();',
+    '  setInterval(runOnce, config.intervalSeconds * 1000);',
+    '}',
+    '',
+    'if (require.main === module) {',
+    '  runHeartbeat({',
+    `    intervalSeconds: Number(process.env.PAN_INTERVAL_SECONDS || '${intervalSeconds}'),`,
+    '  });',
+    '}',
+    '',
+    'module.exports = { runHeartbeat };',
+  ].join('\n');
+}
+
+/**
+ * Install a detached tmux heartbeat daemon on the VM that continuously commits
+ * and pushes the feature branch for the issue.
+ */
+export async function installPushDaemon(
+  provider: FlyProvider,
+  vmName: string,
+  issueId: string,
+): Promise<void> {
+  const branch = `feature/${issueId.toLowerCase()}`;
+  const baseName = `push-daemon-${issueId.toLowerCase()}`;
+  const scriptPath = `${REMOTE_PAN_DIR}/${baseName}.js`;
+  const logFile = `${REMOTE_PAN_DIR}/${baseName}.log`;
+
+  const script = generatePushDaemonScript({ issueId, branch, logFile });
+  await writeRemoteFile(provider, vmName, scriptPath, script);
+
+  const envVars = [
+    `PAN_ISSUE_ID=${shellQuote(issueId)}`,
+    `PAN_BRANCH=${shellQuote(branch)}`,
+    `PAN_LOG_FILE=${shellQuote(logFile)}`,
+    `PAN_INTERVAL_SECONDS=${PUSH_DAEMON_INTERVAL_SECONDS}`,
+  ].join(' ');
+
+  const daemonCmd = `${envVars} node ${scriptPath}`;
+  const tmuxCmd = buildRemoteTmuxCommand([
+    'new-session',
+    '-d',
+    '-s',
+    baseName,
+    '-c',
+    '/workspace',
+    daemonCmd,
+  ]);
+  const result = await runSsh(provider, vmName, tmuxCmd);
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to start push daemon on ${vmName}: ${result.stderr}`);
+  }
+}
+
+export interface EphemeralWatchdogOptions {
+  heartbeatPath: string;
+  intervalSeconds?: number;
+  staleThresholdSeconds?: number;
+  logFile?: string;
+}
+
+/**
+ * Generate a self-contained Node.js watchdog script for ephemeral-tier VMs.
+ * The script polls a host-heartbeat freshness file and stops the machine by
+ * killing PID 1 when the heartbeat is older than the configured threshold.
+ * With Fly restart.policy:'no', the machine stays stopped.
+ */
+export function generateEphemeralWatchdogScript(options: EphemeralWatchdogOptions): string {
+  const heartbeatPathLiteral = JSON.stringify(options.heartbeatPath);
+  const logFileLiteral = JSON.stringify(options.logFile ?? `${REMOTE_PAN_DIR}/ephemeral-watchdog.log`);
+  const intervalSeconds = options.intervalSeconds ?? EPHEMERAL_WATCHDOG_INTERVAL_SECONDS;
+  const staleThresholdSeconds = options.staleThresholdSeconds ?? EPHEMERAL_HEARTBEAT_STALE_THRESHOLD_SECONDS;
+
+  return [
+    "const fs = require('fs');",
+    "const { execFile } = require('child_process');",
+    '',
+    'function log(message) {',
+    '  try {',
+    `    fs.appendFileSync(${logFileLiteral}, '[' + new Date().toISOString() + '] ' + message + '\\n');`,
+    '  } catch {}',
+    '}',
+    '',
+    'function stopMachine() {',
+    "  log('Host heartbeat stale — stopping machine (kill 1)');",
+    "  execFile('kill', ['1'], () => {});",
+    '}',
+    '',
+    'function checkHeartbeat(config) {',
+    '  try {',
+    `    if (!fs.existsSync(${heartbeatPathLiteral})) {`,
+    "      log('Heartbeat file not present yet; waiting for host');",
+    '      return;',
+    '    }',
+    `    const stat = fs.statSync(${heartbeatPathLiteral});`,
+    '    const ageSeconds = (Date.now() - stat.mtimeMs) / 1000;',
+    '    if (ageSeconds > config.staleThresholdSeconds) {',
+    '      log(`Heartbeat stale: ${Math.round(ageSeconds)}s > ${config.staleThresholdSeconds}s`);',
+    '      stopMachine();',
+    '    } else {',
+    '      log(`Heartbeat fresh: ${Math.round(ageSeconds)}s <= ${config.staleThresholdSeconds}s`);',
+    '    }',
+    '  } catch (err) {',
+    "    log('Error checking heartbeat: ' + (err && err.message ? err.message : String(err)));",
+    '  }',
+    '}',
+    '',
+    'function runWatchdog(config) {',
+    '  checkHeartbeat(config);',
+    '  setInterval(() => checkHeartbeat(config), config.intervalSeconds * 1000);',
+    '}',
+    '',
+    'if (require.main === module) {',
+    '  runWatchdog({',
+    `    intervalSeconds: Number(process.env.PAN_WATCHDOG_INTERVAL_SECONDS || '${intervalSeconds}'),`,
+    `    staleThresholdSeconds: Number(process.env.PAN_WATCHDOG_STALE_SECONDS || '${staleThresholdSeconds}'),`,
+    '  });',
+    '}',
+    '',
+    'module.exports = { runWatchdog, checkHeartbeat, stopMachine };',
+  ].join('\n');
+}
+
+/**
+ * Install a detached tmux watchdog session on an ephemeral-tier VM. The
+ * watchdog self-stops the machine when the host heartbeat goes stale.
+ */
+export async function installEphemeralWatchdog(
+  provider: FlyProvider,
+  vmName: string,
+  issueId: string,
+): Promise<void> {
+  const baseName = `ephemeral-watchdog-${issueId.toLowerCase()}`;
+  const scriptPath = `${REMOTE_PAN_DIR}/${baseName}.js`;
+  const logFile = `${REMOTE_PAN_DIR}/${baseName}.log`;
+
+  const script = generateEphemeralWatchdogScript({
+    heartbeatPath: REMOTE_HOST_HEARTBEAT_PATH,
+    intervalSeconds: EPHEMERAL_WATCHDOG_INTERVAL_SECONDS,
+    staleThresholdSeconds: EPHEMERAL_HEARTBEAT_STALE_THRESHOLD_SECONDS,
+    logFile,
+  });
+  await writeRemoteFile(provider, vmName, scriptPath, script);
+
+  const envVars = [
+    `PAN_WATCHDOG_HEARTBEAT_PATH=${shellQuote(REMOTE_HOST_HEARTBEAT_PATH)}`,
+    `PAN_WATCHDOG_LOG_FILE=${shellQuote(logFile)}`,
+    `PAN_WATCHDOG_INTERVAL_SECONDS=${EPHEMERAL_WATCHDOG_INTERVAL_SECONDS}`,
+    `PAN_WATCHDOG_STALE_SECONDS=${EPHEMERAL_HEARTBEAT_STALE_THRESHOLD_SECONDS}`,
+  ].join(' ');
+
+  const daemonCmd = `${envVars} node ${scriptPath}`;
+  const tmuxCmd = buildRemoteTmuxCommand([
+    'new-session',
+    '-d',
+    '-s',
+    baseName,
+    '-c',
+    '/workspace',
+    daemonCmd,
+  ]);
+  const result = await runSsh(provider, vmName, tmuxCmd);
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to start ephemeral watchdog on ${vmName}: ${result.stderr}`);
+  }
+}
 
 export interface RemoteAgentState {
   id: string;
@@ -41,6 +284,7 @@ export interface RemoteAgentState {
   startedAt: string;
   lastActivity?: string;
   location: 'remote';
+  tier?: 'ephemeral' | 'durable';
 }
 
 /**
@@ -96,6 +340,135 @@ function runSsh(
   return Effect.runPromise(provider.ssh(vmName, command));
 }
 
+export interface RefreshHostHeartbeatDeps {
+  listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
+  createFlyProvider?: typeof createFlyProvider;
+  now?: () => Date;
+}
+
+/**
+ * Refresh the host-heartbeat freshness file on every active ephemeral-tier VM.
+ * The deacon patrol calls this each cycle; the VM-side ephemeral watchdog uses
+ * the file's mtime to decide when to self-stop the machine.
+ */
+export async function refreshHostHeartbeatForEphemeralVms(
+  deps: RefreshHostHeartbeatDeps = {},
+): Promise<string[]> {
+  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
+  const ephemeralStates = activeStates.filter(
+    (state) => state.tier !== 'durable',
+    // Missing tier defaults to ephemeral: older states pre-date tier tracking,
+    // and writing a heartbeat is harmless for durable VMs while essential for
+    // ephemeral ones that may still have a watchdog installed.
+  );
+  if (ephemeralStates.length === 0) return [];
+
+  const fly = (deps.createFlyProvider ?? createFlyProvider)();
+  const now = deps.now ? deps.now() : new Date();
+  const heartbeatContent = now.toISOString();
+  const actions: string[] = [];
+
+  for (const state of ephemeralStates) {
+    try {
+      await runSsh(
+        fly,
+        state.vmName,
+        `mkdir -p ${shellQuote(REMOTE_PAN_DIR)} && echo ${shellQuote(heartbeatContent)} > ${shellQuote(REMOTE_HOST_HEARTBEAT_PATH)}`,
+      );
+      actions.push(`Host heartbeat refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`);
+    } catch (err: any) {
+      actions.push(
+        `Host heartbeat failed for ${state.issueId.toUpperCase()} on ${state.vmName}: ${err.message ?? String(err)}`,
+      );
+    }
+  }
+
+  return actions;
+}
+
+export interface RemoteSpendCapResult {
+  allowed: boolean;
+  current: number;
+  cap: number;
+  message?: string;
+}
+
+export interface CheckRemoteSpendCapDeps {
+  listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
+}
+
+/**
+ * Enforce the configured remote.max_concurrent_agents cap before spawning a
+ * new remote work agent. A cap of zero or unset is treated as unlimited,
+ * preserving today's behavior.
+ */
+export function checkRemoteSpendCap(
+  config: { remote?: { max_concurrent_agents?: number } },
+  deps: CheckRemoteSpendCapDeps = {},
+): RemoteSpendCapResult {
+  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
+  const cap = config.remote?.max_concurrent_agents ?? 0;
+
+  if (!cap || cap <= 0) {
+    return { allowed: true, current: activeStates.length, cap: 0 };
+  }
+
+  if (activeStates.length >= cap) {
+    return {
+      allowed: false,
+      current: activeStates.length,
+      cap,
+      message: `Remote agent cap reached: ${activeStates.length}/${cap} active remote agents. Stop an existing remote agent or raise remote.max_concurrent_agents.`,
+    };
+  }
+
+  return { allowed: true, current: activeStates.length, cap };
+}
+
+export interface RemoteDurabilityPreflightResult {
+  ok: boolean;
+  missing: Array<'push_daemon' | 'volume'>;
+  message?: string;
+}
+
+/**
+ * Verify that the remote machine satisfies the durability requirements for the
+ * chosen tier before the work agent starts. Durable tier requires a persistent
+ * volume mounted at /workspace; the continuous push daemon is wired by the
+ * spawn path itself, so this gate focuses on machine-level guarantees.
+ */
+export async function checkRemoteDurabilityPreflight(
+  provider: FlyProvider,
+  vmName: string,
+  tier: 'ephemeral' | 'durable',
+): Promise<RemoteDurabilityPreflightResult> {
+  const missing: Array<'push_daemon' | 'volume'> = [];
+
+  if (tier === 'durable') {
+    const mountCheck = await runSsh(
+      provider,
+      vmName,
+      "mount | grep -q ' on /workspace ' && echo mounted || echo missing",
+    );
+    if (mountCheck.stdout.trim() !== 'mounted') {
+      missing.push('volume');
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      missing,
+      message:
+        `Durability preflight failed for ${tier} tier on ${vmName}: missing ${missing.join(', ')}. ` +
+        `Durable remote work requires a Fly volume mounted at /workspace. ` +
+        `Destroy this machine and re-create it with the durable tier, or spawn as ephemeral.`,
+    };
+  }
+
+  return { ok: true, missing: [] };
+}
+
 /**
  * Check if remote agent session exists
  */
@@ -119,6 +492,7 @@ export interface SpawnRemoteAgentOptions {
   model?: string;
   prompt?: string;
   phase?: string;
+  tier?: 'ephemeral' | 'durable';
 }
 
 function shellQuote(value: string): string {
@@ -190,11 +564,12 @@ export async function writeRemoteFile(
  */
 export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promise<RemoteAgentState> {
   const { issueId, workspace, model = 'claude-sonnet-4-6', prompt } = options;
+  const tier = options.tier ?? 'ephemeral';
 
   const agentId = `agent-${issueId.toLowerCase()}`;
   const vmName = workspace.vmName;
 
-  const fly = createFlyProvider();
+  const fly = createFlyProvider({ resiliencyTier: tier });
 
   // Check if VM is running
   const vmStatus = await Effect.runPromise(fly.getStatus(vmName));
@@ -207,6 +582,13 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     throw new Error(`Agent ${agentId} already running on ${vmName}. Use 'pan tell' to message it.`);
   }
 
+  // Durability preflight: durable-tier machines must have a persistent volume
+  // mounted at /workspace before we run work that expects to survive restarts.
+  const durability = await checkRemoteDurabilityPreflight(fly, vmName, tier);
+  if (!durability.ok) {
+    throw new Error(durability.message);
+  }
+
   // Create agent state
   const state: RemoteAgentState = {
     id: agentId,
@@ -216,6 +598,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     status: 'starting',
     startedAt: new Date().toISOString(),
     location: 'remote',
+    tier,
   };
 
   saveRemoteAgentState(state);
@@ -264,6 +647,17 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     state.status = 'error';
     saveRemoteAgentState(state);
     throw new Error(`Failed to start agent: ${result.stderr}`);
+  }
+
+  // Install a continuous commit+push heartbeat daemon in its own tmux session.
+  // This runs independently of the agent session and survives agent crashes.
+  await installPushDaemon(fly, vmName, issueId);
+
+  // Ephemeral-tier VMs self-stop when the host heartbeat goes stale, so a
+  // laptop-closed / deacon-dead scenario does not leave a fleet running forever.
+  // Durable-tier VMs are explicitly meant to outlive the host and get no watchdog.
+  if (tier === 'ephemeral') {
+    await installEphemeralWatchdog(fly, vmName, issueId);
   }
 
   // Update status

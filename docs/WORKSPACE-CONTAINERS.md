@@ -24,6 +24,48 @@ Workspace containers must never mount `${HOME}/.panopticon`, and the container `
 
 See `.claude/rules/single-deacon-invariant.md` for the full invariant and failure history.
 
+## Remote Fly resiliency tiers
+
+Remote Fly workspaces support two resiliency tiers. The tier is chosen at spawn time
+(`pan start --remote --tier <tier>`) and stored in the workspace config; it can also
+be set as the default in dashboard Settings or `~/.panopticon/config.yaml`.
+
+| Tier | Durability posture | Use when |
+|---|---|---|
+| **ephemeral** | Work survives only while it is pushed out of the VM. The VM rootfs is wiped on every stop/start. | Cost-sensitive, interruptible work; short-lived tasks; the agent can re-clone/restart cheaply. |
+| **durable** | A persistent Fly volume is mounted at `/workspace`, so the working tree, git state, and `.pan/` files survive stop/start and restart-on-failure. | Long-running work you cannot afford to lose; tasks that take more than one bead and may outlast a laptop close. |
+
+### Durability guarantees by tier
+
+- **Both tiers** install a VM-side continuous commit+push heartbeat daemon that
+  commits any uncommitted changes and pushes the feature branch on a regular interval.
+  This is the baseline guarantee: even on ephemeral machines, the branch on origin is
+  kept current.
+- **Durable tier only** mounts a Fly volume at `/workspace`. The volume survives
+  machine stops, restarts, and `restart.on-failure` retries. The rootfs still resets
+  from the image on every start, so anything outside `/workspace` is lost.
+- **Ephemeral tier** has no volume. A VM-side watchdog stops the machine if the host
+  heartbeat goes stale (for example, the operator's laptop closes), keeping costs bounded.
+
+### Production gate: #1 + #2
+
+Do not advertise remote workspaces as "durable" in production until both:
+1. **Continuous push** is active for both tiers (commit+push heartbeat daemon).
+2. **Persistent `/workspace` volume** is mounted for the durable tier.
+
+Without #1, uncommitted work can be lost on unexpected termination. Without #2, the
+"durable" tier has the same rootfs semantics as the ephemeral tier and cannot survive
+restart.
+
+### Guardrails
+
+- **Spend cap / concurrency cap** — `remote.max_concurrent_agents` limits how many
+  remote agents can run at once. A value of `0` means unlimited. Spawns that would
+  exceed the cap are refused before any Fly Machine is created.
+- **Durability preflight gate** — durable-tier spawn verifies that a volume is
+  actually mounted at `/workspace` before the agent starts. If the check fails, the
+  spawn is refused rather than running durable work on a volumeless machine.
+
 ## Health surfaces
 
 Workspace stack health is reported as `{ healthy, reasons, lastObserved }` for projects with `workspace.docker.compose_template` configured.

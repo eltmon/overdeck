@@ -46,5 +46,11 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
   font removed in a37f8c890). Slated for deletion in PAN-1787.
 - **Per-workspace `.venv`** (TLDR) can be ~7.5GB each — don't copy/back up
   workspaces blindly.
+- **Fly Machine rootfs resets on every start** — the rootfs is rebuilt from the
+  image on stop/start and on `restart.on-failure`. The ephemeral tier mitigates this
+  with a VM-side continuous commit+push heartbeat daemon plus per-bead push
+  instructions; the durable tier mitigates it by mounting a persistent Fly volume at
+  `/workspace`. Never run durable work without verifying the volume mount
+  (PAN-1845).
 
 <!-- last-verified: 2026-06-13 -->

@@ -114,6 +114,15 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
   });
 
+  it('surfaces remote work-agent provisioning controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'remote', label: 'Remote'");
+    expect(SETTINGS_PAGE_SOURCE).toContain('id="remote"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Resiliency tier');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteResiliencyTierChange');
+    expect(SETTINGS_PAGE_SOURCE).toContain('Max concurrent remote agents');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleRemoteMaxConcurrentAgentsChange');
+  });
+
   it('surfaces conversation search controls', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('Conversation Search');
     expect(SETTINGS_PAGE_SOURCE).toContain('aria-label="Toggle conversation search"');
@@ -258,6 +267,15 @@ describe('buildMiniMaxFormData', () => {
     };
     const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
     expect(result.agents?.rtk?.enabled).toBe(true);
+  });
+
+  it('preserves existing remote settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      remote: { resiliency_tier: 'durable', max_concurrent_agents: 5 },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.remote).toEqual({ resiliency_tier: 'durable', max_concurrent_agents: 5 });
   });
 
   it('preserves gemini_thinking_level from formData, not from defaults', () => {
