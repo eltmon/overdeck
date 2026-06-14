@@ -95,6 +95,8 @@ interface IssueOptions {
   shadow?: boolean;
   remote?: boolean;
   local?: boolean;
+  /** Remote workspace resiliency tier override: ephemeral | durable. */
+  tier?: string;
   auto?: boolean;
   host?: boolean;
   yes?: boolean;
@@ -329,7 +331,7 @@ async function handleRemoteWorkspace(
     spinner.text = 'Remote workspace not found, creating...';
     try {
       const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
-      remoteMetadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner }));
+      remoteMetadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner, tier: options.tier as 'ephemeral' | 'durable' | undefined }));
     } catch (error: any) {
       spinner.fail(`Failed to create remote workspace: ${error.message}`);
       process.exit(1);
@@ -348,6 +350,10 @@ async function handleRemoteWorkspace(
     process.exit(1);
   }
 
+  // Resolve the effective tier up front so dry-run output and the provider
+  // both see the same value (CLI flag wins over config default).
+  const tier = (options.tier as 'ephemeral' | 'durable' | undefined) ?? config.remote?.resiliency_tier;
+
   if (options.dryRun) {
     spinner.info('Dry run mode (remote)');
     console.log('');
@@ -355,6 +361,7 @@ async function handleRemoteWorkspace(
     console.log(`  Agent ID:   ${agentId}`);
     console.log(`  VM:         ${chalk.cyan(remoteMetadata.vmName)}`);
     console.log(`  Provider:   ${remoteMetadata.provider}`);
+    console.log(`  Tier:       ${tier ?? 'ephemeral'}`);
     console.log(`  Model:      ${options.model || 'default'}`);
     return;
   }
@@ -366,7 +373,7 @@ async function handleRemoteWorkspace(
 
   // Sync all credentials before spawning (tokens may have expired)
   spinner.text = 'Syncing credentials (Claude, GitHub)...';
-  const fly = createFlyProviderFromConfig(config.remote);
+  const fly = createFlyProviderFromConfig(config.remote, tier);
   const credsSynced = await fly.syncAllCredentials(remoteMetadata.vmName);
   if (!credsSynced.claude) {
     spinner.warn('Could not sync Claude credentials - agent may need to re-authenticate');
@@ -721,6 +728,15 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.stderr.write(`Invalid --harness value: ${options.harness}. Expected 'claude-code', 'pi', or 'codex'.\n`);
     process.exit(1);
   }
+  // PAN-1845: validate --tier early so an invalid tier fails before any
+  // workspace setup. The CLI flag overrides config.remote.resiliency_tier for
+  // this spawn only.
+  const VALID_TIERS = ['ephemeral', 'durable'] as const;
+  if (options.tier && !VALID_TIERS.includes(options.tier as (typeof VALID_TIERS)[number])) {
+    process.stderr.write(`Invalid --tier value: ${options.tier}. Expected 'ephemeral' or 'durable'.\n`);
+    process.exit(1);
+  }
+
   if (options.model) {
     const { canUseHarnessSync } = await import('../../lib/harness-policy.js');
     const { getProviderAuthMode } = await import('../../lib/agents.js');
