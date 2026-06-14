@@ -94,6 +94,7 @@ Allowed:
 - `pan flywheel report` to close out the run.
 - `pan plan <id> --auto` to start a planning agent on a high-priority unstarted issue.
 - `pan start <id> --auto` for trivial issues where planning is overkill.
+- `pan review restart <id>` to re-dispatch a stalled or fully-stopped review convoy (kills running reviewers, spawns a fresh review pipeline). `pan review request <id>` to re-request review after a fix lands; `pan review abort <id>` / `pan review reset <id>` for stuck or human-overridden review cycles. These are pipeline-RECOVERY actions — use them to drive through a stalled review (e.g. a fully-stopped convoy on an OPEN in-review issue, the PAN-1614 class) rather than surfacing it for the operator. They are not destructive lifecycle commands.
 
 Do not:
 
