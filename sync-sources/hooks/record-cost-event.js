@@ -5653,10 +5653,14 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
 		} catch {}
 	}
-	if (currentVersion < 54) try {
-		db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
-		db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
-	} catch {}
+	if (currentVersion < 54) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
+		} catch {}
+	}
 	db.pragma(`user_version = 54`);
 }
 //#endregion
