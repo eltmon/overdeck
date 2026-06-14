@@ -43,4 +43,54 @@ describe('makeUatCandidateName (PAN-1691 codename + short date)', () => {
     });
     expect(name).toBe('uat/min-cedar-0103');
   });
+
+  it('assigns codenames in order using the default start index', () => {
+    const label = 'pan';
+    const dateIso = '2026-06-14T00:00:00Z';
+    const codenames = ['otter', 'falcon', 'cedar'];
+
+    expect(
+      makeUatCandidateName({ label, dateIso, codenames }),
+    ).toBe('uat/pan-otter-0614');
+    expect(
+      makeUatCandidateName({
+        label,
+        dateIso,
+        codenames,
+        isTaken: (b) => b === 'uat/pan-otter-0614',
+      }),
+    ).toBe('uat/pan-falcon-0614');
+    expect(
+      makeUatCandidateName({
+        label,
+        dateIso,
+        codenames,
+        isTaken: (b) =>
+          b === 'uat/pan-otter-0614' || b === 'uat/pan-falcon-0614',
+      }),
+    ).toBe('uat/pan-cedar-0614');
+  });
+
+  it('is deterministic for identical inputs without an injected pick', () => {
+    const deps = {
+      label: 'pan',
+      dateIso: '2026-06-14T00:00:00Z',
+      codenames: ['otter', 'falcon'],
+      isTaken: (b: string) => b === 'uat/pan-otter-0614',
+    };
+    const first = makeUatCandidateName(deps);
+    const second = makeUatCandidateName(deps);
+    expect(first).toBe('uat/pan-falcon-0614');
+    expect(second).toBe(first);
+  });
+
+  it('falls back to a numeric suffix when every default codename is taken', () => {
+    const name = makeUatCandidateName({
+      label: 'pan',
+      dateIso: '2026-06-14T00:00:00Z',
+      codenames: ['otter'],
+      isTaken: (b) => b === 'uat/pan-otter-0614',
+    });
+    expect(name).toBe('uat/pan-otter-0614-2');
+  });
 });

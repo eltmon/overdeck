@@ -7,7 +7,7 @@
  *
  * The core is pure and fully injectable (wordlist / index pick / collision
  * check / date) so it's deterministically testable; a thin default wrapper
- * supplies real randomness + a git branch-exists check.
+ * starts at index 0 (deterministic, ordered per day) + a git branch-exists check.
  */
 
 export const UAT_CODENAMES: readonly string[] = [
@@ -28,7 +28,7 @@ export interface UatNameDeps {
   dateIso: string;
   /** Injectable wordlist (default UAT_CODENAMES). */
   codenames?: readonly string[];
-  /** Returns a start index in [0, n) (default Math.random). */
+  /** Returns a start index in [0, n) (default 0). */
   pick?: (n: number) => number;
   /** True if the branch already exists (default: never taken). */
   isTaken?: (branch: string) => boolean;
@@ -36,13 +36,13 @@ export interface UatNameDeps {
 
 /**
  * Build a unique `uat/<label>-<codename>-<MMDD>` branch name, walking the
- * wordlist from a (random) start until an untaken name is found; if every
- * codename for the day is taken, appends a numeric suffix. Pure.
+ * wordlist from index 0 until an untaken name is found; if every codename for
+ * the day is taken, appends a numeric suffix. Pure.
  */
 export function makeUatCandidateName(deps: UatNameDeps): string {
   const day = mmdd(deps.dateIso);
   const words = deps.codenames ?? UAT_CODENAMES;
-  const pick = deps.pick ?? ((n: number) => Math.floor(Math.random() * n));
+  const pick = deps.pick ?? (() => 0);
   const isTaken = deps.isTaken ?? (() => false);
 
   const start = words.length > 0 ? pick(words.length) % words.length : 0;
