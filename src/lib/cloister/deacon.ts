@@ -2378,7 +2378,8 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'passed') continue;
+      // PAN-1862: 'skipped' (mode=none) advances lifecycle the same as 'passed'
+      if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') continue;
       if (status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') continue;
 
       // PAN-1681: a live test session (idle or working) is the failsafe's job,
@@ -2783,7 +2784,8 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
-      if (status.reviewStatus !== 'passed') continue;
+      // PAN-1862: 'skipped' (mode=none) advances lifecycle the same as 'passed'
+      if (status.reviewStatus !== 'passed' && status.reviewStatus !== 'skipped') continue;
       if (status.testStatus !== 'testing' && status.testStatus !== 'pending') continue;
       if (status.stuck || status.deaconIgnored) continue;
       if (await isIssueClosed(issueId)) continue;

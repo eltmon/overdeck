@@ -44,7 +44,7 @@ import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
-import { loadConfigSync as loadYamlConfig, resolveModel, resolveReReviewScope } from '../config-yaml.js';
+import { loadConfigSync as loadYamlConfig, resolveModel, resolveReReviewScope, resolveReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
@@ -486,10 +486,123 @@ async function tryResumeConvoyReviewers(
   }
 }
 
+/** Spawn a single quick reviewer (mode='quick'). No convoy, no synthesis, no discovery/fork. */
+async function spawnQuickReviewForIssue(
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; allowHost?: boolean },
+): Promise<{ success: boolean; message: string; error?: string }> {
+  let headSha = 'unknown';
+  try {
+    const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: opts.workspace, encoding: 'utf-8' });
+    headSha = stdout.trim();
+  } catch { /* non-fatal */ }
+  const runId = headSha !== 'unknown'
+    ? `agent-${opts.issueId.toLowerCase()}-review-${headSha}`
+    : `agent-${opts.issueId.toLowerCase()}-review`;
+  const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
+
+  setReviewStatusSync(opts.issueId, {
+    reviewStatus: 'reviewing',
+    reviewSpawnedAt: new Date().toISOString(),
+  });
+
+  try {
+    const { notifyPipelineSync } = await import('../pipeline-notifier.js');
+    notifyPipelineSync({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
+  } catch { /* non-fatal */ }
+
+  try {
+    let contextManifestPath: string | undefined;
+    let tier1Summary: string | undefined;
+    try {
+      const manifest = await Effect.runPromise(buildReviewContext({
+        runId,
+        issueId: opts.issueId,
+        workspace: opts.workspace,
+        branch: opts.branch,
+      }));
+      contextManifestPath = manifest.manifestPath;
+      tier1Summary = formatTier1Summary(manifest);
+    } catch (ctxErr) {
+      console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} (quick mode):`, ctxErr);
+    }
+
+    const quickTemplate = await readFile(join(packageRoot, 'roles', 'review-quick.md'), 'utf-8');
+    const prompt = [
+      `QUICK REVIEW TASK for ${opts.issueId} — mode: quick (single reviewer, no convoy):`,
+      '',
+      `Issue: ${opts.issueId}`,
+      `Branch: ${opts.branch}`,
+      `Workspace: ${opts.workspace}`,
+      `Review directory: ${reviewDir}`,
+      `Output file: ${join(reviewDir, 'quick.md')}`,
+      ...(contextManifestPath ? [`Context manifest: ${contextManifestPath}`] : []),
+      ...(tier1Summary ? ['', '## Inline diff summary:', '', tier1Summary] : []),
+      '',
+      '---',
+      '',
+      quickTemplate,
+    ].join('\n');
+
+    const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
+    const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
+
+    const run = await spawnRun(opts.issueId, 'review', {
+      workspace: opts.workspace,
+      prompt,
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.harness ? { harness: opts.harness } : {}),
+      ...(allowHost ? { allowHost: true } : {}),
+    });
+    run.reviewRunId = runId;
+    try { await Effect.runPromise(saveAgentState(run)); } catch { /* non-fatal */ }
+    emitActivityEntrySync({ source: 'review', level: 'info', message: `Quick review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+    return { success: true, message: `Quick review spawned: ${run.id}` };
+  } catch (err) {
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'failed',
+      reviewNotes: `Quick review spawn failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return { success: false, message: 'Failed to spawn quick review', error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
+
+  // PAN-1862: branch on review mode. mode='none' skips review entirely and
+  // advances lifecycle toward test. mode='quick' spawns a single reviewer.
+  // mode='full' (default) continues to the existing convoy path.
+  const cfg = loadYamlConfig().config;
+  const mode = resolveReviewMode(cfg);
+
+  if (mode === 'none') {
+    setReviewStatusSync(opts.issueId, {
+      reviewStatus: 'skipped',
+      reviewNotes: 'Review mode: none',
+    });
+    emitActivityEntrySync({
+      source: 'review',
+      level: 'info',
+      message: `Review skipped for ${opts.issueId} (mode=none)`,
+      issueId: opts.issueId,
+    });
+    // Advance lifecycle: set testStatus to pending so the Deacon dispatches the test agent.
+    // If test is also skipped (or already terminal), readyForMerge derives from the gate.
+    const existing = getReviewStatusSync(opts.issueId);
+    const testAlreadyTerminal = existing?.testStatus === 'passed' || existing?.testStatus === 'skipped' || existing?.testStatus === 'failed';
+    if (!testAlreadyTerminal) {
+      setReviewStatusSync(opts.issueId, { testStatus: 'pending' });
+    }
+    return { success: true, message: `Review skipped (mode=none) for ${opts.issueId}` };
+  }
+
+  if (mode === 'quick') {
+    return spawnQuickReviewForIssue(opts);
+  }
+
+  // mode === 'full': existing convoy path below.
 
   // Idempotency: if a review role agent for this issue already has an alive
   // tmux pane, treat the current dispatch as a no-op. spawnRun has its own
