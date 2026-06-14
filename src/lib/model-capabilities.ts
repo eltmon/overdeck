@@ -477,7 +477,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 65,
       'context-length': 95,
     },
-    notes: 'OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 200K, 128K max output.',
+    notes: 'OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 128K max output.',
   },
 
   'gpt-5.5-pro': {

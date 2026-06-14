@@ -2,19 +2,19 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-13T14:39:11.368Z",
-    "updated": "2026-06-13T14:43:45.025Z",
+    "updated": "2026-06-14T04:46:00.959Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1813: pan plan finalize — bd timeouts under load half-finalize the plan (timed-out creates lose bead IDs and silently drop dependency edges)"
   },
   "plan": {
     "id": "pan-1813",
     "title": "Make pan plan finalize resilient to bd timeouts under multi-agent load",
-    "status": "proposed",
+    "status": "completed",
     "uid": "b2a291d4-7173-48bd-817a-a73b68e26431",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-13T14:39:11.368Z",
-    "updated": "2026-06-13T14:43:45.025Z",
+    "updated": "2026-06-14T04:46:00.959Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1813",
@@ -348,5 +348,5 @@
       "canonicalFilename": "2026-06-13-PAN-1813-make-pan-plan-finalize-resilient-to-bd-timeouts-under-multi-agent-load.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

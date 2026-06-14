@@ -137,7 +137,8 @@ vi.mock('../../../lib/cloister/work-agent-prompt.js', () => ({
   getTrackerContext: vi.fn(() => ({ apiKey: 'linear-key' })),
 }));
 
-vi.mock('../../../lib/config.js', () => ({
+vi.mock('../../../lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/config.js')>()),
   getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
 }));
 

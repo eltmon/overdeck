@@ -4321,7 +4321,9 @@ function wrapDatabase(raw) {
 						committed = true;
 						return result;
 					} catch (error) {
-						if (!committed) raw.exec("ROLLBACK");
+						if (!committed) try {
+							raw.exec("ROLLBACK");
+						} catch {}
 						throw error;
 					} finally {
 						transactionDepth = 0;

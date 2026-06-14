@@ -115,6 +115,42 @@ ${Array.from({ length: 20 }, (_, i) => `cloning… ${i}`).join('\n')}
 
     expect(detection).toBeNull()
   })
+
+  // PAN-1834 — Codex/gpt-5.5 rate-limit / model-switch modal.
+  it('detects a rate-limit model-switch modal near the bottom of the pane', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+Rate limit reached for gpt-5.5.
+
+Choose how to continue:
+❯ Keep current model
+  Switch to gpt-5.4-mini
+`)
+
+    expect(detection).toMatchObject({ reason: 'rate_limit' })
+    expect(detection?.prompt).toContain('Keep current model')
+    expect(detection?.prompt).toContain('Switch to gpt-5.4-mini')
+  })
+
+  it('ignores a pane that only mentions a rate limit in prose without the option pairing', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+We hit a rate limit for gpt-5.5 and are retrying after a short delay.
+Some other progress line here.
+`)
+
+    expect(detection).toBeNull()
+  })
+
+  it('ignores a rate-limit modal that has scrolled outside the recent window', () => {
+    const detection = detectAwaitingInputFromPaneSync(`
+Rate limit reached for gpt-5.5.
+Choose how to continue:
+❯ Keep current model
+  Switch to gpt-5.4-mini
+${Array.from({ length: 30 }, (_, i) => `later output ${i}`).join('\n')}
+`)
+
+    expect(detection).toBeNull()
+  })
 })
 
 describe('parseCodexApprovalPrompt', () => {

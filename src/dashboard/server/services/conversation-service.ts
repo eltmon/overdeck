@@ -14,7 +14,9 @@ import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogE
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { parseCodexConversationMessages } from './codex-conversation-parser.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
+import { isPiSessionFile, parsePiConversationMessages } from './pi-conversation-parser.js';
 
 type ModelCapability = (typeof MODEL_CAPABILITIES)[keyof typeof MODEL_CAPABILITIES];
 
@@ -881,21 +883,28 @@ const activitySummaryCache = new Map<string, { mtimeMs: number; size: number; su
 
 export async function summarizeConversationActivity(
   sessionFile: string,
+  options: { harness?: string | null } = {},
 ): Promise<ConversationActivitySummary> {
   const fileStats = await stat(sessionFile);
-  const cached = activitySummaryCache.get(sessionFile);
+  const cacheKey = `${options.harness ?? 'claude-code'}:${sessionFile}`;
+  const cached = activitySummaryCache.get(cacheKey);
   if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
     return cached.summary;
   }
 
-  // Parse from the last compact boundary instead of the full file — avoids
-  // re-reading potentially megabytes of history on every list enrichment tick.
-  // Pass an empty priorState so pendingToolUse stays populated rather than being
-  // flushed into workLog. This lets us detect genuinely pending tools.
-  const { messages, streaming, pendingToolUse, mtimeMs } = await parseFromLastCompactBoundary(
-    sessionFile,
-    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
-  );
+  const parsed = options.harness === 'codex'
+    ? await parseCodexConversationMessages(sessionFile)
+    : options.harness === 'pi' || isPiSessionFile(sessionFile)
+      ? await parsePiConversationMessages(sessionFile)
+      // Parse from the last compact boundary instead of the full file — avoids
+      // re-reading potentially megabytes of history on every list enrichment tick.
+      // Pass an empty priorState so pendingToolUse stays populated rather than being
+      // flushed into workLog. This lets us detect genuinely pending tools.
+      : await parseFromLastCompactBoundary(
+          sessionFile,
+          { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+        );
+  const { messages, streaming, pendingToolUse, workLog, mtimeMs } = parsed;
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
@@ -932,10 +941,18 @@ export async function summarizeConversationActivity(
         currentTool = entry.toolTitle;
       }
     }
+    if (!currentTool && options.harness === 'codex') {
+      for (const entry of workLog) {
+        if (entry.tone === 'tool' && !entry.result && (entry.sequence ?? -1) > maxSequence) {
+          maxSequence = entry.sequence ?? -1;
+          currentTool = entry.label;
+        }
+      }
+    }
   }
 
   const summary: ConversationActivitySummary = { messages, streaming, isWorking, currentTool };
-  activitySummaryCache.set(sessionFile, { mtimeMs, size: fileStats.size, summary });
+  activitySummaryCache.set(cacheKey, { mtimeMs, size: fileStats.size, summary });
   if (activitySummaryCache.size > ACTIVITY_SUMMARY_CACHE_MAX) {
     const firstKey = activitySummaryCache.keys().next().value;
     if (firstKey !== undefined) {

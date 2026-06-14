@@ -49,6 +49,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
+import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 
 declare const Bun: unknown;
 
@@ -57,6 +58,7 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
+console.log(`[panopticon] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
@@ -551,24 +553,6 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
-
-// PAN-1531: startup stash audit narrowed to surface only `salvageable:*`
-// stashes — the only kind that requires human review. Retired stash kinds
-// (pre-merge, pre-spawn, review-temp) and ad-hoc residue are ignored. The
-// scan runs once per project root, not per worktree, because worktrees
-// share `refs/stash` with their parent.
-if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
-  void import('../../lib/cloister/deacon.js')
-    .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
-    .then((findings) => {
-      if (findings.length > 0) {
-        emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} salvageable stash(es) on startup; review via workspace inspector` });
-      }
-    })
-    .catch((err: any) => {
-      console.warn(`[panopticon] Failed salvageable-stash startup scan: ${err.message}`);
-    });
-}
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan done`, nudges dead-end agents,

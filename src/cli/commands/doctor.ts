@@ -235,6 +235,48 @@ function getCachedIssueRowsForDoctor(): unknown[] {
   }
 }
 
+export function checkTrackerRateLimits(): CheckResult {
+  let cache: CacheService | undefined;
+  try {
+    cache = new CacheService();
+    const trackers = ['github', 'linear', 'rally'] as const;
+    const warnings: string[] = [];
+
+    for (const tracker of trackers) {
+      const suspendMs = cache.getSuspensionMs(tracker);
+      if (suspendMs > 0) {
+        const limit = cache.getRateLimit(tracker);
+        const resetTime = limit?.resetAt ? new Date(limit.resetAt).toISOString() : 'unknown';
+        warnings.push(`${tracker} suspended until ${resetTime}`);
+      } else if (cache.shouldBackoff(tracker)) {
+        warnings.push(`${tracker} backing off`);
+      }
+    }
+
+    if (warnings.length > 0) {
+      return {
+        name: 'Tracker Rate Limits',
+        status: 'warn',
+        message: warnings.join('; '),
+      };
+    }
+
+    return {
+      name: 'Tracker Rate Limits',
+      status: 'ok',
+      message: 'All trackers within rate limits',
+    };
+  } catch (err: any) {
+    return {
+      name: 'Tracker Rate Limits',
+      status: 'ok',
+      message: `Skipped (${err.message})`,
+    };
+  } finally {
+    cache?.close();
+  }
+}
+
 export async function checkClosedIssueOrphanAgentDirs(
   issues: unknown[],
   agentsDir: string = AGENTS_DIR,
@@ -721,6 +763,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }
 
   checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
+  checks.push(checkTrackerRateLimits());
   checks.push(checkStoppedListClassification({
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));

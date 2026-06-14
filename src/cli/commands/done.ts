@@ -316,12 +316,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           console.error(line);
         }
         console.error('');
-        // PAN-1531: explicit three-option resolution for dirty worktrees.
-        // No silent stashing — the agent (or operator) picks one and reruns.
+        // Agents never use git stash. Dirty work must be committed, explicitly
+        // discarded, or surfaced to the operator.
         console.error(chalk.dim('  Resolve uncommitted changes by picking ONE:'));
         console.error(chalk.dim('    1. Commit:  git add -A && git commit -m "<message>"'));
         console.error(chalk.dim('    2. Discard: git restore --staged --worktree . (destructive; type the command yourself)'));
-        console.error(chalk.dim('    3. Stash:   git stash push -u -m "salvageable:' + issueId + ':$(date -Iseconds):<description>"'));
+        console.error(chalk.dim('    3. Surface: pan tell ' + issueId + ' "Uncommitted changes need operator decision"'));
         console.error('');
         console.error(chalk.dim(`  After resolving, run 'pan done ${issueId}' again.`));
         console.error(chalk.dim('  Use --force to skip checks (NOT recommended — leaves uncommitted work behind).'));

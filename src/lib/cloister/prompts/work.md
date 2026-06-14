@@ -43,10 +43,10 @@ It MUST return `{{BRANCH_NAME}}`. If it returns anything else — `main`, a diff
 
 - NEVER `cd` to the parent project directory or any path outside your workspace
 - NEVER run `git checkout <other-branch>` inside your workspace — that's the most common way a worktree drifts
-- NEVER run `git stash` — Panopticon never stashes; commit, discard, or surface to operator
+- NEVER run `git stash` for any reason — commit, explicitly discard, or surface to the operator
 - NEVER run destructive git commands outside your workspace
 - **NEVER run history-rewriting git commands:** `git rebase -i`, `git commit --amend`, `git reset --hard`, `git squash`, or any operation that changes commit hashes. These are forbidden — they destroy review history and break the pipeline.
-- **If `pan done` refuses with "Uncommitted changes":** commit your work (`git add -A && git commit -m "..."`) OR discard explicitly (`git restore --staged --worktree .`). Do NOT use `git stash` — `pan done` will keep refusing until the worktree is clean.
+- **If `pan done` refuses with "Uncommitted changes":** commit your work (`git add -A && git commit -m "..."`), discard explicitly (`git restore --staged --worktree .`) only when the work is known disposable, or report the blocker with `pan tell`. Do NOT use `git stash` — `pan done` will keep refusing until the worktree is clean.
 - **If `pan done` fails with rebase conflicts:** run `git merge main` (or `git merge origin/main`) and resolve the single merge conflict. Do NOT attempt to squash, rewrite, or rebase-interactively to avoid conflicts.
 - Your workspace is a git worktree — it has its own branch and working tree independent of the main repo
 - Running git commands in the parent repo will destroy other agents' uncommitted work

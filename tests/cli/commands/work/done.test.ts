@@ -97,7 +97,8 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatus,
 }));
 
-vi.mock('../../../../src/lib/config.js', () => ({
+vi.mock('../../../../src/lib/config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../src/lib/config.js')>()),
   getDashboardApiUrl: mockGetDashboardApiUrl,
   getDashboardApiUrlSync: mockGetDashboardApiUrl,
 }));

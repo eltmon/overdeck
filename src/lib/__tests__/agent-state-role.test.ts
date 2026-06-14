@@ -543,6 +543,15 @@ describe('AgentState role persistence', () => {
     }));
   });
 
+  it('PAN-1872: does not crash on undefined issueId while checking workspace stack health', async () => {
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: '2026-06-13T00:00:00.000Z' })),
+    }));
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    await expect(assertWorkspaceStackHealthyForSpawn(undefined as any, 'work')).resolves.toBeUndefined();
+  });
+
   it('treats state.json without a valid role as missing', async () => {
     const { getAgentStateSync } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');

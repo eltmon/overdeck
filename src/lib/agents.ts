@@ -965,6 +965,9 @@ export interface AgentState {
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
   hostOverride?: boolean;
+
+  /** Inspect sub-role for inspect-* agents (PAN-1834). */
+  inspectSubRole?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -1020,6 +1023,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
     hostOverride: raw.hostOverride,
+    inspectSubRole: raw.inspectSubRole,
   };
 }
 
@@ -3044,7 +3048,10 @@ export async function assertWorkspaceStackHealthyForSpawn(
 ): Promise<void> {
   if (role === 'plan') return;
 
-  const normalizedIssue = issueId.toUpperCase();
+  // PAN-1872: guard against an undefined issueId so workspace health checks do
+  // not crash with `Cannot read properties of undefined (reading 'toUpperCase')`
+  // while pan start is recovering from a sync-main conflict.
+  const normalizedIssue = (issueId ?? '').toUpperCase();
 
   // PAN-1746: absence of a workspace must be a HARDER failure than an unhealthy
   // one. The host-fallback path below lets advancing roles (review/test/ship)

@@ -273,6 +273,7 @@ export function extractTeamPrefix(issueId: string): string | null {
  * Find project by Linear team prefix
  */
 export function findProjectByTeamSync(teamPrefix: string): ProjectConfig | null {
+  if (!teamPrefix) return null;
   const config = loadProjectsConfigSync();
 
   for (const [, projectConfig] of Object.entries(config.projects)) {

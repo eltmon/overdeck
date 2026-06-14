@@ -152,6 +152,25 @@ describe('ConversationList rename flow', () => {
     expect(screen.getByText('My Test Conversation')).toBeInTheDocument();
   });
 
+  it('renders the harness next to the model', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{
+      ...mockConversation,
+      harness: 'codex',
+      model: 'gpt-5.5-codex',
+    }]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByTitle('Harness: Codex')).toHaveTextContent('Codex');
+    expect(screen.getByTitle('Model: gpt-5.5-codex')).toHaveTextContent('gpt-5.5-codex');
+  });
+
   it('renders a spinner for actively working conversations', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: true }]);

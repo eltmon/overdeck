@@ -10,6 +10,8 @@ export type VerbBadgeVariant =
   | 'READY TO MERGE'
   | 'MERGED'
   | 'CHANGES REQUESTED'
+  | 'MERGE BLOCKED'
+  | 'CI BLOCKED'
   | 'STUCK · Nh'
   | 'QUEUED FOR PLAN';
 
@@ -68,6 +70,16 @@ const STATIC_VARIANTS = {
   'CHANGES REQUESTED': {
     label: 'CHANGES REQUESTED',
     className: 'badge-bg-destructive badge-border-destructive text-destructive-foreground',
+    pulse: false,
+  },
+  'MERGE BLOCKED': {
+    label: 'MERGE BLOCKED',
+    className: 'badge-bg-destructive badge-border-destructive text-destructive-foreground',
+    pulse: false,
+  },
+  'CI BLOCKED': {
+    label: 'CI BLOCKED',
+    className: 'badge-bg-warning badge-border-warning text-warning-foreground',
     pulse: false,
   },
   'QUEUED FOR PLAN': {

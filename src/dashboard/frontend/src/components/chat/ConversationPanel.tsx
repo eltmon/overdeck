@@ -654,6 +654,17 @@ export function ConversationPanel({
                 <span>About</span>
               </button>
 
+              <button
+                className={`${styles.conversationAboutToggle} ${hideToolCalls ? styles.conversationAboutToggleActive : ''}`}
+                onClick={toggleHideToolCalls}
+                title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+                aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+                aria-pressed={hideToolCalls}
+              >
+                <Wrench size={14} />
+                <span>Tools</span>
+              </button>
+
               {/* Copy link */}
               <button
                 className={styles.copyLinkButton}
@@ -699,16 +710,6 @@ export function ConversationPanel({
                           ? <Loader2 size={14} className={styles.spinnerIcon} />
                           : <Sparkles size={14} />}
                         Regenerate title
-                      </button>
-
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${hideToolCalls ? styles.headerMenuItemActive : ''}`}
-                        onClick={() => { toggleHideToolCalls(); setMenuOpen(false); }}
-                      >
-                        <Wrench size={14} />
-                        Hide tool calls
-                        {hideToolCalls && <span className={styles.headerMenuItemCheck}><Check size={14} /></span>}
                       </button>
 
                       {conversation.harness === 'claude-code' && (

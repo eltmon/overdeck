@@ -65,7 +65,10 @@ vi.mock('../cloister/config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})),
 vi.mock('../providers.js', () => ({ getProviderForModel: vi.fn(() => ({ name: 'anthropic', compatibility: 'direct' })), getProviderEnv: vi.fn(() => ({})), setupCredentialFileAuth: vi.fn(), clearCredentialFileAuth: vi.fn() }));
 vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), isClaudeCodeChannelsMcpEnabled: vi.fn(() => false), resolveModel: vi.fn(), NormalizedCavemanConfig: {} }));
 vi.mock('../caveman/workspace.js', () => ({ readCavemanVariant: vi.fn() }));
-vi.mock('../config.js', () => ({ loadConfig: vi.fn(() => ({})) }));
+vi.mock('../config.js', async (importActual) => ({
+  ...(await importActual<typeof import('../config.js')>()),
+  loadConfig: vi.fn(() => ({})),
+}));
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));
 vi.mock('../cliproxy.js', () => ({ CLIPROXY_BASE_URL: 'http://127.0.0.1:8317', getCliproxyClientEnv: vi.fn(() => ({})), bridgeGeminiAuthToCliproxy: vi.fn(() => ({})) }));
 vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), createTracker: vi.fn() }));

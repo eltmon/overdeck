@@ -256,7 +256,7 @@ function readDeliveryLog(agentId: string): Array<Record<string, unknown>> {
 }
 
 function launcherFor(session: string): string {
-  return readFileSync(join(fakeHome, '.panopticon', 'conversations', session, 'launcher.sh'), 'utf8');
+  return readFileSync(join(tmpHome, 'conversations', session, 'launcher.sh'), 'utf8');
 }
 
 async function writeConversationSessionFile(conv: { cwd: string; claudeSessionId: string }): Promise<void> {

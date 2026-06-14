@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
+  saveAgentState: vi.fn(),
   sessionExists: vi.fn(),
   writeFileSync: vi.fn(),
 }));
@@ -82,6 +83,7 @@ vi.mock('../../providers.js', () => ({
 vi.mock('../../agents.js', () => ({
   getProviderEnvForModel: mocks.getProviderEnvForModel,
   saveAgentRuntimeState: mocks.saveAgentRuntimeState,
+  saveAgentState: mocks.saveAgentState,
 }));
 
 import { spawnInspectAgent } from '../inspect-agent.js';
@@ -100,6 +102,7 @@ describe('spawnInspectAgent', () => {
     mocks.getDiffStats.mockReturnValue(Effect.succeed('diff stats'));
     mocks.getProviderEnvForModel.mockResolvedValue({});
     mocks.generateLauncherScriptSync.mockReturnValue('#!/usr/bin/env bash\n');
+    mocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
   });
 
   it('skips inspect dispatch when the issue is closed', async () => {
@@ -146,5 +149,24 @@ describe('spawnInspectAgent', () => {
       expect.stringContaining('launcher.sh'),
       expect.any(Object),
     );
+  });
+
+  it('writes a minimal state.json so the inspect agent is enumerable', async () => {
+    await Effect.runPromise(spawnInspectAgent({
+      projectKey: 'panopticon',
+      projectPath: '/repo',
+      issueId: 'PAN-1613',
+      beadId: 'workspace-b95lw',
+      workspace: '/workspace',
+    }));
+
+    expect(mocks.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'inspect-pan-1613-workspace-b95lw',
+      issueId: 'PAN-1613',
+      workspace: '/workspace',
+      role: 'work',
+      status: 'starting',
+      inspectSubRole: 'inspect',
+    }));
   });
 });

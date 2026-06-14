@@ -9,6 +9,7 @@ const agentMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
   getAgentStateSync: vi.fn(),
   clearAgentPaused: vi.fn(),
+  getProviderAuthMode: vi.fn(async () => 'subscription'),
 }))
 
 vi.mock('readline/promises', () => ({
@@ -27,7 +28,7 @@ vi.mock('../../../lib/agents.js', () => ({
   getAgentState: agentMocks.getAgentState,
   getAgentStateSync: agentMocks.getAgentState,
   clearAgentPaused: agentMocks.clearAgentPaused,
-  getProviderAuthMode: vi.fn(async () => 'subscription'),
+  getProviderAuthMode: agentMocks.getProviderAuthMode,
   getProviderEnvForModel: vi.fn(async () => ({})),
   getProviderExportsForModel: vi.fn(async () => ''),
   getAgentRuntimeBaseCommand: vi.fn(async () => 'claude'),
@@ -51,6 +52,8 @@ describe('pan start --harness flag (PAN-636)', () => {
     readlineMocks.close.mockReset()
     agentMocks.getAgentState.mockReset()
     agentMocks.clearAgentPaused.mockReset()
+    agentMocks.getProviderAuthMode.mockClear()
+    agentMocks.getProviderAuthMode.mockResolvedValue('subscription')
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`__exit__:${code}`)
     }) as never)
@@ -66,6 +69,31 @@ describe('pan start --harness flag (PAN-636)', () => {
       delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY
     }
     vi.resetModules()
+  })
+
+  it('returns undefined for a missing --harness flag (flagless → provider default applies downstream)', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(__testInternals.resolveExplicitHarnessFlag(undefined, undefined)).resolves.toBeUndefined()
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(agentMocks.getProviderAuthMode).not.toHaveBeenCalled()
+  })
+
+  it('returns undefined for a flagless non-Anthropic model without pre-gating', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(__testInternals.resolveExplicitHarnessFlag(undefined, 'kimi-k2.7-code')).resolves.toBeUndefined()
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+    expect(agentMocks.getProviderAuthMode).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown explicit --harness value with non-zero exit', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('cursor', undefined),
+    ).rejects.toThrow(/__exit__:1/)
+    const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
+    expect(written).toMatch(/Invalid --harness value: cursor/)
   })
 
   it('rejects --harness pi + Anthropic model + subscription auth with non-zero exit and reason on stderr', async () => {

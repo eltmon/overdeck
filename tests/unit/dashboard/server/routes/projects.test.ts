@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { getPanopticonHome } from '../../../../../src/lib/paths.js';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
@@ -120,15 +120,15 @@ describe('fetchProjectSessionTree', () => {
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/continue.json',
-      join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
-      join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
+      join(getPanopticonHome(), 'agents', 'agent-pan-539'),
+      join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-821', isDirectory: () => true },
       { name: 'feature-pan-539', isDirectory: () => true },
     ]);
     (readFile as any).mockImplementation((p: string) => {
-      if (p === join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json')) {
+      if (p === join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json')) {
         return Promise.resolve(JSON.stringify({
           model: 'gpt-4',
           startedAt: '2026-01-01T00:00:00Z',
