@@ -33,9 +33,10 @@ describe('conversationRuntimeRootPids', () => {
       claudeSessionId: 'sess-3871',
     } as any;
 
+    const panopticonHome = process.env.PANOPTICON_HOME ?? '/home/user/.panopticon';
     const rows = [
-      { pid: 1, ppid: 0, args: 'tmux -L panopticon new-session -d -s conv-20260612-3871 bash /home/user/.panopticon/conversations/conv-20260612-3871/launcher.sh' },
-      { pid: 2, ppid: 1, args: 'bash /home/user/.panopticon/conversations/conv-20260612-3871/launcher.sh' },
+      { pid: 1, ppid: 0, args: `tmux -L panopticon new-session -d -s conv-20260612-3871 bash ${panopticonHome}/conversations/conv-20260612-3871/launcher.sh` },
+      { pid: 2, ppid: 1, args: `bash ${panopticonHome}/conversations/conv-20260612-3871/launcher.sh` },
       { pid: 99999, ppid: 0, args: 'tmux -L panopticon new-session -d -s conv-20260612-3871 bash launcher.sh' },
       { pid: process.pid, ppid: 0, args: 'node dashboard/server.js' },
     ];

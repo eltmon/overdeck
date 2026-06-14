@@ -25,7 +25,6 @@
 
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
-import { homedir } from 'node:os'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
@@ -47,6 +46,7 @@ import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
+import { getPanopticonHome } from '../paths.js'
 
 const execAsync = promisify(exec)
 
@@ -58,7 +58,7 @@ const ACTIVE_HEARTBEAT_TTL_MS = 60_000
 const SPAWN_READY_TIMEOUT_MS = 30_000
 
 function panopticonDir(): string {
-  return join(homedir(), '.panopticon')
+  return getPanopticonHome()
 }
 function heartbeatsDir(): string {
   return join(panopticonDir(), 'heartbeats')
