@@ -774,3 +774,11 @@ red-main strike.
 - **Nothing readyForMerge yet** (MIN-831 only). Drained 1629/1765/1498 in review; 1242/1775/1641/1827/1491 still conflicting (rolling churn). conv/2920 NOT pushed yet (no collision). Main `0039335f` (a bot squash-merge "hide unavailable agent launch control"), CI in-progress.
 - **SERIALIZED (not mass-drained):** held; did not retry PAN-1827 (its >200s workspace-prep hang is a distinct bug, low-priority feature — surfaced, deferred to avoid re-saturating the just-recovered dashboard). PAN-1242/1775 held behind conv/2920.
 - **NEXT TICK:** PAN-1614 converge→merge→reload→cascade; PAN-1887 work progress; PAN-1845 synthesis; PAN-1711 plan→work; watch for conv/2920 push (re-conflicts 1242/1775); MIN-831 operator merge; PAN-1491 awaits PAN-1893.
+
+### RUN-35 tick 8 (2026-06-14 ~19:23Z) — PAN-1614 MERGED (keystone); deploy gated on conv/2920; cross-check caught false-ready
+
+- **PAN-1614 MERGED (19:19, APPROVED)** — convoy-recovery keystone on main (prsMerged=1). Converged after multi-cycle review (dup-import → escalated-recovery-state both fixed). merge-blockers → 0.
+- **Deploy BLOCKED:** `pan reload` would bundle conv/2920's 7 uncommitted WIP files into the live dashboard, so PAN-1614 is merged-but-not-deployed (PAN-1845 not yet systemically unblocked by it; its convoy was separately restarted tick 5). Deploy must wait for a clean tree — operator coordination call (they own both efforts).
+- **Cross-check caught a FALSE-READY read** (tick-3 lesson paid off): `pan review pending --ready` listed 5 PRs but GitHub showed only PAN-1242 (#1516) genuinely MERGEABLE; 1775/1827/1491 were CONFLICTING/DIRTY (stale review-status). PAN-1242 — the only real one — is HELD (conv/2920 overlap). NO merge this tick. ALWAYS cross-check GitHub mergeable before scheduling.
+- conv/2920 still not pushed. planning-pan-1896 = operator (GH-CLI approval friction), left alone. strike-pan-1711 lingering (reap). Re-compacted this file 915→776 (operator asked); PAN-1889 = the permanent auto-retention fix.
+- **NEXT:** PAN-1887/1711 work; PAN-1845 synthesis; on conv/2920 push → deploy PAN-1614 (reload from clean tree) + rebase 1242/1775 onto it; serialize conflicting drain via merge train; MIN-831 operator merge; PAN-1491 awaits PAN-1893.

@@ -411,6 +411,7 @@ export function AwaitingMergeRow({
 
   const isMerging = mergeStatus === 'merging' || mergeStatus === 'queued' || mergeStatus === 'verifying' || mergeMutation.isPending;
   const isFailed = mergeStatus === 'failed';
+  const rebuildFailed = pendingOperation?.type === 'rebuild-stack' && pendingOperation.status === 'failed';
   const stackPending = rebuildMutation.isPending || (pendingOperation?.status === 'running' && (
     pendingOperation.type === 'containerize' ||
     pendingOperation.type === 'start' ||
@@ -550,6 +551,11 @@ export function AwaitingMergeRow({
             pending={stackPending}
             density="compact"
           />
+          {rebuildFailed && pendingOperation?.error ? (
+            <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive">
+              Rebuild failed: {pendingOperation.error}
+            </p>
+          ) : null}
         </div>
       )}
 

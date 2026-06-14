@@ -115,6 +115,10 @@ function isInitContainer(name: string): boolean {
   return /(^|[-_])init($|[-_])/.test(name.toLowerCase());
 }
 
+function isSuccessfulOneShotContainer(name: string): boolean {
+  return /(^|[-_])(?:init|test-unit)($|[-_])/.test(name.toLowerCase());
+}
+
 function parseExitCode(status: string): number | null {
   const match = status.match(/exited \((\d+)\)/i);
   return match ? Number.parseInt(match[1], 10) : null;
@@ -158,7 +162,7 @@ export function evaluateWorkspaceStackHealth(
   for (const container of stackContainers) {
     const exitCode = parseExitCode(container.status);
     if (isExited(container)) {
-      if (isInitContainer(container.name)) {
+      if (isSuccessfulOneShotContainer(container.name)) {
         if (exitCode !== null && exitCode !== 0) {
           reasons.push(`${container.name} init exited non-zero (${exitCode})`);
         }
