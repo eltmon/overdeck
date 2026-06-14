@@ -829,3 +829,31 @@ or (b) restart the dashboard to fire the PAN-1758 startup repair sweep.
 - **Held launches** (correct, unchanged rationale): no clean Flywheel verb advances the 9
   (need PAN-1240 re-rebase) or PAN-1845 (needs review restart); auto_pickup_backlog=false forbids
   fresh backlog.
+
+### RUN-35 tick 3 (2026-06-14 ~17:08Z) — OPERATOR strike-directive; struck PAN-1872; the 8 PRs GENUINELY conflict (correction)
+
+- **Operator directive (new standing rule):** `auto_pickup_backlog=false` disables routine backlog
+  filling only — it does NOT block urgent pipeline repair. If a backlog issue immediately unblocks
+  pipeline flow (red main, agent spawning, review/test/merge, close-out), treat as URGENT and
+  dispatch under the normal author/parked gates; **default to `pan strike <id>`** (unblocking > another
+  reviewer cycle). If a strike lands a minimal unblock without full coverage, file a follow-up for
+  tests/hardening through the normal pipeline.
+- **CORRECTION to tick 1: the 8 stranded PRs GENUINELY conflict** — GitHub `mergeable=CONFLICTING,
+  mergeState=DIRTY` on #1516/1715/1858/1630 (verified). NOT stale blocker flags (my tick-1 PAN-1620
+  hypothesis was wrong). They need real rebase+conflict-resolution. `pan review pending --ready`
+  stably shows ONLY MIN-831.
+- **Dashboard double-restarted mid-tick** (PID 873332→888192, settled on 888192; old 21437 lingers as
+  a non-listening zombie). During the churn the read model briefly mis-reported "4 ready" / "1 blocker"
+  — TRANSIENT warming-noise, correctly NOT acted on. **Lesson: never act on merge-state reads while the
+  dashboard is restarting; cross-check GitHub `mergeable` before any merge action.**
+- **STRUCK PAN-1872** (`strike-pan-1872`, kimi→pi, live) — the scoped meta-unblocker: its
+  `toUpperCase` crash makes `pan start` on a conflicting issue die before spawning, so the 8 can't be
+  re-entered to rebase. Once it lands+deploys, `pan start <id>` per conflicted issue rebases+resolves.
+  **Did NOT strike PAN-1614 fresh** despite it blocking PAN-1845 — its fix already exists in approved
+  conflicted PR #1630; striking fresh would duplicate reviewed work AND land delicate UNREVIEWED deacon
+  convoy logic on main. Correct path: re-land #1630 via `pan start` after PAN-1872 unblocks it.
+- **PAN-1845 (critical v1.0)** convoy still stopped — fastest unblock is operator `pan review restart
+  PAN-1845` (not a Flywheel verb), or it auto-recovers once PAN-1614's #1630 deploys.
+- **NEXT TICK:** verify strike-pan-1872 landed (inspect diff: the toUpperCase fix + spawn-into-conflicted-
+  workspace, no test weakening) → file the regression-coverage follow-up (per directive) → `pan reload`
+  to deploy → then `pan start` the conflicted issues (start with PAN-1614 #1630) to rebase+resolve+drain.
