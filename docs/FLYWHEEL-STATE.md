@@ -2514,3 +2514,140 @@ Two operator-launched strikes self-aborted recommending the full pipeline (corre
 - **PAN-1868** "Cost-bleed circuit breaker: progress-aware always-on guard against runaway spend" (deacon costBleedMonitor + burn detection + deadlock scan + auto-remediation + fleet brake) → `pan plan PAN-1868 --auto` → planning-pan-1868 live. **Do NOT re-strike.**
 - **PAN-1873** "verifying_on_main tagged at first merge, never cleared on re-activation" (core close-out guards already landed on main @ 1f60ca8a2; remaining ACs span regression tests + agent-restart lifecycle clearing of verifying_on_main + dashboard display/count across close-out.ts/cloister/dashboard) → `pan plan PAN-1873 --auto` → planning-pan-1873 live. **Do NOT re-strike.**
 - Stranded strike workspaces (feature-pan-1868-strike, feature-pan-1873-strike) + idle strike sessions remain as cruft — deacon reaps idle sessions; not force-killing (out of role).
+
+## RUN-34 tick 1 (2026-06-14 ~02:53Z) — RED MAIN struck; boot --no-resume strands the pipeline; mass ghosting
+
+### RED MAIN was the dominant finding — filed PAN-1880, struck it
+
+`main` CI `test` job failed **3 consecutive runs** (00:16, 01:46, 02:30 UTC). The
+whole merge gate was silently empty (every PR inherits main's failing check → none
+reach readyForMerge). Single root cause:
+`src/cli/commands/__tests__/start-sync-main-conflict.test.ts > "continues to spawn
+the agent when sync-main reports a conflict"` (PAN-1872 regression guard) throws
+`Error: __exit__:1` at `start.ts:1195` (outer catch `process.exit(1)`).
+
+**Why it's invisible locally:** `vitest.config.ts:24` sets
+`forks: { maxForks: process.env.CI ? 1 : 4 }`. Locally (4 forks) the polluter and
+victim land in different forks → green (`npx vitest run` = 6346 passed). In CI
+(maxForks:1) all 611 files share ONE fork → cross-file state leaks. `issueCommand`
+calls `loadConfigSync()` (start.ts:126/318/511/820); a leaked **partial** `vi.mock`
+of `config.js` (CI log: *"No loadConfigSync export is defined on the config.js
+mock"*) makes the call throw → exit 1. The real `loadConfigSync` (config.ts:275) is
+defensive (try/catch → DEFAULT_CONFIG), so a corrupt on-disk config.json is NOT the
+vector — it's a leaked test mock / cross-file state (cf. #1877: tests mutating live
+`~/.panopticon` because the lib ignores `PANOPTICON_HOME`).
+
+**Reproduction key for future runs: `CI=true npx vitest run` (forces maxForks:1).**
+A plain `npx vitest run` will NOT reproduce — it stays green. A 4-file subset under
+CI=true also stayed green; the leak needs the full-suite ordering.
+
+**Action taken:** filed PAN-1880 (bug,critical) with a full execution brief +
+reproduction + fix options (preferred: stop the partial-mock leak at source by
+spreading `importActual` in the offending `vi.mock('config.js')` factory; AC = full
+`CI=true` suite green, no maxForks change). Dispatched `pan strike PAN-1880
+--harness claude-code --effort xhigh` → `strike-pan-1880` (Cloister routed model
+**kimi-k2.7-code**; renders raw JSON in pane = normal). **Strike is the ONLY viable
+path for red main** — a normal pipeline PR can't merge through the very red gate it
+would fix. Same family as #1720; #1849 = "fix red main first" policy. **Follow-up
+for next tick: verify GitHub CI `test` is green on main after strike-pan-1880 lands;
+if the strike self-aborts, re-strike or escalate — buck stops here.**
+
+### Boot --no-resume strands the whole pipeline (key systemic condition this run)
+
+`pan restart` ~41m before the run booted with **--no-resume** (every stopped agent
+shows `Gate: Boot --no-resume`). Effect: the deacon still does FORWARD dispatch
+(it spawned the PAN-1658 + PAN-1802 review convoys post-restart at 02:40) but will
+NOT auto-resume stopped/orphaned agents. Combined with PAN-1614 (deacon never
+re-dispatches a fully-stopped review convoy), the **10 stalled in-review issues**
+(1817,1775,1765,1696,1641,1629,1614,1498,1491,1242) cannot self-heal, and the
+Flywheel's allowed command set (plan/start/strike — NO resume/wake/review-restart)
+cannot recover them either. Surfaced as openQuestion + high `review`/`resume`
+suggestions; did not over-launch (re-spawning stalled work via `pan start` without
+diagnosing the stall risks duplicate/conflicting work — same restraint as RUN-33).
+
+### Mass ghosting + zombie convoys (ground truth = tmux, not state.json)
+
+~60 agent `state.json` files said `status: running` with NO tmux session (ghosts
+from before the restart; --no-resume leaves them). Real tmux = 11 sessions:
+PAN-1658 review convoy (5) + PAN-1802 review convoy (5) + agent-pan-1827-test (1).
+**Both PAN-1658 and PAN-1802 are `merged` + `verifying-on-main`** — so their running
+review convoys are ZOMBIES (PAN-1613 family) burning 10 sessions for zero output.
+Genuine producers this tick = **2**: strike-pan-1880 + agent-pan-1827-test (test
+verdict written, idle). Reported agentsActive=2 (genuine producers, per the RUN-33
+lesson), not the raw 11. Flywheel cannot pan kill the zombies → openQuestion.
+
+### Primary main worktree is DIVERGED from origin + active uncommitted dev — do NOT push/rebase
+
+Mid-tick the primary `main` worktree showed 7 local commits not on origin and 2
+origin commits not local (true divergence, not just behind). The divergence is a
+double-commit of the same logical change: local `24054b9a9` "test(harness):
+reconcile harness-resolve tests with PAN-1871" vs origin `626b6f8b1` (same intent),
+plus parallel docs/state commits. Separately, `src/cli/commands/flywheel.ts` +
+`flywheel.test.ts` + `sync-sources/skills/pan-flywheel/SKILL.md` were UNCOMMITTED in
+the working tree, adding a new `flywheelStopCommand()` (graceful-stop) — active
+development, almost certainly the operator in the live `conv-20260614-cde3` session.
+**Orchestrator response: leave it ALL untouched.** Committed only docs/FLYWHEEL-STATE.md
+(separate file), did NOT push/pull/rebase (would entangle the operator's in-progress
+work + the divergence). The running strike-pan-1880 is unaffected — it merges via
+origin in its own worktree. The divergence is the operator's to reconcile; flagged
+so report-time (`pan flywheel report` does pull --rebase + push) is done carefully or
+deferred while flywheel.ts has uncommitted changes.
+
+## RUN-34 tick 2 (2026-06-14 ~03:19Z) — RED MAIN RESOLVED; operator striking the systemic blockers
+
+### PAN-1880 fix LANDED — main CI is GREEN again
+
+strike-pan-1880 (kimi-k2.7-code) executed the brief precisely and landed the fix on
+main over 3 CI iterations (~26 min, $8.15, 91% ctx by the end):
+- `75785b153` "stop partial config.js mock leaks breaking CI single-fork" — the
+  systemic fix, but CI still red (failure mode shifted).
+- `c5d5c4041` "make start-sync-main-conflict self-contained for PATH-less CI" — the
+  victim test had a workspace-creation/PATH dependency that broke under the CI
+  single-fork environment; making it self-contained got CI **green**.
+- CI run `27486787509` / sha `c5d5c4041` = **completed/success**. Merge gate reopened.
+
+**Lesson:** for the single-fork (`CI=true`/maxForks:1) pollution class, the first
+"stop the leak" fix is often necessary-but-insufficient — the victim test itself can
+carry an env dependency (PATH, workspace creation) that only fails under the CI
+single-fork harness. Verify with `CI=true npx vitest run` (the strike did), and
+expect 2 passes: (1) plug the polluter, (2) make the victim hermetic. PAN-1880 is
+still OPEN (strikes land on main without close-out); stranded feature-pan-1880-strike
+workspace + idle session are deacon-reap cruft.
+
+### Operator is striking the systemic blockers I flagged — do NOT interfere
+
+Two operator-launched strikes (no flywheelRunId → exempt from governor reaping)
+appeared this tick and directly address tick-1 findings:
+- **strike-pan-1879** (gpt-5.5) — PAN-1879 "pan restart silently re-applies stale
+  boot gates; no way to re-enable deacon/resume". This is the FIX for the boot
+  --no-resume condition that strands the stalled review/test/work set. Once it lands
+  + resume is re-enabled, the 10 stalled in-review PRs + PAN-1827 test + PAN-1845
+  should recover and flow to the now-open merge gate.
+- **strike-pan-1875** (kimi-k2.7-code) — PAN-1875 "add `pan flywheel stop` graceful
+  shutdown" (the `flywheelStopCommand` that was uncommitted on the primary worktree
+  tick 1; now committed to origin as b9477d935 + being finished).
+
+### Zombie convoys cleared; PAN-1827 test now stalled (PAN-1681)
+
+The PAN-1658/PAN-1802 zombie review convoys (10 sessions, tick 1) are gone from tmux
+(deacon idle-reap / completion). New stall: **agent-pan-1827-test** finished testing
+(verdict written) but never called `pan specialists done test` — idle ~25min,
+unchanged ctx/cost/out — the PAN-1681 "test narrates done, never signals" pattern.
+Cannot self-advance under boot --no-resume; Flywheel cannot nudge (no pan tell).
+
+### Nothing launchable for the Flywheel this tick (correct)
+
+Main green reopened the merge gate, but the in-flight set is review-stalled (PRs show
+mergeable=UNKNOWN, not review-passed) pending PAN-1879, and verifying-on-main items
+await operator close-out. auto_pickup_backlog=false forbids fresh backlog. The
+operator's strikes cover the systemic fixes. So the Flywheel's correct output this
+tick was: confirm the red-main win, emit the snapshot, and stay out of the operator's
+active work — not manufacture launches.
+
+### Memory is NOT the limiter this run (contrast RUN-33)
+
+RAM 15/64 GB, **swap 0/8GB** (RUN-33 was 99.9% swap). The launch ceiling this run is
+NOT memory — it's (a) auto_pickup_backlog=false restricting inventory to in-flight
+work, and (b) that in-flight set being stalled-needing-resume which the Flywheel
+can't action. So "prefer over-saturation" had nothing legal to launch beyond the
+red-main strike.
