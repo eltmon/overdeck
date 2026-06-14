@@ -4,17 +4,17 @@
     "created": "2026-06-14T18:22:28.792Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1887: feat(flywheel): auto-merge path is GitHub-only — ready GitLab MRs strand under all-tracked-projects scope",
-    "updated": "2026-06-14T18:29:28.993Z"
+    "updated": "2026-06-14T19:02:01.703Z"
   },
   "plan": {
     "id": "pan-1887",
     "title": "Flywheel auto-merge for GitLab MRs",
-    "status": "proposed",
+    "status": "running",
     "uid": "97508d0a-2a8d-446a-a538-dbfce2b71036",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-14T18:22:28.792Z",
-    "updated": "2026-06-14T18:29:28.993Z",
+    "updated": "2026-06-14T19:02:01.703Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1887",
@@ -339,5 +339,5 @@
       "canonicalFilename": "2026-06-14-PAN-1887-flywheel-auto-merge-for-gitlab-mrs.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

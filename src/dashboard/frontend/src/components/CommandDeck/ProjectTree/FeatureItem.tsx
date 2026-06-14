@@ -11,6 +11,8 @@ import type { Harness } from '../../shared/ModelPicker';
 import { SessionNode } from './SessionNode';
 import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
+import { UatStackStatus, getUatStackSummary } from '../UatStackStatus';
+import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import {
   ContextMenuRoot,
   ContextMenuTrigger,
@@ -1023,6 +1025,21 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     [feature],
   );
   const trainInfo = useUatTrainMembership().get(feature.issueId.toUpperCase());
+  const shouldShowUatStack = expanded && feature.readyForMerge && Boolean(feature.resourceDetails?.hasWorkspace);
+  const workspaceQuery = useWorkspaceQuery(feature.issueId, {
+    enabled: shouldShowUatStack,
+  });
+  const workspace = workspaceQuery.data;
+  const stackPending = workspace?.pendingOperation?.status === 'running' && (
+    workspace.pendingOperation.type === 'containerize' ||
+    workspace.pendingOperation.type === 'start' ||
+    workspace.pendingOperation.type === 'rebuild-stack'
+  );
+  const uatStackSummary = getUatStackSummary({
+    containers: workspace?.containers,
+    stackHealth: workspace?.stackHealth,
+    pending: stackPending,
+  });
 
   // Live flash when dominant status or visible session count changes (blocker-8)
   const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
@@ -1183,6 +1200,15 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               🚆 {trainInfo.name} · {trainInfo.order}/{trainInfo.total}
             </span>
           )}
+          {uatStackSummary && (
+            <span
+              className={`${styles.featureBadge} ${uatStackSummary.active ? styles.featureBadge_paused : styles.featureBadge_running}`}
+              data-testid="feature-uat-stack"
+              title="UAT workspace Docker stack status"
+            >
+              {uatStackSummary.active ? 'UAT starting' : 'UAT healthy'}
+            </span>
+          )}
           <span className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
             {pipeline.map((seg, i) => (
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
@@ -1250,6 +1276,24 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               </>
             );
           })()}
+        </div>
+      )}
+
+      {shouldShowUatStack && uatStackSummary && (
+        <div className={styles.uatStackTreeGroup}>
+          <div className={styles.uatStackTreeHeader}>
+            <ChevronDown size={12} />
+            <span>UAT environment</span>
+            <span className={styles.uatStackTreeSummary}>{uatStackSummary.label.replace(/^UAT stack\s*/i, '')}</span>
+          </div>
+          <UatStackStatus
+            containers={workspace?.containers}
+            stackHealth={workspace?.stackHealth}
+            frontendUrl={workspace?.frontendUrl}
+            apiUrl={workspace?.apiUrl}
+            pending={stackPending}
+            density="compact"
+          />
         </div>
       )}
 

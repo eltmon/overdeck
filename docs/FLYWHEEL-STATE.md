@@ -734,150 +734,11 @@ work, and (b) that in-flight set being stalled-needing-resume which the Flywheel
 can't action. So "prefer over-saturation" had nothing legal to launch beyond the
 red-main strike.
 
-## RUN-35 tick 1 (2026-06-14) — pipeline unfrozen; re-rebase recovery (PAN-1240) is the live blocker
+## RUN-35 ticks 1–4 (compacted 2026-06-14; full detail in git)
 
-### State change vs RUN-34: deacon RUNNING + boot --no-resume gates CLEARED
-
-Big improvement over RUN-34's frozen state. Cloister watchdog `Status: Running`;
-stopped agents now show `gate: none` (RUN-34 had 160 boot --no-resume gates). The
-pipeline CAN move autonomously again. Main GREEN (`76d67be`, CI run 27504164328
-`success`). 1 live agent: `agent-pan-1845` (operator-started, `flywheelRunId: null`,
-kimi-k2.7-code/pi, working the CRITICAL Fly-remote-work-loss issue) — watchdog flags
-it Stuck but kimi/pi renders raw JSON (see project_kimi_pane_raw_json); exempt from
-governor reaping. Did NOT touch it.
-
-### THE blocker: review-passed PRs stranded on stale (red-main-era) bases; nothing re-rebases them
-
-9 in-review PRs (PAN-1498 + 1827/1629/1614/1242/1491/1775/1641/1765, all author=eltmon,
-none parked) are stranded. Two independent deacon paths each decline to recover them:
-
-1. `autoResumeStoppedWorkAgents` (runs every cycle) only resumes a stopped WORK agent
-   that has **pending review feedback** — every candidate is skipped "idle / no review
-   feedback", so it resumes NOTHING. A review-passed PR with a stale base / failing
-   inherited check generates no "review feedback", so its work agent is never
-   re-dispatched.
-2. The merge-train reconciler (merge_train_enabled=true) only re-rebases PRs already in
-   the **ready queue**. A blocked-but-recoverable PR is not in the queue, so it is never
-   rebased onto green main to BECOME ready. No reconciler/rebase activity in the deacon log;
-   `/api/flywheel/auto-merge/pending` is `[]`.
-
-Net: PRs built on a then-red main inherit that failure forever. PAN-1498's base is
-`8d838d9c` (not current `76d67be`); it is flagged `failing_checks` (NOT merge_conflict)
-— the only one in the set whose `pan start` would NOT hit the PAN-1872 sync-main-conflict
-crash. The other 8 show GitHub `mergeable: UNKNOWN` (GitHub hasn't recomputed since main
-moved; the merge-blockers API "merge_conflict" is partly stale per PAN-1620).
-
-**Canonical fix = PAN-1240** (ship-complete PRs go CONFLICTING after main moves → need
-review-preserving auto re-rebase recovery). Family: PAN-1758 (ship lane can't converge on
-moving main; readyForMerge only flips via the **startup repair sweep** → a dashboard
-restart is an operator lever that may flip stranded PRs to ready), PAN-1560 (re-review
-status not reposted after head moves), PAN-1213/1215/1620/1765. All OPEN. auto_pickup_backlog
-=false forbids the Flywheel from launching PAN-1240 itself.
-
-### Held launches (correct, not passive) — minAgents=2 vs auto_pickup_backlog=false
-
-Only 1 live agent (operator's) vs minAgents=2. But there is NO clean launch: the in-review
-set needs a server-side review-preserving re-rebase that doesn't exist; `pan start` on a
-conflict-flagged branch risks the PAN-1872 crash + PAN-1765 review-churn — forcing an
-ill-fitting launch papers over the missing reconciler (violates No-Bandaids). Re-entering
-in-flight issues is NOT forbidden by auto_pickup_backlog=false (that only gates fresh
-backlog), but no verb cleanly advances them. Surfaced the tension as a non-blocking
-openQuestion: operator can (a) flip auto_pickup_backlog so the Flywheel builds PAN-1240/1758,
-or (b) restart the dashboard to fire the PAN-1758 startup repair sweep.
-
-### Filed this tick
-
-- **PAN-1887** (enhancement,substrate): Flywheel auto-merge path is GitHub-only — ready
-  GitLab MRs strand under all-tracked-projects scope. Exposed by **MIN-831** (GitLab MR #62,
-  review=passed test=passed, ready) which the Flywheel cannot auto-merge; needs operator
-  manual GitLab merge. Sibling review-side gap = PAN-933. Route GitLab via `glab mr merge`.
-- **PAN-1888** (substrate): finish the PAN-1883 SQLite-truth migration — `work-agent-stop-hook`
-  still reads legacy `review-status.json` (the follow-up PAN-1883's closure comment flagged).
-  Surgical scope: stop-hook only; close-out/deacon/lifecycle JSON reads may be the
-  merge-specialist completion signal (intentional) — audit before touching.
-
-### Closure review (operator-shared): PAN-1883 + PAN-1884 verified clean
-
-- **PAN-1883** CLOSED/closed-out: orchestrator + UI now read pipeline truth from SQLite/API
-  (commits `4de55ab88`, `a1fbe1687`), CI green at run 27493486855. Confirms my RUN-34 RCA was
-  right — the legacy `review-status.json` IS scratch for pipeline-state judgment. (The
-  `a1cec7da8 ... JSON-authoritative target` commit was an intermediate audit-doc stage, NOT
-  the final design — don't be misled by that subject line.) My RUN-35 tick already complied
-  (used `pan review pending --ready`, `/api/flywheel/merge-blockers`, deacon log, state.json).
-- **PAN-1884** CLOSED/closed-out: operational agent rules promoted into bundled `scope: dev`
-  files under `sync-sources/rules/` (commit `c4d15e6b`), conversation-memory reduced to
-  pointers, lint:skills green.
-
-### RUN-35 tick 2 (2026-06-14 ~16:40Z) — no change on the 9 stranded; PAN-1845 now in-review with a STALLED convoy
-
-- **9 stale-based PRs UNCHANGED** — merge-blockers byte-identical to tick 1, PAN-1827 PR
-  untouched since 06-13, no reconciler/rebase/resume activity in the deacon log. PAN-1240
-  recovery did NOT fire; dashboard was NOT restarted for the PAN-1758 sweep. Main green
-  (`1233e884`, the compaction commit).
-- **agent-pan-1845 is idle-DONE, NOT stuck** (watchdog false positive). Pane: *"I'm not
-  stuck — `pan done PAN-1845` succeeded, issue In Review."* Branch merged origin/main
-  (`736fa7e04`), typecheck+lint pass. responseId static across captures = idle-at-prompt,
-  not hung. Operator-started → exempt; did not touch.
-- **PAN-1845 advanced to in-review (PR #1886) but its review convoy STALLED — PAN-1614 class.**
-  PR is FRESH (created 15:54Z, base near-current main — not stale like the other 9). All 5
-  convoy sessions `stopped`; the review report dir holds only `context.json` (0 reviewer
-  reports) so deterministic synthesis (PAN-1864) correctly never fired. Deacon excludes review
-  roles from auto-resume → won't self-recover. Flywheel can't `pan review restart` (not an
-  allowed verb). **Surfaced as the highest-value operator unblock: `pan review restart PAN-1845`.**
-- **Filed PAN-1889** (this conversation, operator-requested): retention/compaction policy for
-  this file (it was read whole every run, 212KB→compacted to 92KB / 809 lines).
-- **Held launches** (correct, unchanged rationale): no clean Flywheel verb advances the 9
-  (need PAN-1240 re-rebase) or PAN-1845 (needs review restart); auto_pickup_backlog=false forbids
-  fresh backlog.
-
-### RUN-35 tick 3 (2026-06-14 ~17:08Z) — OPERATOR strike-directive; struck PAN-1872; the 8 PRs GENUINELY conflict (correction)
-
-- **Operator directive (new standing rule):** `auto_pickup_backlog=false` disables routine backlog
-  filling only — it does NOT block urgent pipeline repair. If a backlog issue immediately unblocks
-  pipeline flow (red main, agent spawning, review/test/merge, close-out), treat as URGENT and
-  dispatch under the normal author/parked gates; **default to `pan strike <id>`** (unblocking > another
-  reviewer cycle). If a strike lands a minimal unblock without full coverage, file a follow-up for
-  tests/hardening through the normal pipeline.
-- **CORRECTION to tick 1: the 8 stranded PRs GENUINELY conflict** — GitHub `mergeable=CONFLICTING,
-  mergeState=DIRTY` on #1516/1715/1858/1630 (verified). NOT stale blocker flags (my tick-1 PAN-1620
-  hypothesis was wrong). They need real rebase+conflict-resolution. `pan review pending --ready`
-  stably shows ONLY MIN-831.
-- **Dashboard double-restarted mid-tick** (PID 873332→888192, settled on 888192; old 21437 lingers as
-  a non-listening zombie). During the churn the read model briefly mis-reported "4 ready" / "1 blocker"
-  — TRANSIENT warming-noise, correctly NOT acted on. **Lesson: never act on merge-state reads while the
-  dashboard is restarting; cross-check GitHub `mergeable` before any merge action.**
-- **STRUCK PAN-1872** (`strike-pan-1872`, kimi→pi, live) — the scoped meta-unblocker: its
-  `toUpperCase` crash makes `pan start` on a conflicting issue die before spawning, so the 8 can't be
-  re-entered to rebase. Once it lands+deploys, `pan start <id>` per conflicted issue rebases+resolves.
-  **Did NOT strike PAN-1614 fresh** despite it blocking PAN-1845 — its fix already exists in approved
-  conflicted PR #1630; striking fresh would duplicate reviewed work AND land delicate UNREVIEWED deacon
-  convoy logic on main. Correct path: re-land #1630 via `pan start` after PAN-1872 unblocks it.
-- **PAN-1845 (critical v1.0)** convoy still stopped — fastest unblock is operator `pan review restart
-  PAN-1845` (not a Flywheel verb), or it auto-recovers once PAN-1614's #1630 deploys.
-- **NEXT TICK:** verify strike-pan-1872 landed (inspect diff: the toUpperCase fix + spawn-into-conflicted-
-  workspace, no test weakening) → file the regression-coverage follow-up (per directive) → `pan reload`
-  to deploy → then `pan start` the conflicted issues (start with PAN-1614 #1630) to rebase+resolve+drain.
-
-### RUN-35 tick 4 (2026-06-14 ~17:33Z) — PAN-1872 FIXED (operator); keystone drain started (PAN-1614 re-entered)
-
-- **PAN-1872 FIXED + CLOSED by the operator** as `7297d2469` (on main, green CI) — NOT by the strike
-  agent (strike-pan-1872 stopped at 17:08 right after spawn, did no work). The fix is COMPLETE with
-  regression tests (`start-sync-main-conflict.test.ts` +109, `work-agent-prompt-pan-1872.test.ts` +59) →
-  **no coverage follow-up needed** (directive's "minimal-unblock follow-up" does not apply). Verified the
-  fix is built into dist (`syncConflictFiles` in `dist/cli/index.js`), so CLI `pan start` has it.
-- **Keystone drain STARTED: `pan start PAN-1614` succeeded — NO crash** (confirms PAN-1872 fix is live).
-  `agent-pan-1614` (pi/kimi, 3 beads, proposed→active) is re-entering to rebase+resolve its
-  approved-but-conflicted PR #1630. Landing #1630 + `pan reload` deploys deacon convoy-recovery → auto-fixes
-  PAN-1845's stalled convoy + all future review stalls.
-- **Deliberately HELD the other 7 conflicting PRs** (1827/1629/1242/1491/1775/1641/1765). Re-entering them
-  before PAN-1614's convoy-recovery is live would trigger re-reviews that STALL on the exact bug PAN-1614
-  fixes — multiplying stalled convoys. Correct sequence: land PAN-1614 → deploy → THEN parallel-drain the rest.
-- **Running server PID 888192 (started 13:01 EDT) predates the dist rebuild (13:11)** — so the deacon runs
-  pre-PAN-1872 code; irrelevant to CLI `pan start` (which has the fix), but a `pan reload` after PAN-1614
-  lands will deploy both PAN-1872 + PAN-1614 to the server. Old PID 21437 still lingering (zombie).
-- **NEXT TICK:** check agent-pan-1614 rebased #1630 clean → PAN-1658 reconciler re-validates → merge →
-  `pan reload` to deploy convoy-recovery → confirm PAN-1845 convoy auto-recovers → then `pan start` the
-  remaining 6 conflicting issues to drain. MIN-831 still needs operator GitLab merge; PAN-1845 review-restart still surfaced.
+- **t1–2 — pipeline unfrozen, stranded set diagnosed.** Deacon running, boot-gates cleared. 9 review-passed PRs stranded on stale (red-main-era) bases; deacon auto-resume only fires on pending review-feedback + the merge-train reconciler only touches already-queued-ready PRs → nothing re-rebases a blocked PR (**PAN-1240** = canonical fix). Filed **PAN-1887** (GitLab auto-merge is GitHub-only) + **PAN-1888** (work-agent-stop-hook still reads legacy review-status.json). PAN-1845 reached in-review (#1886) with a fully-STOPPED convoy (PAN-1614 class). Verified PAN-1883/1884 closures clean.
+- **t3 — operator strike-directive + correction.** Rule: `auto_pickup_backlog=false` does NOT block urgent pipeline repair; default to `pan strike` for scoped unblockers. CORRECTION: the 8 stranded PRs GENUINELY conflict (GitHub `mergeable=CONFLICTING`, not stale flags). Struck **PAN-1872** (`pan start` toUpperCase crash on sync-main conflict — the meta-unblocker for re-entering conflicted PRs). The "dashboard restart storm" was a misread — those are workspace-container peers (`PANOPTICON_DISABLE_DEACON=1`), not a duel.
+- **t4 — PAN-1872 fixed, drain keystone started.** Operator fixed+closed PAN-1872 (`7297d2469`, on main, +regression tests — complete, no follow-up needed). Confirmed the fix is in dist → `pan start` spawns into conflicted workspaces. Re-entered **PAN-1614** (#1630) to rebase — the convoy-recovery keystone whose landing+reload unblocks PAN-1845 + future stalled convoys.
 
 ### RUN-35 tick 5 (2026-06-14 ~18:14Z) — drained the conflicted backlog; OPERATOR expanded charter (pan review + drive-through gaps)
 
@@ -903,3 +764,13 @@ or (b) restart the dashboard to fire the PAN-1758 startup repair sweep.
 - **NEVER touch these files** — they are conv/2920's live work (the same set the flywheel has been leaving untouched). Flywheel commits = docs/FLYWHEEL-STATE.md + brief/role only.
 - **File-overlap risk → SERIALIZE around 2920's landing:** conv/2920 touches `FeatureItem.tsx` / `WorkspaceCard.tsx` / `AwaitingMergePage.tsx` / `command-deck.module.css`, which overlap drained PRs **PAN-1242** (board/FeatureItem) and **PAN-1775** (fly session row in tree). Do NOT merge a 2920-overlapping drained PR before conv/2920 lands (would conflict it); let 2920's feature land first, then rebase/merge the overlapping PRs onto it. Compounds the moving-main rolling-churn (tick 6) — another reason not to mass-merge.
 - **Protocol:** fetch + FF-only before every commit/push; treat a conv/2920 push as a main-moved event that re-conflicts overlapping PRs; coordinate merge ordering so the flywheel and 2920 don't double-author / collide (RUN-34 divergence lesson).
+
+### RUN-35 tick 7 (2026-06-14 ~19:02Z) — dashboard recovered; cascade iterating; PAN-1711→plan, PAN-1887 work started
+
+- **Dashboard RECOVERED** (health 200 in <1ms; no "slow but alive" since 18:13) — the event loop cleared once the drain agents finished rebasing + I tuned back load. Safe to launch again.
+- **strike-pan-1711 correctly aborted → drove through to full pipeline.** Strike verdict: event-loop saturation needs profiling + architectural changes (IssueDataService polling / agent-state writes / tmux delivery), not a precision fix. Captured its verdict on PAN-1711 + launched `pan plan PAN-1711 --auto --auto-start` (planning-pan-1711 live). Follow-through, not stop.
+- **PAN-1887 (GitLab wiring) work STARTED** — plan finalized (`planned`) but `--auto-start` didn't chain the work agent, so `pan start PAN-1887` (workspace existed) → agent-pan-1887 active. Driving the GitLab gap.
+- **PAN-1614 iterating** (convoy-recovery keystone): dup-import FIXED (build green now), but re-review found a NEW real blocker ("escalated recovery state never cleared on human unstick", deacon.ts:2156) → work agent fixing. Complex deacon logic = multi-cycle review; PAN-1864 deterministic synthesis catching real issues each pass. Closest to merge once it converges.
+- **Nothing readyForMerge yet** (MIN-831 only). Drained 1629/1765/1498 in review; 1242/1775/1641/1827/1491 still conflicting (rolling churn). conv/2920 NOT pushed yet (no collision). Main `0039335f` (a bot squash-merge "hide unavailable agent launch control"), CI in-progress.
+- **SERIALIZED (not mass-drained):** held; did not retry PAN-1827 (its >200s workspace-prep hang is a distinct bug, low-priority feature — surfaced, deferred to avoid re-saturating the just-recovered dashboard). PAN-1242/1775 held behind conv/2920.
+- **NEXT TICK:** PAN-1614 converge→merge→reload→cascade; PAN-1887 work progress; PAN-1845 synthesis; PAN-1711 plan→work; watch for conv/2920 push (re-conflicts 1242/1775); MIN-831 operator merge; PAN-1491 awaits PAN-1893.
