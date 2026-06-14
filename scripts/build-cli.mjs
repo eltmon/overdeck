@@ -1,5 +1,4 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -8,7 +7,7 @@ const distDir = join(projectRoot, 'dist');
 const dashboardDir = join(distDir, 'dashboard');
 const promptsDir = join(distDir, 'prompts');
 const cliPromptsDir = join(distDir, 'cli', 'prompts');
-const preservedRoot = join(tmpdir(), `panopticon-dashboard-${process.pid}-${Date.now()}`);
+const preservedRoot = join(projectRoot, '.tmp', `panopticon-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
 
 const moveDirSync = (src, dst) => {

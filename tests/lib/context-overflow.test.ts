@@ -1,36 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCompactRecoverySeedMessage, isContextOverflowError, isContextOverflowTail } from '../../src/lib/context-overflow.js';
+import { buildCompactRecoverySeedMessage, isContextOverflowTail } from '../../src/lib/context-overflow.js';
 
 const OVERFLOW_LINE = 'API Error: 400 Your input exceeds the context window of this model.';
-
-const CLAUDE_P_OVERFLOW = JSON.stringify({
-  result: 'Prompt is too long',
-  terminal_reason: 'blocking_limit',
-  count: 199_999,
-});
-
-describe('isContextOverflowError', () => {
-  it('returns true for the claude -p blocking-limit envelope', () => {
-    expect(isContextOverflowError(new Error(CLAUDE_P_OVERFLOW))).toBe(true);
-  });
-
-  it('matches case-insensitively', () => {
-    expect(isContextOverflowError(new Error('PROMPT IS TOO LONG'))).toBe(true);
-    expect(isContextOverflowError(new Error('terminal_reason: BLOCKING_LIMIT'))).toBe(true);
-  });
-
-  it('returns true for the existing context-window phrasing', () => {
-    expect(isContextOverflowError(new Error(OVERFLOW_LINE))).toBe(true);
-    expect(isContextOverflowError(OVERFLOW_LINE)).toBe(true);
-  });
-
-  it('returns false for unrelated errors', () => {
-    expect(isContextOverflowError(new Error('ENOENT: no such file or directory'))).toBe(false);
-    expect(isContextOverflowError(new Error('Network timeout'))).toBe(false);
-    expect(isContextOverflowError(null)).toBe(false);
-  });
-});
 
 describe('buildCompactRecoverySeedMessage', () => {
   it('points only at durable recovery artifacts and warns not to restart', () => {

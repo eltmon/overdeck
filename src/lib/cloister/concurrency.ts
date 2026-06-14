@@ -145,6 +145,11 @@ export function tryReserveAdvancingSlot(): boolean {
   return true;
 }
 
+/** Release a same-patrol advancing reservation when dispatch was calmly gated. */
+export function releaseAdvancingSlot(): void {
+  advancingReservedThisPatrol = Math.max(0, advancingReservedThisPatrol - 1);
+}
+
 // ---------------------------------------------------------------------------
 // Emergency brake
 //

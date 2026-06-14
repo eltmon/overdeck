@@ -171,6 +171,7 @@ describe('schema migrations', () => {
     expect(names).toContain('merge_retry_count');
     expect(names).toContain('pr_head_sha');
     expect(names).toContain('pr_number');
+    expect(names).toContain('conflict_resolution_dispatched_at');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 
@@ -285,6 +286,29 @@ describe('schema migrations', () => {
       .get('PAN-MIGRATE-699') as { review_spawned_at: string; test_retry_count: number };
     expect(row.review_spawned_at).toBe('2026-04-20T12:00:00.000Z');
     expect(row.test_retry_count).toBe(2);
+  });
+
+  it('v52 → v53: adds conflict_resolution_dispatched_at idempotently', () => {
+    db.pragma('user_version = 52');
+    db.exec(`
+      CREATE TABLE review_status (
+        issue_id TEXT PRIMARY KEY,
+        review_status TEXT NOT NULL DEFAULT 'pending',
+        test_status TEXT NOT NULL DEFAULT 'pending',
+        updated_at TEXT NOT NULL,
+        ready_for_merge INTEGER NOT NULL DEFAULT 0
+      );
+    `);
+
+    const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    expect(colsBefore.map(c => c.name)).not.toContain('conflict_resolution_dispatched_at');
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
+    expect(colsAfter.map(c => c.name)).toContain('conflict_resolution_dispatched_at');
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 
   it('leaves session_file unchanged when the corrected transcript is missing', () => {
