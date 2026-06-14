@@ -812,29 +812,28 @@ export function clearReadySignal(agentId: string): void {
  *
  * Returns true if the ready signal arrives within the timeout, false otherwise.
  */
+function isReadySignalPresent(readyPath: string): boolean {
+  if (!existsSync(readyPath)) return false;
+  try {
+    const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
+    // Accept both the Claude hook shape ({ ready: true, ... }) and the Pi
+    // extension shape ({ agentId, sessionId, ... } with no `ready` field).
+    return Boolean(signal && typeof signal === 'object' && signal.ready !== false);
+  } catch {
+    // File exists but mid-write / invalid — keep waiting.
+    return false;
+  }
+}
+
 export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): Promise<boolean> {
   const readyPath = getReadySignalPath(agentId);
 
-  for (let i = 0; i <= timeoutSeconds; i++) {
-    if (existsSync(readyPath)) {
-      try {
-        const signal = JSON.parse(readFileSync(readyPath, 'utf-8'));
-        // Accept both the Claude hook shape ({ ready: true, ... }) and the Pi
-        // extension shape ({ agentId, sessionId, ... } with no `ready` field).
-        if (signal && typeof signal === 'object' && signal.ready !== false) {
-          return true;
-        }
-      } catch {
-        // File exists but mid-write / invalid — keep waiting.
-      }
-    }
-
-    if (i < timeoutSeconds) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
-    }
+  for (let i = 0; i < timeoutSeconds; i++) {
+    if (isReadySignalPresent(readyPath)) return true;
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Non-blocking sleep
   }
 
-  return false;
+  return isReadySignalPresent(readyPath);
 }
 
 function promptReadyTimeoutSeconds(): number {

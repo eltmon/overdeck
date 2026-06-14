@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import tempfile
 from pathlib import Path
@@ -42,7 +43,7 @@ def run_pan(*args: str) -> str:
         return cached
 
     last: subprocess.CompletedProcess[str] | None = None
-    for _attempt in range(3):
+    for attempt in range(5):
         last = subprocess.run(
             [*LOCAL_PAN, *args],
             cwd=ROOT,
@@ -56,6 +57,11 @@ def run_pan(*args: str) -> str:
             with RUN_PAN_CACHE_LOCK:
                 RUN_PAN_CACHE[key] = last.stdout
             return last.stdout
+        # The CLI help smoke tests run immediately after tsdown rewrites dist/.
+        # Give the filesystem/module loader a short settle window before treating
+        # a command as genuinely broken.
+        if attempt < 4:
+            time.sleep(0.2 * (attempt + 1))
 
     assert last is not None
     raise subprocess.CalledProcessError(last.returncode, last.args, output=last.stdout)

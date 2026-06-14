@@ -23,8 +23,10 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
+import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { ensureDevcontainerSync } from './ensure-devcontainer.js';
+import { collectDockerContainerLifecycleSnapshot } from './stack-health.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -50,21 +52,23 @@ function declaredComposeProjectName(content: string, featureFolder: string): str
  */
 export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
   const featureFolder = `feature-${issueId.toLowerCase()}`;
-  const expected = `panopticon-${featureFolder}`;
+  const fallback = `panopticon-${featureFolder}`;
   for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
     if (!existsSync(devPath)) continue;
     try {
       const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
-      if (declared && declared !== expected) {
+      if (!declared) continue;
+      if (!declared.endsWith(featureFolder)) {
         throw new Error(
-          `Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected ${expected}`,
+          `Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected a name ending in ${featureFolder}`,
         );
       }
+      return declared;
     } catch (err: any) {
       if (err?.message?.startsWith('Refusing workspace rebuild:')) throw err;
     }
   }
-  return expected;
+  return fallback;
 }
 
 function findDevcontainerComposeFile(workspacePath: string): string | null {
@@ -176,6 +180,8 @@ export const rebuildWorkspaceStack = (
       ['-f', composeFile, '-p', composeProjectName, 'up', '-d', '--build'],
       dirname(composeFile),
     );
+    const containers = yield* collectDockerContainerLifecycleSnapshot();
+    recordDockerContainerLifecycleSnapshot(containers);
 
     return { success: true, workspacePath, composeFile, composeProjectName } satisfies RebuildWorkspaceStackResult;
   }).pipe(
