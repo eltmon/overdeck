@@ -26,6 +26,12 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
   '.pan/spec.vbrief.json',
   '.claude/rules/',
   '.claude/skills/',
+  // PAN-1899: machine-local Panopticon config copied into every workspace by
+  // copyPanopticonSettingsToWorkspaceSync (config.yaml, projects.yaml,
+  // settings.json). It diverges from main constantly and must never enter a
+  // feature branch — that was the source of the recurring projects.yaml sync
+  // conflict.
+  '.panopticon/',
 ];
 
 const SYNC_MAIN_MAIN_PREFERRED_PATHS = [
@@ -41,7 +47,7 @@ export function isSyncMainMainPreferredPath(relativePath: string): boolean {
   );
 }
 
-function isAutoCommitExcludedPath(relativePath: string): boolean {
+export function isAutoCommitExcludedPath(relativePath: string): boolean {
   const normalized = relativePath.replace(/\\/g, '/');
   for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) {
     if (pattern.endsWith('/')) {
