@@ -148,13 +148,6 @@ function pipelineGlyph(state: PipelineState): string {
   return '○'
 }
 
-function pipelineTone(state: PipelineState): string {
-  if (state === 'done') return 'border-success/40 bg-success/10 text-success-foreground'
-  if (state === 'fail') return 'border-destructive/40 bg-destructive/10 text-destructive-foreground'
-  if (state === 'active') return 'border-signal-review/40 bg-signal-review/10 text-signal-review-foreground'
-  return 'border-border bg-muted/30 text-muted-foreground'
-}
-
 function checkRunLabel(run: Pick<IssueCheckRun, 'status' | 'conclusion'>): string {
   if (run.status !== 'completed') return run.status.replace(/_/g, ' ')
   return (run.conclusion ?? 'unknown').replace(/_/g, ' ')
