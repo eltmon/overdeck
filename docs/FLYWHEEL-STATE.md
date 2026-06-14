@@ -807,3 +807,25 @@ or (b) restart the dashboard to fire the PAN-1758 startup repair sweep.
 - **PAN-1884** CLOSED/closed-out: operational agent rules promoted into bundled `scope: dev`
   files under `sync-sources/rules/` (commit `c4d15e6b`), conversation-memory reduced to
   pointers, lint:skills green.
+
+### RUN-35 tick 2 (2026-06-14 ~16:40Z) — no change on the 9 stranded; PAN-1845 now in-review with a STALLED convoy
+
+- **9 stale-based PRs UNCHANGED** — merge-blockers byte-identical to tick 1, PAN-1827 PR
+  untouched since 06-13, no reconciler/rebase/resume activity in the deacon log. PAN-1240
+  recovery did NOT fire; dashboard was NOT restarted for the PAN-1758 sweep. Main green
+  (`1233e884`, the compaction commit).
+- **agent-pan-1845 is idle-DONE, NOT stuck** (watchdog false positive). Pane: *"I'm not
+  stuck — `pan done PAN-1845` succeeded, issue In Review."* Branch merged origin/main
+  (`736fa7e04`), typecheck+lint pass. responseId static across captures = idle-at-prompt,
+  not hung. Operator-started → exempt; did not touch.
+- **PAN-1845 advanced to in-review (PR #1886) but its review convoy STALLED — PAN-1614 class.**
+  PR is FRESH (created 15:54Z, base near-current main — not stale like the other 9). All 5
+  convoy sessions `stopped`; the review report dir holds only `context.json` (0 reviewer
+  reports) so deterministic synthesis (PAN-1864) correctly never fired. Deacon excludes review
+  roles from auto-resume → won't self-recover. Flywheel can't `pan review restart` (not an
+  allowed verb). **Surfaced as the highest-value operator unblock: `pan review restart PAN-1845`.**
+- **Filed PAN-1889** (this conversation, operator-requested): retention/compaction policy for
+  this file (it was read whole every run, 212KB→compacted to 92KB / 809 lines).
+- **Held launches** (correct, unchanged rationale): no clean Flywheel verb advances the 9
+  (need PAN-1240 re-rebase) or PAN-1845 (needs review restart); auto_pickup_backlog=false forbids
+  fresh backlog.
