@@ -2203,12 +2203,15 @@ export async function recoverStalledReviewConvoys(
 
       const { spawnReviewRoleForIssue } = await import('./review-agent.js');
       try {
-        await Effect.runPromise(spawnReviewRoleForIssue({
+        const result = await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace,
           branch: `feature/${issueLower}`,
           force: true,
         }));
+        if (!result.success) {
+          throw new Error(result.error ?? result.message);
+        }
         stalledReviewConvoyRecoveryState.delete(key);
         status.reviewStatus = 'reviewing';
         actions.push(

@@ -206,7 +206,7 @@ describe('recoverStalledReviewConvoys', () => {
     mocks.spawnRun.mockClear();
     mocks.killSessionSync.mockClear();
     mocks.killSession.mockClear();
-    mocks.spawnReviewRoleForIssue.mockReset().mockReturnValue(Effect.succeed({ id: 'agent-pan-1614-review' }));
+    mocks.spawnReviewRoleForIssue.mockReset().mockReturnValue(Effect.succeed({ success: true, message: 'dispatched' }));
     stalledReviewConvoyRecoveryState.clear();
     setStatuses({ 'PAN-1614': { ...stalledStatus } });
   });
@@ -266,7 +266,7 @@ describe('recoverStalledReviewConvoys', () => {
   });
 
   it('defers within the cooldown after a failed attempt', async () => {
-    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.fail(new Error('spawn failed')));
+    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: false, message: 'spawn failed', error: 'spawn failed' }));
 
     await recoverStalledReviewConvoys(async () => 'in_review');
     const actions = await recoverStalledReviewConvoys(async () => 'in_review');
@@ -276,7 +276,7 @@ describe('recoverStalledReviewConvoys', () => {
   });
 
   it('escalates exactly once after the attempt cap is reached', async () => {
-    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.fail(new Error('spawn failed')));
+    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: false, message: 'spawn failed', error: 'spawn failed' }));
 
     await recoverStalledReviewConvoys(async () => 'in_review');
     await vi.advanceTimersByTimeAsync(cooldownMs);
@@ -300,18 +300,18 @@ describe('recoverStalledReviewConvoys', () => {
   });
 
   it('clears recovery state after a successful re-dispatch', async () => {
-    mocks.spawnReviewRoleForIssue.mockReturnValueOnce(Effect.fail(new Error('spawn failed')));
+    mocks.spawnReviewRoleForIssue.mockReturnValueOnce(Effect.succeed({ success: false, message: 'spawn failed', error: 'spawn failed' }));
     await recoverStalledReviewConvoys(async () => 'in_review');
     expect(stalledReviewConvoyRecoveryState.get('PAN-1614')?.attempts).toBe(1);
 
     await vi.advanceTimersByTimeAsync(cooldownMs);
-    mocks.spawnReviewRoleForIssue.mockReturnValueOnce(Effect.succeed({ id: 'agent-pan-1614-review' }));
+    mocks.spawnReviewRoleForIssue.mockReturnValueOnce(Effect.succeed({ success: true, message: 'dispatched' }));
     const actions = await recoverStalledReviewConvoys(async () => 'in_review');
 
     expect(actions).toEqual(['Re-dispatched stalled review convoy for PAN-1614 (attempt 2/3)']);
     expect(stalledReviewConvoyRecoveryState.has('PAN-1614')).toBe(false);
 
-    mocks.spawnReviewRoleForIssue.mockReturnValueOnce(Effect.fail(new Error('spawn failed')));
+    mocks.spawnReviewRoleForIssue.mockReturnValueOnce(Effect.succeed({ success: false, message: 'spawn failed', error: 'spawn failed' }));
     const nextActions = await recoverStalledReviewConvoys(async () => 'in_review');
     expect(nextActions).toEqual(['Failed to re-dispatch stalled review convoy for PAN-1614: spawn failed']);
     expect(stalledReviewConvoyRecoveryState.get('PAN-1614')?.attempts).toBe(1);
@@ -351,5 +351,14 @@ describe('recoverStalledReviewConvoys', () => {
       'Re-dispatched stalled review convoy for PAN-1614 (attempt 1/3)',
     ]);
     expect(mocks.spawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats spawnReviewRoleForIssue success:false as a failed attempt without clearing recovery state', async () => {
+    mocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: false, message: 'harness denied', error: 'harness denied' }));
+
+    const actions = await recoverStalledReviewConvoys(async () => 'in_review');
+
+    expect(actions).toEqual(['Failed to re-dispatch stalled review convoy for PAN-1614: harness denied']);
+    expect(stalledReviewConvoyRecoveryState.get('PAN-1614')?.attempts).toBe(1);
   });
 });
