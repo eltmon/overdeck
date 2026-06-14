@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import {
   cancelPending,
   clearAllPending,
+  deferPendingAutoMerge,
   getActionableAutoMerge,
   getPendingAutoMerge,
+  incrementAttempts,
   listActionableAutoMerges,
   listActiveAutoMerges,
   listDuePendingAutoMerges,
@@ -14,6 +16,8 @@ import {
   listProblemAutoMerges,
   markBlocked,
   markFailed,
+  markMerged,
+  resurrectStrandedAutoMerge,
   scheduleAutoMerge,
   transitionToMerging,
 } from '../pending-auto-merges-db.js';
@@ -163,5 +167,58 @@ describe('pending auto-merges db', () => {
     expect(cancelPending(entry.id, 'operator')).toBe(true);
     expect(markBlocked(entry.id, 'CI checks failing')).toBe(false);
     expect(listPendingAutoMerges()[0]).toMatchObject({ status: 'cancelled', cancelledBy: 'operator' });
+  });
+
+  it('defaults attempts to 0 on a fresh schedule', () => {
+    const entry = schedule('PAN-1486');
+    expect(entry.attempts).toBe(0);
+    expect(getPendingAutoMerge('PAN-1486')?.attempts).toBe(0);
+  });
+
+  it('defers only pending rows', () => {
+    const pending = schedule('PAN-1');
+    const merging = schedule('PAN-2');
+    transitionToMerging(merging.id);
+
+    expect(deferPendingAutoMerge(pending.id, '2026-05-25T12:00:00.000Z')).toBe(true);
+    expect(getPendingAutoMerge('PAN-1')?.scheduledMergeAt).toBe('2026-05-25T12:00:00.000Z');
+
+    expect(deferPendingAutoMerge(merging.id, '2026-05-25T12:00:00.000Z')).toBe(false);
+  });
+
+  it('resurrects only blocked or failed rows', () => {
+    const pending = schedule('PAN-1');
+    const merging = schedule('PAN-2');
+    const blocked = schedule('PAN-3');
+    const failed = schedule('PAN-4');
+    const merged = schedule('PAN-5');
+    const cancelled = schedule('PAN-6');
+
+    transitionToMerging(merging.id);
+    markBlocked(blocked.id, 'blocked');
+    transitionToMerging(failed.id);
+    markFailed(failed.id, 'failed');
+    transitionToMerging(merged.id);
+    markMerged(merged.id);
+    cancelPending(cancelled.id, 'operator');
+
+    expect(resurrectStrandedAutoMerge(pending.id, '2026-05-25T12:00:00.000Z')).toBe(false);
+    expect(resurrectStrandedAutoMerge(merging.id, '2026-05-25T12:00:00.000Z')).toBe(false);
+    expect(resurrectStrandedAutoMerge(merged.id, '2026-05-25T12:00:00.000Z')).toBe(false);
+    expect(resurrectStrandedAutoMerge(cancelled.id, '2026-05-25T12:00:00.000Z')).toBe(false);
+
+    expect(resurrectStrandedAutoMerge(blocked.id, '2026-05-25T12:00:00.000Z')).toBe(true);
+    expect(getActionableAutoMerge('PAN-3')).toMatchObject({ status: 'pending', scheduledMergeAt: '2026-05-25T12:00:00.000Z' });
+
+    expect(resurrectStrandedAutoMerge(failed.id, '2026-05-25T12:00:00.000Z')).toBe(true);
+    expect(getActionableAutoMerge('PAN-4')).toMatchObject({ status: 'pending', scheduledMergeAt: '2026-05-25T12:00:00.000Z' });
+  });
+
+  it('increments attempts and exposes the count', () => {
+    const entry = schedule('PAN-1486');
+    expect(incrementAttempts(entry.id)).toBe(true);
+    expect(getPendingAutoMerge('PAN-1486')?.attempts).toBe(1);
+    expect(incrementAttempts(entry.id)).toBe(true);
+    expect(getPendingAutoMerge('PAN-1486')?.attempts).toBe(2);
   });
 });

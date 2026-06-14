@@ -19,7 +19,7 @@ import type { SqliteDatabase } from './driver.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 54;
+export const SCHEMA_VERSION = 55;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -520,7 +520,8 @@ export function initSchema(db: SqliteDatabase): void {
       mergedAt         TEXT,
       failureReason    TEXT,
       cancelledAt      TEXT,
-      cancelledBy      TEXT
+      cancelledBy      TEXT,
+      attempts         INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
@@ -1482,6 +1483,13 @@ export function runMigrations(db: SqliteDatabase): void {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`); } catch { /* already exists */ }
     try {
       db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
+    } catch { /* already exists */ }
+  }
+
+  // v54 → v55: add attempts counter to pending_auto_merges for retry/backoff caps (PAN-1758)
+  if (currentVersion < 55) {
+    try {
+      db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0`);
     } catch { /* already exists */ }
   }
 

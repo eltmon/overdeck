@@ -21,6 +21,8 @@ export interface PendingAutoMerge {
   failureReason?: string;
   cancelledAt?: string;
   cancelledBy?: string;
+  /** Number of expensive merge attempts consumed; cheap eligibility deferrals do NOT increment this. */
+  attempts: number;
 }
 
 export interface ScheduleAutoMergeInput {
@@ -47,6 +49,7 @@ interface PendingAutoMergeRow {
   failureReason: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
+  attempts: number;
 }
 
 function toPendingAutoMerge(row: PendingAutoMergeRow): PendingAutoMerge {
@@ -64,6 +67,7 @@ function toPendingAutoMerge(row: PendingAutoMergeRow): PendingAutoMerge {
     failureReason: row.failureReason ?? undefined,
     cancelledAt: row.cancelledAt ?? undefined,
     cancelledBy: row.cancelledBy ?? undefined,
+    attempts: row.attempts ?? 0,
   };
 }
 
@@ -194,11 +198,38 @@ export function transitionToMerging(id: number): boolean {
   });
 }
 
+export function incrementAttempts(id: number): boolean {
+  return runDb('incrementAttempts', () => {
+    const result = getDatabase()
+      .prepare('UPDATE pending_auto_merges SET attempts = attempts + 1 WHERE id = ?')
+      .run(id);
+    return result.changes === 1;
+  });
+}
+
 export function markFailed(id: number, reason: string): boolean {
   return runDb('markFailed', () => {
     const result = getDatabase()
       .prepare('UPDATE pending_auto_merges SET "status" = \'failed\', failureReason = ? WHERE id = ? AND "status" = \'merging\'')
       .run(truncateReason(reason), id);
+    return result.changes === 1;
+  });
+}
+
+export function deferPendingAutoMerge(id: number, nextScheduledMergeAt: string): boolean {
+  return runDb('deferPendingAutoMerge', () => {
+    const result = getDatabase()
+      .prepare('UPDATE pending_auto_merges SET scheduledMergeAt = ? WHERE id = ? AND "status" = \'pending\'')
+      .run(nextScheduledMergeAt, id);
+    return result.changes === 1;
+  });
+}
+
+export function resurrectStrandedAutoMerge(id: number, nextScheduledMergeAt: string): boolean {
+  return runDb('resurrectStrandedAutoMerge', () => {
+    const result = getDatabase()
+      .prepare('UPDATE pending_auto_merges SET "status" = \'pending\', scheduledMergeAt = ? WHERE id = ? AND "status" IN (\'blocked\',\'failed\')')
+      .run(nextScheduledMergeAt, id);
     return result.changes === 1;
   });
 }

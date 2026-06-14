@@ -26,7 +26,7 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
 
-    expect(SCHEMA_VERSION).toBe(54);
+    expect(SCHEMA_VERSION).toBe(55);
     const db = getDatabase();
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
 
@@ -45,6 +45,7 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
       'failureReason',
       'cancelledAt',
       'cancelledBy',
+      'attempts',
     ]);
 
     const indexes = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'pending_auto_merges'").all() as Array<{ name: string; sql: string }>;
@@ -101,6 +102,43 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
         { name: 'idx_events_issue_type_timestamp_sequence' },
         { name: 'idx_events_type_timestamp_issue_sequence' },
       ]));
+    } finally {
+      db.close();
+    }
+  });
+
+  it('migrates an existing v54 database by adding attempts column', () => {
+    const home = makeTestHome('pan-pending-auto-merges-v54-attempts');
+    const db = openDatabase(join(home, 'panopticon.db'));
+    try {
+      db.exec(`
+        CREATE TABLE pending_auto_merges (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          issueId          TEXT NOT NULL,
+          prUrl            TEXT NOT NULL,
+          prNumber         INTEGER,
+          projectKey       TEXT NOT NULL,
+          forge            TEXT NOT NULL DEFAULT 'github',
+          "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
+          scheduledMergeAt TEXT NOT NULL,
+          scheduledAt      TEXT NOT NULL,
+          mergedAt         TEXT,
+          failureReason    TEXT,
+          cancelledAt      TEXT,
+          cancelledBy      TEXT
+        );
+        INSERT INTO pending_auto_merges (issueId, prUrl, projectKey, "status", scheduledMergeAt, scheduledAt)
+          VALUES ('PAN-1758', 'https://github.com/eltmon/panopticon-cli/pull/1758', 'panopticon-cli', 'pending', '2026-05-25T10:00:00.000Z', '2026-05-25T09:00:00.000Z');
+        PRAGMA user_version = 54;
+      `);
+
+      runMigrations(db);
+
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+      const columns = db.prepare('PRAGMA table_info(pending_auto_merges)').all() as Array<{ name: string }>;
+      expect(columns.map((column) => column.name)).toContain('attempts');
+      const row = db.prepare('SELECT issueId, attempts FROM pending_auto_merges WHERE issueId = ?').get('PAN-1758') as { issueId: string; attempts: number };
+      expect(row).toEqual({ issueId: 'PAN-1758', attempts: 0 });
     } finally {
       db.close();
     }
