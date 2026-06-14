@@ -112,13 +112,14 @@ export async function isAutoMergeEligible(
     return { eligible: false, reason: 'held for UAT (auto-merge toggled off)' };
   }
 
-  const artifactRef = parseArtifactRef(reviewStatus.prUrl);
-  if (!artifactRef) {
+  const prUrl = reviewStatus.prUrl;
+  const artifactRef = parseArtifactRef(prUrl);
+  if (!artifactRef || !prUrl) {
     return { eligible: false, reason: 'review status PR URL is missing or invalid' };
   }
 
   if (artifactRef.forge === 'gitlab') {
-    const projectPath = parseGitLabProjectPath(reviewStatus.prUrl);
+    const projectPath = parseGitLabProjectPath(prUrl);
     if (!projectPath) {
       return { eligible: false, reason: 'review status PR URL is missing or invalid' };
     }
