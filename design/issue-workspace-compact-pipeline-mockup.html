@@ -453,44 +453,7 @@
     .content {
       min-height: 0;
       display: grid;
-      grid-template-columns: 64px minmax(0, 1fr);
-      transition: grid-template-columns 160ms ease;
-    }
-
-    .content.pipeline-open {
-      grid-template-columns: 244px minmax(0, 1fr);
-    }
-
-    .pipeline {
-      min-width: 0;
-      border-right: 1px solid var(--border);
-      background: var(--card);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .pipeline-head {
-      height: 52px;
-      padding: 0 8px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .pipeline-title {
-      display: none;
-      min-width: 0;
-      color: var(--muted-foreground);
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.10em;
-      text-transform: uppercase;
-    }
-
-    .content.pipeline-open .pipeline-title {
-      display: block;
+      grid-template-columns: 292px minmax(0, 1fr);
     }
 
     .icon-button {
@@ -505,101 +468,294 @@
       cursor: pointer;
     }
 
-    .stage-list {
-      padding: 8px;
-      overflow: auto;
-      display: grid;
-      gap: 6px;
-    }
-
-    .stage-row {
-      min-width: 0;
-      height: 50px;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      display: grid;
-      grid-template-columns: 34px minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 7px;
-      padding: 0 6px;
-      color: var(--muted-foreground);
-      background: transparent;
-    }
-
-    .stage-row.active {
-      border-color: rgba(168, 85, 247, 0.22);
-      background: rgba(168, 85, 247, 0.06);
-      color: var(--foreground);
-    }
-
-    .stage-row .stage-icon {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      display: grid;
-      place-items: center;
-      background: var(--card);
-      font-size: 13px;
-      font-weight: 500;
-    }
-
-    .stage-row.done .stage-icon {
-      color: var(--success-foreground);
-      border-color: rgba(16, 185, 129, 0.24);
-      background: rgba(16, 185, 129, 0.06);
-    }
-
-    .stage-row.active .stage-icon {
-      color: var(--signal-review-foreground);
-      border-color: rgba(168, 85, 247, 0.26);
-      background: rgba(168, 85, 247, 0.08);
-    }
-
-    .stage-copy {
-      display: none;
-      min-width: 0;
-    }
-
-    .content.pipeline-open .stage-copy {
-      display: block;
-    }
-
-    .stage-copy strong {
-      display: block;
-      font-size: 13px;
-      line-height: 1.2;
-      font-weight: 500;
-      color: var(--foreground);
-    }
-
-    .stage-copy span {
-      display: block;
-      margin-top: 3px;
-      font-size: 11px;
-      line-height: 1.2;
-      color: var(--muted-foreground);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .stage-caret {
-      display: none;
-      color: var(--muted-foreground);
-      font-size: 12px;
-    }
-
-    .content.pipeline-open .stage-caret {
-      display: block;
-    }
-
     .main-panel {
+      min-width: 0;
+      min-height: 0;
+      background: #fcfcfb;
+    }
+
+    .workspace-view {
       min-width: 0;
       min-height: 0;
       display: grid;
       grid-template-rows: 52px minmax(0, 1fr);
+    }
+
+    .workspace-view.hidden {
+      display: none;
+    }
+
+    .issue-tree {
+      min-width: 0;
+      min-height: 0;
+      border-right: 1px solid var(--border);
+      background: #f7f7f5;
+      overflow: auto;
+      padding: 12px 8px;
+    }
+
+    .tree-toolbar {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tree-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 6px;
+      color: var(--muted-foreground);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .tree-filter {
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      overflow: hidden;
+    }
+
+    .tree-filter button {
+      border: 0;
+      border-left: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted-foreground);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .tree-filter button:first-child {
+      border-left: 0;
+    }
+
+    .tree-filter .active {
+      color: var(--primary);
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    .tree-project {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tree-count {
+      margin-left: auto;
+      color: var(--muted-foreground);
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .issue-node {
+      border-left: 3px solid transparent;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 8px;
+      background: transparent;
+    }
+
+    .issue-node.selected {
+      border-left-color: var(--primary);
+      background: rgba(59, 130, 246, 0.08);
+    }
+
+    .issue-tree-item {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--foreground);
+      padding: 8px 8px 7px;
+      display: grid;
+      gap: 5px;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 0 7px 7px 0;
+    }
+
+    .issue-tree-item:hover,
+    .issue-tree-item.active {
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .issue-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .issue-key {
+      color: var(--muted-foreground);
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .issue-cost {
+      color: var(--muted-foreground);
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 11px;
+    }
+
+    .issue-label {
+      min-width: 0;
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 500;
+    }
+
+    .issue-meta {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .mini-chip {
+      height: 19px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.66);
+      color: var(--muted-foreground);
+      padding: 0 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+
+    .mini-chip.ready {
+      color: var(--warning-foreground);
+      border-color: rgba(245, 158, 11, 0.26);
+      background: rgba(245, 158, 11, 0.08);
+    }
+
+    .tree-children {
+      padding: 0 0 6px 22px;
+      display: grid;
+      gap: 1px;
+    }
+
+    .tree-child {
+      min-height: 29px;
+      width: 100%;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted-foreground);
+      padding: 0 8px;
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 7px;
+      align-items: center;
+      text-align: left;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .tree-child:hover,
+    .tree-child.active {
+      color: var(--foreground);
+      background: var(--card);
+    }
+
+    .tree-child small {
+      color: var(--muted-foreground);
+      font-family: "SF Mono", ui-monospace, monospace;
+      font-size: 10px;
+    }
+
+    .tree-resource {
+      padding: 7px 8px 7px 32px;
+      color: var(--muted-foreground);
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    .context-view {
+      min-width: 0;
+      min-height: 0;
+      display: none;
+      grid-template-rows: auto minmax(0, 1fr);
       background: #fcfcfb;
+    }
+
+    .context-view.active {
+      display: grid;
+    }
+
+    .context-head {
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      padding: 14px 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .context-head h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 500;
+      line-height: 1.2;
+    }
+
+    .context-head p {
+      margin: 5px 0 0;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .context-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px 22px 24px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .context-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 14px;
+      max-width: 1120px;
+      align-items: start;
+    }
+
+    .timeline-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .timeline-item {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      gap: 10px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .timeline-item .dot {
+      margin: 6px 0 0;
+    }
     }
 
     .tabs {
@@ -1008,93 +1164,116 @@
       </header>
 
       <section class="content" id="content">
-        <aside class="pipeline">
-          <div class="pipeline-head">
-            <div class="pipeline-title">Pipeline · Live</div>
-            <button class="icon-button" id="togglePipeline" type="button" aria-label="Toggle pipeline details">⇥</button>
+        <aside class="issue-tree" aria-label="Issue tree">
+          <div class="tree-toolbar">
+            <div class="tree-title"><span>Issues</span><span>20</span></div>
+            <div class="tree-filter" aria-label="Issue filters">
+              <button class="active" type="button">All</button>
+              <button type="button">Alive</button>
+              <button type="button">Failed</button>
+            </div>
           </div>
 
-          <div class="stage-list">
-            <div class="stage-row done">
-              <div class="stage-icon">✓</div>
-              <div class="stage-copy"><strong>Plan</strong><span>plan artifacts present</span></div>
-              <div class="stage-caret">›</div>
+          <div class="tree-project">⌄ panopticon-cli <span class="tree-count">20</span></div>
+
+          <section class="issue-node selected">
+            <button class="issue-tree-item active" type="button" data-context="issue" data-title="MIN-832" data-summary="Fix notification tray account switching edge case">
+              <span class="issue-row"><span class="issue-key">MIN-832</span><span class="issue-cost">$226.40</span></span>
+              <span class="issue-label">Fix notification tray account switching edge case</span>
+              <span class="issue-meta">
+                <span class="mini-chip">work</span>
+                <span class="mini-chip">main</span>
+                <span class="mini-chip ready">merge ready</span>
+              </span>
+            </button>
+            <div class="tree-children">
+              <button class="tree-child active" type="button" data-context="work" data-title="Work agent" data-summary="Work agent conversation and terminal remain visible inside this pane.">
+                <span>⌘</span><span>Work agent</span><small>gpt-5.5</small>
+              </button>
+              <button class="tree-child" type="button" data-context="review" data-title="Review" data-summary="Reviewer findings, approval, and rerun controls for MIN-832.">
+                <span>◇</span><span>Review</span><small>passed</small>
+              </button>
+              <button class="tree-child" type="button" data-context="test" data-title="Test" data-summary="Test output and verification status for this issue.">
+                <span>⚗</span><span>Test</span><small>passed</small>
+              </button>
+              <button class="tree-child" type="button" data-context="uat" data-title="UAT environment" data-summary="Workspace container, compose services, health checks, and rebuild activity.">
+                <span>▣</span><span>UAT environment</span><small>healthy</small>
+              </button>
+              <button class="tree-child" type="button" data-context="planning" data-title="Planning state" data-summary="vBRIEF, beads, and final planning controls.">
+                <span>☷</span><span>Planning state</span><small>final</small>
+              </button>
             </div>
-            <div class="stage-row done">
-              <div class="stage-icon">✓</div>
-              <div class="stage-copy"><strong>Work</strong><span>agent-min-832 · stopped</span></div>
-              <div class="stage-caret">›</div>
-            </div>
-            <div class="stage-row done">
-              <div class="stage-icon">✓</div>
-              <div class="stage-copy"><strong>Review</strong><span>passed · cycle 1</span></div>
-              <div class="stage-caret">›</div>
-            </div>
-            <div class="stage-row done">
-              <div class="stage-icon">✓</div>
-              <div class="stage-copy"><strong>Test</strong><span>passed</span></div>
-              <div class="stage-caret">›</div>
-            </div>
-            <div class="stage-row">
-              <div class="stage-icon">◦</div>
-              <div class="stage-copy"><strong>GitHub CI/CD</strong><span>no checks</span></div>
-              <div class="stage-caret">›</div>
-            </div>
-            <div class="stage-row">
-              <div class="stage-icon">◦</div>
-              <div class="stage-copy"><strong>Ship</strong><span>pending</span></div>
-              <div class="stage-caret">›</div>
-            </div>
-            <div class="stage-row active">
-              <div class="stage-icon">◆</div>
-              <div class="stage-copy"><strong>Merge</strong><span>ready for human merge</span></div>
-              <div class="stage-caret">›</div>
-            </div>
-          </div>
+            <div class="tree-resource"><span>↗</span><span>PR #1516 · open</span></div>
+            <div class="tree-resource"><span>⑂</span><span>feature/min-832 · local</span></div>
+            <div class="tree-resource"><span>◉</span><span>tmux · attached</span></div>
+          </section>
+
+          <section class="issue-node">
+            <button class="issue-tree-item" type="button" data-context="issue" data-title="MIN-831" data-summary="Restore UAT environment visibility in workspace issue details.">
+              <span class="issue-row"><span class="issue-key">MIN-831</span><span class="issue-cost">$84.12</span></span>
+              <span class="issue-label">Restore UAT environment visibility in issue detail pane</span>
+              <span class="issue-meta">
+                <span class="mini-chip">work</span>
+                <span class="mini-chip ready">in review</span>
+              </span>
+            </button>
+          </section>
+
+          <section class="issue-node">
+            <button class="issue-tree-item" type="button" data-context="issue" data-title="MIN-846" data-summary="Allow supervised agent spawn after planning is finalized.">
+              <span class="issue-row"><span class="issue-key">MIN-846</span><span class="issue-cost">$17.90</span></span>
+              <span class="issue-label">Spawn work agent from issue workspace once planning is complete</span>
+              <span class="issue-meta">
+                <span class="mini-chip">planned</span>
+                <span class="mini-chip">blocked</span>
+              </span>
+            </button>
+          </section>
         </aside>
 
         <section class="main-panel">
-          <nav class="tabs" aria-label="Issue workspace tabs">
-            <button class="tab active" type="button">Overview</button>
-            <button class="tab" type="button">Review</button>
-            <button class="tab" type="button">Test</button>
-            <button class="tab" type="button">PR &amp; CI</button>
-            <button class="tab" type="button">Conversation</button>
-            <button class="tab" type="button">Diff</button>
-            <button class="tab" type="button">Files</button>
-            <button class="tab" type="button">Terminal</button>
-            <button class="tab" type="button">PRD / Plan</button>
-          </nav>
+          <div class="workspace-view hidden" id="workspaceView">
+            <nav class="tabs" aria-label="Issue workspace tabs">
+              <button class="tab active" type="button">Overview</button>
+              <button class="tab" type="button">Review</button>
+              <button class="tab" type="button">Test</button>
+              <button class="tab" type="button">PR &amp; CI</button>
+              <button class="tab" type="button">Conversation</button>
+              <button class="tab" type="button">Diff</button>
+              <button class="tab" type="button">Files</button>
+              <button class="tab" type="button">Terminal</button>
+              <button class="tab" type="button">PRD / Plan</button>
+            </nav>
 
-          <div class="stage-area">
-            <div class="stage-inspector">
-              <section class="inspector-head">
-                <div>
-                  <h2><span id="stageTitle">Merge</span> activity</h2>
-                  <p id="stageSummary">Ready for human merge. Review the conversation or switch to terminal output without leaving the stage context.</p>
-                </div>
-                <div class="mode-toggle" aria-label="Activity view">
-                  <button class="active" type="button" data-mode="conversation">Conversation</button>
-                  <button type="button" data-mode="terminal">Terminal</button>
-                </div>
-              </section>
+            <div class="stage-area">
+              <div class="stage-inspector">
+                <section class="inspector-head">
+                  <div>
+                    <h2><span id="stageTitle">Merge</span> activity</h2>
+                    <p id="stageSummary">Ready for human merge. Review the conversation or switch to terminal output without leaving the stage context.</p>
+                  </div>
+                  <div class="mode-toggle" aria-label="Activity view">
+                    <button class="active" type="button" data-mode="conversation">Conversation</button>
+                    <button type="button" data-mode="terminal">Terminal</button>
+                  </div>
+                </section>
 
-              <section class="activity-panel">
-                <div class="conversation-view active" id="conversationView">
-                  <div class="message">
-                    <strong>operator</strong>
-                    <p>Check the merge gate for MIN-832 and confirm what remains before we move this to main.</p>
+                <section class="activity-panel">
+                  <div class="conversation-view active" id="conversationView">
+                    <div class="message">
+                      <strong>operator</strong>
+                      <p>Check the merge gate for MIN-832 and confirm what remains before we move this to main.</p>
+                    </div>
+                    <div class="message agent">
+                      <strong>merge-agent</strong>
+                      <p>Review and test gates are passing. GitHub CI has no checks for this branch. The remaining blocker is explicit human approval.</p>
+                    </div>
+                    <div class="message">
+                      <strong>operator</strong>
+                      <p>Keep the PR link and rerun controls close to this state so I do not need a duplicate pipeline rail.</p>
+                    </div>
                   </div>
-                  <div class="message agent">
-                    <strong>merge-agent</strong>
-                    <p>Review and test gates are passing. GitHub CI has no checks for this branch. The remaining blocker is explicit human approval.</p>
-                  </div>
-                  <div class="message">
-                    <strong>operator</strong>
-                    <p>Keep the PR link and rerun controls close to this state so I do not need the left pipeline expanded.</p>
-                  </div>
-                </div>
-                <pre class="terminal-view" id="terminalView">agent-min-832 $ pan status MIN-832
+                  <pre class="terminal-view" id="terminalView">agent-min-832 $ pan status MIN-832
 Issue: MIN-832
 Stage: Merge
 Review: passed
@@ -1105,40 +1284,91 @@ Merge: waiting for human approval
 agent-min-832 $ git status --short
 # clean
 </pre>
-              </section>
-            </div>
-
-            <div class="stage-grid" style="margin-top: 14px;">
-              <div class="banner">
-                <div class="ok">✓</div>
-                <div>
-                  <strong>Ready to merge</strong>
-                  <span>Review and tests passed. Merge is blocked only by explicit human action.</span>
-                </div>
-                <button class="btn" type="button">View PR</button>
+                </section>
               </div>
 
-              <section class="card">
-                <div class="card-title"><span><span class="dot"></span>Now</span><span class="ready-pill">READY</span></div>
-                <div class="kv">
-                  <div class="kv-row"><span>Phase</span><span>Merge</span></div>
-                  <div class="kv-row"><span>Review</span><span>passed</span></div>
-                  <div class="kv-row"><span>Test</span><span>passed</span></div>
-                  <div class="kv-row"><span>Blocker</span><span style="color: var(--warning-foreground)">human merge approval</span></div>
-                  <div class="kv-row"><span>Next action</span><span>merge to main</span></div>
+              <div class="stage-grid" style="margin-top: 14px;">
+                <div class="banner">
+                  <div class="ok">✓</div>
+                  <div>
+                    <strong>Ready to merge</strong>
+                    <span>Review and tests passed. Merge is blocked only by explicit human action.</span>
+                  </div>
+                  <button class="btn" type="button">View PR</button>
+                </div>
+
+                <section class="card">
+                  <div class="card-title"><span><span class="dot"></span>Now</span><span class="ready-pill">READY</span></div>
+                  <div class="kv">
+                    <div class="kv-row"><span>Phase</span><span>Merge</span></div>
+                    <div class="kv-row"><span>Review</span><span>passed</span></div>
+                    <div class="kv-row"><span>Test</span><span>passed</span></div>
+                    <div class="kv-row"><span>Blocker</span><span style="color: var(--warning-foreground)">human merge approval</span></div>
+                    <div class="kv-row"><span>Next action</span><span>merge to main</span></div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <div class="card-title"><span>Issue</span><button class="btn" id="openIssueSecondary" type="button">Open drawer</button></div>
+                  <div class="kv">
+                    <div class="kv-row"><span>Issue</span><span>MIN-832</span></div>
+                    <div class="kv-row"><span>Pull request</span><span>no PR</span></div>
+                    <div class="kv-row"><span>CI checks</span><span>no checks</span></div>
+                    <div class="kv-row"><span>Verification</span><span>passed · 1 cycle</span></div>
+                    <div class="kv-row"><span>Merge-ready</span><span>yes</span></div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div class="context-view active" id="contextView">
+            <div class="context-head">
+              <div>
+                <h2 id="contextTitle">Work agent</h2>
+                <p id="contextSummary">Work agent conversation and terminal remain visible inside this pane.</p>
+              </div>
+              <button class="btn" id="backToWorkspace" type="button">← Workspace tabs</button>
+            </div>
+            <div class="context-body">
+              <section class="activity-panel">
+                <div class="conversation-view active" id="treeConversationView">
+                  <div class="message">
+                    <strong>operator</strong>
+                    <p>Make the workspace show UAT environment progress where I can watch containers and health checks come up.</p>
+                  </div>
+                  <div class="message agent">
+                    <strong>work-agent</strong>
+                    <p>I found the old issue workspace detail pane in git history. The prior version rendered workspace resources and UAT health beside the issue metadata.</p>
+                  </div>
+                  <div class="message agent">
+                    <strong>work-agent</strong>
+                    <p>Implementing the event-backed activity feed now. The issue tree keeps this conversation attached to the Work node so the right pane changes immediately when selected.</p>
+                  </div>
                 </div>
               </section>
 
-              <section class="card">
-                <div class="card-title"><span>Issue</span><button class="btn" id="openIssueSecondary" type="button">Open drawer</button></div>
-                <div class="kv">
-                  <div class="kv-row"><span>Issue</span><span>MIN-832</span></div>
-                  <div class="kv-row"><span>Pull request</span><span>no PR</span></div>
-                  <div class="kv-row"><span>CI checks</span><span>no checks</span></div>
-                  <div class="kv-row"><span>Verification</span><span>passed · 1 cycle</span></div>
-                  <div class="kv-row"><span>Merge-ready</span><span>yes</span></div>
-                </div>
-              </section>
+              <div class="context-grid">
+                <section class="card">
+                  <div class="card-title"><span>Recent activity</span><span class="ready-pill">LIVE</span></div>
+                  <div class="timeline-list" id="contextTimeline">
+                    <div class="timeline-item"><span class="dot"></span><span>Workspace container pulled base image and started dependency install.</span></div>
+                    <div class="timeline-item"><span class="dot"></span><span>UAT service reported healthy after rebuild. Link is enabled once health check passes.</span></div>
+                    <div class="timeline-item"><span class="dot"></span><span>Work agent pushed the event listener change and requested review.</span></div>
+                  </div>
+                </section>
+
+                <section class="card">
+                  <div class="card-title"><span>Node details</span><button class="btn" type="button">Open terminal</button></div>
+                  <div class="kv" id="contextFacts">
+                    <div class="kv-row"><span>Issue</span><span>MIN-832</span></div>
+                    <div class="kv-row"><span>Selected</span><span>Work agent</span></div>
+                    <div class="kv-row"><span>Harness</span><span>Codex</span></div>
+                    <div class="kv-row"><span>Model</span><span>gpt-5.5</span></div>
+                    <div class="kv-row"><span>Status</span><span>running</span></div>
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
         </section>
@@ -1177,8 +1407,6 @@ agent-min-832 $ git status --short
   </aside>
 
   <script>
-    const content = document.getElementById('content');
-    const togglePipeline = document.getElementById('togglePipeline');
     const drawer = document.getElementById('drawer');
     const scrim = document.getElementById('scrim');
     const openIssue = document.getElementById('openIssue');
@@ -1191,6 +1419,14 @@ agent-min-832 $ git status --short
     const stageSummary = document.getElementById('stageSummary');
     const conversationView = document.getElementById('conversationView');
     const terminalView = document.getElementById('terminalView');
+    const workspaceView = document.getElementById('workspaceView');
+    const contextView = document.getElementById('contextView');
+    const contextTitle = document.getElementById('contextTitle');
+    const contextSummary = document.getElementById('contextSummary');
+    const treeConversationView = document.getElementById('treeConversationView');
+    const contextTimeline = document.getElementById('contextTimeline');
+    const contextFacts = document.getElementById('contextFacts');
+    const backToWorkspace = document.getElementById('backToWorkspace');
 
     const stageSummaries = {
       Plan: 'Planning artifacts are present. Review the planning discussion or inspect the plan generation terminal output.',
@@ -1236,11 +1472,6 @@ Merge: waiting for human approval
 agent-min-832 $ git status --short
 # clean`,
     };
-
-    togglePipeline.addEventListener('click', () => {
-      content.classList.toggle('pipeline-open');
-      togglePipeline.textContent = content.classList.contains('pipeline-open') ? '⇤' : '⇥';
-    });
 
     function setActionsMenu(open) {
       actionsMenu.classList.toggle('open', open);
@@ -1294,6 +1525,168 @@ agent-min-832 $ git status --short
         conversationView.classList.toggle('active', !terminal);
         terminalView.classList.toggle('active', terminal);
       });
+    });
+
+    const contextData = {
+      issue: {
+        title: 'MIN-832',
+        summary: 'Issue detail replaces the workspace tabs after selecting an issue row. Use the back button to return to Overview, Review, Test, PR & CI, Conversation, Diff, Files, Terminal, and PRD / Plan.',
+        messages: [
+          ['operator', 'Open MIN-832 from the issue tree and show the same issue detail context we use in the slide-out drawer.'],
+          ['workspace', 'The issue tree keeps the selected issue in view while this pane shows summary, UAT, agents, and recent activity.'],
+          ['workspace', 'The workspace tabs are still one click away through the header action above.'],
+        ],
+        timeline: [
+          'Planning is finalized with vBRIEF and beads present.',
+          'Review and test gates are passing.',
+          'Merge is waiting for explicit human approval.',
+        ],
+        facts: [
+          ['Issue', 'MIN-832'],
+          ['Branch', 'feature/min-832'],
+          ['PR / CI', 'no PR'],
+          ['Verification', 'passed'],
+          ['UAT', 'healthy'],
+        ],
+      },
+      work: {
+        title: 'Work agent',
+        summary: 'Work agent conversation and terminal remain visible inside this pane.',
+        messages: [
+          ['operator', 'Make the workspace show UAT environment progress where I can watch containers and health checks come up.'],
+          ['work-agent', 'I found the old issue workspace detail pane in git history. The prior version rendered workspace resources and UAT health beside the issue metadata.'],
+          ['work-agent', 'Implementing the event-backed activity feed now. The issue tree keeps this conversation attached to the Work node so the right pane changes immediately when selected.'],
+        ],
+        timeline: [
+          'Workspace container pulled base image and started dependency install.',
+          'UAT service reported healthy after rebuild. Link is enabled once health check passes.',
+          'Work agent pushed the event listener change and requested review.',
+        ],
+        facts: [
+          ['Issue', 'MIN-832'],
+          ['Selected', 'Work agent'],
+          ['Harness', 'Codex'],
+          ['Model', 'gpt-5.5'],
+          ['Status', 'running'],
+        ],
+      },
+      review: {
+        title: 'Review',
+        summary: 'Reviewer findings, approval, and rerun controls for MIN-832.',
+        messages: [
+          ['operator', 'Check the UAT visibility change and make sure no existing workspace actions disappeared.'],
+          ['review-agent', 'No-loss audit passed. Overview, Review, Test, PR & CI, Conversation, Diff, Files, Terminal, and PRD / Plan remain reachable from the workspace tabs.'],
+          ['review-agent', 'Suggested follow-up: move UAT status updates from polling to dashboard events.'],
+        ],
+        timeline: [
+          'Reviewed issue tree interaction model.',
+          'Confirmed UAT health cards render in issue detail.',
+          'Approved with follow-up for event-backed updates.',
+        ],
+        facts: [
+          ['Issue', 'MIN-832'],
+          ['Selected', 'Review'],
+          ['Reviewer', 'kimi-k2.7-code'],
+          ['Status', 'passed'],
+          ['Findings', '0 blocking'],
+        ],
+      },
+      test: {
+        title: 'Test',
+        summary: 'Test output and verification status for this issue.',
+        messages: [
+          ['operator', 'Run the focused dashboard tests and confirm the pane switching stays stable.'],
+          ['test-agent', 'Focused tests passed. I also verified that selecting issue tree nodes does not reset the top workflow state.'],
+          ['test-agent', 'The remaining CI stage is intentionally visible even when no GitHub checks are attached.'],
+        ],
+        timeline: [
+          'npm run typecheck passed.',
+          'npm run test -- dashboard workspace passed.',
+          'Playwright smoke captured issue tree and context pane.',
+        ],
+        facts: [
+          ['Issue', 'MIN-832'],
+          ['Selected', 'Test'],
+          ['Status', 'passed'],
+          ['Cycles', '1'],
+          ['CI', 'no checks'],
+        ],
+      },
+      uat: {
+        title: 'UAT environment',
+        summary: 'Workspace container, compose services, health checks, and rebuild activity.',
+        messages: [
+          ['operator', 'Clicking rebuild UAT tells me to watch the activity feed, but I need to see containers loading here.'],
+          ['dashboard', 'docker compose pull completed. app, worker, and postgres are starting.'],
+          ['dashboard', 'Health check passed. UAT link is now enabled.'],
+        ],
+        timeline: [
+          'compose pull: app image updated.',
+          'compose up: app, worker, postgres started.',
+          'health: /api/health returned ok after 34 seconds.',
+        ],
+        facts: [
+          ['Issue', 'MIN-832'],
+          ['Selected', 'UAT'],
+          ['App', 'healthy'],
+          ['Worker', 'healthy'],
+          ['Database', 'healthy'],
+        ],
+      },
+      planning: {
+        title: 'Planning state',
+        summary: 'vBRIEF, beads, and final planning controls.',
+        messages: [
+          ['operator', 'Only show Start agent once planning has completed. If planning started but is not finalized, let me finalize it here.'],
+          ['dashboard', 'vBRIEF exists and beads are finalized. Start agent is available with default harness/model and override controls.'],
+          ['dashboard', 'If beads were still draft, this pane would show Finalize planning instead of Start agent.'],
+        ],
+        timeline: [
+          'vBRIEF generated.',
+          'Beads generated and accepted.',
+          'Planning finalization gate passed.',
+        ],
+        facts: [
+          ['Issue', 'MIN-832'],
+          ['Selected', 'Planning'],
+          ['vBRIEF', 'present'],
+          ['Beads', 'finalized'],
+          ['Agent', 'available'],
+        ],
+      },
+    };
+
+    function renderContext(key) {
+      const data = contextData[key] || contextData.issue;
+      workspaceView.classList.add('hidden');
+      contextView.classList.add('active');
+      contextTitle.textContent = data.title;
+      contextSummary.textContent = data.summary;
+      treeConversationView.innerHTML = data.messages.map(([speaker, body], index) => `
+        <div class="message${index > 0 ? ' agent' : ''}">
+          <strong>${speaker}</strong>
+          <p>${body}</p>
+        </div>
+      `).join('');
+      contextTimeline.innerHTML = data.timeline.map((item) => `
+        <div class="timeline-item"><span class="dot"></span><span>${item}</span></div>
+      `).join('');
+      contextFacts.innerHTML = data.facts.map(([label, value]) => `
+        <div class="kv-row"><span>${label}</span><span>${value}</span></div>
+      `).join('');
+    }
+
+    document.querySelectorAll('[data-context]').forEach((item) => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('[data-context]').forEach((node) => node.classList.toggle('active', node === item));
+        renderContext(item.dataset.context);
+      });
+    });
+
+    backToWorkspace.addEventListener('click', () => {
+      contextView.classList.remove('active');
+      workspaceView.classList.remove('hidden');
+      document.querySelectorAll('[data-context]').forEach((node) => node.classList.remove('active'));
     });
   </script>
 </body>
