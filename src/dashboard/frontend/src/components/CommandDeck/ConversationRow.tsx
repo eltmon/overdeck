@@ -26,6 +26,12 @@ function shortModel(model: string): string {
     .replace(/-latest$/, '');
 }
 
+function shortHarness(harness: NonNullable<Conversation['harness']>): string {
+  if (harness === 'claude-code') return 'Claude Code';
+  if (harness === 'pi') return 'Pi';
+  return 'Codex';
+}
+
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
 
 const PHASE_ICONS = {
@@ -382,6 +388,8 @@ export function ConversationRow({
             )}
             {conv.model && (
               <>
+                <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
                 <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
               </>
