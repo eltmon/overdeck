@@ -119,15 +119,17 @@ describe('bd process lock', () => {
     expect(existsSync(path)).toBe(false);
   });
 
-  it('does not allow two simulated separate holders to hold the lock at once', async () => {
+  it('allows same-process reentrant acquisition and keeps the lock until the outermost release', async () => {
     const first = await acquireBdProcessLock('first caller', { workspacePath });
 
-    await expect(
-      acquireBdProcessLock('second caller', { workspacePath, acquisitionTimeoutMs: 0 }),
-    ).rejects.toBeInstanceOf(BdProcessLockError);
+    const second = await acquireBdProcessLock('second caller', { workspacePath, acquisitionTimeoutMs: 0 });
     expect(await readBdProcessLockHolder({ workspacePath })).toMatchObject({ caller: 'first caller' });
 
+    await second.release();
+    expect(existsSync(await lockPath())).toBe(true);
+
     await first.release();
+    expect(existsSync(await lockPath())).toBe(false);
   });
 
   it('reclaims stale locks by dead PID or age and respects live holders', async () => {

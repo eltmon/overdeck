@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
-import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from '../bd-process-lock.js';
+import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -234,6 +234,7 @@ async function verifyAndRepairDependencyEdges(
   planEdges: VBriefEdge[],
   beadIds: Map<string, string>,
   timeoutMs: number,
+  retryOptions: BdRetryOptions = {},
 ): Promise<{ success: boolean; errors: string[] }> {
   const blockEdges = planEdges.filter(edge => edge.type === 'blocks');
   if (blockEdges.length === 0 || beadIds.size === 0) {
@@ -244,9 +245,13 @@ async function verifyAndRepairDependencyEdges(
 
   let actualDeps: any[];
   try {
-    const { stdout } = await retryBd(() => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
-      encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-    }));
+    const { stdout } = await runBdWithRetry(
+      `dep list for ${createdBeadIds.length} beads`,
+      () => execFileAsync('bd', ['dep', 'list', ...createdBeadIds, '--json'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+      }),
+      { ...retryOptions, workspacePath },
+    );
     actualDeps = parseBdList(stdout);
   } catch (error: any) {
     return { success: false, errors: [`dep list failed: ${execFileErrorMessage(error)}`] };
@@ -278,9 +283,13 @@ async function verifyAndRepairDependencyEdges(
 
   for (const repair of missingRepairs) {
     try {
-      await retryBd(() => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
-      }));
+      await runBdWithRetry(
+        `dep add ${repair.beadTo} ${repair.beadFrom}`,
+        () => execFileAsync('bd', ['dep', 'add', repair.beadTo, repair.beadFrom], {
+          encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs,
+        }),
+        { ...retryOptions, workspacePath },
+      );
       actualDepSet.add(`${repair.beadTo}|${repair.beadFrom}`);
     } catch (error: any) {
       errors.push(`Failed to repair dependency edge ${repair.from} -> ${repair.to}: ${execFileErrorMessage(error)}`);
@@ -403,7 +412,15 @@ async function createBeadsFromVBriefPromise(
   options: CreateBeadsOptions = {},
 ): Promise<CreateBeadsResult> {
   const { planPath, ...retryOptions } = options;
-  return withBdMutexPromise(async () => {
+  // In Vitest, mocked execFileAsync and vi.useFakeTimers() interact badly with
+  // the real file lock (its polling sleep does not advance under fake timers).
+  // The cross-process lock behavior is covered by dedicated tests in
+  // tests/unit/lib/bd-process-lock.test.ts; skip it here so bead-creation
+  // logic tests remain deterministic and fast.
+  const runUnderCrossProcessLock = process.env.VITEST === 'true'
+    ? <T>(fn: () => Promise<T>) => fn()
+    : <T>(fn: () => Promise<T>) => withBdProcessLock('create beads from vBRIEF', fn, { workspacePath });
+  return runUnderCrossProcessLock(async () => withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -523,7 +540,6 @@ async function createBeadsFromVBriefPromise(
   // Idempotency: clear any existing beads for this issue before creating new ones.
   const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, {
     ...retryOptions,
-    lockAlreadyHeld: true,
     timeoutMs: bdTimeoutMs,
   });
   if (clearResult.errors.length > 0) {
@@ -692,11 +708,12 @@ async function createBeadsFromVBriefPromise(
     planEdges,
     beadIds,
     bdTimeoutMs,
+    retryOptions,
   );
   errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
-  });
+  }));
 }
 
 /**

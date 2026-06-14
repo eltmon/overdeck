@@ -99,7 +99,7 @@ describe('createBeadsFromVBrief', () => {
   let WORKSPACE_DIR: string;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     // Fix the operational timeout so resolveBdTimeout skips its probe; this keeps
     // existing mock sequences stable. The probe behavior is tested separately below.
     process.env.PANOPTICON_BD_TIMEOUT_MS = '30000';
@@ -1079,7 +1079,6 @@ describe('createBeadsFromVBrief', () => {
     });
 
     it('fails when dep add repair fails (AC3)', async () => {
-      vi.useFakeTimers();
       const ws = createWorkspace('PAN-520');
       setupRedirect(ws.workspacePath);
       writePlan(ws.projectRoot, 'PAN-520', makeDocWithDeps('PAN-520'));
@@ -1096,14 +1095,13 @@ describe('createBeadsFromVBrief', () => {
         .mockRejectedValueOnce(new Error('dep add failed'))
         .mockRejectedValueOnce(new Error('dep add failed'));
 
-      const resultPromise = Effect.runPromise(createBeadsFromVBrief(ws.workspacePath));
-      await vi.advanceTimersByTimeAsync(10000);
-      const result = await resultPromise;
+      const result = await Effect.runPromise(
+        createBeadsFromVBrief(ws.workspacePath, { sleep: () => Promise.resolve() }),
+      );
 
       expect(result.success).toBe(false);
       expect(result.errors.some(error => error.includes('item-a') && error.includes('item-b'))).toBe(true);
 
-      vi.useRealTimers();
       rmSync(ws.projectRoot, { recursive: true, force: true });
     });
 

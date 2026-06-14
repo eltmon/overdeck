@@ -3525,7 +3525,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // see roles/strike.md. The beads gate is the only thing we skip; everything
   // else (workspace health, supervisor wiring, launcher) is identical.
   if (role !== 'strike') {
-    await Effect.runPromise(assertIssueHasBeads(options.workspace, options.issueId));
+    // Use a short lock timeout when spawning from HTTP handlers so dashboard
+    // requests fail fast to the JSONL fallback instead of blocking behind CLI
+    // processes that hold the cross-process bd lock. The CLI `pan start` path
+    // already performs a long-timeout live query before reaching spawnAgent.
+    await Effect.runPromise(
+      assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 500 }),
+    );
   }
 
   // Determine model based on role configuration

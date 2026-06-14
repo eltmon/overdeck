@@ -277,6 +277,27 @@ function matchesHolder(actual: BdProcessLockHolder | null, expected: BdProcessLo
   return actual?.pid === expected.pid && actual.ts === expected.ts && actual.caller === expected.caller;
 }
 
+/**
+ * Per-process reentrancy tracking for the cross-process bd lock.
+ *
+ * The same Node process may acquire the lock at multiple nested call frames
+ * (e.g. `withBdProcessLock` around `createBeadsFromVBrief`, which internally
+ * calls `runBdWithRetry` for each `bd create`). Without reentrancy, the nested
+ * acquisition would see its own lock file and wait until timeout. The map
+ * below lets nested acquisitions in the same process reuse the existing handle
+ * and only unlink the underlying lock file when the outermost holder releases.
+ */
+const heldBdProcessLocks = new Map<string, { holder: BdProcessLockHolder; count: number }>();
+
+async function isLockHeldByCurrentProcess(path: string): Promise<boolean> {
+  const held = heldBdProcessLocks.get(path);
+  if (!held) return false;
+  // Defensive: if the on-disk lock was stolen/reclaimed by another process,
+  // do not treat it as held by us even if our map says so.
+  const onDisk = await readHolderFromPath(path);
+  return matchesHolder(onDisk, held.holder);
+}
+
 async function acquireStaleBreaker(
   path: string,
   caller: string,
@@ -343,10 +364,33 @@ export async function acquireBdProcessLock(
 
   await mkdir(dirname(path), { recursive: true });
 
+  // Reentrant acquisition: if this process already holds the lock, reuse it.
+  if (await isLockHeldByCurrentProcess(path)) {
+    const held = heldBdProcessLocks.get(path)!;
+    held.count += 1;
+    let released = false;
+    return {
+      path,
+      holder: held.holder,
+      async release() {
+        if (released) return;
+        released = true;
+        held.count -= 1;
+        if (held.count === 0) {
+          heldBdProcessLocks.delete(path);
+          if (matchesHolder(await readHolderFromPath(path), held.holder)) {
+            await unlinkIfExists(path);
+          }
+        }
+      },
+    };
+  }
+
   while (true) {
     const holder = { pid: process.pid, ts: now(), caller };
     try {
       await writeLockFile(path, holder);
+      heldBdProcessLocks.set(path, { holder, count: 1 });
       let released = false;
       return {
         path,
@@ -354,8 +398,15 @@ export async function acquireBdProcessLock(
         async release() {
           if (released) return;
           released = true;
-          if (matchesHolder(await readHolderFromPath(path), holder)) {
-            await unlinkIfExists(path);
+          const current = heldBdProcessLocks.get(path);
+          if (current) {
+            current.count -= 1;
+            if (current.count === 0) {
+              heldBdProcessLocks.delete(path);
+              if (matchesHolder(await readHolderFromPath(path), holder)) {
+                await unlinkIfExists(path);
+              }
+            }
           }
         },
       };
