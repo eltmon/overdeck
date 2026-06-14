@@ -4,7 +4,7 @@
  * `Cannot read properties of undefined (reading 'toUpperCase')`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -78,7 +78,15 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-1872-start-'));
-    mkdirSync(join(tmpDir, 'workspaces', 'feature-pan-1872'), { recursive: true });
+    const workspacePath = join(tmpDir, 'workspaces', 'feature-pan-1872');
+    mkdirSync(workspacePath, { recursive: true });
+    // Provide a beads JSONL fallback so the async bd list retry path counts a
+    // task even though this test does not exercise the bd CLI.
+    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    writeFileSync(
+      join(workspacePath, '.beads', 'issues.jsonl'),
+      JSON.stringify({ id: 'bead-1', title: 'Implement issue', labels: ['pan-1872'] }) + '\n',
+    );
 
     syncMainMock.mockReset();
     spawnAgentMock.mockReset();

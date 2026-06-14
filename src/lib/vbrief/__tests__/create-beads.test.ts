@@ -110,7 +110,13 @@ describe('createBeadsFromVBrief', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+    if (originalPanopticonHome === undefined) {
+      delete process.env.PANOPTICON_HOME;
+    } else {
+      process.env.PANOPTICON_HOME = originalPanopticonHome;
+    }
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
@@ -856,7 +862,6 @@ describe('createBeadsFromVBrief', () => {
 
   describe('retryBd', () => {
     it('retries an idempotent bd list twice then succeeds on the third attempt (AC1)', async () => {
-      vi.useFakeTimers();
       const ws = createWorkspace('PAN-515');
       setupRedirect(ws.workspacePath);
 
@@ -875,19 +880,18 @@ describe('createBeadsFromVBrief', () => {
         return { stdout: '', stderr: '' };
       });
 
-      const resultPromise = clearBeadsForIssue(ws.workspacePath, 'pan-515', 30000);
-      await vi.advanceTimersByTimeAsync(10000);
-      const result = await resultPromise;
+      const result = await clearBeadsForIssue(ws.workspacePath, 'pan-515', {
+        timeoutMs: 30000,
+        sleep: () => Promise.resolve(),
+      });
 
       expect(result.errors).toHaveLength(0);
       expect(postDeleteAttempts).toBe(3);
 
-      vi.useRealTimers();
       rmSync(ws.projectRoot, { recursive: true, force: true });
     });
 
     it('fails after three attempts and issues no fourth call (AC2)', async () => {
-      vi.useFakeTimers();
       const ws = createWorkspace('PAN-516');
       setupRedirect(ws.workspacePath);
 
@@ -901,15 +905,15 @@ describe('createBeadsFromVBrief', () => {
         return { stdout: '', stderr: '' };
       });
 
-      const resultPromise = clearBeadsForIssue(ws.workspacePath, 'pan-516', 30000);
-      await vi.advanceTimersByTimeAsync(10000);
-      const result = await resultPromise;
+      const result = await clearBeadsForIssue(ws.workspacePath, 'pan-516', {
+        timeoutMs: 30000,
+        sleep: () => Promise.resolve(),
+      });
 
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0]).toMatch(/list failed/);
       expect(attempts).toBe(3);
 
-      vi.useRealTimers();
       rmSync(ws.projectRoot, { recursive: true, force: true });
     });
 

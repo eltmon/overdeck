@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getPanopticonHome } from './paths.js';
 
-const TRANSIENT_BD_ERRNO_CODES = new Set(['EAGAIN', 'EBUSY', 'EWOULDBLOCK']);
+const TRANSIENT_BD_ERRNO_CODES = new Set(['EAGAIN', 'EBUSY', 'EWOULDBLOCK', 'ETIMEDOUT']);
 
 const TRANSIENT_BD_LOCK_PATTERNS = [
   /\bdatabase is locked\b/i,
@@ -142,6 +142,12 @@ function hasTransientErrnoCode(error: unknown, seen = new Set<unknown>()): boole
  */
 export function isTransientBdError(error: unknown): boolean {
   if (error == null) return false;
+
+  // Client-side timeouts (execFile killed by timeout) are retryable: the
+  // operation may have succeeded server-side or the lock may have released.
+  if (isRecord(error) && error.killed === true) {
+    return true;
+  }
 
   const text = collectErrorText(error);
   if (TRANSIENT_BD_LOCK_PATTERNS.some((pattern) => pattern.test(text))) {

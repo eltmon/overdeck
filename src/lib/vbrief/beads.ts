@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { withBdMutexPromise } from '../bd-mutex.js';
-import { BdTransientFailure, runBdWithRetry, withBdProcessLock, type RunBdWithRetryOptions } from '../bd-process-lock.js';
+import { BdTransientFailure, runBdWithRetry, type RunBdWithRetryOptions } from '../bd-process-lock.js';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
@@ -47,6 +47,22 @@ export interface ClearBeadsResult {
   cleared: number;
   errors: string[];
   transientFailure?: unknown;
+}
+
+type BdRetryOptions = Omit<RunBdWithRetryOptions, 'workspacePath'>;
+
+type ClearBeadsOptions = BdRetryOptions & {
+  lockAlreadyHeld?: boolean;
+  timeoutMs?: number;
+};
+
+function normalizeClearBeadsOptions(
+  value: number | ClearBeadsOptions = {},
+): Required<Pick<ClearBeadsOptions, 'timeoutMs'>> & ClearBeadsOptions {
+  if (typeof value === 'number') {
+    return { timeoutMs: value };
+  }
+  return { timeoutMs: BD_TIMEOUT_FLOOR_MS, ...value };
 }
 
 function firstLine(value: unknown): string {
@@ -116,15 +132,24 @@ function beadIdsFromList(beads: any[]): string[] {
     .map(id => String(id));
 }
 
-async function listBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number): Promise<any[]> {
-  return retryBd(async () => {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
-      { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs }
-    );
-    return parseBdList(stdout);
-  });
+async function listBeadsForIssue(
+  workspacePath: string,
+  issueLabel: string,
+  options: ClearBeadsOptions = {},
+): Promise<any[]> {
+  const { timeoutMs = BD_TIMEOUT_FLOOR_MS, ...retryOptions } = normalizeClearBeadsOptions(options);
+  return runBdWithRetry(
+    `list beads for ${issueLabel}`,
+    async () => {
+      const { stdout } = await execFileAsync(
+        'bd',
+        ['list', '--json', '-l', issueLabel, '--status', 'all', '--limit', '0'],
+        { encoding: 'utf-8', cwd: workspacePath, timeout: timeoutMs },
+      );
+      return parseBdList(stdout);
+    },
+    { ...retryOptions, workspacePath },
+  );
 }
 
 /**
@@ -144,7 +169,7 @@ async function recoverBeadIdByTitle(
 ): Promise<{ id: string | null; ambiguity: boolean }> {
   let beads: any[];
   try {
-    beads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+    beads = await listBeadsForIssue(workspacePath, issueLabel, { timeoutMs });
   } catch {
     return { id: null, ambiguity: false };
   }
@@ -297,10 +322,17 @@ async function deleteBead(workspacePath: string, id: string, timeoutMs: number):
   }
 }
 
-export async function clearBeadsForIssue(workspacePath: string, issueLabel: string, timeoutMs: number = BD_TIMEOUT_FLOOR_MS): Promise<ClearBeadsResult> {
+export async function clearBeadsForIssue(
+  workspacePath: string,
+  issueLabel: string,
+  timeoutMsOrOptions: number | ClearBeadsOptions = {},
+): Promise<ClearBeadsResult> {
+  const options = normalizeClearBeadsOptions(timeoutMsOrOptions);
+  const { timeoutMs = BD_TIMEOUT_FLOOR_MS } = options;
+
   let existingBeads: any[];
   try {
-    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+    existingBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
     return {
       cleared: 0,
@@ -313,7 +345,11 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
   let cleared = 0;
   for (const id of beadIdsFromList(existingBeads)) {
     try {
-      await retryBd(() => deleteBead(workspacePath, id, timeoutMs));
+      await runBdWithRetry(
+        `delete bead ${id} for ${issueLabel}`,
+        () => deleteBead(workspacePath, id, timeoutMs),
+        { ...options, workspacePath },
+      );
       cleared++;
     } catch (error: any) {
       errors.push(`delete ${id}: ${execFileErrorMessage(error)}`);
@@ -322,10 +358,14 @@ export async function clearBeadsForIssue(workspacePath: string, issueLabel: stri
 
   let residualBeads: any[];
   try {
-    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, timeoutMs);
+    residualBeads = await listBeadsForIssue(workspacePath, issueLabel, options);
   } catch (error: any) {
     errors.push(`post-delete list failed: ${execFileErrorMessage(error)}`);
-    return { cleared, errors, transientFailure: error instanceof BdTransientFailure ? error : undefined };
+    return {
+      cleared,
+      errors,
+      transientFailure: error instanceof BdTransientFailure ? error : undefined,
+    };
   }
 
   const residualIds = beadIdsFromList(residualBeads);
@@ -363,9 +403,7 @@ async function createBeadsFromVBriefPromise(
   options: CreateBeadsOptions = {},
 ): Promise<CreateBeadsResult> {
   const { planPath, ...retryOptions } = options;
-  return withBdMutexPromise(() => withBdProcessLock(
-    `createBeadsFromVBrief ${workspacePath}`,
-    async () => {
+  return withBdMutexPromise(async () => {
   const created: string[] = [];
   const errors: string[] = [];
   const beadIds = new Map<string, string>();
@@ -483,7 +521,11 @@ async function createBeadsFromVBriefPromise(
   }
 
   // Idempotency: clear any existing beads for this issue before creating new ones.
-  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, bdTimeoutMs);
+  const clearResult = await clearBeadsForIssue(workspacePath, issueLabel, {
+    ...retryOptions,
+    lockAlreadyHeld: true,
+    timeoutMs: bdTimeoutMs,
+  });
   if (clearResult.errors.length > 0) {
     return {
       success: false,
@@ -654,9 +696,7 @@ async function createBeadsFromVBriefPromise(
   errors.push(...edgeVerification.errors);
 
   return { success: errors.length === 0, created, errors, beadIds };
-    },
-    { ...retryOptions, workspacePath },
-  ));
+  });
 }
 
 /**

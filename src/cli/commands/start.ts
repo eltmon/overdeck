@@ -24,6 +24,14 @@ import { findPlanSync } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import {
+  BdTransientFailure,
+  isTransientBdError,
+  runBdWithRetry,
+  type RunBdWithRetryOptions,
+} from '../../lib/bd-process-lock.js';
+
+export const RETRYABLE_BD_LOCK_EXIT_CODE = 13;
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -1320,5 +1328,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
 export const __testInternals = {
   failPostCreateValidation,
+  failTransientBeadsValidation,
   resolveExplicitHarnessFlag,
 };
