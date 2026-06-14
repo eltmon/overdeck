@@ -257,6 +257,7 @@ function updatePlanningStateCache(identifier: string, entry: PlanningStateCacheE
 }
 
 export class IssueDataService {
+  private skipPolling = false;
   private cache: CacheService;
   private trackers: Record<string, TrackerState> = {};
   private linearLastFullRefresh = 0;
@@ -318,7 +319,8 @@ export class IssueDataService {
     // something to work with before the background fetches complete.
     this.pushSnapshot();
 
-    if (options?.skipPolling) {
+    this.skipPolling = options?.skipPolling ?? false;
+    if (this.skipPolling) {
       console.log('[IssueDataService] Tracker polling DISABLED (peer dashboard / PANOPTICON_DISABLE_DEACON=1) — serving cached issues only, zero tracker API calls (PAN-1817)');
       return;
     }
@@ -364,13 +366,15 @@ export class IssueDataService {
       this.trackers[tracker].lastError = null;
     }
     console.log('[IssueDataService] Cache cleared — re-fetching all trackers');
-    // Re-fetch all trackers
-    await Promise.allSettled([
-      this.pollGitHub(),
-      this.pollLinear(),
-      this.pollRally(),
-    ]);
-    this.pushSnapshot();
+    // Re-fetch all trackers (skip when this peer is not allowed to poll)
+    if (!this.skipPolling) {
+      await Promise.allSettled([
+        this.pollGitHub(),
+        this.pollLinear(),
+        this.pollRally(),
+      ]);
+      this.pushSnapshot();
+    }
   }
 
   /**
@@ -520,6 +524,9 @@ export class IssueDataService {
 
   async invalidateTracker(tracker: string): Promise<void> {
     this.cache.invalidate(tracker);
+
+    // Peer dashboards never poll; invalidation only clears the local cache.
+    if (this.skipPolling) return;
 
     // Force full refresh on next poll (not incremental) so new issues
     // added to the cycle externally are discovered immediately
@@ -1156,7 +1163,7 @@ export class IssueDataService {
         let message = `Linear API error: HTTP 429`;
         try {
           const body = JSON.parse(bodyText);
-          if (body?.errors?.[0]?.message) message = body.errors[0].message;
+          if (body?.errors?.[0]?.message) message = `${body.errors[0].message} (HTTP 429)`;
         } catch { /* ignore non-JSON body */ }
         throw new Error(message);
       }

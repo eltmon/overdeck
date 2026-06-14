@@ -63,7 +63,7 @@ describe('IssueDataService tracker-polling gate (PAN-1817)', () => {
 
   function makeService() {
     // Constructor only stores the cache; scheduleNext calls getBackoffMs.
-    const cache = { getBackoffMs: () => 0 } as any;
+    const cache = { getBackoffMs: () => 0, invalidate: vi.fn() } as any;
     const svc = new IssueDataService(cache);
     // Stub the cache-loading / snapshot plumbing so the test exercises only the
     // poll-vs-no-poll branch, with no SQLite or network dependency.
@@ -91,6 +91,31 @@ describe('IssueDataService tracker-polling gate (PAN-1817)', () => {
 
     // Cache was still loaded so the peer dashboard can serve issues read-only.
     expect((svc as any).loadCachedData).toHaveBeenCalledTimes(1);
+    svc.stop();
+  });
+
+  it('skipPolling:true prevents invalidateTracker from polling', async () => {
+    const { svc, polls } = makeService();
+    await svc.start({ skipPolling: true });
+
+    await svc.invalidateTracker('linear');
+
+    expect(polls.linear).not.toHaveBeenCalled();
+    expect(polls.github).not.toHaveBeenCalled();
+    expect(polls.rally).not.toHaveBeenCalled();
+    expect((svc as any).trackers.linear.timer).toBeNull();
+    svc.stop();
+  });
+
+  it('skipPolling:true prevents clearCacheAndRefresh from polling', async () => {
+    const { svc, polls } = makeService();
+    await svc.start({ skipPolling: true });
+
+    await svc.clearCacheAndRefresh();
+
+    expect(polls.linear).not.toHaveBeenCalled();
+    expect(polls.github).not.toHaveBeenCalled();
+    expect(polls.rally).not.toHaveBeenCalled();
     svc.stop();
   });
 
@@ -152,6 +177,18 @@ describe('IssueDataService poll-outcome recording (PAN-1817)', () => {
     expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('linear', {
       status: 'quota_exhausted',
       message: 'Linear API error: HTTP 429',
+    });
+  });
+
+  it('records quota_exhausted for a GraphQL 429 body without rate-limit keywords', async () => {
+    const { svc } = makeServiceWithRecording();
+    vi.spyOn(svc as any, 'fetchLinearIssues').mockRejectedValue(new Error('Unknown error (HTTP 429)'));
+
+    await (svc as any).pollLinear();
+
+    expect((svc as any).cache.recordPollHealth).toHaveBeenCalledWith('linear', {
+      status: 'quota_exhausted',
+      message: 'Unknown error (HTTP 429)',
     });
   });
 
