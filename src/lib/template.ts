@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { CLAUDE_MD_TEMPLATES } from './paths.js';
@@ -28,7 +28,6 @@ function loadSection(path: string, variables: TemplateVariables): string {
 }
 
 export function generateClaudeMdSync(
-  projectPath: string,
   variables: TemplateVariables
 ): string {
   const sections: string[] = [];
@@ -47,16 +46,10 @@ export function generateClaudeMdSync(
     }
   }
 
-  const projectSections = join(projectPath, '.panopticon', 'claude-md', 'sections');
-  if (existsSync(projectSections)) {
-    const projectFiles = readdirSync(projectSections)
-      .filter((f) => f.endsWith('.md'))
-      .sort();
-
-    for (const file of projectFiles) {
-      sections.push(loadSection(join(projectSections, file), variables));
-    }
-  }
+  // PAN-1899: the legacy per-project section read (<projectRoot>/.panopticon/
+  // claude-md/sections/*.md) has been retired. Project-specific context now
+  // lives in the canonical project layer (<projectRoot>/.pan/context/project.md),
+  // composed into the workspace by assembleWorkspaceContext (PAN-1201).
 
   if (sections.length === 0) {
     return `# Workspace: ${variables.FEATURE_FOLDER}
@@ -85,7 +78,7 @@ export const generateClaudeMd = (
   variables: TemplateVariables,
 ): Effect.Effect<string, FsError> =>
   Effect.try({
-    try: () => generateClaudeMdSync(projectPath, variables),
+    try: () => generateClaudeMdSync(variables),
     catch: (cause) =>
       new FsError({ path: projectPath, operation: 'generateClaudeMd', cause }),
   });
