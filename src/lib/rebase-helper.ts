@@ -178,7 +178,7 @@ async function tryResolvePlanningConflicts(
     }
 
     const nonPlanningConflicts = conflictFiles.filter(
-      f => !f.startsWith('.pan/') && !f.startsWith('.planning/'),
+      f => !f.startsWith('.pan/') && !f.startsWith('.planning/') && !f.startsWith('.panopticon/'),
     );
     if (nonPlanningConflicts.length > 0) {
       return { resolved: false, remainingConflicts: nonPlanningConflicts };
