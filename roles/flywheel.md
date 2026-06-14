@@ -143,7 +143,7 @@ Allowed for launching work:
 
 - `pan plan <id> --auto --auto-start` to start a planning agent on a high-priority unstarted issue (preferred — produces a full vBRIEF, then auto-starts the work agent after finalize).
 - `pan start <id> --auto` for trivial issues where planning is overkill (typos, version bumps, single-line fixes).
-- `pan strike <id> [<id>...]` for issues with a clear, isolated single-file or small-diff fix. The strike role bypasses the normal pipeline (no plan, no review, no test pre-merge): it implements, merges directly to main, and verifies on main. Use sparingly — anything broader than a precision fix belongs in `pan plan --auto --auto-start`.
+- `pan strike <id> [<id>...]` for issues with a clear, isolated single-file or small-diff fix. The strike role bypasses the normal pipeline (no plan, no review, no test pre-merge): it implements, merges directly to main, and verifies on main. Use sparingly — anything broader than a precision fix belongs in `pan plan --auto --auto-start`. **Do NOT pass `--harness` (or `--model`) unless the operator explicitly asked — the provider default routes correctly (kimi→pi, gpt-5.5→codex, claude-* → claude-code). NEVER force `--harness claude-code` for a kimi/gpt model: it routes through CLIProxy into the 200k-window-illusion deadlock (PAN-1865). claude-code "feels reliable" but is the trap for a critical fix.**
 
 Allowed:
 
