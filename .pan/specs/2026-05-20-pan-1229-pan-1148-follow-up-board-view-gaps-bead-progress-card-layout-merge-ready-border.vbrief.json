@@ -4,17 +4,17 @@
     "created": "2026-05-20T02:32:51.033Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1229: PAN-1148 follow-up — Board view gaps (bead progress / card layout / merge-ready border)",
-    "updated": "2026-05-20T22:40:30.298Z"
+    "updated": "2026-06-14T22:51:51.588Z"
   },
   "plan": {
     "id": "pan-1229",
     "title": "PAN-1148 follow-up — Board view gaps (bead progress / card layout / merge-ready border)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "7c9f4e2a-3b1d-4f8e-9a5c-2e8b1d3f7a9e",
     "author": "agent:claude-opus-4-7",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-20T02:32:51.033Z",
-    "updated": "2026-05-20T22:40:30.298Z",
+    "updated": "2026-06-14T22:51:51.588Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1229",
@@ -545,5 +545,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
