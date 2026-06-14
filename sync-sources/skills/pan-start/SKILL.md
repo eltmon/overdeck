@@ -29,6 +29,8 @@ pan start PAN-123 --force  # Clear a paused agent gate and start anyway
 pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health gate
 pan start PAN-123 --fresh  # Drop the saved session and start a new one (e.g. switch model)
 pan start PAN-123 --harness codex  # Explicitly use the Codex harness
+pan start PAN-123 --remote --tier durable  # Remote Fly.io workspace with persistent volume
+pan start PAN-123 --remote --tier ephemeral  # Remote Fly.io workspace that winds down on stale heartbeat
 ```
 
 ## What It Does

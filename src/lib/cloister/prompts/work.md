@@ -306,6 +306,22 @@ that bead's `metadata.requiresInspection` flag — see step 7 above. The inspect
 specialist is NOT auto-spawned by `bd close`; when inspection is required you must
 invoke `pan inspect` yourself.
 
+{{#REMOTE}}
+### Remote durability: push after every bead
+
+Your remote machine can be preempted or lost without warning. To prevent losing work,
+**push the feature branch to origin after every bead commit**, not only at the end of
+the issue:
+
+```bash
+git push origin $(git branch --show-current)
+```
+
+Run this immediately after each bead's `git commit` (step 4 above), before you advance
+to the next bead. The final completion contract below (last push + `REMOTE_DONE`
+sentinel) still applies once every bead is closed and the branch is fully pushed.
+{{/REMOTE}}
+
 ## CRITICAL: Keep `.pan/continue.json` Updated — Crash Recovery Insurance
 
 **You may be interrupted, crash, or be stopped at any time.** If the system crashes with 50 agents

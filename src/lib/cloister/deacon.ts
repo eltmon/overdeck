@@ -5030,6 +5030,18 @@ export async function runPatrol(): Promise<PatrolResult> {
     addLog('warn', `Remote credential refresh patrol failed: ${err.message}`, state.patrolCycle);
   }
 
+  // PAN-1845: keep ephemeral-tier remote VMs from running forever when the host
+  // (or deacon) goes away. The patrol writes a freshness file; a VM-side
+  // watchdog self-stops the machine when the heartbeat goes stale.
+  try {
+    const { refreshHostHeartbeatForEphemeralVms } = await import('../remote/remote-agents.js');
+    const heartbeatActions = await refreshHostHeartbeatForEphemeralVms();
+    actions.push(...heartbeatActions);
+    for (const a of heartbeatActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
+  } catch (err: any) {
+    addLog('warn', `Remote heartbeat refresh patrol failed: ${err.message}`, state.patrolCycle);
+  }
+
   // PAN-1676: hand completed remote (fly.io) agents to the review pipeline.
   // Cheap no-op when no remote-state.json is active (local file scan only —
   // no fly API calls); otherwise checks each VM for the REMOTE_DONE sentinel,

@@ -462,7 +462,7 @@ export default function App() {
 
 
   const queryClient = useQueryClient();
-  const recentActivity = useDashboardStore((state) => state.recentActivity as Array<Record<string, unknown>>);
+  const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 
   useEffect(() => {

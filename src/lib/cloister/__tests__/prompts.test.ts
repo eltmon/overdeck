@@ -515,6 +515,38 @@ optional:
         expect(out).toContain("Never rely on another agent's browser session");
       })
     );
+
+    it.effect('renders per-bead push instruction only in REMOTE work prompt', () =>
+      Effect.gen(function* () {
+        const baseVars = {
+          ISSUE_ID: 'PAN-611',
+          ISSUE_ID_LOWER: 'pan-611',
+          BRANCH_NAME: 'feature/pan-611',
+          WORKSPACE_PATH: '/workspace',
+          PROJECT_ROOT: '/project',
+          BEADS_TASKS: '',
+          STITCH_DESIGNS: '',
+          POLYREPO_CONTEXT: '',
+          PENDING_FEEDBACK: '',
+          NEW_TRACKER_CONTEXT: '',
+          TLDR_AVAILABLE: false,
+        };
+        const remote = yield* renderPrompt({
+          name: 'work',
+          vars: { ...baseVars, LOCAL: false, REMOTE: true },
+        });
+        const local = yield* renderPrompt({
+          name: 'work',
+          vars: { ...baseVars, LOCAL: true, REMOTE: false },
+        });
+
+        expect(remote).toContain('push the feature branch to origin after every bead commit');
+        expect(remote).toContain('git push origin $(git branch --show-current)');
+        expect(remote).toContain('REMOTE_DONE');
+        expect(local).not.toContain('push the feature branch to origin after every bead commit');
+        expect(local).not.toContain('### Remote durability');
+      })
+    );
   });
 
   describe('fail-loud validation', () => {
