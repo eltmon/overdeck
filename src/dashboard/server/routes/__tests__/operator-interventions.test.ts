@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Context, Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -124,8 +124,13 @@ vi.mock('../../../../lib/cloister/merge-agent.js', async (importOriginal) => {
   };
 });
 
-const agentsRouteLayerPromise = import('../agents.js').then((module) => module.agentsRouteLayer);
-const issuesRouteLayerPromise = import('../issues.js').then((module) => module.issuesRouteLayer);
+let agentsRouteLayer: Layer.Layer<HttpRouter.HttpRouter, never, EventStoreService>;
+let issuesRouteLayer: Layer.Layer<HttpRouter.HttpRouter, never, EventStoreService>;
+
+beforeAll(async () => {
+  agentsRouteLayer = (await import('../agents.js')).agentsRouteLayer;
+  issuesRouteLayer = (await import('../issues.js')).issuesRouteLayer;
+}, 15_000);
 
 function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   return Layer.succeed(EventStoreService, {
@@ -167,11 +172,11 @@ async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventSt
 }
 
 async function requestAgents(path: string, init: RequestInit = {}) {
-  return runRoute(await agentsRouteLayerPromise, path, init);
+  return runRoute(agentsRouteLayer, path, init);
 }
 
 async function requestIssues(path: string, init: RequestInit = {}) {
-  return runRoute(await issuesRouteLayerPromise, path, init);
+  return runRoute(issuesRouteLayer, path, init);
 }
 
 const agentState = {

@@ -1,0 +1,216 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-14T21:14:39.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1900: bug(flywheel): UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle",
+    "updated": "2026-06-14T21:52:08.948Z"
+  },
+  "plan": {
+    "id": "pan-1900",
+    "title": "UAT candidate branch codename is non-deterministic — proliferates a new uat/* branch per assembly cycle",
+    "status": "running",
+    "uid": "f42368ab-cea9-485a-8b54-89f59f3acdc6",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 4,
+    "created": "2026-06-14T21:14:39.000Z",
+    "updated": "2026-06-14T21:52:08.948Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1900",
+        "label": "PAN-1900",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1691",
+        "label": "PAN-1691 (merge train + UAT candidate)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1737",
+        "label": "PAN-1737 (UAT batch trains / generations chain)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "uat",
+      "bug",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "Under require_uat_before_merge=true the UAT candidate assembly creates a new uat/<label>-<codename>-<MMDD> branch with a new RANDOM codename every assembly cycle (birch -> willow -> cobalt, 3 for day 0614), instead of reusing one stable candidate. Two independent root causes: (1) Proliferation — roles/flywheel.md tells the orchestrator to POST /api/flywheel/assemble-uat every tick, but PAN-1737 repurposed that endpoint to a FORCED reconcile (runUatTrainReconcile({force:true})) that bypasses the liveSignatureMatches idempotency guard (uat-reconciler.ts:212-217) and assembles a fresh generation every cycle; the role doc also calls GET /api/flywheel/uat-candidate, an endpoint PAN-1737 removed. (2) Non-determinism — makeUatCandidateName (uat-candidate-name.ts:45) defaults its start index to Math.random, so even legitimate new generations get unordered names. Result: the operator can't tell which branch to ship, stale uat/* branches pile up on origin (keep=3 outpaced by proliferation), and GET /api/flywheel/current names no active candidate.",
+      "Proposal": "Fix both defects WITHIN the PAN-1737 generations-chain architecture. (A) Rewrite the require_uat_before_merge=true section of roles/flywheel.md so the orchestrator reads + surfaces the server-assembled candidate instead of force-rebuilding it each tick (the internal 60s reconciler, wired unconditionally in main.ts:400, already auto-assembles idempotently). (B) Default makeUatCandidateName's start index to 0 instead of Math.random — the existing collision-walk then assigns otter -> falcon -> cedar in generation order, deterministic + ordered, with no generations-store changes. (C) Revive GET /api/flywheel/uat-candidate as an authoritative read endpoint returning the newest 'ready' generation (branchName + bundled issue IDs + status).",
+      "NonGoals": "- Do NOT revert the PAN-1737 generations chain to a single force-reset branch per day. The issue's literal 'Suggested fix #1' is declined: generations legitimately differ when the bundle changes, and the revert would tear out multi-generation support + per-generation live stacks.\n- Do NOT change POST /api/flywheel/assemble-uat semantics — it stays an explicit operator forced rebuild; it is simply no longer called on an automated loop.\n- Do NOT modify the reaper / cleanupUatGenerations — origin reaping already works (git push origin --delete, keep=3) and self-corrects once proliferation stops.\n- Do NOT add a field to the shared FlywheelStatus Effect-Schema contract — surfacing uses a dedicated read endpoint instead.\n- Do NOT change makeUatCandidateName's collision-walk or numeric-suffix exhaustion fallback."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix within the PAN-1737 generations chain rather than reverting to one force-reset branch/day (the issue's literal Suggested fix #1).",
+        "rationale": "The issue quotes the OLD PAN-1691 design intent; PAN-1737 deliberately replaced it with the generations chain (newest supersedes, older stay testable, per-gen live stacks). The issue's real complaints (proliferation, non-determinism, no surfacing) are all satisfiable inside the chain; reverting would lose deliberately shipped capability and violate the additive/no-loss rule. Recorded loud in NonGoals + continue.json hazard H1."
+      },
+      {
+        "summary": "Make the codename deterministic by defaulting the start index to 0 (sequence-ordered codenames via the existing collision-walk), not by hashing bundle content.",
+        "rationale": "One-line change, no generations-store mutation; preserves the append-only chain and the memorable-codename feature. Bundle-hash naming was considered but rejected because it needs name-reuse / in-place row mutation that breaks the append-only chain."
+      },
+      {
+        "summary": "Surface the active candidate via a revived dedicated GET /api/flywheel/uat-candidate endpoint, not by extending the FlywheelStatus contract.",
+        "rationale": "The issue accepts either ('/api/flywheel/current ... or a uat-candidate read endpoint'). The dedicated endpoint has the smaller blast radius and revives the endpoint roles/flywheel.md already references but PAN-1737 removed."
+      },
+      {
+        "summary": "No reaper code change.",
+        "rationale": "buildUatGenerationCleanupGit().deleteBranch already deletes branches on origin + locally with keep=3; the 4-branch pile-up is keep=3 outpaced by per-tick proliferation, which self-corrects once Defect 1 is fixed (investigate-before-fixing)."
+      }
+    ],
+    "items": [
+      {
+        "id": "stop-forced-assemble",
+        "title": "Stop the flywheel force-assembling the UAT candidate every tick (roles/flywheel.md)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T21:14:39.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1900",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite the `require_uat_before_merge=true` block of roles/flywheel.md (~lines 165-172) using the exact before/after text in .pan/drafts/PAN-1900.md. Remove the instruction to POST /api/flywheel/assemble-uat every tick and the false 'idempotent / deterministic / force-reset the same branch' claim. Instead state that the server's UAT reconciler auto-assembles every 60s (only rebuilding when the ready set or its commits change), that the orchestrator only GETs /api/flywheel/uat-candidate and surfaces it, and that POST /api/flywheel/assemble-uat is an explicit operator forced rebuild that must not be called on a loop. Keep it in complete sentences with terms defined inline (operator-facing explain-fully rule). This is the proliferation root-cause fix (Defect 1)."
+        },
+        "items": [
+          {
+            "id": "stop-forced-assemble.ac1",
+            "title": "The require_uat_before_merge=true block of roles/flywheel.md contains no unconditional per-tick `POST /api/flywheel/assemble-uat` instruction, and instead contains a `GET /api/flywheel/uat-candidate` read-and-surface step naming the branch and bundled issue IDs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-forced-assemble.ac2",
+            "title": "roles/flywheel.md contains no 'idempotent and safe to run every tick' or 'force-resets the same branch' claim; it contains a statement that the server reconciler auto-assembles every 60s and that `POST /api/flywheel/assemble-uat` is an explicit operator forced rebuild not to be looped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-forced-assemble.ac3",
+            "title": "Every flywheel/UAT endpoint named in the rewritten block resolves to a live route registered in src/dashboard/server/routes/flywheel.ts (GET /api/flywheel/uat-candidate, POST /api/flywheel/merge-next, POST /api/flywheel/assemble-uat); the block contains no reference to a removed endpoint as an automated trigger.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deterministic-codename",
+        "title": "Make the UAT candidate codename deterministic and ordered per day",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-14T21:14:39.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1900",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/uat-candidate-name.ts, change the default `pick` (line 45) from `(n) => Math.floor(Math.random() * n)` to `() => 0` so the walk starts at index 0 and the existing collision-walk assigns otter -> falcon -> cedar as generations accumulate. Update the file header comment that says the default wrapper 'supplies real randomness' to state it starts at index 0 (deterministic, ordered per day). Keep `pick` in the UatNameDeps interface (injectable seam for tests). Do not touch the collision-walk or the numeric-suffix exhaustion fallback. Add/adjust the unit test to assert sequential codenames + determinism. This is the non-determinism root-cause fix (Defect 2)."
+        },
+        "items": [
+          {
+            "id": "deterministic-codename.ac1",
+            "title": "makeUatCandidateName with no injected pick produces uat/<label>-otter-<MMDD> when nothing is taken, uat/<label>-falcon-<MMDD> when otter is taken, and uat/<label>-cedar-<MMDD> when otter and falcon are taken — i.e. codenames assigned in UAT_CODENAMES order as generations accumulate.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deterministic-codename.ac2",
+            "title": "makeUatCandidateName returns the identical branch name across repeated calls for identical (label, dateIso, isTaken) inputs — the default path contains no Math.random.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deterministic-codename.ac3",
+            "title": "When every codename for the label+day is taken, makeUatCandidateName still falls back to the numeric-suffix form uat/<label>-otter-<MMDD>-2 (exhaustion behavior preserved), verified by a unit test in the uat-candidate-name test file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-candidate-endpoint",
+        "title": "Add authoritative GET /api/flywheel/uat-candidate read endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-14T21:14:39.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1900",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add getUatCandidatePayload() to src/dashboard/server/services/uat-train.ts returning the newest 'ready' generation as { branchName, bundled, status } | null, derived from listUatGenerationsSync({ projectRoot, statuses: ['ready'], limit: 1 }) (already imported; orders created_at DESC). bundled = members' issueIds. Add a GET /api/flywheel/uat-candidate route in src/dashboard/server/routes/flywheel.ts and register it in the router list next to getUatGenerationsRoute (~line 1004), following the existing lazy-import handler pattern. Add a test (extend services/__tests__/uat-train.test.ts or routes/__tests__/flywheel.test.ts). This satisfies FR-3 and revives the endpoint the role-doc fix references."
+        },
+        "items": [
+          {
+            "id": "uat-candidate-endpoint.ac1",
+            "title": "GET /api/flywheel/uat-candidate returns { branchName, bundled, status } for the newest 'ready' UAT generation, where branchName is the generation name and bundled is the array of its member issue IDs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-candidate-endpoint.ac2",
+            "title": "GET /api/flywheel/uat-candidate returns a null/empty body when no UAT generation is in 'ready' status.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-candidate-endpoint.ac3",
+            "title": "A test seeds the generations store with a newest 'ready' generation and asserts the payload names it (branchName + bundled issue IDs); with no 'ready' generation it asserts the endpoint returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "uat-candidate-endpoint",
+        "to": "stop-forced-assemble",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-14-PAN-1900-uat-candidate-branch-codename-is-non-deterministic-proliferates-a-new-uat-branch-per-assembly-cycle.vbrief.json"
+    }
+  },
+  "status": "active"
+}

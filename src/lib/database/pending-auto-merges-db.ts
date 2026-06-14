@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { DatabaseError, getDatabase } from './index.js';
+import type { ForgeType } from '../forge.js';
 
 export type PendingAutoMergeStatus = 'pending' | 'merging' | 'blocked' | 'failed' | 'merged' | 'cancelled';
 
@@ -9,6 +10,7 @@ export interface PendingAutoMerge {
   prUrl: string;
   prNumber?: number;
   projectKey: string;
+  forge: ForgeType;
   status: PendingAutoMergeStatus;
   /** Absolute ISO timestamp for when the server may attempt the merge; survives process sleep. */
   scheduledMergeAt: string;
@@ -26,6 +28,7 @@ export interface ScheduleAutoMergeInput {
   prUrl: string;
   prNumber?: number;
   projectKey: string;
+  forge?: ForgeType;
   scheduledMergeAt: string;
   scheduledAt?: string;
 }
@@ -36,6 +39,7 @@ interface PendingAutoMergeRow {
   prUrl: string;
   prNumber: number | null;
   projectKey: string;
+  forge: string;
   status: PendingAutoMergeStatus;
   scheduledMergeAt: string;
   scheduledAt: string;
@@ -52,6 +56,7 @@ function toPendingAutoMerge(row: PendingAutoMergeRow): PendingAutoMerge {
     prUrl: row.prUrl,
     prNumber: row.prNumber ?? undefined,
     projectKey: row.projectKey,
+    forge: (row.forge ?? 'github') as ForgeType,
     status: row.status,
     scheduledMergeAt: row.scheduledMergeAt,
     scheduledAt: row.scheduledAt,
@@ -111,9 +116,9 @@ export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): Sche
     try {
       const result = db.prepare(`
         INSERT INTO pending_auto_merges (
-          issueId, prUrl, prNumber, projectKey, "status", scheduledMergeAt, scheduledAt
-        ) VALUES (?, ?, ?, ?, 'pending', ?, ?)
-      `).run(input.issueId, input.prUrl, input.prNumber ?? null, input.projectKey, input.scheduledMergeAt, scheduledAt);
+          issueId, prUrl, prNumber, projectKey, forge, "status", scheduledMergeAt, scheduledAt
+        ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+      `).run(input.issueId, input.prUrl, input.prNumber ?? null, input.projectKey, input.forge ?? 'github', input.scheduledMergeAt, scheduledAt);
       return { entry: selectById(Number(result.lastInsertRowid))!, created: true };
     } catch (error) {
       const raced = selectActiveByIssue(input.issueId);

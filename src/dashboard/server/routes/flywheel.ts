@@ -43,6 +43,7 @@ import {
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
+import { parseArtifactRef } from '../../../lib/forge.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
 import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
@@ -269,11 +270,6 @@ interface AutoMergeCancelDeps {
   announce?: (issueId: string) => void;
 }
 
-function parsePrNumber(prUrl: string | undefined): number | undefined {
-  const match = prUrl?.match(/\/pull\/(\d+)(?:$|[/?#])/);
-  return match ? Number.parseInt(match[1], 10) : undefined;
-}
-
 function announceAutoMergeScheduled(issueId: string, entry: PendingAutoMerge): void {
   emitActivityTtsSync({
     utterance: `${issueId} auto-merging in 5 minutes; pan merge cancel ${issueId} to abort`,
@@ -330,8 +326,8 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   if (!reviewStatus?.prUrl) {
     return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
   }
-  const prNumber = parsePrNumber(reviewStatus.prUrl);
-  if (prNumber === undefined) {
+  const artifactRef = parseArtifactRef(reviewStatus.prUrl);
+  if (artifactRef === null) {
     return { status: 422, body: { error: 'review status PR URL is missing or invalid' } };
   }
 
@@ -343,8 +339,9 @@ export async function postAutoMergeSchedulePayload(payload: unknown, deps: AutoM
   const result = (deps.schedule ?? scheduleAutoMergeWithResult)({
     issueId,
     prUrl: reviewStatus.prUrl,
-    prNumber,
+    prNumber: artifactRef.number,
     projectKey: project.projectKey,
+    forge: artifactRef.forge,
     scheduledMergeAt: scheduledMergeAt.toISOString(),
     scheduledAt: scheduledAt.toISOString(),
   });

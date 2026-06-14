@@ -61,7 +61,7 @@ export interface ReviewArtifactCreationResult {
   }
 
   try {
-    const beads = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
+    const { beads } = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
     if (beads.length > 0) {
       lines.push('## Implementation Tasks');
       lines.push('');
