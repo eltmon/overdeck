@@ -230,6 +230,28 @@ describe('forge adapters', () => {
     expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
   });
 
+  it('merges GitLab review artifacts via glab mr merge', async () => {
+    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await getForgeAdapter('gitlab').mergeReviewArtifact({
+      forge: 'gitlab',
+      id: '62',
+      method: 'squash',
+    });
+
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('glab mr merge 62'),
+      expect.anything(),
+    );
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('--squash'),
+      expect.anything(),
+    );
+    const calledCommand = execMock.mock.calls[0][0] as string;
+    expect(calledCommand.startsWith('gh ')).toBe(false);
+  });
+
   it('has a GitHub merge timeout of at least 15 minutes', () => {
     expect(GITHUB_MERGE_TIMEOUT_MS).toBe(15 * 60 * 1000);
   });
