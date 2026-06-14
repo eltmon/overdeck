@@ -41,6 +41,7 @@ import { AUTO_MERGE_COOLDOWN_MS } from '../../../../lib/cloister/auto-merge-conf
 import { markBlocked, markFailed, scheduleAutoMerge, transitionToMerging } from '../../../../lib/database/pending-auto-merges-db.js';
 
 const uatTrainMocks = vi.hoisted(() => ({
+  getUatCandidatePayload: vi.fn(async () => null),
   postUatGenerationStackPayload: vi.fn(async () => ({ ok: true as const, frontendUrl: 'https://uat-pan-otter-0610.pan.localhost', evicted: [] })),
   postUatGenerationPromotePayload: vi.fn(async () => ({ success: true as const, generation: 'uat/pan-otter-0610', mergeSha: 'merge-sha', members: ['PAN-1'], postMergeStarted: ['PAN-1'], invalidated: [] })),
   runUatTrainReconcile: vi.fn(async () => ({ action: 'assembled' as const, invalidated: [] })),
@@ -869,6 +870,34 @@ describe('postFlywheelMergeNextPayload (PAN-1691 merge next N / ship batch)', ()
       },
     });
     expect(merge).toHaveBeenCalledTimes(2); // PAN-4 not in the slice; PAN-3 skipped after the failure
+  });
+});
+
+describe('GET /api/flywheel/uat-candidate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the newest ready UAT generation payload', async () => {
+    uatTrainMocks.getUatCandidatePayload.mockResolvedValue({
+      branchName: 'uat/pan-otter-0614',
+      bundled: ['PAN-1901', 'PAN-1902'],
+      status: 'ready',
+    });
+
+    await expect(requestFlywheelRoute('/api/flywheel/uat-candidate')).resolves.toEqual({
+      status: 200,
+      body: { branchName: 'uat/pan-otter-0614', bundled: ['PAN-1901', 'PAN-1902'], status: 'ready' },
+    });
+  });
+
+  it('returns null when no ready UAT generation exists', async () => {
+    uatTrainMocks.getUatCandidatePayload.mockResolvedValue(null);
+
+    await expect(requestFlywheelRoute('/api/flywheel/uat-candidate')).resolves.toEqual({
+      status: 200,
+      body: null,
+    });
   });
 });
 

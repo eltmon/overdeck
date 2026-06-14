@@ -232,6 +232,17 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
   return cache;
 }
 
+/** The newest 'ready' UAT generation, or null when none exists. */
+export async function getUatCandidatePayload(): Promise<{ branchName: string; bundled: string[]; status: UatGeneration['status'] } | null> {
+  const [newest] = listUatGenerationsSync({ projectRoot: projectRoot(), statuses: ['ready'], limit: 1 });
+  if (!newest) return null;
+  return {
+    branchName: newest.name,
+    bundled: newest.members.map((member) => member.issueId),
+    status: newest.status,
+  };
+}
+
 /** The generation chain, newest first, enriched for the UAT batches card. */
 export async function getUatGenerationsPayload(): Promise<UatGenerationPayload[]> {
   const status = await readCurrentFlywheelStatusForDashboard();

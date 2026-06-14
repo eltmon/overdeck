@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getUatGenerationsPayload } from '../uat-train.js';
+import { getUatCandidatePayload, getUatGenerationsPayload } from '../uat-train.js';
 import type { UatGeneration } from '../../../../lib/database/uat-generations-db.js';
 
 const mocks = vi.hoisted(() => ({
@@ -77,6 +77,59 @@ function doc(title: string) {
     },
   };
 }
+
+describe('getUatCandidatePayload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns null when no ready generation exists', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([]);
+    await expect(getUatCandidatePayload()).resolves.toBeNull();
+    expect(mocks.listUatGenerationsSync).toHaveBeenCalledWith({
+      projectRoot: process.cwd(),
+      statuses: ['ready'],
+      limit: 1,
+    });
+  });
+
+  it('returns branchName, bundled issue IDs, and status for the newest ready generation', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([
+      gen([
+        { issueId: 'PAN-7', title: 'Seven', branch: 'feature/pan-7', headSha: 'h7', mergeOrder: 1 },
+        { issueId: 'PAN-8', title: 'Eight', branch: 'feature/pan-8', headSha: 'h8', mergeOrder: 2 },
+      ]),
+    ]);
+
+    await expect(getUatCandidatePayload()).resolves.toEqual({
+      branchName: 'uat/pan-otter-0610',
+      bundled: ['PAN-7', 'PAN-8'],
+      status: 'ready',
+    });
+  });
+
+  it('ignores older ready generations and returns only the newest', async () => {
+    mocks.listUatGenerationsSync.mockReturnValue([
+      {
+        ...gen([{ issueId: 'PAN-9', title: 'Nine', branch: 'feature/pan-9', headSha: 'h9', mergeOrder: 1 }]),
+        name: 'uat/pan-falcon-0610',
+        createdAt: '2026-06-10T12:00:00.000Z',
+      },
+      {
+        ...gen([{ issueId: 'PAN-1', title: 'One', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }]),
+        name: 'uat/pan-otter-0610',
+        createdAt: '2026-06-10T10:00:00.000Z',
+      },
+    ]);
+
+    const payload = await getUatCandidatePayload();
+    expect(payload).toEqual({
+      branchName: 'uat/pan-falcon-0610',
+      bundled: ['PAN-9'],
+      status: 'ready',
+    });
+  });
+});
 
 describe('getUatGenerationsPayload', () => {
   let tmp: string | undefined;

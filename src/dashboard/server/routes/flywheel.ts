@@ -911,6 +911,16 @@ function uatGenerationNameFromParam(param: string): string {
   return decoded.startsWith('uat/') ? decoded : `uat/${decoded}`;
 }
 
+const getUatCandidateRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/uat-candidate',
+  httpHandler(Effect.gen(function* () {
+    const { getUatCandidatePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
+    const payload = yield* Effect.promise(() => getUatCandidatePayload());
+    return jsonResponse(payload);
+  })),
+);
+
 const getUatGenerationsRoute = HttpRouter.add(
   'GET',
   '/api/flywheel/uat-generations',
@@ -998,6 +1008,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   postFlywheelMergeNextRoute,
   deleteAutoMergeRoute,
   getFlywheelMergeQueueRoute,
+  getUatCandidateRoute,
   getUatGenerationsRoute,
   postUatGenerationStackRoute,
   postUatGenerationPromoteRoute,
