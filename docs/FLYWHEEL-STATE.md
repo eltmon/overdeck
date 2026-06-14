@@ -857,3 +857,24 @@ or (b) restart the dashboard to fire the PAN-1758 startup repair sweep.
 - **NEXT TICK:** verify strike-pan-1872 landed (inspect diff: the toUpperCase fix + spawn-into-conflicted-
   workspace, no test weakening) → file the regression-coverage follow-up (per directive) → `pan reload`
   to deploy → then `pan start` the conflicted issues (start with PAN-1614 #1630) to rebase+resolve+drain.
+
+### RUN-35 tick 4 (2026-06-14 ~17:33Z) — PAN-1872 FIXED (operator); keystone drain started (PAN-1614 re-entered)
+
+- **PAN-1872 FIXED + CLOSED by the operator** as `7297d2469` (on main, green CI) — NOT by the strike
+  agent (strike-pan-1872 stopped at 17:08 right after spawn, did no work). The fix is COMPLETE with
+  regression tests (`start-sync-main-conflict.test.ts` +109, `work-agent-prompt-pan-1872.test.ts` +59) →
+  **no coverage follow-up needed** (directive's "minimal-unblock follow-up" does not apply). Verified the
+  fix is built into dist (`syncConflictFiles` in `dist/cli/index.js`), so CLI `pan start` has it.
+- **Keystone drain STARTED: `pan start PAN-1614` succeeded — NO crash** (confirms PAN-1872 fix is live).
+  `agent-pan-1614` (pi/kimi, 3 beads, proposed→active) is re-entering to rebase+resolve its
+  approved-but-conflicted PR #1630. Landing #1630 + `pan reload` deploys deacon convoy-recovery → auto-fixes
+  PAN-1845's stalled convoy + all future review stalls.
+- **Deliberately HELD the other 7 conflicting PRs** (1827/1629/1242/1491/1775/1641/1765). Re-entering them
+  before PAN-1614's convoy-recovery is live would trigger re-reviews that STALL on the exact bug PAN-1614
+  fixes — multiplying stalled convoys. Correct sequence: land PAN-1614 → deploy → THEN parallel-drain the rest.
+- **Running server PID 888192 (started 13:01 EDT) predates the dist rebuild (13:11)** — so the deacon runs
+  pre-PAN-1872 code; irrelevant to CLI `pan start` (which has the fix), but a `pan reload` after PAN-1614
+  lands will deploy both PAN-1872 + PAN-1614 to the server. Old PID 21437 still lingering (zombie).
+- **NEXT TICK:** check agent-pan-1614 rebased #1630 clean → PAN-1658 reconciler re-validates → merge →
+  `pan reload` to deploy convoy-recovery → confirm PAN-1845 convoy auto-recovers → then `pan start` the
+  remaining 6 conflicting issues to drain. MIN-831 still needs operator GitLab merge; PAN-1845 review-restart still surfaced.
