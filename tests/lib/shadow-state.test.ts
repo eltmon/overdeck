@@ -9,7 +9,6 @@ import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, readdirSync, unlinkSync, rmdirSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 
 // Import the functions we're testing
@@ -27,8 +26,9 @@ import {
   getPendingSyncCount,
   getDisplayStatus,
 } from '../../src/lib/shadow-state.js';
+import { getPanopticonHome } from '../../src/lib/paths.js';
 
-const TEST_SHADOW_STATE_DIR = join(homedir(), '.panopticon', 'shadow-state');
+const TEST_SHADOW_STATE_DIR = join(getPanopticonHome(), 'shadow-state');
 
 // Unique prefix for this test file to avoid conflicts with shadow-mode.test.ts
 const TEST_PREFIX = 'TEST-SSTATE';
