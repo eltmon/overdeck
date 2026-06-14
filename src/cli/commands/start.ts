@@ -77,6 +77,7 @@ import {
   spawnRemoteAgent,
   isRemoteAgentRunning,
   createFlyProviderFromConfig,
+  checkRemoteSpendCap,
 } from '../../lib/remote/index.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
@@ -378,6 +379,14 @@ async function handleRemoteWorkspace(
   // settings.json permission mode) — idempotent, heals VMs created before
   // a config change.
   await fly.configureClaudeCode(remoteMetadata.vmName);
+
+  // Enforce remote.max_concurrent_agents spend guardrail before provisioning
+  // more Fly resources. A cap of zero or unset is unlimited.
+  const spendCap = checkRemoteSpendCap(config);
+  if (!spendCap.allowed) {
+    spinner.fail(spendCap.message!);
+    process.exit(1);
+  }
 
   // Spawn remote agent
   spinner.text = 'Spawning remote agent...';

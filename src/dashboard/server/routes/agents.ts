@@ -3001,10 +3001,15 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (isRemote && workspaceMetadata) {
-      const { spawnRemoteAgent } = yield* Effect.promise(() => import('../../../lib/remote/remote-agents.js'));
+      const { spawnRemoteAgent, checkRemoteSpendCap } = yield* Effect.promise(() => import('../../../lib/remote/remote-agents.js'));
       const { createFlyProviderFromConfig } = yield* Effect.promise(() => import('../../../lib/remote/index.js'));
       const { loadConfigSync: loadPanConfig } = yield* Effect.promise(() => import('../../../lib/config.js'));
-      const fly = createFlyProviderFromConfig(loadPanConfig().remote);
+      const panConfig = loadPanConfig();
+      const spendCap = checkRemoteSpendCap(panConfig);
+      if (!spendCap.allowed) {
+        return jsonResponse({ error: spendCap.message }, { status: 429 });
+      }
+      const fly = createFlyProviderFromConfig(panConfig.remote);
       yield* Effect.promise(() => fly.syncAllCredentials(workspaceMetadata.vmName));
 
       const { buildWorkAgentPrompt, getTrackerContext } = yield* Effect.promise(() => import('../../../lib/cloister/work-agent-prompt.js'));

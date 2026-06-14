@@ -33,6 +33,7 @@ import {
   generateEphemeralWatchdogScript,
   installEphemeralWatchdog,
   refreshHostHeartbeatForEphemeralVms,
+  checkRemoteSpendCap,
 } from '../../../src/lib/remote/remote-agents.js';
 
 describe('generatePushDaemonScript', () => {
@@ -204,6 +205,64 @@ describe('ephemeral watchdog behavior', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     log = existsSync(logFile) ? readFileSync(logFile, 'utf-8') : '<no log>';
     expect(log.split('stopping machine').length - 1).toBe(3);
+  });
+});
+
+describe('checkRemoteSpendCap', () => {
+  it('allows spawn when cap is unset', () => {
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: undefined } },
+      { listActiveRemoteAgentStates: () => [{ id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' }] },
+    );
+    expect(result.allowed).toBe(true);
+    expect(result.cap).toBe(0);
+  });
+
+  it('allows spawn when cap is zero', () => {
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 0 } },
+      { listActiveRemoteAgentStates: () => [{ id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' }] },
+    );
+    expect(result.allowed).toBe(true);
+    expect(result.cap).toBe(0);
+  });
+
+  it('allows spawn when active count is below cap', () => {
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 3 } },
+      { listActiveRemoteAgentStates: () => [{ id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' }] },
+    );
+    expect(result.allowed).toBe(true);
+    expect(result.current).toBe(1);
+    expect(result.cap).toBe(3);
+  });
+
+  it('refuses spawn when active count reaches cap', () => {
+    const active = [
+      { id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const },
+      { id: 'agent-pan-2', issueId: 'PAN-2', vmName: 'vm-2', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const },
+    ];
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 2 } },
+      { listActiveRemoteAgentStates: () => active },
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.current).toBe(2);
+    expect(result.cap).toBe(2);
+    expect(result.message).toContain('cap reached');
+    expect(result.message).toContain('2/2');
+  });
+
+  it('counts starting agents against the cap', () => {
+    const active = [
+      { id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'starting', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const },
+    ];
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 1 } },
+      { listActiveRemoteAgentStates: () => active },
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.current).toBe(1);
   });
 });
 

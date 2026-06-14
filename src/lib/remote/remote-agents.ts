@@ -386,6 +386,45 @@ export async function refreshHostHeartbeatForEphemeralVms(
   return actions;
 }
 
+export interface RemoteSpendCapResult {
+  allowed: boolean;
+  current: number;
+  cap: number;
+  message?: string;
+}
+
+export interface CheckRemoteSpendCapDeps {
+  listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
+}
+
+/**
+ * Enforce the configured remote.max_concurrent_agents cap before spawning a
+ * new remote work agent. A cap of zero or unset is treated as unlimited,
+ * preserving today's behavior.
+ */
+export function checkRemoteSpendCap(
+  config: { remote?: { max_concurrent_agents?: number } },
+  deps: CheckRemoteSpendCapDeps = {},
+): RemoteSpendCapResult {
+  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
+  const cap = config.remote?.max_concurrent_agents ?? 0;
+
+  if (!cap || cap <= 0) {
+    return { allowed: true, current: activeStates.length, cap: 0 };
+  }
+
+  if (activeStates.length >= cap) {
+    return {
+      allowed: false,
+      current: activeStates.length,
+      cap,
+      message: `Remote agent cap reached: ${activeStates.length}/${cap} active remote agents. Stop an existing remote agent or raise remote.max_concurrent_agents.`,
+    };
+  }
+
+  return { allowed: true, current: activeStates.length, cap };
+}
+
 /**
  * Check if remote agent session exists
  */

@@ -28,6 +28,7 @@ export {
   pollRemoteAgentStatus,
   loadRemoteAgentState,
   refreshHostHeartbeatForEphemeralVms,
+  checkRemoteSpendCap,
 } from './remote-agents.js';
 export type { RemoteAgentState, SpawnRemoteAgentOptions } from './remote-agents.js';
 
