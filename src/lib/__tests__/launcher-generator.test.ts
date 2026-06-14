@@ -249,7 +249,9 @@ describe('generateLauncherScript', () => {
     expect(script).toContain("pan review validate-trace '/agents/agent-pan-1-review-requirements/review-requirements.md'");
     expect(script).toContain('elif command -v pan >/dev/null 2>&1 && pan review validate-trace --help >/dev/null 2>&1; then');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY requirements /agents/agent-pan-1-review-requirements/review-requirements.md" || true');
-    expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED requirements $REASON" || true');
+    expect(script).toContain('printf -v MSG \'REVIEWER_FAILED %s %s\' "requirements" "$REASON"');
+    expect(script).toContain('pan tell \'agent-pan-1-review\' "$MSG" || true');
+    expect(script).not.toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED requirements $REASON" || true');
     expect(script).toContain('substrate trace check skipped');
     expect(script).toContain('REASON_FILE=$(mktemp');
     expect(script).toContain('trap \'rm -f "$REASON_FILE"\' EXIT');
