@@ -421,12 +421,58 @@ describe('flywheel auto-merge routes', () => {
       prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
       prNumber: 1486,
       projectKey: 'panopticon-cli',
+      forge: 'github',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
       status: 'pending',
     });
     expect(second).toEqual(first);
     expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it('schedules GitLab MR URLs with forge: gitlab and the parsed MR iid', async () => {
+    const now = new Date('2026-05-25T10:00:00.000Z');
+    const announce = vi.fn();
+
+    const result = await postAutoMergeSchedulePayload({ issueId: 'MIN-831' }, eligibleDeps({
+      now: () => now,
+      announce,
+      getReviewStatus: () => ({
+        issueId: 'MIN-831',
+        reviewStatus: 'passed' as const,
+        testStatus: 'passed' as const,
+        mergeStatus: 'pending' as const,
+        updatedAt: '2026-05-25T10:00:00.000Z',
+        readyForMerge: true,
+        prUrl: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62',
+      }),
+      resolveProject: () => ({ projectKey: 'mind-your-now', projectPath: process.cwd(), projectName: 'Mind Your Now' }) as never,
+    }));
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      issueId: 'MIN-831',
+      prUrl: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62',
+      prNumber: 62,
+      projectKey: 'mind-your-now',
+      forge: 'gitlab',
+      status: 'pending',
+    });
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects review status PR URLs that match neither GitHub nor GitLab', async () => {
+    await expect(postAutoMergeSchedulePayload({ issueId: 'PAN-1486' }, eligibleDeps({
+      getReviewStatus: () => ({
+        issueId: 'PAN-1486',
+        reviewStatus: 'passed' as const,
+        testStatus: 'passed' as const,
+        mergeStatus: 'pending' as const,
+        updatedAt: '2026-05-25T10:00:00.000Z',
+        readyForMerge: true,
+        prUrl: 'https://example.com/foo',
+      }),
+    }))).resolves.toEqual({ status: 422, body: { error: 'review status PR URL is missing or invalid' } });
   });
 
   it('rejects scheduling while UAT is still required', async () => {
