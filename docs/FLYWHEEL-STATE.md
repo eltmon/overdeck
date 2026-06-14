@@ -2696,6 +2696,46 @@ with the live deploy). Did NOT launch agents this tick: launching into a frozen 
 (deacon stopped) is pointless, and auto_pickup_backlog=false forbids fresh backlog —
 the recovery path runs through the deacon, which is the operator's to restart.
 
+## RUN-34 tick 4 — deacon back up but resume STILL gated; 11 in-review stranded (review-status lost)
+
+### Closed out 3 more (operator-authorized close-out mode continues)
+
+PAN-1813, PAN-1803, PAN-1821 reached verifying-on-main (merged 06-13) and were verified
+(PR merged + merge commit on origin/main + workspace clean) then `pan close --force`.
+PAN-1821 had one dirty file `.pan/test/result.json` — an ephemeral test-verdict artifact,
+not stranded source — so safe to close. **Run total: 6 issues closed out** (1642,1501,
+1658,1802 + 1813,1803,1821) + the red-main fix. verifying-on-main now 0.
+
+### Deacon RUNNING but boot --no-resume gate PERSISTS (the live blocker)
+
+Operator restarted the deacon (Status: Stopped → Running). BUT every stopped agent STILL
+shows `Gate: Boot --no-resume` — restarting the deacon alone does NOT clear the boot gate.
+This is exactly PAN-1879: re-enabling auto-resume needs a restart WITH resume on (pan
+up/dev without --no-resume, or the PAN-1879 explicit flag), not just the deacon process up.
+So the deacon patrols but won't auto-resume the stalled set.
+
+### review-status.json is UNCOMMITTED runtime state — and it was lost for the 11 in-review
+
+`src/lib/review-status.ts:153` → `DEFAULT_STATUS_FILE = join(homedir(), '.panopticon',
+'review-status.json')`. `~/.panopticon` is NOT a git repo, so review-status.json is NEVER
+committed and has no version history / no rollback. At tick 4 the file was 336 bytes with
+NO entries for any of the 11 in-review issues (1827,1817,1775,1765,1696,1641,1629,1614,
+1498,1491,1242) despite their GitHub in-review labels. The pipeline LOST their review
+state (likely a restart/reset or #1877's live-file mutation), and because the store isn't
+version-controlled there's nothing to restore from. **Consequence:** these 11 are stranded
+beyond simple resume — the deacon's checkOrphanedReviewStatuses has no entry to act on, so
+even with resume re-enabled they may need `pan review restart <id>`/re-entry per issue
+(flywheel-forbidden). The GitHub label is the only surviving signal of where they were.
+
+### Held launches (correct, not passive)
+
+0 live agents at tick 4. No productive launch exists: in-review = review-state-lost +
+resume-gated; in-progress (1845/1491) resume-gated; nothing readyForMerge; auto_pickup
+_backlog=false forbids fresh backlog. Launching into a resume-gated, review-state-lost
+pipeline won't progress. Productive output this tick = 3 close-outs + the stranded-state
+diagnosis. Recovery runs through operator: (a) restart WITH resume, (b) re-enter the 11
+stranded reviews.
+
 ### Memory is NOT the limiter this run (contrast RUN-33)
 
 RAM 15/64 GB, **swap 0/8GB** (RUN-33 was 99.9% swap). The launch ceiling this run is
