@@ -107,6 +107,7 @@ import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
+import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
@@ -600,10 +601,13 @@ program
   .description('Start dashboard (and Traefik if enabled)')
   .option('--detach', 'Run in background')
   .option('--skip-traefik', 'Skip Traefik startup')
+  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited PANOPTICON_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .option('--resume', 'Force agent auto-resume even if the shell inherited PANOPTICON_NO_RESUME')
   .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(async (options) => {
     const noResume = isNoResumeCliOptionEnabled(options);
+    const bootGates = resolveBootGates(options);
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
@@ -655,6 +659,7 @@ program
     if (noResume) {
       console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
     }
+    console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
     // Auto-sync on every startup: skills, agents, hooks, MCP config,
     // and rendered context layers (~/.claude/CLAUDE.md + per-project
@@ -945,13 +950,11 @@ program
       console.log(chalk.dim(`\nLaunching Panopticon desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
+      const electronEnv = applyBootGateEnv({ ...process.env }, options);
       const child = spawn(electronAppPath, [], {
         detached: true,
         stdio: 'ignore',
-        env: {
-          ...process.env,
-          ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
-        },
+        env: electronEnv,
       });
 
       const launchSucceeded = await new Promise<boolean>((resolve) => {
@@ -1018,6 +1021,7 @@ program
           PANOPTICON_TRUSTED_ORIGINS: [process.env.PANOPTICON_TRUSTED_ORIGINS, `https://${traefikDomain}`].filter(Boolean).join(','),
         }
       : {};
+    const dashboardBootEnv = applyBootGateEnv({ ...process.env }, options);
 
     if (options.detach) {
       // Run in background
@@ -1026,14 +1030,12 @@ program
             detached: true,
             stdio: openDashboardLogStdio(),
             env: {
-              ...process.env,
+              ...dashboardBootEnv,
               ...dashboardOriginEnv,
               DASHBOARD_PORT: String(dashboardPort),
               API_PORT: String(dashboardApiPort),
               PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
-              ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-              ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -1085,14 +1087,12 @@ program
       const child = spawn(node22, [bundledServer], {
             stdio: 'inherit',
             env: {
-              ...process.env,
+              ...dashboardBootEnv,
               ...dashboardOriginEnv,
               DASHBOARD_PORT: String(dashboardPort),
               API_PORT: String(dashboardApiPort),
               PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
-              ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-              ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -1263,7 +1263,10 @@ program
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
   .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
+  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited PANOPTICON_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .option('--resume', 'Force agent auto-resume even if the shell inherited PANOPTICON_NO_RESUME')
+  .option('--no-resume', 'Restart dashboard with agent auto-resume disabled for this boot')
   .action(restartCommand);
 
 function registerProjectCommands(command: Command): void {

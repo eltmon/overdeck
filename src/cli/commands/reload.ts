@@ -122,8 +122,6 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
   }
 
   const config = readPlatformConfigSync();
-  const disableDeacon = options.deacon === false;
-
   try {
     if (!options.skipBuild) {
       // Install first so a merge/rebase that added a runtime dep can't produce a
@@ -157,7 +155,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       }
     }
 
-    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
+    await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
     }));
     await recordReloadStatus(startedAt, true);

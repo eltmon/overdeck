@@ -49,6 +49,7 @@ import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cl
 import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-merge-executor.js';
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
+import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 
 declare const Bun: unknown;
 
@@ -57,6 +58,7 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
+console.log(`[panopticon] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });

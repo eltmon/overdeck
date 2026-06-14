@@ -99,13 +99,10 @@ Each is a **singleton on its port.** A second instance that tries to bind an alr
 
 | Env var | Set by | Effect |
 | --- | --- | --- |
-| `PANOPTICON_NO_RESUME=1` | `pan up --no-resume` | Deacon runs but does **not** auto-resume stopped/orphaned agents (orphan recovery off). Use after a reboot — stale `agent-*` `state.json` with `status:running` would otherwise mass-resume. |
+| `PANOPTICON_NO_RESUME=1` | `pan up --no-resume` / `pan restart --no-resume` | Deacon runs but does **not** auto-resume stopped/orphaned agents (orphan recovery off). Use after a reboot — stale `agent-*` `state.json` with `status:running` would otherwise mass-resume. |
 | `PANOPTICON_DISABLE_DEACON=1` | `pan up --no-deacon` / `pan restart --no-deacon` | Deacon auto-start is **skipped entirely** (no patrols, no recovery). Also set on container peers. |
 
-**Partial-restart env hazard.** `spawnDashboardDetached` (in `restart.ts`) spawns the new dashboard with `{ ...process.env }` — i.e. it **inherits the env of whatever shell ran the `pan` command**. Conversation/agent shells inherit the *original boot's* gates. So `pan restart --dashboard` from such a shell silently **re-applies the old `--no-resume`/`--no-deacon` state**, even if you meant to change it. To change a gate:
-
-- Set it explicitly for the command: `env -u PANOPTICON_DISABLE_DEACON pan restart --dashboard` (enable the deacon), or `PANOPTICON_NO_RESUME=1 pan up`.
-- Or do a full `pan down` + `pan up` with the env you want, which also resets the supervisor singleton.
+**Boot gate precedence.** `pan up` and `pan restart` support explicit tri-state gates: `--deacon` / `--no-deacon` and `--resume` / `--no-resume`. Precedence is **flag > inherited env > default**. Use `pan restart --dashboard --deacon --resume` to force both gates back on even from a shell that inherited `PANOPTICON_DISABLE_DEACON=1` or `PANOPTICON_NO_RESUME=1`; use the `--no-*` forms to force them off. Dashboard boot logs include the effective state and source, e.g. `deacon=on source=flag resume=off source=env`.
 
 The deacon can additionally be paused at runtime via the SQLite flag `deacon.globally_paused` (`pan admin cloister freeze` / `unfreeze`), which **persists across restarts** and is independent of the boot gates — a useful belt-and-suspenders while settling the field.
 
