@@ -36,7 +36,45 @@ vi.mock('../../../src/lib/github-app.js', () => ({
   parsePullRequestRef: parsePullRequestRefMock,
 }));
 
-import { getForgeAdapter, GITHUB_MERGE_TIMEOUT_MS } from '../../../src/lib/forge.js';
+import { getForgeAdapter, GITHUB_MERGE_TIMEOUT_MS, parseArtifactRef } from '../../../src/lib/forge.js';
+
+describe('parseArtifactRef', () => {
+  it('parses GitHub pull request URLs', () => {
+    expect(parseArtifactRef('https://github.com/eltmon/panopticon-cli/pull/42')).toEqual({
+      forge: 'github',
+      number: 42,
+    });
+  });
+
+  it('parses GitHub pull request URLs with trailing segments', () => {
+    expect(parseArtifactRef('https://github.com/eltmon/panopticon-cli/pull/42/files')).toEqual({
+      forge: 'github',
+      number: 42,
+    });
+  });
+
+  it('parses GitLab merge request URLs', () => {
+    expect(parseArtifactRef('https://gitlab.com/eltmon/mind-your-now/-/merge_requests/62')).toEqual({
+      forge: 'gitlab',
+      number: 62,
+    });
+  });
+
+  it('parses self-hosted GitLab merge request URLs by path pattern', () => {
+    expect(parseArtifactRef('https://git.example.com/g/r/-/merge_requests/5')).toEqual({
+      forge: 'gitlab',
+      number: 5,
+    });
+  });
+
+  it('returns null for unrecognised URLs', () => {
+    expect(parseArtifactRef('https://example.com/foo')).toBeNull();
+  });
+
+  it('returns null for undefined input', () => {
+    expect(parseArtifactRef(undefined)).toBeNull();
+  });
+});
 
 describe('forge adapters', () => {
   beforeEach(() => {
@@ -190,6 +228,28 @@ describe('forge adapters', () => {
     ).resolves.toBeUndefined();
 
     expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
+  });
+
+  it('merges GitLab review artifacts via glab mr merge', async () => {
+    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await getForgeAdapter('gitlab').mergeReviewArtifact({
+      forge: 'gitlab',
+      id: '62',
+      method: 'squash',
+    });
+
+    expect(execMock).toHaveBeenCalledTimes(1);
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('glab mr merge 62'),
+      expect.anything(),
+    );
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('--squash'),
+      expect.anything(),
+    );
+    const calledCommand = execMock.mock.calls[0][0] as string;
+    expect(calledCommand.startsWith('gh ')).toBe(false);
   });
 
   it('has a GitHub merge timeout of at least 15 minutes', () => {

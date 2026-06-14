@@ -26,6 +26,29 @@ export const GITHUB_MERGE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export type ForgeType = 'github' | 'gitlab';
 
+/**
+ * Parse a review-artifact URL into its forge type and numeric identifier.
+ * Detection is by path pattern (not host) so self-hosted GitLab is supported.
+ * Returns `null` for unrecognised input.
+ */
+export function parseArtifactRef(
+  url: string | undefined,
+): { forge: ForgeType; number: number } | null {
+  if (!url) return null;
+
+  const gitlabMatch = url.match(/\/-\/merge_requests\/(\d+)(?:$|[/?#])/);
+  if (gitlabMatch) {
+    return { forge: 'gitlab', number: Number.parseInt(gitlabMatch[1], 10) };
+  }
+
+  const githubMatch = url.match(/\/pull\/(\d+)(?:$|[/?#])/);
+  if (githubMatch) {
+    return { forge: 'github', number: Number.parseInt(githubMatch[1], 10) };
+  }
+
+  return null;
+}
+
 export interface ReviewArtifactRef {
   forge: ForgeType;
   url?: string;
