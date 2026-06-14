@@ -29,6 +29,12 @@ export interface WorkAgentPromptContext {
 }
 
 export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise<string> {
+  // PAN-1872: tolerate a missing issueId defensively so callers in recovery
+  // paths (e.g. pan start after a sync-main conflict) do not crash on
+  // `Cannot read properties of undefined (reading 'toUpperCase')`.
+  const issueId = ctx.issueId ?? '';
+  const issueIdLower = issueId.toLowerCase();
+
   let beadsTasksStr = '';
   let stitchDesignsStr = '';
   let featureContextStr = '';
@@ -37,9 +43,9 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = await readPlanningContext(ctx.workspacePath);
-    const featureContext = await readFeatureContext(ctx.workspacePath, ctx.issueId);
+    const featureContext = await readFeatureContext(ctx.workspacePath, issueId);
 
-    const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
+    const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, issueId);
     if (beadsTasks.length > 0) {
       beadsTasksStr = beadsTasks.join('\n');
     }
@@ -49,24 +55,24 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       stitchDesignsStr = stitchDesigns;
     }
 
-    const activeSliceContext = await buildActiveSliceContext(ctx.workspacePath, ctx.issueId);
+    const activeSliceContext = await buildActiveSliceContext(ctx.workspacePath, issueId);
     if (activeSliceContext) {
       featureContextStr = activeSliceContext;
     } else if (featureContext) {
       featureContextStr = featureContext;
     }
 
-    polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
+    polyrepoContextStr = buildPolyrepoContext(issueId, ctx.workspacePath);
     pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
   }
 
   return await Effect.runPromise(renderPrompt({
     name: 'work',
     vars: {
-      ISSUE_ID: ctx.issueId,
-      ISSUE_ID_LOWER: ctx.issueId.toLowerCase(),
+      ISSUE_ID: issueId,
+      ISSUE_ID_LOWER: issueIdLower,
       WORKSPACE_PATH: ctx.workspacePath,
-      BRANCH_NAME: `feature/${ctx.issueId.toLowerCase()}`,
+      BRANCH_NAME: `feature/${issueIdLower}`,
       LOCAL: ctx.env === 'LOCAL',
       REMOTE: ctx.env === 'REMOTE',
       PROJECT_ROOT: ctx.projectRoot || '',
@@ -96,12 +102,15 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
     // PAN-977: continue-state readers internally call `getContinuesDir(projectRoot)`
     // which appends `.pan/continues/`. Callers must pass the workspace root, NOT the
     // `.pan` subdirectory, to avoid the double-`.pan` path bug.
-    const cont = await Effect.runPromise(readContinueState(workspacePath, issueId.toUpperCase()));
+    // PAN-1872: guard against an undefined issueId so a malformed context does not
+    // mask a sync-main conflict with `Cannot read properties of undefined (reading 'toUpperCase')`.
+    const normalizedIssueId = (issueId ?? '').toUpperCase();
+    const cont = await Effect.runPromise(readContinueState(workspacePath, normalizedIssueId));
     const currentItemIds = doc.plan.items
       .filter(item => item.status === 'running' || item.id === nextItem.id)
       .map(item => item.id);
     const slice = createActiveSlice(doc, {
-      issueId: issueId.toUpperCase(),
+      issueId: normalizedIssueId,
       itemId: nextItem.id,
       currentItemIds,
       // PAN-1517: swarmRuntime is gone — no synthesisOutputs to pass.
