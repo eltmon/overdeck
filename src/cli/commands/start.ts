@@ -23,6 +23,7 @@ import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
+import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -1152,6 +1153,30 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     });
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
+
+    try {
+      const transition = await Effect.runPromise(transitionVBriefOnMain(
+        projectRoot,
+        id,
+        'active',
+        'approved',
+        `scope: approve ${id.toUpperCase()} vBRIEF`,
+      ));
+      if (transition.moved) {
+        console.log(chalk.green(`  ✓ vBRIEF moved ${transition.fromDir} → active`));
+      }
+    } catch (err: any) {
+      console.warn(chalk.dim(`  ⚠ Could not update main vBRIEF lifecycle: ${err?.message ?? String(err)}`));
+    }
+
+    const spawnedPlanPath = findPlanSync(workspace);
+    if (spawnedPlanPath) {
+      try {
+        updatePlanStatus(spawnedPlanPath, 'running');
+      } catch (err: any) {
+        console.warn(chalk.dim(`  ⚠ Could not set workspace vBRIEF status=running: ${err?.message ?? String(err)}`));
+      }
+    }
 
     // Check shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));

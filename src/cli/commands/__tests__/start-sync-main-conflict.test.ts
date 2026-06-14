@@ -7,12 +7,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { Effect } from 'effect';
 
 const syncMainMock = vi.hoisted(() => vi.fn());
 const spawnAgentMock = vi.hoisted(() => vi.fn());
 const execSyncMock = vi.hoisted(() => vi.fn());
 const execFileSyncMock = vi.hoisted(() => vi.fn());
 const resolveProjectFromIssueSyncMock = vi.hoisted(() => vi.fn());
+const vbriefLifecycleMocks = vi.hoisted(() => ({
+  transitionVBriefOnMain: vi.fn(),
+  updatePlanStatus: vi.fn(),
+}));
 
 vi.mock('../../../lib/cloister/merge-agent.js', () => ({
   syncMainIntoWorkspace: syncMainMock,
@@ -45,6 +50,11 @@ vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
   assertCanStartFreshSync: vi.fn(() => ({ canStartFresh: true })),
 }));
 
+vi.mock('../../../lib/vbrief/lifecycle-io.js', () => ({
+  transitionVBriefOnMain: vbriefLifecycleMocks.transitionVBriefOnMain,
+  updatePlanStatus: vbriefLifecycleMocks.updatePlanStatus,
+}));
+
 vi.mock('../../../lib/cloister/work-agent-prompt.js', () => ({
   buildWorkAgentPrompt: vi.fn(async () => 'prompt'),
   getTrackerContext: vi.fn(async () => ''),
@@ -75,6 +85,8 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
     execSyncMock.mockReset();
     execFileSyncMock.mockReset();
     resolveProjectFromIssueSyncMock.mockReset();
+    vbriefLifecycleMocks.transitionVBriefOnMain.mockReset();
+    vbriefLifecycleMocks.updatePlanStatus.mockReset();
 
     resolveProjectFromIssueSyncMock.mockImplementation(() => ({
       projectKey: 'panopticon-cli',
@@ -96,6 +108,14 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
     });
 
     spawnAgentMock.mockResolvedValue({ id: 'agent-pan-1872' });
+    vbriefLifecycleMocks.transitionVBriefOnMain.mockReturnValue(Effect.succeed({
+      fromDir: 'proposed',
+      toDir: 'active',
+      toPath: join(tmpDir, '.pan', 'specs', 'PAN-1872.vbrief.json'),
+      statusUpdated: true,
+      committed: false,
+      moved: true,
+    }));
 
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`__exit__:${code ?? 'undefined'}`);
@@ -128,6 +148,13 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
         issueId: 'PAN-1872',
         role: 'work',
       }),
+    );
+    expect(vbriefLifecycleMocks.transitionVBriefOnMain).toHaveBeenCalledWith(
+      tmpDir,
+      'PAN-1872',
+      'active',
+      'approved',
+      'scope: approve PAN-1872 vBRIEF',
     );
   });
 });
