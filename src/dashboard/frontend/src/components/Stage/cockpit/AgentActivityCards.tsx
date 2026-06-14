@@ -142,6 +142,7 @@ function AgentLaunchControl({
   })
 
   const busy = finalizeMutation.isPending || startMutation.isPending
+  if (!canShowFinalize && !canShowStart) return null
 
   return (
     <div className="mt-3 border-t border-border pt-3">
