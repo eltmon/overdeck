@@ -623,6 +623,79 @@ describe('FeatureItem', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
   });
 
+  it('shows expanded UAT environment state for ready-for-merge issues', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/workspaces/PAN-821') {
+        return {
+          ok: true,
+          json: async () => ({
+            exists: true,
+            issueId: 'PAN-821',
+            frontendUrl: 'https://feature-pan-821.pan.localhost',
+            stackHealth: {
+              healthy: false,
+              reasons: ['api unhealthy: connection refused'],
+              lastObserved: '2026-06-14T19:02:00.000Z',
+            },
+            pendingOperation: {
+              type: 'rebuild-stack',
+              status: 'running',
+              startedAt: '2026-06-14T19:01:00.000Z',
+            },
+            containers: {
+              postgres: { running: true, uptime: '2m', status: 'running', health: 'healthy', ports: [5432] },
+              api: { running: true, uptime: '42s', status: 'running', health: 'starting', ports: [8080] },
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          workspacePaths: [],
+          localBranchNames: [],
+          remoteBranchNames: [],
+          tmuxSessionNames: [],
+          prs: [],
+          dockerContainerNames: [],
+        } satisfies ProjectFeatureResourceIdentifiers),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'In Review',
+          readyForMerge: true,
+          resourceSources: ['workspace'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 2,
+          },
+          sessions: [
+            makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(await screen.findByText('UAT environment')).toBeTruthy();
+    expect(await screen.findByText('UAT stack 1/2 healthy')).toBeTruthy();
+    expect(screen.getByText('api unhealthy: connection refused')).toBeTruthy();
+    expect(screen.getByText('postgres')).toBeTruthy();
+    expect(screen.getByText('api')).toBeTruthy();
+    expect(screen.getByTestId('feature-uat-stack')).toBeTruthy();
+  });
+
   it('shows cleanup affordances for orphaned resources', () => {
     const onCleanupOrphanedResources = vi.fn();
     renderFeature(

@@ -89,7 +89,7 @@ The positional text after `<conv>` is the focus — a short statement of what th
 
 ## Fallback behavior
 
-`pan handoff <conv>` always attempts to create a usable new conversation. If the live-agent handoff cannot complete, Panopticon falls back to a summary fork and prints the fallback reason.
+`pan handoff <conv>` always attempts to create a usable new conversation. If the live-agent handoff cannot complete, Panopticon falls back to a summary fork and prints the fallback reason. An oversized source conversation is never a hard failure: it is auto-degraded through a truncated smart summary, then a heuristic fallback, then a focus-only seed, and the handoff still spawns.
 
 Common fallback reasons:
 
@@ -97,6 +97,7 @@ Common fallback reasons:
 - `handoff-timeout` — the source did not write both the document and `.done` sentinel in time.
 - `handoff-validation` — the document did not satisfy the handoff contract.
 - `source-workspace-devcontainer` — the source cannot write to the host handoff directory from a workspace container.
+- `handoff-request-failed` — the authoring request failed (e.g., context overflow) and the system fell back to a degraded summary.
 
 ## Output
 

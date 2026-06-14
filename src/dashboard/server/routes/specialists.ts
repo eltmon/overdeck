@@ -1646,6 +1646,7 @@ const getModelsResolveRoute = HttpRouter.add(
       { key: 'role:work', role: 'work' },
       { key: 'role:work.inspect', role: 'work', subRole: 'inspect' },
       { key: 'role:work.inspect-deep', role: 'work', subRole: 'inspect-deep' },
+      { key: 'role:strike', role: 'strike' },
       { key: 'role:review', role: 'review' },
       { key: 'role:review.correctness', role: 'review', subRole: 'correctness' },
       { key: 'role:review.security', role: 'review', subRole: 'security' },

@@ -174,6 +174,17 @@ The harness is chosen **per spawn** at four user-initiated surfaces:
 There is **no per-issue lock** — an issue planned with Pi can have a Claude Code
 review agent on the same PR, and vice versa.
 
+### Switching harness on a live conversation (experimental)
+
+Changing harnesses on an already-running conversation is best-effort. Panopticon
+attempts to convert the transcript into the new harness format, but that
+converter is intentionally unsupported and may lose fidelity. If conversion or
+resume fails, Panopticon falls back to starting a fresh session with the selected
+harness and model.
+
+Use this as an escape hatch, not a support promise. If the converted transcript
+looks wrong, report the case and continue in the fresh fallback session.
+
 ### Role runs (plan / work / review / test / ship)
 
 Pipeline-spawned roles do **not** prompt at runtime. They read per-role

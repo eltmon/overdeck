@@ -33,7 +33,7 @@ test.describe('Experimental — Claude Code Channels toggle', () => {
       },
       api_keys: {},
       tracker_keys: {},
-      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false },
+      experimental: { claudeCodeChannels: false, claudeCodeChannelsMcp: false, streamdownRenderer: false },
     };
 
     await page.route('**/api/settings', async (route: Route) => {
@@ -76,8 +76,17 @@ test.describe('Experimental — Claude Code Channels toggle', () => {
 
     await toggle.click();
     await expect.poll(() => lastWrittenBody, { timeout: 5_000 }).toMatchObject({
-      experimental: { claudeCodeChannels: true, claudeCodeChannelsMcp: false },
+      experimental: { claudeCodeChannels: true, claudeCodeChannelsMcp: false, streamdownRenderer: false },
     });
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    const streamdownToggle = page.getByTestId('experimental-streamdown-toggle');
+    await expect(streamdownToggle).toHaveAttribute('aria-checked', 'false');
+
+    await streamdownToggle.click();
+    await expect.poll(() => lastWrittenBody, { timeout: 5_000 }).toMatchObject({
+      experimental: { claudeCodeChannels: true, claudeCodeChannelsMcp: false, streamdownRenderer: true },
+    });
+    await expect(streamdownToggle).toHaveAttribute('aria-checked', 'true');
   });
 });

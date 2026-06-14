@@ -1,13 +1,18 @@
 import chalk from 'chalk';
-import { messageAgent, normalizeAgentId } from '../../lib/agents.js';
+import { messageAgent, resolveAgentTargetSync } from '../../lib/agents.js';
 import { loadRemoteAgentState, sendToRemoteAgent } from '../../lib/remote/index.js';
 
 export async function tellCommand(id: string, message: string): Promise<void> {
-  // normalizeAgentId preserves singleton IDs (flywheel-orchestrator) and known
-  // prefixes (planning-, conv-, strike-, inspect-) instead of blindly
-  // prepending 'agent-', which made `pan tell flywheel-orchestrator` resolve
-  // a nonexistent agent and fail with "not running" (PAN-1749).
-  const agentId = normalizeAgentId(id);
+  // Resolve through the same target path as lifecycle commands so issue IDs can
+  // address non-work agents such as strike-pan-* when that is the registered run.
+  const agentId = resolveAgentTargetSync(id);
+  if (!agentId) {
+    console.error(chalk.red(`Could not resolve agent target "${id}"`));
+    console.error(chalk.dim(
+      'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.panopticon/agents/',
+    ));
+    process.exit(1);
+  }
 
   try {
     // Remote agents (fly.io) have no local tmux session — deliver via the

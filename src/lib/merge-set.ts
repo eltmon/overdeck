@@ -137,7 +137,7 @@ export function withRepoStateSync(
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // All operations delegate to the SQLite-backed merge-set DB. The underlying
-// merge-set-db is sync (better-sqlite3); these wrappers preserve the contract
+// merge-set-db is synchronous; these wrappers preserve the contract
 // and route exceptions through Effect.try so callers in Effect graphs get a
 // typed error channel instead of an unchecked throw.
 

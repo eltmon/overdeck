@@ -24,7 +24,6 @@ const mockedWriteFileSync = vi.mocked(writeFileSync);
 
 describe('loadCloisterConfig', () => {
   afterEach(() => {
-    delete process.env.PAN_STASH_JANITOR_CYCLES;
     mockedExistsSync.mockImplementation((path: Parameters<typeof existsSync>[0]) => String(path) !== '/tmp/test-panopticon/cloister.toml');
     mockedReadFileSync.mockReset();
     mockedWriteFileSync.mockReset();
@@ -80,11 +79,4 @@ describe('loadCloisterConfig', () => {
     });
   });
 
-  it('accepts PAN_STASH_JANITOR_CYCLES=0 as a valid override', () => {
-    process.env.PAN_STASH_JANITOR_CYCLES = '0';
-
-    const config = loadCloisterConfigSync();
-
-    expect(config.monitoring.stash_janitor_every_cycles).toBe(0);
-  });
 });

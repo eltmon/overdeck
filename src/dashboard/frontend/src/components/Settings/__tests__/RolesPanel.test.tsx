@@ -94,6 +94,12 @@ function installFetchMock(opts: {
           kimi: [
             { id: 'kimi-k2.6-flash', name: 'Kimi K2.6 Flash', costPer1MTokens: 1 },
           ],
+          mimo: [
+            { id: 'mimo-vl', name: 'MiMo VL', costPer1MTokens: 1 },
+          ],
+          dashscope: [
+            { id: 'qwen3-max', name: 'Qwen3 Max', costPer1MTokens: 2 },
+          ],
         }),
       } as Response);
     }
@@ -140,12 +146,72 @@ describe('RolesPanel', () => {
     expect(screen.getAllByText('Expensive (claude-opus-4-7)').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('MiMo > MiMo VL').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Alibaba DashScope > Qwen3 Max').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Default: Workhorse: Expensive')[0]).toHaveAttribute(
       'title',
       'Workhorse: Expensive = claude-opus-4-7',
     );
     expect(screen.getAllByText('Resolved: claude-opus-4-7').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Anthropic is not configured');
+  });
+
+  it('renders a provider-default harness select for every top-level role', async () => {
+    renderPanel();
+
+    await screen.findAllByTestId('role-card');
+    for (const role of ['Plan', 'Work', 'Strike', 'Review', 'Test', 'Ship', 'Flywheel']) {
+      const select = screen.getByLabelText(`${role} harness`);
+      expect(select).toHaveValue('');
+      expect(within(select).getByRole('option', { name: 'Provider default' })).toHaveValue('');
+      expect(within(select).getByRole('option', { name: 'Claude Code' })).toHaveValue('claude-code');
+      expect(within(select).getByRole('option', { name: 'Pi' })).toHaveValue('pi');
+      expect(within(select).getByRole('option', { name: 'Codex' })).toHaveValue('codex');
+    }
+    expect(screen.getAllByLabelText('Claude Code logo')).toHaveLength(7);
+  });
+
+  it('persists explicit role harness overrides', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await screen.findByLabelText('Work harness');
+    await user.selectOptions(screen.getByLabelText('Work harness'), 'pi');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Work harness')).toHaveValue('pi');
+    });
+    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
+
+    const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
+      url.toString() === '/api/settings' && init?.method === 'PUT'
+    ));
+    const body = JSON.parse(putCall?.[1]?.body as string);
+    expect(body.roles.work.harness).toBe('pi');
+    expect(body.roles.work.model).toBe('workhorse:mid');
+  });
+
+  it('clears role harness overrides when Provider default is selected', async () => {
+    const user = userEvent.setup();
+    const settingsWithHarness = structuredClone(settingsPayload);
+    settingsWithHarness.roles.plan = { ...settingsWithHarness.roles.plan, harness: 'codex' };
+    installFetchMock({ settings: settingsWithHarness });
+    renderPanel();
+
+    await screen.findByLabelText('Plan harness');
+    expect(screen.getByLabelText('Plan harness')).toHaveValue('codex');
+    await user.selectOptions(screen.getByLabelText('Plan harness'), '');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Plan harness')).toHaveValue('');
+    });
+
+    const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
+      url.toString() === '/api/settings' && init?.method === 'PUT'
+    ));
+    const body = JSON.parse(putCall?.[1]?.body as string);
+    expect(body.roles.plan.harness).toBeNull();
+    expect(body.roles.plan.model).toBe('workhorse:expensive');
   });
 
   it('expands work and review cards to show configured sub-role defaults', async () => {

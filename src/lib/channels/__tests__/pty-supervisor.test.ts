@@ -69,8 +69,20 @@ async function waitForSocketPath(socketPath: string, predicate: () => boolean, m
 }
 
 async function waitForExit(child: ChildProcess): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return { code: child.exitCode, signal: child.signalCode };
+  }
+
   return new Promise((resolve) => {
-    child.once('exit', (code, signal) => resolve({ code, signal }));
+    const forceKill = setTimeout(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGKILL');
+      }
+    }, 2_000);
+    child.once('exit', (code, signal) => {
+      clearTimeout(forceKill);
+      resolve({ code, signal });
+    });
   });
 }
 

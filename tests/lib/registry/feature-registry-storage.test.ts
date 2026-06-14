@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
 import { mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -49,7 +49,7 @@ describe('feature registry storage', () => {
     const dbFile = await stat(resolveFeatureRegistryDbPath());
     expect(dbFile.isFile()).toBe(true);
 
-    const db = new Database(resolveFeatureRegistryDbPath(), { readonly: true });
+    const db = openDatabase(resolveFeatureRegistryDbPath());
     try {
       const columns = db.prepare('PRAGMA table_info(features)').all() as Array<{ name: string }>;
       expect(columns.map((column) => column.name)).toEqual([

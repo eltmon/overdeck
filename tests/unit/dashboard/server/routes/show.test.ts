@@ -13,12 +13,12 @@ import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 
 import {
   getShadowState,
   createShadowState,
 } from '../../../../../src/lib/shadow-state.js';
+import { getPanopticonHome } from '../../../../../src/lib/paths.js';
 
 // ─── Health mocks (getRuntimeForAgent + getAgentHealth from cloister) ─────────
 
@@ -37,7 +37,7 @@ vi.mock('../../../../../src/lib/cloister/health.js', () => ({
 
 // ─── Test-file isolation ──────────────────────────────────────────────────────
 
-const SHADOW_STATE_DIR = join(homedir(), '.panopticon', 'shadow-state');
+const SHADOW_STATE_DIR = join(getPanopticonHome(), 'shadow-state');
 const TEST_PREFIX = 'TEST-ROUTE-SHOW';
 
 function cleanupShadowTestFiles() {
@@ -183,4 +183,3 @@ describe('health logic used by /api/show/:issueId routes', () => {
     expect(getRuntimeForAgentMock).toHaveBeenCalledWith('agent-pan-705');
   });
 });
-

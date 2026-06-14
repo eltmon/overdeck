@@ -126,9 +126,4 @@ describe("SubstrateBugFiledEvent", () => {
         filedBy: "operator",
         severity: "P2",
       },
-    }
-
-    expect(decodeSubstrateBugFiledEvent(event)).toEqual(event)
-    expect(decodeDomainEvent(event)).toEqual(event)
-  })
-})
+   

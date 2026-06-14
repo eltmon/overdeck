@@ -1,9 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import type Database from 'better-sqlite3';
 import type { ArtifactLifecycleState, ArtifactMetadata } from '@panctl/contracts';
+import { openDatabase, type SqliteDatabase } from '../database/driver.js';
 import { getPanopticonHome } from '../paths.js';
 
 export interface ArtifactIndexOptions {
@@ -59,9 +58,6 @@ interface ArtifactRow {
   unshared_at: string | null;
 }
 
-declare const Bun: unknown;
-
-const _require = createRequire(import.meta.url);
 const SLUG_PATTERN = /^[A-Za-z0-9_-]{8}$/;
 
 export function getArtifactsDir(): string {
@@ -99,7 +95,7 @@ export function getArtifactLifecycleState(
 }
 
 export class ArtifactIndexRepository {
-  private readonly db: Database.Database;
+  private readonly db: SqliteDatabase;
   private readonly now: () => string;
   private readonly slugGenerator: () => string;
   private readonly maxSlugAttempts: number;
@@ -107,7 +103,7 @@ export class ArtifactIndexRepository {
   constructor(options: ArtifactIndexOptions = {}) {
     const dbPath = options.dbPath ?? getArtifactIndexPath();
     mkdirSync(dirname(dbPath), { recursive: true });
-    this.db = openSqliteDatabase(dbPath);
+    this.db = openDatabase(dbPath);
     this.now = options.now ?? (() => new Date().toISOString());
     this.slugGenerator = options.slugGenerator ?? generateArtifactSlug;
     this.maxSlugAttempts = options.maxSlugAttempts ?? 32;
@@ -165,17 +161,17 @@ export class ArtifactIndexRepository {
   }
 
   listByWorkspace(workspaceId: string): ArtifactIndexEntry[] {
-    const rows = this.db.prepare('SELECT * FROM artifacts WHERE workspace_id = ? ORDER BY created_at DESC').all(workspaceId) as ArtifactRow[];
+    const rows = this.db.prepare('SELECT * FROM artifacts WHERE workspace_id = ? ORDER BY created_at DESC').all(workspaceId) as unknown as ArtifactRow[];
     return rows.map(rowToEntry);
   }
 
   listByIssue(issueId: string): ArtifactIndexEntry[] {
-    const rows = this.db.prepare('SELECT * FROM artifacts WHERE issue_id = ? ORDER BY created_at DESC').all(issueId) as ArtifactRow[];
+    const rows = this.db.prepare('SELECT * FROM artifacts WHERE issue_id = ? ORDER BY created_at DESC').all(issueId) as unknown as ArtifactRow[];
     return rows.map(rowToEntry);
   }
 
   listAll(): ArtifactIndexEntry[] {
-    const rows = this.db.prepare('SELECT * FROM artifacts ORDER BY created_at DESC').all() as ArtifactRow[];
+    const rows = this.db.prepare('SELECT * FROM artifacts ORDER BY created_at DESC').all() as unknown as ArtifactRow[];
     return rows.map(rowToEntry);
   }
 
@@ -229,7 +225,7 @@ export function createArtifactIndexRepository(options: ArtifactIndexOptions = {}
   return new ArtifactIndexRepository(options);
 }
 
-function initializeArtifactIndexSchema(db: Database.Database): void {
+function initializeArtifactIndexSchema(db: SqliteDatabase): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS artifacts (
       artifact_id TEXT PRIMARY KEY,
@@ -290,13 +286,3 @@ function assertValidSlug(slug: string): void {
   }
 }
 
-function openSqliteDatabase(dbPath: string): Database.Database {
-  if (typeof Bun !== 'undefined') {
-    const { Database: BunDatabase } = _require('bun:sqlite') as { Database: new (path: string) => any };
-    const bunDb = new BunDatabase(dbPath);
-    return bunDb as Database.Database;
-  }
-
-  const BetterSqlite3 = _require('better-sqlite3');
-  return new BetterSqlite3(dbPath) as Database.Database;
-}

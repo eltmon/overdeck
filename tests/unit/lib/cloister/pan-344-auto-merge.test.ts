@@ -21,15 +21,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { homedir } from 'os';
 import { join } from 'path';
+import { getPanopticonHome } from '../../../../src/lib/paths.js';
 
 // ---------------------------------------------------------------------------
 // Derive file paths that deacon.ts uses internally
 // ---------------------------------------------------------------------------
-const REVIEW_STATUS_PATH = join(homedir(), '.panopticon', 'review-status.json');
-const DEACON_STATE_PATH  = join(homedir(), '.panopticon', 'deacon', 'health-state.json');
-const DEACON_DIR         = join(homedir(), '.panopticon', 'deacon');
+const REVIEW_STATUS_PATH = join(getPanopticonHome(), 'review-status.json');
+const DEACON_STATE_PATH  = join(getPanopticonHome(), 'deacon', 'health-state.json');
+const DEACON_DIR         = join(getPanopticonHome(), 'deacon');
 
 // ---------------------------------------------------------------------------
 // Mutable test state — mutated in beforeEach, read via closure by the fs mock

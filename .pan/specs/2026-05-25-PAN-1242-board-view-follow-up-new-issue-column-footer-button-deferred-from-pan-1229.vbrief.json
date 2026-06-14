@@ -4,17 +4,17 @@
     "created": "2026-05-25T16:22:30.504Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1242: Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "updated": "2026-05-25T16:28:28.731Z"
+    "updated": "2026-06-14T18:01:19.375Z"
   },
   "plan": {
     "id": "pan-1242",
     "title": "Board view follow-up — + New issue column footer button (deferred from PAN-1229)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8b9d2a3c-1f4e-4d6a-9c5e-7a8b1d4f6e2c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-05-25T16:22:30.504Z",
-    "updated": "2026-05-25T16:28:28.731Z",
+    "updated": "2026-06-14T18:01:19.375Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1242",
@@ -416,5 +416,5 @@
       "canonicalFilename": "2026-05-25-PAN-1242-board-view-follow-up-new-issue-column-footer-button-deferred-from-pan-1229.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

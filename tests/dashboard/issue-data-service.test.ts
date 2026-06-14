@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { IssueDataService, getCanonicalStatus } from '../../src/dashboard/server/services/issue-data-service.js';
 import { CacheService } from '../../src/dashboard/server/services/cache-service.js';
+import { getLinearApiKey } from '../../src/dashboard/server/services/tracker-config.js';
 
-// Mock dependencies
 vi.mock('../../src/dashboard/server/services/tracker-config.js', () => ({
   getGitHubConfig: vi.fn(() => null),
   getLinearApiKey: vi.fn(() => null),
@@ -237,6 +237,431 @@ describe('IssueDataService - getIssues cycle filter', () => {
         canonicalStatus: 'verifying_on_main',
         mergeStatus: 'merged',
       });
+    });
+  });
+});
+
+describe('IssueDataService - fetchLinearIssues rate-limit headers', () => {
+  let service: IssueDataService;
+  let mockCache: any;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    mockCache = {
+      get: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(),
+      getEtag: vi.fn(),
+      updateRateLimit: vi.fn(),
+      getRateLimit: vi.fn(),
+      getBackoffMs: vi.fn(() => 0),
+      isStale: vi.fn(() => true),
+      invalidate: vi.fn(),
+    };
+    service = new IssueDataService(mockCache);
+
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    vi.mocked(getLinearApiKey).mockReturnValue('linear-api-key');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  function makeLinearResponse(headers: Record<string, string>, body: any, status: number = 200) {
+    const bodyText = typeof body === 'string' ? body : JSON.stringify(body);
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: new Headers(headers),
+      json: vi.fn().mockResolvedValue(body),
+      text: vi.fn().mockResolvedValue(bodyText),
+    };
+  }
+
+  it('records Linear rate-limit headers before reading the body', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '2499',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', {
+      remaining: 2499,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    });
+  });
+
+  it('normalizes reset values below 1e12 as Unix seconds', async () => {
+    const resetSeconds = 1_700_000_000;
+    const expectedResetAt = new Date(resetSeconds * 1000).toISOString();
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '100',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetSeconds),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      resetAt: expectedResetAt,
+    }));
+  });
+
+  it('normalizes reset values at or above 1e12 as Unix milliseconds', async () => {
+    const resetMs = 1_700_000_000_000;
+    const expectedResetAt = new Date(resetMs).toISOString();
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '100',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      resetAt: expectedResetAt,
+    }));
+  });
+
+  it('falls back to bare x-ratelimit-* header names', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-remaining': '1500',
+          'x-ratelimit-limit': '2500',
+          'x-ratelimit-reset': String(resetMs),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', {
+      remaining: 1500,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    });
+  });
+
+  it('skips update and does not throw when headers are missing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {},
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('skips update and does not throw when header values are unparseable', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': 'nope',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(Date.now() + 3_600_000),
+        },
+        { data: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } }
+      )
+    );
+
+    await (service as any).fetchLinearIssues('linear-api-key', null);
+
+    expect(mockCache.updateRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('records rate-limit headers even when the GraphQL body contains errors', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { errors: [{ message: 'RATELIMITED' }] }
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('RATELIMITED');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    }));
+  });
+
+  it('records exhaustion on HTTP 429 before throwing', async () => {
+    const resetMs = Date.now() + 3_600_000;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {
+          'x-ratelimit-requests-remaining': '0',
+          'x-ratelimit-requests-limit': '2500',
+          'x-ratelimit-requests-reset': String(resetMs),
+        },
+        { errors: [{ message: 'Rate limit exceeded' }] },
+        429
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('Rate limit exceeded');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      total: 2500,
+      resetAt: new Date(resetMs).toISOString(),
+    }));
+  });
+
+  it('derives resetAt from Retry-After on 429 when rate-limit headers are absent', async () => {
+    const retryAfterSeconds = 120;
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        { 'retry-after': String(retryAfterSeconds) },
+        'Too Many Requests',
+        429
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('HTTP 429');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      resetAt: new Date(Date.now() + retryAfterSeconds * 1000).toISOString(),
+    }));
+  });
+
+  it('defaults resetAt to one hour on 429 when no reset or Retry-After is present', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {},
+        'Too Many Requests',
+        429
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('HTTP 429');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      resetAt: new Date(Date.now() + 3_600_000).toISOString(),
+    }));
+  });
+
+  it('records exhaustion on GraphQL RATELIMITED error (HTTP 200) before throwing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeLinearResponse(
+        {},
+        { errors: [{ message: 'RATELIMITED' }] }
+      )
+    );
+
+    await expect((service as any).fetchLinearIssues('linear-api-key', null)).rejects.toThrow('RATELIMITED');
+
+    expect(mockCache.updateRateLimit).toHaveBeenCalledWith('linear', expect.objectContaining({
+      remaining: 0,
+      resetAt: new Date(Date.now() + 3_600_000).toISOString(),
+    }));
+  });
+});
+
+describe('IssueDataService - scheduleNext suspension', () => {
+  let service: IssueDataService;
+  let mockCache: any;
+  let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    vi.mocked(getLinearApiKey).mockReturnValue(null);
+
+    mockCache = {
+      get: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(),
+      getEtag: vi.fn(),
+      updateRateLimit: vi.fn(),
+      getRateLimit: vi.fn(),
+      getBackoffMs: vi.fn(() => 0),
+      getSuspensionMs: vi.fn(() => 0),
+      isStale: vi.fn(() => true),
+      invalidate: vi.fn(),
+    };
+    service = new IssueDataService(mockCache);
+    setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+  });
+
+  afterEach(() => {
+    service.stop();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('arms the timer for the suspension delay when getSuspensionMs > 0', () => {
+    mockCache.getSuspensionMs.mockReturnValue(120_000);
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 120_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(120_000);
+  });
+
+  it('clamps suspension delay to 3_600_000 ms', () => {
+    mockCache.getSuspensionMs.mockReturnValue(10_000_000);
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 3_600_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(3_600_000);
+  });
+
+  it('uses the normal effectiveInterval when getSuspensionMs returns 0', () => {
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(30_000);
+  });
+
+  it('resumes the normal interval after the suspension delay elapses and clears', async () => {
+    mockCache.getSuspensionMs.mockReturnValueOnce(120_000).mockReturnValueOnce(0);
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 120_000);
+
+    setTimeoutSpy.mockClear();
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    expect(setTimeoutSpy).toHaveBeenLastCalledWith(expect.any(Function), 30_000);
+  });
+
+  it('falls back to the default interval when cache reads throw', () => {
+    mockCache.getBackoffMs.mockImplementation(() => {
+      throw new Error('db locked');
+    });
+    (service as any).started = true;
+    (service as any).scheduleNext('linear');
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+    expect((service as any).trackers.linear.currentInterval).toBe(30_000);
+  });
+});
+
+describe('IssueDataService - getDiagnostics', () => {
+  let service: IssueDataService;
+  let mockCache: any;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+
+    mockCache = {
+      get: vi.fn(),
+      set: vi.fn(),
+      getStale: vi.fn(),
+      getEtag: vi.fn(),
+      updateRateLimit: vi.fn(),
+      getRateLimit: vi.fn(),
+      getBackoffMs: vi.fn(() => 0),
+      getSuspensionMs: vi.fn(() => 0),
+      isStale: vi.fn(() => true),
+      invalidate: vi.fn(),
+    };
+    service = new IssueDataService(mockCache);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  it('exposes backoffMs, suspendedUntil, and rateLimited for each tracker', () => {
+    const diagnostics = service.getDiagnostics();
+
+    for (const tracker of ['github', 'linear', 'rally']) {
+      expect(diagnostics[tracker]).toMatchObject({
+        remaining: null,
+        total: null,
+        backoffMs: 0,
+        suspendedUntil: null,
+        rateLimited: false,
+        pollInterval: expect.any(Number),
+        lastFetched: null,
+        lastError: null,
+        issueCount: 0,
+      });
+    }
+  });
+
+  it('reports rateLimited:true and suspendedUntil when a tracker is suspended', () => {
+    const resetAt = new Date(Date.now() + 3_600_000).toISOString();
+    mockCache.getRateLimit.mockReturnValue({ remaining: 0, total: 2500, resetAt });
+    mockCache.getSuspensionMs.mockReturnValue(3_600_000);
+    mockCache.getBackoffMs.mockReturnValue(270_000);
+
+    const diagnostics = service.getDiagnostics();
+
+    expect(diagnostics.linear).toMatchObject({
+      remaining: 0,
+      total: 2500,
+      backoffMs: 270_000,
+      suspendedUntil: resetAt,
+      rateLimited: true,
+    });
+  });
+
+  it('preserves existing fields and reports rateLimited:false when within limits', () => {
+    const resetAt = new Date(Date.now() + 3_600_000).toISOString();
+    mockCache.getRateLimit.mockReturnValue({ remaining: 2499, total: 2500, resetAt });
+    mockCache.getSuspensionMs.mockReturnValue(0);
+
+    const diagnostics = service.getDiagnostics();
+
+    expect(diagnostics.linear).toMatchObject({
+      remaining: 2499,
+      total: 2500,
+      rateLimited: false,
+      suspendedUntil: null,
+      pollInterval: expect.any(Number),
+      lastFetched: null,
+      lastError: null,
+      issueCount: 0,
     });
   });
 });

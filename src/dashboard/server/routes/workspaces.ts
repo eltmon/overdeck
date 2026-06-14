@@ -116,6 +116,7 @@ import { extractPrefixSync, extractNumberSync, parseIssueIdSync } from '../../..
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
+import { emitActivityEntrySync } from '../../../lib/activity-logger.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleStateSync } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -369,7 +370,7 @@ function appendActivityOutput(id: string, line: string): void {
 // ─── Pending operations (in-memory) ──────────────────────────────────────────
 
 interface PendingOperation {
-  type: 'review' | 'merge' | 'approve' | 'start' | 'clean' | 'containerize' | 'refresh-db';
+  type: 'review' | 'merge' | 'approve' | 'start' | 'clean' | 'containerize' | 'refresh-db' | 'rebuild-stack';
   status: 'running' | 'completed' | 'failed';
   startedAt: string;
   error?: string;
@@ -595,7 +596,7 @@ async function getDirtyWorkspaceErrorForReviewRequest(
       return null;
     }
 
-    return `Workspace has uncommitted changes. Commit or stash them before requesting review:\ncd ${workspacePath}\ngit status`;
+    return `Workspace has uncommitted changes. Commit the changes, explicitly discard them, or surface them to the operator before requesting review:\ncd ${workspacePath}\ngit status`;
   } catch {
     return null;
   }
@@ -614,8 +615,22 @@ function isGitHubIssue(issueId: string): {
   return { isGitHub: false };
 }
 
-function spawnPanCommand(args: string[], description: string, cwd?: string): string {
+function spawnPanCommand(
+  args: string[],
+  description: string,
+  cwd?: string,
+  options?: { issueId?: string; pendingOperation?: PendingOperation['type'] },
+): string {
   const activityId = Date.now().toString();
+  if (options?.issueId && options.pendingOperation) {
+    setPendingOperation(options.issueId, options.pendingOperation);
+    emitActivityEntrySync({
+      source: 'dashboard',
+      level: 'info',
+      issueId: options.issueId.toUpperCase(),
+      message: `${description} started`,
+    });
+  }
   logActivity({
     id: activityId,
     timestamp: new Date().toISOString(),
@@ -642,6 +657,15 @@ function spawnPanCommand(args: string[], description: string, cwd?: string): str
   });
   child.on('close', (code) => {
     updateActivity(activityId, { status: code === 0 ? 'completed' : 'failed' });
+    if (options?.issueId && options.pendingOperation) {
+      completePendingOperation(options.issueId, code === 0 ? null : `pan ${args.join(' ')} exited ${code ?? 'unknown'}`);
+      emitActivityEntrySync({
+        source: 'dashboard',
+        level: code === 0 ? 'success' : 'error',
+        issueId: options.issueId.toUpperCase(),
+        message: `${description} ${code === 0 ? 'completed' : 'failed'}`,
+      });
+    }
   });
 
   return activityId;
@@ -1769,6 +1793,7 @@ const postWorkspaceRebuildRoute = HttpRouter.add(
       ['workspace', 'rebuild', issueId],
       `Rebuild stack for ${issueId}`,
       projectPath,
+      { issueId, pendingOperation: 'rebuild-stack' },
     );
     return jsonResponse({
       success: true,
@@ -3418,24 +3443,6 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       });
       console.log(`[review-status] Set review-agent (${tmuxSession}) to idle`);
 
-      // PAN-1048 review feedback 003: drop the review-temp stash on terminal
-      // review status. spawnReviewRoleForIssue() persists the stash ref before
-      // dispatching the review role; without this symmetric cleanup, every
-      // successful review leaves a stale review-temp:* stash and dangling
-      // reviewTempStashRef metadata. cleanupReviewTempStash is a no-op when
-      // no stash ref is set, so it's safe across all terminal verdicts.
-      try {
-        const wsInfo = getWorkspaceInfoForIssue(issueId);
-        if (wsInfo.exists && !wsInfo.isRemote && wsInfo.localPath) {
-          const { cleanupReviewTempStash } = yield* Effect.promise(() =>
-            import('../../../lib/cloister/review-agent.js')
-          );
-          yield* cleanupReviewTempStash(issueId, wsInfo.localPath!);
-        }
-      } catch (err) {
-        console.error(`[review-status] Failed to drop review-temp stash for ${issueId}:`, err);
-      }
-
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;
@@ -3798,7 +3805,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             // PAN-1048 C1/R3: review now runs as the role primitive via spawnRun
             // (loads roles/review.md → Agent tool fans out to code-review-* sub-agents).
             // The wrapper preserves dispatchParallelReview's orchestration concerns
-            // (idempotency, feedback archive, review-temp stash, status flip,
+            // (idempotency, feedback archive, status flip,
             // pipeline event) but the review itself is no longer a detached
             // `pan review run` coordinator process.
             const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
@@ -5949,7 +5956,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
             { cwd: workspacePath, encoding: 'utf-8' }
           );
           if (status.trim()) {
-            const error = `Workspace has uncommitted changes. Please commit or stash them first:\ncd ${workspacePath}\ngit status`;
+            const error = `Workspace has uncommitted changes. Please commit the changes, explicitly discard them, or surface them to the operator first:\ncd ${workspacePath}\ngit status`;
             completePendingOperation(issueId, error);
             return jsonResponse({ error }, { status: 400 });
           }
@@ -6020,7 +6027,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
         console.log(`[approve] Starting role pipeline for ${issueId}...`);
 
         // PAN-1048 R3: route through the same wrapper every other approve path
-        // uses (idempotency + feedback archive + review-temp stash + status flip
+        // uses (idempotency + feedback archive + status flip
         // + pipeline event). The role agent loads roles/review.md, fans out the
         // four code-review-* convoy reviewers via Agent tool, synthesizes, and
         // posts the verdict via /api/review/:id/status. Test dispatch is NOT

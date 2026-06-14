@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   piGlobalContextFile: vi.fn(),
   codexGlobalContextFile: vi.fn(),
   ensureSessionContextBriefingFile: vi.fn(),
+  resolveHarness: vi.fn(),
 }));
 
 vi.mock('../../agents.js', async (importActual) => ({
@@ -26,13 +27,40 @@ vi.mock('../../briefing-freshness.js', () => ({
   ensureSessionContextBriefingFile: mocks.ensureSessionContextBriefingFile,
 }));
 
-import { buildPlanningLauncherConfig } from '../spawn-planning-session.js';
+vi.mock('../../harness-resolve.js', () => ({
+  resolveHarness: mocks.resolveHarness,
+}));
+
+import { buildPlanningLauncherConfig, resolvePlanningSessionHarness } from '../spawn-planning-session.js';
 
 async function makeWorkspace(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'pan-plan-launcher-'));
   await mkdir(join(dir, '.pan', 'context'), { recursive: true });
   return dir;
 }
+
+describe('resolvePlanningSessionHarness', () => {
+  it('uses resolveHarness for provider defaults and explicit overrides', async () => {
+    mocks.resolveHarness.mockImplementation(async ({ explicit, model }) => {
+      if (explicit) return explicit;
+      return model === 'gpt-5.5' ? 'codex' : 'claude-code';
+    });
+
+    await expect(resolvePlanningSessionHarness('gpt-5.5')).resolves.toBe('codex');
+    await expect(resolvePlanningSessionHarness('gpt-5.5', 'pi')).resolves.toBe('pi');
+
+    expect(mocks.resolveHarness).toHaveBeenNthCalledWith(1, {
+      explicit: undefined,
+      role: 'plan',
+      model: 'gpt-5.5',
+    });
+    expect(mocks.resolveHarness).toHaveBeenNthCalledWith(2, {
+      explicit: 'pi',
+      role: 'plan',
+      model: 'gpt-5.5',
+    });
+  });
+});
 
 describe('buildPlanningLauncherConfig', () => {
   let workspacePath: string;

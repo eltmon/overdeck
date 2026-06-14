@@ -28,9 +28,10 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getCodexLauncherFields, getPiLauncherFields, getProviderExportsForModel, preflightProviderForModel, resolveEffectiveHarness, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getCodexLauncherFields, getPiLauncherFields, getProviderExportsForModel, preflightProviderForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
-import { getProviderForModelSync } from '../providers.js';
+import { resolveHarness } from '../harness-resolve.js';
+import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync, type LauncherConfig } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -116,8 +117,8 @@ export interface SpawnPlanningOptions {
   shadowMode?: boolean;
   /** Optional model override — if omitted, roles.plan.model is used. */
   model?: string;
-  /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
-  harness?: 'claude-code' | 'pi' | 'codex';
+  /** Optional harness override (PAN-636). */
+  harness?: RuntimeName;
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
   /** Non-interactive planning: choose defensible defaults and record inferred choices. */
@@ -140,7 +141,7 @@ export interface PlanningAgentStateInput {
   issueId: string;
   workspacePath: string;
   model: string;
-  harness: 'claude-code' | 'pi' | 'codex';
+  harness: RuntimeName;
   workspaceLocation: 'local' | 'remote';
   autoSpawnOnFinalize?: boolean;
   startedAt?: string;
@@ -471,6 +472,10 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
   ));
 }
 
+export async function resolvePlanningSessionHarness(planningModel: string, explicit?: RuntimeName): Promise<RuntimeName> {
+  return resolveHarness({ explicit, role: 'plan', model: planningModel });
+}
+
 // ─── Main spawn function ─────────────────────────────────────────────────────
 
 /**
@@ -612,11 +617,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
-    const config = loadConfigSync().config;
     const planningModel = modelOverride || settingsModel;
-    const providerDefaultHarness = config.providerHarnesses?.[getProviderForModelSync(planningModel).name];
-    const requestedHarness = opts.harness ?? config.roles?.plan?.harness ?? providerDefaultHarness ?? 'claude-code';
-    const effectiveHarness = await resolveEffectiveHarness(requestedHarness, planningModel);
+    const effectiveHarness = await resolvePlanningSessionHarness(planningModel, opts.harness);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace

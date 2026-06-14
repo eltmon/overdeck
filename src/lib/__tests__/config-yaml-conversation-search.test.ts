@@ -1,6 +1,24 @@
 import { homedir } from 'os';
 import { join } from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: (path: Parameters<typeof actual.existsSync>[0]) => {
+      const stringPath = String(path);
+      if (
+        stringPath.endsWith('/.panopticon/config.yaml') ||
+        stringPath.endsWith('/.pan.yaml') ||
+        stringPath.endsWith('/.panopticon.yaml')
+      ) {
+        return false;
+      }
+      return actual.existsSync(path);
+    },
+  };
+});
 
 import { getConversationSearchConfigSync, loadConfigSync, mergeConfigs } from '../config-yaml.js';
 

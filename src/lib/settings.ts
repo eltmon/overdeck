@@ -24,13 +24,14 @@ export type OpenAIModel =
   | 'gpt-4o'
   | 'gpt-4o-mini';
 export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
-export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
+export type KimiModel = 'kimi-k2.7-code' | 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed' | 'MiniMax-M3';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel;
+export type GrokModel = 'grok-build-0.1';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -63,6 +64,7 @@ export interface ApiKeysConfig {
   mimo?: string;
   nous?: string;
   dashscope?: string;
+  xai?: string;
 }
 
 // Complete settings structure
@@ -157,6 +159,7 @@ export function loadSettingsSync(): SettingsConfig {
   if (process.env.MIMO_API_KEY) envApiKeys.mimo = process.env.MIMO_API_KEY;
   if (process.env.NOUS_API_KEY) envApiKeys.nous = process.env.NOUS_API_KEY;
   if (process.env.DASHSCOPE_API_KEY) envApiKeys.dashscope = process.env.DASHSCOPE_API_KEY;
+  if (process.env.XAI_API_KEY) envApiKeys.xai = process.env.XAI_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -235,6 +238,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   mimo: MimoModel[];
   nous: NousModel[];
   dashscope: DashScopeModel[];
+  xai: GrokModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-fable-5',
@@ -254,7 +258,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
-    ? ['kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']
+    ? ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']
     : [];
 
   const minimaxModels: MiniMaxModel[] = settings.api_keys.minimax
@@ -273,6 +277,10 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     ? ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max']
     : [];
 
+  const xaiModels: GrokModel[] = settings.api_keys.xai
+    ? ['grok-build-0.1']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
@@ -282,6 +290,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
     mimo: mimoModels,
     nous: nousModels,
     dashscope: dashscopeModels,
+    xai: xaiModels,
   };
 }
 

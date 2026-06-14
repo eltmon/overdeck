@@ -164,7 +164,7 @@ export function deleteReviewStatus(issueId: string): void {
 }
 
 // ============== Async wrappers (dashboard-reachable code) ==============
-// better-sqlite3 is synchronous. These wrappers defer execution via
+// The SQLite driver is synchronous. These wrappers defer execution via
 // setImmediate so the Node event loop can process other I/O (HTTP,
 // WebSocket, terminal) between SQLite operations. This satisfies the
 // "No Blocking Calls" dashboard rule (PAN-70 / PAN-446) for the

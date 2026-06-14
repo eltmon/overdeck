@@ -610,6 +610,8 @@ export interface ExperimentalConfig {
    */
   claudeCodeChannels?: boolean;
   claudeCodeChannelsMcp?: boolean;
+  /** Render dashboard chat markdown with Streamdown instead of ReactMarkdown. */
+  streamdownRenderer?: boolean;
 }
 
 /**
@@ -860,6 +862,8 @@ export interface NormalizedExperimentalConfig {
   claudeCodeChannels: boolean;
   /** Whether legacy Claude Code Channels MCP wiring is enabled for new spawns. */
   claudeCodeChannelsMcp: boolean;
+  /** Whether dashboard chat markdown renders through Streamdown. */
+  streamdownRenderer: boolean;
 }
 
 /**
@@ -1129,6 +1133,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   experimental: {
     claudeCodeChannels: false,
     claudeCodeChannelsMcp: false,
+    streamdownRenderer: false,
   },
   claude: {
     permissionMode: 'auto',
@@ -1788,6 +1793,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     experimental: {
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
       claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
+      streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer,
     },
     claude: {
       permissionMode: DEFAULT_CONFIG.claude.permissionMode,
@@ -2227,6 +2233,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (typeof config.experimental.claudeCodeChannelsMcp === 'boolean') {
         result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
+      }
+      if (typeof config.experimental.streamdownRenderer === 'boolean') {
+        result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
       }
     }
 

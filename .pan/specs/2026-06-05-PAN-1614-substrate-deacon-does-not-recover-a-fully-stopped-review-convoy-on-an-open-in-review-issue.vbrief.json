@@ -4,17 +4,17 @@
     "created": "2026-06-05T18:58:00.293Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1614: Substrate: deacon does not recover a fully-stopped review convoy on an OPEN in-review issue",
-    "updated": "2026-06-05T19:00:35.974Z"
+    "updated": "2026-06-14T17:33:15.153Z"
   },
   "plan": {
     "id": "pan-1614",
     "title": "Substrate: deacon does not recover a fully-stopped review convoy on an OPEN in-review issue",
-    "status": "proposed",
+    "status": "running",
     "uid": "725663f3-12a0-46d4-932d-1033a1610bdd",
     "author": "agent:claude-opus-4-8",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-06-05T18:58:00.293Z",
-    "updated": "2026-06-05T19:00:35.974Z",
+    "updated": "2026-06-14T17:33:15.153Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1614",
@@ -272,5 +272,5 @@
       "canonicalFilename": "2026-06-05-PAN-1614-substrate-deacon-does-not-recover-a-fully-stopped-review-convoy-on-an-open-in-review-issue.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

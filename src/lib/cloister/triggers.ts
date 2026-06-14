@@ -285,9 +285,24 @@ function detectTestFailure(workspace: string): {
   }
 
   const computePromise = (async (): Promise<TriggerDetection> => {
+    // PAN-1812: the workspace beads DB must be queried from the agent's own
+    // workspace. Without cwd the query can run against the wrong directory and
+    // falsely report no open beads.
+    if (!workspace) {
+      return {
+        triggered: false,
+        type: 'task_complete',
+        reason: 'No workspace available to check task completion',
+        confidence: 'high',
+      };
+    }
+
+    const bdOptions = { encoding: 'utf-8' as const, cwd: workspace };
+    const issueLower = issueId.toLowerCase();
+
     try {
       const { stdout: output } = await Effect.runPromise(withBdMutex(() => Effect.tryPromise({
-        try: () => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, { encoding: 'utf-8' }),
+        try: () => execAsync(`bd list --json --title-contains ${issueLower} --status closed`, bdOptions),
         catch: (cause) => cause,
       })));
       const tasks = JSON.parse(output);
@@ -297,9 +312,7 @@ function detectTestFailure(workspace: string): {
       );
 
       if (implementTask) {
-        const { stdout: openOutput } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status open`, {
-          encoding: 'utf-8',
-        });
+        const { stdout: openOutput } = await execAsync(`bd list --json --title-contains ${issueLower} --status open`, bdOptions);
         const openTasks = JSON.parse(openOutput);
 
         if (openTasks.length === 0) {

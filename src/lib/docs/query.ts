@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import { openDatabase, type SqliteDatabase } from '../database/driver.js';
 
 import { getDefaultDocsConfig, type NormalizedDocsConfig } from '../config-yaml.js';
 import { getDocsIndexPath } from '../paths.js';
@@ -55,7 +55,7 @@ interface FtsRow extends ChunkRow {
 }
 
 interface EmbeddingRow extends ChunkRow {
-  embedding: Buffer;
+  embedding: Uint8Array;
 }
 
 const DEFAULT_DOCS_CONFIG = getDefaultDocsConfig();
@@ -73,9 +73,9 @@ export function queryDocsIndex(options: QueryDocsOptions): DocsQueryResult {
   const ftsQuery = sanitizeDocsFtsQuery(query);
   if (!ftsQuery) return { query, results: [] };
 
-  let db: Database.Database | null = null;
+  let db: SqliteDatabase | null = null;
   try {
-    db = new Database(options.indexPath ?? getDocsIndexPath(), { readonly: true });
+    db = openDatabase(options.indexPath ?? getDocsIndexPath());
     const metadata = validateDocsIndex(db);
     const maxFtsRows = options.maxFtsRows ?? 20;
     const maxVectorRows = options.maxVectorRows ?? 20;
@@ -118,7 +118,7 @@ export function formatDocsQueryJson(result: DocsQueryResult): string {
   return JSON.stringify(result, null, 2);
 }
 
-function queryFtsRows(db: Database.Database, ftsQuery: string, kind: DocsDocKind | undefined, limit: number): FtsRow[] {
+function queryFtsRows(db: SqliteDatabase, ftsQuery: string, kind: DocsDocKind | undefined, limit: number): FtsRow[] {
   const kindClause = kind ? 'AND c.doc_kind = ?' : '';
   const statement = db.prepare(`
     SELECT
@@ -137,11 +137,11 @@ function queryFtsRows(db: Database.Database, ftsQuery: string, kind: DocsDocKind
     ORDER BY bm25(docs_fts) ASC
     LIMIT ?
   `);
-  return (kind ? statement.all(ftsQuery, kind, limit) : statement.all(ftsQuery, limit)) as FtsRow[];
+  return (kind ? statement.all(ftsQuery, kind, limit) : statement.all(ftsQuery, limit)) as unknown as FtsRow[];
 }
 
 function queryStoredVectorRows(
-  db: Database.Database,
+  db: SqliteDatabase,
   ftsRows: FtsRow[],
   dimensions: number,
   kind: DocsDocKind | undefined,
@@ -166,17 +166,17 @@ function queryStoredVectorRows(
     JOIN docs_chunks c ON c.chunk_id = e.chunk_id
     ${kindClause}
   `);
-  const rows = (kind ? statement.all(kind) : statement.all()) as EmbeddingRow[];
+  const rows = (kind ? statement.all(kind) : statement.all()) as unknown as EmbeddingRow[];
   return rows
     .map((row) => ({ ...row, similarity: cosineSimilarity(queryVector, bufferToFloat32Array(row.embedding, dimensions)) }))
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, limit);
 }
 
-function loadEmbeddingsForChunks(db: Database.Database, chunkIds: number[], dimensions: number): Float32Array[] {
+function loadEmbeddingsForChunks(db: SqliteDatabase, chunkIds: number[], dimensions: number): Float32Array[] {
   if (chunkIds.length === 0) return [];
   const placeholders = chunkIds.map(() => '?').join(', ');
-  const rows = db.prepare(`SELECT embedding FROM docs_embeddings WHERE chunk_id IN (${placeholders})`).all(...chunkIds) as Array<{ embedding: Buffer }>;
+  const rows = db.prepare(`SELECT embedding FROM docs_embeddings WHERE chunk_id IN (${placeholders})`).all(...chunkIds) as unknown as Array<{ embedding: Uint8Array }>;
   return rows.map((row) => bufferToFloat32Array(row.embedding, dimensions));
 }
 

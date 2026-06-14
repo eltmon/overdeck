@@ -73,6 +73,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
+      { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },
       { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
       { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: FlaskConical, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
@@ -112,6 +113,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'qwen3-coder-plus' as ModelId, name: 'Qwen3 Coder Plus', icon: FlaskConical, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope coding-specialist model.' },
       { id: 'qwen3-plus' as ModelId, name: 'Qwen3 Plus', icon: Sparkles, tier: 'balanced', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope balanced Qwen3 model.' },
       { id: 'qwen3.7-max' as ModelId, name: 'Qwen3.7 Max', icon: Gem, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'DashScope flagship Qwen3.7 Max model.' },
+    ],
+  },
+  xai: {
+    name: 'xAI (Grok)',
+    models: [
+      { id: 'grok-build-0.1' as ModelId, name: 'Grok Build 0.1', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'vision'], description: 'xAI\'s agentic coding model (May 2026). 256K context, reasoning always active.' },
     ],
   },
 };

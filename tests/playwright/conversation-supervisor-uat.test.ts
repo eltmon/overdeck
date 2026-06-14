@@ -256,7 +256,7 @@ function readDeliveryLog(agentId: string): Array<Record<string, unknown>> {
 }
 
 function launcherFor(session: string): string {
-  return readFileSync(join(fakeHome, '.panopticon', 'conversations', session, 'launcher.sh'), 'utf8');
+  return readFileSync(join(tmpHome, 'conversations', session, 'launcher.sh'), 'utf8');
 }
 
 async function writeConversationSessionFile(conv: { cwd: string; claudeSessionId: string }): Promise<void> {
@@ -264,6 +264,12 @@ async function writeConversationSessionFile(conv: { cwd: string; claudeSessionId
   const sessionFile = sessionFilePath(conv.cwd, conv.claudeSessionId);
   mkdirSync(dirname(sessionFile), { recursive: true });
   writeFileSync(sessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'parent context' } })}\n`);
+}
+
+function writeCodexRollout(tmuxSession: string, threadId: string): void {
+  const dayDir = join(tmpHome, 'agents', tmuxSession, 'codex-home', 'sessions', '2026', '06', '14');
+  mkdirSync(dayDir, { recursive: true });
+  writeFileSync(join(dayDir, `rollout-2026-06-14T10-00-00-${threadId}.jsonl`), '{"type":"session_meta"}\n');
 }
 
 async function cleanupConversationThroughApi(conversation: { name: string }): Promise<void> {
@@ -335,6 +341,23 @@ beforeEach(async () => {
     getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
   }));
 
+  vi.doMock('../../src/lib/agents.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/lib/agents.js')>();
+    return {
+      ...actual,
+      getProviderExportsForModel: vi.fn(async () => ''),
+      getProviderEnvForModel: vi.fn(async () => ({})),
+    };
+  });
+
+  vi.doMock('../../src/lib/harness-resolve.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../src/lib/harness-resolve.js')>();
+    return {
+      ...actual,
+      resolveHarness: vi.fn(async ({ explicit }: { explicit?: string }) => explicit ?? 'claude-code'),
+    };
+  });
+
   vi.doMock('../../src/lib/tmux.js', async (importOriginal) => {
     const actual = await importOriginal<typeof TmuxModule>();
     actualTmux = actual;
@@ -395,10 +418,46 @@ afterEach(async () => {
   removeTempDir(fakeHome);
   removeTempDir(workspace);
   vi.doUnmock('../../src/dashboard/server/event-store.js');
+  vi.doUnmock('../../src/lib/agents.js');
+  vi.doUnmock('../../src/lib/harness-resolve.js');
   vi.doUnmock('../../src/lib/tmux.js');
 });
 
 describe('conversation supervisor Playwright UAT', () => {
+  it('resumes Codex conversations through the real route with codex resume', async () => {
+    await page.goto(baseUrl);
+    const conversation = await page.evaluate(async () => {
+      return await (window as any).api('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gpt-5.5', harness: 'codex' }),
+      }) as { name: string; tmuxSession: string };
+    });
+    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(true);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(true);
+
+    const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
+    writeCodexRollout(conversation.tmuxSession, threadId);
+
+    await page.evaluate(async (conv) => {
+      await (window as any).api('/api/conversations/' + conv.name + '/stop', { method: 'POST' });
+    }, conversation);
+    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(false);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(false);
+
+    await page.evaluate(async (conv) => {
+      await (window as any).api('/api/conversations/' + conv.name + '/resume', { method: 'POST' });
+    }, conversation);
+    await expect.poll(() => sessions.has(conversation.tmuxSession)).toBe(true);
+    await expect.poll(() => tmuxSessionExists(conversation.tmuxSession)).toBe(true);
+
+    const launcher = launcherFor(conversation.tmuxSession);
+    expect(launcher).toContain(`codex resume -c project_doc_max_bytes=0 '${threadId}'`);
+    expect(launcher).not.toContain('codex -c project_doc_max_bytes=0\n');
+
+    await cleanupConversationThroughApi(conversation);
+  }, 45_000);
+
   it('delivers through real conversation routes and keeps plain forks off Channels MCP', async () => {
     await page.goto(baseUrl);
     await page.locator('#create').click();

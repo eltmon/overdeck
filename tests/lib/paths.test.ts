@@ -34,8 +34,8 @@ describe('paths', () => {
   const home = homedir();
 
   describe('PANOPTICON_HOME', () => {
-    it('should be in home directory', () => {
-      expect(PANOPTICON_HOME).toBe(join(home, '.panopticon'));
+    it('should respect PANOPTICON_HOME when set', () => {
+      expect(PANOPTICON_HOME).toBe(process.env.PANOPTICON_HOME ?? join(home, '.panopticon'));
     });
   });
 

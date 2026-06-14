@@ -231,6 +231,8 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   thinking: Schema.optional(ThinkingState),       // set when activity === "thinking"
   waiting: Schema.optional(WaitingState),         // set when activity === "waiting"
   claudeSessionId: Schema.optional(Schema.String),
+  sessionModel: Schema.optional(Schema.String),
+  sessionHarness: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   lastMessageAt: Schema.optional(Schema.String),  // last user→agent message delivered
   // Last structured Claude Code Channels reply emitted by the work agent.
@@ -504,6 +506,7 @@ export type SessionNodePresence = typeof SessionNodePresence.Type
 export const SessionNodeType = Schema.Literals([
   "planning",
   "work",
+  "strike",
   "review",
   "reviewer",
   "test",

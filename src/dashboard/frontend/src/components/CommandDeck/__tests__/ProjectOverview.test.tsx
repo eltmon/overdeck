@@ -55,6 +55,11 @@ function expectPhase(
   ).toBe(expected);
 }
 
+function expectBadgeVariant(issueId: string, variant: string) {
+  const row = screen.getByText(issueId).closest('[data-component="issue-row"]') as HTMLElement;
+  expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', variant);
+}
+
 describe('bucketFeaturePhase', () => {
   beforeEach(() => {
     useDashboardStore.setState({ reviewStatusByIssueId: {} });
@@ -250,6 +255,101 @@ describe('bucketFeaturePhase', () => {
     const row = screen.getByText('PAN-1').closest('[data-component="issue-row"]') as HTMLElement;
     expect(row).toHaveAttribute('data-variant', 'command-deck');
     expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'WORK RUNNING');
+  });
+
+  it('labels structural merge blockers as merge blocked', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', detectedAt: '2026-06-14T00:00:00Z' }] }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'not_mergeable', summary: 'Not mergeable', detectedAt: '2026-06-14T00:00:00Z' }] }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'Conflict' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Not mergeable' }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expectBadgeVariant('PAN-1', 'MERGE BLOCKED');
+    expectBadgeVariant('PAN-2', 'MERGE BLOCKED');
+  });
+
+  it('labels failing checks as CI blocked', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' }] }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1', title: 'CI red' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expectBadgeVariant('PAN-1', 'CI BLOCKED');
+  });
+
+  it('keeps review feedback blockers as changes requested', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'failed' }),
+        'PAN-2': reviewStatus({ issueId: 'PAN-2', reviewStatus: 'blocked' }),
+        'PAN-3': reviewStatus({ issueId: 'PAN-3', blockerReasons: [{ type: 'changes_requested', summary: 'Changes requested', detectedAt: '2026-06-14T00:00:00Z' }] }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[
+          makeFeature({ issueId: 'PAN-1', title: 'Review failed' }),
+          makeFeature({ issueId: 'PAN-2', title: 'Review blocked' }),
+          makeFeature({ issueId: 'PAN-3', title: 'Changes requested' }),
+        ]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expectBadgeVariant('PAN-1', 'CHANGES REQUESTED');
+    expectBadgeVariant('PAN-2', 'CHANGES REQUESTED');
+    expectBadgeVariant('PAN-3', 'CHANGES REQUESTED');
+  });
+
+  it('gives structural merge blockers precedence over failing checks', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': reviewStatus({
+          issueId: 'PAN-1',
+          blockerReasons: [
+            { type: 'failing_checks', summary: 'Checks failing', detectedAt: '2026-06-14T00:00:00Z' },
+            { type: 'merge_conflict', summary: 'Merge conflict', detectedAt: '2026-06-14T00:00:00Z' },
+          ],
+        }),
+      },
+    });
+
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1', title: 'Conflict and CI red' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expectBadgeVariant('PAN-1', 'MERGE BLOCKED');
   });
 
   it('renders partial cost breakdown details without crashing', () => {

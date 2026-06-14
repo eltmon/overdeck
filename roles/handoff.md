@@ -37,10 +37,13 @@ The document must include these H2 sections:
 - `## Open work`
 - `## Suggested skills`
 - `## Artifacts and references`
+- `## Completion behavior`
 
 The `## Suggested skills` section is required. List any Claude Code slash skills, Panopticon skills, repo-specific commands, or workflow helpers the successor should consider using, with a short reason for each suggestion.
 
 In `## Artifacts and references`, reference PRDs, plans, ADRs, issues, commits, diffs, logs, screenshots, and other artifacts by path, commit hash, issue URL, or other stable pointer. Do not duplicate PRD, plan, ADR, issue, commit, or diff content verbatim. Summarize the relevance in one sentence and point to the source.
+
+In `## Completion behavior`, state the submission rule for the successor: if this handoff enters a Panopticon feature workspace (`workspaces/feature-*`) and the successor completes real work that results in pushed commits, the successor must submit the work rather than stopping at "done". For Panopticon-tracked issues, run `pan done <ISSUE_ID>` (or invoke `/rebase-and-submit` if addressing review feedback); for untracked branches, open a pull request with `gh pr create`. If this handoff is not entering a feature workspace, write "N/A — not a feature workspace".
 
 ## Redaction requirements
 

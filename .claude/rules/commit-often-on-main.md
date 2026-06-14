@@ -22,7 +22,7 @@ uncommitted change accumulate across many edits.
 - Never rely on the working tree as storage between steps. The only durable
   state is a commit.
 - This complements — does not replace — the stash-discipline rule: agents
-  still never `git stash`. Commit or discard; never stash.
+  still never `git stash`. Commit, discard, or surface; never stash.
 
 This rule is **Panopticon-development-specific** (`scope: dev`). It folds into
 the global managed region only on a panopticon-cli source checkout, so it

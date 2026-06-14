@@ -114,7 +114,11 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 // Import under test (after mocks)
-import { syncMainIntoWorkspace, scanForConflictMarkers } from '../../src/lib/cloister/merge-agent.js';
+import {
+  isSyncMainMainPreferredPath,
+  scanForConflictMarkers,
+  syncMainIntoWorkspace,
+} from '../../src/lib/cloister/merge-agent.js';
 import { cleanupStaleLocks } from '../../src/lib/git-utils.js';
 
 // ---------------------------------------------------------------------------
@@ -174,6 +178,18 @@ describe('scanForConflictMarkers', () => {
     execMock.mockRejectedValue(new Error('not a git repo'));
     const result = await scanForConflictMarkers('/some/path');
     expect(result).toEqual([]);
+  });
+});
+
+describe('isSyncMainMainPreferredPath', () => {
+  it('matches only pipeline-owned sync state paths', () => {
+    expect(isSyncMainMainPreferredPath('.pan/continues/PAN-1.vbrief.json')).toBe(true);
+    expect(isSyncMainMainPreferredPath('.pan/specs/PAN-1.vbrief.json')).toBe(true);
+    expect(isSyncMainMainPreferredPath('.beads/issues.jsonl')).toBe(true);
+
+    expect(isSyncMainMainPreferredPath('.pan/continue.json')).toBe(false);
+    expect(isSyncMainMainPreferredPath('.pan/spec.vbrief.json')).toBe(false);
+    expect(isSyncMainMainPreferredPath('src/foo.ts')).toBe(false);
   });
 });
 
@@ -313,6 +329,59 @@ describe('syncMainIntoWorkspace', () => {
   });
 
   describe('conflict handling — operator-resolved (PAN-1531)', () => {
+    it('auto-resolves pipeline-owned conflicts with origin/main', async () => {
+      let conflictScanCount = 0;
+      execMock.mockImplementation(async (cmd: string) => {
+        if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git merge origin/main')) {
+          const err: any = new Error('CONFLICT (content): Merge conflict in .beads/issues.jsonl');
+          err.stdout = [
+            'Auto-merging .beads/issues.jsonl',
+            'CONFLICT (content): Merge conflict in .beads/issues.jsonl',
+            'Auto-merging .pan/continues/PAN-1.vbrief.json',
+            'CONFLICT (content): Merge conflict in .pan/continues/PAN-1.vbrief.json',
+            '',
+          ].join('\n');
+          err.stderr = '';
+          throw err;
+        }
+        if (cmd.includes('git diff --name-only --diff-filter=U')) {
+          conflictScanCount += 1;
+          return {
+            stdout: conflictScanCount === 1
+              ? '.beads/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n'
+              : '',
+            stderr: '',
+          };
+        }
+        if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .beads')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .pan/continues')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .pan/specs')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git checkout origin/main -- .beads')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git checkout origin/main -- .pan/continues')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git checkout origin/main -- .pan/specs')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git add -A -- .beads')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git add -A -- .pan/continues')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git add -A -- .pan/specs')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git commit --no-edit')) return { stdout: '[feature abc123] Merge remote-tracking branch origin/main\n', stderr: '' };
+        if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: '.beads/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n', stderr: '' };
+        if (cmd.includes('git log ORIG_HEAD..HEAD --oneline')) return { stdout: 'abc1234 Merge remote-tracking branch origin/main\n', stderr: '' };
+        return { stdout: '', stderr: '' };
+      });
+
+      const result = await syncMainIntoWorkspace(PROJECT_PATH, ISSUE_ID);
+
+      expect(result.success).toBe(true);
+      expect(result.conflictFiles).toBeUndefined();
+      expect(result.changedFiles).toEqual(['.beads/issues.jsonl', '.pan/continues/PAN-1.vbrief.json']);
+      expect(result.commitCount).toBe(1);
+      expect(execMock).not.toHaveBeenCalledWith(
+        expect.stringContaining('git merge --abort'),
+        expect.anything(),
+      );
+    });
+
     it('returns failure with conflict files when git merge has conflicts', async () => {
       let mergeAbortCalled = false;
       execMock.mockImplementation(async (cmd: string) => {
