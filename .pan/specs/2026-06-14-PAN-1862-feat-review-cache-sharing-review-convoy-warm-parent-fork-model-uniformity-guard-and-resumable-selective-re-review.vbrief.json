@@ -1,0 +1,849 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-13T23:54:52.014Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1862: cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review",
+    "updated": "2026-06-14T00:03:32.065Z"
+  },
+  "plan": {
+    "id": "pan-1862",
+    "title": "feat(review): cache-sharing review convoy — warm-parent fork, model-uniformity guard, and resumable selective re-review",
+    "status": "proposed",
+    "uid": "aee18359-8d82-4670-8717-14d671d009b6",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-13T23:54:52.014Z",
+    "updated": "2026-06-14T00:03:32.065Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1862",
+        "label": "PAN-1862",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/main/.pan/drafts/PAN-1862.md",
+        "label": "PRD draft",
+        "type": "doc"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1874",
+        "label": "PAN-1874 (per-issue override — follow-up)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review",
+      "cost-optimization",
+      "prompt-cache",
+      "convoy",
+      "fork",
+      "config"
+    ],
+    "narratives": {
+      "Problem": "The four convoy reviewers (security/correctness/performance/requirements) each open the changed files and surrounding code independently — overlapping reads paid 4x at full input price with zero cross-reviewer cache sharing (each is a separate session with a different prompt prefix). Every re-review after a fixes-commit kills the whole convoy and respawns fresh (review-agent.ts stale-runId branch), discarding accumulated context and re-running all four even when only one blocked. There is no per-reviewer verdict tracking, so selective re-review is not even expressible. And there is no operator guard ensuring the five review roles share a model (the cache is per-model) nor any signal when the optimization fails to land.",
+      "Proposal": "Five phases, one issue. (A) The review/synthesis parent does shared discovery reads once; its session is then forked — via a properly-extracted reusable forkSession() primitive lifted from the conversation-panel machinery — into the four convoy reviewers, which resume the parent's byte-identical prefix and get prompt-cache reads (~10% of input price). (B) A red banner in Settings -> Roles when the five review roles do not resolve to the same model (cache-sharing disabled). (C) Cache-miss detection (a forked reviewer's first request shows cacheRead==0, or the discovery->fork gap approaches the 5-min TTL) surfaced as an activity-log entry + desktop notification. (D) Per-reviewer verdict tracking + a configurable reReviewScope (all/changed/blockers, default changed) so re-review RESUMES in-scope reviewer sessions instead of respawning the convoy. (E) A review mode (full/quick/none) at the single review entry point, with reviewStatus:'skipped' passing the merge gate. Correctness never depends on the cache landing (NFR-2).",
+      "NonGoals": "- No per-issue review override (mode/reReviewScope are global + per-project only) — per-issue is PAN-1874 (depends on this).\n- No change to the merge gate / readyForMerge derivation EXCEPT letting reviewStatus:'skipped' pass it (mirroring testStatus:'skipped').\n- No change to the test/UAT roles or the post-merge lifecycle.\n- No new model tier or workhorse slot; this feature only reads/aligns existing model config.\n- No silent rewrite of user model assignments — savings are opt-in, the banner is the only nudge.\n- No Pi/Codex fork support — fork-cache is a Claude Code --resume optimization; Pi/Codex reviewers fall back to today's independent-read behavior.\n- No change to killAllReviewerSessions for terminal lifecycle events (merge/reset/cancel/deep-wipe/abort).\n- No caching of the synthesis step itself across issues.\n- Cache-hit realization is an implementation checkpoint, not a merge gate — reviews are correct even on a full cache miss.\n- quick/none modes are deliberately NOT wired to the cache-sharing machinery."
+    },
+    "autoDecisions": [
+      {
+        "summary": "reReviewScope 'changed' resolved to Quality-first (operator-confirmed Q1): correctness+requirements always re-run; security/performance by documented domain patterns + prior-flagged files; include the reviewer when ambiguous.",
+        "rationale": "Honors NFR-1 (never skip a reviewer whose relevant files changed) while still saving tokens when a fix touches only one reviewer's domain. The conservative pattern set is documented in the reviewers-to-rerun-helper bead."
+      }
+    ],
+    "items": [
+      {
+        "id": "fork-session-primitive",
+        "title": "Extract a reusable forkSession() primitive from the conversation-panel fork machinery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1862",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "discovery-fork-orchestration",
+            "resume-selective-rereview"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Lift the session-fork logic out of the conversation-panel path into a reusable forkSession({ sourceSessionId, cwd, model, harness, kickoffMessage, remainOnExit, fullHistory }) primitive (new module, e.g. src/lib/conversations/fork-session.ts). Compose it from copySessionFromCompactBoundaryPromise (src/lib/conversations/summary-fork.ts:627-649 — note it copies ONLY from the last compact boundary by default; add a fullHistory:true path that copies the entire source JSONL per hazard H3), reserveSummaryForkSessionPromise (:559-571, randomUUID + session-file path), and the resume-launch path (spawnConversationSession resume=true, conversations.ts:1407-1679; --resume emitted in launcher-generator.ts:430,532). Refactor runForkPipeline (conversations.ts:3870-4009) to call the new primitive so the conversation panel and the review convoy share ONE code path (NFR-3 — no copy-paste). The source JSONL is COPIED to a new id and never mutated (hazard H6, JSONL sacred)."
+        },
+        "items": [
+          {
+            "id": "fork-session-primitive.ac1",
+            "title": "Given a source session id, forkSession() creates a new randomUUID session id and writes a new JSONL whose content equals the source (byte-identical modulo thinking-sanitization), leaving the source JSONL untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-session-primitive.ac2",
+            "title": "forkSession({ fullHistory: true }) copies the ENTIRE source JSONL; the default (fullHistory:false) preserves today's copy-from-last-compact-boundary behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-session-primitive.ac3",
+            "title": "The generated launcher for a forked session contains `--resume <newSessionId>` (resolved via the existing launcher-generator path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-session-primitive.ac4",
+            "title": "runForkPipeline() is refactored to call forkSession() and preserves the existing conversation-panel behavior (its conversation-fork tests still pass unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "discovery-phase-prompts",
+        "title": "Add a discovery phase to roles/review.md and 'context already loaded' framing to the four sub-role prompts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit roles/review.md to add an explicit FIRST 'discovery' phase: the parent reads the diff + the changed files above the manifest risk threshold + their changed hunks + immediately surrounding code (bounded by the manifest's existing large-changeset guard), and the prompt states WHY — the convoy will be forked from this session to share the warm prompt cache, so reviewers must build on this context rather than re-reading. Add matching 'a shared discovery pass already loaded the diff and high-risk files into your context (for cost + consistency); build on it, do not re-run a broad git diff or re-read the same files' framing to each of roles/review-security.md, review-correctness.md, review-performance.md, review-requirements.md. review.md currently has NO discovery phase (verified)."
+        },
+        "items": [
+          {
+            "id": "discovery-phase-prompts.ac1",
+            "title": "roles/review.md contains a discovery phase that instructs the parent to read the diff + high-risk changed files + surrounding code before the convoy starts, and states why (forked reviewers reuse this warm-cache context)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-phase-prompts.ac2",
+            "title": "Each of the four roles/review-<subRole>.md files contains framing that tells the reviewer the discovery context is already in history and to build on it rather than re-read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-phase-prompts.ac3",
+            "title": "A snapshot test on the assembled convoy prompt (buildConvoyPromptPromise) shows the assembled prompt contains the 'context already loaded' framing for each sub-role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "discovery-fork-orchestration",
+        "title": "Spawn the parent in discovery mode and fork the convoy on a discovery-ready signal (idempotent)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1862",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "cache-miss-detection",
+            "resume-selective-rereview"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In spawnReviewRoleForIssue (Promise impl spawnReviewRoleForIssuePromise ~review-agent.ts:296; parent spawn `spawnRun(...,'review',...)` :443; reviewer fan-out `Promise.all(REVIEW_SUB_ROLES.map(...))` :463 calling spawnReviewSubRoleForIssue :465), change first-cycle 'full' mode so the parent is spawned with a discovery-first prompt and the convoy is NOT spawned inline. Add a discovery-ready CLI signal (extend `pan admin specialists`, e.g. `discovery-ready review <id>`, mirroring the PAN-977 launcher-signal pattern) the parent fires once it is quiescent at a turn boundary. Add handleDiscoveryReady(issueId) (server) that: (1) confirms the parent is quiescent; (2) for each sub-role forks the parent via forkSession({ fullHistory:true, remainOnExit:true }) and delivers the review-<subRole>.md kickoff + 'context already loaded; write findings to <outputPath>; signal contract unchanged'; (3) wires the existing PAN-977 reviewer-exit signal contract so the still-alive parent synthesizes unchanged (FR-4). For non-claude-code harnesses, SKIP the fork and spawn reviewers the old independent-read way (decision D9). Idempotent: a second discovery-ready signal for the same run is a no-op (NFR-5). Record discoveryReadyAt/convoyLaunchedAt on the run for the TTL heuristic."
+        },
+        "items": [
+          {
+            "id": "discovery-fork-orchestration.ac1",
+            "title": "On 'full' first-cycle review, spawnReviewRoleForIssue spawns exactly one parent (review/discovery) session and does NOT spawn any convoy reviewer inline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-fork-orchestration.ac2",
+            "title": "Given a discovery-ready signal, the server spawns exactly four reviewer sessions forked from the parent's session id (full history) and preserves the parent session alive to synthesize",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-fork-orchestration.ac3",
+            "title": "A second discovery-ready signal for the same run spawns no additional reviewers (idempotent no-op) and survives a simulated dashboard restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-fork-orchestration.ac4",
+            "title": "When the resolved review harness is not claude-code, the convoy is spawned via the independent-read path (no fork attempted) and review still completes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discovery-fork-orchestration.ac5",
+            "title": "The run records discoveryReadyAt and convoyLaunchedAt timestamps readable by the cache-miss detector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-uniformity-banner",
+        "title": "Red banner in Settings -> Roles when the five review roles do not resolve to one model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx after the sub-role pickers (:603-638), resolve synthesis + the four reviewers' configured tiers to concrete models via the workhorses map (the component already resolves via displayModelRef — do NOT compare raw tier strings, hazard H4) and render a red banner when they are not all equal. The banner names the differing role->model pairs and states: prompt-cache sharing across the convoy is disabled, so each reviewer re-reads the full diff + high-risk files at full price (~Nx the input tokens per review); assign all review roles the same model to enable cache sharing. Follow the pan-style-guide (red = genuine warning; no decorative color, no pill badge). NOTE: this bead renders the banner unconditionally on mode-agnostic logic; review-mode-ui later gates it behind mode==='full'."
+        },
+        "items": [
+          {
+            "id": "model-uniformity-banner.ac1",
+            "title": "When synthesis + the four reviewers resolve to the same concrete model, no banner renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-uniformity-banner.ac2",
+            "title": "When at least one of the five review roles resolves to a different model, a red banner renders naming the differing role->model pairs and the ~Nx token ramification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-uniformity-banner.ac3",
+            "title": "Given two distinct tiers that resolve to the same model, no banner renders (uniformity is computed on RESOLVED models via the tier->workhorse mapping)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cache-miss-detection",
+        "title": "Detect a fork cache miss (cacheRead==0 first request, or discovery->launch gap near the 5-min TTL)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "In the server convoy monitor (Deacon review section / the orchestration tracking reviewer state), read each forked reviewer's first CostEvent (src/lib/costs/events.ts: cacheRead :28, cacheWrite :29; populated from usage.cache_read_input_tokens in sync-sources/hooks/record-cost-event.ts:187-188) and flag a miss when cacheRead==0 where a warm hit was expected. Add the proactive heuristic: using discoveryReadyAt/convoyLaunchedAt from the orchestration bead, flag a likely miss when convoyLaunchedAt - discoveryReadyAt approaches 300s. Expose a single detected-miss outcome the notification bead consumes. Only flag misses on claude-code forked reviewers (Pi/Codex never fork, decision D9)."
+        },
+        "items": [
+          {
+            "id": "cache-miss-detection.ac1",
+            "title": "Given a forked reviewer whose first CostEvent has cacheRead==0, the detector marks it as a cache miss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-miss-detection.ac2",
+            "title": "Given a forked reviewer whose first CostEvent has cacheRead>0, the detector marks no miss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-miss-detection.ac3",
+            "title": "Given a discovery->launch gap approaching 300s, the detector flags a proactive likely-miss warning (test uses fake timers, never real waits)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-miss-detection.ac4",
+            "title": "Given a non-claude-code reviewer that never forks, the detector marks no miss (excluded from detection)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cache-miss-notification",
+        "title": "On a detected cache miss, emit an activity-log entry + a desktop notification",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-12",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "On a detected miss (a) emit one activity-log entry via emitActivityEntrySync({ source:'review', level:'warn', message:`Review cache miss for ${issueId} — convoy did not reuse the warm cache (TTL/model). Reviews proceed at full cost.`, issueId, link }) (src/lib/activity-logger.ts:107-121) and (b) fire a desktop notification: add a notify-eligible flag to the activity entry (e.g. desktop?:boolean) or a dedicated lightweight event, and have App.tsx fire new Notification() on it at the existing site (src/dashboard/frontend/src/App.tsx:894, reusing the permission flow at :858-872 / requestPermission :865). Optionally emit TTS via emitActivityTtsSync (:153-166) at info priority behind the existing tts.enabled gate. The miss NEVER blocks or skips the review (NFR-2)."
+        },
+        "items": [
+          {
+            "id": "cache-miss-notification.ac1",
+            "title": "A detected miss emits exactly one activity.entry at level 'warn' carrying the issueId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-miss-notification.ac2",
+            "title": "A notify-flagged activity entry causes App.tsx to call new Notification() (when permission granted), reusing the existing permission flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-miss-notification.ac3",
+            "title": "Given a cache miss, the review preserves correctness — it still resolves to pass or block exactly as without the cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "per-reviewer-verdicts",
+        "title": "Track a per-sub-role verdict (passed/blocked, atCommit) in ReviewStatus + the review_status table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1862",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "reviewers-to-rerun-helper",
+            "resume-selective-rereview"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend ReviewStatus (src/lib/review-status.ts:42-115) with reviewerVerdicts?: Record<ReviewSubRole, { status:'passed'|'blocked'; atCommit:string; findingsPath?:string }>. Add a reviewerVerdicts column to the review_status table (src/lib/database/schema.ts:211-262) — via an ALTER TABLE ADD COLUMN migration using the file's existing migration mechanism (hazard H2 — editing only CREATE TABLE IF NOT EXISTS leaves existing DBs without the column) plus the row read/write mapping. Synthesis already reads all four reports, so it has each reviewer's outcome — persist the per-sub-role verdict (with the reviewed commit) when it reads each report, via the signal path (pan admin specialists done review extended to accept per-reviewer outcomes, or synthesis writes them directly before signaling)."
+        },
+        "items": [
+          {
+            "id": "per-reviewer-verdicts.ac1",
+            "title": "ReviewStatus persists and round-trips a reviewerVerdicts map of {status, atCommit, findingsPath?} per sub-role through the review_status table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-reviewer-verdicts.ac2",
+            "title": "Given an existing DB without the column, the ALTER TABLE migration adds the reviewerVerdicts column on load (not only on a fresh CREATE)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-reviewer-verdicts.ac3",
+            "title": "A blocked synthesis records status:'blocked' for each blocking sub-role and status:'passed' for the others, each stamped with the reviewed commit sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rereview-scope-config",
+        "title": "Add roles.review.reReviewScope (all|changed|blockers, default changed) to config + settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add reReviewScope?: 'all'|'changed'|'blockers' (and the ReReviewScope type) to RoleConfig (src/lib/config-yaml.ts:347-365), defaulting to 'changed' in the loader/normalizer. Wire it through the settings-API normalizer normalizeRolesConfig (src/lib/settings-api.ts:394-401) so it survives GET/PUT. It resolves through the existing global+per-project roles.review merge (mergeRoleConfig :1621-1644, per-project wins) — no per-issue scope (decision D8). Backend/config only here; the Settings UI control lives in review-mode-ui."
+        },
+        "items": [
+          {
+            "id": "rereview-scope-config.ac1",
+            "title": "Settings GET/PUT persists roles.review.reReviewScope for each of 'all','changed','blockers' (returns the value unchanged on round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rereview-scope-config.ac2",
+            "title": "When reReviewScope is unset, the loader defaults to 'changed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rereview-scope-config.ac3",
+            "title": "A per-project roles.review.reReviewScope overrides the global value via the existing merge (per-project wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reviewers-to-rerun-helper",
+        "title": "Pure reviewersToRerun() helper implementing the quality-first changed domain map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement a pure reviewersToRerun(scope, changedFilesSinceReviewedCommit, priorVerdicts) -> ReviewSubRole[]. 'all' -> all four. 'blockers' -> sub-roles with prior status:'blocked'. 'changed' (operator-confirmed Quality-first, continue.json D1) -> a reviewer is in scope if it blocked last cycle OR any of its prior-flagged files changed OR a changed file is in its DOMAIN, where: correctness domain = ALL changed files (always re-runs on any change); requirements domain = ALL changed files (always re-runs); security domain = changed paths matching security-sensitive patterns (auth, crypto/secrets, input parsing, network/http, dependency manifests e.g. package.json/bun.lock); performance domain = changed paths matching a small DOCUMENTED hot-path allowlist. When the mapping is ambiguous, INCLUDE the reviewer (fail-safe toward quality, NFR-1). Document the security/performance pattern sets inline next to the helper."
+        },
+        "items": [
+          {
+            "id": "reviewers-to-rerun-helper.ac1",
+            "title": "scope='all' returns all four sub-roles; scope='blockers' returns exactly the prior-blocked sub-roles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewers-to-rerun-helper.ac2",
+            "title": "Given scope='changed' and any changed file, reviewersToRerun returns correctness and requirements (always included)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewers-to-rerun-helper.ac3",
+            "title": "Under scope='changed', security is included when a changed path matches a security-sensitive pattern or a prior-flagged file changed; performance when a changed path matches the hot-path allowlist or a prior-flagged file changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reviewers-to-rerun-helper.ac4",
+            "title": "Given a reviewer that blocked last cycle, reviewersToRerun returns it under every scope regardless of changed files (NFR-1: never drops a reviewer whose files changed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resume-selective-rereview",
+        "title": "Re-review RESUMES in-scope reviewer sessions instead of respawning the convoy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Rework the stale-runId re-review path (review-agent.ts:326-365; the branch `if (!paneDead && !opts.force && !staleRunId)` :354 then killAllReviewerSessions :362) for the RE-REVIEW case only: compute the in-scope set via reviewersToRerun(scope, changedFiles, priorVerdicts); for each in-scope reviewer whose remain-on-exit session is still alive, RESUME it (deliver the new diff + its prior findings + the work agent's response via sendKeysAsync — load-buffer/paste-buffer/300ms/C-m, never sendKeys, hazard H7) instead of killing. Out-of-scope reviewers carry their prior 'passed' verdict forward without running. Only fall back to fresh spawn (+ optional re-fork via forkSession) when a reviewer's session is gone (decision D4). Re-arm synthesis (FR-9): tell it which sub-roles are running this cycle and which verdicts are carried forward; it waits for terminal signals only from the in-scope reviewers, then re-synthesizes from fresh + carried verdicts. PRESERVE killAllReviewerSessions for terminal lifecycle events (merge/reset/cancel/deep-wipe/abort)."
+        },
+        "items": [
+          {
+            "id": "resume-selective-rereview.ac1",
+            "title": "Given a second cycle with one prior blocker under scope='blockers', the path sends the new diff to exactly that one reviewer via sendKeysAsync, kills no sessions, and preserves the other three reviewers' prior 'passed' verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-selective-rereview.ac2",
+            "title": "Given scope='all', a re-review sends the new diff to all four reviewers and synthesis resolves only after terminal signals from the in-scope set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-selective-rereview.ac3",
+            "title": "When an in-scope reviewer's session is gone, the path falls back to a fresh spawn for that reviewer rather than failing the cycle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resume-selective-rereview.ac4",
+            "title": "killAllReviewerSessions still fires for terminal lifecycle events (merge/reset/cancel/deep-wipe/abort) — the resume path applies only to the re-review trigger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-status-skipped-gate",
+        "title": "Add reviewStatus 'skipped' and let it pass the readyForMerge gate",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'skipped' to the reviewStatus union (src/lib/review-status.ts:44 — currently 'pending'|'reviewing'|'passed'|'failed'|'blocked'). Update the readyForMerge gate so a skipped review passes, mirroring testStatus:'skipped' and verificationStatus:'skipped' (:53). IMPORTANT (hazard H1): the gate's reviewStatus==='passed' requirement appears at MORE than one site — grep for `reviewStatus === 'passed'` and the readyForMerge derivation (:282-295 and the testStatus:'skipped' acceptance also seen at :487,:515,:551) and update EVERY gate to accept reviewStatus==='skipped' the same way it accepts 'passed'."
+        },
+        "items": [
+          {
+            "id": "review-status-skipped-gate.ac1",
+            "title": "The review_status store persists and returns reviewStatus:'skipped' as a valid union member (round-trips unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-skipped-gate.ac2",
+            "title": "Given reviewStatus:'skipped' and testStatus:'skipped' (and verification satisfied), readyForMerge derives true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-status-skipped-gate.ac3",
+            "title": "Every readyForMerge gate site that accepts reviewStatus==='passed' also accepts 'skipped' (verified by a test exercising each site, not just the primary one)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-mode-config",
+        "title": "Add roles.review.mode (full|quick|none, default full) + resolveReviewMode helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Add mode?: 'full'|'quick'|'none' (and the ReviewMode type) to RoleConfig (src/lib/config-yaml.ts:347-365), default 'full' in the loader. Add a resolveReviewMode(config) helper (default 'full'). Wire it through the settings-API normalizer normalizeRolesConfig (src/lib/settings-api.ts:394-401). Resolves through the existing global+per-project roles.review merge (decision D8). Config + helper only here; the branch logic is review-mode-branch and the UI is review-mode-ui."
+        },
+        "items": [
+          {
+            "id": "review-mode-config.ac1",
+            "title": "Settings GET/PUT persists roles.review.mode for each of 'full','quick','none' (returns the value unchanged on round-trip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-config.ac2",
+            "title": "resolveReviewMode returns 'full' when mode is unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-config.ac3",
+            "title": "A per-project roles.review.mode overrides the global value via the existing merge (per-project wins)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-mode-branch",
+        "title": "Branch the single review entry point on mode: none skips, quick runs one reviewer, full runs the convoy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-13",
+            "FR-14",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "At the TOP of the review entry point (Promise impl spawnReviewRoleForIssuePromise ~review-agent.ts:296, the single entry per hazard H8) branch on resolveReviewMode(cfg): mode==='none' -> set reviewStatus:'skipped' (reviewNotes 'Review mode: none'), emit an activity entry recording the skip, invoke the same lifecycle advance an APPROVED review triggers (advance toward test, or toward readyForMerge if test is also skipped), return — WITHOUT spawning any reviewer; the pre-review verification floor (runVerificationForIssue, workspaces.ts:3755) still runs ahead of this (decision D7). mode==='quick' -> spawnQuickReviewForIssue(opts): spawn ONE reviewer (no convoy fan-out, no separate synthesis agent, no discovery/fork) reading a new roles/review-quick.md (a focused correctness+security+requirements pass using the same severity/verdict vocabulary) that signals the verdict directly via `pan admin specialists done review`. mode==='full' -> existing convoy (the discovery/fork path). Verify the branch is honored from the trigger route (workspaces.ts:3806) AND both Deacon re-dispatch sites (deacon.ts:1971, 2175)."
+        },
+        "items": [
+          {
+            "id": "review-mode-branch.ac1",
+            "title": "mode='none' spawns zero reviewers, sets reviewStatus:'skipped', emits a skip activity entry, advances lifecycle toward test/readyForMerge, and the verification floor still ran beforehand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-branch.ac2",
+            "title": "mode='quick' spawns exactly one reviewer reading roles/review-quick.md and no separate synthesis agent, and that reviewer signals the verdict directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-branch.ac3",
+            "title": "mode='full' spawns the convoy (discovery parent path) as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-branch.ac4",
+            "title": "The mode branch is honored when review is triggered from a Deacon re-dispatch site, not only from the HTTP trigger route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-mode-ui",
+        "title": "Settings -> Roles: review mode + reReviewScope selectors; gate the model banner behind mode==='full'",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-13T23:54:52.014Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1862",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/RolesPanel.tsx add a review mode selector (full/quick/none) and a reReviewScope selector (all/changed/blockers) bound to roles.review.mode and roles.review.reReviewScope. Gate the FR-10 model-uniformity banner (from model-uniformity-banner) so it renders ONLY when mode==='full' — quick/none neither fork nor cache-share, so the banner is irrelevant. Follow the pan-style-guide (no pill badges, no decorative color, muted status text)."
+        },
+        "items": [
+          {
+            "id": "review-mode-ui.ac1",
+            "title": "The Roles panel renders a review mode selector and a reReviewScope selector whose changes persist to roles.review.mode and roles.review.reReviewScope via settings save",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-ui.ac2",
+            "title": "The model-uniformity banner renders only when mode==='full' with mixed models, and is hidden under mode 'quick' or 'none' even with mixed models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-mode-ui.ac3",
+            "title": "The selectors render their current persisted values on load (full and changed shown when unset)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fork-session-primitive",
+        "to": "discovery-fork-orchestration",
+        "type": "blocks"
+      },
+      {
+        "from": "discovery-phase-prompts",
+        "to": "discovery-fork-orchestration",
+        "type": "blocks"
+      },
+      {
+        "from": "discovery-fork-orchestration",
+        "to": "cache-miss-detection",
+        "type": "blocks"
+      },
+      {
+        "from": "cache-miss-detection",
+        "to": "cache-miss-notification",
+        "type": "blocks"
+      },
+      {
+        "from": "discovery-fork-orchestration",
+        "to": "resume-selective-rereview",
+        "type": "blocks"
+      },
+      {
+        "from": "per-reviewer-verdicts",
+        "to": "reviewers-to-rerun-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "per-reviewer-verdicts",
+        "to": "resume-selective-rereview",
+        "type": "blocks"
+      },
+      {
+        "from": "rereview-scope-config",
+        "to": "reviewers-to-rerun-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "rereview-scope-config",
+        "to": "resume-selective-rereview",
+        "type": "blocks"
+      },
+      {
+        "from": "reviewers-to-rerun-helper",
+        "to": "resume-selective-rereview",
+        "type": "blocks"
+      },
+      {
+        "from": "review-status-skipped-gate",
+        "to": "review-mode-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "review-mode-config",
+        "to": "review-mode-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "review-mode-config",
+        "to": "review-mode-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "rereview-scope-config",
+        "to": "review-mode-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "model-uniformity-banner",
+        "to": "review-mode-ui",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-14-PAN-1862-feat-review-cache-sharing-review-convoy-warm-parent-fork-model-uniformity-guard-and-resumable-selective-re-review.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
