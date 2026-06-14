@@ -403,6 +403,9 @@ export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 /** PAN-1862: review execution mode — full convoy, single reviewer, or skip entirely */
 export type ReviewMode = 'full' | 'quick' | 'none';
 
+/** PAN-1862: scope of reviewers to re-run when a re-review is triggered */
+export type ReReviewScope = 'all' | 'changed' | 'blockers';
+
 export interface RoleConfig {
   model: ModelRef;
   harness?: 'claude-code' | 'pi' | 'codex';
@@ -423,6 +426,8 @@ export interface RoleConfig {
   sub?: Record<string, RoleSubConfig>;
   /** PAN-1862: review execution mode (review role only). Default 'full'. */
   mode?: ReviewMode;
+  /** PAN-1862: scope of reviewers to re-run on re-review (review role only). Default 'changed'. */
+  reReviewScope?: ReReviewScope;
 }
 
 export type RolesConfig = Partial<Record<Role, RoleConfig>>;
@@ -1661,6 +1666,11 @@ export function resolveModel(
 /** PAN-1862: resolve the review execution mode, defaulting to 'full'. */
 export function resolveReviewMode(config: Pick<NormalizedConfig, 'roles'> = {}): ReviewMode {
   return config.roles?.review?.mode ?? 'full';
+}
+
+/** PAN-1862: resolve the re-review scope, defaulting to 'changed'. */
+export function resolveReReviewScope(config: Pick<NormalizedConfig, 'roles'> = {}): ReReviewScope {
+  return config.roles?.review?.reReviewScope ?? 'changed';
 }
 
 function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
