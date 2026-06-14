@@ -400,6 +400,9 @@ export type RoleEffort = EffortLevel;
 export const ROLE_EFFORTS: readonly RoleEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
+/** PAN-1862: review execution mode — full convoy, single reviewer, or skip entirely */
+export type ReviewMode = 'full' | 'quick' | 'none';
+
 export interface RoleConfig {
   model: ModelRef;
   harness?: 'claude-code' | 'pi' | 'codex';
@@ -418,6 +421,8 @@ export interface RoleConfig {
   maxAgents?: number;
   scope?: FlywheelScope;
   sub?: Record<string, RoleSubConfig>;
+  /** PAN-1862: review execution mode (review role only). Default 'full'. */
+  mode?: ReviewMode;
 }
 
 export type RolesConfig = Partial<Record<Role, RoleConfig>>;
@@ -1651,6 +1656,11 @@ export function resolveModel(
       ? `roles.${role}.model`
       : `defaults.${role}.model`;
   return derefWorkhorse(ref, config, fieldPath);
+}
+
+/** PAN-1862: resolve the review execution mode, defaulting to 'full'. */
+export function resolveReviewMode(config: Pick<NormalizedConfig, 'roles'> = {}): ReviewMode {
+  return config.roles?.review?.mode ?? 'full';
 }
 
 function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
