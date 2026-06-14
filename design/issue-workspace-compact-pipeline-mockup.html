@@ -361,7 +361,7 @@
     .workflow-line {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
-      gap: 7px;
+      gap: 6px;
       align-items: start;
     }
 
@@ -371,12 +371,21 @@
       background: transparent;
       color: var(--muted-foreground);
       padding: 0;
+      display: block;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .workflow-step:hover .copy {
+      color: var(--foreground);
+    }
+
+    .workflow-label {
+      min-width: 0;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr);
       gap: 7px;
-      align-items: start;
-      cursor: pointer;
-      text-align: left;
+      align-items: center;
     }
 
     .workflow-step .mark {
@@ -390,7 +399,6 @@
       place-items: center;
       font-size: 10px;
       line-height: 1;
-      margin-top: 1px;
     }
 
     .workflow-step .copy {
@@ -404,12 +412,13 @@
     }
 
     .workflow-step .bar {
-      grid-column: 2;
+      display: block;
+      width: 100%;
       height: 4px;
       border-radius: 999px;
       background: var(--muted);
       overflow: hidden;
-      margin-top: 6px;
+      margin-top: 8px;
     }
 
     .workflow-step.done .mark {
@@ -988,13 +997,13 @@
         </div>
 
         <section class="workflow-line" aria-label="Issue workflow">
-          <button class="workflow-step done" type="button" data-stage="Plan"><span class="mark">✓</span><span><span class="copy">Plan approved</span><span class="bar"></span></span></button>
-          <button class="workflow-step done" type="button" data-stage="Work"><span class="mark">✓</span><span><span class="copy">Work done</span><span class="bar"></span></span></button>
-          <button class="workflow-step done" type="button" data-stage="Review"><span class="mark">✓</span><span><span class="copy">Review passed</span><span class="bar"></span></span></button>
-          <button class="workflow-step done" type="button" data-stage="Test"><span class="mark">✓</span><span><span class="copy">Test passed</span><span class="bar"></span></span></button>
-          <button class="workflow-step" type="button" data-stage="CI/CD"><span class="mark">◦</span><span><span class="copy">CI/CD</span><span class="bar"></span></span></button>
-          <button class="workflow-step" type="button" data-stage="Ship"><span class="mark">◦</span><span><span class="copy">Ship</span><span class="bar"></span></span></button>
-          <button class="workflow-step active" type="button" data-stage="Merge"><span class="mark">◆</span><span><span class="copy">Merge ready</span><span class="bar"></span></span></button>
+          <button class="workflow-step done" type="button" data-stage="Plan"><span class="workflow-label"><span class="mark">✓</span><span class="copy">Plan approved</span></span><span class="bar"></span></button>
+          <button class="workflow-step done" type="button" data-stage="Work"><span class="workflow-label"><span class="mark">✓</span><span class="copy">Work done</span></span><span class="bar"></span></button>
+          <button class="workflow-step done" type="button" data-stage="Review"><span class="workflow-label"><span class="mark">✓</span><span class="copy">Review passed</span></span><span class="bar"></span></button>
+          <button class="workflow-step done" type="button" data-stage="Test"><span class="workflow-label"><span class="mark">✓</span><span class="copy">Test passed</span></span><span class="bar"></span></button>
+          <button class="workflow-step" type="button" data-stage="CI/CD"><span class="workflow-label"><span class="mark">◦</span><span class="copy">CI/CD</span></span><span class="bar"></span></button>
+          <button class="workflow-step" type="button" data-stage="Ship"><span class="workflow-label"><span class="mark">◦</span><span class="copy">Ship</span></span><span class="bar"></span></button>
+          <button class="workflow-step active" type="button" data-stage="Merge"><span class="workflow-label"><span class="mark">◆</span><span class="copy">Merge ready</span></span><span class="bar"></span></button>
         </section>
       </header>
 
