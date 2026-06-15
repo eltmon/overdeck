@@ -21,6 +21,7 @@
 | Document | Description |
 |----------|-------------|
 | [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
+| [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) | Three-plane state model: permanent git records, local SQLite runtime registry, and tmux liveness oracle |
 | [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
 | [Specialist Pipeline Diagram](./diagrams/panopticon-specialist-pipeline.png) | Visual overview of the work-agent → verification gate → specialist handoff flow |
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
