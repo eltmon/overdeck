@@ -22,12 +22,14 @@ import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
+import { ProjectNode, type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import type { PaneType } from '../../../lib/panesStore'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { ReviewVerificationCard } from './ReviewVerificationCard'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
+import type { SessionNode } from '@panctl/contracts'
 import styles from './cockpitBody.module.css'
 
 export interface IssueMissionControlProps {
@@ -65,6 +67,18 @@ type PipelineState = 'done' | 'active' | 'fail' | 'todo'
 type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
 
 type IssueTreeContext = 'issue' | 'work' | 'review' | 'test' | 'ci' | 'plan' | 'beads' | 'activity'
+
+const COCKPIT_SESSION_CONTEXT: Partial<Record<SessionNode['type'], IssueTreeContext>> = {
+  work: 'work',
+  strike: 'work',
+  review: 'review',
+  reviewer: 'review',
+  test: 'test',
+  ship: 'ci',
+  merge: 'ci',
+  planning: 'plan',
+  legacy: 'plan',
+}
 
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -475,6 +489,62 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
   )
 }
 
+function toCockpitSession(section: {
+  type?: string
+  sessionId?: string
+  model?: string
+  status?: string
+  startedAt?: string
+  duration?: number | null
+}): SessionNode | null {
+  const type = section.type === 'reviewer'
+    ? 'reviewer'
+    : section.type === 'review'
+      ? 'review'
+      : section.type === 'test'
+        ? 'test'
+        : section.type === 'ship'
+          ? 'ship'
+          : section.type === 'merge'
+            ? 'merge'
+            : section.type === 'planning'
+              ? 'planning'
+              : section.type === 'legacy'
+                ? 'legacy'
+                : section.type === 'strike'
+                  ? 'strike'
+                  : section.type === 'work'
+                    ? 'work'
+                    : null
+  if (!type) return null
+  const normalizedStatus = section.status === 'completed'
+    ? 'stopped'
+    : section.status === 'running' || section.status === 'starting' || section.status === 'error' || section.status === 'stopped'
+    ? section.status
+    : section.status?.toLowerCase().includes('fail')
+      ? 'error'
+      : section.status?.toLowerCase().includes('run')
+        ? 'running'
+        : 'stopped'
+  return {
+    type,
+    sessionId: section.sessionId || `${type}-session`,
+    model: section.model || 'unknown',
+    startedAt: section.startedAt || new Date(0).toISOString(),
+    duration: section.duration ?? null,
+    status: normalizedStatus,
+    presence: normalizedStatus === 'running' || normalizedStatus === 'starting' ? 'active' : 'ended',
+  }
+}
+
+function issueTreeStateLabel(rs: ReviewStatusData | undefined): string {
+  if (rs?.mergeStatus === 'merged') return 'Done'
+  if (rs?.readyForMerge) return 'In Review'
+  if (rs?.testStatus === 'testing') return 'Testing'
+  if (rs?.reviewStatus === 'reviewing' || rs?.reviewStatus === 'passed' || rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') return 'In Review'
+  return 'In Progress'
+}
+
 function IssueTreeLane({
   issueId,
   title,
@@ -491,91 +561,77 @@ function IssueTreeLane({
   const review = useReviewStatusQuery(issueId)
   const activity = useActivityQuery(issueId)
   const actions = useIssueActions(issueId)
-  const checks = useIssueCheckRunsQuery(issueId)
-  const sections = activity.data?.sections ?? []
-  const work = sections.find((section) => section.type === 'work')
-  const test = sections.find((section) => section.type === 'test')
-  const ship = sections.find((section) => section.type === 'ship')
-  const reviewerCount = sections.filter((section) => section.type === 'review' || section.type === 'reviewer').length
-  const hasPlan = actions.state.hasPlan
-  const hasBeads = actions.state.hasBeads
-  const issueActive = selected === 'issue'
+  const sessions = useMemo(() => {
+    const base = (activity.data?.sections ?? [])
+      .map((section) => toCockpitSession(section))
+      .filter((session): session is SessionNode => Boolean(session))
+    if (actions.state.hasPlan && !base.some((session) => session.type === 'planning' || session.type === 'legacy')) {
+      base.push({
+        type: 'legacy',
+        sessionId: `${issueId}-planning-state`,
+        model: 'planning',
+        startedAt: new Date(0).toISOString(),
+        duration: null,
+        status: 'stopped',
+        presence: 'ended',
+      })
+    }
+    return base
+  }, [actions.state.hasPlan, activity.data?.sections, issueId])
 
-  const childClass = (context: IssueTreeContext) => `grid w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 rounded-[8px] px-2 py-1.5 text-left text-[12px] transition-colors ${
-    selected === context ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:bg-card/70 hover:text-foreground'
-  }`
+  const feature: ProjectFeature = useMemo(() => ({
+    issueId,
+    title,
+    projectName: projectName ?? 'Project',
+    branch: '',
+    status: sessions.some((session) => session.presence === 'active') ? 'running' : actions.state.hasPlan ? 'has_state' : 'idle',
+    stateLabel: issueTreeStateLabel(review.data),
+    agentStatus: sessions.some((session) => session.presence === 'active') ? 'running' : null,
+    hasPlanning: actions.state.hasPlan,
+    hasPrd: actions.state.hasPlan,
+    hasState: actions.state.hasPlan,
+    isShadow: false,
+    readyForMerge: review.data?.readyForMerge,
+    sessions,
+    resourceSources: [
+      ...(actions.state.hasPlan ? ['vbrief' as const] : []),
+      ...(actions.state.hasBeads ? ['beads' as const] : []),
+      'workspace' as const,
+    ],
+    resourceDetails: {
+      hasWorkspace: true,
+      localBranchCount: 0,
+      remoteBranchCount: 0,
+      tmuxSessionCount: sessions.length,
+      prs: [],
+      hasVbrief: actions.state.hasPlan,
+      hasBeads: actions.state.hasBeads,
+      dockerContainerCount: 0,
+    },
+  }), [actions.state.hasBeads, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
+
+  const selectedSessionId = useMemo(() => {
+    if (!selected) return null
+    const matchingType = Object.entries(COCKPIT_SESSION_CONTEXT).find(([, context]) => context === selected)?.[0]
+    return sessions.find((session) => session.type === matchingType)?.sessionId ?? null
+  }, [selected, sessions])
 
   return (
-    <aside className="min-w-0 rounded-[20px] border border-border bg-card/50 p-3" aria-label="Issue tree">
-      <div className="mb-3 flex items-center justify-between px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        <span>Issues</span>
-        <span>current</span>
-      </div>
-      <div className="mb-2 flex items-center gap-2 px-1 text-[12px] font-semibold text-foreground">
-        <span>⌄</span>
-        <span className="min-w-0 truncate">{projectName ?? 'Project'}</span>
-      </div>
-      <section className="border-l-2 border-primary bg-primary/[0.07] pl-2">
-        <button
-          type="button"
-          onClick={() => onSelect('issue')}
-          className={`grid w-full gap-1 rounded-r-[10px] px-2 py-2 text-left transition-colors ${issueActive ? 'bg-card shadow-sm' : 'hover:bg-card/70'}`}
-        >
-          <span className="flex items-center justify-between gap-2">
-            <span className="font-mono text-[11px] text-muted-foreground">{issueId}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">{review.data?.readyForMerge ? 'ready' : review.data?.reviewStatus ?? 'open'}</span>
-          </span>
-          <span className="line-clamp-2 text-[12px] font-semibold leading-snug text-foreground">{title}</span>
-          <span className="flex flex-wrap gap-1.5">
-            <CockpitPill tone={statusToTone(review.data?.reviewStatus)} className="px-1.5 py-0 text-[9px]">{review.data?.reviewStatus ?? 'status'}</CockpitPill>
-            {review.data?.readyForMerge && <CockpitPill tone="success" className="px-1.5 py-0 text-[9px]">merge ready</CockpitPill>}
-          </span>
-        </button>
-        <div className="mt-1 grid gap-0.5 pb-2 pl-4">
-          <button type="button" onClick={() => onSelect('work')} className={childClass('work')}>
-            <span>⌘</span>
-            <span className="min-w-0 truncate">Work agent</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{work?.status ?? 'none'}</span>
-          </button>
-          <button type="button" onClick={() => onSelect('review')} className={childClass('review')}>
-            <span>◇</span>
-            <span className="min-w-0 truncate">Review</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{reviewerCount || review.data?.reviewStatus || 'pending'}</span>
-          </button>
-          <button type="button" onClick={() => onSelect('test')} className={childClass('test')}>
-            <span>⚗</span>
-            <span className="min-w-0 truncate">Test</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{test?.status ?? review.data?.testStatus ?? 'pending'}</span>
-          </button>
-          <button type="button" onClick={() => onSelect('ci')} className={childClass('ci')}>
-            <span>◉</span>
-            <span className="min-w-0 truncate">PR & CI</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{checks.data?.summary.total ? `${checks.data.summary.passed}/${checks.data.summary.total}` : 'none'}</span>
-          </button>
-          <button type="button" onClick={() => onSelect('plan')} className={childClass('plan')}>
-            <span>☷</span>
-            <span className="min-w-0 truncate">Planning state</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{hasPlan ? 'ready' : 'missing'}</span>
-          </button>
-          <button type="button" onClick={() => onSelect('beads')} className={childClass('beads')}>
-            <span>▦</span>
-            <span className="min-w-0 truncate">Beads</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{hasBeads ? 'present' : 'none'}</span>
-          </button>
-          <button type="button" onClick={() => onSelect('activity')} className={childClass('activity')}>
-            <span>↯</span>
-            <span className="min-w-0 truncate">Activity</span>
-            <span className="font-mono text-[10px] text-muted-foreground">{sections.length}</span>
-          </button>
-          {ship && (
-            <div className="grid grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 px-2 py-1.5 text-[11px] text-muted-foreground">
-              <span>⇡</span>
-              <span className="min-w-0 truncate">Ship agent</span>
-              <span className="font-mono text-[10px]">{ship.status}</span>
-            </div>
-          )}
-        </div>
-      </section>
+    <aside className="min-w-0 rounded-[20px] border border-border bg-card/50 p-2" aria-label="Issue tree">
+      <ProjectNode
+        name={projectName ?? 'Project'}
+        features={[feature]}
+        selectedFeature={selected === 'issue' ? issueId : null}
+        selectedProject={projectName ?? 'Project'}
+        onSelectFeature={() => onSelect('issue')}
+        selectedSessionId={selectedSessionId}
+        onSelectSession={(_, sessionId) => {
+          const session = sessions.find((candidate) => candidate.sessionId === sessionId)
+          const context = session ? COCKPIT_SESSION_CONTEXT[session.type] : null
+          onSelect(context ?? 'work')
+        }}
+        filter="all"
+      />
     </aside>
   )
 }

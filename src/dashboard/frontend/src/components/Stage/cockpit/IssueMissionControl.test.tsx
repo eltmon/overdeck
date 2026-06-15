@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
@@ -30,6 +31,7 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
     },
   }),
   useIssueCostsQuery: () => ({ data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }),
+  useWorkspaceQuery: () => ({ data: null, isLoading: false }),
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
@@ -43,17 +45,23 @@ vi.mock('../../../lib/issueActions', () => ({
 }))
 
 vi.mock('../../IssueActionMenu/useIssueActions', () => ({
-  useIssueActions: () => ({
-    all: [
+  useIssueActions: () => {
+    const all = [
       { action: { key: 'plan', label: 'Plan', group: 'planning', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
       { action: { key: 'startAgent', label: 'Start agent', group: 'work', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
       { action: { key: 'reviewTest', label: 'Review & test', group: 'review', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
       { action: { key: 'tell', label: 'Tell agent', group: 'agent', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
       { action: { key: 'wipe', label: 'Wipe', group: 'danger', kind: 'destructive' }, enabled: true, isPending: false, invoke: actionInvoke },
-    ],
-    state: { hasPlan: true, hasBeads: true },
-    activeDialog: null,
-  }),
+    ]
+    return {
+      all,
+      primary: all.slice(0, 2),
+      secondary: all.slice(2, 4),
+      overflow: all.slice(4),
+      state: { hasPlan: true, hasBeads: true },
+      activeDialog: null,
+    }
+  },
 }))
 
 vi.mock('../../IssueActionMenu/IssueActionMenu', () => ({
@@ -81,17 +89,25 @@ import { IssueMissionControl } from './IssueMissionControl'
 
 function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
   const onOpenPane = extra?.onOpenPane ?? vi.fn()
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
   render(
-    <IssueMissionControl
-      issueId="PAN-1661"
-      title="Mission control"
-      branch="feature/pan-1661"
-      launcher={<div>Launcher</div>}
-      agentDock={<div>Agent dock</div>}
-      actionDock={<div>Action dock</div>}
-      timeline={<div>Timeline</div>}
-      onOpenPane={onOpenPane as (pane: PaneType) => void}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <IssueMissionControl
+        issueId="PAN-1661"
+        title="Mission control"
+        branch="feature/pan-1661"
+        launcher={<div>Launcher</div>}
+        agentDock={<div>Agent dock</div>}
+        actionDock={<div>Action dock</div>}
+        timeline={<div>Timeline</div>}
+        onOpenPane={onOpenPane as (pane: PaneType) => void}
+      />
+    </QueryClientProvider>,
   )
   return { onOpenPane }
 }
@@ -103,7 +119,7 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText('Issue Cockpit · Mission Control')).toBeTruthy()
     expect(screen.getAllByText('PAN-1661').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Issue tree')).toBeTruthy()
-    expect(screen.getByText('Work agent')).toBeTruthy()
+    expect(screen.getAllByText('Work').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /PR & CI/ }).length).toBeGreaterThan(0)
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
@@ -146,7 +162,7 @@ describe('IssueMissionControl', () => {
   it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
     renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: /Work agent/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Work/ }))
 
     expect(screen.getByTestId('issue-tree-context-panel')).toBeTruthy()
     expect(screen.getByText('Launch')).toBeTruthy()
