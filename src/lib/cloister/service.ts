@@ -423,8 +423,22 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
     const payload = event.payload as { agentId?: string } | undefined;
     const agentId = payload?.agentId;
     if (agentId) {
-      const { handleAgentStoppedEvent } = await import('./deacon.js');
-      await handleAgentStoppedEvent(agentId);
+      const { handleAgentStoppedEvent, handleAgentStoppedForOrphanReviewerSessions } = await import('./deacon.js');
+      const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
+      handleAgentLifecycleEventForIdleStack(agentId);
+      await Promise.all([
+        handleAgentStoppedEvent(agentId),
+        handleAgentStoppedForOrphanReviewerSessions(agentId),
+      ]);
+    }
+    return;
+  }
+  if (event.type === 'agent.started') {
+    const payload = event.payload as { agentId?: string } | undefined;
+    const agentId = payload?.agentId;
+    if (agentId) {
+      const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
+      handleAgentLifecycleEventForIdleStack(agentId);
     }
     return;
   }
@@ -457,6 +471,27 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
       await handleWorkCompleted(issueId);
     }
     // Fall through to onIssueStateChange for in_review dispatch.
+  }
+
+  // PAN-1908: reactive reconcilers — deacon handles issue.statusChanged events
+  // for closed issues and proposed specs instead of patrol scans.
+  if (event.type === 'issue.statusChanged') {
+    const payload = event.payload as { issueId?: string; status?: string; canonicalStatus?: string } | undefined;
+    const issueId = payload?.issueId;
+    const canonicalStatus = payload?.canonicalStatus?.toLowerCase();
+    const status = payload?.status?.toLowerCase();
+    if (issueId) {
+      if (canonicalStatus === 'closed' || status === 'closed') {
+        const { handleIssueStatusChangedClosed } = await import('./closed-issue-reaper.js');
+        await handleIssueStatusChangedClosed(issueId);
+        return;
+      }
+      if (canonicalStatus === 'todo' || status === 'planned' || status === 'todo') {
+        const { handleOrphanProposedSpec } = await import('./orphan-proposed-reconciler.js');
+        await handleOrphanProposedSpec(issueId);
+        // Fall through to onIssueStateChange in case it drives role dispatch.
+      }
+    }
   }
 
   const change = issueStateChangeFromDomainEvent(event);

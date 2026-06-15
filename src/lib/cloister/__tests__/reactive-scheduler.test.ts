@@ -86,6 +86,21 @@ vi.mock('../../review-status.js', () => ({
   setReviewStatusSync: vi.fn(),
 }));
 
+const closedIssueReaperMock = vi.hoisted(() => ({
+  handleIssueStatusChangedClosed: vi.fn(async () => ['reaped-closed']),
+}));
+vi.mock('../closed-issue-reaper.js', () => closedIssueReaperMock);
+
+const orphanProposedMock = vi.hoisted(() => ({
+  handleOrphanProposedSpec: vi.fn(async () => ['spawned-orphan']),
+}));
+vi.mock('../orphan-proposed-reconciler.js', () => orphanProposedMock);
+
+const idleStackReaperMock = vi.hoisted(() => ({
+  handleAgentLifecycleEventForIdleStack: vi.fn(),
+}));
+vi.mock('../idle-stack-reaper.js', () => idleStackReaperMock);
+
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
@@ -418,5 +433,45 @@ describe('reactive Cloister scheduler', () => {
 
     expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', expect.objectContaining({ reviewStatus: 'pending', testStatus: 'pending' }));
     expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-503' }));
+  });
+
+  it('routes issue.statusChanged(closed) to the closed-issue reaper handler', async () => {
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'issue.statusChanged',
+      payload: { issueId: 'PAN-503', status: 'Closed', canonicalStatus: 'closed' },
+    }));
+
+    expect(closedIssueReaperMock.handleIssueStatusChangedClosed).toHaveBeenCalledWith('PAN-503');
+    expect(orphanProposedMock.handleOrphanProposedSpec).not.toHaveBeenCalled();
+  });
+
+  it('routes issue.statusChanged(planned) to the orphan-proposed handler', async () => {
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'issue.statusChanged',
+      payload: { issueId: 'PAN-503', status: 'Planned', canonicalStatus: 'todo' },
+    }));
+
+    expect(orphanProposedMock.handleOrphanProposedSpec).toHaveBeenCalledWith('PAN-503');
+    expect(closedIssueReaperMock.handleIssueStatusChangedClosed).not.toHaveBeenCalled();
+  });
+
+  it('routes agent.started to the idle-stack grace-clock reset', async () => {
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'agent.started',
+      payload: { agentId: 'agent-pan-503' },
+    }));
+
+    expect(idleStackReaperMock.handleAgentLifecycleEventForIdleStack).toHaveBeenCalledWith('agent-pan-503');
+  });
+
+  it('routes agent.stopped to the idle-stack grace-clock reset', async () => {
+    vi.mocked(getAgentStateSync).mockReturnValue(null);
+
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'agent.stopped',
+      payload: { agentId: 'agent-pan-503' },
+    }));
+
+    expect(idleStackReaperMock.handleAgentLifecycleEventForIdleStack).toHaveBeenCalledWith('agent-pan-503');
   });
 });

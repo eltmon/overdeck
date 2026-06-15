@@ -150,6 +150,7 @@ import {
   getTmuxSessionName,
   isRunning,
   getAllProjectSpecialistStatuses,
+  parseReviewerSessionName,
 } from './specialists.js';
 import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -1453,33 +1454,17 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
   return actions;
 }
 
-/**
- * Clean up orphan reviewer and specialist tmux sessions (PAN-846).
- *
- * Sweeps for sessions whose naming pattern indicates they belong to a
- * reviewer or specialist, checks whether the corresponding work agent is
- * still alive or a review is in flight, and kills sessions that have been
- * alive for more than one hour with no owner.
- *
- * Safety net for orphaned convoy reviewer sessions (agent-<id>-review-<subRole>)
- * whose synthesis session already ended but whose sub-role session outlived the
- * stop-hook reaper (e.g. reaper race, tmux busy, dashboard restart).
- */
-export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
-  const actions: string[] = [];
-  const ORPHAN_AGE_MS = 60 * 60 * 1000; // 1 hour
-  const now = Date.now();
+const ORPHAN_REVIEWER_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-  let sessions: string[];
-  let creationTimes: Map<string, number>;
+async function loadTmuxSessionsWithCreationTimes(): Promise<{ sessions: string[]; creationTimes: Map<string, number> } | null> {
   try {
     const { stdout } = await execAsync(
       `tmux -L panopticon -f ${join(PANOPTICON_HOME, 'tmux', 'panopticon.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
       { encoding: 'utf-8' },
     );
     const lines = stdout.split('\n').filter(l => l.trim());
-    sessions = [];
-    creationTimes = new Map();
+    const sessions: string[] = [];
+    const creationTimes = new Map<string, number>();
     for (const line of lines) {
       const parts = line.split(' ');
       if (parts.length >= 2) {
@@ -1492,73 +1477,124 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
         }
       }
     }
+    return { sessions, creationTimes };
   } catch {
     // tmux server may not be running — nothing to clean
-    return actions;
+    return null;
+  }
+}
+
+function issueIdFromReviewerSessionName(sessionName: string): string | null {
+  // PAN-1059 convoy pattern: agent-<issueId>-review-<subRole>
+  const convoyMatch = sessionName.match(/^agent-([a-z0-9]+-\d+)-review-(?:security|correctness|performance|requirements)$/);
+  if (convoyMatch) {
+    return convoyMatch[1].toUpperCase();
   }
 
+  // Legacy specialist pattern: specialist-<project>-<issueId>-review-<role>
+  const parsedReviewer = parseReviewerSessionName(sessionName);
+  if (parsedReviewer) {
+    return parsedReviewer.issueId.toUpperCase();
+  }
+
+  // Generic fallback
+  const match = sessionName.match(/([A-Z0-9]+-\d+)/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+async function handleOrphanReviewerSession(
+  sessionName: string,
+  sessions: string[],
+  creationTimes: Map<string, number>,
+  now: number,
+): Promise<string | null> {
+  // PAN-1059: convoy sub-role sessions are agent-<id>-review-<subRole>.
+  // Legacy specialist sessions matched specialist-*-review-*. Both contain -review-.
+  if (!sessionName.includes('-review-')) return null;
+
+  const createdMs = creationTimes.get(sessionName);
+  if (!createdMs || now - createdMs < ORPHAN_REVIEWER_AGE_MS) return null;
+
+  const issueId = issueIdFromReviewerSessionName(sessionName);
+  if (!issueId) return null;
+
+  // Gate 1: work agent running?
+  const agentSession = `agent-${issueId.toLowerCase()}`;
+  if (sessions.includes(agentSession)) return null;
+
+  // Gate 2: review in flight for this issue?
   const { getReviewStatusSync } = await import('../review-status.js');
-  const { parseReviewerSessionName } = await import('./specialists.js');
+  try {
+    const status = getReviewStatusSync(issueId);
+    if (status?.reviewStatus === 'reviewing') return null;
+  } catch {
+    // No status entry → safe to clean
+  }
 
+  try {
+    await Effect.runPromise(killSession(sessionName));
+    const ageMin = Math.round((now - createdMs) / 60000);
+    const msg = `Killed orphan reviewer session ${sessionName} (${ageMin}m old)`;
+    console.log(`[deacon] ${msg}`);
+    return msg;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[deacon] Failed to kill orphan session ${sessionName}:`, msg);
+    return null;
+  }
+}
+
+/**
+ * PAN-1908: reactive orphan reviewer-session cleanup. When a work agent stops,
+ * check whether any reviewer sessions for the same issue have outlived it and
+ * kill them if they are old enough and no review is in flight.
+ */
+export async function handleAgentStoppedForOrphanReviewerSessions(agentId: string): Promise<string[]> {
+  const match = agentId.match(/^agent-([a-z0-9]+-\d+)$/i);
+  if (!match) return [];
+  const issueId = match[1].toUpperCase();
+
+  const loaded = await loadTmuxSessionsWithCreationTimes();
+  if (!loaded) return [];
+  const { sessions, creationTimes } = loaded;
+
+  const actions: string[] = [];
+  const now = Date.now();
   for (const sessionName of sessions) {
-    // PAN-1059: convoy sub-role sessions are agent-<id>-review-<subRole>.
-    // Legacy specialist sessions matched specialist-*-review-*. Both contain -review-.
-    if (!sessionName.includes('-review-')) continue;
+    const sessionIssueId = issueIdFromReviewerSessionName(sessionName);
+    if (sessionIssueId !== issueId) continue;
 
-    // Check age
-    const createdMs = creationTimes.get(sessionName);
-    if (!createdMs || now - createdMs < ORPHAN_AGE_MS) continue;
-
-    // Extract issueId from session name
-    let issueId: string | null = null;
-
-    // PAN-1059 convoy pattern: agent-<issueId>-review-<subRole>
-    const convoyMatch = sessionName.match(/^agent-([a-z0-9]+-\d+)-review-(?:security|correctness|performance|requirements)$/);
-    if (convoyMatch) {
-      issueId = convoyMatch[1].toUpperCase();
-    } else {
-      // Legacy specialist pattern: specialist-<project>-<issueId>-review-<role>
-      const parsedReviewer = parseReviewerSessionName(sessionName);
-      if (parsedReviewer) {
-        issueId = parsedReviewer.issueId.toUpperCase();
-      } else {
-        // Generic fallback
-        const match = sessionName.match(/([A-Z0-9]+-\d+)/i);
-        if (match) issueId = match[1].toUpperCase();
-      }
-    }
-
-    if (!issueId) continue;
-
-    // Gate 1: work agent running?
-    const agentSession = `agent-${issueId.toLowerCase()}`;
-    if (sessions.includes(agentSession)) continue;
-
-    // Gate 2: review in flight for this issue?
-    try {
-      const status = getReviewStatusSync(issueId);
-      if (status?.reviewStatus === 'reviewing') continue;
-    } catch {
-      // No status entry → safe to clean
-    }
-
-    // Both gates passed — session is an orphan, kill it
-    try {
-      await Effect.runPromise(killSession(sessionName));
-      const ageMin = Math.round((now - createdMs) / 60000);
-      const msg = `Killed orphan reviewer session ${sessionName} (${ageMin}m old)`;
-      actions.push(msg);
-      console.log(`[deacon] ${msg}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[deacon] Failed to kill orphan session ${sessionName}: ${msg}`);
-    }
+    const result = await handleOrphanReviewerSession(sessionName, sessions, creationTimes, now);
+    if (result) actions.push(result);
   }
 
   if (actions.length > 0) {
     console.log(`[deacon] Orphan session cleanup: killed ${actions.length} session(s)`);
   }
+  return actions;
+}
 
+/**
+ * Clean up orphan reviewer and specialist tmux sessions (PAN-846).
+ *
+ * PAN-1908: this is now a thin dropped-event safety net. The primary cleanup
+ * path is reactive via handleAgentStoppedForOrphanReviewerSessions.
+ */
+export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
+  const loaded = await loadTmuxSessionsWithCreationTimes();
+  if (!loaded) return [];
+  const { sessions, creationTimes } = loaded;
+
+  const actions: string[] = [];
+  const now = Date.now();
+  for (const sessionName of sessions) {
+    const result = await handleOrphanReviewerSession(sessionName, sessions, creationTimes, now);
+    if (result) actions.push(result);
+  }
+
+  if (actions.length > 0) {
+    console.log(`[deacon] Orphan session cleanup: killed ${actions.length} session(s)`);
+  }
   return actions;
 }
 
@@ -5327,8 +5363,9 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of feedbackActions) addLog('action', a, state.patrolCycle);
   }
 
-  // Periodic orphan reviewer/specialist session sweep (PAN-846).
-  // Safety net for convoy sessions the stop-hook reaper missed.
+  // PAN-1908: primary orphan reviewer-session cleanup is reactive
+  // (agent.stopped for the owning work agent). This is a thin safety-net
+  // sweep for dropped events (PAN-846).
   if (Math.random() < 0.01) {
     const orphanActions = await cleanupOrphanReviewerSessions();
     actions.push(...orphanActions);
