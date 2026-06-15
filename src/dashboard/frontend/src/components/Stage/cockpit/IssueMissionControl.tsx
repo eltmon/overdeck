@@ -535,22 +535,32 @@ function issueTreeStateLabel(rs: ReviewStatusData | undefined): string {
   return 'In Progress'
 }
 
-async function fetchCockpitProjectFeature(projectName: string, issueId: string): Promise<ProjectFeature | null> {
-  const [issuesRes, treesRes] = await Promise.all([
-    fetch('/api/issues/resource-allocated'),
-    fetch(`/api/session-trees?projects=${encodeURIComponent(projectName)}`),
-  ])
-  if (!issuesRes.ok || !treesRes.ok) return null
-
-  const issues = await issuesRes.json() as ProjectFeature[]
-  const treesPayload = await treesRes.json() as { trees?: ProjectSessionTree[] }
+async function fetchCockpitProjectFeature(projectName: string | undefined, issueId: string): Promise<ProjectFeature | null> {
   const lowerIssueId = issueId.toLowerCase()
+
+  // The session-trees endpoint (which carries each session's harness) needs a
+  // concrete project key. On an `?issue=` deep-link the projectName prop is
+  // often missing, which previously disabled this query and forced the cockpit
+  // onto the harness-less activity-sections fallback — so pi/codex work agents
+  // showed neither the RPC terminal notice nor live streaming (PAN-1908).
+  // Resolve the project from resource-allocated (which records each feature's
+  // projectName) when the prop is absent.
+  const issuesRes = await fetch('/api/issues/resource-allocated')
+  if (!issuesRes.ok) return null
+  const issues = await issuesRes.json() as ProjectFeature[]
   const feature = issues.find((candidate) =>
     candidate.issueId.toLowerCase() === lowerIssueId &&
-    candidate.projectName === projectName,
+    (!projectName || candidate.projectName === projectName),
   ) ?? null
+
+  const effectiveProject = projectName ?? feature?.projectName
+  if (!effectiveProject) return feature
+
+  const treesRes = await fetch(`/api/session-trees?projects=${encodeURIComponent(effectiveProject)}`)
+  if (!treesRes.ok) return feature
+  const treesPayload = await treesRes.json() as { trees?: ProjectSessionTree[] }
   const treeFeature = (treesPayload.trees ?? [])
-    .find((tree) => tree.projectKey === projectName)
+    .find((tree) => tree.projectKey === effectiveProject)
     ?.features
     .find((candidate) => candidate.issueId.toLowerCase() === lowerIssueId)
 
@@ -559,7 +569,7 @@ async function fetchCockpitProjectFeature(projectName: string, issueId: string):
     return {
       issueId,
       title: treeFeature?.title ?? issueId,
-      projectName,
+      projectName: effectiveProject,
       branch: '',
       status: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : 'has_state',
       stateLabel: 'In Progress',
@@ -601,8 +611,11 @@ function IssueTreeLane({
   const actions = useIssueActions(issueId)
   const projectFeature = useQuery({
     queryKey: ['cockpit-project-feature', projectName, issueId],
-    queryFn: () => fetchCockpitProjectFeature(projectName!, issueId),
-    enabled: Boolean(projectName),
+    // Always enabled: fetchCockpitProjectFeature resolves the project from the
+    // issue when the projectName prop is absent (deep-link), so the harness-
+    // carrying session-trees data is fetched either way (PAN-1908).
+    queryFn: () => fetchCockpitProjectFeature(projectName, issueId),
+    enabled: true,
     staleTime: 10_000,
   })
   const sessions = useMemo(() => {

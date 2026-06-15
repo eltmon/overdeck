@@ -78,7 +78,11 @@ function agentToConversation(agent: Agent): Conversation {
     sessionAlive: !ended,
     sessionFile: agent.id,
     model: agent.model,
-    harness: agent.harness ?? null,
+    // The agent snapshot carries the harness in `runtime` (claude-code|pi|codex);
+    // `harness` itself is not on AgentSnapshot. Fall back to runtime so the
+    // synthetic conversation is correctly tagged — this drives the RPC terminal
+    // notice and pi/codex live streaming (PAN-1908).
+    harness: ((agent.harness ?? agent.runtime) as Conversation['harness']) ?? null,
   };
 }
 
