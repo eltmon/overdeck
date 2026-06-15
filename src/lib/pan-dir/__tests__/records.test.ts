@@ -36,6 +36,9 @@ import {
   getIssueRecordPath,
   writeIssueRecordSync,
   queueIssueRecordCommit,
+  readIssueRecord,
+  claimIssueOwner,
+  clearIssueOwner,
 } from '../records.js';
 
 describe('buildIssueRecord', () => {
@@ -253,6 +256,85 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
       paths: [recordPath],
       subject: 'chore(records): update PAN-1908 permanent record',
     });
+  });
+});
+
+describe('owner URI lease (PAN-1908)', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'pan-records-owner-'));
+    mockQueueAutoCommit.mockClear();
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  function makeProject(): ProjectConfig {
+    return { name: 'Test', path: tmp };
+  }
+
+  it('claims ownership by writing the URI into the record', async () => {
+    const project = makeProject();
+    const result = await claimIssueOwner(project, 'PAN-1908', 'pan://host-a:3000');
+
+    expect(result.ok).toBe(true);
+    expect(result.owner).toBe('pan://host-a:3000');
+
+    const record = await readIssueRecord(project, 'PAN-1908');
+    expect(record?.owner).toBe('pan://host-a:3000');
+  });
+
+  it('refuses to claim when a different owner URI is already set', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1908', {
+      issueId: 'PAN-1908',
+      schemaVersion: 1,
+      pipeline: { issueId: 'PAN-1908', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-06-15T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+      owner: 'pan://host-b:3000',
+    });
+
+    const result = await claimIssueOwner(project, 'PAN-1908', 'pan://host-a:3000');
+
+    expect(result.ok).toBe(false);
+    expect(result.owner).toBe('pan://host-b:3000');
+
+    const record = await readIssueRecord(project, 'PAN-1908');
+    expect(record?.owner).toBe('pan://host-b:3000');
+  });
+
+  it('re-claims when the same owner URI is already set', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1908', {
+      issueId: 'PAN-1908',
+      schemaVersion: 1,
+      pipeline: { issueId: 'PAN-1908', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-06-15T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+      owner: 'pan://host-a:3000',
+    });
+
+    const result = await claimIssueOwner(project, 'PAN-1908', 'pan://host-a:3000');
+
+    expect(result.ok).toBe(true);
+    expect(result.owner).toBe('pan://host-a:3000');
+  });
+
+  it('clears ownership at close-out', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1908', {
+      issueId: 'PAN-1908',
+      schemaVersion: 1,
+      pipeline: { issueId: 'PAN-1908', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-06-15T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+      owner: 'pan://host-a:3000',
+    });
+
+    await clearIssueOwner(project, 'PAN-1908');
+
+    const record = await readIssueRecord(project, 'PAN-1908');
+    expect(record?.owner).toBeUndefined();
   });
 });
 

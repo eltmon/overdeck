@@ -17,6 +17,8 @@ import { existsSync } from 'node:fs';
 import { mkdirSync, writeFileSync, promises as fsp } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 import {
   getCostBreakdownByStageAndModel,
   getCostForIssueFromDb,
@@ -31,7 +33,7 @@ import {
 import { queueAutoCommit } from './auto-commit.js';
 import type { ReviewStatus } from '../review-status.js';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+
 
 export interface PanIssueContinueRecord {
   issueId: string;
@@ -247,6 +249,82 @@ export function writeIssueRecordSync(
   }
   writeFileSync(path, JSON.stringify(record, null, 2), 'utf-8');
   return path;
+}
+
+export async function readIssueRecord(
+  project: ProjectConfig,
+  issueId: string,
+): Promise<PanIssueRecord | null> {
+  const path = getIssueRecordPath(project, issueId);
+  try {
+    const raw = await fsp.readFile(path, 'utf-8');
+    return JSON.parse(raw) as PanIssueRecord;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Owner-URI lease (PAN-1908, CP-3) ─────────────────────────────────────────
+
+/** Build this node's owner URI: pan://host[:port]. */
+export function buildOwnUri(): string {
+  const port = process.env.PANOPTICON_PORT ? `:${process.env.PANOPTICON_PORT}` : '';
+  return `pan://${hostname()}${port}`;
+}
+
+export interface ClaimResult {
+  ok: boolean;
+  owner?: string;
+}
+
+/**
+ * Claim ownership of an issue by writing this node's URI into the per-issue
+ * record. Refuses if the record already has a different owner URI (minimal
+ * single-machine correctness: the operator must clear stale owners manually;
+ * multi-node liveness/heartbeat is out of scope).
+ */
+export async function claimIssueOwner(
+  project: ProjectConfig,
+  issueId: string,
+  ownUri: string = buildOwnUri(),
+): Promise<ClaimResult> {
+  const record = (await readIssueRecord(project, issueId)) ?? {
+    issueId,
+    schemaVersion: 1,
+    pipeline: {
+      issueId,
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: new Date().toISOString(),
+    },
+    closeOut: {
+      usage: { byStage: {}, totals: {} },
+      merges: [],
+      ranOn: hostname(),
+    },
+  };
+
+  if (record.owner && record.owner !== ownUri) {
+    return { ok: false, owner: record.owner };
+  }
+
+  record.owner = ownUri;
+  writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, getIssueRecordPath(project, issueId));
+  return { ok: true, owner: ownUri };
+}
+
+/** Release ownership of an issue at close-out (or manual override). */
+export async function clearIssueOwner(
+  project: ProjectConfig,
+  issueId: string,
+): Promise<void> {
+  const record = await readIssueRecord(project, issueId);
+  if (!record) return;
+  delete record.owner;
+  writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, getIssueRecordPath(project, issueId));
 }
 
 export function queueIssueRecordCommit(
