@@ -1,0 +1,1733 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-15T03:25:03.510Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1908: event-driven agent state \u2014 SQLite runtime registry + git-permanent issue records in the infra repo (big-bang)",
+    "updated": "2026-06-15T16:44:09.000Z"
+  },
+  "plan": {
+    "id": "pan-1908",
+    "title": "feat(architecture): event-driven agent state \u2014 SQLite runtime registry + git-permanent issue records in the infra repo (big-bang)",
+    "status": "completed",
+    "uid": "1f596ba9-7d42-4c7e-8169-3a4da3032f67",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-15T03:25:03.510Z",
+    "updated": "2026-06-15T16:44:09.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1908",
+        "label": "PAN-1908",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1908.md",
+        "label": "Self-contained PRD (body \u00a71-\u00a712 + Appendices A-C)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "architecture",
+      "state",
+      "sqlite",
+      "event-driven",
+      "migration",
+      "big-bang"
+    ],
+    "narratives": {
+      "Problem": "Agent + per-issue pipeline state lives on the filesystem-as-registry: ~/.panopticon/agents/<id>/state.json files are simultaneously the data AND the only way to enumerate agents, forcing O(all-agents-ever) synchronous directory scans on 5s/60s hot paths. This stalls the dashboard event loop (24s /api/resources), triggers watchdog restarts and WebSocket reconnect storms (PAN-1711, PAN-1436, PAN-1846), and diverges across state.json / SQLite / tmux / review-status.json (PAN-1883, PAN-1888). There is no canonical infra repo and no machine-to-machine portability (PAN-541, PAN-111, PAN-1325).",
+      "Proposal": "Move every datum into exactly one of three planes. RUNTIME (local SQLite ~/.panopticon/panopticon.db): a new authoritative `agents` table becomes the enumeration+status registry, updated event-driven via a write-through transactional projection \u2014 no directory scans, no patrol polling. PERMANENT (git, a declared infra repo): a per-issue vBRIEF record (continue + pipeline status + close-out + owner-URI lease) is autocommitted, making issues portable. LIVENESS (tmux): unchanged. Big-bang cutover (not phased dual-write): add the table, back the choke-points, emit lifecycle events, delete the patrol scans, declare the infra repo, write the permanent records, backfill, and remove confirmed-legacy fields. Reuse vBRIEF v0.6 structures throughout; extend the existing event store + reactive scheduler rather than inventing new machinery.",
+      "NonGoals": "- Conversations stay machine-local SQLite (conversations table); they are NOT made portable here (FR-8).\n- Multi-node owner-URI reclaim-timeout tuning and heartbeat wiring are deferred; only the single-machine claim/refuse/clear slice ships (CP-3).\n- channels_enabled and the Claude Code Channels delivery path are KEPT (live: written agents.ts:3727, read agents.ts:1522); their removal is a separate post-Channels-retirement effort.\n- getAgentDir and the per-agent directory stay; sidecar artifacts (pty-token, transcripts, output.log, launcher.sh) are NOT moved out of the directory.\n- The docker-stats 5s poll stays (container telemetry, not agent state).\n- The ~90 \u00a712c out-of-scope issues (event-store retention, log rotation, remote/fly, merge-train, lifecycle-classification) are untouched.\n- \u00a712b remainders are NOT delivered: specialist .session files + compact-offsets (PAN-541), the stop-hook review-status.json writer (PAN-1888), per-project infra setup + docs/prds (PAN-1325), and the other narrowed sub-deliverables.\n- No work/implementation bead closes GitHub issues or clears pipeline/merge rows; \u00a712 execution is the post-merge close-out ceremony, captured only as a runbook.\n- No phased dual-write store: this is a single big-bang cutover."
+    },
+    "autoDecisions": [
+      {
+        "summary": "CP-2: keep state.json written through cutover (not dropped) as the rollback source per \u00a78a; final disposition deferred to the choke-point bead.",
+        "rationale": "Big-bang has no dual-write safety; keeping the old enumeration source until the new registry is proven is the defensible default."
+      },
+      {
+        "summary": "CP-3: implement only the single-machine owner-URI slice (write own URI on claim, refuse live-other-owned, clear at close-out); defer multi-node reclaim/heartbeat.",
+        "rationale": "The PRD scopes tonight to single-machine correctness; multi-node tuning is a separable follow-up."
+      },
+      {
+        "summary": "Scope stays one big-bang issue covering both runtime and permanent planes, per the PRD title and FR-1..FR-8.",
+        "rationale": "The runtime cutover cannot be phased; the PRD is the operator's own authored decision. Recorded as hazard H1 with the permanent plane as the carve point if review size forces a fast-follow."
+      }
+    ],
+    "items": [
+      {
+        "id": "agents-table-schema",
+        "title": "Add the SQLite `agents` table + indexes + migration (authoritative runtime registry)",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "agents-db-module",
+            "back-getsave-agentstate",
+            "back-list-count-agents",
+            "no-loss-audit-test",
+            "backfill-agents-table"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the SQLite `agents` table with every column listed in PRD \u00a75.1 plus idx_agents_status_role and idx_agents_issue indexes, and its forward migration in src/lib/database/schema.ts, so it becomes the authoritative runtime registry replacing state.json enumeration."
+        },
+        "items": [
+          {
+            "id": "agents-table-schema.ac1",
+            "title": "Given a fresh database, running migrations creates the agents table with every column listed in PRD \u00a75.1 (id PRIMARY KEY through updated_at).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agents-table-schema.ac2",
+            "title": "The migration creates indexes idx_agents_status_role on (status, role) and idx_agents_issue on (issue_id).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agents-table-schema.ac3",
+            "title": "The schema preserves channels_enabled as an INTEGER column and contains no codexMode or preSpawnStash columns.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agents-table-schema.ac4",
+            "title": "Re-running migrations on an existing database preserves existing rows and creates no duplicate table (idempotent).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "agents-db-module",
+        "title": "Create src/lib/database/agents-db.ts data-access module + unit tests",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/database/agents-db.ts mirroring conversations-db.ts, exposing upsert, get-by-id, list-by-status-and-role, count-by-role, and delete-by-id functions over the agents table, covered by a vitest unit suite."
+        },
+        "items": [
+          {
+            "id": "agents-db-module.ac1",
+            "title": "upsertAgent persists a row keyed by id and returns the stored shape (AC-1).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agents-db-module.ac2",
+            "title": "getAgent returns the row for a known id and returns null for an unknown id.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agents-db-module.ac3",
+            "title": "listAgentsByStatusRole returns only rows matching the given status and role via the indexed query.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agents-db-module.ac4",
+            "title": "A vitest unit suite exercises upsert/get/list/count and passes.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "back-getsave-agentstate",
+        "title": "Back getAgentState/saveAgentState (sync+async) with SQLite, dual-writing state.json through cutover",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite getAgentState/getAgentStateSync and saveAgentState/saveAgentStateSync in src/lib/agents.ts to read from and write to agents-db, still writing state.json through cutover (D2/CP-2) and never re-introducing the non-atomic writeFileSync registry write at agents.ts:1080."
+        },
+        "items": [
+          {
+            "id": "back-getsave-agentstate.ac1",
+            "title": "getAgentStateSync returns an agent's state by reading the agents table, not by reading state.json.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "back-getsave-agentstate.ac2",
+            "title": "saveAgentStateSync persists the row to the agents table transactionally and also writes state.json (kept as the rollback source per \u00a78a).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "back-getsave-agentstate.ac3",
+            "title": "Given an agent saved via saveAgentState, getAgentState returns the same fields back.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "back-getsave-agentstate.ac4",
+            "title": "Running the existing agents and concurrency suites produces no new failures.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "back-list-count-agents",
+        "title": "Back listRunningAgentsSync + countRunningAgents with indexed agents-table queries",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite listRunningAgentsSync (agents.ts) and countRunningAgents (concurrency.ts) to answer from indexed agents-table queries instead of scanning ~/.panopticon/agents directories, ending the O(all-agents-ever) enumeration."
+        },
+        "items": [
+          {
+            "id": "back-list-count-agents.ac1",
+            "title": "countRunningAgents returns per-role counts from a single GROUP BY query against the agents table.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "back-list-count-agents.ac2",
+            "title": "Grepping the rewritten listRunningAgentsSync shows it returns rows from an indexed SELECT and contains no readdir.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "back-list-count-agents.ac3",
+            "title": "Given 3 running and 2 stopped agents in the table, listRunningAgentsSync returns exactly the 3 running rows.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "agent-event-payloads",
+        "title": "Define agent-lifecycle event payload schemas + reducers (the event protocol consumers depend on)",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "transactional-projection",
+            "wire-lifecycle-emit-sites",
+            "react-agent-liveness",
+            "react-review-orphans",
+            "react-reconcilers",
+            "readmodel-event-driven"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add typed payload schemas for agent.started (full initial row), agent.status_changed (agentId + changed fields), agent.stopped, and agent.heartbeat_dead to packages/contracts/src/events.ts, plus the reducers projecting them onto the agents read-model, matching the live taxonomy without inventing new event names."
+        },
+        "items": [
+          {
+            "id": "agent-event-payloads.ac1",
+            "title": "packages/contracts/src/events.ts contains typed payload schemas for agent.started, agent.status_changed, agent.stopped, and agent.heartbeat_dead.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agent-event-payloads.ac2",
+            "title": "The agent.status_changed payload contains only the agentId plus changed fields, and the reducer applies it by merging only present fields.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agent-event-payloads.ac3",
+            "title": "The reducer preserves absent columns so a partial event never nulls a field it omits.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "agent-event-payloads.ac4",
+            "title": "Replaying the same lifecycle event twice produces an identical projected row (idempotent).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "transactional-projection",
+        "title": "Implement the write-through transactional projection (row upsert + event append in one tx)",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the write-through transactional boundary so every lifecycle transition upserts the agents row AND appends its event inside one SQLite transaction, with idempotent partial-field merge, replacing append-then-async-project (which a crash could leave stale)."
+        },
+        "items": [
+          {
+            "id": "transactional-projection.ac1",
+            "title": "Each lifecycle transition commits the agents-row upsert and the event append inside one SQLite transaction (AC-11).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "transactional-projection.ac2",
+            "title": "Given a simulated crash between the row upsert and the event append, a test shows the row and event log cannot disagree.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "transactional-projection.ac3",
+            "title": "Replaying any lifecycle event preserves the resulting agents row unchanged (idempotent).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "transactional-projection.ac4",
+            "title": "A partial event applied to an existing row preserves the columns it does not mention.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "wire-lifecycle-emit-sites",
+        "title": "Route the agent lifecycle emit sites through the transactional projection boundary",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Route the existing agent lifecycle emit sites (spawn/start/stop/status-change/fail in routes/agents.ts and lib/agents.ts) through the transactional projection boundary so they emit the new payloads and update the agents row atomically."
+        },
+        "items": [
+          {
+            "id": "wire-lifecycle-emit-sites.ac1",
+            "title": "Spawning an agent emits agent.started carrying the full initial row and persists that row.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "wire-lifecycle-emit-sites.ac2",
+            "title": "Stopping an agent emits agent.stopped and updates the row status to stopped.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "wire-lifecycle-emit-sites.ac3",
+            "title": "A heartbeat-death detection emits agent.heartbeat_dead for the dead agent.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "react-agent-liveness",
+        "title": "Replace autoResume + recoverOrphaned patrol scans with agent.stopped/heartbeat_dead handlers",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the autoResumeStoppedWorkAgents and recoverOrphanedAgents directory-scan patrol steps in deacon.ts with handlers subscribed to agent.stopped and agent.heartbeat_dead events, so liveness recovery reacts to events rather than scanning agent directories."
+        },
+        "items": [
+          {
+            "id": "react-agent-liveness.ac1",
+            "title": "When agent.stopped fires for a work agent with pending feedback, the deacon resumes it without any directory scan.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "react-agent-liveness.ac2",
+            "title": "Receiving agent.heartbeat_dead marks the agent stopped and triggers recovery without scanning agent directories.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "react-agent-liveness.ac3",
+            "title": "Grepping deacon.ts shows the autoResumeStoppedWorkAgents and recoverOrphanedAgents scan bodies are deleted from the patrol.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "react-review-orphans",
+        "title": "Replace checkOrphaned/MissingReviewStatuses scans with review/work event handlers",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the checkOrphanedReviewStatuses and checkMissingReviewStatuses patrol scans in deacon.ts with handlers reacting to review.status_changed, review.coordinator.died, and work.completed events, so orphan/missing review rows are handled reactively."
+        },
+        "items": [
+          {
+            "id": "react-review-orphans.ac1",
+            "title": "When review.coordinator.died fires, the deacon re-dispatches review for that issue without re-scanning the review-status DB.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "react-review-orphans.ac2",
+            "title": "When work.completed fires for a work agent, a missing review-status row is created reactively.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "react-review-orphans.ac3",
+            "title": "Grepping deacon.ts shows the checkOrphanedReviewStatuses and checkMissingReviewStatuses scan bodies are deleted.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "react-reconcilers",
+        "title": "Replace orphan-proposed / closed-issue / idle-stack / session-cleanup scans with event handlers",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the orphan-proposed-spec, closed-issue, idle-stack, and orphaned planning/review session patrol scans with event handlers keyed on spec-finalized/plan-status, issue.statusChanged(closed), and agent.stopped/started events."
+        },
+        "items": [
+          {
+            "id": "react-reconcilers.ac1",
+            "title": "When a spec reaches status proposed, the work agent spawns from that event rather than from a spec-directory scan.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "react-reconcilers.ac2",
+            "title": "When issue.statusChanged(closed) fires, the deacon stops that issue's agent without a reconcile scan.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "react-reconcilers.ac3",
+            "title": "Grepping deacon.ts and orphan-proposed-reconciler.ts shows the converted scan bodies are deleted.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "thin-patrol-safety-net",
+        "title": "Reduce the 60s deacon patrol to a thin dropped-event reconciler",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Reduce the 60s deacon patrol to a thin reconciler that only catches dropped events, keeping the dropped-event fallback while the former per-step scans now run as event handlers (per \u00a76.1 \u2014 do not delete the patrol entirely)."
+        },
+        "items": [
+          {
+            "id": "thin-patrol-safety-net.ac1",
+            "title": "The 60s patrol contains only a thin reconciler pass and no per-agent directory enumeration.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "thin-patrol-safety-net.ac2",
+            "title": "Given a dropped lifecycle event, the safety-net patrol still recovers the affected agent on its next pass.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "thin-patrol-safety-net.ac3",
+            "title": "The deacon.log no longer emits a per-agent skip line every 60s.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "resources-query-agents",
+        "title": "Rewrite GET /api/resources to query the agents table + push resources.updated",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite GET /api/resources in routes/resources.ts to answer from the agents table and push a resources.updated event to WebSocket subscribers instead of performing the per-request state.json readdir sweep."
+        },
+        "items": [
+          {
+            "id": "resources-query-agents.ac1",
+            "title": "GET /api/resources returns the active-agent set from a single SELECT against the agents table.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "resources-query-agents.ac2",
+            "title": "Grepping routes/resources.ts shows no readdir of the agents directory remains.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "resources-query-agents.ac3",
+            "title": "A resource change emits a resources.updated event to subscribers.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "readmodel-event-driven",
+        "title": "Drive read-model reconcile + running-agents cache from lifecycle events",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Drive the dashboard read-model agent reconcile and the running-agents cache (running-agents-cache.ts) from agent.started/agent.stopped events instead of periodic tmux/state.json diffing, reconciling against tmux only once at bootstrap."
+        },
+        "items": [
+          {
+            "id": "readmodel-event-driven.ac1",
+            "title": "An agent.started event updates the read-model running-agent set and agent.stopped removes it, without a periodic tmux sweep.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "readmodel-event-driven.ac2",
+            "title": "running-agents-cache.ts is populated from lifecycle events and contains no directory scan.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "readmodel-event-driven.ac3",
+            "title": "Given the read-model bootstrap, agent liveness reconciles against tmux once at startup and thereafter updates on events.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "infra-repo-resolver",
+        "title": "Add projects.yaml pan_records declaration + infra-repo resolver",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the pan_records (repo + path) declaration to projects.yaml and a resolver mapping a project to its infra-repo checkout, defaulting monorepos to '.' and selecting a named entry from repos[] for polyrepos (\u00a74.2)."
+        },
+        "items": [
+          {
+            "id": "infra-repo-resolver.ac1",
+            "title": "A monorepo project with no pan_records defaults to the project repo itself ('.').",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "infra-repo-resolver.ac2",
+            "title": "A polyrepo project's pan_records.repo resolves to the matching entry in its repos[] list.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "infra-repo-resolver.ac3",
+            "title": "The resolver returns the infra-repo checkout path and the .pan subdir for a given project.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "infra-record-writer",
+        "title": "Build the per-issue permanent-record writer + queueAutoCommit repo-target selection",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "pipeline-status-to-git",
+            "closeout-usage-aggregation",
+            "owner-uri-lease",
+            "backfill-permanent-records"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the per-issue permanent-record writer (continue + pipeline + closeOut + owner shape from \u00a74.1) and extend queueAutoCommit in src/lib/pan-dir/auto-commit.ts to support repo-target selection so .pan records commit to the declared infra repo rather than unconditionally the project repo."
+        },
+        "items": [
+          {
+            "id": "infra-record-writer.ac1",
+            "title": "The writer produces a single per-issue record file shaped per \u00a74.1 (durable continue subset + pipeline + closeOut + owner).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "infra-record-writer.ac2",
+            "title": "queueAutoCommit accepts a repo target and commits .pan records to the declared infra repo.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "infra-record-writer.ac3",
+            "title": "The record preserves the durable continue subset and contains none of the runtime-only fields (resumePoint, sessionHistory, agentModel, beadsMapping).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "infra-record-writer.ac4",
+            "title": "Committing a record to the infra repo preserves the existing main-only, debounced, rebase-after-commit behavior.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "pipeline-status-to-git",
+        "title": "Route durable review_status verdicts into the per-issue record's pipeline block",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Route the 23 durable review_status verdict/override columns (\u00a75.3) into the per-issue record's pipeline block on change, while the 16 ephemeral columns stay in the SQLite review_status table."
+        },
+        "items": [
+          {
+            "id": "pipeline-status-to-git.ac1",
+            "title": "When a durable review_status column changes, the per-issue record's pipeline block records the new verdict and commits to the infra repo.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "pipeline-status-to-git.ac2",
+            "title": "The pipeline block contains the five notes columns and the three deacon_ignored columns (durable tier).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "pipeline-status-to-git.ac3",
+            "title": "The SQLite review_status table preserves the 16 ephemeral columns and the git record contains none of them.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "closeout-usage-aggregation",
+        "title": "Aggregate per-issue close-out usage.byStage + merges[] + ranOn",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Aggregate per-issue cost_events into closeOut.usage.byStage (GROUP BY session_type, provider, model filtered by issue_id), produce forge-agnostic merges[] URLs from merge_set_repos, bucket unknown session_type under stage 'other', and stamp ranOn."
+        },
+        "items": [
+          {
+            "id": "closeout-usage-aggregation.ac1",
+            "title": "Close-out produces usage.byStage raw token counts keyed by provider/model and bucketed by pipeline stage for the issue.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "closeout-usage-aggregation.ac2",
+            "title": "Close-out routes cost_events rows with null/unknown session_type into stage 'other' and drops none.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "closeout-usage-aggregation.ac3",
+            "title": "Close-out produces a forge-agnostic merges[] array of URL strings from merge_set_repos rows.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "closeout-usage-aggregation.ac4",
+            "title": "Given the stored usage counts, the close-out dollar cost recomputes deterministically (not stored as source of truth).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "owner-uri-lease",
+        "title": "Implement the minimal single-machine owner-URI lease (claim / refuse / clear)",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the minimal owner-URI lease (CP-3): write pan://host[:port] to the per-issue record on claim, refuse to drive an issue owned by a live other URI, and clear the owner at close-out \u2014 single-machine correctness only."
+        },
+        "items": [
+          {
+            "id": "owner-uri-lease.ac1",
+            "title": "Claiming an issue persists this node's owner URI (pan://host[:port]) into the per-issue record.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "owner-uri-lease.ac2",
+            "title": "A node refuses to drive an issue whose owner is a live, different URI (AC-12).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "owner-uri-lease.ac3",
+            "title": "Close-out deletes the owner value from the per-issue record.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "no-loss-audit-test",
+        "title": "Add the no-loss audit test (every AgentState field + review_status column maps to one home)",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a blocking test that maps every AgentState field and every review_status column to exactly one home (agents-column, pipeline-block route, ephemeral-SQLite, or explicit DELETE list) and fails when any field is unclassified, so the big-bang cannot silently drop a field. Appendix A \u00a71/\u00a72 is the manifest."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit-test.ac1",
+            "title": "The test fails when any of the 39 AgentState fields is unclassified across {agents-column, pipeline-route, ephemeral, delete-list}.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "no-loss-audit-test.ac2",
+            "title": "The test fails when any of the 39 review_status columns is unaccounted for in the durable/ephemeral/delete split.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "no-loss-audit-test.ac3",
+            "title": "Adding a new unclassified AgentState field fails the audit test (red).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "no-loss-audit-test.ac4",
+            "title": "Grep of the migration and backfill shows no read or write of the conversations table (FR-8).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "remove-dead-agentstate-fields",
+        "title": "Delete dead preSpawnStash* fields and collapse codexMode to the launcher default",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete the dead preSpawnStashRef/Message/BaselineHead fields and their deserialize/copy-on-respawn code, and collapse codexMode to the single launcher default 'work-tui' (drop 'exec'/'tui' from the persisted union), per the Appendix A verdicts."
+        },
+        "items": [
+          {
+            "id": "remove-dead-agentstate-fields.ac1",
+            "title": "The AgentState interface contains no preSpawnStashRef, preSpawnStashMessage, or preSpawnBaselineHead fields.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "remove-dead-agentstate-fields.ac2",
+            "title": "Grep finds no remaining references to the deleted preSpawn fields and typecheck passes.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "remove-dead-agentstate-fields.ac3",
+            "title": "codexMode no longer persists to the agents table and collapses to the launcher default 'work-tui'.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "remove-legacy-reviewstatus-fields",
+        "title": "Remove interface-only review_status legacy fields and reconcile lifetimeAutoRequeueCount",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Remove the interface-only review_status legacy fields (queuePosition, lastReviewCommits) from the ReviewStatus interface and reconcile lifetimeAutoRequeueCount to the single backing lifetime_auto_requeue_count column, per Appendix A \u00a72d."
+        },
+        "items": [
+          {
+            "id": "remove-legacy-reviewstatus-fields.ac1",
+            "title": "The ReviewStatus interface contains no queuePosition or lastReviewCommits fields.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "remove-legacy-reviewstatus-fields.ac2",
+            "title": "lifetimeAutoRequeueCount resolves to the single lifetime_auto_requeue_count column (no phantom interface field).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "remove-legacy-reviewstatus-fields.ac3",
+            "title": "Typecheck passes and grep finds no references to the removed fields.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "backfill-agents-table",
+        "title": "One-time versioned backfill of the agents table + pan admin rebuild-agents",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the one-time versioned backfill that enumerates ~/.panopticon/agents/*/state.json into the agents table (the only permitted directory enumeration), reconciles status against live tmux, is idempotent by id, and provides a pan admin rebuild-agents rebuild path; a test asserts no hot path reaches the enumeration."
+        },
+        "items": [
+          {
+            "id": "backfill-agents-table.ac1",
+            "title": "Running the backfill persists one agents-table row per existing state.json, keyed by id.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "backfill-agents-table.ac2",
+            "title": "Re-running the backfill preserves rows and creates no duplicates (idempotent by id).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "backfill-agents-table.ac3",
+            "title": "The backfill marks an agent stopped when no live tmux session matches its id.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "backfill-agents-table.ac4",
+            "title": "A test shows no dashboard/deacon hot path reaches the directory enumeration (AC-2).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "backfill-permanent-records",
+        "title": "Backfill in-flight per-issue permanent records into the infra repo",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Backfill the per-issue permanent records for in-flight issues into the infra repo from the current .pan/continues and review_status data, committing them via the new repo-target writer."
+        },
+        "items": [
+          {
+            "id": "backfill-permanent-records.ac1",
+            "title": "For each in-flight issue, the backfill produces a per-issue record combining .pan/continues and review_status data.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "backfill-permanent-records.ac2",
+            "title": "The backfill commits the per-issue records to the declared infra repo.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "backfill-permanent-records.ac3",
+            "title": "Re-running the records backfill preserves existing records and creates no duplicates.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "cutover-safety-net",
+        "title": "Cutover safety net \u2014 pre-migrate DB snapshot + kill-switch fallback",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Provide the big-bang safety net (\u00a78a): snapshot panopticon.db before migrating and a kill-switch flag that disables the event-driven deacon and falls back to no-resume mode without data loss."
+        },
+        "items": [
+          {
+            "id": "cutover-safety-net.ac1",
+            "title": "The migration creates a file-copy snapshot of panopticon.db before altering the agents data.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "cutover-safety-net.ac2",
+            "title": "Setting the kill-switch flag falls back to no-resume mode and disables the event-driven deacon.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "cutover-safety-net.ac3",
+            "title": "Losing the SQLite DB preserves all permanent data (the git record + tmux rebuild the runtime plane).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "doc-agent-state-planes",
+        "title": "Write docs/AGENT-STATE-PLANES.md (canonical three-plane description)",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Write the new docs/AGENT-STATE-PLANES.md describing the permanent/runtime/liveness three-plane model, the agents table, and the infra-repo (pan_records) configuration."
+        },
+        "items": [
+          {
+            "id": "doc-agent-state-planes.ac1",
+            "title": "docs/AGENT-STATE-PLANES.md exists and contains a section for each of the three planes (permanent/runtime/liveness).",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "doc-agent-state-planes.ac2",
+            "title": "The doc contains the infra-repo (pan_records) configuration shape.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "doc-claude-vbrief",
+        "title": "Revise CLAUDE.md + docs/VBRIEF.md for the three-plane model and per-issue record",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Revise CLAUDE.md and docs/VBRIEF.md so the four-artifact/agent-state sections describe the three-plane model and the per-issue record carrying pipeline + closeOut + owner blocks, with spec/continue now living in the infra repo."
+        },
+        "items": [
+          {
+            "id": "doc-claude-vbrief.ac1",
+            "title": "CLAUDE.md contains the three-plane model in place of the directory-as-registry description.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "doc-claude-vbrief.ac2",
+            "title": "docs/VBRIEF.md contains the pipeline/closeOut/owner blocks and the infra-repo location for spec/continue.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "doc-roles-flywheel-kanban",
+        "title": "Revise roles/flywheel + ROLES/FLYWHEEL/MISSION-CONTROL/KANBAN docs to drop scan/review-status.json language",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Revise docs/ROLES.md, docs/FLYWHEEL-STATE.md, docs/MISSION-CONTROL.md, docs/KANBAN-MODEL.md, roles/flywheel.md, and docs/flywheel-brief.md to remove central review-status.json / directory-scan language and point at the agents table + git records."
+        },
+        "items": [
+          {
+            "id": "doc-roles-flywheel-kanban.ac1",
+            "title": "Grepping the listed docs shows no remaining 'central review-status.json' or directory-scan language.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "doc-roles-flywheel-kanban.ac2",
+            "title": "roles/flywheel.md contains the rule that pipeline truth lives in SQLite/git records, never review-status.json.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "doc-mark-audits-resolved",
+        "title": "Mark STATE-STORAGE-AUDIT resolved + archive NewAgentApproach.md as superseded",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Mark docs/STATE-STORAGE-AUDIT.md resolved with a link to this PRD and add a superseded-by-PAN-1908 banner to NewAgentApproach.md (it is not a live source; this PRD is self-contained)."
+        },
+        "items": [
+          {
+            "id": "doc-mark-audits-resolved.ac1",
+            "title": "docs/STATE-STORAGE-AUDIT.md contains a resolved marker linking to PAN-1908.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "doc-mark-audits-resolved.ac2",
+            "title": "NewAgentApproach.md contains a superseded-by-PAN-1908 banner.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      },
+      {
+        "id": "post-merge-closeout-runbook",
+        "title": "Write the post-merge close-out runbook for the \u00a712 superseded/narrowed issues (no execution at work time)",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-06-15T03:25:03.510Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1908",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "acJustification": "Four ACs are needed: three runbook-content checks (the \u00a712a close steps, the pipeline-row cleanup, the \u00a712b relabels) plus the critical guard that no implementation bead executes gh issue close during the work phase."
+        },
+        "narrative": {
+          "Action": "Write the post-merge close-out runbook listing the five \u00a712a issues with exact gh issue close commands and review_status/merge-row cleanup, plus the twelve \u00a712b relabel steps \u2014 for execution during the post-merge close-out ceremony, never during implementation (D5)."
+        },
+        "items": [
+          {
+            "id": "post-merge-closeout-runbook.ac1",
+            "title": "The runbook contains all five \u00a712a issues with their exact gh issue close commands referencing this PRD/PR.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "post-merge-closeout-runbook.ac2",
+            "title": "The runbook contains the review_status/merge-row cleanup steps for each \u00a712a issue.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "post-merge-closeout-runbook.ac3",
+            "title": "The runbook contains the twelve \u00a712b relabel-to-remaining-scope steps and marks them do-not-close.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          },
+          {
+            "id": "post-merge-closeout-runbook.ac4",
+            "title": "Grepping the branch diff shows no gh issue close invocation in any implementation bead.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-06-15T16:44:09.000Z"
+          }
+        ],
+        "completed": "2026-06-15T16:44:09.000Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "agents-table-schema",
+        "to": "agents-db-module",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-table-schema",
+        "to": "back-getsave-agentstate",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-table-schema",
+        "to": "back-list-count-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-table-schema",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-table-schema",
+        "to": "backfill-agents-table",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-db-module",
+        "to": "back-getsave-agentstate",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-db-module",
+        "to": "back-list-count-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "back-getsave-agentstate",
+        "to": "transactional-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-event-payloads",
+        "to": "transactional-projection",
+        "type": "blocks"
+      },
+      {
+        "from": "transactional-projection",
+        "to": "wire-lifecycle-emit-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-event-payloads",
+        "to": "react-agent-liveness",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-event-payloads",
+        "to": "react-review-orphans",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-event-payloads",
+        "to": "react-reconcilers",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-lifecycle-emit-sites",
+        "to": "react-agent-liveness",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-lifecycle-emit-sites",
+        "to": "react-review-orphans",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-lifecycle-emit-sites",
+        "to": "react-reconcilers",
+        "type": "blocks"
+      },
+      {
+        "from": "react-agent-liveness",
+        "to": "thin-patrol-safety-net",
+        "type": "blocks"
+      },
+      {
+        "from": "react-review-orphans",
+        "to": "thin-patrol-safety-net",
+        "type": "blocks"
+      },
+      {
+        "from": "react-reconcilers",
+        "to": "thin-patrol-safety-net",
+        "type": "blocks"
+      },
+      {
+        "from": "back-list-count-agents",
+        "to": "resources-query-agents",
+        "type": "blocks"
+      },
+      {
+        "from": "back-list-count-agents",
+        "to": "readmodel-event-driven",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-event-payloads",
+        "to": "readmodel-event-driven",
+        "type": "blocks"
+      },
+      {
+        "from": "infra-repo-resolver",
+        "to": "infra-record-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "infra-record-writer",
+        "to": "pipeline-status-to-git",
+        "type": "blocks"
+      },
+      {
+        "from": "infra-record-writer",
+        "to": "closeout-usage-aggregation",
+        "type": "blocks"
+      },
+      {
+        "from": "infra-record-writer",
+        "to": "owner-uri-lease",
+        "type": "blocks"
+      },
+      {
+        "from": "infra-record-writer",
+        "to": "backfill-permanent-records",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit-test",
+        "to": "remove-dead-agentstate-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit-test",
+        "to": "remove-legacy-reviewstatus-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "cutover-safety-net",
+        "to": "backfill-agents-table",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit-test",
+        "to": "pipeline-status-to-git",
+        "type": "informs"
+      },
+      {
+        "from": "agents-table-schema",
+        "to": "doc-agent-state-planes",
+        "type": "informs"
+      },
+      {
+        "from": "infra-record-writer",
+        "to": "doc-agent-state-planes",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-15-PAN-1908-feat-architecture-event-driven-agent-state-sqlite-runtime-registry-git-permanent-issue-records-in-the-infra-repo-big-bang.vbrief.json"
+    }
+  }
+}
