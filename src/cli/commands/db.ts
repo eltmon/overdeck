@@ -77,6 +77,13 @@ export function registerDbCommands(program: Command): void {
     .option('--dry-run', 'Show what would be backfilled without writing')
     .option('--verbose', 'Log each processed agent')
     .action(rebuildAgentsCommand);
+
+  db.command('backfill-records')
+    .description('Backfill per-issue permanent records into the infra repo (PAN-1908)')
+    .option('--issue-id <id>', 'Backfill only this issue')
+    .option('--force', 'Overwrite records even if unchanged')
+    .option('--verbose', 'Log each processed issue')
+    .action(backfillRecordsCommand);
 }
 
 async function snapshotCommand(options: {
@@ -643,6 +650,39 @@ async function rebuildAgentsCommand(options: {
     );
   } catch (error: any) {
     spinner.fail(`Rebuild failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function backfillRecordsCommand(options: {
+  issueId?: string;
+  force?: boolean;
+  verbose?: boolean;
+}): Promise<void> {
+  const spinner = ora('Backfilling per-issue permanent records...').start();
+
+  try {
+    const { backfillIssueRecords } = await import('../../lib/pan-dir/records-backfill.js');
+    const result = await backfillIssueRecords({
+      issueId: options.issueId,
+      force: options.force,
+      verbose: options.verbose,
+    });
+
+    spinner.succeed(
+      `Records backfill complete: ${result.processed} written, ${result.skipped} skipped, ${result.failed} failed`
+    );
+
+    if (result.failed > 0) {
+      for (const detail of result.details) {
+        if (detail.action === 'failed') {
+          console.log(chalk.red(`  ${detail.issueId}: ${detail.reason}`));
+        }
+      }
+      process.exitCode = 1;
+    }
+  } catch (error: any) {
+    spinner.fail(`Records backfill failed: ${error.message}`);
     process.exitCode = 1;
   }
 }
