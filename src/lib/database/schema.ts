@@ -14,9 +14,10 @@
  * @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import type { SqliteDatabase } from './driver.js';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { encodeClaudeProjectDir, getPanopticonHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
@@ -1542,6 +1543,22 @@ export function runMigrations(db: SqliteDatabase): void {
 
   // v54 → v55: add authoritative agents runtime registry (PAN-1908)
   if (currentVersion < 55) {
+    // Safety net: snapshot the database before the migration touches agents
+    // data, so an operator can fall back to the pre-cutover state if the new
+    // event-driven registry misbehaves. The snapshot is a one-time file copy
+    // made before any schema change or backfill runs.
+    try {
+      const dbPath = join(getPanopticonHome(), 'panopticon.db');
+      const snapshotPath = `${dbPath}.v54-backfill-snapshot`;
+      if (existsSync(dbPath) && !existsSync(snapshotPath)) {
+        const source = readFileSync(dbPath);
+        writeFileSync(snapshotPath, source);
+        console.log(`[schema] Snapshot created: ${snapshotPath}`);
+      }
+    } catch (err) {
+      console.warn('[schema] Failed to create pre-v55 snapshot:', err instanceof Error ? err.message : String(err));
+    }
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS agents (
         id            TEXT PRIMARY KEY,
