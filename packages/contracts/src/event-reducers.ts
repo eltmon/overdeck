@@ -452,9 +452,14 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const nextAgent: AgentSnapshot = (() => {
         const base: Record<string, unknown> = { ...agent, status: event.payload.status }
         const optionalFields = [
-          'hasLiveTmuxSession', 'stoppedByUser', 'paused', 'pausedReason', 'pausedAt',
+          'hasLiveTmuxSession', 'stoppedByUser', 'stoppedByPause', 'paused', 'pausedReason', 'pausedAt',
           'troubled', 'troubledAt', 'consecutiveFailures',
           'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason', 'lastFailureNextRetryAt',
+          'kickoffDelivered', 'hostOverride', 'role', 'model', 'workspace', 'sessionId',
+          'lastActivity', 'lastResumeAt', 'stoppedAt', 'branch', 'costSoFar',
+          'flywheelRunId', 'reviewSubRole', 'reviewRunId', 'reviewOutputPath',
+          'reviewSynthesisAgentId', 'reviewDeadlineAt', 'reviewMonitorSignaled', 'reviewRetryAttempt',
+          'inspectSubRole', 'deliveryMethod', 'supervisorEnabled', 'channelsEnabled',
         ] as const
         for (const field of optionalFields) {
           if (field in event.payload) {
@@ -491,6 +496,37 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           [event.payload.agentId]: nextAgent,
         },
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
+      }
+    }
+
+    case 'agent.heartbeat_dead': {
+      const agent = state.agentsById[event.payload.agentId]
+      if (!agent) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const runtimeById = state.agentRuntimeById ?? {}
+      const prevRuntime = runtimeById[event.payload.agentId]
+      const nextRuntimeById = prevRuntime
+        ? {
+            ...runtimeById,
+            [event.payload.agentId]: {
+              ...prevRuntime,
+              activity: 'stopped' as const,
+              currentTool: undefined,
+              thinking: undefined,
+              waiting: undefined,
+              channelReply: undefined,
+              lastActivity: event.timestamp,
+              updatedAtSequence: event.sequence,
+            },
+          }
+        : runtimeById
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentsById: {
+          ...state.agentsById,
+          [event.payload.agentId]: { ...agent, status: 'error' as const },
+        },
+        agentRuntimeById: nextRuntimeById,
       }
     }
 

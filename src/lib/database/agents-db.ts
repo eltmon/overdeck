@@ -26,17 +26,17 @@ export interface Agent {
   lastActivity: string | null;
   lastResumeAt: string | null;
   stoppedAt: string | null;
-  stoppedByUser: boolean;
-  stoppedByPause: boolean;
-  kickoffDelivered: boolean;
-  hostOverride: boolean;
+  stoppedByUser: boolean | null;
+  stoppedByPause: boolean | null;
+  kickoffDelivered: boolean | null;
+  hostOverride: boolean | null;
   costSoFar: number | null;
   phase: string | null;
   workType: string | null;
-  paused: boolean;
+  paused: boolean | null;
   pausedReason: string | null;
   pausedAt: string | null;
-  troubled: boolean;
+  troubled: boolean | null;
   troubledAt: string | null;
   consecutiveFailures: number | null;
   firstFailureInRunAt: string | null;
@@ -54,8 +54,8 @@ export interface Agent {
   reviewRetryAttempt: number | null;
   inspectSubRole: string | null;
   deliveryMethod: string | null;
-  supervisorEnabled: boolean;
-  channelsEnabled: boolean;
+  supervisorEnabled: boolean | null;
+  channelsEnabled: boolean | null;
   updatedAt: string;
 }
 
@@ -76,17 +76,17 @@ export function rowToAgent(row: Record<string, unknown>): Agent {
     lastActivity: (row['last_activity'] as string | null) ?? null,
     lastResumeAt: (row['last_resume_at'] as string | null) ?? null,
     stoppedAt: (row['stopped_at'] as string | null) ?? null,
-    stoppedByUser: Boolean(row['stopped_by_user']),
-    stoppedByPause: Boolean(row['stopped_by_pause']),
-    kickoffDelivered: Boolean(row['kickoff_delivered']),
-    hostOverride: Boolean(row['host_override']),
+    stoppedByUser: row['stopped_by_user'] == null ? null : Boolean(row['stopped_by_user']),
+    stoppedByPause: row['stopped_by_pause'] == null ? null : Boolean(row['stopped_by_pause']),
+    kickoffDelivered: row['kickoff_delivered'] == null ? null : Boolean(row['kickoff_delivered']),
+    hostOverride: row['host_override'] == null ? null : Boolean(row['host_override']),
     costSoFar: (row['cost_so_far'] as number | null) ?? null,
     phase: (row['phase'] as string | null) ?? null,
     workType: (row['work_type'] as string | null) ?? null,
-    paused: Boolean(row['paused']),
+    paused: row['paused'] == null ? null : Boolean(row['paused']),
     pausedReason: (row['paused_reason'] as string | null) ?? null,
     pausedAt: (row['paused_at'] as string | null) ?? null,
-    troubled: Boolean(row['troubled']),
+    troubled: row['troubled'] == null ? null : Boolean(row['troubled']),
     troubledAt: (row['troubled_at'] as string | null) ?? null,
     consecutiveFailures: (row['consecutive_failures'] as number | null) ?? null,
     firstFailureInRunAt: (row['first_failure_in_run_at'] as string | null) ?? null,
@@ -104,8 +104,8 @@ export function rowToAgent(row: Record<string, unknown>): Agent {
     reviewRetryAttempt: (row['review_retry_attempt'] as number | null) ?? null,
     inspectSubRole: (row['inspect_sub_role'] as string | null) ?? null,
     deliveryMethod: (row['delivery_method'] as string | null) ?? null,
-    supervisorEnabled: Boolean(row['supervisor_enabled']),
-    channelsEnabled: Boolean(row['channels_enabled']),
+    supervisorEnabled: row['supervisor_enabled'] == null ? null : Boolean(row['supervisor_enabled']),
+    channelsEnabled: row['channels_enabled'] == null ? null : Boolean(row['channels_enabled']),
     updatedAt: row['updated_at'] as string,
   };
 }
@@ -143,17 +143,17 @@ function agentToParams(agent: Agent): unknown[] {
     agent.lastActivity,
     agent.lastResumeAt,
     agent.stoppedAt,
-    agent.stoppedByUser ? 1 : 0,
-    agent.stoppedByPause ? 1 : 0,
-    agent.kickoffDelivered ? 1 : 0,
-    agent.hostOverride ? 1 : 0,
+    agent.stoppedByUser == null ? null : (agent.stoppedByUser ? 1 : 0),
+    agent.stoppedByPause == null ? null : (agent.stoppedByPause ? 1 : 0),
+    agent.kickoffDelivered == null ? null : (agent.kickoffDelivered ? 1 : 0),
+    agent.hostOverride == null ? null : (agent.hostOverride ? 1 : 0),
     agent.costSoFar,
     agent.phase,
     agent.workType,
-    agent.paused ? 1 : 0,
+    agent.paused == null ? null : (agent.paused ? 1 : 0),
     agent.pausedReason,
     agent.pausedAt,
-    agent.troubled ? 1 : 0,
+    agent.troubled == null ? null : (agent.troubled ? 1 : 0),
     agent.troubledAt,
     agent.consecutiveFailures,
     agent.firstFailureInRunAt,
@@ -171,8 +171,8 @@ function agentToParams(agent: Agent): unknown[] {
     agent.reviewRetryAttempt,
     agent.inspectSubRole,
     agent.deliveryMethod,
-    agent.supervisorEnabled ? 1 : 0,
-    agent.channelsEnabled ? 1 : 0,
+    agent.supervisorEnabled == null ? null : (agent.supervisorEnabled ? 1 : 0),
+    agent.channelsEnabled == null ? null : (agent.channelsEnabled ? 1 : 0),
     agent.updatedAt,
   ];
 }

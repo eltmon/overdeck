@@ -75,6 +75,13 @@ vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), crea
 vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), findProjectByPathSync: vi.fn(), getIssuePrefix: vi.fn() }));
 vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));
 vi.mock('../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn() }));
+vi.mock('../database/agents-db.js', () => ({
+  getAgent: vi.fn(() => undefined),
+  upsertAgent: vi.fn(),
+  listAllAgents: vi.fn(() => []),
+  countAgentsByRole: vi.fn(() => 0),
+  countAgentsByStatusRole: vi.fn(() => 0),
+}));
 vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), generateInstallationToken: vi.fn(), configureWorkspaceForBot: vi.fn() }));
 vi.mock('../workspace-manager.js', () => ({ preTrustDirectory: vi.fn() }));
 vi.mock('../paths.js', () => ({
@@ -84,6 +91,7 @@ vi.mock('../paths.js', () => ({
 }));
 
 import { getAgentStateSync, listRunningAgentsSync, resolveAgentTargetSync } from '../agents.js';
+import { listAllAgents } from '../database/agents-db.js';
 
 describe('agent ID normalization (PAN-871)', () => {
   beforeEach(() => {
@@ -98,6 +106,55 @@ describe('agent ID normalization (PAN-871)', () => {
   });
 
   it('marks tmux active using the canonical agent-pan session id', () => {
+    vi.mocked(listAllAgents).mockReturnValue([
+      {
+        id: 'agent-pan-871',
+        issueId: 'PAN-871',
+        role: 'work',
+        status: 'running',
+        workspace: '/tmp/workspace',
+        harness: 'claude-code',
+        model: 'claude-sonnet-4-6',
+        branch: null,
+        sessionId: null,
+        startedAt: '2026-04-27T00:00:00.000Z',
+        lastActivity: null,
+        lastResumeAt: null,
+        stoppedAt: null,
+        stoppedByUser: false,
+        stoppedByPause: false,
+        kickoffDelivered: false,
+        hostOverride: false,
+        costSoFar: null,
+        phase: null,
+        workType: null,
+        paused: false,
+        pausedReason: null,
+        pausedAt: null,
+        troubled: false,
+        troubledAt: null,
+        consecutiveFailures: null,
+        firstFailureInRunAt: null,
+        lastFailureAt: null,
+        lastFailureReason: null,
+        lastFailureNextRetryAt: null,
+        flywheelRunId: null,
+        roleRunHead: null,
+        reviewSubRole: null,
+        reviewRunId: null,
+        reviewSynthesisAgentId: null,
+        reviewOutputPath: null,
+        reviewDeadlineAt: null,
+        reviewMonitorSignaled: null,
+        reviewRetryAttempt: null,
+        inspectSubRole: null,
+        deliveryMethod: null,
+        supervisorEnabled: false,
+        channelsEnabled: false,
+        updatedAt: '2026-04-27T00:00:00.000Z',
+      },
+    ]);
+
     const agents = listRunningAgentsSync();
 
     expect(agents).toHaveLength(1);

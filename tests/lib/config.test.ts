@@ -122,12 +122,17 @@ describe('config', () => {
       );
       vi.resetModules();
       vi.doMock('../../src/lib/paths.js', () => ({ CONFIG_FILE: configPath }));
+      vi.doMock('../../src/lib/config-yaml.js', () => ({
+        loadConfig: () => ({ config: {}, migration: null }),
+        loadConfigSync: () => ({ config: {}, migration: null }),
+      }));
       const { loadConfigSync } = await import('../../src/lib/config.js');
       const config = loadConfigSync();
       expect(config.remote?.enabled).toBe(true);
       expect(config.remote?.resiliency_tier).toBe('durable');
       expect(config.remote?.max_concurrent_agents).toBe(7);
       vi.doUnmock('../../src/lib/paths.js');
+      vi.doUnmock('../../src/lib/config-yaml.js');
     });
 
     it('lets config.yaml remote settings override config.toml values', async () => {
