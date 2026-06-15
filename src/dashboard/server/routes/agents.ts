@@ -133,6 +133,7 @@ import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panctl/contracts';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection.js';
 import { buildTmuxCommandString, capturePane, killSession, listSessions, sessionExists } from '../../../lib/tmux.js';
 
@@ -1200,11 +1201,18 @@ export function createAgentStopHandler(
     // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
     // ws-rpc drops events that fail Schema validation, so emits without issueId
     // never reach subscribers and the dashboard misses the stop transition.
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-      type: 'agent.stopped',
-      timestamp: new Date().toISOString(),
-      payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
-    })));
+    //
+    // PAN-1908: write-through projection — re-upsert the stopped row and append
+    // the lifecycle event in one SQLite transaction. stopAgent already saved
+    // state, but repeating the upsert here makes the event append atomic.
+    const stateAfterStop = yield* getAgentState(id);
+    if (stateAfterStop) {
+      yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: id, issueId: stateAfterStop.issueId || stateBeforeStop?.issueId || '' },
+      });
+    }
     const issueId = stateBeforeStop?.issueId;
     // PAN-1048: derive label from role; legacy state.phase no longer exists.
     const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
@@ -1814,11 +1822,17 @@ const postAgentSuspendRoute = HttpRouter.add(
       lastActivity: new Date().toISOString(),
       claudeSessionId: effectiveSessionId,
     });
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-      type: 'agent.stopped',
-      timestamp: new Date().toISOString(),
-      payload: { agentId: id, issueId: suspendIssueId },
-    })));
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction. Preserve the existing agent-table status
+    // (suspend does not flip it to stopped).
+    const stateAfterSuspend = yield* getAgentState(id);
+    if (stateAfterSuspend) {
+      yield* saveAgentStateAndEmitEventProgram(stateAfterSuspend, {
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: id, issueId: stateAfterSuspend.issueId || suspendIssueId },
+      });
+    }
 
     invalidateAgentsCache();
     return jsonResponse({ success: true });
@@ -1868,7 +1882,6 @@ const postAgentPauseRoute = HttpRouter.add(
     if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
       const stoppedState = markAgentStoppedState(updatedState);
       updatedState = stoppedState;
-      yield* saveAgentState(stoppedState);
       yield* Effect.promise(() => saveAgentRuntimeState(id, {
         state: 'stopped',
         lastActivity: new Date().toISOString(),
@@ -1881,11 +1894,13 @@ const postAgentPauseRoute = HttpRouter.add(
       kind: 'pause',
       source: 'dashboard',
     }));
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
       payload: buildAgentControlEventPayload(updatedState, previousStatus),
-    })));
+    });
 
     invalidateAgentsCache();
     return jsonResponse({ success: true, agent: updatedState });
@@ -1926,11 +1941,13 @@ const postAgentUnpauseRoute = HttpRouter.add(
         source: 'dashboard:agent-unpause',
       }));
     }
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
       payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeUnpause.status)),
-    })));
+    });
 
     invalidateAgentsCache();
     return jsonResponse({ success: true, agent: updatedState });
@@ -1971,11 +1988,13 @@ const postAgentUntroubledRoute = HttpRouter.add(
         source: 'dashboard:agent-untroubled',
       }));
     }
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
       payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeClear.status)),
-    })));
+    });
 
     invalidateAgentsCache();
     return jsonResponse({ success: true, agent: updatedState });
@@ -2027,29 +2046,31 @@ const postAgentResumeRoute = HttpRouter.add(
       : undefined;
     const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));
     if (result.success) {
-      // Emit agent.started event so the read model transitions agent status
-      // from 'stopped' → 'running' and the frontend updates immediately.
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction so the read model transitions agent
+      // status from 'stopped' → 'running' and the frontend updates immediately.
       const agentState = yield* getAgentState(id);
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'agent.started',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId: id,
-          issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
-          resumed: true,
-          agent: {
-            id,
-            issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
-            workspace: agentState?.workspace,
-            runtime: agentState?.harness ?? 'claude-code',
-            model: agentState?.model,
-            status: 'running',
-            startedAt: agentState?.startedAt,
-            lastActivity: new Date().toISOString(),
-            role: agentState?.role ?? 'work',
+      if (agentState) {
+        yield* saveAgentStateAndEmitEventProgram(agentState, {
+          type: 'agent.started',
+          timestamp: new Date().toISOString(),
+          payload: {
+            agentId: id,
+            issueId: agentState.issueId,
+            agent: {
+              id,
+              issueId: agentState.issueId,
+              workspace: agentState.workspace,
+              runtime: agentState.harness ?? 'claude-code',
+              model: agentState.model,
+              status: 'running',
+              startedAt: agentState.startedAt,
+              lastActivity: new Date().toISOString(),
+              role: agentState.role ?? 'work',
+            },
           },
-        },
-      })));
+        });
+      }
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_succeeded', {
         hasMessage: !!message,
       }));
@@ -2111,13 +2132,14 @@ const postAgentRecoverRoute = HttpRouter.add(
 
     const updatedState = yield* getAgentState(id);
     if (updatedState) {
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction.
+      yield* saveAgentStateAndEmitEventProgram(updatedState, {
         type: 'agent.started',
         timestamp: new Date().toISOString(),
         payload: {
           agentId: id,
           issueId: updatedState.issueId || stateBeforeRecover.issueId || id.replace('agent-', '').toUpperCase(),
-          recovered: true,
           agent: {
             id,
             issueId: updatedState.issueId || stateBeforeRecover.issueId,
@@ -2129,7 +2151,7 @@ const postAgentRecoverRoute = HttpRouter.add(
             role: updatedState.role ?? 'work',
           },
         },
-      })));
+      });
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.recover_succeeded'));
@@ -2187,7 +2209,9 @@ const postAgentRestartRoute = HttpRouter.add(
       // Kick off async restart — don't block the HTTP response for 30s
       (async () => {
         try {
-          await Effect.runPromise(eventStore.append({
+          // PAN-1908: write-through projection — agents-row upsert + lifecycle
+          // event append in one SQLite transaction.
+          await Effect.runPromise(saveAgentStateAndEmitEventProgram(agentState, {
             type: 'agent.stopped',
             timestamp: new Date().toISOString(),
             payload: { agentId: id, issueId: agentState.issueId },
@@ -2197,29 +2221,32 @@ const postAgentRestartRoute = HttpRouter.add(
 
           if (result.success) {
             const updatedState = await Effect.runPromise(getAgentState(id));
-            await Effect.runPromise(eventStore.append({
-              type: 'agent.started',
-              timestamp: new Date().toISOString(),
-              payload: {
-                agentId: id,
-                issueId: updatedState?.issueId || agentState.issueId,
-                restarted: true,
-                agent: {
-                  id,
-                  issueId: updatedState?.issueId || agentState.issueId,
-                  workspace: updatedState?.workspace || agentState.workspace,
-                  // PAN-1048 review feedback 004 (C3): same as quick-restart
-                  // below — surface the actual harness so Pi agents do not
-                  // get mis-labelled as Claude Code on graceful restart.
-                  runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
-                  model: restartModel || updatedState?.model || agentState.model,
-                  status: 'running',
-                  startedAt: updatedState?.startedAt || agentState.startedAt,
-                  lastActivity: new Date().toISOString(),
-                  role: updatedState?.role ?? agentState.role,
+            // PAN-1908: write-through projection — agents-row upsert + lifecycle
+            // event append in one SQLite transaction.
+            if (updatedState) {
+              await Effect.runPromise(saveAgentStateAndEmitEventProgram(updatedState, {
+                type: 'agent.started',
+                timestamp: new Date().toISOString(),
+                payload: {
+                  agentId: id,
+                  issueId: updatedState.issueId || agentState.issueId,
+                  agent: {
+                    id,
+                    issueId: updatedState.issueId || agentState.issueId,
+                    workspace: updatedState.workspace || agentState.workspace,
+                    // PAN-1048 review feedback 004 (C3): same as quick-restart
+                    // below — surface the actual harness so Pi agents do not
+                    // get mis-labelled as Claude Code on graceful restart.
+                    runtime: updatedState.harness ?? agentState.harness ?? 'claude-code',
+                    model: restartModel || updatedState.model || agentState.model,
+                    status: 'running',
+                    startedAt: updatedState.startedAt || agentState.startedAt,
+                    lastActivity: new Date().toISOString(),
+                    role: updatedState.role ?? agentState.role,
+                  },
                 },
-              },
-            }));
+              }));
+            }
             invalidateAgentsCache();
           }
           await appendAgentLifecycleLog(id, 'agent.restart_completed', {
@@ -2246,35 +2273,39 @@ const postAgentRestartRoute = HttpRouter.add(
         kind: 'restart',
         source: 'dashboard',
       }));
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'agent.stopped',
-        timestamp: new Date().toISOString(),
-        payload: { agentId: id, issueId: updatedState?.issueId || agentState.issueId },
-      })));
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'agent.started',
-        timestamp: new Date().toISOString(),
-        payload: {
-          agentId: id,
-          issueId: updatedState?.issueId || agentState.issueId,
-          restarted: true,
-          agent: {
-            id,
-            issueId: updatedState?.issueId || agentState.issueId,
-            workspace: updatedState?.workspace || agentState.workspace,
-            // PAN-1048 review feedback 004 (C3): preserve the agent's actual
-            // harness instead of hard-coding 'claude'. AgentSnapshot.runtime
-            // is what getHarness() reads, so a Pi agent restarted through
-            // this path was being mis-labelled as Claude Code.
-            runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
-            model: restartModel || updatedState?.model || agentState.model,
-            status: 'running',
-            startedAt: updatedState?.startedAt || agentState.startedAt,
-            lastActivity: new Date().toISOString(),
-            role: updatedState?.role ?? agentState.role,
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction. restartAgent already saved state, but
+      // repeating the upsert here makes each lifecycle event atomic.
+      if (updatedState) {
+        yield* saveAgentStateAndEmitEventProgram(updatedState, {
+          type: 'agent.stopped',
+          timestamp: new Date().toISOString(),
+          payload: { agentId: id, issueId: updatedState.issueId || agentState.issueId },
+        });
+        yield* saveAgentStateAndEmitEventProgram(updatedState, {
+          type: 'agent.started',
+          timestamp: new Date().toISOString(),
+          payload: {
+            agentId: id,
+            issueId: updatedState.issueId || agentState.issueId,
+            agent: {
+              id,
+              issueId: updatedState.issueId || agentState.issueId,
+              workspace: updatedState.workspace || agentState.workspace,
+              // PAN-1048 review feedback 004 (C3): preserve the agent's actual
+              // harness instead of hard-coding 'claude'. AgentSnapshot.runtime
+              // is what getHarness() reads, so a Pi agent restarted through
+              // this path was being mis-labelled as Claude Code.
+              runtime: updatedState.harness ?? agentState.harness ?? 'claude-code',
+              model: restartModel || updatedState.model || agentState.model,
+              status: 'running',
+              startedAt: updatedState.startedAt || agentState.startedAt,
+              lastActivity: new Date().toISOString(),
+              role: updatedState.role ?? agentState.role,
+            },
           },
-        },
-      })));
+        });
+      }
       invalidateAgentsCache();
       return jsonResponse({ success: true, restarted: true, agentId: id, model: restartModel || agentState.model });
     }
@@ -3065,7 +3096,19 @@ const postAgentsRoute = HttpRouter.add(
       // event.payload.agentId — the previous shape ({ agentId: issueId, issueId })
       // omitted .agent and used the issue ID as the key, inserting `undefined`
       // into the read model and breaking dashboard consumers.
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      //
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction.
+      yield* saveAgentStateAndEmitEventProgram({
+        id: state.id,
+        issueId: state.issueId,
+        workspace: workspacePath,
+        role: 'work',
+        model: spawnModel,
+        status: state.status,
+        startedAt: state.startedAt,
+        harness: 'claude-code',
+      }, {
         type: 'agent.started',
         timestamp: new Date().toISOString(),
         payload: {
@@ -3081,7 +3124,7 @@ const postAgentsRoute = HttpRouter.add(
             lastActivity: state.lastActivity,
           },
         },
-      })));
+      });
       emitStartAgentPhase(issueId, 'spawn', 'success', 'remote work agent spawn requested', {
         agentId: state.id,
         vmName: workspaceMetadata.vmName,
@@ -3623,7 +3666,20 @@ const postAgentsRoute = HttpRouter.add(
     // payload (agentId = session name, agent = AgentSnapshot) so the read-model
     // reducer writes a real snapshot into agentsById instead of `undefined`.
     // Mirrors the early state.json shape we just wrote at line 2693.
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+    //
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    yield* saveAgentStateAndEmitEventProgram({
+      id: earlyAgentId,
+      issueId,
+      workspace: workspacePath,
+      role,
+      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      hostOverride: allowHost || undefined,
+    }, {
       type: 'agent.started',
       timestamp: new Date().toISOString(),
       payload: {
@@ -3639,7 +3695,7 @@ const postAgentsRoute = HttpRouter.add(
           ...(effectiveHarness ? { runtime: effectiveHarness } : {}),
         },
       },
-    })));
+    });
     try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
     invalidateAgentsCache();
     return jsonResponse({
@@ -3775,11 +3831,14 @@ const postAgentResetSessionRoute = HttpRouter.add(
 
     // Emit event so dashboard updates. PAN-1048 review feedback 004 (C1):
     // include issueId — without it AgentStoppedEvent fails Schema validation.
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+    //
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    yield* saveAgentStateAndEmitEventProgram(agentState, {
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
       payload: { agentId: id, issueId: agentState.issueId },
-    })));
+    });
 
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
     invalidateAgentsCache();
@@ -3862,11 +3921,17 @@ const postAgentSwitchModelRoute = HttpRouter.add(
     // Stop running agent if alive
     if (lifecycle.hasLiveTmuxSession) {
       yield* stopAgent(id);
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'agent.stopped',
-        timestamp: new Date().toISOString(),
-        payload: { agentId: id, issueId: agentState.issueId },
-      })));
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction. stopAgent already saved state, but
+      // repeating the upsert here makes the event append atomic.
+      const stateAfterStop = yield* getAgentState(id);
+      if (stateAfterStop) {
+        yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
+          type: 'agent.stopped',
+          timestamp: new Date().toISOString(),
+          payload: { agentId: id, issueId: stateAfterStop.issueId || agentState.issueId },
+        });
+      }
     }
 
     const agentDir = getAgentDir(id);

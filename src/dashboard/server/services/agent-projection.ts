@@ -11,6 +11,7 @@
  * in-memory read model stays current.
  */
 
+import { Effect } from 'effect';
 import { getDatabase } from '../../../lib/database/index.js';
 import type { SqliteDatabase } from '../../../lib/database/driver.js';
 import { upsertAgentWithDb, type Agent as DbAgent } from '../../../lib/database/agents-db.js';
@@ -85,6 +86,17 @@ export function saveAgentStateAndEmitEvent(
   const db = getDatabase();
   const eventStore = getEventStore();
   return saveAgentStateAndEmitEventWithDeps(db, eventStore, state, event);
+}
+
+/**
+ * Effect wrapper for server routes. Runs the synchronous projection under
+ * Effect.sync so callers in Effect.gen can compose it without blocking.
+ */
+export function saveAgentStateAndEmitEventProgram(
+  state: AgentState,
+  event: Omit<DomainEvent, 'sequence'>,
+): Effect.Effect<AgentProjectionResult> {
+  return Effect.sync(() => saveAgentStateAndEmitEvent(state, event));
 }
 
 /**

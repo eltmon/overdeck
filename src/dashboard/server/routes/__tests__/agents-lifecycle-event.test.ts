@@ -31,6 +31,10 @@ vi.mock('../../../../lib/agents.js', () => ({
   stopAgentProgram: vi.fn(),
 }));
 
+vi.mock('../../services/agent-projection.js', () => ({
+  saveAgentStateAndEmitEventProgram: vi.fn(() => Effect.void),
+}));
+
 vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
@@ -44,9 +48,11 @@ vi.mock('../origin-validation.js', () => ({
 
 import { createAgentStopHandler } from '../agents.js';
 import { getAgentState, stopAgent } from '../../../../lib/agents.js';
+import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 
 const mockGetAgentState = vi.mocked(getAgentState);
 const mockStopAgent = vi.mocked(stopAgent);
+const mockSaveAgentStateAndEmitEventProgram = vi.mocked(saveAgentStateAndEmitEventProgram);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -120,5 +126,14 @@ describe('createAgentStopHandler lifecycle events', () => {
 
     expect(mockGetAgentState).toHaveBeenCalledWith('agent-pan-999');
     expect(mockStopAgent).toHaveBeenCalledWith('agent-pan-999');
+  });
+
+  it('routes agent.stopped through the transactional projection boundary', async () => {
+    await runAgentStopHandler('agent.stop_requested');
+
+    expect(mockSaveAgentStateAndEmitEventProgram).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: 'PAN-TEST' }),
+      expect.objectContaining({ type: 'agent.stopped' }),
+    );
   });
 });

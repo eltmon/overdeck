@@ -35,6 +35,7 @@ import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
 import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
+import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
@@ -331,16 +332,19 @@ setAgentStoppedNotifier((agentId) => {
       const es = getEventStore();
       const state = await Effect.runPromise(getAgentState(agentId));
       if (state) {
+        // heartbeat_dead only updates runtime snapshot; emit it directly.
         es.append({
           type: 'agent.heartbeat_dead',
           timestamp: new Date().toISOString(),
           payload: { agentId, issueId: state.issueId, sessionId: state.sessionId },
         } as any);
-        es.append({
+        // PAN-1908: write-through projection — agents-row upsert + lifecycle
+        // event append in one SQLite transaction.
+        saveAgentStateAndEmitEvent(state, {
           type: 'agent.status_changed',
           timestamp: new Date().toISOString(),
           payload: buildAgentStatusChangedPayload(state),
-        } as any);
+        });
         return;
       }
       es.append({
@@ -355,12 +359,13 @@ setAgentStoppedNotifier((agentId) => {
 });
 setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
   try {
-    const es = getEventStore();
-    es.append({
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    saveAgentStateAndEmitEvent(state, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
       payload: buildAgentStatusChangedPayload(state, previousStatus, hasLiveTmuxSession),
-    } as any);
+    });
   } catch (err) {
     console.error('[pipeline] Failed to append agent.status_changed event:', err);
   }

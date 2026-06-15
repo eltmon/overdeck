@@ -18,6 +18,7 @@ import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from
 import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
+import { saveAgentStateAndEmitEvent } from './agent-projection.js'
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
@@ -130,7 +131,9 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               },
             },
           }
-          await eventStore.appendAsync(createdEvent as never)
+          // PAN-1908: write-through projection — agents-row upsert + lifecycle
+          // event append in one SQLite transaction.
+          saveAgentStateAndEmitEvent(agent, createdEvent)
         } catch {
           // Non-fatal — event store may not be ready at startup
         }
@@ -151,7 +154,9 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
               hasLiveTmuxSession: true,
             },
           }
-          await eventStore.appendAsync(statusEvent as never)
+          // PAN-1908: write-through projection — agents-row upsert + lifecycle
+          // event append in one SQLite transaction.
+          saveAgentStateAndEmitEvent(agent, statusEvent)
         } catch {
           // Non-fatal
         }
