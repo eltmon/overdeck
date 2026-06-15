@@ -4537,7 +4537,11 @@ function parseAgentStateJson(content, fallbackId) {
 }
 function buildNamedParams(row) {
 	const params = {};
-	for (const [key, column] of Object.entries(COLUMN_MAP)) params[column] = row[key];
+	for (const [key, column] of Object.entries(COLUMN_MAP)) {
+		let value = row[key];
+		if (typeof value === "boolean") value = value ? 1 : 0;
+		params[column] = value;
+	}
 	return params;
 }
 /**
@@ -5306,7 +5310,7 @@ function initSchema(db) {
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
 * This function handles upgrading from older schema versions.
 */
-function runMigrations(db) {
+function runMigrations(db, dbPath) {
 	const currentVersion = db.pragma("user_version", { simple: true });
 	if (currentVersion === 55) return;
 	if (currentVersion === 0) {
@@ -5951,10 +5955,10 @@ function runMigrations(db) {
 	}
 	if (currentVersion < 55) {
 		try {
-			const dbPath = join(getPanopticonHome(), "panopticon.db");
-			const snapshotPath = `${dbPath}.v54-backfill-snapshot`;
-			if (existsSync(dbPath) && !existsSync(snapshotPath)) {
-				writeFileSync(snapshotPath, readFileSync(dbPath));
+			const resolvedDbPath = dbPath ?? join(getPanopticonHome(), "panopticon.db");
+			const snapshotPath = `${resolvedDbPath}.v54-backfill-snapshot`;
+			if (existsSync(resolvedDbPath) && !existsSync(snapshotPath)) {
+				writeFileSync(snapshotPath, readFileSync(resolvedDbPath));
 				console.log(`[schema] Snapshot created: ${snapshotPath}`);
 			}
 		} catch (err) {
@@ -6058,12 +6062,13 @@ function getDatabase() {
 	if (_db) return _db;
 	const home = getPanopticonHome();
 	if (!existsSync(home)) mkdirSync(home, { recursive: true });
-	_db = openDatabase(getDatabasePath());
+	const dbPath = getDatabasePath();
+	_db = openDatabase(dbPath);
 	_db.pragma("journal_mode = WAL");
 	_db.pragma("foreign_keys = ON");
 	_db.pragma("synchronous = NORMAL");
 	_db.pragma("journal_size_limit = 67108864");
-	runMigrations(_db);
+	runMigrations(_db, dbPath);
 	const currentVacuum = _db.pragma("auto_vacuum", { simple: true });
 	if (currentVacuum !== 2) {
 		const sizeBefore = _db.pragma("page_count", { simple: true });
