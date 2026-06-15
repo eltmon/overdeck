@@ -31,6 +31,7 @@ import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } fr
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
+import { getAgent as getAgentFromDb, upsertAgent, type Agent as DbAgent } from './database/agents-db.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -1042,8 +1043,116 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
+function agentStateToDbAgent(state: AgentState): DbAgent {
+  return {
+    id: state.id,
+    issueId: state.issueId,
+    role: state.role,
+    status: state.status,
+    workspace: state.workspace,
+    harness: state.harness ?? null,
+    model: state.model ?? null,
+    branch: state.branch ?? null,
+    sessionId: state.sessionId ?? null,
+    startedAt: state.startedAt ?? null,
+    lastActivity: state.lastActivity ?? null,
+    lastResumeAt: state.lastResumeAt ?? null,
+    stoppedAt: state.stoppedAt ?? null,
+    stoppedByUser: state.stoppedByUser ?? false,
+    stoppedByPause: state.stoppedByPause ?? false,
+    kickoffDelivered: state.kickoffDelivered ?? false,
+    hostOverride: state.hostOverride ?? false,
+    costSoFar: state.costSoFar ?? null,
+    phase: state.phase ?? null,
+    workType: state.workType ?? null,
+    paused: state.paused ?? false,
+    pausedReason: state.pausedReason ?? null,
+    pausedAt: state.pausedAt ?? null,
+    troubled: state.troubled ?? false,
+    troubledAt: state.troubledAt ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? null,
+    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+    lastFailureAt: state.lastFailureAt ?? null,
+    lastFailureReason: state.lastFailureReason ?? null,
+    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+    flywheelRunId: state.flywheelRunId ?? null,
+    roleRunHead: state.roleRunHead ?? null,
+    reviewSubRole: state.reviewSubRole ?? null,
+    reviewRunId: state.reviewRunId ?? null,
+    reviewSynthesisAgentId: state.reviewSynthesisAgentId ?? null,
+    reviewOutputPath: state.reviewOutputPath ?? null,
+    reviewDeadlineAt: state.reviewDeadlineAt ?? null,
+    reviewMonitorSignaled: state.reviewMonitorSignaled ?? null,
+    reviewRetryAttempt: state.reviewRetryAttempt ?? null,
+    inspectSubRole: state.inspectSubRole ?? null,
+    deliveryMethod: state.deliveryMethod ?? null,
+    supervisorEnabled: state.supervisorEnabled ?? false,
+    channelsEnabled: state.channelsEnabled ?? false,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function dbAgentToAgentState(agent: DbAgent): AgentState {
+  return cleanAgentState({
+    id: agent.id,
+    issueId: agent.issueId,
+    workspace: agent.workspace,
+    role: agent.role as Role,
+    model: agent.model ?? '',
+    status: agent.status as AgentState['status'],
+    startedAt: agent.startedAt ?? new Date().toISOString(),
+    harness: agent.harness ? (agent.harness as RuntimeName) : undefined,
+    lastActivity: agent.lastActivity ?? undefined,
+    lastResumeAt: agent.lastResumeAt ?? undefined,
+    stoppedAt: agent.stoppedAt ?? undefined,
+    stoppedByUser: agent.stoppedByUser || undefined,
+    stoppedByPause: agent.stoppedByPause || undefined,
+    kickoffDelivered: agent.kickoffDelivered || undefined,
+    paused: agent.paused || undefined,
+    pausedReason: agent.pausedReason ?? undefined,
+    pausedAt: agent.pausedAt ?? undefined,
+    troubled: agent.troubled || undefined,
+    troubledAt: agent.troubledAt ?? undefined,
+    consecutiveFailures: agent.consecutiveFailures ?? undefined,
+    firstFailureInRunAt: agent.firstFailureInRunAt ?? undefined,
+    lastFailureAt: agent.lastFailureAt ?? undefined,
+    lastFailureReason: agent.lastFailureReason ?? undefined,
+    lastFailureNextRetryAt: agent.lastFailureNextRetryAt ?? undefined,
+    branch: agent.branch ?? undefined,
+    costSoFar: agent.costSoFar ?? undefined,
+    sessionId: agent.sessionId ?? undefined,
+    phase: agent.phase ? (agent.phase as AgentState['phase']) : undefined,
+    workType: agent.workType ?? undefined,
+    preSpawnStashRef: undefined,
+    preSpawnStashMessage: undefined,
+    preSpawnBaselineHead: undefined,
+    roleRunHead: agent.roleRunHead ?? undefined,
+    channelsEnabled: agent.channelsEnabled || undefined,
+    supervisorEnabled: agent.supervisorEnabled || undefined,
+    deliveryMethod: agent.deliveryMethod ? (agent.deliveryMethod as AgentState['deliveryMethod']) : undefined,
+    flywheelRunId: agent.flywheelRunId ?? undefined,
+    reviewSubRole: agent.reviewSubRole ?? undefined,
+    reviewRunId: agent.reviewRunId ?? undefined,
+    reviewOutputPath: agent.reviewOutputPath ?? undefined,
+    reviewSynthesisAgentId: agent.reviewSynthesisAgentId ?? undefined,
+    reviewDeadlineAt: agent.reviewDeadlineAt ?? undefined,
+    reviewMonitorSignaled: agent.reviewMonitorSignaled
+      ? (agent.reviewMonitorSignaled as AgentState['reviewMonitorSignaled'])
+      : undefined,
+    reviewRetryAttempt: agent.reviewRetryAttempt ?? undefined,
+    hostOverride: agent.hostOverride || undefined,
+    inspectSubRole: agent.inspectSubRole ?? undefined,
+  });
+}
+
 export function getAgentStateSync(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
+
+  // PAN-1908: authoritative runtime registry is the agents table. Fall back to
+  // state.json only while pre-migration directories have not been backfilled.
+  const dbAgent = getAgentFromDb(normalizedId);
+  if (dbAgent) return dbAgentToAgentState(dbAgent);
+
   const stateFile = join(getAgentDir(normalizedId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
@@ -1051,16 +1160,11 @@ export function getAgentStateSync(agentId: string): AgentState | null {
   return parseAgentState(content, normalizedId);
 }
 
-
 export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
-  const normalizedId = normalizeAgentId(agentId);
-  const stateFile = join(getAgentDir(normalizedId), 'state.json');
-  if (!existsSync(stateFile)) return Effect.succeed(null);
-
-  return Effect.tryPromise({
-    try: () => readFile(stateFile, 'utf-8'),
-    catch: (cause) => toAgentFsError('read', stateFile, cause),
-  }).pipe(Effect.map((content) => parseAgentState(content, normalizedId)));
+  return Effect.try({
+    try: () => getAgentStateSync(agentId),
+    catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+  });
 };
 
 export function saveAgentStateSync(state: AgentState): void {
@@ -1077,6 +1181,10 @@ export function saveAgentStateSync(state: AgentState): void {
     state.stoppedAt = new Date().toISOString();
   }
 
+  // PAN-1908: write the authoritative row to SQLite and keep state.json as the
+  // rollback/rebuild source through the cutover (D2/CP-2).
+  upsertAgent(agentStateToDbAgent(state));
+
   writeFileSync(
     join(dir, 'state.json'),
     JSON.stringify(cleanAgentState(state), null, 2)
@@ -1086,7 +1194,6 @@ export function saveAgentStateSync(state: AgentState): void {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
 }
-
 
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
@@ -1106,6 +1213,11 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     } else if (state.status === 'stopped' && !state.stoppedAt) {
       state.stoppedAt = new Date().toISOString();
     }
+
+    yield* Effect.try({
+      try: () => upsertAgent(agentStateToDbAgent(state)),
+      catch: (cause) => toAgentFsError('write', `agents-db:${state.id}`, cause),
+    });
 
     yield* Effect.tryPromise({
       try: () => writeFileAsync(stateFile, JSON.stringify(cleanAgentState(state), null, 2)),
