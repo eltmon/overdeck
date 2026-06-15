@@ -11,6 +11,10 @@ const appSettingsMocks = vi.hoisted(() => ({
   paused: false,
 }));
 
+const agentsDbMocks = vi.hoisted(() => ({
+  runningWorkCount: 0,
+}));
+
 vi.mock('../../../../lib/database/app-settings.js', () => ({
   getFlywheelActiveRunId: () => appSettingsMocks.activeRunId,
   isFlywheelGloballyPaused: () => appSettingsMocks.paused,
@@ -20,6 +24,11 @@ vi.mock('../../../../lib/database/app-settings.js', () => ({
   setFlywheelGloballyPaused: (paused: boolean) => {
     appSettingsMocks.paused = paused;
   },
+}));
+
+vi.mock('../../../../lib/database/agents-db.js', () => ({
+  countAgentsByStatusRole: (status: string, role: string) =>
+    status === 'running' && role === 'work' ? agentsDbMocks.runningWorkCount : 0,
 }));
 
 import {
@@ -76,6 +85,7 @@ describe('flywheel run state', () => {
     panopticonHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-run-state-'));
     appSettingsMocks.activeRunId = null;
     appSettingsMocks.paused = false;
+    agentsDbMocks.runningWorkCount = 0;
   });
 
   afterEach(async () => {
@@ -89,14 +99,23 @@ describe('flywheel run state', () => {
     const detail = await getFlywheelRunDetail('RUN-1', { panopticonHome });
 
     expect(latestPath).toBe(join(panopticonHome, 'flywheel', 'runs', 'RUN-1', 'latest.json'));
-    // PAN-1528: getFlywheelRunDetail overlays a live work-agent count over the
-    // persisted status. Empty test panopticonHome => no agents => count is 0,
-    // overriding the fixture's `agentsActive: 1`.
+    // PAN-1528/PAN-1908: getFlywheelRunDetail overlays the agents-table
+    // running work-agent count over the persisted status.
     expect(detail?.latest).toEqual({
       ...status,
       system: { ...status.system, agentsActive: 0 },
     });
     expect(await readFile(latestPath, 'utf8')).toContain('"runId": "RUN-1"');
+  });
+
+  it('overlays active work-agent count from the agents table', async () => {
+    const status = makeStatus('RUN-1', '2026-05-18T10:00:00.000Z');
+    agentsDbMocks.runningWorkCount = 3;
+
+    await writeLatestFlywheelStatus(status, { panopticonHome });
+    const detail = await getFlywheelRunDetail('RUN-1', { panopticonHome });
+
+    expect(detail?.latest?.system.agentsActive).toBe(3);
   });
 
   it('generates monotonic run IDs from existing run directories', async () => {

@@ -199,6 +199,14 @@ export function listAgentsByStatusRole(status: string, role: string): Agent[] {
   return rows.map(rowToAgent);
 }
 
+export function countAgentsByStatusRole(status: string, role: string): number {
+  const db = getDatabase();
+  const row = db
+    .prepare(`SELECT COUNT(*) AS n FROM agents WHERE status = ? AND role = ?`)
+    .get(status, role) as { n: number } | undefined;
+  return row?.n ?? 0;
+}
+
 export function countAgentsByRole(): Record<string, number> {
   const db = getDatabase();
   const rows = db

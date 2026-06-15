@@ -31,6 +31,7 @@ import {
   upsertAgent,
   getAgent,
   listAgentsByStatusRole,
+  countAgentsByStatusRole,
   countAgentsByRole,
   deleteAgent,
   type Agent,
@@ -136,6 +137,18 @@ describe('agents-db', () => {
     expect(runningPlan[0].id).toBe('a4');
 
     expect(listAgentsByStatusRole('error', 'work')).toHaveLength(0);
+  });
+
+  it('countAgentsByStatusRole returns only the matching row count', () => {
+    upsertAgent(makeAgent({ id: 'a1', status: 'running', role: 'work' }));
+    upsertAgent(makeAgent({ id: 'a2', status: 'running', role: 'work' }));
+    upsertAgent(makeAgent({ id: 'a3', status: 'stopped', role: 'work' }));
+    upsertAgent(makeAgent({ id: 'a4', status: 'running', role: 'plan' }));
+
+    expect(countAgentsByStatusRole('running', 'work')).toBe(2);
+    expect(countAgentsByStatusRole('stopped', 'work')).toBe(1);
+    expect(countAgentsByStatusRole('running', 'plan')).toBe(1);
+    expect(countAgentsByStatusRole('error', 'work')).toBe(0);
   });
 
   it('countAgentsByRole returns per-role counts', () => {
