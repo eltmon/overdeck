@@ -312,7 +312,7 @@ export function getCostBreakdownByStageAndModel(
   const db = getDatabase();
   const rows = db.prepare(`
     SELECT
-      COALESCE(session_type, 'other') as stage,
+      CASE WHEN session_type IS NULL OR session_type = 'unknown' THEN 'other' ELSE session_type END as stage,
       COALESCE(provider || '/' || model, 'unknown') as provider_model,
       SUM(input) as input,
       SUM(output) as output,
