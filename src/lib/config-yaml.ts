@@ -8,8 +8,8 @@
  * Uses smart (capability-based) model selection - no legacy presets.
  */
 
-import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
-import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync, mkdir as mkdirAsync } from 'fs/promises';
+import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync, chmodSync } from 'fs';
+import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync, mkdir as mkdirAsync, chmod as chmodAsync } from 'fs/promises';
 import { Effect } from 'effect';
 import { ConfigError, ConfigParseError } from './errors.js';
 import { dirname, join } from 'path';
@@ -2381,6 +2381,11 @@ function writeGlobalConfig(config: YamlConfig): void {
   });
 
   writeFileSync(GLOBAL_CONFIG_PATH, yamlContent, 'utf-8');
+  // config.yaml contains API keys in api_keys.* — must not be world-readable.
+  // writeFileSync's `mode` option is only honored on file creation, so chmod
+  // explicitly to handle the case where the file already exists with looser
+  // permissions (e.g. from an older install).
+  chmodSync(GLOBAL_CONFIG_PATH, 0o600);
 }
 
 // ─── In-memory config cache (invalidated on file mtime change) ───────────────
@@ -2739,6 +2744,11 @@ export const updateConversationsConfig = (
 
       await mkdirAsync(dirname(GLOBAL_CONFIG_PATH), { recursive: true });
       await writeFileAsync(GLOBAL_CONFIG_PATH, doc.toString({ lineWidth: 120 }), 'utf-8');
+      // config.yaml contains API keys in api_keys.* — must not be world-readable.
+      // writeFile's `mode` option is only honored on file creation, so chmod
+      // explicitly to handle the case where the file already exists with looser
+      // permissions (e.g. from an older install).
+      await chmodAsync(GLOBAL_CONFIG_PATH, 0o600);
       clearConfigCache();
     },
     catch: (cause) =>
