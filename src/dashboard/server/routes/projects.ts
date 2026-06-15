@@ -242,6 +242,7 @@ async function collectSessionTreeNodes(
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
+        harness: state.harness,
         deliveryMethod: state.deliveryMethod,
         paused: state.paused === true ? true : undefined,
         pausedReason: state.paused === true ? state.pausedReason : undefined,

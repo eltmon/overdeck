@@ -350,6 +350,7 @@ export async function fetchActivityDataWithContext(
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
+        harness: state.harness,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
       });
     } catch { /* skip malformed state */ }

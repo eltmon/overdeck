@@ -105,6 +105,21 @@ describe('SessionPanel', () => {
     expect(screen.getByTestId('x-terminal')).toBeInTheDocument();
   });
 
+  it('shows an RPC notice instead of the terminal for pi agents', () => {
+    // Pi runs `--mode rpc` with no TUI — the pane streams raw protocol JSON, so
+    // the Terminal view must show a notice pointing at the Conversation tab.
+    render(<SessionPanel session={makeSession({ harness: 'pi' })} />);
+    fireEvent.click(screen.getByText('Terminal'));
+    expect(screen.getByText(/runs in RPC mode \(pi\)/)).toBeInTheDocument();
+    expect(screen.queryByTestId('x-terminal')).not.toBeInTheDocument();
+  });
+
+  it('keeps the live terminal for claude-code agents', () => {
+    render(<SessionPanel session={makeSession({ harness: 'claude-code' })} />);
+    fireEvent.click(screen.getByText('Terminal'));
+    expect(screen.getByTestId('x-terminal')).toBeInTheDocument();
+  });
+
   it('switches back to conversation view on toggle click', () => {
     render(<SessionPanel session={makeSession({ transcript: 'hello' })} />);
     fireEvent.click(screen.getByText('Terminal'));

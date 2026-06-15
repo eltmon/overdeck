@@ -384,7 +384,19 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         )}
 
         {view === 'terminal' && (
-          hasTerminal && tmuxName ? (
+          session.harness === 'pi' ? (
+            // Pi agents run as `pi --mode rpc`: there is no interactive TUI. The
+            // tmux pane carries the raw JSON-RPC wire protocol (one JSON object
+            // per streamed event), which is unreadable as a terminal. Point the
+            // operator at the Conversation tab, which renders the same transcript
+            // parsed into messages. (Claude Code and Codex run real TUIs, so they
+            // keep the live terminal.)
+            <div className={styles.sessionPanelEmpty}>
+              This agent runs in RPC mode (pi), which has no interactive terminal —
+              the pane only carries raw protocol JSON. Use the <strong>Conversation</strong>{' '}
+              tab to follow what it's doing.
+            </div>
+          ) : hasTerminal && tmuxName ? (
             <XTerminal sessionName={tmuxName} />
           ) : (
             <div className={styles.sessionPanelEmpty}>

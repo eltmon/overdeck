@@ -544,6 +544,11 @@ export const SessionNode = Schema.Struct({
   sessionId: Schema.String,
   tmuxSession: Schema.optional(Schema.String),
   model: Schema.String,
+  // Harness that spawned the session (claude-code | pi | codex). Pi/codex run
+  // `--mode rpc` with no TUI, so their terminal pane streams raw RPC protocol —
+  // the SessionPanel uses this to show a notice instead, and to gate live
+  // message streaming. Optional for backward compatibility with older payloads.
+  harness: Schema.optional(Schema.String),
   startedAt: Schema.String,
   endedAt: Schema.optional(Schema.String),
   duration: Schema.NullOr(Schema.Number),
