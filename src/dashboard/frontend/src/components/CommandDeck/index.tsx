@@ -546,11 +546,16 @@ export function CommandDeck({
     }
   }, [convId, conversations, resolveConversationProjectName, onSelectProject, openConversationTabIn, pendingConversationTarget, onPendingConversationTargetConsumed]);
 
-  // Auto-select first conversation on initial load if no deep-link and no feature selected
+  // Auto-select first conversation on initial load if no deep-link and no feature selected.
+  // An `?issue=` deep-link (issue cockpit/drawer, e.g. ?issue=PAN-1908&tab=conversation)
+  // is ALSO a deep-link: without this guard, auto-select grabbed conversations[0] and
+  // navigated to /conv/<id>, bouncing the operator off the issue's work-agent view onto an
+  // unrelated conversation on every page load/reload.
   const hasAutoSelected = useRef(false);
   useEffect(() => {
     if (hasAutoSelected.current) return;
-    if (conversations.length === 0 || convId || selectedConversation !== null || selectedFeature !== null || selectedProject !== null) return;
+    const hasIssueDeepLink = new URLSearchParams(window.location.search).has('issue');
+    if (conversations.length === 0 || convId || hasIssueDeepLink || selectedConversation !== null || selectedFeature !== null || selectedProject !== null) return;
     setSelectedConversation(conversations[0].name);
     hasAutoSelected.current = true;
   }, [conversations, convId, selectedConversation, selectedFeature, selectedProject]);
