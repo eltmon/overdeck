@@ -151,7 +151,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
@@ -1724,397 +1724,449 @@ async function recoverUnhealthyTestStack(
   return 'rebuilt';
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PAN-1908: reactive review-status handlers (replace directory scans)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ReviewStatusLike {
+  reviewStatus?: string;
+  testStatus?: string;
+  mergeStatus?: string;
+  readyForMerge?: boolean;
+  prUrl?: string | null;
+  stuck?: boolean;
+  deaconIgnored?: boolean;
+  stuckReason?: string;
+  reviewRetryCount?: number;
+  recoveryStartedAt?: string;
+  history?: Array<{ type: string; status: string; notes?: string }>;
+  reviewNotes?: string;
+  reviewedAtCommit?: string;
+  stuckAt?: string;
+  stuckDetails?: string;
+}
+
+function latestHistoryEntry(
+  history: Array<{ type: string; status: string; notes?: string }> | undefined,
+  type: 'review' | 'test',
+  terminalStatuses: readonly string[],
+): { status: string; notes?: string } | null {
+  if (!history || history.length === 0) return null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (entry.type === type && terminalStatuses.includes(entry.status)) {
+      return { status: entry.status, notes: entry.notes };
+    }
+  }
+  return null;
+}
+
+function latestHistoryByType(
+  history: Array<{ type: string; status: string; notes?: string }> | undefined,
+  type: 'review' | 'test',
+): string | undefined {
+  if (!history || history.length === 0) return undefined;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].type === type) return history[i].status;
+  }
+  return undefined;
+}
+
+async function isReviewAgentActiveForIssue(issueId: string): Promise<boolean> {
+  // PAN-1048 R5: role-primitive review/test runs (agent-<id>-review, agent-<id>-test).
+  try {
+    const agents = await Effect.runPromise(listRunningAgents());
+    for (const agent of agents) {
+      if (agent.status === 'stopped' || agent.status === 'error') continue;
+      const id = (agent.issueId ?? '').trim().toUpperCase();
+      if (!id || id !== issueId.toUpperCase()) continue;
+      const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : agent.id.endsWith('-test') ? 'test' : null);
+      if (role === 'review') return true;
+    }
+  } catch {
+    // fall through
+  }
+
+  // Global specialists
+  for (const type of ['review-agent'] as const) {
+    const session = getTmuxSessionName(type);
+    if (sessionExistsSync(session)) {
+      const rState = getAgentRuntimeStateSync(session);
+      if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
+        return true;
+      }
+    }
+  }
+
+  // Per-project ephemeral specialists
+  try {
+    const projectStatuses = await getAllProjectSpecialistStatuses();
+    for (const projSpec of projectStatuses) {
+      if (!projSpec.isRunning || projSpec.specialistType !== 'review-agent') continue;
+      const rState = getAgentRuntimeStateSync(projSpec.tmuxSession);
+      if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
+        return true;
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  return false;
+}
+
+async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
+  try {
+    const agents = await Effect.runPromise(listRunningAgents());
+    for (const agent of agents) {
+      if (agent.status === 'stopped' || agent.status === 'error') continue;
+      const id = (agent.issueId ?? '').trim().toUpperCase();
+      if (!id || id !== issueId.toUpperCase()) continue;
+      const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : agent.id.endsWith('-test') ? 'test' : null);
+      if (role === 'test') return true;
+    }
+  } catch {
+    // fall through
+  }
+
+  for (const type of ['test-agent'] as const) {
+    const session = getTmuxSessionName(type);
+    if (sessionExistsSync(session)) {
+      const rState = getAgentRuntimeStateSync(session);
+      if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
+        return true;
+      }
+    }
+  }
+
+  try {
+    const projectStatuses = await getAllProjectSpecialistStatuses();
+    for (const projSpec of projectStatuses) {
+      if (!projSpec.isRunning || projSpec.specialistType !== 'test-agent') continue;
+      const rState = getAgentRuntimeStateSync(projSpec.tmuxSession);
+      if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
+        return true;
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  return false;
+}
+
+/**
+ * PAN-1908: react to review.coordinator.died by resetting the issue to a
+ * pending review state and re-dispatching the review role. No review-status
+ * DB scan — operates on the single issue ID from the event.
+ */
+export async function handleReviewCoordinatorDied(
+  issueId: string,
+  _sessionName: string,
+  _reason: string,
+): Promise<string[]> {
+  const actions: string[] = [];
+  const status = getReviewStatusSync(issueId);
+
+  if (!status) {
+    logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — no review-status row`);
+    return actions;
+  }
+
+  if (status.stuck || status.deaconIgnored) {
+    logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — stuck/deaconIgnored`);
+    return actions;
+  }
+
+  if (await isIssueClosed(issueId)) {
+    logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — issue closed`);
+    return actions;
+  }
+
+  // Only reset from active/reviewing states; terminal/failed states should not
+  // be overwritten by a coordinator death event.
+  if (status.reviewStatus !== 'reviewing' && status.reviewStatus !== 'pending') {
+    logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — reviewStatus=${status.reviewStatus}`);
+    return actions;
+  }
+
+  const nextRetry = (status.reviewRetryCount ?? 0) + 1;
+  const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
+  setReviewStatusSync(issueId, {
+    reviewStatus: 'pending',
+    reviewRetryCount: nextRetry,
+    recoveryStartedAt: recoveryStart,
+  });
+  actions.push(`Reset review for ${issueId} after coordinator died (retry ${nextRetry})`);
+
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const issueLower = issueId.toLowerCase();
+  const workspace = findWorkspacePath(resolved?.projectPath ?? '', issueLower);
+
+  if (!resolved || !workspace) {
+    actions.push(`Skipped review re-dispatch for ${issueId}: workspace unavailable`);
+    return actions;
+  }
+
+  if (!tryReserveAdvancingSlot()) {
+    actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
+    return actions;
+  }
+
+  try {
+    const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+    const dispatchResult = await Effect.runPromise(
+      spawnReviewRoleForIssue({ issueId, workspace, branch: `feature/${issueLower}` }),
+    );
+    if (dispatchResult.gated) {
+      releaseAdvancingSlot();
+      actions.push(`Deferred review re-dispatch for ${issueId} — ${dispatchResult.message}`);
+    } else if (dispatchResult.success) {
+      actions.push(`Re-dispatched review for ${issueId} after coordinator died`);
+    } else {
+      actions.push(`Failed to re-dispatch review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    actions.push(`Failed to re-dispatch review for ${issueId}: ${msg}`);
+  }
+
+  return actions;
+}
+
+/**
+ * PAN-1908: react to work.completed by creating a review-status row if one is
+ * missing. The reactive scheduler's issue-state change already dispatches the
+ * review role; this handler ensures the row exists so downstream reads don't
+ * fail.
+ */
+export async function handleWorkCompleted(issueId: string): Promise<string[]> {
+  const actions: string[] = [];
+  const status = getReviewStatusSync(issueId);
+  if (status) {
+    logDeaconEventSync(`handleWorkCompleted: ${issueId} already has review-status row`);
+    return actions;
+  }
+
+  if (await isIssueClosed(issueId)) {
+    logDeaconEventSync(`handleWorkCompleted: ${issueId} skipped — issue closed`);
+    return actions;
+  }
+
+  setReviewStatusSync(issueId, {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    updatedAt: new Date().toISOString(),
+  });
+  actions.push(`Created missing review-status row for ${issueId} (work completed)`);
+  return actions;
+}
+
+/**
+ * PAN-1908: per-issue orphan reconciler for a single review-status row. Used by
+ * the legacy checkOrphanedReviewStatuses safety net and by reactive handlers.
+ */
+async function reconcileReviewStatusOrphan(issueId: string, status: ReviewStatusLike): Promise<string[]> {
+  const actions: string[] = [];
+
+  if (status.stuck) return actions;
+  if (status.deaconIgnored) return actions;
+  if (await isIssueClosed(issueId)) return actions;
+
+  const hasPassedReview = latestHistoryByType(status.history, 'review') === 'passed';
+  const hasPassedTest = latestHistoryByType(status.history, 'test') === 'passed';
+  const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
+  const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
+
+  const reviewAgentActive = await isReviewAgentActiveForIssue(issueId);
+
+  // Orphaned reviewing status
+  if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
+    if (latestTerminalReview && latestTerminalReview.status === 'passed') {
+      const reviewUpdate: Record<string, unknown> = {
+        reviewStatus: latestTerminalReview.status,
+        reviewNotes: latestTerminalReview.notes,
+      };
+      try {
+        const project = resolveProjectFromIssueSync(issueId);
+        if (project) {
+          const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          if (existsSync(workspacePath)) {
+            const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+            reviewUpdate['reviewedAtCommit'] = stdout.trim();
+          }
+        }
+      } catch { /* non-fatal */ }
+      if (status.stuckReason === 'review_infrastructure_failure') {
+        reviewUpdate['stuck'] = false;
+        reviewUpdate['stuckReason'] = undefined;
+        reviewUpdate['stuckAt'] = undefined;
+        reviewUpdate['stuckDetails'] = undefined;
+      }
+      if (latestTerminalTest) {
+        reviewUpdate['testStatus'] = latestTerminalTest.status;
+        reviewUpdate['testNotes'] = latestTerminalTest.notes;
+      }
+      if (status.mergeStatus === 'failed') {
+        const isCiFailure = typeof status.reviewNotes === 'string' && status.reviewNotes.includes('failing required checks');
+        if (!isCiFailure) {
+          reviewUpdate['mergeStatus'] = 'pending';
+        }
+      }
+      setReviewStatusSync(issueId, reviewUpdate);
+      actions.push(
+        `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
+        (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
+      );
+      return actions;
+    }
+    if (!hasPassedReview) {
+      const nextRetry = (status.reviewRetryCount ?? 0) + 1;
+      const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
+      setReviewStatusSync(issueId, {
+        reviewStatus: 'pending',
+        reviewRetryCount: nextRetry,
+        recoveryStartedAt: recoveryStart,
+      });
+      actions.push(
+        `Reset orphaned review for ${issueId} (no review-agent active; retry ${nextRetry}/${REVIEW_INFRA_BREAKER_THRESHOLD})`,
+      );
+    }
+  }
+
+  // Re-dispatch pending reviews
+  const reviewQueuedOrActive = reviewAgentActive;
+  if (
+    status.reviewStatus === 'pending' &&
+    !reviewQueuedOrActive &&
+    !hasPassedReview &&
+    status.prUrl
+  ) {
+    if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+      try {
+        markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
+          reviewRetryCount: status.reviewRetryCount ?? 0,
+          recoveryStartedAt: status.recoveryStartedAt,
+          lastReviewNotes: status.reviewNotes,
+        });
+        actions.push(
+          `Tripped review-infra breaker for ${issueId} after ${status.reviewRetryCount} retries — marked stuck`,
+        );
+      } catch (err) {
+        console.error(`[deacon] Failed to mark ${issueId} stuck after breaker trip:`, err);
+      }
+      return actions;
+    }
+
+    const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
+    const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
+    if (!existsSync(completedProcessedFile)) return actions;
+
+    const agentState = getAgentStateSync(agentIdForCheck);
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const issueLower = issueId.toLowerCase();
+    const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
+
+    if (workspace && resolved && !tryReserveAdvancingSlot()) {
+      actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
+    } else if (workspace && resolved) {
+      try {
+        const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+        const dispatchResult = await Effect.runPromise(
+          spawnReviewRoleForIssue({ issueId, workspace, branch: `feature/${issueLower}` }),
+        );
+        if (dispatchResult.gated) {
+          releaseAdvancingSlot();
+          actions.push(`Deferred review re-dispatch for ${issueId} — ${dispatchResult.message}`);
+        } else if (dispatchResult.success) {
+          actions.push(`Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`);
+        } else {
+          actions.push(`Failed to re-dispatch pending review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
+        }
+      } catch (err) {
+        actions.push(`Failed to re-dispatch pending review for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else if (!resolved) {
+      actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
+    } else {
+      actions.push(`Skipped pending review re-dispatch for ${issueId}: workspace unavailable`);
+    }
+  }
+
+  // Orphaned testing status
+  const testAgentActive = await isTestAgentActiveForIssue(issueId);
+  if (
+    (status.testStatus === 'testing' || status.testStatus === 'dispatch_failed') &&
+    !testAgentActive &&
+    !hasPassedTest &&
+    !status.readyForMerge
+  ) {
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const agentState = getAgentStateSync(agentId);
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const issueLower = issueId.toLowerCase();
+    const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
+
+    if (workspace && resolved) {
+      const branch = `feature/${issueLower}`;
+      const { spawnRun } = await import('../agents.js');
+      const { buildTestRolePrompt } = await import('./test-agent-queue.js');
+
+      const stackRecovery = await recoverUnhealthyTestStack(issueId, workspace);
+      if (stackRecovery === 'cooldown' || stackRecovery === 'exhausted') {
+        setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
+        actions.push(
+          stackRecovery === 'exhausted'
+            ? `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuild cap reached — escalated to human`
+            : `Orphaned test for ${issueId}: workspace docker stack rebuilding — deferring re-dispatch`,
+        );
+      } else if (!tryReserveAdvancingSlot()) {
+        actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
+      } else {
+        try {
+          const run = await spawnRun(issueId, 'test', {
+            workspace,
+            prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+          });
+          testStackRebuildState.delete(issueId.toUpperCase());
+          setReviewStatusSync(issueId, { testStatus: 'testing' });
+          actions.push(`Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('already running')) {
+            setReviewStatusSync(issueId, { testStatus: 'testing' });
+            actions.push(`Orphaned test for ${issueId}: test role already running`);
+          } else {
+            setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
+            actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+          }
+        }
+      }
+    } else {
+      setReviewStatusSync(issueId, { testStatus: 'pending' });
+      actions.push(
+        !resolved
+          ? `Reset orphaned test for ${issueId}: no project configured`
+          : `Reset orphaned test for ${issueId}: workspace unavailable`,
+      );
+    }
+  }
+
+  return actions;
+}
+
 export async function checkOrphanedReviewStatuses(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    // loadReviewStatuses() prefers SQLite (DB-first) and falls back to JSON —
-    // this is the authoritative source of truth after the PAN-653 DB migration.
+    // PAN-1908: the primary orphan recovery path is now reactive
+    // (review.coordinator.died / work.completed events). This function is kept
+    // as a thin SQLite-only safety net for dropped events.
     const statuses = loadReviewStatuses();
-
-    // Build a set of all active specialist sessions (global + per-project)
-    // so we can check if ANY specialist is working on review/test tasks.
-    const activeReviewSessions = new Set<string>(); // issue IDs being reviewed
-    const activeTestSessions = new Set<string>(); // issue IDs being tested
-
-    // Check global specialists
-    for (const type of ['review-agent', 'test-agent'] as const) {
-      const session = getTmuxSessionName(type);
-      if (sessionExistsSync(session)) {
-        const rState = getAgentRuntimeStateSync(session);
-        if (rState?.state === 'active' && rState.currentIssue) {
-          (type === 'review-agent' ? activeReviewSessions : activeTestSessions).add(rState.currentIssue.toUpperCase());
-        }
-      }
-    }
-
-    // Check per-project ephemeral specialists
-    const projectStatuses = await getAllProjectSpecialistStatuses();
-    for (const projSpec of projectStatuses) {
-      if (!projSpec.isRunning) continue;
-      const rState = getAgentRuntimeStateSync(projSpec.tmuxSession);
-      const isWorking = rState?.state === 'active';
-      if (isWorking && rState.currentIssue) {
-        if (projSpec.specialistType === 'review-agent') {
-          activeReviewSessions.add(rState.currentIssue.toUpperCase());
-        } else if (projSpec.specialistType === 'test-agent') {
-          activeTestSessions.add(rState.currentIssue.toUpperCase());
-        }
-      }
-    }
-
-    // PAN-1048 R5: detect role-primitive review/test runs (agent-<id>-review,
-    // agent-<id>-test) so the deacon doesn't spuriously flag an in-flight role
-    // run as an orphan. Replaces the legacy getActiveParallelReviewIssues
-    // helper that scanned for review-coordinator-* / review-<id>-<role>
-    // sessions spawned by dispatchParallelReview (now retired).
-    try {
-      const { listRunningAgents } = await import('../agents.js');
-      const agents = await Effect.runPromise(listRunningAgents());
-      for (const agent of agents) {
-        if (agent.status === 'stopped' || agent.status === 'error') continue;
-        const issueId = (agent.issueId ?? '').trim().toUpperCase();
-        if (!issueId) continue;
-        const role = agent.role
-          ?? (agent.id.endsWith('-review') ? 'review'
-            : agent.id.endsWith('-test') ? 'test'
-            : null);
-        if (role === 'review') activeReviewSessions.add(issueId);
-        else if (role === 'test') activeTestSessions.add(issueId);
-      }
-    } catch {
-      // Non-fatal: fall back to specialist-only detection
-    }
-
-    let modified = false;
-
-    const latestHistoryEntry = (
-      history: Array<{ type: string; status: string; notes?: string }> | undefined,
-      type: 'review' | 'test',
-      terminalStatuses: readonly string[],
-    ): { status: string; notes?: string } | null => {
-      if (!history || history.length === 0) return null;
-      for (let i = history.length - 1; i >= 0; i--) {
-        const entry = history[i];
-        if (entry.type === type && terminalStatuses.includes(entry.status)) {
-          return { status: entry.status, notes: entry.notes };
-        }
-      }
-      return null;
-    };
-
     for (const [issueId, status] of Object.entries(statuses)) {
-      // PAN-794: skip workspaces the breaker already marked stuck. A human unstick
-      // or a new commit is required to re-arm review dispatch for this issue.
-      if (status.stuck) continue;
-      // Operator-set ignore flag: skip all patrol re-dispatch for this issue
-      // until the human toggles it back off via the kanban button.
-      if (status.deaconIgnored) continue;
-      // PAN-1496/PAN-1613: never re-dispatch review/test for an issue closed
-      // on the tracker or shadow-state. The shared helper is TTL-cached, so
-      // checking each surviving row at most once per cache window is bounded and
-      // cannot reproduce the PAN-328 API storm.
-      if (await isIssueClosed(issueId)) {
-        console.log(`[deacon] ${issueId}: skipping review/test re-dispatch — issue is closed`);
-        continue;
-      }
-      // Skip issues that already completed their pipeline — don't reset
-      // statuses that the specialist already reported results for.
-      // History contains the ground truth; the top-level status fields
-      // are just the latest snapshot.
-      // "hasPassedX" means: the LATEST test/review history entry is 'passed',
-      // i.e. no newer 'testing'/'reviewing' marker has been recorded since.
-      // A stale 'passed' from a previous round must NOT block re-dispatch when
-      // new commits have triggered another round (the snapshot is bumped back
-      // to 'testing' but the old 'passed' is still in history).
-      const latestHistoryByType = (type: 'review' | 'test'): string | undefined => {
-        if (!status.history) return undefined;
-        for (let i = status.history.length - 1; i >= 0; i--) {
-          if (status.history[i].type === type) return status.history[i].status;
-        }
-        return undefined;
-      };
-      const hasPassedReview = latestHistoryByType('review') === 'passed';
-      const hasPassedTest = latestHistoryByType('test') === 'passed';
-      const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
-      const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
-
-      // Check for orphaned reviewing status — no specialist (global or per-project) is actively reviewing this issue
-      const reviewAgentActive = activeReviewSessions.has(issueId.toUpperCase());
-      if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
-        // Only restore terminal 'passed' states. Restoring 'failed'/'blocked' would replay
-        // stale review notes verbatim (deacon has no way to know whether the agent has
-        // pushed new commits that address those notes), creating the cycling-review illusion
-        // where every patrol tick appears to be a fresh review failure. For failed/blocked
-        // terminal states, fall through to reset=pending so the re-dispatch path below wakes
-        // a real review against the current code.
-        if (latestTerminalReview && latestTerminalReview.status === 'passed') {
-          const reviewUpdate: Record<string, unknown> = {
-            reviewStatus: latestTerminalReview.status,
-            reviewNotes: latestTerminalReview.notes,
-          };
-          // Snapshot the workspace HEAD when restoring a passed review from
-          // history. Without reviewedAtCommit the canSkipTests fast-path and
-          // checkPostReviewCommits both go blind, and the issue can jam at
-          // passed-but-no-commit-anchor (PAN-977).
-          try {
-            const { resolveProjectFromIssueSync } = await import('../projects.js');
-            const project = resolveProjectFromIssueSync(issueId);
-            if (project) {
-              const workspacePath = join(
-                project.projectPath,
-                'workspaces',
-                `feature-${issueId.toLowerCase()}`,
-              );
-              if (existsSync(workspacePath)) {
-                const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
-                reviewUpdate['reviewedAtCommit'] = stdout.trim();
-              }
-            }
-          } catch { /* non-fatal — leave reviewedAtCommit unchanged */ }
-          // A restored terminal-passed review resolves any review-infra stuck
-          // marker — clear it so the deacon stops skipping the issue.
-          if (status.stuckReason === 'review_infrastructure_failure') {
-            reviewUpdate['stuck'] = false;
-            reviewUpdate['stuckReason'] = undefined;
-            reviewUpdate['stuckAt'] = undefined;
-            reviewUpdate['stuckDetails'] = undefined;
-          }
-          if (latestTerminalTest) {
-            reviewUpdate['testStatus'] = latestTerminalTest.status;
-            reviewUpdate['testNotes'] = latestTerminalTest.notes;
-          }
-          if (status.mergeStatus === 'failed') {
-            // Only reset transient failures (e.g. git conflicts, network errors).
-            // CI check failures must stay 'failed' until the work agent pushes a fix —
-            // resetting to 'pending' would re-queue the merge and cycle indefinitely.
-            const isCiFailure = typeof status.mergeNotes === 'string' &&
-              status.mergeNotes.includes('failing required checks');
-            if (!isCiFailure) {
-              reviewUpdate['mergeStatus'] = 'pending';
-            }
-          }
-          setReviewStatusSync(issueId, reviewUpdate as Parameters<typeof setReviewStatusSync>[1]);
-          status.reviewStatus = latestTerminalReview.status;
-          if (latestTerminalTest) {
-            status.testStatus = latestTerminalTest.status as typeof status.testStatus;
-          }
-          actions.push(
-            `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` +
-            (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
-          );
-          continue;
-        }
-        if (!hasPassedReview) {
-          console.log(`[deacon] Orphaned review detected: ${issueId} shows 'reviewing' but no review-agent is working on it`);
-          // PAN-794: an orphaned 'reviewing' with no active session is the
-          // signature of an infrastructure failure (spawn crash, tmux session
-          // died, dispatch never wrote a terminal status). Count each reset so
-          // the breaker can trip after a bounded number of failed recovery cycles.
-          const nextRetry = (status.reviewRetryCount ?? 0) + 1;
-          const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
-          // Use setReviewStatus (not direct JSON write) so SQLite is updated too
-          setReviewStatusSync(issueId, {
-            reviewStatus: 'pending',
-            reviewRetryCount: nextRetry,
-            recoveryStartedAt: recoveryStart,
-          });
-          status.reviewStatus = 'pending';
-          status.reviewRetryCount = nextRetry;
-          status.recoveryStartedAt = recoveryStart;
-          actions.push(
-            `Reset orphaned review for ${issueId} (no review-agent active; retry ${nextRetry}/${REVIEW_INFRA_BREAKER_THRESHOLD})`,
-          );
-        }
-      }
-
-      // Re-dispatch pending reviews that should be in the pipeline.
-      // This covers the gap where checkOrphanedReviewStatuses resets reviewing → pending
-      // but nothing re-enqueues the issue. Conditions: reviewStatus=pending AND the issue
-      // has completed (completed.processed exists) AND has a PR (prUrl exists) AND no
-      // review agent is currently working on it.
-      const reviewQueuedOrActive = activeReviewSessions.has(issueId.toUpperCase());
-      if (
-        status.reviewStatus === 'pending' &&
-        !reviewQueuedOrActive &&
-        !hasPassedReview &&
-        status.prUrl
-      ) {
-        // PAN-794: trip the circuit breaker before another re-dispatch if the
-        // current recovery cycle has already consumed its retry budget. The
-        // workspace is marked stuck with a specific review-infra reason so the
-        // dashboard can render the recovery UI and a human can unstick once the
-        // root cause (spawn script, review template, etc.) is addressed.
-        if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
-          try {
-            markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
-              reviewRetryCount: status.reviewRetryCount ?? 0,
-              recoveryStartedAt: status.recoveryStartedAt,
-              lastReviewNotes: status.reviewNotes,
-            });
-            status.stuck = true;
-            status.stuckReason = 'review_infrastructure_failure';
-            actions.push(
-              `Tripped review-infra breaker for ${issueId} after ${status.reviewRetryCount} retries — marked stuck`,
-            );
-            console.warn(
-              `[deacon] Review-infra breaker tripped for ${issueId} (retries=${status.reviewRetryCount}); marked stuck`,
-            );
-          } catch (err) {
-            console.error(`[deacon] Failed to mark ${issueId} stuck after breaker trip:`, err);
-          }
-          continue;
-        }
-        // Check completed.processed marker
-        const agentIdForCheck = `agent-${issueId.toLowerCase()}`;
-        const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
-        if (existsSync(completedProcessedFile)) {
-          const agentState = getAgentStateSync(agentIdForCheck);
-          // A completed.processed marker means the work agent intentionally handed off;
-          // review recovery does not require that work session to still be running.
-          const { resolveProjectFromIssueSync } = await import('../projects.js');
-          const resolved = resolveProjectFromIssueSync(issueId);
-          const issueLower = issueId.toLowerCase();
-          const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
-
-          if (workspace && resolved && !tryReserveAdvancingSlot()) {
-            // PAN-1665: at the concurrency ceiling — defer (leave status untouched
-            // so a later patrol retries once a slot frees). Never fail the review.
-            actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred review re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
-          } else if (workspace && resolved) {
-            const branch = `feature/${issueLower}`;
-            // PAN-1048 R4: deacon recovery routes through the role primitive.
-            const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-            try {
-              const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
-              if (dispatchResult.gated) {
-                releaseAdvancingSlot();
-                actions.push(`Deferred review re-dispatch for ${issueId} — ${dispatchResult.message}`);
-                console.log(`[deacon] Deferred review re-dispatch for ${issueId}: ${dispatchResult.message}`);
-              } else if (dispatchResult.success) {
-                // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally;
-                // keep local status in sync so this patrol doesn't re-process the issue.
-                status.reviewStatus = 'reviewing';
-                actions.push(
-                  `Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`,
-                );
-                console.log(
-                  `[deacon] Re-dispatched review for ${issueId} after orphan/pending detection`,
-                );
-              } else {
-                actions.push(
-                  `Failed to re-dispatch pending review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`,
-                );
-                console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, dispatchResult.error || dispatchResult.message);
-              }
-            } catch (err) {
-              actions.push(
-                `Failed to re-dispatch pending review for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
-              );
-              console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, err);
-            }
-          } else if (!resolved) {
-            actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
-          } else {
-            actions.push(`Skipped pending review re-dispatch for ${issueId}: workspace unavailable`);
-            console.log(`[deacon] Skipped review re-dispatch for ${issueId} — workspace unavailable`);
-          }
-        }
-      }
-
-      // Check for orphaned testing status (includes dispatch_failed from PAN-369)
-      const testAgentActive = activeTestSessions.has(issueId.toUpperCase());
-      if (
-        (status.testStatus === 'testing' || status.testStatus === 'dispatch_failed') &&
-        !testAgentActive &&
-        !hasPassedTest &&
-        !status.readyForMerge
-      ) {
-        console.log(
-          `[deacon] Orphaned test detected: ${issueId} shows '${status.testStatus}' but test-agent is not active`,
-        );
-
-        // Re-dispatch through the unified test role runner (no specialist queue fallback)
-        const agentId = `agent-${issueId.toLowerCase()}`;
-        const agentState = getAgentStateSync(agentId);
-        const { resolveProjectFromIssueSync } = await import('../projects.js');
-        const resolved = resolveProjectFromIssueSync(issueId);
-        const issueLower = issueId.toLowerCase();
-        const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
-
-        if (workspace && resolved) {
-          const branch = `feature/${issueLower}`;
-          const { spawnRun } = await import('../agents.js');
-          const { buildTestRolePrompt } = await import('./test-agent-queue.js');
-
-          // PAN-1190: a test role cannot spawn while the workspace docker stack
-          // is unhealthy (assertWorkspaceStackHealthyForSpawn throws). Self-heal
-          // the stack before re-dispatch so this patrol does not loop
-          // `dispatch_failed` forever; defer this cycle while a rebuild is
-          // cooling down, and stop entirely once the rebuild cap is exhausted.
-          const stackRecovery = await recoverUnhealthyTestStack(issueId, workspace);
-          if (stackRecovery === 'cooldown' || stackRecovery === 'exhausted') {
-            setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
-            status.testStatus = 'dispatch_failed';
-            actions.push(
-              stackRecovery === 'exhausted'
-                ? `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuild cap reached — escalated to human`
-                : `Orphaned test for ${issueId}: workspace docker stack rebuilding — deferring re-dispatch`,
-            );
-          } else if (!tryReserveAdvancingSlot()) {
-            // PAN-1665: at the concurrency ceiling — defer without touching status
-            // so a later patrol retries once a slot frees.
-            actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-            logDeaconEventSync(`checkOrphanedReviewStatuses: deferred test re-dispatch for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
-          } else {
-            try {
-              const run = await spawnRun(issueId, 'test', {
-                workspace,
-                prompt: buildTestRolePrompt({ issueId, workspace, branch }),
-              });
-              testStackRebuildState.delete(issueId.toUpperCase());
-              setReviewStatusSync(issueId, { testStatus: 'testing' });
-              status.testStatus = 'testing';
-              actions.push(
-                `Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`,
-              );
-              console.log(
-                `[deacon] Re-dispatched test role for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
-              );
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              if (msg.includes('already running')) {
-                setReviewStatusSync(issueId, { testStatus: 'testing' });
-                status.testStatus = 'testing';
-                actions.push(`Orphaned test for ${issueId}: test role already running`);
-                console.log(`[deacon] Test role already running for ${issueId}`);
-              } else {
-                setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
-                status.testStatus = 'dispatch_failed';
-                actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
-                console.log(`[deacon] Orphaned test role dispatch failed for ${issueId}: ${msg}`);
-              }
-            }
-          }
-        } else {
-          // Cannot derive workspace/project — reset to pending so the pipeline can re-trigger cleanly
-          setReviewStatusSync(issueId, { testStatus: 'pending' });
-          status.testStatus = 'pending';
-          actions.push(
-            !resolved
-              ? `Reset orphaned test for ${issueId}: no project configured`
-              : `Reset orphaned test for ${issueId}: workspace unavailable`,
-          );
-          console.log(
-            !resolved
-              ? `[deacon] Reset orphaned test for ${issueId} to pending (no project configured)`
-              : `[deacon] Reset orphaned test for ${issueId} to pending (workspace unavailable)`,
-          );
-        }
-      }
+      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike);
+      actions.push(...result);
     }
-
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error checking orphaned review statuses:', msg);
@@ -2273,77 +2325,57 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(AGENTS_DIR)) return actions;
-
-    const { loadReviewStatuses } = await import('../review-status.js');
+    // PAN-1908: primary missing-status creation is now reactive (work.completed
+    // event). This function is kept as a thin safety net that queries the
+    // agents table instead of scanning directories.
     const statuses = loadReviewStatuses();
+    const agents = listAllAgents();
 
-    const agentDirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name.startsWith('agent-'));
+    for (const agent of agents) {
+      if (!agent.id.startsWith('agent-')) continue;
+      const issueId = agent.id.replace('agent-', '').toUpperCase();
+      if (statuses[issueId]) continue;
 
-    for (const dir of agentDirs) {
-      const issueId = dir.name.replace('agent-', '').toUpperCase();
-      if (statuses[issueId]) continue; // already has a status row
-
-      const completedFile = join(AGENTS_DIR, dir.name, 'completed');
-      const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
+      const completedFile = join(AGENTS_DIR, agent.id, 'completed');
+      const processedFile = join(AGENTS_DIR, agent.id, 'completed.processed');
       if (!existsSync(completedFile) && !existsSync(processedFile)) continue;
 
-      // PAN-1496 (zombie-on-closed): if the issue is CLOSED on the tracker, do
-      // not re-dispatch review/test against it — and REAP the stale
-      // completed/completed.processed markers so this patrol stops re-firing on
-      // it every cycle (the markers are what keep a closed issue alive here).
-      // This is API-safe: checkMissingReviewStatuses only reaches here for
-      // agent dirs that both lack a status row AND carry a completion marker —
-      // a small, bounded set — so the per-issue tracker fallback in
-      // isIssueClosed can't storm the API the way a per-open-issue check would.
+      const rowCreated = await handleWorkCompleted(issueId);
+      actions.push(...rowCreated);
+
+      // PAN-1496: if the issue is closed, reap the stale markers.
       try {
         if (await isIssueClosed(issueId)) {
           try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
           try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
           actions.push(`Reaped stale completion markers for CLOSED ${issueId} (no review re-dispatch)`);
-          console.log(`[deacon] ${issueId} is closed — reaped stale completion markers, skipping review dispatch`);
           continue;
         }
       } catch (closedErr) {
-        // Non-fatal: if the closed check itself errors, fall through to the
-        // normal dispatch path rather than silently dropping the issue.
         console.warn(`[deacon] checkMissingReviewStatuses closed-check failed for ${issueId}:`, closedErr);
       }
 
-      // Work is done but no status row — auto-trigger review
-      const { resolveProjectFromIssueSync } = await import('../projects.js');
       const resolved = resolveProjectFromIssueSync(issueId);
-      if (!resolved) {
-        actions.push(`Skipped missing-status review for ${issueId}: no project configured`);
-        continue;
-      }
-
       const issueLower = issueId.toLowerCase();
-      const workspace = findWorkspacePath(resolved.projectPath, issueLower);
-      if (!workspace) {
-        actions.push(`Skipped missing-status review for ${issueId}: workspace unavailable`);
+      const workspace = findWorkspacePath(resolved?.projectPath ?? '', issueLower);
+      if (!resolved || !workspace) {
+        actions.push(`Skipped missing-status review for ${issueId}: ${!resolved ? 'no project configured' : 'workspace unavailable'}`);
         continue;
       }
 
-      // PAN-1665: defer when at the advancing-role concurrency ceiling. No status
-      // row exists yet, so leaving it untouched lets a later patrol retry cleanly.
       if (!tryReserveAdvancingSlot()) {
         actions.push(`Deferred missing-status review for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkMissingReviewStatuses: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
         continue;
       }
 
-      // PAN-1048 R4: deacon auto-trigger routes through the role primitive.
-      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
       try {
+        const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace,
           branch: `feature/${issueLower}`,
         }));
         actions.push(`Auto-triggered review for ${issueId} (missing status entry)`);
-        console.log(`[deacon] Auto-triggered review for ${issueId} (missing status entry)`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         actions.push(`Failed to auto-trigger review for ${issueId}: ${msg}`);
@@ -5081,7 +5113,9 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...reapedAwaitingTestActions);
   for (const a of reapedAwaitingTestActions) addLog('action', a, state.patrolCycle);
 
-  // Check for orphaned review/test statuses (PAN-88)
+  // PAN-1908: primary review-status orphan recovery is now reactive
+  // (review.coordinator.died / work.completed events). The patrol keeps a thin
+  // SQLite-only safety net for dropped events.
   const orphanActions = await checkOrphanedReviewStatuses();
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
@@ -5101,7 +5135,8 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stalledConvoyActions);
   for (const a of stalledConvoyActions) addLog('action', a, state.patrolCycle);
 
-  // Check for completed work with no review status entry at all (PAN-699)
+  // PAN-1908: primary missing-status creation is now reactive (work.completed
+  // event). The patrol keeps a thin agents-table safety net for dropped events.
   const missingStatusActions = await checkMissingReviewStatuses();
   actions.push(...missingStatusActions);
   for (const a of missingStatusActions) addLog('action', a, state.patrolCycle);

@@ -149,7 +149,7 @@ import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
-import { getReviewStatusSync } from '../../review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -383,5 +383,40 @@ describe('reactive Cloister scheduler', () => {
     }));
 
     expect(killSession).not.toHaveBeenCalled();
+  });
+
+  it('routes review.coordinator.died events to the deacon review recovery handler', async () => {
+    vi.mocked(getReviewStatusSync).mockReturnValue({
+      issueId: 'PAN-503',
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      reviewRetryCount: 0,
+    } as any);
+    vi.mocked(getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-503',
+      issueId: 'PAN-503',
+      workspace: '/tmp/workspace',
+    } as any);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+    vi.mocked(sessionExistsSync).mockReturnValue(false);
+
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'review.coordinator.died',
+      payload: { issueId: 'PAN-503', sessionName: 'agent-pan-503-review', reason: 'pane dead' },
+    }));
+
+    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', expect.objectContaining({ reviewStatus: 'pending' }));
+  });
+
+  it('routes work.completed events to the missing review-status handler', async () => {
+    vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
+
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'work.completed',
+      payload: { issueId: 'PAN-503' },
+    }));
+
+    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', expect.objectContaining({ reviewStatus: 'pending', testStatus: 'pending' }));
+    expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-503' }));
   });
 });

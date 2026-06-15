@@ -438,6 +438,27 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
     return;
   }
 
+  // PAN-1908: reactive review-status handlers — deacon handles review lifecycle
+  // events instead of scanning directories / the review-status DB.
+  if (event.type === 'review.coordinator.died') {
+    const payload = event.payload as { issueId?: string; sessionName?: string; reason?: string } | undefined;
+    const issueId = payload?.issueId;
+    if (issueId) {
+      const { handleReviewCoordinatorDied } = await import('./deacon.js');
+      await handleReviewCoordinatorDied(issueId, payload?.sessionName ?? '', payload?.reason ?? '');
+    }
+    return;
+  }
+  if (event.type === 'work.completed') {
+    const payload = event.payload as { issueId?: string } | undefined;
+    const issueId = payload?.issueId;
+    if (issueId) {
+      const { handleWorkCompleted } = await import('./deacon.js');
+      await handleWorkCompleted(issueId);
+    }
+    // Fall through to onIssueStateChange for in_review dispatch.
+  }
+
   const change = issueStateChangeFromDomainEvent(event);
   if (!change) return;
   await Effect.runPromise(onIssueStateChange(change.issueId, change.state));
