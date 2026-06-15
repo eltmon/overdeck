@@ -327,6 +327,25 @@ Deacon auto-resume is intentionally suppressible through three gates:
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.
 
+## Agent State Planes (PAN-1908)
+
+Agent and pipeline state is split into three planes. Do not read or write the wrong one.
+
+1. **Permanent plane — git infra repo.** Durable per-issue records under `.pan/<recordsPath>/<issue>.json` containing the continue subset (`decisions`, `hazards`, `feedback`), the `pipeline` verdict block, `closeOut` (usage, merges, ranOn), and the `owner` URI lease. Specs and project-side continues live here too. Portable across machines.
+2. **Runtime plane — local SQLite `~/.panopticon/panopticon.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
+3. **Liveness oracle — tmux on socket `-L panopticon`.** Ground truth for whether an agent process is actually running.
+
+Key rules:
+- Enumerate agents from the `agents` table, not from `~/.panopticon/agents/*/state.json`.
+- `state.json` is kept as a rollback/rebuild source only.
+- Durable `review_status` verdicts are mirrored into the per-issue permanent record's `pipeline` block.
+- Configure the infra repo per project in `projects.yaml` under `pan_records: { repo, path }`.
+- `pan admin db rebuild-agents` reconstructs the `agents` table from `state.json` + live tmux.
+- `pan admin db backfill-records` writes permanent records for all in-flight issues.
+- `PANOPTICON_NO_RESUME=1` disables event-driven deacon resume/orphan recovery as a kill switch.
+
+See [`docs/AGENT-STATE-PLANES.md`](docs/AGENT-STATE-PLANES.md) for the full model.
+
 ## Project Resolution from Issue IDs
 
 Issue IDs are resolved to projects via `resolveProjectFromIssue()` in `src/lib/projects.ts`
