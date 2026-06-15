@@ -218,7 +218,6 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     await writeFile(join(agentDir, 'state.json'), JSON.stringify({
       id: CODEX_AGENT_ID,
       harness: 'codex',
-      codexMode: 'work-tui',
     }));
     const sessionsDay = join(agentDir, 'codex-home', 'sessions', '2026', '06', '12');
     await mkdir(sessionsDay, { recursive: true });

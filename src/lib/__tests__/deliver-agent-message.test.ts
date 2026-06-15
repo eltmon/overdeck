@@ -226,11 +226,10 @@ describe('channel bridge delivery', () => {
     }
   });
 
-  it('codex work-tui agents use live-session delivery instead of exec resume', async () => {
+  it('codex work agents use live-session delivery instead of exec resume', async () => {
     const agentId = 'agent-codex-tui';
     writeAgentState(agentId, {
       harness: 'codex',
-      codexMode: 'work-tui',
       channelsEnabled: false,
       supervisorEnabled: true,
     });

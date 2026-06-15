@@ -24,31 +24,17 @@ const AGENTS_TABLE_COLUMNS = new Set([
   'pausedAt', 'troubled', 'troubledAt', 'consecutiveFailures',
   'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason',
   'lastFailureNextRetryAt', 'branch', 'costSoFar', 'sessionId', 'phase',
-  'workType', 'flywheelRunId', 'roleRunHead', 'reviewDeadlineAt',
+  'workType', 'flywheelRunId', 'roleRunHead', 'reviewSubRole', 'reviewRunId',
+  'reviewSynthesisAgentId', 'reviewOutputPath', 'reviewDeadlineAt',
   'reviewMonitorSignaled', 'reviewRetryAttempt', 'hostOverride',
   'inspectSubRole', 'deliveryMethod', 'supervisorEnabled', 'channelsEnabled',
 ]);
 
-// Per PRD §5.1, 39 AgentState fields are persisted to the agents column set
-// below; the remaining interface fields are either routed to the per-issue
-// record pipeline or are in the explicit delete list.
-// Per PRD §5.1 / D4: only 39 AgentState fields survive the cutover. The
-// interface currently has 43 persisted + 4 deleted = 47 fields. The audit
-// enforces that 39 of them are classified to an agents-column home and the
-// rest are either routed elsewhere or in the delete list.
-const AGENTS_ROUTED_FIELDS = new Set([
-  'reviewSubRole', 'reviewRunId', 'reviewOutputPath', 'reviewSynthesisAgentId',
-]);
-
-const AGENTS_PIPELINE_ROUTE_FIELDS = new Set<string>([
-  ...AGENTS_ROUTED_FIELDS,
-]);
+const AGENTS_PIPELINE_ROUTE_FIELDS = new Set<string>([]);
 
 const AGENTS_EPHEMERAL_FIELDS = new Set<string>([]);
 
-const AGENTS_DELETE_FIELDS = new Set([
-  'preSpawnStashRef', 'preSpawnStashMessage', 'preSpawnBaselineHead', 'codexMode',
-]);
+const AGENTS_DELETE_FIELDS = new Set<string>([]);
 
 // ─── review_status column manifest — Appendix A §2 ───────────────────────────
 
@@ -75,8 +61,7 @@ const REVIEW_STATUS_DELETE_COLUMNS = new Set<string>([]);
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function allAgentStateFields(): string[] {
-  // All fields that exist in the AgentState interface, including the four
-  // that are explicitly deleted. The audit verifies every one is classified.
+  // All fields that exist in the current AgentState interface.
   return [
     ...AGENTS_TABLE_COLUMNS,
     ...AGENTS_PIPELINE_ROUTE_FIELDS,
@@ -112,20 +97,20 @@ function classifyReviewStatusColumn(column: string): string {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('PAN-1908 no-loss audit', () => {
-  it('classifies every non-deleted AgentState field (43 total)', () => {
-    const fields = allAgentStateFields().filter((f) => !AGENTS_DELETE_FIELDS.has(f));
+  it('classifies every AgentState field (43 total)', () => {
+    const fields = allAgentStateFields();
     expect(fields.length).toBe(43);
 
     const unclassified = fields.filter((f) => classifyAgentField(f) === 'unclassified');
     expect(unclassified).toEqual([]);
   });
 
-  it('exactly 39 AgentState fields map to the agents table', () => {
-    expect(AGENTS_TABLE_COLUMNS.size).toBe(39);
+  it('exactly 43 AgentState fields map to the agents table', () => {
+    expect(AGENTS_TABLE_COLUMNS.size).toBe(43);
   });
 
-  it('maps every non-deleted AgentState field to exactly one home', () => {
-    const fields = allAgentStateFields().filter((f) => !AGENTS_DELETE_FIELDS.has(f));
+  it('maps every AgentState field to exactly one home', () => {
+    const fields = allAgentStateFields();
 
     for (const field of fields) {
       const homes = [
@@ -144,14 +129,13 @@ describe('PAN-1908 no-loss audit', () => {
     // updating the manifest, the previous test catches it.
     const manifestFields = new Set(allAgentStateFields());
     const interfaceFields = new Set([
-      'id', 'issueId', 'workspace', 'harness', 'codexMode', 'role', 'model',
+      'id', 'issueId', 'workspace', 'harness', 'role', 'model',
       'status', 'startedAt', 'lastActivity', 'lastResumeAt', 'kickoffDelivered',
       'stoppedAt', 'stoppedByUser', 'stoppedByPause', 'paused', 'pausedReason',
       'pausedAt', 'troubled', 'troubledAt', 'consecutiveFailures',
       'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason',
       'lastFailureNextRetryAt', 'branch', 'costSoFar', 'sessionId', 'phase',
-      'workType', 'preSpawnStashRef', 'preSpawnStashMessage',
-      'preSpawnBaselineHead', 'channelsEnabled', 'supervisorEnabled',
+      'workType', 'channelsEnabled', 'supervisorEnabled',
       'deliveryMethod', 'roleRunHead', 'flywheelRunId', 'reviewSubRole',
       'reviewRunId', 'reviewOutputPath', 'reviewSynthesisAgentId',
       'reviewDeadlineAt', 'reviewMonitorSignaled', 'reviewRetryAttempt',

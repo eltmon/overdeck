@@ -884,8 +884,6 @@ export interface AgentState {
   workspace: string;
   /** Coding-agent harness this agent runs under (PAN-636). */
   harness?: RuntimeName;
-  /** Codex launch mode for compatibility with legacy one-shot agents. */
-  codexMode?: 'exec' | 'tui' | 'work-tui';
   /** Unified role primitive (PAN-1048). */
   role: Role;
   model: string;
@@ -923,9 +921,6 @@ export interface AgentState {
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Current work type ID
-  preSpawnStashRef?: string;
-  preSpawnStashMessage?: string;
-  preSpawnBaselineHead?: string;
 
   /**
    * Whether this work agent was launched with the experimental Claude Code
@@ -985,7 +980,6 @@ function cleanAgentState(raw: AgentState): AgentState {
     issueId: raw.issueId,
     workspace: raw.workspace,
     harness: raw.harness,
-    codexMode: raw.codexMode,
     role: raw.role,
     model: raw.model,
     status: raw.status,
@@ -1009,9 +1003,6 @@ function cleanAgentState(raw: AgentState): AgentState {
     branch: raw.branch,
     costSoFar: raw.costSoFar,
     sessionId: raw.sessionId,
-    preSpawnStashRef: raw.preSpawnStashRef,
-    preSpawnStashMessage: raw.preSpawnStashMessage,
-    preSpawnBaselineHead: raw.preSpawnBaselineHead,
     roleRunHead: raw.roleRunHead,
     channelsEnabled: raw.channelsEnabled,
     supervisorEnabled: raw.supervisorEnabled,
@@ -1123,9 +1114,6 @@ function dbAgentToAgentState(agent: DbAgent): AgentState {
     sessionId: agent.sessionId ?? undefined,
     phase: agent.phase ? (agent.phase as AgentState['phase']) : undefined,
     workType: agent.workType ?? undefined,
-    preSpawnStashRef: undefined,
-    preSpawnStashMessage: undefined,
-    preSpawnBaselineHead: undefined,
     roleRunHead: agent.roleRunHead ?? undefined,
     channelsEnabled: agent.channelsEnabled ?? undefined,
     supervisorEnabled: agent.supervisorEnabled ?? undefined,
@@ -1629,15 +1617,6 @@ export async function deliverAgentMessage(
   let resolvedMethod = deliveryMethod;
   try {
     const state = await Effect.runPromise(getAgentState(normalizedId));
-    // Legacy Codex exec agents were headless one-shot processes; route those
-    // through `codex exec resume`. Persistent work-tui agents use the normal
-    // supervisor/channels/tmux delivery ladder below.
-    if (state?.harness === 'codex' && state.codexMode !== 'work-tui') {
-      const { CodexRuntimeSync } = await import('./runtimes/codex.js');
-      const rt = new CodexRuntimeSync();
-      await rt.sendMessage(normalizedId, message);
-      return { ok: true, path: 'codex' };
-    }
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
   } catch {
@@ -3365,7 +3344,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     issueId,
     workspace,
     harness: resolvedHarness,
-    codexMode: resolvedHarness === 'codex' ? 'work-tui' : undefined,
     role,
     model: selectedModel,
     status: 'starting',
@@ -3549,30 +3527,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
-  // Legacy codex exec specialists wrote a rollout before exiting; capture that
-  // thread-id for old exec launches only. Codex work-tui sessions write their
-  // rollout after the first delivered prompt, so this pre-prompt poll would
-  // only delay kickoff.
-  if (resolvedHarness === 'codex' && state.codexMode !== 'work-tui') {
-    const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
-      await import('./runtimes/codex.js');
-    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
-    const rolloutPath = await waitForCodexRollout(codexHomeForAgent, 30000);
-    if (rolloutPath) {
-      const threadId = extractThreadIdFromRollout(rolloutPath);
-      if (threadId) {
-        writeCodexThreadId(agentId, threadId);
-        try {
-          await writeFile(join(getAgentDir(agentId), 'session.id'), threadId, 'utf-8');
-        } catch (err) {
-          console.warn(`[spawnRun] Failed to update session.id with codex thread-id for ${agentId}:`, err instanceof Error ? err.message : String(err));
-        }
-      }
-    } else {
-      console.warn(`[spawnRun] Codex specialist ${agentId}: rollout did not appear within 30s — thread-id not captured`);
-    }
-  }
-
   if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
@@ -3696,21 +3650,16 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   // Create state
-  const existingState = getAgentStateSync(agentId);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
     workspace: options.workspace,
     harness: resolvedHarness,
-    codexMode: resolvedHarness === 'codex' ? 'work-tui' : undefined,
     role,
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
-    preSpawnStashRef: existingState?.preSpawnStashRef,
-    preSpawnStashMessage: existingState?.preSpawnStashMessage,
-    preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
     hostOverride: options.allowHost || undefined,
   };
 
@@ -4515,9 +4464,6 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
-    if (fallbackHarness === 'codex') {
-      agentState.codexMode = 'work-tui';
-    }
     await assertWorkspaceStackHealthyForSpawn(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       resumeRole,
@@ -4531,7 +4477,6 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
-    saveAgentStateSync(agentState);
     const fallbackContent = generateLauncherScriptSync({
       role: resumeRole,
       workingDir: agentState.workspace,
@@ -4885,11 +4830,6 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const legacyHarnessMigrated =
       !hasSessionOrigin && priorHarness !== undefined && priorHarness !== effectiveHarness;
     agentState.harness = effectiveHarness;
-    if (effectiveHarness === 'codex') {
-      agentState.codexMode = 'work-tui';
-    } else {
-      delete agentState.codexMode;
-    }
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
     const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
@@ -5384,11 +5324,6 @@ export async function recoverAgent(
   const recoveryCodexFields = recoveryHarness === 'codex'
     ? getCodexLauncherFields(normalizedId, state.model, state.workspace)
     : {};
-  if (recoveryHarness === 'codex') {
-    state.codexMode = 'work-tui';
-  } else {
-    delete state.codexMode;
-  }
   const recoveryLauncherContent = generateLauncherScriptSync({
     role: recoveryRole,
     workingDir: state.workspace,
