@@ -4,7 +4,7 @@
     "created": "2026-06-15T03:25:03.510Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1908: event-driven agent state — SQLite runtime registry + git-permanent issue records in the infra repo (big-bang)",
-    "updated": "2026-06-15T06:43:55.305Z"
+    "updated": "2026-06-15T18:50:20.803Z"
   },
   "plan": {
     "id": "pan-1908",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "1f596ba9-7d42-4c7e-8169-3a4da3032f67",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 6,
     "created": "2026-06-15T03:25:03.510Z",
-    "updated": "2026-06-15T06:43:55.305Z",
+    "updated": "2026-06-15T18:50:20.803Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1908",
