@@ -19,7 +19,7 @@ import type { SqliteDatabase } from './driver.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 54;
+export const SCHEMA_VERSION = 55;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -426,6 +426,60 @@ export function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
       ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
       WHERE json_type(payload, '$.issueId') = 'text';
+
+    -- ===== Agents (PAN-1908: authoritative runtime registry) =====
+    CREATE TABLE IF NOT EXISTS agents (
+      id            TEXT PRIMARY KEY,
+      issue_id      TEXT NOT NULL,
+      role          TEXT NOT NULL,
+      status        TEXT NOT NULL,
+      workspace     TEXT NOT NULL,
+      harness       TEXT,
+      model         TEXT,
+      branch        TEXT,
+      session_id    TEXT,
+      started_at    TEXT,
+      last_activity TEXT,
+      last_resume_at TEXT,
+      stopped_at    TEXT,
+      stopped_by_user INTEGER,
+      stopped_by_pause INTEGER,
+      kickoff_delivered INTEGER,
+      host_override INTEGER,
+      cost_so_far   REAL,
+      phase         TEXT,
+      work_type     TEXT,
+      paused        INTEGER,
+      paused_reason TEXT,
+      paused_at     TEXT,
+      troubled      INTEGER,
+      troubled_at   TEXT,
+      consecutive_failures INTEGER,
+      first_failure_in_run_at TEXT,
+      last_failure_at TEXT,
+      last_failure_reason TEXT,
+      last_failure_next_retry_at TEXT,
+      flywheel_run_id TEXT,
+      role_run_head TEXT,
+      review_sub_role TEXT,
+      review_run_id TEXT,
+      review_synthesis_agent_id TEXT,
+      review_output_path TEXT,
+      review_deadline_at TEXT,
+      review_monitor_signaled TEXT,
+      review_retry_attempt INTEGER,
+      inspect_sub_role TEXT,
+      delivery_method TEXT,
+      supervisor_enabled INTEGER,
+      channels_enabled INTEGER,
+      updated_at    TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agents_status_role
+      ON agents(status, role);
+
+    CREATE INDEX IF NOT EXISTS idx_agents_issue
+      ON agents(issue_id);
 
     -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
     CREATE TABLE IF NOT EXISTS projection_cache (
@@ -1483,6 +1537,64 @@ export function runMigrations(db: SqliteDatabase): void {
     try {
       db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
     } catch { /* already exists */ }
+  }
+
+  // v54 → v55: add authoritative agents runtime registry (PAN-1908)
+  if (currentVersion < 55) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id            TEXT PRIMARY KEY,
+        issue_id      TEXT NOT NULL,
+        role          TEXT NOT NULL,
+        status        TEXT NOT NULL,
+        workspace     TEXT NOT NULL,
+        harness       TEXT,
+        model         TEXT,
+        branch        TEXT,
+        session_id    TEXT,
+        started_at    TEXT,
+        last_activity TEXT,
+        last_resume_at TEXT,
+        stopped_at    TEXT,
+        stopped_by_user INTEGER,
+        stopped_by_pause INTEGER,
+        kickoff_delivered INTEGER,
+        host_override INTEGER,
+        cost_so_far   REAL,
+        phase         TEXT,
+        work_type     TEXT,
+        paused        INTEGER,
+        paused_reason TEXT,
+        paused_at     TEXT,
+        troubled      INTEGER,
+        troubled_at   TEXT,
+        consecutive_failures INTEGER,
+        first_failure_in_run_at TEXT,
+        last_failure_at TEXT,
+        last_failure_reason TEXT,
+        last_failure_next_retry_at TEXT,
+        flywheel_run_id TEXT,
+        role_run_head TEXT,
+        review_sub_role TEXT,
+        review_run_id TEXT,
+        review_synthesis_agent_id TEXT,
+        review_output_path TEXT,
+        review_deadline_at TEXT,
+        review_monitor_signaled TEXT,
+        review_retry_attempt INTEGER,
+        inspect_sub_role TEXT,
+        delivery_method TEXT,
+        supervisor_enabled INTEGER,
+        channels_enabled INTEGER,
+        updated_at    TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agents_status_role
+        ON agents(status, role);
+
+      CREATE INDEX IF NOT EXISTS idx_agents_issue
+        ON agents(issue_id);
+    `);
   }
 
   // After all migrations, set the version
