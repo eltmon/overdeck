@@ -195,6 +195,40 @@ export async function resolveCodexRolloutPath(
 }
 
 /**
+ * Resolve the pi/kimi session JSONL (PAN-1908). Pi writes its session transcript
+ * as `<iso-ts>_<session-id>.jsonl` either in the agent dir's `sessions/` subdir
+ * (conversations) OR in the agent dir root (work agents) — so check both. The dir
+ * also holds `cost-events.jsonl` / `activity.jsonl`, which are NOT transcripts.
+ * Return the freshest transcript by mtime, or null if pi hasn't written one yet.
+ */
+export async function resolvePiSessionPath(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
+  const agentDir = join(agentsRoot, agentId);
+  const NON_TRANSCRIPT = new Set(['cost-events.jsonl', 'activity.jsonl']);
+  let best: { path: string; mtime: number } | null = null;
+  for (const dir of [join(agentDir, 'sessions'), agentDir]) {
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const name of entries) {
+      if (!name.endsWith('.jsonl') || NON_TRANSCRIPT.has(name)) continue;
+      const p = join(dir, name);
+      try {
+        const m = (await stat(p)).mtimeMs;
+        if (!best || m > best.mtime) best = { path: p, mtime: m };
+      } catch { /* unreadable entry — skip */ }
+    }
+  }
+  return best?.path ?? null;
+}
+
+/**
  * Resolve the JSONL transcript for an agent.
  *
  * Codex agents resolve to their rollout JSONL (PAN-1805). For claude-code
@@ -208,8 +242,12 @@ export async function resolveJsonlPath(
 ): Promise<string | null> {
   // Dispatch on the recorded harness so a stale session.id from an earlier
   // claude-code run of the same agent id can't shadow the codex transcript.
-  if (await resolveAgentHarness(agentId, opts) === 'codex') {
+  const harness = await resolveAgentHarness(agentId, opts);
+  if (harness === 'codex') {
     return resolveCodexRolloutPath(agentId, opts);
+  }
+  if (harness === 'pi') {
+    return resolvePiSessionPath(agentId, opts);
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
