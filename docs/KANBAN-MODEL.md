@@ -111,7 +111,7 @@ The close-out ceremony is the final human-gated step in the issue lifecycle. It 
 5. **Clean up agent state** — Removes `~/.panopticon/agents/agent-{issue}/` and `planning-{issue}/`
 6. **Close issue on tracker** — Ensures issue is in Done/Closed state (usually already done by the post-merge lifecycle). (**Hard fail**)
 7. **Apply `closed-out` label** — Creates the label if missing (blue `#1d4ed8`), adds to issue
-8. **Clear review status** — Removes the issue's row from SQLite (`review_status` in `panopticon.db`)
+8. **Clear review status** — Removes the issue's row from SQLite (`review_status` in `panopticon.db`). Per-issue durable verdicts remain in the permanent record under the infra repo's `.pan/` records path.
 
 **Invocation:**
 - **Dashboard**: Click "Close Out" on a Done card
@@ -244,7 +244,7 @@ These are defaults. Projects can add custom classification labels — they just 
 | `planned` | Planning state removed from kanban |
 | `done` | Redundant — closing the issue IS marking it done |
 | `review-ready` | Redundant — In Review state already signals this |
-| `Review Ready` (Linear) | Redundant — `readyForMerge` on the SQLite-backed `review_status` row tracks merge readiness; In Review column signals stakeholder involvement |
+| `Review Ready` (Linear) | Redundant — `readyForMerge` on the SQLite-backed `review_status` row tracks runtime merge readiness; durable verdicts live in the permanent record's `pipeline` block. In Review column signals stakeholder involvement |
 | `wontfix` | Optional GitHub convention, not Panopticon-managed |
 | `pan:*` prefix | Over-engineered fallback strategy; direct labels are simpler |
 
