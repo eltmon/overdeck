@@ -17,6 +17,14 @@ import { toast } from 'sonner';
 const IS_MAC = typeof navigator !== 'undefined' && navigator.platform.includes('Mac');
 export const EMERGENCY_STOP_HOTKEY_LABEL = IS_MAC ? '⌘⇧.' : 'Ctrl+Shift+.';
 
+/** Event name a visible button can dispatch to open the emergency-stop confirm. */
+export const EMERGENCY_STOP_EVENT = 'pan:emergency-stop-open';
+
+/** Open the emergency-stop confirm from anywhere (e.g. an app-bar button). */
+export function triggerEmergencyStop(): void {
+  window.dispatchEvent(new CustomEvent(EMERGENCY_STOP_EVENT));
+}
+
 async function fireEmergencyStop(): Promise<string[]> {
   const res = await fetch('/api/cloister/emergency-stop', { method: 'POST' });
   if (!res.ok) throw new Error('Emergency stop request failed');
@@ -40,6 +48,13 @@ export function EmergencyStopOverlay() {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Also open when a visible affordance (app-bar STOP button) requests it.
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(EMERGENCY_STOP_EVENT, onOpen);
+    return () => window.removeEventListener(EMERGENCY_STOP_EVENT, onOpen);
   }, []);
 
   const confirm = useCallback(async () => {

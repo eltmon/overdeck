@@ -110,7 +110,8 @@ describe('SessionPanel', () => {
     // the Terminal view must show a notice pointing at the Conversation tab.
     render(<SessionPanel session={makeSession({ harness: 'pi' })} />);
     fireEvent.click(screen.getByText('Terminal'));
-    expect(screen.getByText(/runs in RPC mode \(pi\)/)).toBeInTheDocument();
+    expect(screen.getByText(/No live terminal for this agent/)).toBeInTheDocument();
+    expect(screen.getByText(/--mode rpc/)).toBeInTheDocument();
     expect(screen.queryByTestId('x-terminal')).not.toBeInTheDocument();
   });
 

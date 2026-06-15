@@ -7,7 +7,7 @@ import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
-import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
+import { EmergencyStopOverlay, triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { AskUserQuestionDialog, type AskUserQuestionSubject } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
@@ -54,7 +54,7 @@ import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { CostWarningStyles } from './components/shared/costWarning';
-import { AlertTriangle, CheckCircle2, History, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgents, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
 import { useAskUserQuestionUiStore } from './lib/askUserQuestionUiStore';
@@ -1411,6 +1411,17 @@ export default function App() {
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-600 dark:text-emerald-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{runningAgentCount} agent{runningAgentCount === 1 ? '' : 's'}
               </span>
+            )}
+            {runningAgentCount > 0 && (
+              <button
+                type="button"
+                onClick={triggerEmergencyStop}
+                title={`Emergency stop — kill all agents and freeze auto-resume (${EMERGENCY_STOP_HOTKEY_LABEL})`}
+                aria-label="Emergency stop all agents"
+                className="inline-flex items-center gap-1.5 rounded-full border border-destructive/40 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
+              >
+                <StopCircle className="h-3.5 w-3.5" /> Stop all
+              </button>
             )}
             <StoppedAgentsBanner variant="pill" />
             <LowCostModePill onOpenSettings={() => setActiveTab('settings')} />

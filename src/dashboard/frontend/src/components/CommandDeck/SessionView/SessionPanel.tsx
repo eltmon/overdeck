@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
+import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
@@ -391,10 +391,26 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
             // operator at the Conversation tab, which renders the same transcript
             // parsed into messages. (Claude Code and Codex run real TUIs, so they
             // keep the live terminal.)
-            <div className={styles.sessionPanelEmpty}>
-              This agent runs in RPC mode (pi), which has no interactive terminal —
-              the pane only carries raw protocol JSON. Use the <strong>Conversation</strong>{' '}
-              tab to follow what it's doing.
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-8 py-10 text-center">
+              <div className="relative">
+                <TerminalSquare className="h-9 w-9 text-muted-foreground/40" />
+                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-card text-[10px] font-bold text-muted-foreground/60">×</span>
+              </div>
+              <div className="text-sm font-semibold text-foreground">No live terminal for this agent</div>
+              <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+                Pi agents run in <span className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">--mode rpc</span> —
+                there is no interactive terminal, so this pane would only stream raw
+                JSON-RPC protocol. Use the <strong className="text-foreground">Conversation</strong> tab,
+                which renders the same transcript as readable messages.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleSetView('conversation')}
+                className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                <MessagesSquare className="h-3.5 w-3.5" />
+                Open Conversation
+              </button>
             </div>
           ) : hasTerminal && tmuxName ? (
             <XTerminal sessionName={tmuxName} />
