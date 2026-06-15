@@ -457,6 +457,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason', 'lastFailureNextRetryAt',
           'kickoffDelivered', 'hostOverride', 'role', 'model', 'workspace', 'sessionId',
           'lastActivity', 'lastResumeAt', 'stoppedAt', 'branch', 'costSoFar',
+          'phase', 'workType', 'roleRunHead',
           'flywheelRunId', 'reviewSubRole', 'reviewRunId', 'reviewOutputPath',
           'reviewSynthesisAgentId', 'reviewDeadlineAt', 'reviewMonitorSignaled', 'reviewRetryAttempt',
           'inspectSubRole', 'deliveryMethod', 'supervisorEnabled', 'channelsEnabled',

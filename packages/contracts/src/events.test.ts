@@ -151,7 +151,7 @@ function baseAgentSnapshot(overrides: Partial<typeof AgentSnapshot.Type> = {}): 
   return {
     id: "agent-pan-1908",
     issueId: "PAN-1908",
-    status: "idle",
+    status: "unknown",
     ...overrides,
   } as typeof AgentSnapshot.Type
 }
@@ -219,7 +219,7 @@ describe("Agent lifecycle events", () => {
 
     it("preserves absent columns when applying a partial event", () => {
       const agent = baseAgentSnapshot({
-        status: "idle",
+        status: "unknown",
         model: "claude-sonnet-4",
         workspace: "/tmp/ws",
         hasLiveTmuxSession: false,
@@ -250,6 +250,34 @@ describe("Agent lifecycle events", () => {
       expect(changed.agentsById["agent-pan-1908"].pausedReason).toBe("paused-by-operator")
     })
 
+    it("merges spawn-time columns carried by a status change (phase, workType, roleRunHead)", () => {
+      const agent = baseAgentSnapshot({ status: "starting" })
+      const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
+        type: "agent.started" as const,
+        sequence: 1,
+        timestamp: "2026-06-15T12:00:00.000Z",
+        payload: { agentId: "agent-pan-1908", issueId: "PAN-1908", agent },
+      }))
+
+      const changed = applyEvent(started, decodeDomainEvent({
+        type: "agent.status_changed" as const,
+        sequence: 2,
+        timestamp: "2026-06-15T12:01:00.000Z",
+        payload: {
+          agentId: "agent-pan-1908",
+          status: "running",
+          phase: "work",
+          workType: "feature",
+          roleRunHead: "abc123",
+        },
+      }))
+
+      expect(changed.agentsById["agent-pan-1908"].status).toBe("running")
+      expect(changed.agentsById["agent-pan-1908"].phase).toBe("work")
+      expect(changed.agentsById["agent-pan-1908"].workType).toBe("feature")
+      expect(changed.agentsById["agent-pan-1908"].roleRunHead).toBe("abc123")
+    })
+
     it("is idempotent when replayed", () => {
       const agent = baseAgentSnapshot({ status: "running" })
       const started = applyEvent(INITIAL_READ_MODEL_STATE, decodeDomainEvent({
@@ -264,7 +292,7 @@ describe("Agent lifecycle events", () => {
         timestamp: "2026-06-15T12:01:00.000Z",
         payload: {
           agentId: "agent-pan-1908",
-          status: "paused",
+          status: "stopped",
           paused: true,
           pausedReason: "operator-request",
           pausedAt: "2026-06-15T12:01:00.000Z",
