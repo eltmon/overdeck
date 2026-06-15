@@ -5,6 +5,9 @@ import { exec, execFileSync } from "child_process";
 import { dirname, join, sep } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
+import { readFileSync as readFileSync$1, readdirSync, statSync as statSync$1 } from "node:fs";
+import { join as join$1 } from "node:path";
+import { execFileSync as execFileSync$1 } from "node:child_process";
 import { promisify } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -4376,6 +4379,237 @@ function openDatabase(path, options = {}) {
 	const { DatabaseSync } = loadNodeSqlite();
 	return wrapDatabase(new DatabaseSync(path, options));
 }
+//#endregion
+//#region ../../src/lib/database/agent-mappers.ts
+function agentStateToDbAgent(state) {
+	return {
+		id: state.id,
+		issueId: state.issueId,
+		role: state.role,
+		status: state.status,
+		workspace: state.workspace,
+		harness: state.harness ?? null,
+		model: state.model ?? null,
+		branch: state.branch ?? null,
+		sessionId: state.sessionId ?? null,
+		startedAt: state.startedAt ?? null,
+		lastActivity: state.lastActivity ?? null,
+		lastResumeAt: state.lastResumeAt ?? null,
+		stoppedAt: state.stoppedAt ?? null,
+		stoppedByUser: state.stoppedByUser ?? null,
+		stoppedByPause: state.stoppedByPause ?? null,
+		kickoffDelivered: state.kickoffDelivered ?? null,
+		hostOverride: state.hostOverride ?? null,
+		costSoFar: state.costSoFar ?? null,
+		phase: state.phase ?? null,
+		workType: state.workType ?? null,
+		paused: state.paused ?? null,
+		pausedReason: state.pausedReason ?? null,
+		pausedAt: state.pausedAt ?? null,
+		troubled: state.troubled ?? null,
+		troubledAt: state.troubledAt ?? null,
+		consecutiveFailures: state.consecutiveFailures ?? null,
+		firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+		lastFailureAt: state.lastFailureAt ?? null,
+		lastFailureReason: state.lastFailureReason ?? null,
+		lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+		flywheelRunId: state.flywheelRunId ?? null,
+		roleRunHead: state.roleRunHead ?? null,
+		reviewSubRole: state.reviewSubRole ?? null,
+		reviewRunId: state.reviewRunId ?? null,
+		reviewSynthesisAgentId: state.reviewSynthesisAgentId ?? null,
+		reviewOutputPath: state.reviewOutputPath ?? null,
+		reviewDeadlineAt: state.reviewDeadlineAt ?? null,
+		reviewMonitorSignaled: state.reviewMonitorSignaled ?? null,
+		reviewRetryAttempt: state.reviewRetryAttempt ?? null,
+		inspectSubRole: state.inspectSubRole ?? null,
+		deliveryMethod: state.deliveryMethod ?? null,
+		supervisorEnabled: state.supervisorEnabled ?? null,
+		channelsEnabled: state.channelsEnabled ?? null,
+		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+	};
+}
+//#endregion
+//#region ../../src/lib/database/agent-backfill.ts
+/**
+* One-time versioned backfill for the PAN-1908 agents table.
+*
+* This is the ONLY module permitted to enumerate
+* `${PANOPTICON_HOME}/agents/{id}/state.json`. It is invoked:
+*
+*   - automatically once during the v54 -> v55 schema migration, and
+*   - manually via `pan admin db rebuild-agents`.
+*
+* Keeping the enumeration here makes it easy to audit that no hot path
+* (dashboard handlers, deacon patrol, read model) reads agent state from the
+* filesystem.
+*/
+const VALID_ROLES = new Set([
+	"plan",
+	"work",
+	"review",
+	"test",
+	"ship",
+	"flywheel",
+	"strike"
+]);
+const COLUMN_MAP = {
+	id: "id",
+	issueId: "issue_id",
+	role: "role",
+	status: "status",
+	workspace: "workspace",
+	harness: "harness",
+	model: "model",
+	branch: "branch",
+	sessionId: "session_id",
+	startedAt: "started_at",
+	lastActivity: "last_activity",
+	lastResumeAt: "last_resume_at",
+	stoppedAt: "stopped_at",
+	stoppedByUser: "stopped_by_user",
+	stoppedByPause: "stopped_by_pause",
+	kickoffDelivered: "kickoff_delivered",
+	hostOverride: "host_override",
+	costSoFar: "cost_so_far",
+	phase: "phase",
+	workType: "work_type",
+	paused: "paused",
+	pausedReason: "paused_reason",
+	pausedAt: "paused_at",
+	troubled: "troubled",
+	troubledAt: "troubled_at",
+	consecutiveFailures: "consecutive_failures",
+	firstFailureInRunAt: "first_failure_in_run_at",
+	lastFailureAt: "last_failure_at",
+	lastFailureReason: "last_failure_reason",
+	lastFailureNextRetryAt: "last_failure_next_retry_at",
+	flywheelRunId: "flywheel_run_id",
+	roleRunHead: "role_run_head",
+	reviewSubRole: "review_sub_role",
+	reviewRunId: "review_run_id",
+	reviewSynthesisAgentId: "review_synthesis_agent_id",
+	reviewOutputPath: "review_output_path",
+	reviewDeadlineAt: "review_deadline_at",
+	reviewMonitorSignaled: "review_monitor_signaled",
+	reviewRetryAttempt: "review_retry_attempt",
+	inspectSubRole: "inspect_sub_role",
+	deliveryMethod: "delivery_method",
+	supervisorEnabled: "supervisor_enabled",
+	channelsEnabled: "channels_enabled",
+	updatedAt: "updated_at"
+};
+function getManagedTmuxSocketName() {
+	return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? "panopticon";
+}
+function listLiveTmuxSessionNames() {
+	try {
+		const output = execFileSync$1("tmux", [
+			"-L",
+			getManagedTmuxSocketName(),
+			"list-sessions",
+			"-F",
+			"#{session_name}"
+		], {
+			encoding: "utf-8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"ignore"
+			]
+		});
+		return new Set(output.split("\n").map((line) => line.trim()).filter(Boolean));
+	} catch {
+		return /* @__PURE__ */ new Set();
+	}
+}
+function parseAgentStateJson(content, fallbackId) {
+	let parsed;
+	try {
+		parsed = JSON.parse(content);
+	} catch {
+		return null;
+	}
+	if (!parsed.role || !VALID_ROLES.has(parsed.role)) return null;
+	if (!parsed.id) parsed.id = fallbackId;
+	if (!parsed.status) parsed.status = "stopped";
+	return parsed;
+}
+function buildNamedParams(row) {
+	const params = {};
+	for (const [key, column] of Object.entries(COLUMN_MAP)) params[column] = row[key];
+	return params;
+}
+/**
+* Enumerate agent state files and upsert them into the agents table.
+*
+* Idempotent by id — re-running creates no duplicates. Status is reconciled
+* against live tmux sessions: an agent whose state says running/starting but
+* has no live session is marked stopped.
+*/
+function backfillAgentsFromStateJsonSync(db, options) {
+	const agentsDir = join$1(getPanopticonHome(), "agents");
+	const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNames();
+	let processed = 0;
+	let skipped = 0;
+	let markedStopped = 0;
+	let entries = [];
+	try {
+		entries = readdirSync(agentsDir);
+	} catch {
+		return {
+			processed,
+			skipped,
+			markedStopped
+		};
+	}
+	const columns = Object.values(COLUMN_MAP);
+	const placeholders = columns.map((col) => `$${col}`).join(", ");
+	const upsert = db.prepare(`INSERT OR REPLACE INTO agents (${columns.join(", ")}) VALUES (${placeholders})`);
+	db.transaction(() => {
+		for (const entry of entries) {
+			const dirPath = join$1(agentsDir, entry);
+			let statePath;
+			try {
+				if (!statSync$1(dirPath).isDirectory()) continue;
+				statePath = join$1(dirPath, "state.json");
+			} catch {
+				continue;
+			}
+			let content;
+			try {
+				content = readFileSync$1(statePath, "utf-8");
+			} catch {
+				skipped++;
+				continue;
+			}
+			const state = parseAgentStateJson(content, entry);
+			if (!state) {
+				skipped++;
+				continue;
+			}
+			const reconciled = reconcileAgentStatus(state, liveSessions);
+			if (reconciled.status === "stopped" && state.status !== "stopped") markedStopped++;
+			const row = agentStateToDbAgent(reconciled);
+			upsert.run(buildNamedParams(row));
+			processed++;
+			if (options?.verbose) console.log(`[backfill] ${row.id} -> ${row.status}`);
+		}
+	})();
+	return {
+		processed,
+		skipped,
+		markedStopped
+	};
+}
+function reconcileAgentStatus(state, liveSessions) {
+	if ((state.status === "running" || state.status === "starting") && !liveSessions.has(state.id)) return {
+		...state,
+		status: "stopped",
+		stoppedAt: state.stoppedAt ?? (/* @__PURE__ */ new Date()).toISOString()
+	};
+	return state;
+}
 function parseArrayColumn(value) {
 	if (!value) return [];
 	try {
@@ -4767,6 +5001,60 @@ function initSchema(db) {
       ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
       WHERE json_type(payload, '$.issueId') = 'text';
 
+    -- ===== Agents (PAN-1908: authoritative runtime registry) =====
+    CREATE TABLE IF NOT EXISTS agents (
+      id            TEXT PRIMARY KEY,
+      issue_id      TEXT NOT NULL,
+      role          TEXT NOT NULL,
+      status        TEXT NOT NULL,
+      workspace     TEXT NOT NULL,
+      harness       TEXT,
+      model         TEXT,
+      branch        TEXT,
+      session_id    TEXT,
+      started_at    TEXT,
+      last_activity TEXT,
+      last_resume_at TEXT,
+      stopped_at    TEXT,
+      stopped_by_user INTEGER,
+      stopped_by_pause INTEGER,
+      kickoff_delivered INTEGER,
+      host_override INTEGER,
+      cost_so_far   REAL,
+      phase         TEXT,
+      work_type     TEXT,
+      paused        INTEGER,
+      paused_reason TEXT,
+      paused_at     TEXT,
+      troubled      INTEGER,
+      troubled_at   TEXT,
+      consecutive_failures INTEGER,
+      first_failure_in_run_at TEXT,
+      last_failure_at TEXT,
+      last_failure_reason TEXT,
+      last_failure_next_retry_at TEXT,
+      flywheel_run_id TEXT,
+      role_run_head TEXT,
+      review_sub_role TEXT,
+      review_run_id TEXT,
+      review_synthesis_agent_id TEXT,
+      review_output_path TEXT,
+      review_deadline_at TEXT,
+      review_monitor_signaled TEXT,
+      review_retry_attempt INTEGER,
+      inspect_sub_role TEXT,
+      delivery_method TEXT,
+      supervisor_enabled INTEGER,
+      channels_enabled INTEGER,
+      updated_at    TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agents_status_role
+      ON agents(status, role);
+
+    CREATE INDEX IF NOT EXISTS idx_agents_issue
+      ON agents(issue_id);
+
     -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
     CREATE TABLE IF NOT EXISTS projection_cache (
       key        TEXT PRIMARY KEY,
@@ -5012,7 +5300,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 54`);
+	db.pragma(`user_version = 55`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -5020,7 +5308,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 54) return;
+	if (currentVersion === 55) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5661,7 +5949,79 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
 		} catch {}
 	}
-	db.pragma(`user_version = 54`);
+	if (currentVersion < 55) {
+		try {
+			const dbPath = join(getPanopticonHome(), "panopticon.db");
+			const snapshotPath = `${dbPath}.v54-backfill-snapshot`;
+			if (existsSync(dbPath) && !existsSync(snapshotPath)) {
+				writeFileSync(snapshotPath, readFileSync(dbPath));
+				console.log(`[schema] Snapshot created: ${snapshotPath}`);
+			}
+		} catch (err) {
+			console.warn("[schema] Failed to create pre-v55 snapshot:", err instanceof Error ? err.message : String(err));
+		}
+		db.exec(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id            TEXT PRIMARY KEY,
+        issue_id      TEXT NOT NULL,
+        role          TEXT NOT NULL,
+        status        TEXT NOT NULL,
+        workspace     TEXT NOT NULL,
+        harness       TEXT,
+        model         TEXT,
+        branch        TEXT,
+        session_id    TEXT,
+        started_at    TEXT,
+        last_activity TEXT,
+        last_resume_at TEXT,
+        stopped_at    TEXT,
+        stopped_by_user INTEGER,
+        stopped_by_pause INTEGER,
+        kickoff_delivered INTEGER,
+        host_override INTEGER,
+        cost_so_far   REAL,
+        phase         TEXT,
+        work_type     TEXT,
+        paused        INTEGER,
+        paused_reason TEXT,
+        paused_at     TEXT,
+        troubled      INTEGER,
+        troubled_at   TEXT,
+        consecutive_failures INTEGER,
+        first_failure_in_run_at TEXT,
+        last_failure_at TEXT,
+        last_failure_reason TEXT,
+        last_failure_next_retry_at TEXT,
+        flywheel_run_id TEXT,
+        role_run_head TEXT,
+        review_sub_role TEXT,
+        review_run_id TEXT,
+        review_synthesis_agent_id TEXT,
+        review_output_path TEXT,
+        review_deadline_at TEXT,
+        review_monitor_signaled TEXT,
+        review_retry_attempt INTEGER,
+        inspect_sub_role TEXT,
+        delivery_method TEXT,
+        supervisor_enabled INTEGER,
+        channels_enabled INTEGER,
+        updated_at    TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agents_status_role
+        ON agents(status, role);
+
+      CREATE INDEX IF NOT EXISTS idx_agents_issue
+        ON agents(issue_id);
+    `);
+		try {
+			const result = backfillAgentsFromStateJsonSync(db);
+			if (result.processed > 0 || result.markedStopped > 0) console.log(`[schema] Backfilled agents table: ${result.processed} rows, ${result.markedStopped} marked stopped (no live tmux session)`);
+		} catch (err) {
+			console.warn("[schema] agents-table backfill failed:", err instanceof Error ? err.message : String(err));
+		}
+	}
+	db.pragma(`user_version = 55`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
