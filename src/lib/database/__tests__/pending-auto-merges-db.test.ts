@@ -208,10 +208,14 @@ describe('pending auto-merges db', () => {
     expect(resurrectStrandedAutoMerge(cancelled.id, '2026-05-25T12:00:00.000Z')).toBe(false);
 
     expect(resurrectStrandedAutoMerge(blocked.id, '2026-05-25T12:00:00.000Z')).toBe(true);
-    expect(getActionableAutoMerge('PAN-3')).toMatchObject({ status: 'pending', scheduledMergeAt: '2026-05-25T12:00:00.000Z' });
+    const resurrectedBlocked = getActionableAutoMerge('PAN-3');
+    expect(resurrectedBlocked).toMatchObject({ status: 'pending', scheduledMergeAt: '2026-05-25T12:00:00.000Z' });
+    expect(resurrectedBlocked?.scheduledAt).not.toBe('2026-05-25T09:00:00.000Z');
 
     expect(resurrectStrandedAutoMerge(failed.id, '2026-05-25T12:00:00.000Z')).toBe(true);
-    expect(getActionableAutoMerge('PAN-4')).toMatchObject({ status: 'pending', scheduledMergeAt: '2026-05-25T12:00:00.000Z' });
+    const resurrectedFailed = getActionableAutoMerge('PAN-4');
+    expect(resurrectedFailed).toMatchObject({ status: 'pending', scheduledMergeAt: '2026-05-25T12:00:00.000Z' });
+    expect(resurrectedFailed?.scheduledAt).not.toBe('2026-05-25T09:00:00.000Z');
   });
 
   it('increments attempts and exposes the count', () => {

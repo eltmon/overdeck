@@ -228,8 +228,8 @@ export function deferPendingAutoMerge(id: number, nextScheduledMergeAt: string):
 export function resurrectStrandedAutoMerge(id: number, nextScheduledMergeAt: string): boolean {
   return runDb('resurrectStrandedAutoMerge', () => {
     const result = getDatabase()
-      .prepare('UPDATE pending_auto_merges SET "status" = \'pending\', scheduledMergeAt = ? WHERE id = ? AND "status" IN (\'blocked\',\'failed\')')
-      .run(nextScheduledMergeAt, id);
+      .prepare('UPDATE pending_auto_merges SET "status" = \'pending\', scheduledMergeAt = ?, scheduledAt = ? WHERE id = ? AND "status" IN (\'blocked\',\'failed\')')
+      .run(nextScheduledMergeAt, new Date().toISOString(), id);
     return result.changes === 1;
   });
 }

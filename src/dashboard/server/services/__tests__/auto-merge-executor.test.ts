@@ -162,7 +162,7 @@ describe('auto-merge executor', () => {
   });
 
   it('marks failed merges as failed and announces the failure when attempts are already exhausted', async () => {
-    const markFailed = vi.fn();
+    const markFailed = vi.fn().mockReturnValue(true);
     const announceFailure = vi.fn();
     const requeueToPending = vi.fn();
     const incrementAttempts = vi.fn().mockReturnValue(true);
@@ -239,7 +239,7 @@ describe('auto-merge executor', () => {
   it('caps recoverable merge failures at 3 attempts and announces the final failure', async () => {
     const incrementAttempts = vi.fn().mockReturnValue(true);
     const requeueToPending = vi.fn().mockReturnValue(true);
-    const markFailed = vi.fn();
+    const markFailed = vi.fn().mockReturnValue(true);
     const announceFailure = vi.fn();
     const mergeIssue = vi.fn().mockResolvedValue({ success: false, statusCode: 500, error: 'merge exploded' });
 

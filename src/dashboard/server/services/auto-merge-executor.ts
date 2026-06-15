@@ -86,7 +86,9 @@ async function defaultComputeMergeOrderMeta(
       try {
         const { stdout } = await execFileAsync('git', ['diff', '--name-only', `main...${branch}`], { cwd: projectRoot });
         return new Set(stdout.trim().split('\n').filter(Boolean));
-      } catch {
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        log(`[auto-merge] cannot compute changed files for ${entry.issueId} (${branch}): ${message}`);
         return new Set<string>();
       }
     }),
@@ -252,8 +254,8 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
           log(`[auto-merge] lost requeue race for ${entry.issueId} (#${entry.id}) after failed merge`);
         }
       } else {
-        (deps.markFailed ?? markFailed)(entry.id, reason);
-        (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
+        const marked = (deps.markFailed ?? markFailed)(entry.id, reason);
+        if (marked) (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
       }
     } catch (error) {
       const reason = errorMessage(error);
@@ -267,8 +269,8 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
           log(`[auto-merge] lost requeue race for ${entry.issueId} (#${entry.id}) after merge exception`);
         }
       } else {
-        (deps.markFailed ?? markFailed)(entry.id, reason);
-        (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
+        const marked = (deps.markFailed ?? markFailed)(entry.id, reason);
+        if (marked) (deps.announceFailure ?? defaultAnnounceFailure)(entry.issueId, reason);
       }
     }
   }

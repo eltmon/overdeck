@@ -4860,7 +4860,8 @@ function initSchema(db) {
       mergedAt         TEXT,
       failureReason    TEXT,
       cancelledAt      TEXT,
-      cancelledBy      TEXT
+      cancelledBy      TEXT,
+      attempts         INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
@@ -5012,7 +5013,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 54`);
+	db.pragma(`user_version = 55`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -5020,7 +5021,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 54) return;
+	if (currentVersion === 55) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5522,7 +5523,8 @@ function runMigrations(db) {
         mergedAt         TEXT,
         failureReason    TEXT,
         cancelledAt      TEXT,
-        cancelledBy      TEXT
+        cancelledBy      TEXT,
+        attempts         INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
@@ -5541,7 +5543,8 @@ function runMigrations(db) {
         mergedAt         TEXT,
         failureReason    TEXT,
         cancelledAt      TEXT,
-        cancelledBy      TEXT
+        cancelledBy      TEXT,
+        attempts         INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
@@ -5661,7 +5664,10 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
 		} catch {}
 	}
-	db.pragma(`user_version = 54`);
+	if (currentVersion < 55) try {
+		db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0`);
+	} catch {}
+	db.pragma(`user_version = 55`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts
