@@ -1043,7 +1043,7 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
-function agentStateToDbAgent(state: AgentState): DbAgent {
+export function agentStateToDbAgent(state: AgentState): DbAgent {
   return {
     id: state.id,
     issueId: state.issueId,
@@ -1167,28 +1167,35 @@ export const getAgentState = (agentId: string): Effect.Effect<AgentState | null,
   });
 };
 
-export function saveAgentStateSync(state: AgentState): void {
-  const dir = getAgentDir(state.id);
-  mkdirSync(dir, { recursive: true });
-
-  // Detect status transition for audit trail
-  const oldState = getAgentStateSync(state.id);
-  const oldStatus = oldState?.status;
-
+function prepareAgentStateForSave(state: AgentState): AgentState {
   if (state.status === 'running' || state.status === 'starting') {
     delete state.stoppedAt;
   } else if (state.status === 'stopped' && !state.stoppedAt) {
     state.stoppedAt = new Date().toISOString();
   }
+  return state;
+}
 
-  // PAN-1908: write the authoritative row to SQLite and keep state.json as the
-  // rollback/rebuild source through the cutover (D2/CP-2).
-  upsertAgent(agentStateToDbAgent(state));
-
+export function writeAgentStateJsonSync(state: AgentState): void {
+  const dir = getAgentDir(state.id);
+  mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'state.json'),
     JSON.stringify(cleanAgentState(state), null, 2)
   );
+}
+
+export function saveAgentStateSync(state: AgentState): void {
+  // Detect status transition for audit trail
+  const oldState = getAgentStateSync(state.id);
+  const oldStatus = oldState?.status;
+
+  prepareAgentStateForSave(state);
+
+  // PAN-1908: write the authoritative row to SQLite and keep state.json as the
+  // rollback/rebuild source through the cutover (D2/CP-2).
+  upsertAgent(agentStateToDbAgent(state));
+  writeAgentStateJsonSync(state);
 
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);

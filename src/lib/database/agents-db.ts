@@ -9,6 +9,7 @@
  */
 
 import { getDatabase } from './index.js';
+import type { SqliteDatabase } from './driver.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -180,7 +181,10 @@ function agentToParams(agent: Agent): unknown[] {
 // ─── Read operations ──────────────────────────────────────────────────────────
 
 export function getAgent(id: string): Agent | null {
-  const db = getDatabase();
+  return getAgentWithDb(getDatabase(), id);
+}
+
+export function getAgentWithDb(db: Pick<SqliteDatabase, 'prepare'>, id: string): Agent | null {
   const row = db
     .prepare(`${SELECT_SQL} WHERE id = ?`)
     .get(id) as Record<string, unknown> | undefined;
@@ -228,13 +232,16 @@ export function listAllAgents(): Agent[] {
 // ─── Write operations ─────────────────────────────────────────────────────────
 
 export function upsertAgent(agent: Agent): Agent {
-  const db = getDatabase();
+  return upsertAgentWithDb(getDatabase(), agent);
+}
+
+export function upsertAgentWithDb(db: Pick<SqliteDatabase, 'prepare'>, agent: Agent): Agent {
   const columns = ALL_COLUMNS.join(', ');
   const placeholders = ALL_COLUMNS.map(() => '?').join(', ');
   db.prepare(
     `INSERT OR REPLACE INTO agents (${columns}) VALUES (${placeholders})`,
   ).run(...agentToParams(agent));
-  return getAgent(agent.id) ?? agent;
+  return getAgentWithDb(db, agent.id) ?? agent;
 }
 
 export function deleteAgent(id: string): void {

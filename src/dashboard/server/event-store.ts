@@ -67,6 +67,12 @@ export interface EventStore {
   purgeType(type: string): number;
   /** Return the highest sequence number in the store (0 if empty). */
   getLatestSequence(): number;
+  /**
+   * Emit an already-persisted event to in-memory subscribers without writing
+   * to SQLite. Used by transactional projections that insert the row inside
+   * their own transaction and then notify listeners after commit.
+   */
+  emitStored(event: StoredEvent): void;
 }
 
 // ─── Minimal DB interface (compatible with the shared SQLite driver) ─────────
@@ -349,7 +355,11 @@ export function createEventStore(db: DbAdapter): EventStore {
     return rows.map(rowToStored).reverse();
   }
 
-  return { append, appendAsync, emitOnly, readFrom, queryByType, subscribe, compact, purgeType, getLatestSequence };
+  function emitStored(event: StoredEvent): void {
+    emitter.emit('event', event);
+  }
+
+  return { append, appendAsync, emitOnly, readFrom, queryByType, subscribe, compact, purgeType, getLatestSequence, emitStored };
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
