@@ -12,6 +12,7 @@ import type { ProjectConfig } from '../../projects.js';
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
 const mockGetReviewStatusSync = vi.hoisted(() => vi.fn());
+const mockGetCostBreakdownByStageAndModel = vi.hoisted(() => vi.fn());
 const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
@@ -21,6 +22,7 @@ vi.mock('../../review-status.js', () => ({
 }));
 
 vi.mock('../../database/cost-events-db.js', () => ({
+  getCostBreakdownByStageAndModel: mockGetCostBreakdownByStageAndModel,
   getCostForIssueFromDb: mockGetCostForIssueFromDb,
 }));
 
@@ -47,6 +49,7 @@ describe('buildIssueRecord', () => {
   beforeEach(() => {
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-records-test-'));
     mockGetReviewStatusSync.mockReturnValue(null);
+    mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
     mockGetCostForIssueFromDb.mockReturnValue(null);
     mockGetMergeSetSync.mockReturnValue(null);
     mockQueueAutoCommit.mockClear();
@@ -75,15 +78,15 @@ describe('buildIssueRecord', () => {
     const record = await buildIssueRecord(projectRoot, 'PAN-1908');
 
     expect(record.issueId).toBe('PAN-1908');
-    expect(record.continue.issueId).toBe('PAN-1908');
-    expect(record.continue.branch).toBe('feature/pan-1908');
-    expect(record.continue.decisions).toHaveLength(1);
-    expect(record.continue.hazards).toHaveLength(1);
-    expect(record.continue).not.toHaveProperty('resumePoint');
-    expect(record.continue).not.toHaveProperty('sessionHistory');
-    expect(record.continue).not.toHaveProperty('agentModel');
-    expect(record.continue).not.toHaveProperty('beadsMapping');
-    expect(record.continue).not.toHaveProperty('gitState');
+    expect(record.decisions).toHaveLength(1);
+    expect(record.hazards).toHaveLength(1);
+    expect(record.feedback).toEqual([]);
+    expect(record).not.toHaveProperty('continue');
+    expect(record).not.toHaveProperty('resumePoint');
+    expect(record).not.toHaveProperty('sessionHistory');
+    expect(record).not.toHaveProperty('agentModel');
+    expect(record).not.toHaveProperty('beadsMapping');
+    expect(record).not.toHaveProperty('gitState');
   });
 
   it('projects durable review_status verdicts', async () => {
@@ -141,22 +144,23 @@ describe('buildIssueRecord', () => {
   });
 
   it('aggregates usage and merges into closeOut', async () => {
+    mockGetCostBreakdownByStageAndModel.mockReturnValue({
+      byStage: {
+        work: {
+          'anthropic/claude-opus-4-8': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 },
+        },
+        review: {
+          'openai-codex/gpt-5.5': { input: 80, output: 20, cacheRead: 100, cacheWrite: 5 },
+        },
+      },
+      totals: {
+        'anthropic/claude-opus-4-8': { input: 100, output: 50, cacheRead: 200, cacheWrite: 10 },
+        'openai-codex/gpt-5.5': { input: 80, output: 20, cacheRead: 100, cacheWrite: 5 },
+      },
+    });
     mockGetCostForIssueFromDb.mockReturnValue({
       issueId: 'PAN-1908',
       totalCost: 12.34,
-      inputTokens: 1000,
-      outputTokens: 500,
-      cacheReadTokens: 2000,
-      cacheWriteTokens: 100,
-      lastUpdated: '2026-06-15T00:00:00.000Z',
-      budgetWarning: false,
-      models: {
-        'anthropic/claude-opus-4-8': { cost: 10, calls: 2, tokens: 1000 },
-      },
-      stages: {
-        work: { cost: 8, calls: 1, tokens: 700 },
-        review: { cost: 4, calls: 1, tokens: 300 },
-      },
     });
 
     mockGetMergeSetSync.mockReturnValue({
@@ -173,8 +177,12 @@ describe('buildIssueRecord', () => {
     ]);
     expect(record.closeOut.closedAt).toBe('2026-06-15T01:00:00.000Z');
     expect(record.closeOut.ranOn).toBeTruthy();
-    expect(record.closeOut.usage.byStage.work.calls).toBe(1);
-    expect(record.closeOut.usage.byModel['anthropic/claude-opus-4-8'].calls).toBe(2);
+    expect(record.closeOut.usage.byStage.work['anthropic/claude-opus-4-8']).toEqual({
+      input: 100, output: 50, cacheRead: 200, cacheWrite: 10,
+    });
+    expect(record.closeOut.usage.totals['anthropic/claude-opus-4-8']).toEqual({
+      input: 100, output: 50, cacheRead: 200, cacheWrite: 10,
+    });
     expect(record.closeOut.usage.costAtCloseOut?.usd).toBe(12.34);
   });
 });
@@ -204,10 +212,8 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
     const path = writeIssueRecordSync(project, 'PAN-1908', {
       issueId: 'PAN-1908',
       schemaVersion: 1,
-      continue: { issueId: 'PAN-1908' },
       pipeline: { issueId: 'PAN-1908', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-06-15T00:00:00.000Z' },
-      closeOut: { usage: { byStage: {}, byModel: {} }, merges: [], ranOn: 'host' },
-      owner: {},
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
     });
 
     expect(path).toBe(join(tmp, '.pan', 'pan-1908.json'));
@@ -227,10 +233,8 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
     const path = writeIssueRecordSync(project, 'PAN-1908', {
       issueId: 'PAN-1908',
       schemaVersion: 1,
-      continue: { issueId: 'PAN-1908' },
       pipeline: { issueId: 'PAN-1908', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-06-15T00:00:00.000Z' },
-      closeOut: { usage: { byStage: {}, byModel: {} }, merges: [], ranOn: 'host' },
-      owner: {},
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
     });
 
     expect(path).toBe(join(tmp, 'infra', '.pan', 'records', 'pan-1908.json'));
@@ -251,6 +255,7 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
 
     expect(mockQueueAutoCommit).toHaveBeenCalledWith({
       projectRoot: join(tmp, 'infra'),
+      repoRoot: join(tmp, 'infra'),
       paths: [recordPath],
       subject: 'chore(records): update PAN-1908 permanent record',
     });

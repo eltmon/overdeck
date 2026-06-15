@@ -19,7 +19,10 @@ import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { getReviewStatusSync } from '../review-status.js';
-import { getCostForIssueFromDb } from '../database/cost-events-db.js';
+import {
+  getCostBreakdownByStageAndModel,
+  getCostForIssueFromDb,
+} from '../database/cost-events-db.js';
 import { getMergeSetSync } from '../merge-set.js';
 import { readContinueFile } from './continues.js';
 import { resolveInfraRepo, type ProjectConfig } from '../projects.js';
@@ -62,18 +65,16 @@ export interface PanIssuePipelineRecord {
   updatedAt: string;
 }
 
-export interface PanIssueUsageStageRecord {
+export interface PanIssueUsageModelRecord {
   input: number;
   output: number;
   cacheRead: number;
   cacheWrite: number;
-  costUsd: number;
-  calls: number;
 }
 
 export interface PanIssueUsageRecord {
-  byStage: Record<string, PanIssueUsageStageRecord>;
-  byModel: Record<string, PanIssueUsageStageRecord>;
+  byStage: Record<string, Record<string, PanIssueUsageModelRecord>>;
+  totals: Record<string, PanIssueUsageModelRecord>;
   costAtCloseOut?: { usd: number; pricingAsOf: string };
 }
 
@@ -93,10 +94,12 @@ export interface PanIssueOwnerRecord {
 export interface PanIssueRecord {
   issueId: string;
   schemaVersion: number;
-  continue: PanIssueContinueRecord;
+  decisions?: Array<{ id: string; summary: string; recordedAt: string }>;
+  hazards?: Array<{ id: string; summary: string; mitigation: string }>;
+  feedback?: unknown[];
   pipeline: PanIssuePipelineRecord;
   closeOut: PanIssueCloseOutRecord;
-  owner: PanIssueOwnerRecord;
+  owner?: string;
 }
 
 // ─── Continue projection ──────────────────────────────────────────────────────
@@ -104,16 +107,16 @@ export interface PanIssueRecord {
 interface ContinueFile {
   issueId?: string;
   gitState?: { branch?: string };
-  decisions?: PanIssueContinueRecord['decisions'];
-  hazards?: PanIssueContinueRecord['hazards'];
+  decisions?: Array<{ id: string; summary: string; recordedAt: string }>;
+  hazards?: Array<{ id: string; summary: string; mitigation: string }>;
+  feedback?: unknown[];
 }
 
-function projectContinue(issueId: string, raw: ContinueFile | null): PanIssueContinueRecord {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'feedback'> {
   return {
-    issueId,
-    branch: raw?.gitState?.branch,
     decisions: raw?.decisions,
     hazards: raw?.hazards,
+    feedback: raw?.feedback ?? [],
   };
 }
 
@@ -156,46 +159,15 @@ function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssue
 
 // ─── Usage projection ─────────────────────────────────────────────────────────
 
-function emptyStageRecord(): PanIssueUsageStageRecord {
-  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, calls: 0 };
-}
-
 function projectUsage(issueId: string): PanIssueUsageRecord {
+  const { byStage, totals } = getCostBreakdownByStageAndModel(issueId);
   const aggregate = getCostForIssueFromDb(issueId);
-  const byStage: Record<string, PanIssueUsageStageRecord> = {};
-  const byModel: Record<string, PanIssueUsageStageRecord> = {};
 
-  if (aggregate) {
-    for (const [stage, breakdown] of Object.entries(aggregate.stages ?? {})) {
-      const key = stage || 'other';
-      byStage[key] = {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        costUsd: breakdown.cost ?? 0,
-        calls: breakdown.calls ?? 0,
-      };
-    }
-
-    for (const [model, breakdown] of Object.entries(aggregate.models ?? {})) {
-      byModel[model] = {
-        input: 0,
-        output: 0,
-        cacheRead: 0,
-        cacheWrite: 0,
-        costUsd: breakdown.cost ?? 0,
-        calls: breakdown.calls ?? 0,
-      };
-    }
-  }
-
-  const totalCost = aggregate?.totalCost ?? 0;
   return {
     byStage,
-    byModel,
+    totals,
     costAtCloseOut: {
-      usd: totalCost,
+      usd: aggregate?.totalCost ?? 0,
       pricingAsOf: new Date().toISOString(),
     },
   };
@@ -215,7 +187,7 @@ function projectMerges(issueId: string): string[] {
 
 export interface BuildIssueRecordOptions {
   closedAt?: string;
-  owner?: PanIssueOwnerRecord;
+  owner?: string;
 }
 
 export async function buildIssueRecord(
@@ -229,7 +201,7 @@ export async function buildIssueRecord(
       onFailure: () => Effect.succeed(null),
     }),
   );
-  const continueRecord = projectContinue(issueId, await Effect.runPromise(rawContinue));
+  const continueSubset = projectContinue(await Effect.runPromise(rawContinue));
   const reviewStatus = getReviewStatusSync(issueId);
   const pipelineRecord = projectPipeline(issueId, reviewStatus);
   const usageRecord = projectUsage(issueId);
@@ -238,7 +210,7 @@ export async function buildIssueRecord(
   return {
     issueId,
     schemaVersion: 1,
-    continue: continueRecord,
+    ...continueSubset,
     pipeline: pipelineRecord,
     closeOut: {
       usage: usageRecord,
@@ -246,7 +218,7 @@ export async function buildIssueRecord(
       ranOn: hostname(),
       closedAt: opts.closedAt,
     },
-    owner: opts.owner ?? {},
+    owner: opts.owner,
   };
 }
 
@@ -279,6 +251,7 @@ export function queueIssueRecordCommit(
   const { repoPath } = resolveInfraRepo(project);
   queueAutoCommit({
     projectRoot: repoPath,
+    repoRoot: repoPath,
     paths: [recordPath],
     subject: `chore(records): update ${issueId.toUpperCase()} permanent record`,
   });

@@ -38,6 +38,8 @@ interface QueuedCommit {
   paths: Set<string>;
   subjects: string[];
   timer: NodeJS.Timeout;
+  /** PAN-1908: git checkout to commit into (defaults to projectRoot). */
+  repoRoot?: string;
 }
 
 /**
@@ -138,13 +140,18 @@ function runGit(
  * Queue an auto-commit for one or more files. Returns immediately; the actual
  * git commit happens after the debounce window. Multiple calls for the same
  * project root inside the window coalesce.
+ *
+ * PAN-1908: `repoRoot` allows committing files to a different git checkout
+ * than the project root (e.g., a declared infra repo for per-issue permanent
+ * records). When omitted, commits go to `projectRoot` as before.
  */
 export function queueAutoCommit(opts: {
   projectRoot: string;
   paths: string[];
   subject: string;
+  repoRoot?: string;
 }): void {
-  const { projectRoot, paths, subject } = opts;
+  const { projectRoot, paths, subject, repoRoot } = opts;
   if (paths.length === 0) return;
 
   const existing = pending.get(projectRoot);
@@ -159,6 +166,7 @@ export function queueAutoCommit(opts: {
     paths: new Set(paths),
     subjects: [subject],
     timer: setTimeout(() => void flushInner(projectRoot), DEBOUNCE_MS),
+    repoRoot,
   });
 }
 
@@ -217,15 +225,16 @@ function doCommit(
   projectRoot: string,
   batch: QueuedCommit,
 ): Effect.Effect<FlushResult, never> {
+  const gitRoot = batch.repoRoot ?? projectRoot;
   return Effect.gen(function* () {
-    if (!existsSync(join(projectRoot, '.git'))) {
+    if (!existsSync(join(gitRoot, '.git'))) {
       return { committed: false, reason: 'not a git repo' };
     }
 
     // Check current branch.
     const branchResult: FlushResult | string = yield* runGit(
       ['rev-parse', '--abbrev-ref', 'HEAD'],
-      projectRoot,
+      gitRoot,
     ).pipe(
       Effect.matchEffect({
         onSuccess: (r) => Effect.succeed(r.stdout.trim()),
@@ -248,7 +257,7 @@ function doCommit(
     // rebase after the commit, preventing local main from diverging when
     // a PR merges between beads sync cycles. Fetch is safe with a dirty
     // working tree (unlike pull --rebase).
-    yield* runGit(['fetch', 'origin', 'main'], projectRoot).pipe(
+    yield* runGit(['fetch', 'origin', 'main'], gitRoot).pipe(
       Effect.matchEffect({
         onSuccess: () => Effect.void,
         onFailure: () => Effect.void, // best-effort; network may be down
@@ -256,8 +265,10 @@ function doCommit(
     );
 
     const paths = Array.from(batch.paths);
+    // Relativize against the git root where the commit will land, not the
+    // logical project root.
     const relativePaths = paths
-      .map((p) => relativizeToRoot(p, projectRoot))
+      .map((p) => relativizeToRoot(p, gitRoot))
       .filter((p) => !isAutoCommitExcludedPath(p));
 
     if (relativePaths.length === 0) {
@@ -267,7 +278,7 @@ function doCommit(
     // git add
     const addOk: boolean | FlushResult = yield* runGit(
       ['add', '--', ...relativePaths],
-      projectRoot,
+      gitRoot,
     ).pipe(
       Effect.matchEffect({
         onSuccess: () => Effect.succeed(true as const),
@@ -286,7 +297,7 @@ function doCommit(
     // So a successful run means "no diff" — bail out.
     const noDiff: boolean = yield* runGit(
       ['diff', '--cached', '--quiet', '--', ...relativePaths],
-      projectRoot,
+      gitRoot,
     ).pipe(
       Effect.matchEffect({
         onSuccess: () => Effect.succeed(true),
@@ -304,7 +315,7 @@ function doCommit(
 
     const commitOk: boolean | FlushResult = yield* runGit(
       ['commit', '-m', subject, '--', ...relativePaths],
-      projectRoot,
+      gitRoot,
     ).pipe(
       Effect.matchEffect({
         onSuccess: () => Effect.succeed(true as const),
@@ -321,13 +332,13 @@ function doCommit(
 
     // Rebase onto origin/main so the auto-commit sits on top of any PR
     // merges that landed on the remote between sync cycles.
-    yield* runGit(['rebase', 'origin/main'], projectRoot).pipe(
+    yield* runGit(['rebase', 'origin/main'], gitRoot).pipe(
       Effect.matchEffect({
         onSuccess: () => Effect.void,
         onFailure: (err) => {
           console.warn(`[pan-dir/auto-commit] rebase failed for ${branch}: ${err.stderr || err._tag}`);
           // Abort the rebase so the repo isn't left in a conflicted state.
-          return runGit(['rebase', '--abort'], projectRoot).pipe(
+          return runGit(['rebase', '--abort'], gitRoot).pipe(
             Effect.matchEffect({ onSuccess: () => Effect.void, onFailure: () => Effect.void }),
           );
         },
