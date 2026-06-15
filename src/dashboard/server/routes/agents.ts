@@ -91,6 +91,7 @@ import {
   getProviderAuthMode,
   setAgentDeliveryMethod,
   normalizeAgentId,
+  listAgentStates,
 } from '../../../lib/agents.js';
 import { stopWorkspaceDocker } from '../../../lib/workspace-manager.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
@@ -411,11 +412,11 @@ function buildStoppedAgentLifecycle(
   };
 }
 
-async function readPersistedAgentState(agentId: string): Promise<Partial<AgentState>> {
-  const stateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
-  if (!existsSync(stateFile)) return {};
+async function readRemoteAgentState(agentId: string): Promise<Record<string, unknown>> {
+  const remoteStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'remote-state.json');
+  if (!existsSync(remoteStateFile)) return {};
   try {
-    return JSON.parse(await readFile(stateFile, 'utf-8')) as Partial<AgentState>;
+    return JSON.parse(await readFile(remoteStateFile, 'utf-8')) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -692,83 +693,137 @@ const getAgentsRoute = HttpRouter.add(
         }
 
         const sessions = yield* listSessions();
-        const agentLines = sessions
-          .filter((session) => session.name.startsWith('agent-') || session.name.startsWith('planning-') || session.name.startsWith('strike-'))
-          .map((session) => `${session.name}|${Math.floor(session.created.getTime() / 1000)}`);
+        const sessionByName = new Map(sessions.map((session) => [session.name, session]));
+        const registeredStates = listAgentStates()
+          .filter((state) => state.id.startsWith('agent-') || state.id.startsWith('planning-') || state.id.startsWith('strike-'));
 
-        const agentsDir = join(homedir(), '.panopticon', 'agents');
-        const remoteAgentIds: string[] = [];
-        const startingAgentIds: string[] = [];
-        const failedAgentIds: string[] = [];
-
-        if (existsSync(agentsDir)) {
-          const dirs = (yield* Effect.promise(() => readdir(agentsDir))).filter(d => d.startsWith('agent-') || d.startsWith('planning-') || d.startsWith('strike-'));
-          for (const dir of dirs) {
-            const inLocalList = agentLines.some(line => line.startsWith(dir + '|'));
-            const remoteStateFile = join(agentsDir, dir, 'remote-state.json');
-            if (existsSync(remoteStateFile)) {
-              try {
-                const state = JSON.parse(yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')));
-                if (state.location === 'remote' && state.status === 'running' && !inLocalList) {
-                  remoteAgentIds.push(dir);
-                }
-              } catch {}
-            }
-            if (!inLocalList && !remoteAgentIds.includes(dir)) {
-              const localStateFile = join(agentsDir, dir, 'state.json');
-              if (existsSync(localStateFile)) {
-                try {
-                  const state = JSON.parse(yield* Effect.promise(() => readFile(localStateFile, 'utf-8')));
-                  if (state.status === 'starting') {
-                    startingAgentIds.push(dir);
-                  } else if (state.status === 'error' || state.status === 'failed') {
-                    // PAN-1048 review feedback 004 (C2): contract AgentStatus
-                    // is starting | running | stopped | error | unknown. Writers
-                    // now persist 'error'; the legacy 'failed' literal is
-                    // accepted here for backward compatibility with state.json
-                    // files written by older builds.
-                    failedAgentIds.push(dir);
-                  }
-                } catch {}
-              }
-            }
-          }
-        }
-
-        const agents = yield* Effect.promise(() => Promise.all(
-          agentLines.map(async (line) => {
-            const [name, created] = line.split('|');
-            const startedAt = new Date(parseInt(created) * 1000).toISOString();
+        const allAgents = (yield* Effect.promise(() => Promise.all(
+          registeredStates.map(async (state) => {
+            const name = state.id;
             const isPlanning = name.startsWith('planning-');
             const isStrike = name.startsWith('strike-');
-            const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
+            const issueId = state.issueId?.toUpperCase() ||
+              (isPlanning ? name.replace('planning-', '') : isStrike ? name.replace('strike-', '') : name.replace('agent-', '')).toUpperCase();
+            const session = sessionByName.get(name);
+            const remoteState = await readRemoteAgentState(name);
+            const isRemote = remoteState.location === 'remote';
+            const runtimeData = await Effect.runPromise(getAgentRuntimeState(name));
+            const startedAt = state.startedAt || (session ? new Date(session.created).toISOString() : new Date().toISOString());
             const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
-            let state: any = { model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
             let health: any = { killCount: 0 };
-
-            if (existsSync(stateFile)) {
-              try { state = { ...state, ...JSON.parse(await readFile(stateFile, 'utf-8')) }; } catch {}
-            }
             if (existsSync(healthFile)) {
               try { health = { ...health, ...JSON.parse(await readFile(healthFile, 'utf-8')) }; } catch {}
             }
 
-            const gitStatus = state.workspace ? await getGitStatusAsync(state.workspace) : null;
-            const issueId = isPlanning
-              ? name.replace('planning-', '').toUpperCase()
-              : isStrike
-                ? name.replace('strike-', '').toUpperCase()
-                : name.replace('agent-', '').toUpperCase();
+            if (state.status === 'stopped') {
+              const stoppedTimestamp = state.stoppedAt || runtimeData?.lastActivity || state.lastActivity;
+              const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
+              const reviewStatus = getReviewStatusSync(issueId);
+              const keepStoppedAgentVisible =
+                hasActiveAgentGateOrRetry(state, now) ||
+                (
+                  !!reviewStatus &&
+                  reviewStatus.mergeStatus !== 'merged' &&
+                  (
+                    !!reviewStatus.prUrl ||
+                    reviewStatus.readyForMerge === true ||
+                    reviewStatus.reviewStatus !== 'pending' ||
+                    reviewStatus.testStatus !== 'pending' ||
+                    reviewStatus.mergeStatus === 'failed'
+                  )
+                );
+              if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) return null;
+              const lifecycle = buildStoppedAgentLifecycle(name, state, runtimeData ?? {});
+              const needsInput = runtimeData?.resolution === 'needs_input';
+              const pendingQuestionPrompt = needsInput
+                ? normalizeAwaitingInputPrompt(
+                    runtimeData?.waitingNotification ||
+                      'Agent stopped because it needs human input or hit a blocker',
+                  )
+                : undefined;
+              const pendingQuestionReason = needsInput
+                ? runtimeData?.waitingReason || 'other'
+                : undefined;
+              return {
+                id: name,
+                issueId,
+                runtime: state.harness ?? 'claude-code',
+                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+                status: 'stopped' as const,
+                startedAt,
+                ...buildAgentGateFailureSnapshot(state),
+                killCount: health.killCount || 0,
+                workspace: state.workspace || null,
+                workspaceLocation: isRemote ? 'remote' : 'local',
+                git: null,
+                type: 'agent',
+                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+                hasPendingQuestion: needsInput,
+                pendingQuestionCount: 0,
+                pendingQuestionPrompt,
+                pendingQuestionReason,
+                resolution: runtimeData?.resolution || 'working',
+                resolutionCount: runtimeData?.resolutionCount || 0,
+                hasSession: lifecycle.canResumeSession,
+                lifecycle,
+                ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
+              };
+            }
 
-            const runtimeState = await Effect.runPromise(getAgentRuntimeState(name));
+            if (state.status === 'starting') {
+              return {
+                id: name,
+                issueId,
+                runtime: state.harness ?? 'claude-code',
+                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+                status: 'starting' as const,
+                startedAt,
+                ...buildAgentGateFailureSnapshot(state),
+                killCount: health.killCount || 0,
+                workspace: state.workspace || null,
+                workspaceLocation: isRemote ? 'remote' : 'local',
+                git: null,
+                type: 'agent',
+                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+                hasPendingQuestion: false,
+                pendingQuestionCount: 0,
+                message: (state as { message?: string }).message || 'Starting...',
+                ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
+              };
+            }
+
+            if (state.status === 'error') {
+              return {
+                id: name,
+                issueId,
+                runtime: state.harness ?? 'claude-code',
+                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+                status: 'error' as const,
+                startedAt,
+                ...buildAgentGateFailureSnapshot(state),
+                killCount: health.killCount || 0,
+                workspace: state.workspace || null,
+                workspaceLocation: isRemote ? 'remote' : 'local',
+                git: null,
+                type: 'agent',
+                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+                hasPendingQuestion: false,
+                pendingQuestionCount: 0,
+                error: state.lastFailureReason || 'Unknown error',
+                ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
+              };
+            }
 
             const issueReviewStatus = getReviewStatusSync(issueId);
             const hasActiveSpecialist = issueReviewStatus?.reviewStatus === 'reviewing'
               || issueReviewStatus?.testStatus === 'testing'
               || issueReviewStatus?.mergeStatus === 'merging';
             const enrichment = await Effect.runPromise(computeAgentEnrichment(name, startedAt, hasActiveSpecialist));
-
-            const workspaceLocation = await getWorkspaceLocation(issueId);
+            const workspaceLocation = isRemote ? 'remote' : await getWorkspaceLocation(issueId);
+            const workspace = isRemote && remoteState.vmName
+              ? `/workspace (${String(remoteState.vmName)})`
+              : state.workspace || null;
+            const gitStatus = workspace && !isRemote ? await getGitStatusAsync(workspace) : null;
 
             let contextPercent: number | null = null;
             let initialContextPercent: number | null = null;
@@ -789,7 +844,7 @@ const getAgentsRoute = HttpRouter.add(
               startedAt,
               ...buildAgentGateFailureSnapshot(state),
               killCount: health.killCount || 0,
-              workspace: state.workspace || null,
+              workspace,
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
@@ -801,189 +856,14 @@ const getAgentsRoute = HttpRouter.add(
               pendingInputCount: enrichment.pendingInputCount,
               pendingInputKinds: enrichment.pendingInputKinds,
               pendingAskUserQuestion: enrichment.pendingAskUserQuestion,
-              resolution: runtimeState?.resolution || enrichment.resolution || 'working',
-              resolutionCount: runtimeState?.resolutionCount || enrichment.resolutionCount || 0,
+              resolution: runtimeData?.resolution || enrichment.resolution || 'working',
+              resolutionCount: runtimeData?.resolutionCount || enrichment.resolutionCount || 0,
               contextPercent,
               initialContextPercent,
+              ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
             };
-          })
-        ));
-
-        const remoteAgents = yield* Effect.promise(() => Promise.all(
-          remoteAgentIds.map(async (name) => {
-            const remoteStateFile = join(homedir(), '.panopticon', 'agents', name, 'remote-state.json');
-            const isPlanning = name.startsWith('planning-');
-            const isStrike = name.startsWith('strike-');
-            try {
-              const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
-              const persistedState = await readPersistedAgentState(name);
-              const issueId = state.issueId?.toUpperCase() || persistedState.issueId?.toUpperCase() || name.replace(/^(agent-|planning-|strike-)/, '').toUpperCase();
-              const workspaceLocation = await getWorkspaceLocation(issueId);
-              return {
-                id: name,
-                issueId,
-                runtime: state.harness ?? persistedState.harness ?? 'claude-code',
-                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-                status: 'healthy' as const,
-                startedAt: state.startedAt || persistedState.startedAt || new Date().toISOString(),
-                ...buildAgentGateFailureSnapshot(persistedState),
-                killCount: 0,
-                workspace: `/workspace (${state.vmName})`,
-                workspaceLocation: 'remote',
-                vmName: state.vmName,
-                git: null,
-                type: 'agent',
-                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
-                hasPendingQuestion: false,
-                pendingQuestionCount: 0,
-                remote: true,
-              };
-            } catch { return null; }
-          })
-        ));
-
-        const stoppedAgents: any[] = [];
-        if (existsSync(agentsDir)) {
-          const allDirs = (yield* Effect.promise(() => readdir(agentsDir))).filter(d => d.startsWith('agent-') || d.startsWith('planning-') || d.startsWith('strike-'));
-          const alreadyListed = new Set([
-            ...agentLines.map(l => l.split('|')[0]),
-            ...remoteAgentIds,
-          ]);
-          for (const dir of allDirs) {
-            if (alreadyListed.has(dir)) continue;
-            const stateFile = join(agentsDir, dir, 'state.json');
-            if (!existsSync(stateFile)) continue;
-            try {
-              const state = JSON.parse(yield* Effect.promise(() => readFile(stateFile, 'utf-8')));
-              const runtimeFile = join(agentsDir, dir, 'runtime.json');
-              let runtimeData: any = {};
-              if (existsSync(runtimeFile)) {
-                try { runtimeData = JSON.parse(yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'))); } catch {}
-              }
-              const hasCompletedMarker = existsSync(join(agentsDir, dir, 'completed')) ||
-                existsSync(join(agentsDir, dir, 'completed.processed'));
-              const runtimeIdle = runtimeData.state === 'idle' || state.state === 'idle';
-              const isStopped = state.status === 'stopped' || hasCompletedMarker ||
-                (runtimeIdle && state.status !== 'starting');
-              if (!isStopped) continue;
-              const isPlanning = dir.startsWith('planning-');
-              const isStrike = dir.startsWith('strike-');
-              const issueId = state.issueId?.toUpperCase() ||
-                (isPlanning ? dir.replace('planning-', '') : isStrike ? dir.replace('strike-', '') : dir.replace('agent-', '')).toUpperCase();
-              const stoppedTimestamp = state.stoppedAt || runtimeData.lastActivity || state.lastActivity;
-              const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
-              const reviewStatus = getReviewStatusSync(issueId);
-              const keepStoppedAgentVisible =
-                hasActiveAgentGateOrRetry(state, now) ||
-                (
-                  !!reviewStatus &&
-                  reviewStatus.mergeStatus !== 'merged' &&
-                  (
-                    !!reviewStatus.prUrl ||
-                    reviewStatus.readyForMerge === true ||
-                    reviewStatus.reviewStatus !== 'pending' ||
-                    reviewStatus.testStatus !== 'pending' ||
-                    reviewStatus.mergeStatus === 'failed'
-                  )
-                );
-              if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
-              const lifecycle = buildStoppedAgentLifecycle(dir, state, runtimeData);
-              const needsInput = runtimeData.resolution === 'needs_input';
-              const pendingQuestionPrompt = needsInput
-                ? normalizeAwaitingInputPrompt(
-                    runtimeData.waitingNotification ||
-                      'Agent stopped because it needs human input or hit a blocker',
-                  )
-                : undefined;
-              const pendingQuestionReason = needsInput
-                ? runtimeData.waitingReason || 'other'
-                : undefined;
-              stoppedAgents.push({
-                id: dir,
-                issueId,
-                runtime: state.harness ?? 'claude-code',
-                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-                status: 'stopped' as const,
-                startedAt: state.startedAt || new Date().toISOString(),
-                ...buildAgentGateFailureSnapshot(state),
-                killCount: 0,
-                workspace: state.workspace || null,
-                workspaceLocation: 'local',
-                git: null,
-                type: 'agent',
-                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
-                hasPendingQuestion: needsInput,
-                pendingQuestionCount: 0,
-                pendingQuestionPrompt,
-                pendingQuestionReason,
-                resolution: runtimeData.resolution || 'working',
-                resolutionCount: runtimeData.resolutionCount || 0,
-                hasSession: lifecycle.canResumeSession,
-                lifecycle,
-              });
-            } catch {}
-          }
-        }
-
-        const startingAgents = (yield* Effect.promise(() => Promise.all(startingAgentIds.map(async dir => {
-          const stateFile = join(agentsDir, dir, 'state.json');
-          try {
-            const state = JSON.parse(await readFile(stateFile, 'utf-8'));
-            const isPlanning = dir.startsWith('planning-');
-            const isStrike = dir.startsWith('strike-');
-            const issueId = state.issueId?.toUpperCase() ||
-              (isPlanning ? dir.replace('planning-', '') : isStrike ? dir.replace('strike-', '') : dir.replace('agent-', '')).toUpperCase();
-            return {
-              id: dir,
-              issueId,
-              runtime: state.harness ?? 'claude-code',
-              model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-              status: 'starting' as const,
-              startedAt: state.startedAt || new Date().toISOString(),
-              ...buildAgentGateFailureSnapshot(state),
-              killCount: 0,
-              workspace: state.workspace || null,
-              workspaceLocation: 'local',
-              git: null,
-              type: 'agent',
-              role: state.role ?? (isPlanning ? 'plan' : 'work'),
-              hasPendingQuestion: false,
-              pendingQuestionCount: 0,
-              message: state.message || 'Starting...',
-            };
-          } catch { return null; }
-        })))).filter(Boolean);
-
-        const failedAgents = (yield* Effect.promise(() => Promise.all(failedAgentIds.map(async dir => {
-          const stateFile = join(agentsDir, dir, 'state.json');
-          try {
-            const state = JSON.parse(await readFile(stateFile, 'utf-8'));
-            const isPlanning = dir.startsWith('planning-');
-            const isStrike = dir.startsWith('strike-');
-            const issueId = state.issueId?.toUpperCase() ||
-              (isPlanning ? dir.replace('planning-', '') : isStrike ? dir.replace('strike-', '') : dir.replace('agent-', '')).toUpperCase();
-            return {
-              id: dir,
-              issueId,
-              runtime: state.harness ?? 'claude-code',
-              model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-              status: 'error' as const,
-              startedAt: state.startedAt || new Date().toISOString(),
-              ...buildAgentGateFailureSnapshot(state),
-              killCount: 0,
-              workspace: state.workspace || null,
-              workspaceLocation: state.location || 'local',
-              git: null,
-              type: 'agent',
-              role: state.role ?? (isPlanning ? 'plan' : 'work'),
-              hasPendingQuestion: false,
-              pendingQuestionCount: 0,
-              error: state.error || 'Unknown error',
-            };
-          } catch { return null; }
-        })))).filter(Boolean);
-
-        const allAgents = [...agents, ...remoteAgents.filter(Boolean), ...startingAgents, ...failedAgents, ...stoppedAgents];
+          }),
+        ))).filter(Boolean);
         const visibleAgents = filterClosedIssueAgents(allAgents, getIssueDataService().getIssues());
         agentsCache = { data: visibleAgents, timestamp: now };
         return jsonResponse(visibleAgents);

@@ -14,6 +14,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // ─── AgentState field manifest — Appendix A §1 of PAN-1908 PRD ───────────────
 
@@ -179,5 +181,19 @@ describe('PAN-1908 no-loss audit', () => {
     // are empty where appropriate.
     expect([...REVIEW_STATUS_DURABLE_COLUMNS, ...REVIEW_STATUS_EPHEMERAL_COLUMNS]).not.toContain('conversation_id');
     expect(allAgentStateFields()).not.toContain('conversationId');
+  });
+
+  it('keeps GET /api/agents membership on the agents table, not agent-directory scans', () => {
+    const routePath = join(process.cwd(), 'src/dashboard/server/routes/agents.ts');
+    const source = readFileSync(routePath, 'utf-8');
+    const start = source.indexOf("const getAgentsRoute = HttpRouter.add(");
+    const end = source.indexOf("// ─── Route: GET /api/agents/:id/output", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+
+    const routeSource = source.slice(start, end);
+    expect(routeSource).toContain('listAgentStates()');
+    expect(routeSource).not.toContain('readdir(agentsDir)');
+    expect(routeSource).not.toContain("join(agentsDir, dir, 'state.json')");
   });
 });
