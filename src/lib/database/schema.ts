@@ -738,7 +738,7 @@ export function initSchema(db: SqliteDatabase): void {
  * Run schema migrations if the database version is older than SCHEMA_VERSION.
  * This function handles upgrading from older schema versions.
  */
-export function runMigrations(db: SqliteDatabase): void {
+export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
   if (currentVersion === SCHEMA_VERSION) {
@@ -1548,10 +1548,10 @@ export function runMigrations(db: SqliteDatabase): void {
     // event-driven registry misbehaves. The snapshot is a one-time file copy
     // made before any schema change or backfill runs.
     try {
-      const dbPath = join(getPanopticonHome(), 'panopticon.db');
-      const snapshotPath = `${dbPath}.v54-backfill-snapshot`;
-      if (existsSync(dbPath) && !existsSync(snapshotPath)) {
-        const source = readFileSync(dbPath);
+      const resolvedDbPath = dbPath ?? join(getPanopticonHome(), 'panopticon.db');
+      const snapshotPath = `${resolvedDbPath}.v54-backfill-snapshot`;
+      if (existsSync(resolvedDbPath) && !existsSync(snapshotPath)) {
+        const source = readFileSync(resolvedDbPath);
         writeFileSync(snapshotPath, source);
         console.log(`[schema] Snapshot created: ${snapshotPath}`);
       }

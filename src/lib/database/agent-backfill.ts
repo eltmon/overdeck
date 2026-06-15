@@ -132,7 +132,11 @@ function parseAgentStateJson(content: string, fallbackId: string): AgentState | 
 function buildNamedParams(row: DbAgent): Record<string, unknown> {
   const params: Record<string, unknown> = {};
   for (const [key, column] of Object.entries(COLUMN_MAP)) {
-    params[column] = (row as unknown as Record<string, unknown>)[key];
+    let value = (row as unknown as Record<string, unknown>)[key];
+    if (typeof value === 'boolean') {
+      value = value ? 1 : 0;
+    }
+    params[column] = value;
   }
   return params;
 }

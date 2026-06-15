@@ -72,7 +72,7 @@ export function getDatabase(): SqliteDatabase {
   _db.pragma('journal_size_limit = 67108864');
 
   // Initialize or migrate schema
-  runMigrations(_db);
+  runMigrations(_db, dbPath);
 
   // One-time migration: enable incremental auto_vacuum.
   //
