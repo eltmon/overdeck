@@ -28,6 +28,7 @@ import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
+import { setDeaconGloballyPaused, setFlywheelGloballyPaused } from '../database/app-settings.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEventSync, createHandoffEvent } from './handoff-logger.js';
@@ -897,6 +898,19 @@ export class CloisterService {
    */
   emergencyStop(): string[] {
     console.log('🚨 EMERGENCY STOP - Killing all agents');
+
+    // Freeze auto-resume FIRST, before killing — otherwise the deacon patrol or a
+    // dashboard restart re-spawns the agents we are about to kill and the money
+    // keeps burning. This persists in SQLite, so the freeze survives a restart;
+    // the operator clears it explicitly (Deacon resume / flywheel resume) when
+    // they are ready to let agents run again.
+    try {
+      setDeaconGloballyPaused(true);
+      setFlywheelGloballyPaused(true);
+      console.log('  ✓ Froze Deacon + flywheel auto-resume');
+    } catch (error) {
+      console.error('  ✗ Failed to set global pause flags:', error);
+    }
 
     const runningAgents = listRunningAgentsSync();
     const killedAgents: string[] = [];

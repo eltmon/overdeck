@@ -7,6 +7,7 @@ import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { AskUserQuestionDialog, type AskUserQuestionSubject } from './components/AskUserQuestionDialog';
 import { EventRouter } from './components/EventRouter';
@@ -1639,6 +1640,9 @@ export default function App() {
         }}
         onOpenConversationHit={handleOpenConversationHit}
       />
+
+      {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}
+      <EmergencyStopOverlay />
 
       {/* Toast Notifications */}
       <Toaster />

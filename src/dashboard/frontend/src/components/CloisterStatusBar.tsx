@@ -9,6 +9,7 @@ import { Bell, BellOff, AlertTriangle, StopCircle, Settings, Zap, RefreshCw } fr
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore, selectAgents } from '../lib/store';
+import { EMERGENCY_STOP_HOTKEY_LABEL } from './EmergencyStopOverlay';
 import { fetchWithTimeout } from '../lib/apiFetch';
 
 interface CloisterStatus {
@@ -386,7 +387,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
           <button
             onClick={() => setShowEmergencyConfirm(true)}
             className="p-1 rounded text-xs badge-bg-destructive text-destructive border badge-border-destructive hover:bg-destructive/20 transition-colors"
-            title="Emergency stop - kill all agents"
+            title={`Emergency stop — kill all agents (hotkey: ${EMERGENCY_STOP_HOTKEY_LABEL})`}
           >
             <StopCircle className="w-3.5 h-3.5" />
           </button>
