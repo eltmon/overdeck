@@ -245,6 +245,16 @@ async function fetchConversationMessageLocator(name: string, byteOffset: number)
   return res.json();
 }
 
+function describeConversationHitOpenFailure(hit: ConversationPaletteOpenRequest, err: unknown): string {
+  const reason = err instanceof Error ? err.message : 'Unable to open conversation hit';
+  const details = [
+    hit.sourceLabel,
+    hit.conversationId === hit.sessionId ? 'no dashboard conversation row' : null,
+    hit.projectId ? `project ${hit.projectId}` : null,
+  ].filter(Boolean).join(' · ');
+  return details ? `${reason}. ${details}` : reason;
+}
+
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
   const res = await fetch('/api/tracker-status');
   if (!res.ok) throw new Error('Failed to fetch tracker status');
@@ -666,7 +676,7 @@ export default function App() {
         targetMessageNonce: nonce,
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Unable to open conversation hit');
+      toast.error(describeConversationHitOpenFailure(hit, err));
     }
   }, [setActiveTab, setConversationRoute]);
 

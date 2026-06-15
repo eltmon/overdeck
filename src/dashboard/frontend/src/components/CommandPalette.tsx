@@ -66,6 +66,7 @@ export interface ConversationPaletteOpenRequest {
   projectKey: string | null;
   byteOffset: number;
   label: string;
+  sourceLabel?: string;
 }
 
 interface CommandPaletteProps {
@@ -148,6 +149,12 @@ function friendlyProjectLabel(projectId: string): string {
   if (projectsIdx >= 0) return after.join('-') || projectId;
   // No `Projects` anchor — best effort: the cwd basename (last segment).
   return after[after.length - 1] || projectId;
+}
+
+function issueIdFromProjectLabel(label: string): string | null {
+  const match = label.match(/\bfeature-([a-z]+)-(\d+)\b/i);
+  if (!match) return null;
+  return `${match[1]!.toUpperCase()}-${match[2]}`;
 }
 
 /** Compact, human-friendly timestamp: "Today 18:30", "Yesterday 09:12", "Jun 9", "Jun 9, 2025". */
@@ -575,9 +582,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     for (const hit of searchResults.conversations) {
       const label = hit.displayContent || hit.conversationId || hit.sessionId;
       const project = friendlyProjectLabel(hit.projectId);
+      const issueId = issueIdFromProjectLabel(project);
+      const isDashboardConversation = hit.conversationId !== hit.sessionId;
+      const sourceLabel = isDashboardConversation
+        ? `Conversation ${hit.conversationId}`
+        : `Claude session ${hit.sessionId.slice(0, 8)}`;
       const date = formatHitDate(hit.ts);
       const metaChips: PaletteAction['meta'] = [];
       if (project) metaChips.push({ icon: FolderOpen, text: project, pill: true });
+      if (issueId) metaChips.push({ text: issueId, pill: true });
+      metaChips.push({ text: sourceLabel });
       if (date) metaChips.push({ icon: Clock, text: date });
       if (hit.role) metaChips.push({ text: hit.role });
       out.push({
@@ -601,6 +615,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
               projectKey: hit.projectKey,
               byteOffset: hit.byteOffset,
               label,
+              sourceLabel,
             });
             return;
           }

@@ -129,7 +129,8 @@ describe('CommandPalette conversation results', () => {
             conversations: [{
               sessionId: 'session-a',
               conversationId: 'session-a',
-              projectId: 'panopticon-cli',
+              projectId: '-home-eltmon-Projects-panopticon-cli-workspaces-feature-pan-1896',
+              projectKey: 'panopticon-cli',
               role: 'assistant',
               ts: '2026-06-02T01:00:00.000Z',
               byteOffset: 42,
@@ -190,6 +191,9 @@ describe('CommandPalette conversation results', () => {
     const conversationsHeading = groupHeading('Conversations');
     expect(screen.getByText('semantic transcript hit')).toBeInTheDocument();
     expect(screen.getByText('needle')).toBeInTheDocument();
+    expect(screen.getByText('panopticon-cli · feature-pan-1896')).toBeInTheDocument();
+    expect(screen.getByText('PAN-1896')).toBeInTheDocument();
+    expect(screen.getByText('Claude session session-')).toBeInTheDocument();
 
     const memoryHeading = groupHeading('Memory');
     expect(conversationsHeading.compareDocumentPosition(memoryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -218,9 +222,11 @@ describe('CommandPalette conversation results', () => {
     expect(onOpenConversationHit).toHaveBeenCalledWith({
       sessionId: 'session-a',
       conversationId: 'session-a',
-      projectId: 'panopticon-cli',
+      projectId: '-home-eltmon-Projects-panopticon-cli-workspaces-feature-pan-1896',
+      projectKey: 'panopticon-cli',
       byteOffset: 42,
       label: 'semantic transcript hit',
+      sourceLabel: 'Claude session session-',
     });
   });
 });
