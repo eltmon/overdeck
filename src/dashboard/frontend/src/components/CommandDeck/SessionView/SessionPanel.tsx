@@ -264,6 +264,9 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       sessionFile: session.sessionId,
       model: actualModel ?? fallbackModel,
       deliveryMethod: session.deliveryMethod ?? null,
+      // Carry the harness so the live message stream can be enabled for this
+      // synthetic agent session (PAN-1908: pi/codex work agents stream too).
+      harness: session.harness as Conversation['harness'],
     };
   }, [session, issueId, resolvedModels]);
 

@@ -108,8 +108,22 @@ export function applyConversationMessagesEvent(
   };
 }
 
-export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'harness' | 'sessionAlive'> & { id?: number }): boolean {
-  return conversation.sessionAlive && conversation.id !== undefined && conversation.id >= 0 && (conversation.harness === 'claude-code' || conversation.harness == null);
+export function shouldStreamConversationMessages(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number }): boolean {
+  if (!conversation.sessionAlive) return false;
+  // Real DB conversations (id >= 0) keep the original behavior: stream only for
+  // claude-code (or legacy null harness). Pi/codex DB conversations stay on the
+  // existing HTTP-poll path to limit blast radius.
+  if (conversation.id !== undefined && conversation.id >= 0) {
+    return conversation.harness === 'claude-code' || conversation.harness == null;
+  }
+  // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels).
+  // Only pi/codex stream here (PAN-1908): the server tails their transcript and
+  // pushes snapshots. Claude work agents stay on the existing HTTP-poll path,
+  // which already works — no need to add a server watcher for them.
+  const name = conversation.name ?? '';
+  const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
+  const streamable = conversation.harness === 'pi' || conversation.harness === 'codex';
+  return isAgentSession && streamable;
 }
 
 export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number }): boolean {
