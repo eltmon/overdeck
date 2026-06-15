@@ -81,6 +81,9 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
   statusColor: () => ({ bg: 'transparent', fg: 'currentColor', label: 'pass' }),
 }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/VBriefTab', () => ({ VBriefTab: () => <div>vBRIEF tab</div> }))
+vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
+  SessionPanel: ({ session }: { session: { sessionId: string } }) => <div data-testid="session-panel">{session.sessionId}</div>,
+}))
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>Review card</div> }))
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
@@ -165,9 +168,13 @@ describe('IssueMissionControl', () => {
     fireEvent.click(screen.getByRole('button', { name: /Work/ }))
 
     expect(screen.getByTestId('issue-tree-context-panel')).toBeTruthy()
-    expect(screen.getByText('Launch')).toBeTruthy()
+    expect(screen.getByTestId('session-panel')).toBeTruthy()
+    expect(screen.getByText('Issue overview')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('false')
     expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-selected')).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
+    expect(screen.getByText('Now')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
 

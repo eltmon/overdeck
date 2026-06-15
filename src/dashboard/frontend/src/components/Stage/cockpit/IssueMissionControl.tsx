@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
@@ -23,13 +24,14 @@ import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
 import { ProjectNode, type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
+import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import type { PaneType } from '../../../lib/panesStore'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { ReviewVerificationCard } from './ReviewVerificationCard'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
-import type { SessionNode } from '@panctl/contracts'
+import type { ProjectSessionTree, SessionNode } from '@panctl/contracts'
 import styles from './cockpitBody.module.css'
 
 export interface IssueMissionControlProps {
@@ -66,19 +68,7 @@ type PipelineState = 'done' | 'active' | 'fail' | 'todo'
 
 type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
 
-type IssueTreeContext = 'issue' | 'work' | 'review' | 'test' | 'ci' | 'plan' | 'beads' | 'activity'
-
-const COCKPIT_SESSION_CONTEXT: Partial<Record<SessionNode['type'], IssueTreeContext>> = {
-  work: 'work',
-  strike: 'work',
-  review: 'review',
-  reviewer: 'review',
-  test: 'test',
-  ship: 'ci',
-  merge: 'ci',
-  planning: 'plan',
-  legacy: 'plan',
-}
+type IssueTreeContext = 'issue'
 
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -545,22 +535,76 @@ function issueTreeStateLabel(rs: ReviewStatusData | undefined): string {
   return 'In Progress'
 }
 
+async function fetchCockpitProjectFeature(projectName: string, issueId: string): Promise<ProjectFeature | null> {
+  const [issuesRes, treesRes] = await Promise.all([
+    fetch('/api/issues/resource-allocated'),
+    fetch(`/api/session-trees?projects=${encodeURIComponent(projectName)}`),
+  ])
+  if (!issuesRes.ok || !treesRes.ok) return null
+
+  const issues = await issuesRes.json() as ProjectFeature[]
+  const treesPayload = await treesRes.json() as { trees?: ProjectSessionTree[] }
+  const lowerIssueId = issueId.toLowerCase()
+  const feature = issues.find((candidate) =>
+    candidate.issueId.toLowerCase() === lowerIssueId &&
+    candidate.projectName === projectName,
+  ) ?? null
+  const treeFeature = (treesPayload.trees ?? [])
+    .find((tree) => tree.projectKey === projectName)
+    ?.features
+    .find((candidate) => candidate.issueId.toLowerCase() === lowerIssueId)
+
+  if (!feature && !treeFeature) return null
+  if (!feature) {
+    return {
+      issueId,
+      title: treeFeature?.title ?? issueId,
+      projectName,
+      branch: '',
+      status: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : 'has_state',
+      stateLabel: 'In Progress',
+      agentStatus: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : null,
+      hasPlanning: treeFeature?.sessions.some((session) => session.type === 'planning' || session.type === 'legacy') ?? false,
+      hasPrd: false,
+      hasState: false,
+      isShadow: false,
+      sessions: treeFeature?.sessions ?? [],
+    }
+  }
+  return {
+    ...feature,
+    sessions: treeFeature?.sessions ?? feature.sessions,
+  }
+}
+
 function IssueTreeLane({
   issueId,
   title,
   projectName,
-  selected,
-  onSelect,
+  selectedIssue,
+  selectedSessionId,
+  onSelectIssue,
+  onSelectSession,
+  onSessionsChange,
 }: {
   issueId: string
   title: string
   projectName?: string
-  selected: IssueTreeContext | null
-  onSelect: (context: IssueTreeContext) => void
+  selectedIssue: boolean
+  selectedSessionId: string | null
+  onSelectIssue: () => void
+  onSelectSession: (session: SessionNode) => void
+  onSessionsChange: (sessions: readonly SessionNode[]) => void
 }) {
   const review = useReviewStatusQuery(issueId)
   const activity = useActivityQuery(issueId)
   const actions = useIssueActions(issueId)
+  const projectFeature = useQuery({
+    queryKey: ['cockpit-project-feature', projectName, issueId],
+    queryFn: () => fetchCockpitProjectFeature(projectName!, issueId),
+    enabled: Boolean(projectName),
+    staleTime: 10_000,
+  })
   const sessions = useMemo(() => {
     const base = (activity.data?.sections ?? [])
       .map((section) => toCockpitSession(section))
@@ -579,7 +623,7 @@ function IssueTreeLane({
     return base
   }, [actions.state.hasPlan, activity.data?.sections, issueId])
 
-  const feature: ProjectFeature = useMemo(() => ({
+  const fallbackFeature: ProjectFeature = useMemo(() => ({
     issueId,
     title,
     projectName: projectName ?? 'Project',
@@ -610,25 +654,25 @@ function IssueTreeLane({
     },
   }), [actions.state.hasBeads, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
 
-  const selectedSessionId = useMemo(() => {
-    if (!selected) return null
-    const matchingType = Object.entries(COCKPIT_SESSION_CONTEXT).find(([, context]) => context === selected)?.[0]
-    return sessions.find((session) => session.type === matchingType)?.sessionId ?? null
-  }, [selected, sessions])
+  const feature = projectFeature.data ?? fallbackFeature
+  const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
+
+  useEffect(() => {
+    onSessionsChange(renderedSessions)
+  }, [onSessionsChange, renderedSessions])
 
   return (
     <aside className="min-w-0 rounded-[20px] border border-border bg-card/50 p-2" aria-label="Issue tree">
       <ProjectNode
         name={projectName ?? 'Project'}
         features={[feature]}
-        selectedFeature={selected === 'issue' ? issueId : null}
+        selectedFeature={selectedIssue ? issueId : null}
         selectedProject={projectName ?? 'Project'}
-        onSelectFeature={() => onSelect('issue')}
+        onSelectFeature={onSelectIssue}
         selectedSessionId={selectedSessionId}
         onSelectSession={(_, sessionId) => {
-          const session = sessions.find((candidate) => candidate.sessionId === sessionId)
-          const context = session ? COCKPIT_SESSION_CONTEXT[session.type] : null
-          onSelect(context ?? 'work')
+          const session = renderedSessions.find((candidate) => candidate.sessionId === sessionId)
+          if (session) onSelectSession(session)
         }}
         filter="all"
       />
@@ -639,48 +683,65 @@ function IssueTreeLane({
 function IssueTreeContextPanel({
   context,
   issueId,
+  selectedSession,
+  treeSessions,
   launcher,
   agentDock,
   actionDock,
   timeline,
+  onBackToIssue,
 }: {
   context: IssueTreeContext
   issueId: string
+  selectedSession: SessionNode | null
+  treeSessions: readonly SessionNode[]
   launcher: ReactNode
   agentDock: ReactNode
   actionDock: ReactNode
   timeline: ReactNode
+  onBackToIssue: () => void
 }) {
-  const review = useReviewStatusQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const work = activity.data?.sections.find((section) => section.type === 'work')
   const copy: Record<IssueTreeContext, { title: string; summary: string }> = {
-    issue: { title: issueId, summary: 'Issue detail from the tree. Workspace tabs stay visible above this pane.' },
-    work: { title: 'Work agent', summary: work ? `${work.sessionId} · ${work.status}` : 'No work agent session is attached to this issue.' },
-    review: { title: 'Review', summary: `Review status: ${review.data?.reviewStatus ?? 'pending'}.` },
-    test: { title: 'Test', summary: `Test status: ${review.data?.testStatus ?? 'pending'}.` },
-    ci: { title: 'PR & CI', summary: 'GitHub pull request and check run state for this issue.' },
-    plan: { title: 'Planning state', summary: 'vBRIEF, PRD, and planning state for this issue.' },
-    beads: { title: 'Beads', summary: 'Implementation beads generated from the finalized plan.' },
-    activity: { title: 'Activity', summary: 'Issue activity feed and recent pipeline events.' },
+    issue: { title: issueId, summary: 'Issue overview from the tree. Workspace tabs stay visible above this pane.' },
   }
 
   const body = (() => {
+    if (selectedSession) {
+      return (
+        <SessionPanel
+          session={selectedSession}
+          issueId={issueId}
+          reviewers={treeSessions.filter((session) => session.type === 'reviewer')}
+        />
+      )
+    }
     if (context === 'issue') return <OverviewTab issueId={issueId} />
-    if (context === 'work') return <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />
-    if (context === 'review') return <ReviewVerificationCard issueId={issueId} />
-    if (context === 'test') return <TestPanel issueId={issueId} />
-    if (context === 'ci') return <GitHubCiPanel issueId={issueId} />
-    if (context === 'plan') return <PlanMissionTab issueId={issueId} />
-    if (context === 'beads') return <BeadsTab issueId={issueId} />
-    return <ActivityTab issueId={issueId} />
+    return <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />
   })()
+
+  const title = selectedSession
+    ? selectedSession.role
+      ? `${selectedSession.role[0]?.toUpperCase() ?? ''}${selectedSession.role.slice(1)} reviewer`
+      : `${selectedSession.type[0]?.toUpperCase() ?? ''}${selectedSession.type.slice(1)} session`
+    : copy[context].title
+  const summary = selectedSession
+    ? `${selectedSession.sessionId} · ${selectedSession.status}`
+    : copy[context].summary
 
   return (
     <div className="space-y-3.5" data-testid="issue-tree-context-panel">
-      <div className="rounded-[16px] border border-border bg-card px-4 py-3">
-        <h2 className="text-[16px] font-semibold text-foreground">{copy[context].title}</h2>
-        <p className="mt-1 text-[12px] text-muted-foreground">{copy[context].summary}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-[16px] border border-border bg-card px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-[16px] font-semibold text-foreground">{title}</h2>
+          <p className="mt-1 truncate text-[12px] text-muted-foreground">{summary}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onBackToIssue}
+          className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-accent"
+        >
+          Issue overview
+        </button>
       </div>
       {body}
     </div>
@@ -920,6 +981,8 @@ function tabBadge(tab: MissionTab, rs: ReviewStatusData | undefined, checks: Ret
 export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline, onOpenPane }: IssueMissionControlProps) {
   const [activeTab, setActiveTab] = useState<MissionTab | null>('overview')
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
+  const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
+  const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
   const review = useReviewStatusQuery(issueId)
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
@@ -929,11 +992,25 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const selectTab = (tab: MissionTab) => {
     setActiveTab(tab)
     setTreeContext(null)
+    setSelectedTreeSession(null)
   }
-  const selectTreeContext = (context: IssueTreeContext) => {
-    setTreeContext(context)
+  const selectIssueFromTree = () => {
+    setTreeContext('issue')
+    setSelectedTreeSession(null)
     setActiveTab(null)
   }
+  const selectSessionFromTree = (session: SessionNode) => {
+    setSelectedTreeSession(session)
+    setTreeContext(null)
+    setActiveTab(null)
+  }
+  const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
+    setTreeSessions(sessions)
+    setSelectedTreeSession((current) => {
+      if (!current) return current
+      return sessions.find((session) => session.sessionId === current.sessionId) ?? current
+    })
+  }, [])
 
   return (
     <div className={styles.missionWrap}>
@@ -945,12 +1022,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="font-mono text-[13px] font-semibold text-foreground">{issueId}</span>
-              <h1 className="min-w-0 text-[16px] font-semibold text-foreground">{title}</h1>
+              <h1 className="min-w-0 max-w-full break-words text-[16px] font-semibold leading-snug text-foreground">{title}</h1>
               <CockpitPill tone={statusToTone(phase)}>{phase}</CockpitPill>
             </div>
             <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">Issue Cockpit · Mission Control</div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
             <HeaderStat label="Branch" value={<span className="font-mono">{branch}</span>} />
             <HeaderStat
               label="PR / CI"
@@ -968,9 +1045,18 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       </header>
 
       <div className={styles.missionBody}>
-        <IssueTreeLane issueId={issueId} title={title} projectName={projectName} selected={treeContext} onSelect={selectTreeContext} />
+        <IssueTreeLane
+          issueId={issueId}
+          title={title}
+          projectName={projectName}
+          selectedIssue={treeContext === 'issue'}
+          selectedSessionId={selectedTreeSession?.sessionId ?? null}
+          onSelectIssue={selectIssueFromTree}
+          onSelectSession={selectSessionFromTree}
+          onSessionsChange={recordTreeSessions}
+        />
         <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
-          <nav className="flex gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
+          <nav className="flex flex-wrap gap-1 border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
             {TABS.map((tab) => {
               const badge = tabBadge(tab.id, review.data, checks.data)
               return (
@@ -992,14 +1078,17 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             })}
           </nav>
           <div className="p-4">
-            {treeContext && (
+            {(treeContext || selectedTreeSession) && (
               <IssueTreeContextPanel
-                context={treeContext}
+                context={treeContext ?? 'issue'}
                 issueId={issueId}
+                selectedSession={selectedTreeSession}
+                treeSessions={treeSessions}
                 launcher={launcher}
                 agentDock={agentDock}
                 actionDock={actionDock}
                 timeline={timeline}
+                onBackToIssue={selectIssueFromTree}
               />
             )}
             {activeTab === 'overview' && <OverviewTab issueId={issueId} />}
