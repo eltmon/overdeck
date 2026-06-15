@@ -24,6 +24,7 @@ import {
   saveAgentStateSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
+import { countAgentsByStatus } from '../database/agents-db.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
@@ -80,14 +81,18 @@ export function describeRunningAgents(): string {
     + ` | advancing=[${advancing.join(', ')}] work=[${work.join(', ')}]`;
 }
 
-/** Count currently-running (tmux-alive) agents by role class. */
+/** Count currently-running agents by role class.
+ *
+ * PAN-1908: the agents table is the authoritative runtime registry. Counts are
+ * derived from status='running' rows grouped by role; the deacon's event-driven
+ * updates keep status in sync with tmux liveness.
+ */
 export function countRunningAgents(): RunningCounts {
-  let work = 0;
+  const counts = countAgentsByStatus('running');
+  const work = counts['work'] ?? 0;
   let advancing = 0;
-  for (const agent of listRunningAgentsSync()) {
-    if (!agent.tmuxActive) continue;
-    if (agent.role === 'work') work++;
-    else if (agent.role && ADVANCING_ROLES.has(agent.role)) advancing++;
+  for (const role of ADVANCING_ROLES) {
+    advancing += counts[role] ?? 0;
   }
   return { work, advancing, total: work + advancing };
 }

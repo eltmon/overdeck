@@ -207,6 +207,18 @@ export function countAgentsByRole(): Record<string, number> {
   return result;
 }
 
+export function countAgentsByStatus(status: string): Record<string, number> {
+  const db = getDatabase();
+  const rows = db
+    .prepare(`SELECT role, COUNT(*) AS n FROM agents WHERE status = ? GROUP BY role`)
+    .all(status) as Array<{ role: string; n: number }>;
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    result[row.role] = row.n;
+  }
+  return result;
+}
+
 export function listAllAgents(): Agent[] {
   const db = getDatabase();
   const rows = db.prepare(SELECT_SQL).all() as Record<string, unknown>[];

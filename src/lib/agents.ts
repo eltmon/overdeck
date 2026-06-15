@@ -31,7 +31,7 @@ import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } fr
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
-import { getAgent as getAgentFromDb, upsertAgent, type Agent as DbAgent } from './database/agents-db.js';
+import { getAgent as getAgentFromDb, upsertAgent, listAllAgents, type Agent as DbAgent } from './database/agents-db.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -4000,27 +4000,16 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
   const tmuxSessions = listSessionsSync();
   const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-  const agents: (AgentState & { tmuxActive: boolean })[] = [];
-
-  // Read all agent states
-  if (!existsSync(AGENTS_DIR)) return agents;
-
-  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory());
-
-  for (const dir of dirs) {
-    const state = getAgentStateSync(dir.name);
-    if (state) {
-      const normalizedId = normalizeAgentId(state.id || dir.name);
-      agents.push({
-        ...state,
-        id: normalizedId,
-        tmuxActive: tmuxNames.has(normalizedId),
-      });
-    }
-  }
-
-  return agents;
+  // PAN-1908: authoritative registry is the agents table; no directory scan.
+  return listAllAgents().map((agent) => {
+    const state = dbAgentToAgentState(agent);
+    const normalizedId = normalizeAgentId(state.id);
+    return {
+      ...state,
+      id: normalizedId,
+      tmuxActive: tmuxNames.has(normalizedId),
+    };
+  });
 }
 
 
