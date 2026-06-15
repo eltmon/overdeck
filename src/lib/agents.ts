@@ -4037,6 +4037,8 @@ export function listAgentStates(options?: { status?: AgentStatus; role?: Role })
 
 export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
+    // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
+    //
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
     // session on the `panopticon` socket. Run this from a one-off `tsx -e`/CLI
     // process that lacks access to that socket and `listSessions()` returns
@@ -4053,30 +4055,15 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     const tmuxSessions = yield* listSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-    if (!existsSync(AGENTS_DIR)) return [];
-
-    const entries = yield* Effect.tryPromise({
-      try: () => readdir(AGENTS_DIR),
-      catch: (cause) => toAgentFsError('readdir', AGENTS_DIR, cause),
-    }).pipe(Effect.orElseSucceed(() => [] as string[]));
-
-    const states = yield* Effect.forEach(
-      entries,
-      (entry) => getAgentState(entry).pipe(
-        Effect.map((state) => {
-          if (!state) return null;
-          const normalizedId = normalizeAgentId(state.id || entry);
-          return {
-            ...state,
-            id: normalizedId,
-            tmuxActive: tmuxNames.has(normalizedId),
-          };
-        }),
-      ),
-      { concurrency: 'unbounded' },
-    );
-
-    return states.filter((state): state is AgentState & { tmuxActive: boolean } => state !== null);
+    return listAllAgents().map((agent) => {
+      const state = dbAgentToAgentState(agent);
+      const normalizedId = normalizeAgentId(state.id);
+      return {
+        ...state,
+        id: normalizedId,
+        tmuxActive: tmuxNames.has(normalizedId),
+      };
+    });
   });
 
 /**

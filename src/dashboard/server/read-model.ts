@@ -25,19 +25,11 @@ import {
 import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEventSync } from '../../lib/persistent-logger.js';
+import { listAllAgents } from '../../lib/database/agents-db.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
-export async function discoverNewAgentIds(agentsDir: string, cachedIds: Set<string>): Promise<string[]> {
-  const { readdir } = await import('node:fs/promises');
-  let entries: string[];
-  try {
-    entries = await readdir(agentsDir);
-  } catch {
-    return [];
-  }
-  return entries.filter(e => !cachedIds.has(e) && existsSync(join(agentsDir, e, 'state.json')));
-}
+
 
 // PAN-1510: bootstrap previously only seeded `issuesRaw` from the projection
 // cache or replaced it wholesale from `issueService.getIssues()`. Both paths
@@ -151,9 +143,10 @@ export function getClosedIssueIdsForReadSource(issues: unknown[]): Set<string> {
 export function pruneAgentsForReadSource(
   agentsById: Record<string, AgentSnapshot>,
   issues: unknown[],
-  agentsDir = AGENTS_DIR,
 ): { agentsById: Record<string, AgentSnapshot>; prunedCount: number } {
   const closedIssueIds = getClosedIssueIdsForReadSource(issues);
+  // PAN-1908: authoritative membership is the SQLite agents table, not state.json.
+  const liveAgentIds = new Set(listAllAgents().map(a => a.id));
   const nextAgentsById: Record<string, AgentSnapshot> = {};
   let prunedCount = 0;
 
@@ -162,7 +155,7 @@ export function pruneAgentsForReadSource(
       prunedCount++;
       continue;
     }
-    if (!existsSync(join(agentsDir, agent.id, 'state.json'))) {
+    if (!liveAgentIds.has(agent.id)) {
       prunedCount++;
       continue;
     }
@@ -504,49 +497,22 @@ export const ReadModelServiceLive = Layer.effect(
         projectionCache = getProjectionCache();
         const cached = projectionCache.load();
         if (cached && cached.sequence > 0) {
-          // Validate cached agents against actual state files — remove stale entries
-          // from agents that were wiped/removed while the server was down
-          const { existsSync: existsSyncFs } = yield* Effect.promise(() => import('node:fs'));
-          const { join: joinPath } = yield* Effect.promise(() => import('node:path'));
-          const { homedir: homedirFn } = yield* Effect.promise(() => import('node:os'));
-          const agentsDir = joinPath(homedirFn(), '.panopticon', 'agents');
-          const validAgents = (cached.agents ?? []).filter((a: any) => {
-            const stateFile = joinPath(agentsDir, a.id, 'state.json');
-            return existsSyncFs(stateFile);
-          });
+          // PAN-1908: validate cached agents against the SQLite agents table,
+          // not the filesystem. Agents that were wiped while the server was down
+          // no longer have a row; agents created after the last cache save will
+          // be picked up by listRunningAgents below.
+          const liveAgentIds = new Set(listAllAgents().map(a => a.id));
+          const validAgents = (cached.agents ?? []).filter((a: any) => liveAgentIds.has(a.id));
           const pruned = (cached.agents ?? []).length - validAgents.length;
           if (pruned > 0) {
             console.log(`[ReadModel] Pruned ${pruned} stale agents from projection cache`);
           }
 
-          // Also pick up agents created after the last cache save (new state files not in cache)
-          const cachedIds = new Set(validAgents.map((a: any) => a.id));
-          const { readdir: readdirAsync, readFile: readFileAsync } = yield* Effect.promise(() => import('node:fs/promises'));
-          const newAgentIds: string[] = [];
-          const dirEntries = yield* Effect.promise(() => readdirAsync(agentsDir).catch(() => [] as string[]));
-          for (const entry of dirEntries) {
-            if (!cachedIds.has(entry) && existsSyncFs(joinPath(agentsDir, entry, 'state.json'))) {
-              newAgentIds.push(entry);
-            }
-          }
+          const allAgents = validAgents;
 
-          // Load new agent state files and add them to the snapshot
-          const newAgents: any[] = [];
-          for (const agentId of newAgentIds) {
-            try {
-              const raw = yield* Effect.promise(() => readFileAsync(joinPath(agentsDir, agentId, 'state.json'), 'utf-8'));
-              newAgents.push(JSON.parse(raw));
-            } catch { /* skip unreadable state files */ }
-          }
-          if (newAgents.length > 0) {
-            console.log(`[ReadModel] Found ${newAgents.length} agent(s) created after last cache save: ${newAgents.map((a) => a.id).join(', ')}`);
-          }
-
-          const allAgents = [...validAgents, ...newAgents];
-
-          // Reconcile cached agent statuses against ground truth (state.json + tmux).
+          // Reconcile cached agent statuses against ground truth (SQLite agents table + tmux).
           // The projection cache may be stale if an agent's tmux session died while
-          // the server was down — the cache still says 'running' but state.json says
+          // the server was down — the cache still says 'running' but the agents table says
           // 'stopped'. Without this step the dashboard shows incorrect action buttons.
           const { listRunningAgents: listRunningForReconcile } = yield* Effect.promise(
             () => import('../../lib/agents.js'),
@@ -639,7 +605,7 @@ export const ReadModelServiceLive = Layer.effect(
           usedProjectionCache = true;
           console.log(
             `[ReadModel] Fast bootstrap from projection cache: seq=${cached.sequence}, ` +
-            `agents=${allAgents.length} (${validAgents.length} cached + ${newAgents.length} new), issues=${(cached.issues ?? []).length}`,
+            `agents=${allAgents.length} (${validAgents.length} cached), issues=${(cached.issues ?? []).length}`,
           );
         }
       } catch {
