@@ -14,18 +14,20 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, promises as fsp } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
-import { Effect } from 'effect';
-import { getReviewStatusSync } from '../review-status.js';
 import {
   getCostBreakdownByStageAndModel,
   getCostForIssueFromDb,
 } from '../database/cost-events-db.js';
 import { getMergeSetSync } from '../merge-set.js';
-import { readContinueFile } from './continues.js';
-import { resolveInfraRepo, type ProjectConfig } from '../projects.js';
+import {
+  getProjectSync,
+  resolveInfraRepo,
+  resolveProjectFromIssueSync,
+  type ProjectConfig,
+} from '../projects.js';
 import { queueAutoCommit } from './auto-commit.js';
 import type { ReviewStatus } from '../review-status.js';
 
@@ -188,6 +190,16 @@ function projectMerges(issueId: string): string[] {
 export interface BuildIssueRecordOptions {
   closedAt?: string;
   owner?: string;
+  reviewStatus?: ReviewStatus | null;
+}
+
+async function readContinueText(projectRoot: string, issueId: string): Promise<string | null> {
+  const path = join(projectRoot, '.pan', 'continues', `${issueId.toLowerCase()}.vbrief.json`);
+  try {
+    return await fsp.readFile(path, 'utf-8');
+  } catch {
+    return null;
+  }
 }
 
 export async function buildIssueRecord(
@@ -195,15 +207,9 @@ export async function buildIssueRecord(
   issueId: string,
   opts: BuildIssueRecordOptions = {},
 ): Promise<PanIssueRecord> {
-  const rawContinue = await readContinueFile(projectRoot, issueId).pipe(
-    Effect.matchEffect({
-      onSuccess: (text) => Effect.succeed(text ? (JSON.parse(text) as ContinueFile) : null),
-      onFailure: () => Effect.succeed(null),
-    }),
-  );
-  const continueSubset = projectContinue(await Effect.runPromise(rawContinue));
-  const reviewStatus = getReviewStatusSync(issueId);
-  const pipelineRecord = projectPipeline(issueId, reviewStatus);
+  const rawContinueText = await readContinueText(projectRoot, issueId);
+  const continueSubset = projectContinue(rawContinueText ? (JSON.parse(rawContinueText) as ContinueFile) : null);
+  const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null);
   const usageRecord = projectUsage(issueId);
   const merges = projectMerges(issueId);
 
@@ -255,4 +261,27 @@ export function queueIssueRecordCommit(
     paths: [recordPath],
     subject: `chore(records): update ${issueId.toUpperCase()} permanent record`,
   });
+}
+
+/**
+ * PAN-1908: rebuild and queue the per-issue permanent record for a given issue.
+ * Fire-and-forget: failures are logged, never thrown, so review-status writes
+ * stay synchronous and fast.
+ */
+export async function updateIssueRecordForIssue(
+  issueId: string,
+  reviewStatus?: ReviewStatus | null,
+): Promise<void> {
+  try {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return;
+    const project = getProjectSync(resolved.projectKey);
+    if (!project) return;
+
+    const record = await buildIssueRecord(resolved.projectPath, issueId, { reviewStatus });
+    const recordPath = writeIssueRecordSync(project, issueId, record);
+    queueIssueRecordCommit(project, issueId, recordPath);
+  } catch (err) {
+    console.warn(`[pan-dir/records] Failed to update record for ${issueId}: ${(err as Error).message}`);
+  }
 }

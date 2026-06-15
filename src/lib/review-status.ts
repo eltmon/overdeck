@@ -16,6 +16,7 @@ import {
   getReviewStatusFromDb,
 } from './database/review-status-db.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
+import { updateIssueRecordForIssue } from './pan-dir/records.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -340,6 +341,11 @@ export function setReviewStatusSync(
   // for live runtime pipeline state. Do not mirror this into canonical vBRIEF
   // specs: PAN-1124 makes .pan/specs immutable after planning except plan.status.
   dbUpsert(updated);
+
+  // PAN-1908: project durable review_status verdicts into the infra repo's
+  // per-issue permanent record. Fire-and-forget so the SQLite write path stays
+  // synchronous and fast; queueAutoCommit debounces bursts into one commit.
+  void updateIssueRecordForIssue(issueId, updated);
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 

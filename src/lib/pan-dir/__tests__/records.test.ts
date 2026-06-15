@@ -11,15 +11,10 @@ import type { ProjectConfig } from '../../projects.js';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
-const mockGetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockGetCostBreakdownByStageAndModel = vi.hoisted(() => vi.fn());
 const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
-
-vi.mock('../../review-status.js', () => ({
-  getReviewStatusSync: mockGetReviewStatusSync,
-}));
 
 vi.mock('../../database/cost-events-db.js', () => ({
   getCostBreakdownByStageAndModel: mockGetCostBreakdownByStageAndModel,
@@ -48,7 +43,6 @@ describe('buildIssueRecord', () => {
 
   beforeEach(() => {
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-records-test-'));
-    mockGetReviewStatusSync.mockReturnValue(null);
     mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
     mockGetCostForIssueFromDb.mockReturnValue(null);
     mockGetMergeSetSync.mockReturnValue(null);
@@ -90,7 +84,7 @@ describe('buildIssueRecord', () => {
   });
 
   it('projects durable review_status verdicts', async () => {
-    mockGetReviewStatusSync.mockReturnValue({
+    const reviewStatus = {
       issueId: 'PAN-1908',
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -111,9 +105,9 @@ describe('buildIssueRecord', () => {
       autoMerge: true,
       deaconIgnored: false,
       updatedAt: '2026-06-15T00:00:00.000Z',
-    });
+    };
 
-    const record = await buildIssueRecord(projectRoot, 'PAN-1908');
+    const record = await buildIssueRecord(projectRoot, 'PAN-1908', { reviewStatus });
 
     expect(record.pipeline.issueId).toBe('PAN-1908');
     expect(record.pipeline.reviewStatus).toBe('passed');
@@ -125,7 +119,7 @@ describe('buildIssueRecord', () => {
   });
 
   it('omits ephemeral review_status fields', async () => {
-    mockGetReviewStatusSync.mockReturnValue({
+    const reviewStatus = {
       issueId: 'PAN-1908',
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -134,9 +128,9 @@ describe('buildIssueRecord', () => {
       mergeRetryCount: 2,
       queuePosition: 1,
       updatedAt: '2026-06-15T00:00:00.000Z',
-    });
+    };
 
-    const record = await buildIssueRecord(projectRoot, 'PAN-1908');
+    const record = await buildIssueRecord(projectRoot, 'PAN-1908', { reviewStatus });
 
     expect(record.pipeline).not.toHaveProperty('verificationCycleCount');
     expect(record.pipeline).not.toHaveProperty('mergeRetryCount');
