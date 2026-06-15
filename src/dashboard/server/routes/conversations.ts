@@ -24,7 +24,7 @@ import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
-import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath } from './jsonl-resolver.js';
+import { resolveAgentHarness, resolveClaudeSessionId, resolveCodexRolloutPath, resolvePiSessionPath } from './jsonl-resolver.js';
 import { validateOrigin } from './origin-validation.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getProjectSync } from '../../../lib/projects.js';
@@ -3029,14 +3029,24 @@ const getConversationMessagesRoute = HttpRouter.add(
           if (cached) {
             sessionFile = cached;
           } else if (/^(specialist-|agent-|planning-)/.test(name)) {
-            // Codex agents (PAN-1805): no Claude session exists — the
-            // transcript is the rollout JSONL under the per-agent CODEX_HOME.
+            // Non-claude harnesses (no Claude session exists): the transcript
+            // is the harness's own JSONL under the per-agent dir. Codex
+            // (PAN-1805) writes a rollout under CODEX_HOME; pi/kimi (PAN-1908)
+            // writes a timestamped session JSONL — work agents put it in the
+            // agent-dir root, conversations in the sessions/ subdir.
             try {
-              if (await resolveAgentHarness(name) === 'codex') {
+              const agentHarness = await resolveAgentHarness(name);
+              if (agentHarness === 'codex') {
                 const rollout = await resolveCodexRolloutPath(name);
                 if (rollout) {
                   sessionFile = rollout;
                   setSpecialistSessionCache(name, rollout);
+                }
+              } else if (agentHarness === 'pi') {
+                const piSession = await resolvePiSessionPath(name);
+                if (piSession) {
+                  sessionFile = piSession;
+                  setSpecialistSessionCache(name, piSession);
                 }
               }
             } catch { /* fall through to the Claude lookup */ }

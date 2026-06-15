@@ -7,6 +7,7 @@ import {
   resolveClaudeSessionId,
   resolveCodexRolloutPath,
   resolveJsonlPath,
+  resolvePiSessionPath,
 } from '../jsonl-resolver.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 
@@ -315,5 +316,78 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     });
 
     expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+});
+
+describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () => {
+  const PI_AGENT_ID = 'agent-pan-1908';
+  const TRANSCRIPT_OLD = '2026-06-15T06-43-53-944Z_019eca05-bbd8-7330-82e8-f54e6020a7e2.jsonl';
+  const TRANSCRIPT_NEW = '2026-06-15T07-10-00-000Z_019eca05-cccc-7330-82e8-ffffffffffff.jsonl';
+
+  async function setupPiAgent(): Promise<string> {
+    const agentDir = join(agentsDir, PI_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({ id: PI_AGENT_ID, harness: 'pi' }));
+    return agentDir;
+  }
+
+  it('work agents: resolves the transcript written at the agent-dir ROOT', async () => {
+    // The bug: pi work agents write `<ts>_<id>.jsonl` to the agent-dir root
+    // (not the sessions/ subdir), so the messages endpoint returned 404 →
+    // "No conversation data available" / "How can I help you?".
+    const agentDir = await setupPiAgent();
+    await writeFile(join(agentDir, TRANSCRIPT_OLD), '{"type":"session"}\n');
+
+    const path = await resolveJsonlPath(PI_AGENT_ID, WORKSPACE_PATH, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(join(agentDir, TRANSCRIPT_OLD));
+  });
+
+  it('does NOT return cost-events.jsonl / activity.jsonl as the transcript', async () => {
+    const agentDir = await setupPiAgent();
+    await writeFile(join(agentDir, 'cost-events.jsonl'), '{"cost":1}\n');
+    await writeFile(join(agentDir, 'activity.jsonl'), '{"act":1}\n');
+    await writeFile(join(agentDir, TRANSCRIPT_OLD), '{"type":"session"}\n');
+
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(join(agentDir, TRANSCRIPT_OLD));
+  });
+
+  it('conversations: resolves the transcript written in the sessions/ subdir', async () => {
+    const agentDir = await setupPiAgent();
+    const sessionsDir = join(agentDir, 'sessions');
+    await mkdir(sessionsDir, { recursive: true });
+    await writeFile(join(sessionsDir, TRANSCRIPT_OLD), '{"type":"session"}\n');
+
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(join(sessionsDir, TRANSCRIPT_OLD));
+  });
+
+  it('picks the freshest transcript by mtime across root and sessions/', async () => {
+    const agentDir = await setupPiAgent();
+    const sessionsDir = join(agentDir, 'sessions');
+    await mkdir(sessionsDir, { recursive: true });
+    const older = join(sessionsDir, TRANSCRIPT_OLD);
+    const newer = join(agentDir, TRANSCRIPT_NEW);
+    await writeFile(older, '{"type":"session"}\n');
+    await writeFile(newer, '{"type":"session"}\n');
+    const tOld = new Date(Date.now() - 60_000);
+    const tNew = new Date();
+    await utimes(older, tOld, tOld);
+    await utimes(newer, tNew, tNew);
+
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBe(newer);
+  });
+
+  it('returns null when pi has not written a transcript yet', async () => {
+    await setupPiAgent();
+
+    const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
+
+    expect(path).toBeNull();
   });
 });
