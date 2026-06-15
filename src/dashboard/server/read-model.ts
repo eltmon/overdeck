@@ -26,6 +26,7 @@ import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSna
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 import { listAllAgents } from '../../lib/database/agents-db.js';
+import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -324,7 +325,7 @@ export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): Revie
     reviewCoordinatorSessionName: status.reviewCoordinatorSessionName || undefined,
     reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
     reviewSubStatuses: status.reviewSubStatuses,
-    queuePosition: typeof status.queuePosition === 'number' ? status.queuePosition : undefined,
+    queuePosition: computeQueuePositionFromStatusSync(status).queuePosition ?? undefined,
     activeSpecialist: status.activeSpecialist || undefined,
     mergeRetryCount: typeof status.mergeRetryCount === 'number' ? status.mergeRetryCount : undefined,
     mergeNotes: status.mergeNotes || undefined,

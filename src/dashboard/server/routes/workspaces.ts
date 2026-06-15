@@ -3749,21 +3749,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               console.log(`Feature branch push note: ${pushErr.message}`);
             }
 
-	            if (!workspaceInfo.isRemote) {
-	              try {
-	                const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
-	                const commits = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
-	                setReviewStatus(issueId, {
-	                  lastReviewCommits: {
-	                    ahead: 0,
-	                    behind: 0,
-	                    branch: commits.branch,
-	                    commits: [commits.HEAD],
-	                  },
-	                });
-	              } catch {}
-	            }
-
 	            // Ensure review artifacts exist so review/test agents have stable URLs.
 	            let reviewTargetBranch: string | undefined;
 	            try {
@@ -4215,15 +4200,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
       : undefined;
 
-    let requestReviewCommits: Record<string, string> | undefined;
-    if (!workspaceInfo.isRemote) {
-      try {
-        const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
-        const commitInfo = yield* getWorkspaceGitInfo(workspacePath);
-        requestReviewCommits = { HEAD: commitInfo.HEAD, branch: commitInfo.branch };
-      } catch {}
-    }
-
     const reqVerifyOutcome = yield* runVerificationForIssue(
       issueId,
       workspacePath,
@@ -4258,14 +4234,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       testStatus: 'pending',
       autoRequeueCount: newCount,
       reviewNotes,
-      ...(requestReviewCommits ? {
-        lastReviewCommits: {
-          ahead: 0,
-          behind: 0,
-          branch: requestReviewCommits['branch'] ?? '',
-          commits: requestReviewCommits['HEAD'] ? [requestReviewCommits['HEAD']] : [],
-        },
-      } : {}),
     });
 
     console.log(

@@ -70,7 +70,6 @@ export interface ReviewStatus {
   autoMerge?: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;
-  queuePosition?: number | null;
   prUrl?: string;
   /** PAN-905: HEAD commit SHA of the tracked PR for webhook identity validation */
   prHeadSha?: string;
@@ -109,8 +108,6 @@ export interface ReviewStatus {
   deaconIgnoredAt?: string;
   /** Optional free-form reason shown alongside the ignore toggle. */
   deaconIgnoredReason?: string;
-  /** Commits at time of review request — used to detect new commits after review */
-  lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
