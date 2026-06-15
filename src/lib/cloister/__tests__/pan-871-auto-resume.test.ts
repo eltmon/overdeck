@@ -206,11 +206,19 @@ vi.mock('../no-resume-mode.js', () => ({
 }));
 
 vi.mock('../../../lib/paths.js', () => ({
+  getPanopticonHome: () => '/tmp/test-panopticon',
   PANOPTICON_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
   PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
+}));
+
+// PAN-1908: autoResumeStoppedWorkAgents now reads from the agents table instead
+// of scanning directories. The real fs is mocked in this suite, so feed the
+// reconcile a deterministic candidate list.
+vi.mock('../../../lib/database/agents-db.js', () => ({
+  listAllAgents: vi.fn(() => [{ id: 'agent-pan-871', status: 'stopped', role: 'work' }]),
 }));
 
 vi.mock('fs', () => ({

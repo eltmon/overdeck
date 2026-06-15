@@ -28,7 +28,7 @@ vi.mock('../../agents.js', async () => {
   // on the reactive scheduler hot path.
   listRunningAgentsProgram: effectMock([]),
   getAgentState: effectMock(null),
-  getAgentStateSync: effectMock(null),
+  getAgentStateSync: vi.fn(() => null),
   // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
   // async agent-state read, so the mock module must export this symbol or the
   // dynamic call in the scheduler throws before reaching the wrapper spy.
@@ -36,6 +36,14 @@ vi.mock('../../agents.js', async () => {
   getAgentRuntimeState: vi.fn(() => null),
   getAgentRuntimeStateSync: vi.fn(() => null),
   saveAgentRuntimeState: vi.fn(),
+  saveAgentState: vi.fn(() => Effect.void),
+  saveAgentStateSync: vi.fn(),
+  resumeAgent: vi.fn(async () => ({ success: true })),
+  recordAgentFailure: vi.fn(() => Effect.succeed(null)),
+  resetAgentFailureCount: vi.fn(),
+  markAgentRunningState: vi.fn((s: any) => { s.status = 'running'; }),
+  getAgentDir: vi.fn((id: string) => `/tmp/agents/${id}`),
+  normalizeAgentId: vi.fn((id: string) => id),
   spawnRun: vi.fn(async (issueId: string, role: string) => ({ id: `agent-${issueId.toLowerCase()}-${role}` })),
   };
 });
@@ -77,6 +85,18 @@ vi.mock('../../review-status.js', () => ({
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
 }));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: (path: string) => {
+      if (path === '/tmp/workspace') return true;
+      if (path.startsWith('/tmp/agents/')) return false;
+      return actual.existsSync(path);
+    },
+  };
+});
 
 // Stale-session (zombie) detection: activeRoleRunExists probes the workspace
 // HEAD and onIssueStateChange kills a leftover tmux session before re-dispatch.
@@ -124,8 +144,8 @@ vi.mock('../../tmux.js', async () => {
   };
 });
 
-import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState } from '../../agents.js';
-import { sessionExists, killSession } from '../../tmux.js';
+import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, getAgentStateSync, resumeAgent } from '../../agents.js';
+import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
@@ -314,5 +334,54 @@ describe('reactive Cloister scheduler', () => {
       type: 'agent.completed',
       payload: { issueId: 'PAN-503' },
     })).toEqual({ issueId: 'PAN-503', state: 'in_review' });
+  });
+
+  it('routes agent.stopped events to the deacon resume handler', async () => {
+    vi.mocked(getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-503',
+      issueId: 'PAN-503',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    } as any);
+    vi.mocked(getReviewStatusSync).mockReturnValue({
+      issueId: 'PAN-503',
+      reviewStatus: 'blocked',
+      testStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+    } as any);
+    vi.mocked(sessionExists).mockResolvedValue(false);
+
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'agent.stopped',
+      payload: { agentId: 'agent-pan-503', issueId: 'PAN-503' },
+    }));
+
+    expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');
+  });
+
+  it('routes agent.heartbeat_dead events to the deacon orphan handler', async () => {
+    vi.mocked(getAgentStateSync).mockReturnValue({
+      id: 'agent-pan-503',
+      issueId: 'PAN-503',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    } as any);
+    vi.mocked(sessionExistsSync).mockReturnValue(false);
+
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'agent.heartbeat_dead',
+      payload: { agentId: 'agent-pan-503', issueId: 'PAN-503' },
+    }));
+
+    expect(killSession).not.toHaveBeenCalled();
   });
 });
