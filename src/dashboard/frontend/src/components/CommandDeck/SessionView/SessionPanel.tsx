@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare } from 'lucide-react';
+import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wrench } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
@@ -12,6 +12,7 @@ import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
+import { useConversationUiState } from '../../../hooks/useConversationUiState';
 import styles from '../styles/command-deck.module.css';
 
 // PAN-1523: branch/worktree chip in the SessionPanel header. Mirrors the
@@ -209,6 +210,11 @@ function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string
 export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
   const isReviewSession = session.type === 'review';
   const resolvedModels = useResolvedModels();
+  // Tool-call visibility toggle — shared with the embedded ConversationPanel
+  // via controlled props. Keyed by sessionId so the preference sticks per
+  // agent and matches the standalone conversation view's key for the same
+  // session. (PAN-XXXX)
+  const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(session.sessionId);
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
     // Default review sessions without JSONL to summary tab; with JSONL default
@@ -322,6 +328,16 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
             Terminal
           </button>
         </div>
+        <button
+          className={`${styles.conversationAboutToggle} ${hideToolCalls ? styles.conversationAboutToggleActive : ''}`}
+          onClick={toggleHideToolCalls}
+          title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+          aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+          aria-pressed={hideToolCalls}
+        >
+          <Wrench size={14} />
+          <span>Tools</span>
+        </button>
         {session.deliveryMethod !== undefined && (
           <DeliveryMethodToggle sessionId={session.sessionId} deliveryMethod={session.deliveryMethod} />
         )}
@@ -338,6 +354,8 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
               roundMetadata={session.roundMetadata}
               embedded
               agentId={session.sessionId}
+              hideToolCalls={hideToolCalls}
+              onToggleHideToolCalls={toggleHideToolCalls}
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>

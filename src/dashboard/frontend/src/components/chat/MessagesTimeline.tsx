@@ -1310,6 +1310,44 @@ function ToolUseExpanded({
       );
     }
 
+    // ─── Pi harness (lowercase tool names; `path`/`command`/`edits` keys) ────
+    case 'bash': {
+      const description = asString(input.description);
+      const command = asString(input.command);
+      return (
+        <>
+          {description && <div className={styles.workLogToolHeader}>{description}</div>}
+          {command && (
+            <pre className={styles.workLogResult}>
+              <code>{command}</code>
+            </pre>
+          )}
+        </>
+      );
+    }
+
+    case 'read':
+    case 'write': {
+      const filePath = asString(input.path) ?? asString(input.file_path);
+      if (!filePath) break;
+      return (
+        <div className={styles.workLogResult}>
+          <ChatMarkdown text={`\`${filePath}\``} cwd={cwd} issueId={issueId} />
+        </div>
+      );
+    }
+
+    case 'edit': {
+      const filePath = asString(input.path) ?? asString(input.file_path);
+      if (!filePath) break;
+      const edits = Array.isArray(input.edits) ? input.edits.length : 0;
+      return (
+        <div className={styles.workLogResult}>
+          <ChatMarkdown text={`\`${filePath}\`${edits > 1 ? ` \u00b7 ${edits} edits` : ''}`} cwd={cwd} issueId={issueId} />
+        </div>
+      );
+    }
+
     default:
       break;
   }
@@ -1335,7 +1373,7 @@ function SimpleWorkEntryRow({ entry, cwd, issueId }: { entry: WorkLogEntry; cwd?
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
   const isThinking = entry.tone === 'thinking';
   const hasResult = !!entry.result;
-  const hasToolBody = !!entry.toolInput && entry.tone === 'tool';
+  const hasToolBody = !!entry.toolInput && (entry.tone === 'tool' || entry.tone === 'error');
   const isExpandable = hasResult || hasToolBody || (isThinking && !!entry.detail);
   const displayDetail = getWorkLogDisplayDetail(entry);
 

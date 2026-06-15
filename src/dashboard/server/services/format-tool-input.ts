@@ -93,6 +93,31 @@ export function summarizeToolInputForWorkLog(
       return description ? truncate(description) : subagentType;
     }
 
+    // ─── Pi harness (lowercase tool names, `path`/`command`/`edits` keys) ────
+    // These mirror the Claude cases above but read Pi's native argument shape
+    // so the collapsed row shows the command / file path without remapping.
+    case 'bash': {
+      const description = asString(input.description);
+      if (description) return truncate(description);
+      const command = asString(input.command);
+      return command ? truncate(firstLine(command)) : undefined;
+    }
+
+    case 'read':
+    case 'write': {
+      const filePath = asString(input.path) ?? asString(input.file_path);
+      return filePath ? truncate(basename(filePath)) : undefined;
+    }
+
+    case 'edit': {
+      const filePath = asString(input.path) ?? asString(input.file_path);
+      if (!filePath) return undefined;
+      const edits = Array.isArray(input.edits) ? input.edits : undefined;
+      return edits && edits.length > 1
+        ? truncate(`${basename(filePath)} · ${edits.length} edits`)
+        : truncate(basename(filePath));
+    }
+
     default: {
       // MCP / unknown tools — show the first short string value if there is one,
       // otherwise leave blank and let the expanded view render JSON.

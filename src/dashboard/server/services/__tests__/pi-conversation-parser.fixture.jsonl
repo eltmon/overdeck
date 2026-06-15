@@ -1,0 +1,8 @@
+{"type":"session","id":"sess-1","timestamp":"2026-06-15T18:00:00.000Z"}
+{"type":"model_change","id":"mc-1","timestamp":"2026-06-15T18:00:01.000Z"}
+{"type":"message","id":"msg-user-1","timestamp":"2026-06-15T18:00:02.000Z","message":{"role":"user","content":[{"type":"text","text":"list the files"}]}}
+{"type":"message","id":"msg-asst-1","timestamp":"2026-06-15T18:00:03.000Z","message":{"role":"assistant","content":[{"type":"text","text":"reading the dir"},{"type":"toolCall","id":"call_abc","name":"bash","arguments":{"command":"ls src"}}]}}
+{"type":"message","id":"msg-tool-1","timestamp":"2026-06-15T18:00:04.000Z","message":{"role":"toolResult","toolCallId":"call_abc","toolName":"bash","isError":false,"content":[{"type":"text","text":"file-a.ts\nfile-b.ts"}]}}
+{"type":"message","id":"msg-asst-2","timestamp":"2026-06-15T18:00:05.000Z","message":{"role":"assistant","content":[{"type":"text","text":"now editing"},{"type":"toolCall","id":"call_def","name":"edit","arguments":{"path":"/repo/src/file-a.ts","edits":[{"oldText":"a","newText":"b"}]}}]}}
+{"type":"message","id":"msg-tool-2","timestamp":"2026-06-15T18:00:06.000Z","message":{"role":"toolResult","toolCallId":"call_def","toolName":"edit","isError":true,"content":[{"type":"text","text":"oldText not found"}]}}
+{"type":"message","id":"msg-asst-3","timestamp":"2026-06-15T18:00:07.000Z","message":{"role":"assistant","content":[{"type":"text","text":"trying a read that never returns"},{"type":"toolCall","id":"call_orphan","name":"read","arguments":{"path":"/repo/src/file-b.ts"}}]}}

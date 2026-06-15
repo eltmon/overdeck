@@ -16,12 +16,13 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
+import { GitFork, TriangleAlert, AlertCircle, Wrench } from 'lucide-react';
 
 import { ConversationPanel } from '../chat/ConversationPanel';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { XTerminal } from '../XTerminal';
 import type { Agent } from '../../types';
+import { useConversationUiState } from '../../hooks/useConversationUiState';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 interface AgentGitInfo {
@@ -108,6 +109,11 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
   );
   const conversation = useMemo(() => (agent ? agentToConversation(agent) : null), [agent]);
 
+  // Tool-call visibility toggle for the embedded ConversationPanel. Keyed by
+  // agent.id (== session name) so it matches SessionPanel's key for the same
+  // agent and the standalone conversation view. (PAN-XXXX)
+  const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(agent?.id ?? '');
+
   // PAN-1523: surface the agent's actual branch + drift/missing-workspace
   // state. ConversationPanel is embedded here so its own header is hidden;
   // the chip lives in the drawer toolbar instead.
@@ -141,63 +147,72 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
 
   return (
     <div data-testid={testId} className="flex min-h-0 flex-1 flex-col gap-[10px]">
-      {(agents.length > 1 || showBranchChip) && (
-        <div className="flex shrink-0 items-center gap-[8px]">
-          {agents.length > 1 && (
-            <>
-              <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                Agent
-              </span>
-              <select
-                value={agent.id}
-                onChange={(event) => onSelectAgent(event.target.value)}
-                aria-label="Select agent session"
-                className="rounded-[var(--radius-sm)] border border-border bg-card px-[8px] py-[4px] text-[12px] text-foreground"
-              >
-                {agents.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {agentOptionLabel(candidate)}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-          {showBranchChip && (
-            <span
-              className={`${styles.terminalBranchBar} ${
-                missing
-                  ? styles.terminalBranchBarMissing
-                  : drifted
-                    ? styles.terminalBranchBarDrift
-                    : ''
-              }`}
-              title={
-                missing
-                  ? `Workspace missing on disk: ${gitInfo?.workspacePath ?? '(unknown path)'}`
-                  : drifted
-                    ? `Expected ${gitInfo?.expectedBranch ?? '(none)'}, on ${gitInfo?.actualBranch ?? '(none)'}`
-                    : `${gitInfo?.workspacePath ?? ''}`
-              }
-              data-testid="drawer-agent-branch-chip"
-            >
-              {missing ? (
-                <>
-                  <AlertCircle size={12} />
-                  <span className={styles.terminalBranchBarMode}>Worktree missing</span>
-                </>
-              ) : (
-                <>
-                  {drifted ? <TriangleAlert size={12} /> : <GitFork size={12} />}
-                  <span className={styles.terminalBranchBarMode}>
-                    {drifted ? 'Drifted' : 'Worktree'}
-                  </span>
-                  <span className={styles.terminalBranchBarText}>{gitInfo?.actualBranch}</span>
-                </>
-              )}
+      <div className="flex shrink-0 items-center gap-[8px]">
+        {agents.length > 1 && (
+          <>
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Agent
             </span>
-          )}
-        </div>
-      )}
+            <select
+              value={agent.id}
+              onChange={(event) => onSelectAgent(event.target.value)}
+              aria-label="Select agent session"
+              className="rounded-[var(--radius-sm)] border border-border bg-card px-[8px] py-[4px] text-[12px] text-foreground"
+            >
+              {agents.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {agentOptionLabel(candidate)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        {showBranchChip && (
+          <span
+            className={`${styles.terminalBranchBar} ${
+              missing
+                ? styles.terminalBranchBarMissing
+                : drifted
+                  ? styles.terminalBranchBarDrift
+                  : ''
+            }`}
+            title={
+              missing
+                ? `Workspace missing on disk: ${gitInfo?.workspacePath ?? '(unknown path)'}`
+                : drifted
+                  ? `Expected ${gitInfo?.expectedBranch ?? '(none)'}, on ${gitInfo?.actualBranch ?? '(none)'}`
+                  : `${gitInfo?.workspacePath ?? ''}`
+            }
+            data-testid="drawer-agent-branch-chip"
+          >
+            {missing ? (
+              <>
+                <AlertCircle size={12} />
+                <span className={styles.terminalBranchBarMode}>Worktree missing</span>
+              </>
+            ) : (
+              <>
+                {drifted ? <TriangleAlert size={12} /> : <GitFork size={12} />}
+                <span className={styles.terminalBranchBarMode}>
+                  {drifted ? 'Drifted' : 'Worktree'}
+                </span>
+                <span className={styles.terminalBranchBarText}>{gitInfo?.actualBranch}</span>
+              </>
+            )}
+          </span>
+        )}
+        <button
+          type="button"
+          className={`ml-auto ${styles.conversationAboutToggle} ${hideToolCalls ? styles.conversationAboutToggleActive : ''}`}
+          onClick={toggleHideToolCalls}
+          title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+          aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+          aria-pressed={hideToolCalls}
+        >
+          <Wrench size={14} />
+          <span>Tools</span>
+        </button>
+      </div>
       <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius)] border border-border">
         {view === 'conversation' ? (
           <ConversationPanel
@@ -206,6 +221,8 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
             viewMode="conversation"
             embedded
             agentId={agent.id}
+            hideToolCalls={hideToolCalls}
+            onToggleHideToolCalls={toggleHideToolCalls}
           />
         ) : isEndedAgent(agent) ? (
           <div className="flex h-full items-center justify-center p-[18px] text-[13px] text-muted-foreground">

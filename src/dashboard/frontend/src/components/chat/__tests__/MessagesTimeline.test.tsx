@@ -382,3 +382,99 @@ describe('MessagesTimeline — roundMarkers', () => {
     expect(screen.getByText('git status --short')).toBeInTheDocument();
   });
 });
+
+describe('MessagesTimeline — Pi harness tool entries', () => {
+  it('renders the lowercase bash label + command summary in the collapsed row', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog: WorkLogEntry[] = [
+      {
+        id: 'w1',
+        createdAt: new Date(1_700_000_005_000).toISOString(),
+        label: 'bash',
+        toolTitle: 'bash',
+        toolInput: { command: 'rg -n foo src/' },
+        detail: 'rg -n foo src/',
+        result: 'src/a.ts:1:foo',
+        tone: 'tool',
+      },
+    ];
+    render(<MessagesTimeline messages={messages} workLog={workLog} streaming={false} />);
+    expect(screen.getByText('bash')).toBeInTheDocument();
+    expect(screen.getByText('rg -n foo src/')).toBeInTheDocument();
+  });
+
+  it('expands a bash entry to show the full command in a shell block', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog: WorkLogEntry[] = [
+      {
+        id: 'w1',
+        createdAt: new Date(1_700_000_005_000).toISOString(),
+        label: 'bash',
+        toolTitle: 'bash',
+        toolInput: { command: 'fd -t f pi src/\n# second line' },
+        detail: 'fd -t f pi src/',
+        tone: 'tool',
+      },
+    ];
+    render(<MessagesTimeline messages={messages} workLog={workLog} streaming={false} />);
+    // Collapsed: only the first-line summary is visible.
+    expect(screen.queryByText(/# second line/)).not.toBeInTheDocument();
+    // The row label is clickable to expand.
+    fireEvent.click(screen.getByText('bash'));
+    // Expanded: the second line of the command renders — it only exists in
+    // the expanded shell block, so this uniquely proves the full command is shown.
+    expect(screen.getByText(/# second line/)).toBeInTheDocument();
+  });
+
+  it('expands a read entry to show the file path', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog: WorkLogEntry[] = [
+      {
+        id: 'w1',
+        createdAt: new Date(1_700_000_005_000).toISOString(),
+        label: 'read',
+        toolTitle: 'read',
+        toolInput: { path: '/repo/src/lib/util.ts' },
+        detail: 'util.ts',
+        tone: 'tool',
+      },
+    ];
+    render(<MessagesTimeline messages={messages} workLog={workLog} streaming={false} />);
+    fireEvent.click(screen.getByText('read'));
+    // ChatMarkdown is mocked to pass the path (wrapped in backticks) through as text.
+    expect(screen.getByText(/\/repo\/src\/lib\/util\.ts/)).toBeInTheDocument();
+  });
+
+  it('still shows the tool body for error-tone entries (errored tool call)', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog: WorkLogEntry[] = [
+      {
+        id: 'w1',
+        createdAt: new Date(1_700_000_005_000).toISOString(),
+        label: 'edit',
+        toolTitle: 'edit',
+        toolInput: { path: '/repo/src/a.ts', edits: [{ oldText: 'x', newText: 'y' }] },
+        result: 'oldText not found',
+        tone: 'error',
+      },
+    ];
+    render(<MessagesTimeline messages={messages} workLog={workLog} streaming={false} />);
+    // Errored entry is expandable and surfaces the file path (tool body)
+    // alongside the error result.
+    fireEvent.click(screen.getByText('edit'));
+    expect(screen.getByText(/\/repo\/src\/a\.ts/)).toBeInTheDocument();
+    expect(screen.getByText('oldText not found')).toBeInTheDocument();
+  });
+});

@@ -92,6 +92,41 @@ describe('summarizeToolInputForWorkLog', () => {
     ).toBe('general-purpose: Investigate the cache bug');
   });
 
+  describe('Pi harness (lowercase names, path/command/edits keys)', () => {
+    it('shows the first line of a bash command', () => {
+      expect(
+        summarizeToolInputForWorkLog('bash', {
+          command: 'rg -n foo src/\n# more',
+          cwd: '/repo',
+        }),
+      ).toBe('rg -n foo src/');
+    });
+
+    it('shows basename for read/write (path key)', () => {
+      expect(
+        summarizeToolInputForWorkLog('read', { path: '/repo/src/lib/util.ts', offset: 10 }),
+      ).toBe('util.ts');
+      expect(summarizeToolInputForWorkLog('write', { path: '/repo/README.md', content: 'x' })).toBe(
+        'README.md',
+      );
+    });
+
+    it('appends edit count for multi-edit edit calls', () => {
+      expect(
+        summarizeToolInputForWorkLog('edit', {
+          path: '/repo/src/a.ts',
+          edits: [{ oldText: 'a', newText: 'b' }],
+        }),
+      ).toBe('a.ts');
+      expect(
+        summarizeToolInputForWorkLog('edit', {
+          path: '/repo/src/a.ts',
+          edits: [{ oldText: 'a', newText: 'b' }, { oldText: 'c', newText: 'd' }, { oldText: 'e', newText: 'f' }],
+        }),
+      ).toBe('a.ts · 3 edits');
+    });
+  });
+
   it('returns first non-empty string for unknown tools', () => {
     expect(
       summarizeToolInputForWorkLog('mcp__linear__list_issues', {

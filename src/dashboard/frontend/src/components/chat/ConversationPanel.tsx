@@ -91,6 +91,13 @@ interface ConversationPanelProps {
   targetMessageIndex?: number;
   targetMessageNonce?: number;
   onTargetMessageHandled?: () => void;
+  /**
+   * Controlled tool-call visibility. When provided (embedded agent panes that
+   * render their own Tools toggle in the parent header), overrides the
+   * internal per-conversation localStorage state.
+   */
+  hideToolCalls?: boolean;
+  onToggleHideToolCalls?: () => void;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -135,6 +142,8 @@ export function ConversationPanel({
   targetMessageIndex,
   targetMessageNonce,
   onTargetMessageHandled,
+  hideToolCalls: controlledHideToolCalls,
+  onToggleHideToolCalls,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -520,8 +529,12 @@ export function ConversationPanel({
     }
   }, [conversation.name]);
 
-  // Per-conversation UI state (client-only, localStorage)
-  const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(conversation.name);
+  // Per-conversation UI state (client-only, localStorage). Embedded agent
+  // panes pass controlled props from their own header toggle; when absent
+  // (standalone conversation view) the internal hook is authoritative.
+  const uiToolState = useConversationUiState(conversation.name);
+  const hideToolCalls = controlledHideToolCalls ?? uiToolState.hideToolCalls;
+  const toggleHideToolCalls = onToggleHideToolCalls ?? uiToolState.toggleHideToolCalls;
 
   const handleCopyLink = useCallback(() => {
     const params = new URLSearchParams();
