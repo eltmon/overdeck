@@ -42,8 +42,8 @@ describe('classifyAutoMergeIneligibility', () => {
   it.each([
     ['checks_pending', 'retryable'],
     ['not_mergeable', 'retryable'],
-    ['pr_draft', 'retryable'],
-    ['checks_failing', 'retryable'],
+    ['pr_draft', 'terminal'],
+    ['checks_failing', 'terminal'],
     ['not_ready', 'retryable'],
     ['gitlab_mr_lookup_failed', 'retryable'],
   ] as [AutoMergeIneligibilityCode, 'retryable' | 'terminal'][])('classifies %s as %s', (code, expected) => {

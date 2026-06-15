@@ -34,8 +34,6 @@ export function classifyAutoMergeIneligibility(
   switch (code) {
     case 'checks_pending':
     case 'not_mergeable':
-    case 'pr_draft':
-    case 'checks_failing':
     case 'not_ready':
     case 'gitlab_mr_lookup_failed':
       return 'retryable';
@@ -45,6 +43,8 @@ export function classifyAutoMergeIneligibility(
     case 'missing_pr_url':
     case 'blocker_label':
     case 'gitlab_mr_not_opened':
+    case 'pr_draft':
+    case 'checks_failing':
       return 'terminal';
   }
 }

@@ -55,6 +55,7 @@ const DEFER_BACKOFF_MS = 60_000;
 const RECOVERABLE_BACKOFF_MS = 60_000;
 const STALE_CEILING_MS = 2 * 60 * 60 * 1000;
 const MAX_MERGE_ATTEMPTS = 3;
+const MERGE_ORDER_GIT_CONCURRENCY = 4;
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let activeTick: Promise<void> | null = null;
@@ -80,19 +81,24 @@ async function defaultComputeMergeOrderMeta(
   const { promisify } = await import('node:util');
   const execFileAsync = promisify(execFile);
 
-  const fileSets = await Promise.all(
-    entries.map(async (entry) => {
-      const branch = `feature/${entry.issueId.toLowerCase()}`;
-      try {
-        const { stdout } = await execFileAsync('git', ['diff', '--name-only', `main...${branch}`], { cwd: projectRoot });
-        return new Set(stdout.trim().split('\n').filter(Boolean));
-      } catch (cause) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        log(`[auto-merge] cannot compute changed files for ${entry.issueId} (${branch}): ${message}`);
-        return new Set<string>();
-      }
-    }),
-  );
+  const fileSets: Set<string>[] = [];
+  for (let i = 0; i < entries.length; i += MERGE_ORDER_GIT_CONCURRENCY) {
+    const batch = entries.slice(i, i + MERGE_ORDER_GIT_CONCURRENCY);
+    const batchSets = await Promise.all(
+      batch.map(async (entry) => {
+        const branch = `feature/${entry.issueId.toLowerCase()}`;
+        try {
+          const { stdout } = await execFileAsync('git', ['diff', '--name-only', `main...${branch}`], { cwd: projectRoot });
+          return new Set(stdout.trim().split('\n').filter(Boolean));
+        } catch (cause) {
+          const message = cause instanceof Error ? cause.message : String(cause);
+          log(`[auto-merge] cannot compute changed files for ${entry.issueId} (${branch}): ${message}`);
+          return new Set<string>();
+        }
+      }),
+    );
+    fileSets.push(...batchSets);
+  }
 
   const conflictsMap = new Map<number, Set<number>>();
   for (let i = 0; i < entries.length; i++) {
