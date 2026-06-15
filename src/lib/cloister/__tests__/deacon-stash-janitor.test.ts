@@ -27,7 +27,7 @@ vi.mock('../../../lib/agents.js', () => ({
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   getAgentDir: vi.fn(),
-  getAgentState: vi.fn(),
+  getAgentState: vi.fn(() => Effect.succeed(null)),
   getAgentStateSync: vi.fn(),
   saveAgentState: vi.fn(),
   saveAgentStateSync: vi.fn(),

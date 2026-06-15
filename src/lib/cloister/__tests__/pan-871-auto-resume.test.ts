@@ -36,6 +36,7 @@ vi.mock('../../../lib/agents.js', async () => {
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn(() => []),
   listRunningAgentsSync: vi.fn(() => []),
+  listAgentStates: vi.fn(() => []),
   getAgentDir: vi.fn((agentId: string) => `/tmp/test-agents/${agentId}`),
   getAgentState: effectMock(null),
   getAgentStateSync: vi.fn(),
@@ -232,6 +233,7 @@ vi.mock('fs', () => ({
 }));
 
 import { autoResumeStoppedWorkAgents, nudgeIdleWorkAgentsWithOpenBeads, nudgeStalledResumeWorkAgents } from '../deacon.js';
+import { listAgentStates } from '../../../lib/agents.js';
 import { getAgentStateSync, getAgentState, messageAgent, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
@@ -243,6 +245,7 @@ import { captureTranscriptUserRecordSnapshot } from '../../../lib/transcript-lan
 
 const mockGetAgentState = getAgentStateSync as any;
 const mockGetAgentStateAsync = getAgentState as any;
+const mockListAgentStates = listAgentStates as any;
 const mockMessageAgent = messageAgent as any;
 const mockResumeAgent = resumeAgent as any;
 const mockGetReviewStatus = getReviewStatusSync as any;
@@ -279,6 +282,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
     };
     mockGetAgentState.mockReturnValue(agentState);
     mockGetAgentStateAsync.mockResolvedValue({ ...agentState, status: 'running' });
+    mockListAgentStates.mockReturnValue([agentState]);
     mockGetReviewStatus.mockReturnValue({
       issueId: 'PAN-871',
       reviewStatus: 'blocked',
@@ -400,6 +404,16 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       status: 'running',
       startedAt: new Date().toISOString(),
     });
+    mockListAgentStates.mockReturnValue([{
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    }]);
     mockSessionExists.mockResolvedValue(true);
     mockIsAgentIdleForNudge.mockReturnValue(true);
 
@@ -422,6 +436,18 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       lastResumeAt: '2026-06-10T00:01:00.000Z',
       sessionId: 'session-1',
     });
+    mockListAgentStates.mockReturnValue([{
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    }]);
     mockSessionExists.mockResolvedValue(true);
     mockIsAgentIdleForNudge.mockReturnValue(true);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({ sessionFile: '/tmp/session.jsonl', userRecordCount: 0 });
@@ -446,6 +472,18 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       lastResumeAt: '2026-06-10T00:01:00.000Z',
       sessionId: 'session-1',
     });
+    mockListAgentStates.mockReturnValue([{
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    }]);
     mockIsIssueClosed.mockResolvedValue(true);
     mockSessionExists.mockResolvedValue(true);
     mockIsAgentIdleForNudge.mockReturnValue(true);
@@ -471,6 +509,18 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       lastResumeAt: '2026-06-10T00:01:00.000Z',
       sessionId: 'session-1',
     });
+    mockListAgentStates.mockReturnValue([{
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+    }]);
     mockSessionExists.mockResolvedValue(true);
     mockIsAgentIdleForNudge.mockReturnValue(true);
     mockCaptureTranscriptUserRecordSnapshot.mockResolvedValue({
@@ -499,6 +549,19 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       sessionId: 'session-1',
       paused: true,
     });
+    mockListAgentStates.mockReturnValue([{
+      id: 'agent-pan-871',
+      issueId: 'PAN-871',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-06-10T00:00:00.000Z',
+      lastResumeAt: '2026-06-10T00:01:00.000Z',
+      sessionId: 'session-1',
+      paused: true,
+    }]);
     mockSessionExists.mockResolvedValue(true);
     mockIsAgentIdleForNudge.mockReturnValue(true);
 

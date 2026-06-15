@@ -152,7 +152,7 @@ import {
   getAllProjectSpecialistStatuses,
   parseReviewerSessionName,
 } from './specialists.js';
-import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
+import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, listAgentStates, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
 import { withConcurrencyLimit } from '../concurrency.js';
@@ -1308,6 +1308,17 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
           }
         } catch {
           // No session — candidate for cleanup
+        }
+
+        // PAN-1908: for canonical agent-* directories, prefer the SQLite agents
+        // table as the source of truth. If an entry exists, keep the directory
+        // even if state.json is old — the registry (not the filesystem) owns
+        // retention. Reviewer directories remain filesystem-ephemeral.
+        if (dir.name.startsWith('agent-')) {
+          const agent = await Effect.runPromise(
+            getAgentState(dir.name).pipe(Effect.catch(() => Effect.succeed(null))),
+          );
+          if (agent != null) continue;
         }
 
         // Check directory age via state.json mtime (or dir mtime as fallback)
@@ -6137,7 +6148,10 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
   const reviewStates: AgentState[] = [];
 
   for (const agentId of agentDirs) {
-    const state = getAgentStateSync(agentId);
+    // PAN-1908: use the agents table; fall back to state.json only for legacy dirs.
+    const state = await Effect.runPromise(
+      getAgentState(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
+    ).then((dbState) => dbState ?? getAgentStateSync(agentId));
     if (!state) continue;
     if (state.role !== 'review') continue;
     reviewStates.push(state);
@@ -6444,18 +6458,11 @@ function buildStalledResumePrompt(state: AgentState): string | null {
 
 export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
-  if (!existsSync(AGENTS_DIR)) return actions;
 
-  let dirs: string[];
-  try {
-    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
-  } catch { return actions; }
+  const states = listAgentStates({ status: 'running', role: 'work' });
 
-  for (const agentId of dirs) {
-    const state = getAgentStateSync(agentId);
-    if (!state) continue;
-    if (state.status !== 'running') continue;
-    if (state.role !== 'work') continue;
+  for (const state of states) {
+    const agentId = state.id;
     if (state.paused || state.troubled) continue;
     if (!state.lastResumeAt) continue;
     if (await isIssueClosed(state.issueId)) continue;
@@ -6488,18 +6495,11 @@ export async function nudgeStalledResumeWorkAgents(): Promise<string[]> {
 
 export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
   const actions: string[] = [];
-  if (!existsSync(AGENTS_DIR)) return actions;
 
-  let dirs: string[];
-  try {
-    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
-  } catch { return actions; }
+  const states = listAgentStates({ status: 'running', role: 'work' });
 
-  for (const agentId of dirs) {
-    const state = getAgentStateSync(agentId);
-    if (!state) continue;
-    if (state.status !== 'running') continue;
-    if (state.role !== 'work') continue;
+  for (const state of states) {
+    const agentId = state.id;
     if (await isIssueClosed(state.issueId)) {
       logDeaconEventSync(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} skipped — issue ${state.issueId} is closed`);
       continue;

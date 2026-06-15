@@ -54,7 +54,7 @@ import { getFlywheelActiveRunId } from './database/app-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import { sendGracefulRestartWarning } from './graceful-restart.js';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity, AgentStatus } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -4017,6 +4017,21 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
       tmuxActive: tmuxNames.has(normalizedId),
     };
   });
+}
+
+/**
+ * PAN-1908: list all agents in the SQLite registry with optional filtering.
+ * This is the replacement for enumerating ~/.panopticon/agents/ directories.
+ */
+export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
+  const agents = listAllAgents();
+  return agents
+    .map(dbAgentToAgentState)
+    .filter((state) => {
+      if (options?.status && state.status !== options.status) return false;
+      if (options?.role && state.role !== options.role) return false;
+      return true;
+    });
 }
 
 
