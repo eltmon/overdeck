@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
@@ -32,6 +32,7 @@ import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
 import { getAgent as getAgentFromDb, upsertAgent, listAllAgents, type Agent as DbAgent } from './database/agents-db.js';
+import { agentStateToDbAgent } from './database/agent-mappers.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -617,22 +618,10 @@ export function resolveAgentTargetSync(input: string): string | null {
   if (getAgentStateSync(canonicalAgentId)) return canonicalAgentId;
 
   try {
-    if (!existsSync(AGENTS_DIR)) return canonicalAgentId;
     const wantedIssueId = issueId.toUpperCase();
-    const matches: string[] = [];
-    for (const entry of readdirSync(AGENTS_DIR, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const stateFile = join(AGENTS_DIR, entry.name, 'state.json');
-      if (!existsSync(stateFile)) continue;
-      try {
-        const parsed = JSON.parse(readFileSync(stateFile, 'utf-8')) as { issueId?: string };
-        if (parsed.issueId?.toUpperCase() === wantedIssueId) {
-          matches.push(entry.name);
-        }
-      } catch {
-        // Skip unreadable state files.
-      }
-    }
+    const matches = listAllAgents()
+      .filter((agent) => agent.issueId.toUpperCase() === wantedIssueId)
+      .map((agent) => agent.id);
     if (matches.length === 1) return matches[0].toLowerCase();
     return canonicalAgentId;
   } catch {
@@ -1032,55 +1021,6 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   } catch {
     return null;
   }
-}
-
-export function agentStateToDbAgent(state: AgentState): DbAgent {
-  return {
-    id: state.id,
-    issueId: state.issueId,
-    role: state.role,
-    status: state.status,
-    workspace: state.workspace,
-    harness: state.harness ?? null,
-    model: state.model ?? null,
-    branch: state.branch ?? null,
-    sessionId: state.sessionId ?? null,
-    startedAt: state.startedAt ?? null,
-    lastActivity: state.lastActivity ?? null,
-    lastResumeAt: state.lastResumeAt ?? null,
-    stoppedAt: state.stoppedAt ?? null,
-    stoppedByUser: state.stoppedByUser ?? null,
-    stoppedByPause: state.stoppedByPause ?? null,
-    kickoffDelivered: state.kickoffDelivered ?? null,
-    hostOverride: state.hostOverride ?? null,
-    costSoFar: state.costSoFar ?? null,
-    phase: state.phase ?? null,
-    workType: state.workType ?? null,
-    paused: state.paused ?? null,
-    pausedReason: state.pausedReason ?? null,
-    pausedAt: state.pausedAt ?? null,
-    troubled: state.troubled ?? null,
-    troubledAt: state.troubledAt ?? null,
-    consecutiveFailures: state.consecutiveFailures ?? null,
-    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
-    lastFailureAt: state.lastFailureAt ?? null,
-    lastFailureReason: state.lastFailureReason ?? null,
-    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
-    flywheelRunId: state.flywheelRunId ?? null,
-    roleRunHead: state.roleRunHead ?? null,
-    reviewSubRole: state.reviewSubRole ?? null,
-    reviewRunId: state.reviewRunId ?? null,
-    reviewSynthesisAgentId: state.reviewSynthesisAgentId ?? null,
-    reviewOutputPath: state.reviewOutputPath ?? null,
-    reviewDeadlineAt: state.reviewDeadlineAt ?? null,
-    reviewMonitorSignaled: state.reviewMonitorSignaled ?? null,
-    reviewRetryAttempt: state.reviewRetryAttempt ?? null,
-    inspectSubRole: state.inspectSubRole ?? null,
-    deliveryMethod: state.deliveryMethod ?? null,
-    supervisorEnabled: state.supervisorEnabled ?? null,
-    channelsEnabled: state.channelsEnabled ?? null,
-    updatedAt: new Date().toISOString(),
-  };
 }
 
 function dbAgentToAgentState(agent: DbAgent): AgentState {

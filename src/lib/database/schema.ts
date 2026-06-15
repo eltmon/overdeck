@@ -17,6 +17,7 @@
 import { existsSync } from 'fs';
 import type { SqliteDatabase } from './driver.js';
 import { encodeClaudeProjectDir } from '../paths.js';
+import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
 export const SCHEMA_VERSION = 55;
@@ -1595,6 +1596,21 @@ export function runMigrations(db: SqliteDatabase): void {
       CREATE INDEX IF NOT EXISTS idx_agents_issue
         ON agents(issue_id);
     `);
+
+    // PAN-1908: one-time backfill from legacy state.json files into the new
+    // agents table. This is the only permitted directory enumeration; it runs
+    // once during the v54→v55 migration and is idempotent by agent id.
+    try {
+      const result = backfillAgentsFromStateJsonSync(db);
+      if (result.processed > 0 || result.markedStopped > 0) {
+        console.log(
+          `[schema] Backfilled agents table: ${result.processed} rows, ` +
+          `${result.markedStopped} marked stopped (no live tmux session)`
+        );
+      }
+    } catch (err) {
+      console.warn('[schema] agents-table backfill failed:', err instanceof Error ? err.message : String(err));
+    }
   }
 
   // After all migrations, set the version

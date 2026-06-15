@@ -6,6 +6,8 @@ import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
+import { getDatabase } from '../../lib/database/index.js';
+import { backfillAgentsFromStateJsonSync } from '../../lib/database/agent-backfill.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -69,6 +71,12 @@ export function registerDbCommands(program: Command): void {
     .description('Show database configuration for a project')
     .argument('[project]', 'Project key')
     .action(configCommand);
+
+  db.command('rebuild-agents')
+    .description('Rebuild the SQLite agents table from state.json rollback sources (PAN-1908)')
+    .option('--dry-run', 'Show what would be backfilled without writing')
+    .option('--verbose', 'Log each processed agent')
+    .action(rebuildAgentsCommand);
 }
 
 async function snapshotCommand(options: {
@@ -606,5 +614,35 @@ async function configCommand(project?: string): Promise<void> {
     if (dbConfig.migrations.path) {
       console.log(chalk.dim(`    Path: ${dbConfig.migrations.path}`));
     }
+  }
+}
+
+async function rebuildAgentsCommand(options: {
+  dryRun?: boolean;
+  verbose?: boolean;
+}): Promise<void> {
+  const spinner = ora('Rebuilding agents table from state.json sources...').start();
+
+  try {
+    const db = getDatabase();
+
+    if (options.dryRun) {
+      // For a dry run we still need to read state.json, but we don't write.
+      const { backfillAgentsFromStateJsonSync } = await import('../../lib/database/agent-backfill.js');
+      const result = backfillAgentsFromStateJsonSync(db, { verbose: options.verbose });
+      spinner.info(
+        `Dry run: would process ${result.processed} agents, mark ${result.markedStopped} stopped, skip ${result.skipped}`
+      );
+      return;
+    }
+
+    const { backfillAgentsFromStateJsonSync } = await import('../../lib/database/agent-backfill.js');
+    const result = backfillAgentsFromStateJsonSync(db, { verbose: options.verbose });
+    spinner.succeed(
+      `Rebuilt agents table: ${result.processed} rows, ${result.markedStopped} marked stopped, ${result.skipped} skipped`
+    );
+  } catch (error: any) {
+    spinner.fail(`Rebuild failed: ${error.message}`);
+    process.exitCode = 1;
   }
 }

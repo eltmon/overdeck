@@ -16,7 +16,8 @@ import { getDatabase } from '../../../lib/database/index.js';
 import type { SqliteDatabase } from '../../../lib/database/driver.js';
 import { upsertAgentWithDb, type Agent as DbAgent } from '../../../lib/database/agents-db.js';
 import { getEventStore, type EventStore, type StoredEvent } from '../event-store.js';
-import { agentStateToDbAgent, writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
+import { writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
+import { agentStateToDbAgent } from '../../../lib/database/agent-mappers.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 import type { DomainEvent } from '@panctl/contracts';
 

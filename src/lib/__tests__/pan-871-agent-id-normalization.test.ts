@@ -163,26 +163,54 @@ describe('agent ID normalization (PAN-871)', () => {
   });
 
   it('resolves issue IDs to the single registered strike agent when no work agent exists', async () => {
-    const { existsSync, readFileSync, readdirSync } = await import('fs');
-    vi.mocked(existsSync).mockImplementation((path: string) =>
-      String(path) === '/tmp/test/agents' ||
-      String(path).includes('strike-pan-1820/state.json')
-    );
-    vi.mocked(readdirSync).mockImplementation(((_path: string, opts?: any) => {
-      if (opts && typeof opts === 'object' && 'withFileTypes' in opts) {
-        return [{ name: 'strike-pan-1820', isDirectory: () => true }];
-      }
-      return [];
-    }) as typeof readdirSync);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      issueId: 'PAN-1820',
-      workspace: '/tmp/workspace',
-      harness: 'codex',
-      role: 'strike',
-      model: 'gpt-5',
-      status: 'running',
-      startedAt: '2026-06-13T00:00:00.000Z',
-    }));
+    vi.mocked(listAllAgents).mockReturnValue([
+      {
+        id: 'strike-pan-1820',
+        issueId: 'PAN-1820',
+        role: 'strike',
+        status: 'running',
+        workspace: '/tmp/workspace',
+        harness: 'codex',
+        model: 'gpt-5',
+        branch: null,
+        sessionId: null,
+        startedAt: '2026-06-13T00:00:00.000Z',
+        lastActivity: null,
+        lastResumeAt: null,
+        stoppedAt: null,
+        stoppedByUser: false,
+        stoppedByPause: false,
+        kickoffDelivered: false,
+        hostOverride: false,
+        costSoFar: null,
+        phase: null,
+        workType: null,
+        paused: false,
+        pausedReason: null,
+        pausedAt: null,
+        troubled: false,
+        troubledAt: null,
+        consecutiveFailures: null,
+        firstFailureInRunAt: null,
+        lastFailureAt: null,
+        lastFailureReason: null,
+        lastFailureNextRetryAt: null,
+        flywheelRunId: null,
+        roleRunHead: null,
+        reviewSubRole: null,
+        reviewRunId: null,
+        reviewSynthesisAgentId: null,
+        reviewOutputPath: null,
+        reviewDeadlineAt: null,
+        reviewMonitorSignaled: null,
+        reviewRetryAttempt: null,
+        inspectSubRole: null,
+        deliveryMethod: null,
+        supervisorEnabled: false,
+        channelsEnabled: false,
+        updatedAt: '2026-06-13T00:00:00.000Z',
+      },
+    ]);
 
     expect(resolveAgentTargetSync('PAN-1820')).toBe('strike-pan-1820');
   });
