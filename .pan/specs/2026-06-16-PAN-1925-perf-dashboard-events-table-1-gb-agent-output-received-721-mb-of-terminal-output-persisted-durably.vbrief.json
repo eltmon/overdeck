@@ -4,17 +4,17 @@
     "created": "2026-06-16T20:00:13.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1925: stop persisting agent.output_received durably (events table ~1 GB / 721 MB of terminal output)",
-    "updated": "2026-06-16T20:04:12.653Z"
+    "updated": "2026-06-16T20:21:36.662Z"
   },
   "plan": {
     "id": "pan-1925",
     "title": "perf(dashboard): events table ~1 GB — agent.output_received (721 MB of terminal output) persisted durably",
-    "status": "proposed",
+    "status": "running",
     "uid": "128e99ed-3c51-47a9-9ae3-9bbe46435b9e",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-16T20:00:13.000Z",
-    "updated": "2026-06-16T20:04:12.653Z",
+    "updated": "2026-06-16T20:21:36.662Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1925",
@@ -225,5 +225,5 @@
       "canonicalFilename": "2026-06-16-PAN-1925-perf-dashboard-events-table-1-gb-agent-output-received-721-mb-of-terminal-output-persisted-durably.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
