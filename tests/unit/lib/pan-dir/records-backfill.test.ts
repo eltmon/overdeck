@@ -137,7 +137,7 @@ describe('backfillIssueRecords', () => {
     expect(result.processed).toBe(1);
     expect(result.skipped).toBe(0);
     expect(result.failed).toBe(0);
-    expect(existsSync(join(infraRepo, '.pan', 'pan-1908.json'))).toBe(true);
+    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1908.json'))).toBe(true);
   });
 
   it('discovers issues from the agents table even without review_status or continue files', async () => {
@@ -155,7 +155,7 @@ describe('backfillIssueRecords', () => {
 
     expect(result.processed).toBe(1);
     expect(result.details.find((d) => d.issueId === 'PAN-1909')?.action).toBe('written');
-    expect(existsSync(join(infraRepo, '.pan', 'pan-1909.json'))).toBe(true);
+    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1909.json'))).toBe(true);
   });
 
   it('is idempotent by skipping unchanged records on re-run', async () => {
@@ -185,8 +185,8 @@ describe('backfillIssueRecords', () => {
     const result = await backfillIssueRecords({ issueId: 'PAN-1908' });
 
     expect(result.processed).toBe(1);
-    expect(existsSync(join(infraRepo, '.pan', 'pan-1908.json'))).toBe(true);
-    expect(existsSync(join(infraRepo, '.pan', 'pan-1909.json'))).toBe(false);
+    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1908.json'))).toBe(true);
+    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1909.json'))).toBe(false);
   });
 
   it('commits queued records to the infra repo', async () => {

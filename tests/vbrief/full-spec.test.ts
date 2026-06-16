@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
@@ -88,6 +88,13 @@ function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
 
 function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
   return readPlanSync(join(workspacePath, '.pan', 'spec.vbrief.json'));
+}
+
+function readRecordStatusOverrides(workspacePath: string): Record<string, string> | undefined {
+  const recordPath = join(workspacePath, '.pan', 'records', 'pan-453.json');
+  if (!existsSync(recordPath)) return undefined;
+  const raw = readFileSync(recordPath, 'utf-8');
+  return (JSON.parse(raw) as { statusOverrides?: Record<string, string> }).statusOverrides;
 }
 
 beforeEach(() => {
@@ -180,14 +187,14 @@ describe('VBriefItem created/completed fields', () => {
 
 // ─── updateItemStatus: statusOverrides in continue.json ─────────────────────
 
-describe('updateItemStatus: writes to continue.json statusOverrides', () => {
-  it('writes status to continue.json statusOverrides', async () => {
+describe('updateItemStatus: writes to per-issue record statusOverrides', () => {
+  it('writes status to per-issue record statusOverrides', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const cont = await readWorkspaceContinue(TEST_DIR);
-    expect(cont?.statusOverrides?.['update-types']).toBe('running');
+    const overrides = readRecordStatusOverrides(TEST_DIR);
+    expect(overrides?.['update-types']).toBe('running');
   });
 
   it('does not mutate the spec file on disk', () => {
@@ -238,14 +245,14 @@ describe('updateItemStatus: writes to continue.json statusOverrides', () => {
 
 // ─── updateSubItemStatus: statusOverrides in continue.json ──────────────────
 
-describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
-  it('writes status to continue.json with dotted key', async () => {
+describe('updateSubItemStatus: writes to per-issue record statusOverrides', () => {
+  it('writes status to per-issue record with dotted key', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const cont = await readWorkspaceContinue(TEST_DIR);
-    expect(cont?.statusOverrides?.['update-types.ac1']).toBe('completed');
+    const overrides = readRecordStatusOverrides(TEST_DIR);
+    expect(overrides?.['update-types.ac1']).toBe('completed');
   });
 
   it('merged view reflects updated subItem status', () => {
@@ -289,9 +296,9 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
 
     updateItemStatus(TEST_DIR, 'update-types', 'completed');
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const cont = await readWorkspaceContinue(TEST_DIR);
-    expect(cont?.statusOverrides?.['update-types']).toBe('completed');
-    expect(cont?.statusOverrides?.['update-types.ac1']).toBe('completed');
+    const overrides = readRecordStatusOverrides(TEST_DIR);
+    expect(overrides?.['update-types']).toBe('completed');
+    expect(overrides?.['update-types.ac1']).toBe('completed');
   });
 });
 

@@ -252,6 +252,7 @@ describe('auto-resume gates', () => {
     vi.doMock('../../../src/lib/projects.js', () => ({
       resolveProjectFromIssue: vi.fn().mockReturnValue(resolvedProject),
       resolveProjectFromIssueSync: vi.fn().mockReturnValue(resolvedProject),
+      getProjectSync: vi.fn(() => null),
       hasProjects: vi.fn().mockReturnValue(true),
       hasProjectsSync: vi.fn().mockReturnValue(true),
       listProjects: vi.fn().mockReturnValue(projects),
