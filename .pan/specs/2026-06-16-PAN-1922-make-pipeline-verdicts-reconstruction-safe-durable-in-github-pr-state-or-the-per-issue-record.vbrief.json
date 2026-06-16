@@ -1,0 +1,383 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-16T20:00:16.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1922: Make pipeline verdicts reconstruction-safe (durable in GitHub PR state or the per-issue record)",
+    "updated": "2026-06-16T20:05:50.465Z"
+  },
+  "plan": {
+    "id": "pan-1922",
+    "title": "Make pipeline verdicts reconstruction-safe (durable in GitHub PR state or the per-issue record)",
+    "status": "proposed",
+    "uid": "10e92889-22f0-471c-baa3-986d9479f9cb",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-16T20:00:16.000Z",
+    "updated": "2026-06-16T20:05:50.465Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1922",
+        "label": "PAN-1922",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-1922.md",
+        "label": "PRD: PAN-1922",
+        "type": "prd"
+      },
+      {
+        "uri": "reference/state-model.mdx",
+        "label": "State Model",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "state-model",
+      "reconstruction",
+      "review-status",
+      "pan-1908",
+      "cli",
+      "durability"
+    ],
+    "narratives": {
+      "Problem": "Pipeline verdicts (review approved/blocked, test pass/fail, verification, inspect, merge readiness) live only in the SQLite review_status table. They are the one piece of pipeline state not derivable from the workspace. The PAN-1908 mirror already writes them durably into the per-issue git record on every status write, but the inverse arrow is missing: getReviewStatusSync() (review-status.ts:468) is a pure DB read with no fallback, so on a database loss the verdicts vanish and nothing repopulates the review_status table. PAN-1920 (closed 2026-06-16) rebuilt the in-memory read-model from records (read-model.ts:487) but does NOT write the review_status table — its rebuildCommand discards the returned reviewStatusByIssueId. So server-side synchronous readers (deacon patrols, merge gate) still see an empty table after a rebuild.",
+      "Proposal": "Build the one missing read/reconstruction arrow. (1) A library function restoreReviewStatusFromRecords() rebuilds the durable subset of review_status rows from the per-issue git records, writing through setReviewStatusSync so ready_for_merge recomputes and ephemeral columns seed at defaults. (2) During restore, the PR-owned merge-state (blocker_reasons) is re-derived LIVE via the existing refreshMergeStateFromGitHub(), never from a stored snapshot. (3) A standalone pan admin db restore-verdicts CLI command runs it, mirroring pan admin db backfill-records. (4) Because PAN-1920 closed without wiring the seam, also call restoreReviewStatusFromRecords() from the pan admin db rebuild CLI action (rebuildCommand) so the umbrella rebuild repopulates the review_status table symmetrically with how it already rebuilds the agents table. (5) A no-loss audit test enumerates every review_status column via PRAGMA and fails closed on any column not classified DURABLE/DERIVED/EPHEMERAL. Additive only; no schema migration.",
+      "NonGoals": "- Reading internal review/test verdicts from GitHub PR state (reviewDecision/checks): GitHub only reflects Panopticon's approval at merge time, so intermediate verdicts are not reconstructable from the live PR — they come from the per-issue record.\n- Restoring blocker_reasons or ready_for_merge as stored values: blockers are re-derived live; ready_for_merge is recomputed by the gate.\n- Restoring ephemeral counters, stuck state, or dispatch timestamps: they reset to schema defaults on rebuild (acceptable loss).\n- Restoring status_history: it is a separate append-only UI-log table, not projected into the record; the restored row starts with empty history.\n- Any new SQLite column or schema migration.\n- Auto-repopulating review_status during the server boot reconstruction path (reconstructCache called from read-model.ts and agent-state-service.ts): deferred follow-up, out of scope here.\n- Modifying reconstructCache, getReviewStatusSync, or the PAN-1908 mirror write path."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add a fifth bead (wire-rebuild) wiring restoreReviewStatusFromRecords() into the pan admin db rebuild CLI action (rebuildCommand, db.ts:662).",
+        "rationale": "The PRD's FR-5 deferred wiring to PAN-1920, but PAN-1920 closed 2026-06-16 without it: reconstructCache rebuilds the agents table and the in-memory read-model snapshot yet discards reviewStatusByIssueId and never writes the review_status table. rebuildCommand is a CLI action (NOT the boot path), so wiring is roughly three additive low-risk lines and prevents the FR-5 seam from being orphaned between two closed issues. Boot-path repopulation stays out of scope per the no-live-boot-hotpatch caution."
+      },
+      {
+        "summary": "Restore durable verdicts from the per-issue git record, not from GitHub; re-derive only PR-owned merge-state live.",
+        "rationale": "Verified that GitHub's PR reviewDecision is only set when Panopticon approves at merge time (forge.ts:293, workspaces.ts:5770), so an intermediate 'review passed / test pending' verdict is not reconstructable from the live PR (PRD section 3.1). The record is the only faithful durable home; merge-state alone is genuinely PR-owned and must be read live."
+      },
+      {
+        "summary": "Five small beads with restore-core as the single inspection-gated foundation (requiresInspection true, deep).",
+        "rationale": "restore-core defines the exported signature and the durable/ephemeral column mapping that the other four beads consume; a wrong mapping (e.g. copying blockerReasons or misclassifying deacon_ignored/auto_merge) would cascade into the CLI, the umbrella wiring, and the round-trip test, so a deep inspection gate is warranted there and nowhere else."
+      },
+      {
+        "summary": "status_history is accepted as lost on rebuild.",
+        "rationale": "It is a separate append-only UI-log table, not projected into the record and not a verdict; documenting the gap is correct rather than fabricating history."
+      }
+    ],
+    "items": [
+      {
+        "id": "restore-core",
+        "title": "restoreReviewStatusFromRecords(): rebuild durable review_status columns from the per-issue record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-16T20:00:16.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1922",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "blocker-refresh",
+            "restore-cli",
+            "wire-rebuild",
+            "noloss-audit"
+          ],
+          "acJustification": "Foundation function with six independently-verifiable contracts mapping 1:1 to the PRD's named criteria (AC-1, AC-2, AC-3, AC-7) and FR-3/FR-6/NFR-1; splitting them would lose traceability and merging them would hide distinct failure modes.",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create new file src/lib/pan-dir/verdict-restore.ts exporting async restoreReviewStatusFromRecords(options?: RestoreVerdictsOptions): Promise<RestoreVerdictsResult>, modelled on backfillIssueRecords() in records-backfill.ts. First export the currently-private collectInFlightIssueIds() from records-backfill.ts (change 'async function' to 'export async function') and reuse it for the issue set when no issueId is given. For each target issue: resolve the project, call readIssueRecord(); if there is no record or no record.pipeline, push {action:'skipped'} and continue (FR-6). Otherwise map record.pipeline (PanIssuePipelineRecord) to a Partial<ReviewStatus> containing ONLY the durable columns listed in PRD section 4 — do NOT copy blockerReasons (refreshed live in blocker-refresh) and do NOT copy readyForMerge (recomputed). Write via setReviewStatusSync(issueId, durableUpdate) on purpose: it recomputes ready_for_merge, re-fires the harmless idempotent PAN-1908 mirror, and seeds ephemeral columns at schema defaults via the upsert. Under dryRun, tally without writing. Return {restored, skipped, failed, details}. Surgical: do not refactor records-backfill.ts beyond the one export, and do not touch getReviewStatusSync or the mirror write path."
+        },
+        "items": [
+          {
+            "id": "restore-core.ac1",
+            "title": "Given a per-issue record with pipeline verdicts and an absent review_status row, when restoreReviewStatusFromRecords({issueId}) runs, then the durable columns (review_status, test_status, merge_status, inspect_status, inspect_notes, verification_status, verification_notes, review_notes, test_notes, merge_notes, pr_url, pr_number, pr_head_sha, reviewed_at_commit, last_verified_commit, auto_merge, deacon_ignored, deacon_ignored_at, deacon_ignored_reason) match the record values.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-core.ac2",
+            "title": "Given the same record, when restore runs twice, then both runs produce identical durable columns (idempotent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-core.ac3",
+            "title": "Given an issue with no per-issue record or no pipeline block, when restore runs, then it records the issue as skipped, returns without throwing, and creates no review_status row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-core.ac4",
+            "title": "Given a record whose pipeline carries readyForMerge true and non-empty blockerReasons, when restore runs with no live GitHub call, then review_status.blocker_reasons defaults to empty and ready_for_merge is recomputed by the PAN-1650 gate rather than copied from the record.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-core.ac5",
+            "title": "Given restore completes for an issue, then the ephemeral counters merge_retry_count, verification_cycle_count, auto_requeue_count, review_retry_count, test_retry_count and stuck each default to their schema values.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-core.ac6",
+            "title": "Given a caller imports verdict-restore.ts, then restoreReviewStatusFromRecords accepts an optional RestoreVerdictsOptions and returns a Promise that resolves to a RestoreVerdictsResult with numeric restored, skipped and failed plus a details array.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "blocker-refresh",
+        "title": "Re-derive PR-owned merge-state live during restore via refreshMergeStateFromGitHub()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-16T20:00:16.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend restoreReviewStatusFromRecords() so that, after the durable setReviewStatusSync write for an issue that has both a pr_url and a pr_number, it derives repo (owner/repo) from the pr_url (reuse the existing parse at review-status.ts:311 or extract a tiny shared parsePrUrl helper) and awaits refreshMergeStateFromGitHub(issueId, repo, prNumber) to re-derive blocker_reasons live from the current PR (skipped under dryRun). Wrap the call in try/catch per issue: a GitHub read failure (offline, missing gh auth, deleted or merged PR) must not fail the whole restore — log and continue, leaving the durable verdicts already restored. refreshMergeStateFromGitHub is already async and uses execFileAsync, so no execSync is introduced (NFR-3)."
+        },
+        "items": [
+          {
+            "id": "blocker-refresh.ac1",
+            "title": "Given a restored issue with a pr_url and pr_number, when restore re-derives merge-state, then it calls refreshMergeStateFromGitHub(issueId, repo, prNumber) with repo parsed from the pr_url and updates blocker_reasons from the live PR.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-refresh.ac2",
+            "title": "Given an issue with no pr_url or no pr_number, when restore runs, then it sends no GitHub request for that issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-refresh.ac3",
+            "title": "Given refreshMergeStateFromGitHub throws (offline or missing gh auth), when restore processes that issue, then the issue still counts as restored, its durable columns survive intact, and the overall restore does not fail.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "blocker-refresh.ac4",
+            "title": "Given the --dry-run flag, when restore runs, then it performs no live GitHub refresh and persists nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restore-cli",
+        "title": "pan admin db restore-verdicts CLI command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T20:00:16.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Register a new db.command('restore-verdicts') in src/cli/commands/db.ts next to backfill-records (registration at db.ts:86-91), with --issue-id <id>, --dry-run and --verbose options and a sibling restoreVerdictsCommand action modelled on backfillRecordsCommand (db.ts:681). The action dynamic-imports restoreReviewStatusFromRecords from ../../lib/pan-dir/verdict-restore.js, runs it with the options, calls spinner.succeed with a 'restored/skipped/failed' summary, prints any failures in red, and sets process.exitCode = 1 when any issue fails. Mirror the existing command's shape exactly; no new harness."
+        },
+        "items": [
+          {
+            "id": "restore-cli.ac1",
+            "title": "Given the CLI, when a user runs `pan admin db restore-verdicts --help`, then it prints the command description and the --issue-id, --dry-run and --verbose options.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-cli.ac2",
+            "title": "Given records exist, when `pan admin db restore-verdicts` runs, then it invokes restoreReviewStatusFromRecords and prints a summary of restored, skipped and failed counts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-cli.ac3",
+            "title": "Given one or more issues fail to restore, when the command finishes, then it exits with a non-zero process exit code.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-rebuild",
+        "title": "Call restoreReviewStatusFromRecords() from the pan admin db rebuild CLI action",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T20:00:16.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In rebuildCommand (src/cli/commands/db.ts:662), after the existing reconstructCache(db) call, also dynamic-import and await restoreReviewStatusFromRecords({ verbose: options.verbose }) so pan admin db rebuild repopulates the review_status table — today rebuildCommand rebuilds the agents table and the in-memory read-model snapshot but discards reconstructCache's reviewStatusByIssueId and never writes review_status. Extend the spinner.succeed message to report the verdict-restore count alongside the existing issue and agent counts. This edits ONLY the rebuildCommand CLI action; do not modify reconstructCache or the server boot reconstruction path (read-model.ts, agent-state-service.ts), which is an out-of-scope follow-up."
+        },
+        "items": [
+          {
+            "id": "wire-rebuild.ac1",
+            "title": "Given `pan admin db rebuild` runs, when reconstructCache finishes, then rebuildCommand also calls restoreReviewStatusFromRecords so the review_status table is repopulated, not only the agents table and the read-model.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-rebuild.ac2",
+            "title": "Given the rebuild completes, then its success message reports the number of verdicts restored alongside the existing issue and agent counts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-rebuild.ac3",
+            "title": "Given the server boot reconstruction path (read-model.ts and agent-state-service.ts), then this change preserves it untouched and modifies only the rebuildCommand action in db.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "noloss-audit",
+        "title": "No-loss audit test: enumerate every review_status column + round-trip restore",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-16T20:00:16.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1922",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/database/review-status-no-loss-audit.test.ts. Open an in-memory DB, initSchema(db), then PRAGMA table_info(review_status) to get the LIVE column list. Define three explicit sets DURABLE, DERIVED, EPHEMERAL (exactly the PRD section 4 classification, plus issue_id as trivially durable) and assert every live column is in exactly one set and no set names a non-existent column, failing closed and naming any unclassified column. Add a round-trip test (here or in verdict-restore.test.ts): seed full verdicts into review_status, mirror them to a record fixture, deleteReviewStatus(issueId) to clear the cache, run restoreReviewStatusFromRecords({issueId}), then assert every durable column returns to its pre-clear value, every ephemeral column is at its schema default, and ready_for_merge is re-derived consistently with the gate. Follow the in-memory-DB injection patterns in tests/unit/lib/review-status-pan-1908-record.test.ts and tests/unit/lib/pan-dir/records-backfill.test.ts."
+        },
+        "items": [
+          {
+            "id": "noloss-audit.ac1",
+            "title": "Given the live review_status schema, when the audit test enumerates columns via PRAGMA table_info, then it asserts every column is classified into exactly one of DURABLE, DERIVED or EPHEMERAL and fails closed naming any unclassified column.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "noloss-audit.ac2",
+            "title": "Given full verdicts seeded into review_status and mirrored to a record, when the row is deleted and restoreReviewStatusFromRecords runs, then every durable column returns to its pre-deletion value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "noloss-audit.ac3",
+            "title": "Given the same round-trip, then every ephemeral column shows its schema default and ready_for_merge is re-derived consistently with the gate.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "noloss-audit.ac4",
+            "title": "Given a new unclassified review_status column is added later, when the audit runs, then the test fails until the column is added to one of the three classification sets.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "restore-core",
+        "to": "blocker-refresh",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-core",
+        "to": "restore-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-core",
+        "to": "wire-rebuild",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-core",
+        "to": "noloss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-refresh",
+        "to": "wire-rebuild",
+        "type": "informs"
+      },
+      {
+        "from": "blocker-refresh",
+        "to": "noloss-audit",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-16-PAN-1922-make-pipeline-verdicts-reconstruction-safe-durable-in-github-pr-state-or-the-per-issue-record.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
