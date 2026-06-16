@@ -1,0 +1,45 @@
+{
+  "issueId": "PAN-1920",
+  "schemaVersion": 1,
+  "feedback": [],
+  "pipeline": {
+    "issueId": "PAN-1920",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T14:54:14.696Z",
+    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1924"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 5116,
+            "output": 53,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 5116,
+          "output": 53,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.0043048,
+        "pricingAsOf": "2026-06-16T14:54:14.729Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/panopticon-cli/pull/1924"
+    ],
+    "ranOn": "eltmon-z790"
+  }
+}
