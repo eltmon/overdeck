@@ -90,13 +90,13 @@ Rationale: the primary use case is local sidecars on the same machine as pan. An
 
 External subscribers may only depend on events in the **public catalog**. Events outside this list exist and will be streamed, but may change shape without notice.
 
-| Type                             | Purpose                                      | Payload highlights |
-|----------------------------------|----------------------------------------------|--------------------|
-| `activity.entry`                 | Human-readable activity log line             | `source`, `level`, `message`, `details?`, `issueId?` |
-| `activity.updated`               | Legacy aggregate activity event              | `events[]` (deprecated — prefer `activity.entry`) |
-| `agent.started`                  | Agent lifecycle: started                     | `agentId`, `issueId` |
-| `agent.stopped`                  | Agent lifecycle: stopped                     | `agentId`, `reason` |
-| `agent.output_received`          | Agent stdout lines                           | `agentId`, `lines[]` |
+| Type                             | Purpose                                      | Replayable | Payload highlights |
+|----------------------------------|----------------------------------------------|------------|--------------------|
+| `activity.entry`                 | Human-readable activity log line             | yes        | `source`, `level`, `message`, `details?`, `issueId?` |
+| `activity.updated`               | Legacy aggregate activity event              | yes        | `events[]` (deprecated — prefer `activity.entry`) |
+| `agent.started`                  | Agent lifecycle: started                     | yes        | `agentId`, `issueId` |
+| `agent.stopped`                  | Agent lifecycle: stopped                     | yes        | `agentId`, `reason` |
+| `agent.output_received`          | Agent stdout lines                           | **no — live only** | `agentId`, `lines[]` |
 | `workspace.created`              | Workspace provisioned                        | `issueId`, `path` |
 | `workspace.destroyed`            | Workspace torn down                          | `issueId` |
 | `issue.status_changed`           | Tracker status transition                    | `issueId`, `from`, `to` |
@@ -115,8 +115,9 @@ Canonical schemas live in `packages/contracts/src/events.ts`. The catalog above 
 ## Retention & Replay
 
 - The event store retains events for **7 days** (`src/dashboard/server/event-store.ts`). Replay via `?since=` or `Last-Event-ID` only works within that window. Older sequence numbers receive a `410 Gone`.
+- **`agent.output_received` is live-only.** It is streamed in real time to connected clients, but it is **not persisted** and will **not** appear in `?since=` or `Last-Event-ID` replay. Consumers that need historical terminal output should read the agent's tmux session directly.
 - Consumers that need longer retention must persist their own state.
-- On reconnect with `Last-Event-ID`, the server replays any missed events (up to the retention window) before resuming the live tail, so at-least-once delivery is guaranteed across transient disconnects.
+- On reconnect with `Last-Event-ID`, the server replays any missed events (up to the retention window) before resuming the live tail, so at-least-once delivery is guaranteed across transient disconnects for replayable event types.
 - No deduplication is performed — if a sidecar crashes mid-event, it may receive the same event twice on reconnect. Consumers should be idempotent or track the last `sequence` they processed.
 - **Replay is capped at 1000 events per connection.** If a consumer's gap exceeds the cap, the server skips the oldest events and emits an SSE comment like `: replay truncated, skipped N events` before tailing. The cap exists because `since=0` against a multi-day store would otherwise OOM the dashboard. Bulk historical export should use a pagination API (not yet implemented), not live SSE replay.
 
