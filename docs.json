@@ -125,6 +125,7 @@
             "group": "Reference",
             "pages": [
               "reference/architecture",
+              "reference/state-model",
               "reference/harness-landscape",
               "reference/template-conversations",
               "reference/prompts",
