@@ -1,16 +1,26 @@
 {
   "issueId": "PAN-1920",
   "schemaVersion": 1,
-  "feedback": [],
+  "decisions": [],
+  "hazards": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-16T15:14:15Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1920 (attempt 1/10):\n\nFailed check: build\n\nVerification FAILED at build (28265ms):\n\nℹ\u001b[39m entry: \u001b[34msrc/cli/index.ts, src/index.ts, src/supervisor/server.ts, src/lib/channels/pty-supervisor.ts, src/lib/memory/fts-worker.ts\u001b[39m\n\u001b[34mℹ\u001b[39m target: \u001b[34mnode18\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 486 files\n\n<--- Last few GCs --->\n\n[2593619:0xbad2000]    21832 ms: Scavenge 4049.2 (4133.8) -> 4046.5 (4137.0) MB, pooled: 0 MB, 6.37 / 0.00 ms  (average mu = 0.517, current mu = 0.252) allocation failure; \n[2593619:0xbad2000]    22944 ms: Mark-Compact 4052.3 (4137.0) -> 4039.9 (4152.8) MB, pooled: 1 MB, 1107.94 / 0.00 ms  (average mu = 0.324, current mu = 0.064) allocation failure; scavenge might not succeed\n\n\n<--- JS stacktrace --->\n\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\n----- Native stack trace -----\n\n 1: 0xe40d24 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]\n 2: 0x1216be0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 3: 0x1216eb7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 4: 0x1444875  [node]\n 5: 0x145e109 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node]\n 6: 0x14327b8 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 7: 0x14336e5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 8: 0x140c3be v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node]\n 9: 0x186da1c v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [node]\n10: 0x7e7105e6c476 \nAborted (core dumped)\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1920 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1920 -m \"Fixed build\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
   "pipeline": {
     "issueId": "PAN-1920",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T15:14:15.746Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-06-16T15:14:20.992Z",
+    "reviewNotes": "Verification failed at build",
     "verificationNotes": "Verification FAILED at build (28265ms):\n\nℹ\u001b[39m entry: \u001b[34msrc/cli/index.ts, src/index.ts, src/supervisor/server.ts, src/lib/channels/pty-supervisor.ts, src/lib/memory/fts-worker.ts\u001b[39m\n\u001b[34mℹ\u001b[39m target: \u001b[34mnode18\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 486 files\n\n<--- Last few GCs --->\n\n[2593619:0xbad2000]    21832 ms: Scavenge 4049.2 (4133.8) -> 4046.5 (4137.0) MB, pooled: 0 MB, 6.37 / 0.00 ms  (average mu = 0.517, current mu = 0.252) allocation failure; \n[2593619:0xbad2000]    22944 ms: Mark-Compact 4052.3 (4137.0) -> 4039.9 (4152.8) MB, pooled: 1 MB, 1107.94 / 0.00 ms  (average mu = 0.324, current mu = 0.064) allocation failure; scavenge might not succeed\n\n\n<--- JS stacktrace --->\n\nFATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory\n----- Native stack trace -----\n\n 1: 0xe40d24 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [node]\n 2: 0x1216be0 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 3: 0x1216eb7 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [node]\n 4: 0x1444875  [node]\n 5: 0x145e109 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [node]\n 6: 0x14327b8 v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 7: 0x14336e5 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [node]\n 8: 0x140c3be v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [node]\n 9: 0x186da1c v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [node]\n10: 0x7e7105e6c476 \nAborted (core dumped)\n",
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1924"
   },
@@ -36,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0043048,
-        "pricingAsOf": "2026-06-16T15:14:15.760Z"
+        "pricingAsOf": "2026-06-16T15:14:21.034Z"
       }
     },
     "merges": [
