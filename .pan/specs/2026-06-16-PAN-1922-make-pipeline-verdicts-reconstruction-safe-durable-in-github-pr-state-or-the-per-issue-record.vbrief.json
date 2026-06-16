@@ -4,17 +4,17 @@
     "created": "2026-06-16T20:00:16.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1922: Make pipeline verdicts reconstruction-safe (durable in GitHub PR state or the per-issue record)",
-    "updated": "2026-06-16T20:05:50.465Z"
+    "updated": "2026-06-16T20:27:31.200Z"
   },
   "plan": {
     "id": "pan-1922",
     "title": "Make pipeline verdicts reconstruction-safe (durable in GitHub PR state or the per-issue record)",
-    "status": "proposed",
+    "status": "running",
     "uid": "10e92889-22f0-471c-baa3-986d9479f9cb",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-16T20:00:16.000Z",
-    "updated": "2026-06-16T20:05:50.465Z",
+    "updated": "2026-06-16T20:27:31.200Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1922",
@@ -379,5 +379,5 @@
       "canonicalFilename": "2026-06-16-PAN-1922-make-pipeline-verdicts-reconstruction-safe-durable-in-github-pr-state-or-the-per-issue-record.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
