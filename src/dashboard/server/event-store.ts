@@ -153,14 +153,6 @@ export async function openEventDb(): Promise<DbAdapter> {
         ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
         WHERE json_type(payload, '$.issueId') = 'text'
     `);
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS projection_cache (
-        key        TEXT PRIMARY KEY,
-        data       TEXT NOT NULL,
-        sequence   INTEGER NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    `);
     initWorkspaceDiscoveredSessionsSchema(db as unknown as SqliteDatabase);
     return db as unknown as DbAdapter;
   } else {
@@ -389,10 +381,6 @@ export async function initEventStore(): Promise<EventStore> {
     }
     _store = store;
     setActivityEventStoreProvider(() => store);
-    // Initialize projection cache with same DB connection
-    import('./services/projection-cache.js').then(({ initProjectionCache }) => {
-      initProjectionCache(db);
-    }).catch(() => { /* module not available yet */ });
     return store;
   });
 
