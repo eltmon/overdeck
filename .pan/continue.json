@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1925",
   "created": "2026-06-16T19:49:39.227Z",
-  "updated": "2026-06-16T20:00:13.000Z",
-  "gitState": { "branch": "feature/pan-1925", "sha": "5df8456021", "dirty": false },
+  "updated": "2026-06-16T21:31:00.000Z",
+  "gitState": { "branch": "feature/pan-1925", "sha": "f5a7da9171", "dirty": true },
   "decisions": [
     { "id": "D1", "summary": "Adopt issue Option 1 (preferred): stop persisting agent.output_received durably; emit it stream-only via eventStore.emitOnly() instead of appendAsync(). Rejected Option 2 (per-type shortened retention) — it keeps the write churn.", "recordedAt": "2026-06-16T20:00:13.000Z" },
     { "id": "D2", "summary": "Reuse existing primitives: emitOnly (event-store.ts:304) for stream-only delivery and purgeType (event-store.ts:334) for the one-time cleanup of ~264k existing rows, mirroring the issues.snapshot purge already in initEventStore (event-store.ts:378).", "recordedAt": "2026-06-16T20:00:13.000Z" },
@@ -18,8 +18,32 @@
     { "id": "H4", "summary": "Immediate disk reclaim is runtime-dependent. Under Bun (dev only) auto_vacuum is not set on the event-store's own connection, so incremental_vacuum is a no-op; production is Node 22 only.", "mitigation": "Phrase the reclaim AC for the Node production path (freelist returns to OS). The unit test verifies the PURGE (rows -> 0), not the VACUUM, to avoid fragile auto_vacuum-mode test scaffolding." },
     { "id": "H5", "summary": "No secondary bloat source. mapDomainEventToDetailed (domain-services.ts:188) auto-emits activity.detailed for many event types.", "mitigation": "Verified there is NO agent.output_received case in mapDomainEventToDetailed (returns null) — switching to emitOnly does not strand a secondary persisted activity.detailed stream. No change needed." }
   ],
-  "resumePoint": null,
-  "beadsMapping": {},
+  "resumePoint": {
+    "description": "All beads implemented. Run full quality gates (typecheck, lint, test), commit any remaining changes (including .pan/records/pan-1925.json), push, and call pan done PAN-1925.",
+    "beadId": null,
+    "filesToRead": []
+  },
+  "beadsMapping": {
+    "workspace-2iyoc": "sse-frame-id",
+    "workspace-4wfa7": "emit-only",
+    "workspace-i60qk": "purge-migration"
+  },
+  "statusOverrides": {
+    "sse-frame-id": "completed",
+    "sse-frame-id.ac1": "completed",
+    "sse-frame-id.ac2": "completed",
+    "sse-frame-id.ac3": "completed",
+    "emit-only": "completed",
+    "emit-only.ac1": "completed",
+    "emit-only.ac2": "completed",
+    "emit-only.ac3": "completed",
+    "emit-only.ac4": "completed",
+    "purge-migration": "completed",
+    "purge-migration.ac1": "completed",
+    "purge-migration.ac2": "completed",
+    "purge-migration.ac3": "completed",
+    "purge-migration.ac4": "completed"
+  },
   "agentModel": "agent:claude-opus-4-8",
   "sessionHistory": [
     {
@@ -31,6 +55,24 @@
       "timestamp": "2026-06-16T20:00:13.000Z",
       "reason": "planning",
       "note": "Auto-planning complete: 3-bead plan (emitOnly switch + one-time purge/reclaim + SSE Last-Event-ID safety). Option 1 chosen. All consumers traced; emitOnly path verified end-to-end (server stream, RPC, SSE, frontend coordinator, reducer).",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "timestamp": "2026-06-16T21:23:30.000Z",
+      "reason": "work",
+      "note": "Closed bead workspace-2iyoc (sse-frame-id): exported formatFrame, omit SSE id: line for sequence < 0, updated EXTERNAL-EVENT-STREAM.md to mark agent.output_received live-only, added src/dashboard/server/routes/__tests__/events.test.ts.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "timestamp": "2026-06-16T21:28:00.000Z",
+      "reason": "work",
+      "note": "Closed bead workspace-4wfa7 (emit-only): switched agent-output-service pollOnce from appendAsync to emitOnly, updated agent-output-service.test.ts to assert emitOnly called and appendAsync not called.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "timestamp": "2026-06-16T21:31:00.000Z",
+      "reason": "work",
+      "note": "Closed bead workspace-i60qk (purge-migration): added startup purgeType('agent.output_received') in initEventStore with conditional PRAGMA incremental_vacuum, preserved readFromStmt exclusion list, added event-store-purge-output-received.test.ts.",
       "agentModel": "agent:claude-opus-4-8"
     }
   ],
