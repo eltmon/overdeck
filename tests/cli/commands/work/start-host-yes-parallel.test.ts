@@ -73,6 +73,11 @@ vi.mock('../../../../src/lib/projects.js', () => ({
     projectName: 'Panopticon',
     projectPath: projectRoot,
   })),
+  getProjectSync: vi.fn(() => ({
+    name: 'Panopticon',
+    path: projectRoot,
+    issue_prefix: 'PAN',
+  })),
   hasProjectsSync: vi.fn(() => true),
   listProjectsSync: vi.fn(() => [{ key: 'panopticon', config: { name: 'Panopticon', path: projectRoot } }]),
 }));
@@ -228,6 +233,7 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
       }
       callback(null, { stdout: '', stderr: '' }, '');
     });
+    mocks.readBeadsTasks.mockResolvedValue(beads);
 
     const { issueCommand } = await import('../../../../src/cli/commands/start.js');
     const logs: string[] = [];

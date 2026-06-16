@@ -68,7 +68,8 @@ Panopticon also keeps **search indexes** in SQLite — full-text and semantic se
 
 ## The rules that keep this true
 
-- **All state mutations go through the database API** — never ad-hoc writes to scattered files. The database is the single write surface; the per-issue git record is its durable mirror.
+- **All state mutations go through the database API** — never ad-hoc writes to scattered files. The database is the single write surface; the per-issue git record is its durable mirror. This is enforced mechanically by `scripts/lint-state-writes.sh`, which runs in `npm run lint` and CI.
+- **Legacy continue/feedback/session writers are being routed to the record writer.** A small set of pre-PAN-1919 writers (continue files, feedback files, session JSONL) remain while they are migrated; the guard allowlists them explicitly and fails on any *new* ad-hoc state write.
 - **The database is reconstructable.** A rebuild path walks every workspace + GitHub and repopulates the cache from scratch.
 - **The few facts a workspace can't derive** — an agent's chosen harness/model, pipeline verdicts, retry counters — live in the **per-issue record committed to the feature branch**, so they travel across machines and survive a database loss.
 

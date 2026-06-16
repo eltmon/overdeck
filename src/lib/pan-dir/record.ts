@@ -143,9 +143,13 @@ export function getIssueRecordPathForWorkspace(workspacePath: string, issueId: s
  * (used in tests and non-worktree contexts).
  */
 export function getIssueRecordPath(project: ProjectConfig, issueId: string): string {
+  return join(getIssueRecordBasePath(project, issueId), '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+}
+
+/** Base directory for an issue record: workspace if it exists, else project root. */
+export function getIssueRecordBasePath(project: ProjectConfig, issueId: string): string {
   const workspacePath = getIssueWorkspacePath(issueId);
-  const basePath = workspacePath ?? project.path;
-  return join(basePath, '.pan', RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+  return workspacePath && existsSync(workspacePath) ? workspacePath : project.path;
 }
 
 // ─── Read / write ─────────────────────────────────────────────────────────────
@@ -202,10 +206,10 @@ export function queueIssueRecordCommit(
   issueId: string,
   recordPath: string,
 ): void {
-  const workspacePath = getIssueWorkspacePath(issueId);
+  const basePath = getIssueRecordBasePath(project, issueId);
   queueAutoCommit({
-    projectRoot: workspacePath ?? project.path,
-    repoRoot: workspacePath ?? project.path,
+    projectRoot: basePath,
+    repoRoot: basePath,
     paths: [recordPath],
     subject: `chore(records): update ${issueId.toUpperCase()} per-issue record`,
   });

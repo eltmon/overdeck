@@ -1095,11 +1095,13 @@ export function getAgentStateSync(agentId: string): AgentState | null {
 
   // PAN-1919: harness/model are no longer sourced from state.json. Merge from
   // the per-issue git-tracked record so cross-machine pickup works.
-  const project = resolveProjectForIssue(state.issueId);
-  if (project) {
-    const record = readIssueRecordSync(project, state.issueId);
-    if (record?.harness) state.harness = record.harness;
-    if (record?.model) state.model = record.model;
+  if (state.issueId) {
+    const project = resolveProjectForIssue(state.issueId);
+    if (project) {
+      const record = readIssueRecordSync(project, state.issueId);
+      if (record?.harness) state.harness = record.harness;
+      if (record?.model) state.model = record.model;
+    }
   }
 
   return state;
@@ -1145,7 +1147,7 @@ export function saveAgentStateSync(state: AgentState): void {
   // PAN-1919: mirror harness/model into the per-issue git-tracked record so
   // they travel with the branch. Done synchronously at save time; auto-commit
   // is suppressed here because spawn paths explicitly queue the commit.
-  if (state.harness && state.model) {
+  if (state.issueId && state.harness && state.model) {
     const project = resolveProjectForIssue(state.issueId);
     if (project) {
       try {

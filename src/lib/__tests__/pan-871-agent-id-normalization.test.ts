@@ -72,7 +72,7 @@ vi.mock('../config.js', async (importActual) => ({
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));
 vi.mock('../cliproxy.js', () => ({ CLIPROXY_BASE_URL: 'http://127.0.0.1:8317', getCliproxyClientEnv: vi.fn(() => ({})), bridgeGeminiAuthToCliproxy: vi.fn(() => ({})) }));
 vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), createTracker: vi.fn() }));
-vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), findProjectByPathSync: vi.fn(), getIssuePrefix: vi.fn() }));
+vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), findProjectByPathSync: vi.fn(), getIssuePrefix: vi.fn(), resolveProjectFromIssueSync: vi.fn(() => null), getProjectSync: vi.fn(() => null) }));
 vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));
 vi.mock('../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn() }));
 vi.mock('../database/agents-db.js', () => ({
