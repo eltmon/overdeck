@@ -9,7 +9,7 @@
   "plan": {
     "id": "pan-1908",
     "title": "feat(architecture): event-driven agent state — SQLite runtime registry + git-permanent issue records in the infra repo (big-bang)",
-    "status": "running",
+    "status": "completed",
     "uid": "1f596ba9-7d42-4c7e-8169-3a4da3032f67",
     "author": "agent:claude-opus-4-8",
     "sequence": 6,
