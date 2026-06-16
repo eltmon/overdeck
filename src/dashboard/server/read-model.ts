@@ -371,9 +371,6 @@ export const ReadModelServiceLive = Layer.effect(
   Effect.gen(function* () {
     let state: ReadModelState = { ...INITIAL_READ_MODEL_STATE };
 
-    // Reference to projection cache — set during bootstrap once the event store initializes it
-    let projectionCache: import('./services/projection-cache.js').ProjectionCache | null = null;
-
     function cloneTurnDiffSummaries(summaries: TurnDiffSummary[] | undefined): TurnDiffSummary[] {
       if (!summaries || summaries.length === 0) return [];
       return summaries.map(summary => ({
@@ -424,8 +421,6 @@ export const ReadModelServiceLive = Layer.effect(
 
     const applyEvent = (event: DomainEvent): void => {
       state = applyEventReducer(state, event);
-      // Persist updated projection on every event (debounced inside the cache service)
-      projectionCache?.save(buildSnapshot());
     };
 
     const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
@@ -460,7 +455,6 @@ export const ReadModelServiceLive = Layer.effect(
       const pruned = pruneAgentsForReadSource(state.agentsById, state.issuesRaw);
       if (pruned.prunedCount > 0) {
         state = { ...state, agentsById: pruned.agentsById };
-        projectionCache?.save(buildSnapshot());
         console.log(`[ReadModel] Pruned ${pruned.prunedCount} stale agent${pruned.prunedCount === 1 ? '' : 's'} from read source`);
       }
 
@@ -489,14 +483,10 @@ export const ReadModelServiceLive = Layer.effect(
       // per-issue records). Reconstruction returns agents, runtime snapshots,
       // derived pipeline phases, and review statuses sourced from the git-backed
       // per-issue record. The event log and projection_cache are no longer used
-      // as reconstruction inputs; projection_cache write-through continues below.
+      // as reconstruction inputs.
       const { reconstructCache } = yield* Effect.promise(() =>
         import('../../lib/reconstruct/reconstruct-cache.js'),
       );
-      const { initProjectionCache } = yield* Effect.promise(
-        () => import('./services/projection-cache.js'),
-      );
-      projectionCache = initProjectionCache(getDatabase() as unknown as import('./event-store.js').DbAdapter);
 
       const result = yield* Effect.promise(() => reconstructCache(getDatabase()));
 
@@ -608,7 +598,6 @@ export const ReadModelServiceLive = Layer.effect(
 
           if (reconciled > 0) {
             console.log(`[ReadModel] Reconciled checkpoints for ${reconciled} agent(s)`);
-            projectionCache?.save(buildSnapshot());
           }
         } catch (err) {
           console.warn('[ReadModel] Checkpoint reconciliation failed:', err);
@@ -659,8 +648,6 @@ export const ReadModelServiceLive = Layer.effect(
         issueService.onIssuesChanged((issues) => {
           const cleaned = cleanIssues(issues);
           state = { ...state, issuesRaw: cleaned };
-          // Persist updated snapshot to projection cache
-          projectionCache?.save(buildSnapshot());
 
           // Fan-out issues.snapshot to live WebSocket subscribers via in-memory PubSub.
           // Uses emitOnly (NOT append) — issues.snapshot is ~1.5 MB and must never be

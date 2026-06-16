@@ -17,8 +17,8 @@
  * - `emit()` MUST route through `appendAsync`, never `emitOnly`. emitOnly
  *   assigns sequence=-1 which would regress `updatedAtSequence` and break the
  *   Math.max(state.sequence, event.sequence) invariant in the shared reducer.
- * - `readFileSync` is forbidden — bootstrap uses projection_cache and
- *   `fs.promises.readFile` for the one-time runtime.json migration fallback.
+ * - `readFileSync` is forbidden — bootstrap uses `fs.promises.readFile` for
+ *   the one-time runtime.json migration fallback.
  */
 
 import { Effect, Layer, Context, Stream, SubscriptionRef } from 'effect';
@@ -30,14 +30,12 @@ import type {
   AgentRuntimeSnapshot,
   DomainEvent,
 } from '@panctl/contracts';
-import { initEventStore, getSharedDb } from '../event-store.js';
+import { initEventStore } from '../event-store.js';
 import { getDatabase } from '../../../lib/database/index.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
-
-const AGENT_RUNTIME_KEY_PREFIX = 'agent-runtime:';
 
 /**
  * Event types that affect AgentRuntimeSnapshot. Keep in sync with
@@ -104,22 +102,6 @@ export const AgentStateServiceLive = Layer.effect(
     const store = yield* Effect.promise(() => initEventStore());
     const ref = yield* SubscriptionRef.make<Record<string, AgentRuntimeSnapshot>>({});
 
-    // Prepare projection_cache write-through statement. Same table as the
-    // dashboard snapshot cache (key 'dashboard'), different key prefix:
-    // `agent-runtime:<agentId>`. Keyed by agentId so stopped agents persist past
-    // the 7-day event log compaction — without this the runtime snapshot would
-    // vanish at retention. We no longer bootstrap FROM the cache (PAN-1920);
-    // reconstruction uses state.json + tmux + GitHub sources.
-    const db = getSharedDb();
-    const upsertStmt = db.prepare<void>(
-      `INSERT INTO projection_cache (key, data, sequence, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(key) DO UPDATE SET
-         data = excluded.data,
-         sequence = excluded.sequence,
-         updated_at = excluded.updated_at`,
-    );
-
     // ── Bootstrap from sources (PAN-1920) ───────────────────────────────────
     // Reconstruct runtime snapshots from state.json + tmux in a background fork
     // so the dashboard port binds fast. The merge keeps any live events that
@@ -146,7 +128,7 @@ export const AgentStateServiceLive = Layer.effect(
     // No unsubscribe — the service lives for the whole dashboard process.
     store.subscribe((ev) => {
       if (!isRuntimeEvent(ev)) return;
-      Effect.runFork(applyEventToRef(ref, ev, upsertStmt));
+      Effect.runFork(applyEventToRef(ref, ev));
     });
 
     return {
@@ -163,8 +145,6 @@ export const AgentStateServiceLive = Layer.effect(
 );
 
 // ─── Internals ────────────────────────────────────────────────────────────────
-
-type UpsertStmt = ReturnType<ReturnType<typeof getSharedDb>['prepare']>;
 
 function mergeRuntimeBySequence(
   current: Record<string, AgentRuntimeSnapshot>,
@@ -189,7 +169,6 @@ function mergeRuntimeBySequence(
 function applyEventToRef(
   ref: SubscriptionRef.SubscriptionRef<Record<string, AgentRuntimeSnapshot>>,
   ev: StoredEvent,
-  upsertStmt: UpsertStmt,
 ): Effect.Effect<void> {
   return SubscriptionRef.update(ref, (current) => {
     const fakeState = {
@@ -198,23 +177,6 @@ function applyEventToRef(
     };
     const nextState = applyReducerEvent(fakeState, ev as unknown as DomainEvent);
     const next = nextState.agentRuntimeById;
-
-    for (const [id, snap] of Object.entries(next)) {
-      if (current[id] === snap) continue;
-      try {
-        upsertStmt.run([
-          `${AGENT_RUNTIME_KEY_PREFIX}${id}`,
-          JSON.stringify(snap),
-          snap.updatedAtSequence,
-          new Date().toISOString(),
-        ]);
-      } catch (err) {
-        console.warn(
-          `[AgentStateService] projection_cache upsert failed for ${id}:`,
-          err,
-        );
-      }
-    }
 
     Effect.runSync(setAgentRuntimeMirror(next));
     return next;

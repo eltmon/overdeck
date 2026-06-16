@@ -5059,14 +5059,6 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_agents_issue
       ON agents(issue_id);
 
-    -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
-    CREATE TABLE IF NOT EXISTS projection_cache (
-      key        TEXT PRIMARY KEY,
-      data       TEXT NOT NULL,     -- JSON-serialized DashboardSnapshot
-      sequence   INTEGER NOT NULL,  -- Last event sequence applied
-      updated_at TEXT NOT NULL      -- ISO timestamp
-    );
-
     -- ===== Conversations (PAN-416: Mission Control conversation launcher) =====
     CREATE TABLE IF NOT EXISTS conversations (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5304,7 +5296,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 55`);
+	db.pragma(`user_version = 56`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -5312,7 +5304,7 @@ function initSchema(db) {
 */
 function runMigrations(db, dbPath) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 55) return;
+	if (currentVersion === 56) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -5361,14 +5353,6 @@ function runMigrations(db, dbPath) {
 
       CREATE INDEX IF NOT EXISTS idx_events_timestamp
         ON events(timestamp);
-    `);
-	if (currentVersion < 5) db.exec(`
-      CREATE TABLE IF NOT EXISTS projection_cache (
-        key        TEXT PRIMARY KEY,
-        data       TEXT NOT NULL,
-        sequence   INTEGER NOT NULL,
-        updated_at TEXT NOT NULL
-      );
     `);
 	if (currentVersion < 6) db.exec(`
       CREATE TABLE IF NOT EXISTS conversations (
@@ -6025,7 +6009,8 @@ function runMigrations(db, dbPath) {
 			console.warn("[schema] agents-table backfill failed:", err instanceof Error ? err.message : String(err));
 		}
 	}
-	db.pragma(`user_version = 55`);
+	if (currentVersion < 56) db.exec(`DROP TABLE IF EXISTS projection_cache`);
+	db.pragma(`user_version = 56`);
 }
 //#endregion
 //#region ../../src/lib/database/index.ts

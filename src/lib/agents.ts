@@ -2278,7 +2278,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // ============================================================================
 //
 // Persistence: append-only `events` SQLite table → AgentStateService's
-// SubscriptionRef → projection_cache rows keyed 'agent-runtime:<id>'.
+// SubscriptionRef. The projection_cache write-through was removed in PAN-1847.
 //
 // Writes: emitAgentEvent POSTs to /api/agents/:id/heartbeat. Reads: in-process
 // lib uses getRuntimeSnapshot (Effect-native); CLI/out-of-process uses
