@@ -1,0 +1,58 @@
+{
+  "issueId": "PAN-1498",
+  "schemaVersion": 1,
+  "decisions": [],
+  "hazards": [],
+  "feedback": [],
+  "pipeline": {
+    "issueId": "PAN-1498",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "inspectStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T01:08:11.030Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "inspectNotes": "Spec fidelity and constraint compliance passed for bead workspace-k8qiq.",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-06-14T15:20:06.426Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1811",
+    "lastVerifiedCommit": "4307e94f4cd9038d78624fdbb2bfd8980c1bb4de"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 66,
+            "output": 3115,
+            "cacheRead": 1210622,
+            "cacheWrite": 103508
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 66,
+          "output": 3115,
+          "cacheRead": 1210622,
+          "cacheWrite": 103508
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.266088,
+        "pricingAsOf": "2026-06-16T01:08:12.642Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/panopticon-cli/pull/1811"
+    ],
+    "ranOn": "eltmon-z790"
+  }
+}

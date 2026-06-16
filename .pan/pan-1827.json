@@ -1,0 +1,69 @@
+{
+  "issueId": "PAN-1827",
+  "schemaVersion": 1,
+  "feedback": [],
+  "pipeline": {
+    "issueId": "PAN-1827",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T01:08:11.030Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "testNotes": "Ran npm run typecheck, npm run lint, npm run test. All gates passed: 605 test files, 6349 tests passed (51 skipped). Pi resolver regression tests verified: resolvePiSessionPath implementation, pi harness dispatch before claude fallback, strike-/inspect- prefix guard in /messages fallback, codex/claude-code regression coverage. All acceptance criteria met.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-16T00:57:53.741Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1858",
+    "lastVerifiedCommit": "197e3b49ab63d07f19c5041d936a868b147a7374"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 20092,
+            "output": 54583,
+            "cacheRead": 6423188,
+            "cacheWrite": 191225
+          }
+        },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 224,
+            "output": 8402,
+            "cacheRead": 2547922,
+            "cacheWrite": 341807
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 20092,
+          "output": 54583,
+          "cacheRead": 6423188,
+          "cacheWrite": 191225
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 224,
+          "output": 8402,
+          "cacheRead": 2547922,
+          "cacheWrite": 341807
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.596072,
+        "pricingAsOf": "2026-06-16T01:08:12.220Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/panopticon-cli/pull/1858"
+    ],
+    "ranOn": "eltmon-z790"
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "issueId": "PAN-1775",
+  "schemaVersion": 1,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Fix-cycle plan, not a re-plan: the feature is already implemented on feature/pan-1775 (core commit 441eeecbc) with open PR #1786 and green CI. Review cycle 3 blocked on one finding. The work agent commits fixes onto the existing branch; do not recreate or restructure the merged-in implementation.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Resolve the blocking finding by untracking BOTH workspace working copies with `git rm --cached .pan/continue.json .pan/spec.vbrief.json` in a NEW commit. Planning discovered .pan/spec.vbrief.json is tracked too (same PAN-1073 invariant, also carrying foreign PAN-1788 content, inherited from the merge-base so absent from the PR diff). No history rewrite, no .gitignore edits (both already ignored at lines 59-60 and 120/123), files stay on disk as workspace runtime state.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Fix the demoted correctness finding: in fetchProjectSessionTree (src/dashboard/server/routes/projects.ts:471-542), seed feature candidates from listActiveRemoteAgentStates() (src/lib/remote/remote-agents.ts:82) in addition to the workspaces/feature-* scan. Use the dynamic-import + try/catch pattern from src/dashboard/server/services/resource-discovery.ts:507-521. Filter to the requested project (resolve state.issueId to a project and compare with project.key) and dedupe by issueLower against workspace-scan candidates.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Out of scope: the 5s remote-output polling cadence in SessionPanel.tsx RemoteSessionOutput (performance reviewer classified it acceptable and non-blocking), any interactive remote terminal bridge, and changes to collectSessionTreeNodes synthesis.",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Completion path: after both beads pass quality gates (npm run typecheck, npm run lint, npm test), follow the review synthesis instruction — commit, then `pan review request PAN-1775 -m \"Fixed review issues\"` (pan done handles rebase/push/PR submission).",
+      "recordedAt": "2026-06-12T20:21:00Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": ".pan/continue.json AND .pan/spec.vbrief.json are currently TRACKED on the branch; planning tooling overwrites their content (the bootstrap replaced foreign PAN-1788 state with PAN-1775 state). Any broad `git add` before the untrack bead lands will re-commit them. Beware: `git check-ignore` reports them as NOT ignored while tracked — gitignore patterns do not apply to tracked files; this is expected and resolves after `git rm --cached`.",
+      "mitigation": "Land the untrack bead first. After every commit, verify `git ls-files -- .pan/continue.json .pan/spec.vbrief.json` returns nothing."
+    },
+    {
+      "id": "H2",
+      "summary": "origin/main no longer tracks .pan/continue.json, so the pre-merge rebase can hit a modify/delete conflict on this path.",
+      "mitigation": "Resolve in favor of deletion from the index (accept main's removal); the on-disk file is untouched."
+    },
+    {
+      "id": "H3",
+      "summary": "Review convergence gate: editing src/dashboard/server/routes/projects.ts in this cycle makes the previously demoted 'remote-only agents excluded from session tree' finding promotable to a blocker in cycle 4.",
+      "mitigation": "The remote-candidate seeding bead must fully resolve that finding, with a unit test proving the no-local-workspace case."
+    },
+    {
+      "id": "H4",
+      "summary": "For remote-only candidates, collectSessionTreeNodes receives a workspacePath that does not exist on disk. Its internals tolerate missing paths (readOptional/pathExists guards), but resolveJsonlPath and getSessionTreeWorkspacePath must not throw on a nonexistent directory.",
+      "mitigation": "The unit test must exercise exactly this path: active remote-state.json, no workspaces/feature-<issue> directory."
+    },
+    {
+      "id": "H5",
+      "summary": "A prior minimal auto-start spec for PAN-1775 (2026-06-11) exists in .pan/specs/ on main, and old continue state recorded its 'auto-start' bead as completed.",
+      "mitigation": "pan plan finalize owns spec promotion and bead creation deterministically; never hand-run bd create or hand-edit the old spec."
+    }
+  ],
+  "feedback": [],
+  "pipeline": {
+    "issueId": "PAN-1775",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T01:08:11.030Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-16T00:57:53.741Z"
+      }
+    ],
+    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1786",
+    "lastVerifiedCommit": "1929ddf158f1729d2838304330ffad1c988b7624"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 2597,
+            "output": 5998,
+            "cacheRead": 2494885,
+            "cacheWrite": 122148
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 2597,
+          "output": 5998,
+          "cacheRead": 2494885,
+          "cacheWrite": 122148
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.434759,
+        "pricingAsOf": "2026-06-16T01:08:12.642Z"
+      }
+    },
+    "merges": [
+      "https://github.com/eltmon/panopticon-cli/pull/1786"
+    ],
+    "ranOn": "eltmon-z790"
+  }
+}
