@@ -130,11 +130,10 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
           },
         }
 
-        try {
-          await eventStore.appendAsync(event as never)
-        } catch {
-          // Non-fatal — event store may not be initialized yet at startup
-        }
+        // Terminal output is ephemeral per the state model: it is reconstructable
+        // from the agent's tmux session, so emit it in-memory only rather than
+        // persisting it to the events table.
+        eventStore.emitOnly(event as never)
       },
       catch: (cause) => cause,
     })),
