@@ -360,7 +360,8 @@ export type AgentResolutionChangedEvent = typeof AgentResolutionChangedEvent.Typ
 
 /**
  * Bootstrap-only event emitted by AgentStateService when it seeds a runtime
- * snapshot from projection_cache. Not emitted by hooks.
+ * snapshot during bootstrap (reconstruction from sources, PAN-1920). Not
+ * emitted by hooks.
  */
 export const AgentStateRestoredEvent = Schema.Struct({
   type: Schema.Literal("agent.state_restored"),

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1847",
   "created": "2026-06-16T15:35:46.876Z",
-  "updated": "2026-06-16T17:45:00.000Z",
+  "updated": "2026-06-16T17:50:00.000Z",
   "gitState": { "branch": "feature/pan-1847", "sha": "7320a378a5", "dirty": true },
   "agentModel": "agent:claude-opus-4-8",
   "decisions": [
@@ -21,9 +21,9 @@
     { "id": "H5", "summary": "The v55->v56 DROP runs on the live 1.4 GB DB. DROP of a ~2 MB table is fast and within a normal migration; a pre-v55 file snapshot already exists (panopticon.db.v54-backfill-snapshot).", "mitigation": "DROP TABLE IF EXISTS is a no-op if absent; no full VACUUM (D3). Migration tests from v52/53/54 must reach user_version=56 green." }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-bynce (add regression test locking projection_cache deletion). New test file tests/unit/dashboard/server/projection-cache-removed.test.ts passes. Stage, commit, close the bead, then advance to the next unblocked bead.",
-    "beadId": "workspace-bynce",
-    "filesToRead": ["tests/unit/dashboard/server/projection-cache-removed.test.ts"]
+    "description": "Implementing bead workspace-ypqx1 (update stale comments that describe projection_cache as a live path). Updated comments in src/lib/agent-runtime.ts, src/lib/agents.ts, and packages/contracts/src/events.ts. Typecheck and lint pass. Stage, commit, close the bead, then run the full relevant test suite and pan done pan-1847.",
+    "beadId": "workspace-ypqx1",
+    "filesToRead": ["src/lib/agent-runtime.ts", "src/lib/agents.ts", "packages/contracts/src/events.ts"]
   },
   "beadsMapping": {},
   "sessionHistory": [
@@ -73,6 +73,12 @@
       "timestamp": "2026-06-16T17:45:00.000Z",
       "reason": "work",
       "note": "Completed bead workspace-bynce: added tests/unit/dashboard/server/projection-cache-removed.test.ts with assertions that a fresh DB via runMigrations has no projection_cache table and that dashboard server source files contain no initProjectionCache, .save(buildSnapshot, or services/projection-cache references. Test passes.",
+      "agentModel": "agent:pi:kimi-k2.7-code"
+    },
+    {
+      "timestamp": "2026-06-16T17:50:00.000Z",
+      "reason": "work",
+      "note": "Completed bead workspace-ypqx1: updated stale comments in src/lib/agent-runtime.ts, src/lib/agents.ts, and packages/contracts/src/events.ts that described projection_cache as a live persistence path. No functional code changed. Typecheck and lint pass.",
       "agentModel": "agent:pi:kimi-k2.7-code"
     }
   ],

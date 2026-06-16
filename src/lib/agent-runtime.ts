@@ -3,8 +3,8 @@
  *
  * Every caller that previously read/wrote ~/.panopticon/agents/<id>/runtime.json
  * now goes through this module. There is no file fallback: the dashboard's
- * AgentStateService (SubscriptionRef + projection_cache) is the single source
- * of truth. CLI and lib modules that need runtime state hit the HTTP API.
+ * AgentStateService SubscriptionRef is the single source of truth for runtime
+ * snapshots. CLI and lib modules that need runtime state hit the HTTP API.
  * Server-reachable code inside the dashboard process yields AgentStateService
  * directly (zero-roundtrip) — this module is for everything else.
  */
