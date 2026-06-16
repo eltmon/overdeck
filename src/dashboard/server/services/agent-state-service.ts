@@ -141,59 +141,46 @@ export const AgentStateServiceLive = Layer.effect(
       return seed;
     };
 
-    // ── Subscribe forward FIRST ───────────────────────────────────────────────
-    // Subscribing before the background seed (below) guarantees no live event is
-    // missed while the cache loads. No unsubscribe — the service lives for the
-    // whole dashboard process. The reducer's Math.max(sequence) invariant makes
-    // per-agent application order-independent.
+    const initial = seedFromCache();
+    let maxCachedSequence = 0;
+    if (Object.keys(initial).length > 0) {
+      for (const snap of Object.values(initial)) {
+        if (snap.updatedAtSequence > maxCachedSequence) maxCachedSequence = snap.updatedAtSequence;
+      }
+      yield* SubscriptionRef.set(ref, initial);
+      yield* setAgentRuntimeMirror(initial);
+      console.log(
+        `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache (seq=${maxCachedSequence})`,
+      );
+    }
+
+    // ── Replay runtime events NEWER than the cache ────────────────────────────
+    // Covers events that appended after the last projection_cache upsert (e.g.
+    // server crash before a fold committed). Starting from maxCachedSequence
+    // avoids redundantly replaying the entire 7-day event log (~14k events
+    // observed in practice) — the projection_cache already captured those.
+    try {
+      const stored = store.readFrom(maxCachedSequence);
+      let replayed = 0;
+      for (const ev of stored) {
+        if (isRuntimeEvent(ev)) {
+          yield* applyEventToRef(ref, ev, upsertStmt);
+          replayed++;
+        }
+      }
+      if (replayed > 0) {
+        console.log(`[AgentStateService] Replayed ${replayed} runtime event(s) from event log`);
+      }
+    } catch (err) {
+      console.warn('[AgentStateService] event-log replay failed:', err);
+    }
+
+    // ── Subscribe forward ────────────────────────────────────────────────────
+    // No unsubscribe — the service lives for the whole dashboard process.
     store.subscribe((ev) => {
       if (!isRuntimeEvent(ev)) return;
       Effect.runFork(applyEventToRef(ref, ev, upsertStmt));
     });
-
-    // ── Seed from projection_cache + replay — IN THE BACKGROUND (PAN-1847) ─────
-    // Loading ~12k snapshots used to run during layer construction, blocking the
-    // HTTP listener for ~100s of cold start. Forking it off the construction path
-    // lets the port bind in seconds; the runtime map fills in a moment later.
-    // Readers see a warming (possibly empty) map until then — every dashboard
-    // surface already polls/streams, so it converges with no operator action.
-    //
-    // Because live events may land during the seed, the cache is merged by
-    // sequence (mergeBySequence) rather than wholesale-replacing the ref: a
-    // cached snapshot only wins if no fresher live event already wrote that
-    // agent. The post-cache replay covers events appended after the last cache
-    // upsert (e.g. a crash before a fold committed), starting at
-    // maxCachedSequence to avoid re-folding the whole ~7-day event log.
-    const seedAndReplay = Effect.gen(function* () {
-      const initial = seedFromCache();
-      let maxCachedSequence = 0;
-      if (Object.keys(initial).length > 0) {
-        for (const snap of Object.values(initial)) {
-          if (snap.updatedAtSequence > maxCachedSequence) maxCachedSequence = snap.updatedAtSequence;
-        }
-        yield* SubscriptionRef.update(ref, (current) => mergeBySequence(current, initial));
-        yield* setAgentRuntimeMirror(yield* SubscriptionRef.get(ref));
-        console.log(
-          `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache (seq=${maxCachedSequence})`,
-        );
-      }
-      try {
-        const stored = store.readFrom(maxCachedSequence);
-        let replayed = 0;
-        for (const ev of stored) {
-          if (isRuntimeEvent(ev)) {
-            yield* applyEventToRef(ref, ev, upsertStmt);
-            replayed++;
-          }
-        }
-        if (replayed > 0) {
-          console.log(`[AgentStateService] Replayed ${replayed} runtime event(s) from event log`);
-        }
-      } catch (err) {
-        console.warn('[AgentStateService] event-log replay failed:', err);
-      }
-    });
-    yield* Effect.forkDaemon(seedAndReplay);
 
     return {
       get: (id) =>
@@ -211,27 +198,6 @@ export const AgentStateServiceLive = Layer.effect(
 // ─── Internals ────────────────────────────────────────────────────────────────
 
 type UpsertStmt = ReturnType<ReturnType<typeof getSharedDb>['prepare']>;
-
-/**
- * Merge cached snapshots into the current (possibly live-event-populated) map.
- * A live event that already landed during background seeding wins — the cached
- * snapshot is adopted only when strictly newer than what is already present.
- * This makes the deferred projection_cache seed safe against the live event
- * subscription running concurrently (PAN-1847).
- */
-function mergeBySequence(
-  current: Record<string, AgentRuntimeSnapshot>,
-  seed: Record<string, AgentRuntimeSnapshot>,
-): Record<string, AgentRuntimeSnapshot> {
-  const merged = { ...current };
-  for (const [id, snap] of Object.entries(seed)) {
-    const existing = merged[id];
-    if (!existing || snap.updatedAtSequence > existing.updatedAtSequence) {
-      merged[id] = snap;
-    }
-  }
-  return merged;
-}
 
 function applyEventToRef(
   ref: SubscriptionRef.SubscriptionRef<Record<string, AgentRuntimeSnapshot>>,
