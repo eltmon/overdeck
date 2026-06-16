@@ -31,6 +31,7 @@ import type {
   DomainEvent,
 } from '@panctl/contracts';
 import { initEventStore, getSharedDb } from '../event-store.js';
+import { getDatabase } from '../../../lib/database/index.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
 
@@ -103,10 +104,12 @@ export const AgentStateServiceLive = Layer.effect(
     const store = yield* Effect.promise(() => initEventStore());
     const ref = yield* SubscriptionRef.make<Record<string, AgentRuntimeSnapshot>>({});
 
-    // Prepare projection_cache statements. Same table as the dashboard snapshot
-    // cache (key 'dashboard'), different key prefix: `agent-runtime:<agentId>`.
-    // Keyed by agentId so stopped agents persist past the 7-day event log
-    // compaction — without this the runtime snapshot would vanish at retention.
+    // Prepare projection_cache write-through statement. Same table as the
+    // dashboard snapshot cache (key 'dashboard'), different key prefix:
+    // `agent-runtime:<agentId>`. Keyed by agentId so stopped agents persist past
+    // the 7-day event log compaction — without this the runtime snapshot would
+    // vanish at retention. We no longer bootstrap FROM the cache (PAN-1920);
+    // reconstruction uses state.json + tmux + GitHub sources.
     const db = getSharedDb();
     const upsertStmt = db.prepare<void>(
       `INSERT INTO projection_cache (key, data, sequence, updated_at)
@@ -116,64 +119,28 @@ export const AgentStateServiceLive = Layer.effect(
          sequence = excluded.sequence,
          updated_at = excluded.updated_at`,
     );
-    const loadAllStmt = db.prepare<{ key: string; data: string; sequence: number }>(
-      `SELECT key, data, sequence FROM projection_cache WHERE key LIKE ?`,
-    );
 
-    // ── Bootstrap from projection_cache ──────────────────────────────────────
-    const seedFromCache = (): Record<string, AgentRuntimeSnapshot> => {
-      const seed: Record<string, AgentRuntimeSnapshot> = {};
-      try {
-        const rows = loadAllStmt.all([`${AGENT_RUNTIME_KEY_PREFIX}%`]);
-        for (const row of rows) {
-          try {
-            const snap = JSON.parse(row.data) as AgentRuntimeSnapshot;
-            if (snap && typeof snap.id === 'string') {
-              seed[snap.id] = snap;
-            }
-          } catch {
-            // skip malformed row
-          }
-        }
-      } catch (err) {
-        console.warn('[AgentStateService] projection_cache bootstrap failed:', err);
-      }
-      return seed;
-    };
-
-    const initial = seedFromCache();
-    let maxCachedSequence = 0;
-    if (Object.keys(initial).length > 0) {
-      for (const snap of Object.values(initial)) {
-        if (snap.updatedAtSequence > maxCachedSequence) maxCachedSequence = snap.updatedAtSequence;
-      }
-      yield* SubscriptionRef.set(ref, initial);
-      yield* setAgentRuntimeMirror(initial);
-      console.log(
-        `[AgentStateService] Bootstrapped ${Object.keys(initial).length} runtime snapshot(s) from projection_cache (seq=${maxCachedSequence})`,
+    // ── Bootstrap from sources (PAN-1920) ───────────────────────────────────
+    // Reconstruct runtime snapshots from state.json + tmux in a background fork
+    // so the dashboard port binds fast. The merge keeps any live events that
+    // arrived during the fork (they have a higher sequence than reconstruction).
+    const seedFromSources = Effect.gen(function* () {
+      const { reconstructCache } = yield* Effect.promise(() =>
+        import('../../../lib/reconstruct/reconstruct-cache.js'),
       );
-    }
-
-    // ── Replay runtime events NEWER than the cache ────────────────────────────
-    // Covers events that appended after the last projection_cache upsert (e.g.
-    // server crash before a fold committed). Starting from maxCachedSequence
-    // avoids redundantly replaying the entire 7-day event log (~14k events
-    // observed in practice) — the projection_cache already captured those.
-    try {
-      const stored = store.readFrom(maxCachedSequence);
-      let replayed = 0;
-      for (const ev of stored) {
-        if (isRuntimeEvent(ev)) {
-          yield* applyEventToRef(ref, ev, upsertStmt);
-          replayed++;
-        }
+      const result = yield* Effect.promise(() => reconstructCache(getDatabase()));
+      const seeded = result.agentRuntimeById;
+      if (Object.keys(seeded).length > 0) {
+        yield* SubscriptionRef.update(ref, (current) =>
+          mergeRuntimeBySequence(current, seeded),
+        );
+        yield* setAgentRuntimeMirror(yield* SubscriptionRef.get(ref));
+        console.log(
+          `[AgentStateService] Bootstrapped ${Object.keys(seeded).length} runtime snapshot(s) from sources`,
+        );
       }
-      if (replayed > 0) {
-        console.log(`[AgentStateService] Replayed ${replayed} runtime event(s) from event log`);
-      }
-    } catch (err) {
-      console.warn('[AgentStateService] event-log replay failed:', err);
-    }
+    });
+    yield* Effect.forkDetach(seedFromSources);
 
     // ── Subscribe forward ────────────────────────────────────────────────────
     // No unsubscribe — the service lives for the whole dashboard process.
@@ -198,6 +165,26 @@ export const AgentStateServiceLive = Layer.effect(
 // ─── Internals ────────────────────────────────────────────────────────────────
 
 type UpsertStmt = ReturnType<ReturnType<typeof getSharedDb>['prepare']>;
+
+function mergeRuntimeBySequence(
+  current: Record<string, AgentRuntimeSnapshot>,
+  reconstructed: Record<string, AgentRuntimeSnapshot>,
+): Record<string, AgentRuntimeSnapshot> {
+  const merged: Record<string, AgentRuntimeSnapshot> = { ...reconstructed };
+  for (const [id, snap] of Object.entries(current)) {
+    const recon = reconstructed[id];
+    if (!recon) {
+      merged[id] = snap;
+      continue;
+    }
+    const currentSeq = snap.updatedAtSequence ?? -1;
+    const reconSeq = recon.updatedAtSequence ?? 0;
+    if (currentSeq >= reconSeq) {
+      merged[id] = snap;
+    }
+  }
+  return merged;
+}
 
 function applyEventToRef(
   ref: SubscriptionRef.SubscriptionRef<Record<string, AgentRuntimeSnapshot>>,

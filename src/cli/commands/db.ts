@@ -78,6 +78,11 @@ export function registerDbCommands(program: Command): void {
     .option('--verbose', 'Log each processed agent')
     .action(rebuildAgentsCommand);
 
+  db.command('rebuild')
+    .description('Reconstruct the dashboard cache from git + GitHub sources (PAN-1920)')
+    .option('--verbose', 'Log each enumerated issue and agent')
+    .action(rebuildCommand);
+
   db.command('backfill-records')
     .description('Backfill per-issue permanent records into the infra repo (PAN-1908)')
     .option('--issue-id <id>', 'Backfill only this issue')
@@ -650,6 +655,25 @@ async function rebuildAgentsCommand(options: {
     );
   } catch (error: any) {
     spinner.fail(`Rebuild failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function rebuildCommand(options: { verbose?: boolean }): Promise<void> {
+  const spinner = ora('Reconstructing cache from git + GitHub sources...').start();
+
+  try {
+    const db = getDatabase();
+    const { reconstructCache } = await import('../../lib/reconstruct/reconstruct-cache.js');
+    const r = await reconstructCache(db, { verbose: options.verbose });
+    const phases = Object.entries(r.phaseCounts)
+      .map(([p, n]) => `${p}=${n}`)
+      .join(' ');
+    spinner.succeed(
+      `Reconstructed: ${r.issuesEnumerated} in-flight issue(s), ${r.agentsRebuilt} agent(s); phases ${phases}`,
+    );
+  } catch (error: any) {
+    spinner.fail(`Reconstruct failed: ${error.message}`);
     process.exitCode = 1;
   }
 }

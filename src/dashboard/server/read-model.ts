@@ -12,6 +12,8 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect, Layer, Context } from 'effect';
+import { getSharedDb } from './event-store.js';
+import { getDatabase } from '../../lib/database/index.js';
 import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@panctl/contracts';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import {
@@ -483,276 +485,46 @@ export const ReadModelServiceLive = Layer.effect(
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
-      const { loadReviewStatuses } = yield* Effect.promise(
-        () => import('../../lib/review-status.js'),
+      // PAN-1920: bootstrap from durable sources (state.json + tmux + GitHub +
+      // per-issue records). Reconstruction returns agents, runtime snapshots,
+      // derived pipeline phases, and review statuses sourced from the git-backed
+      // per-issue record. The event log and projection_cache are no longer used
+      // as reconstruction inputs; projection_cache write-through continues below.
+      const { reconstructCache } = yield* Effect.promise(() =>
+        import('../../lib/reconstruct/reconstruct-cache.js'),
       );
+      const { getProjectionCache } = yield* Effect.promise(
+        () => import('./services/projection-cache.js'),
+      );
+      projectionCache = getProjectionCache();
 
-      // ── Fast path: projection cache ──────────────────────────────────────────
-      // Try to load the full snapshot from SQLite — sub-millisecond if available.
-      // Falls back to the slow lib-module path on first boot or corruption.
-      let usedProjectionCache = false;
+      const result = yield* Effect.promise(() => reconstructCache(getDatabase()));
+
+      // ── Sequence from event store (labels the snapshot, not a replay source) ─
+      let sequence = 0;
       try {
-        const { getProjectionCache } = yield* Effect.promise(
-          () => import('./services/projection-cache.js'),
+        const { getEventStore } = yield* Effect.promise(
+          () => import('./event-store.js'),
         );
-        projectionCache = getProjectionCache();
-        const cached = projectionCache.load();
-        if (cached && cached.sequence > 0) {
-          // PAN-1908: validate cached agents against the SQLite agents table,
-          // not the filesystem. Agents that were wiped while the server was down
-          // no longer have a row; agents created after the last cache save will
-          // be picked up by listRunningAgents below.
-          const liveAgentIds = new Set(listAllAgents().map(a => a.id));
-          const validAgents = (cached.agents ?? []).filter((a: any) => liveAgentIds.has(a.id));
-          const pruned = (cached.agents ?? []).length - validAgents.length;
-          if (pruned > 0) {
-            console.log(`[ReadModel] Pruned ${pruned} stale agents from projection cache`);
-          }
-
-          const allAgents = validAgents;
-
-          // Reconcile cached agent statuses against ground truth (SQLite agents table + tmux).
-          // The projection cache may be stale if an agent's tmux session died while
-          // the server was down — the cache still says 'running' but the agents table says
-          // 'stopped'. Without this step the dashboard shows incorrect action buttons.
-          const { listRunningAgents: listRunningForReconcile } = yield* Effect.promise(
-            () => import('../../lib/agents.js'),
-          );
-          const groundTruthAgents = yield* listRunningForReconcile();
-          const cachedAgentById = new Map(allAgents.map((a: any) => [a.id, a]));
-          const agentsById: Record<string, AgentSnapshot> = {};
-          for (const a of groundTruthAgents) {
-            const cachedAgent = cachedAgentById.get(a.id);
-            let reconciled = a.status as AgentStatus | string;
-            if (a.tmuxActive && a.status === 'stopped') {
-              reconciled = 'running';
-              logDeaconEventSync(`readModel cache-reconcile: ${a.id} stopped→running (tmux session alive, resumed outside API)`);
-            } else if (!a.tmuxActive && a.status === 'running') {
-              reconciled = 'stopped';
-              logDeaconEventSync(`readModel cache-reconcile: ${a.id} running→stopped (tmux session dead, likely reboot/crash)`);
-            }
-            if (cachedAgent && cachedAgent.status !== toAgentStatus(reconciled)) {
-              console.log(`[ReadModel] Reconciled ${a.id}: ${cachedAgent.status} → ${reconciled} (tmux=${a.tmuxActive}, state=${a.status})`);
-            }
-            agentsById[a.id] = {
-              ...cachedAgent,
-              id: a.id,
-              issueId: a.issueId,
-              workspace: a.workspace || undefined,
-              // PAN-1048 review feedback 004 (C3): AgentState carries `harness`,
-              // not `runtime`. The snapshot field consumed by getHarness() is
-              // `runtime` (packages/contracts/src/types.ts:54-60). Without this
-              // mapping, every Pi agent rendered as Claude Code in the
-              // dashboard because runtime defaulted to undefined → claude-code.
-              // The legacy `runtime` field is read first for backward compat
-              // with state.json files written before the rename.
-              runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
-              model: a.model || undefined,
-              status: toAgentStatus(reconciled),
-              startedAt: a.startedAt || undefined,
-              lastActivity: a.lastActivity || undefined,
-              branch: a.branch || undefined,
-              costSoFar: a.costSoFar,
-              sessionId: a.sessionId || undefined,
-              role: toRole((a as { role?: unknown }).role),
-              hasLiveTmuxSession: a.tmuxActive,
-              stoppedByUser: a.stoppedByUser,
-              paused: a.paused,
-              pausedReason: a.pausedReason,
-              pausedAt: a.pausedAt,
-              troubled: a.troubled,
-              troubledAt: a.troubledAt,
-              consecutiveFailures: a.consecutiveFailures,
-              firstFailureInRunAt: a.firstFailureInRunAt,
-              lastFailureAt: a.lastFailureAt,
-              lastFailureReason: a.lastFailureReason,
-              lastFailureNextRetryAt: a.lastFailureNextRetryAt,
-              runtimeState: cachedAgent?.runtimeState,
-              // PAN-1591 — clear pending-input for non-live agents (the spread of
-              // `...cachedAgent` above carries stale fields; this overrides them).
-              ...projectPendingInput(toAgentStatus(reconciled), {
-                hasPendingQuestion: cachedAgent?.hasPendingQuestion,
-                pendingQuestionCount: cachedAgent?.pendingQuestionCount,
-                pendingQuestionPrompt: cachedAgent?.pendingQuestionPrompt,
-                pendingQuestionReason: cachedAgent?.pendingQuestionReason,
-                pendingInputCount: cachedAgent?.pendingInputCount,
-                pendingInputKinds: cachedAgent?.pendingInputKinds,
-                pendingAskUserQuestion: cachedAgent?.pendingAskUserQuestion,
-              }),
-              resolution: cachedAgent?.resolution,
-              resolutionCount: cachedAgent?.resolutionCount,
-            };
-          }
-
-          const statusMap = loadReviewStatuses();
-          const cachedMemory = cached.memory as Partial<ReadModelState> | undefined;
-          state = {
-            ...INITIAL_READ_MODEL_STATE,
-            sequence: cached.sequence,
-            agentsById,
-            // PAN-1048 — specialistsByName projection retired; consumers derive
-            // from agentsById filtered by role.
-            reviewStatusByIssueId: Object.fromEntries(
-              Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
-            ),
-            issuesRaw: [...(cached.issues ?? [])] as unknown[],
-            resources: (cached.resources as ResourceStats | null) ?? null,
-            observationsByIssueId: cachedMemory?.observationsByIssueId ?? INITIAL_READ_MODEL_STATE.observationsByIssueId,
-            statusByIssueId: cachedMemory?.statusByIssueId ?? INITIAL_READ_MODEL_STATE.statusByIssueId,
-            rollupsByIssueId: cachedMemory?.rollupsByIssueId ?? INITIAL_READ_MODEL_STATE.rollupsByIssueId,
-            resetMarkersByScopeId: cachedMemory?.resetMarkersByScopeId ?? INITIAL_READ_MODEL_STATE.resetMarkersByScopeId,
-            healthByIssueId: cachedMemory?.healthByIssueId ?? INITIAL_READ_MODEL_STATE.healthByIssueId,
-          };
-          usedProjectionCache = true;
-          console.log(
-            `[ReadModel] Fast bootstrap from projection cache: seq=${cached.sequence}, ` +
-            `agents=${allAgents.length} (${validAgents.length} cached), issues=${(cached.issues ?? []).length}`,
-          );
-        }
+        sequence = getEventStore().getLatestSequence();
       } catch {
-        // Projection cache not initialized yet (first boot) — fall through to slow path
+        // Event store may not be initialized yet
       }
 
-      // ── Slow path: bootstrap from lib modules ────────────────────────────────
-      if (!usedProjectionCache) {
-        // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgents, warnOnBareNumericIssueIds }, { getReviewStatusSync }, { computeAgentEnrichment }] =
-          yield* Effect.all([
-            Effect.promise(() => import('../../lib/agents.js')),
-            Effect.promise(() => import('../../lib/review-status.js')),
-            Effect.promise(() => import('../../lib/agent-enrichment.js')),
-          ]);
+      state = {
+        ...INITIAL_READ_MODEL_STATE,
+        sequence,
+        agentsById: result.agentsById,
+        reviewStatusByIssueId: result.reviewStatusByIssueId,
+        issuesRaw: [],
+      };
 
-        // Warn on legacy state files with bare numeric issueIds (PAN-489).
-        // PAN-1048 P2: async to avoid blocking the dashboard event loop on
-        // startup while it scans agent state files and kills stale tmux.
-        yield* Effect.promise(() => warnOnBareNumericIssueIds());
-
-        // ── Agents ────────────────────────────────────────────────────────────
-        const running = yield* listRunningAgents();
-        const agentsById: Record<string, AgentSnapshot> = {};
-
-        // Compute enrichment for all agents in parallel during bootstrap
-        // so the initial snapshot already has badges/buttons data (no 3s gap).
-        const enrichmentResults = yield* Effect.promise(() =>
-          Promise.all(
-            running.map(async (a) => {
-              const reviewStatus = getReviewStatusSync(a.issueId)
-              const hasActiveSpecialist =
-                reviewStatus?.reviewStatus === 'reviewing' ||
-                reviewStatus?.testStatus === 'testing' ||
-                reviewStatus?.mergeStatus === 'merging'
-              try {
-                return await Effect.runPromise(computeAgentEnrichment(a.id, a.startedAt, hasActiveSpecialist))
-              } catch {
-                return undefined
-              }
-            })
-          )
-        )
-
-        for (let i = 0; i < running.length; i++) {
-          const a = running[i]
-          const enrichment = enrichmentResults[i]
-          // Check if the agent completed normally (completed/completed.processed marker).
-          // This distinguishes "session lost mid-review" from "agent finished and transitioned to in_review".
-          const agentDir = join(AGENTS_DIR, a.id);
-          const completedNormally =
-            existsSync(join(agentDir, 'completed')) ||
-            existsSync(join(agentDir, 'completed.processed'));
-          // Reconcile on-disk status with live tmux state (hoisted so the
-          // pending-input projection below can gate on the final status).
-          const reconciledStatus = (() => {
-            let reconciled = a.status as AgentStatus | string;
-            if (a.tmuxActive && a.status === 'stopped') {
-              reconciled = 'running';
-              logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled stopped→running (tmux session alive, resumed outside API)`);
-            } else if (!a.tmuxActive && a.status === 'running') {
-              reconciled = 'stopped';
-              logDeaconEventSync(`readModel bootstrap: ${a.id} reconciled running→stopped (tmux session dead, likely reboot/crash)`);
-            }
-            return toAgentStatus(reconciled);
-          })();
-          agentsById[a.id] = {
-            id: a.id,
-            issueId: a.issueId,
-            workspace: a.workspace || undefined,
-            // PAN-1048 review feedback 004 (C3): same mapping as the cached
-            // path above — surface AgentState.harness as snapshot.runtime so
-            // getHarness() returns the actual harness instead of defaulting
-            // every agent to claude-code.
-            runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
-            model: a.model || undefined,
-            status: reconciledStatus,
-            startedAt: a.startedAt || undefined,
-            lastActivity: a.lastActivity || undefined,
-            branch: a.branch || undefined,
-            costSoFar: a.costSoFar,
-            sessionId: a.sessionId || undefined,
-            role: toRole((a as { role?: unknown }).role),
-            hasLiveTmuxSession: a.tmuxActive,
-            paused: a.paused,
-            pausedReason: a.pausedReason,
-            pausedAt: a.pausedAt,
-            troubled: a.troubled,
-            troubledAt: a.troubledAt,
-            consecutiveFailures: a.consecutiveFailures,
-            firstFailureInRunAt: a.firstFailureInRunAt,
-            lastFailureAt: a.lastFailureAt,
-            lastFailureReason: a.lastFailureReason,
-            lastFailureNextRetryAt: a.lastFailureNextRetryAt,
-            runtimeState: completedNormally ? 'completed' : undefined,
-            // Enrichment fields (PAN-440) — pending-input gated on liveness
-            // (PAN-1591): a stopped agent's cached hasPendingQuestion is stale.
-            ...projectPendingInput(reconciledStatus, {
-              hasPendingQuestion: enrichment?.hasPendingQuestion,
-              pendingQuestionCount: enrichment?.pendingQuestionCount,
-              pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
-              pendingQuestionReason: enrichment?.pendingQuestionReason,
-              pendingInputCount: enrichment?.pendingInputCount,
-              pendingInputKinds: enrichment?.pendingInputKinds,
-              pendingAskUserQuestion: enrichment?.pendingAskUserQuestion,
-            }),
-            resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
-            resolutionCount: enrichment?.resolutionCount,
-          };
-        }
-
-        // ── Review statuses ────────────────────────────────────────────────────
-        const statusMap = loadReviewStatuses();
-        const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
-        for (const rs of Object.values(statusMap)) {
-          reviewStatusByIssueId[rs.issueId] = toReviewStatusSnapshot(rs);
-        }
-
-        // ── Sequence from event store ──────────────────────────────────────────
-        let sequence = 0;
-        try {
-          const { getEventStore } = yield* Effect.promise(
-            () => import('./event-store.js'),
-          );
-          sequence = getEventStore().getLatestSequence();
-        } catch {
-          // Event store may not be initialized yet
-        }
-
-        // Agents, specialists, and review statuses are already clean — validators
-        // map unknown values to concrete typed defaults. No JSON round-trip needed.
-        state = {
-          ...INITIAL_READ_MODEL_STATE,
-          sequence,
-          agentsById,
-          // PAN-1048 — specialistsByName projection retired; consumers derive
-          // from agentsById filtered by role.
-          reviewStatusByIssueId,
-          issuesRaw: [],
-        };
-
-        console.log(
-          `[ReadModel] Bootstrapped: ${Object.keys(agentsById).length} agents, ` +
-          `${Object.keys(reviewStatusByIssueId).length} review statuses, seq=${sequence}`,
-        );
-      }
+      console.log(
+        `[ReadModel] Bootstrapped from sources: ` +
+        `${Object.keys(result.agentsById).length} agents, ` +
+        `${Object.keys(result.reviewStatusByIssueId).length} review statuses, ` +
+        `${result.issuesEnumerated} in-flight issue(s), seq=${sequence}`,
+      );
 
       // ── Checkpoint reconciliation (deferred — non-blocking) ──────────────────
       // Fire-and-forget: scan workspaces for git checkpoints in the background
@@ -863,7 +635,7 @@ export const ReadModelServiceLive = Layer.effect(
         // hit a null callback or be skipped by `issuesChanged()` because
         // `lastFetchedIssues` already matched the new GitHub fetch.
         const currentIssues = cleanIssues(issueService.getIssues());
-        if (currentIssues.length > 0 || !usedProjectionCache) {
+        if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
           const newIssues = discoverNewIssues(state.issuesRaw, currentIssues);
           if (newIssues.length > 0) {
             const sample = newIssues
