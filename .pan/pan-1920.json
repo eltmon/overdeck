@@ -1,15 +1,26 @@
 {
   "issueId": "PAN-1920",
   "schemaVersion": 1,
-  "feedback": [],
+  "decisions": [],
+  "hazards": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-16T14:55:57Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1920 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (12229ms):\n\nuld not sync main: Sync-main produced 1 conflict(s) in PAN-1872: tests/foo.test.ts. Resolve manually in the workspace, then re-run sync-main. Conflicts: tests/foo.test.ts.\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✔ Agent spawned: agent-pan-1872\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1920 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1920 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
   "pipeline": {
     "issueId": "PAN-1920",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T14:55:57.132Z",
+    "updatedAt": "2026-06-16T14:56:03.108Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (12229ms):\n\nuld not sync main: Sync-main produced 1 conflict(s) in PAN-1872: tests/foo.test.ts. Resolve manually in the workspace, then re-run sync-main. Conflicts: tests/foo.test.ts.\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✔ Agent spawned: agent-pan-1872\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1924"
   },
@@ -35,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0043048,
-        "pricingAsOf": "2026-06-16T14:55:57.233Z"
+        "pricingAsOf": "2026-06-16T14:56:03.133Z"
       }
     },
     "merges": [
