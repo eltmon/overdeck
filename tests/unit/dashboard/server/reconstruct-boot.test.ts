@@ -45,11 +45,6 @@ vi.mock('../../../../src/lib/agent-runtime-mirror.js', () => ({
   markAgentStateServiceInProcess: vi.fn(() => Effect.void),
 }));
 
-vi.mock('../../../../src/dashboard/server/services/projection-cache.js', () => ({
-  getProjectionCache: vi.fn(() => ({ load: vi.fn(() => null), save: vi.fn() })),
-  initProjectionCache: vi.fn(),
-}));
-
 import { reconstructCache } from '../../../../src/lib/reconstruct/reconstruct-cache.js';
 import { initEventStore, getSharedDb } from '../../../../src/dashboard/server/event-store.js';
 import { AgentStateServiceLive } from '../../../../src/dashboard/server/services/agent-state-service.js';

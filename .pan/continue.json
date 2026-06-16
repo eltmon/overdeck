@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1847",
   "created": "2026-06-16T15:35:46.876Z",
-  "updated": "2026-06-16T17:25:00.000Z",
-  "gitState": { "branch": "feature/pan-1847", "sha": "fa88544f47", "dirty": true },
+  "updated": "2026-06-16T17:30:00.000Z",
+  "gitState": { "branch": "feature/pan-1847", "sha": "7aec924888", "dirty": true },
   "agentModel": "agent:claude-opus-4-8",
   "decisions": [
     { "id": "D1", "summary": "PAN-1847 = delete the dead projection_cache table + both write-through save() paths (root-cause, NOT a GC). Operator-confirmed Option 1. The original 'prune rows + VACUUM to reclaim 1.4 GB' premise is RETIRED: the 12,125 agent-runtime: rows are 1.93 MB (0.14% of the 1379 MB DB); the table is fully unread after PAN-1920 (load() has zero callers).", "recordedAt": "2026-06-16T15:59:52.000Z" },
@@ -21,9 +21,9 @@
     { "id": "H5", "summary": "The v55->v56 DROP runs on the live 1.4 GB DB. DROP of a ~2 MB table is fast and within a normal migration; a pre-v55 file snapshot already exists (panopticon.db.v54-backfill-snapshot).", "mitigation": "DROP TABLE IF EXISTS is a no-op if absent; no full VACUUM (D3). Migration tests from v52/53/54 must reach user_version=56 green." }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-bk6t0 (remove projection_cache wiring from event-store.ts). The Bun-path CREATE TABLE block and post-init dynamic import are removed; grep returns no matches and typecheck passes. Stage, commit, close the bead, then advance to the next unblocked bead.",
-    "beadId": "workspace-bk6t0",
-    "filesToRead": ["src/dashboard/server/event-store.ts"]
+    "description": "Implementing bead workspace-sof0i (delete projection-cache.ts service module and its dedicated test). Files are deleted and the broken vi.mock in reconstruct-boot.test.ts is removed; grep/services/projection-cache returns no matches, typecheck passes, and reconstruct-boot.test.ts stays green. Stage, commit, close the bead, then advance to the next unblocked bead.",
+    "beadId": "workspace-sof0i",
+    "filesToRead": ["src/dashboard/server/services/projection-cache.ts", "tests/dashboard/projection-cache.test.ts", "tests/unit/dashboard/server/reconstruct-boot.test.ts"]
   },
   "beadsMapping": {},
   "sessionHistory": [
@@ -49,6 +49,12 @@
       "timestamp": "2026-06-16T17:25:00.000Z",
       "reason": "work",
       "note": "Completed bead workspace-bk6t0: removed the Bun-path CREATE TABLE IF NOT EXISTS projection_cache block and the post-init dynamic import of services/projection-cache.js from event-store.ts. Verified grep projection_cache and services/projection-cache return no matches and `npm run typecheck` passes.",
+      "agentModel": "agent:pi:kimi-k2.7-code"
+    },
+    {
+      "timestamp": "2026-06-16T17:30:00.000Z",
+      "reason": "work",
+      "note": "Completed bead workspace-sof0i: deleted src/dashboard/server/services/projection-cache.ts and tests/dashboard/projection-cache.test.ts; removed the now-broken vi.mock of services/projection-cache.js from reconstruct-boot.test.ts. Verified grep -rn services/projection-cache returns no matches, typecheck passes, and tests/unit/dashboard/server/reconstruct-boot.test.ts passes.",
       "agentModel": "agent:pi:kimi-k2.7-code"
     }
   ],
