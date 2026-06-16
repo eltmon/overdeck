@@ -28,7 +28,6 @@ const fakeReconstructResult = {
 const readFromSpy = vi.fn(() => []);
 const subscribeSpy = vi.fn(() => () => {});
 const appendAsyncSpy = vi.fn(async () => 1);
-const dbPrepareSpy = vi.fn(() => ({ run: vi.fn() }));
 
 vi.mock('../../../../src/lib/reconstruct/reconstruct-cache.js', () => ({
   reconstructCache: vi.fn(),
@@ -36,7 +35,6 @@ vi.mock('../../../../src/lib/reconstruct/reconstruct-cache.js', () => ({
 
 vi.mock('../../../../src/dashboard/server/event-store.js', () => ({
   initEventStore: vi.fn(),
-  getSharedDb: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agent-runtime-mirror.js', () => ({
@@ -46,13 +44,12 @@ vi.mock('../../../../src/lib/agent-runtime-mirror.js', () => ({
 }));
 
 import { reconstructCache } from '../../../../src/lib/reconstruct/reconstruct-cache.js';
-import { initEventStore, getSharedDb } from '../../../../src/dashboard/server/event-store.js';
+import { initEventStore } from '../../../../src/dashboard/server/event-store.js';
 import { AgentStateServiceLive } from '../../../../src/dashboard/server/services/agent-state-service.js';
 import { ReadModelServiceLive } from '../../../../src/dashboard/server/read-model.js';
 
 const reconstructCacheMock = vi.mocked(reconstructCache);
 const initEventStoreMock = vi.mocked(initEventStore);
-const getSharedDbMock = vi.mocked(getSharedDb);
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -63,7 +60,6 @@ beforeEach(() => {
     appendAsync: appendAsyncSpy,
     emitOnly: vi.fn(),
   } as any);
-  getSharedDbMock.mockReturnValue({ prepare: dbPrepareSpy } as any);
 });
 
 describe('AgentStateService bootstrap (PAN-1920)', () => {
