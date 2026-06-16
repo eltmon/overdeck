@@ -5304,7 +5304,7 @@ function initSchema(db) {
 */
 function runMigrations(db, dbPath) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 56) return;
+	if (currentVersion >= 56) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
