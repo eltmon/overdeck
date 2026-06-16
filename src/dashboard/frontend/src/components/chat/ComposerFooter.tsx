@@ -414,12 +414,14 @@ export function ComposerFooter({
       .join('\n');
     const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
     try {
-      // If the selected model differs from the conversation's current model,
-      // kill the session and restart with the new model before sending.
-      // switchModel already waits for the new session to be ready before returning.
-      if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(submitConversationName, model, agentId, harness);
-      }
+      // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
+      // This auto-switch silently killed a running agent's live session (the Opus
+      // planning takeover on PAN-1847): the picker showed a hardcoded gpt-5.5
+      // default (ConversationPanel.tsx `|| getDefaultConversationModel()`) because
+      // the agent's real model wasn't reflected, that mismatched the agent's actual
+      // model, and submitting a message tore down its session. Model changes are now
+      // an EXPLICIT picker action only. Do NOT re-enable a submit-time switch without
+      // (a) the picker reflecting the agent's true model and (b) an explicit confirm.
 
       // Abort if conversation switched during the async model switch. Leave the
       // pasted images in their owning conversation (they persist now) so they
