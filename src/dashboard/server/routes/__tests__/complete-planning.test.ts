@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill, completePlanningFilesToStage } from '../issues.js';
+import { commitWorkspacePlanningArtifacts, completePlanningArtifacts, completePlanningAutoSpawn, completePlanningAutoSpawnAndKill, completePlanningFilesToStage } from '../issues.js';
 import { PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 
@@ -343,5 +345,49 @@ describe('completePlanningArtifacts', () => {
       workAgentSession: 'agent-pan-1151',
     });
     expect(events).toEqual([]);
+  });
+});
+
+describe('commitWorkspacePlanningArtifacts', () => {
+  const execFileAsync = promisify(execFile);
+  const issueId = 'PAN-1931';
+  let gitRoot: string | null = null;
+
+  afterEach(() => {
+    if (gitRoot) {
+      rmSync(gitRoot, { recursive: true, force: true });
+      gitRoot = null;
+    }
+  });
+
+  it('stages tracked .pan artifacts and skips gitignored ephemeral files', async () => {
+    gitRoot = mkdtempSync(join(tmpdir(), 'complete-planning-git-'));
+
+    await execFileAsync('git', ['init'], { cwd: gitRoot });
+    await execFileAsync('git', ['config', 'user.email', 'test@example.com'], { cwd: gitRoot });
+    await execFileAsync('git', ['config', 'user.name', 'Test'], { cwd: gitRoot });
+
+    writeFileSync(join(gitRoot, '.gitignore'), [
+      '.pan/continue.json',
+      '.pan/spec.vbrief.json',
+    ].join('\n'));
+
+    const trackedSpecPath = join(gitRoot, '.pan', 'specs', `${issueId}.vbrief.json`);
+    mkdirSync(join(gitRoot, '.pan', 'specs'), { recursive: true });
+    writeFileSync(trackedSpecPath, JSON.stringify({ plan: { id: issueId } }));
+    writeFileSync(join(gitRoot, '.pan', 'continue.json'), JSON.stringify({ issueId }));
+    writeFileSync(join(gitRoot, '.pan', 'spec.vbrief.json'), JSON.stringify({ issueId }));
+
+    await execFileAsync('git', ['add', '.gitignore'], { cwd: gitRoot });
+    await execFileAsync('git', ['commit', '-m', 'initial'], { cwd: gitRoot });
+
+    await commitWorkspacePlanningArtifacts(gitRoot, issueId);
+
+    const { stdout: tree } = await execFileAsync('git', ['show', '--pretty=format:', '--name-only', 'HEAD'], { cwd: gitRoot });
+    const committedFiles = tree.split('\n').filter(Boolean);
+
+    expect(committedFiles).toContain('.pan/specs/PAN-1931.vbrief.json');
+    expect(committedFiles).not.toContain('.pan/continue.json');
+    expect(committedFiles).not.toContain('.pan/spec.vbrief.json');
   });
 });

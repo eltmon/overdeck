@@ -235,6 +235,26 @@ export function completePlanningFilesToStage(projectPath: string, proposedFilena
   return filesToStage;
 }
 
+export async function commitWorkspacePlanningArtifacts(gitRoot: string, issueId: string): Promise<void> {
+  const isGitRepo = existsSync(join(gitRoot, '.git'));
+  if (!isGitRepo) {
+    await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+
+  if (existsSync(join(gitRoot, '.pan'))) {
+    await execFileAsync('git', ['add', '.pan/'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+  if (existsSync(join(gitRoot, '.beads'))) {
+    await execFileAsync('git', ['add', '.beads/'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+
+  try {
+    await execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
+  } catch {
+    await execFileAsync('git', ['commit', '-m', `chore(plan): complete planning for ${issueId}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+}
+
 function getInternalDashboardOrigin(): string {
   const port = Number.parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   return process.env['PANOPTICON_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
@@ -1417,23 +1437,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         }
       }
 
-      const isGitRepo = existsSync(join(gitRoot, '.git'));
-      if (!isGitRepo) {
-        await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      if (existsSync(join(gitRoot, '.pan'))) {
-        await execFileAsync('git', ['add', '-f', '.pan/'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-      if (existsSync(join(gitRoot, '.beads'))) {
-        await execFileAsync('git', ['add', '.beads/'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      try {
-        await execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
-      } catch {
-        await execFileAsync('git', ['commit', '-m', `chore(plan): complete planning for ${id}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
+      await commitWorkspacePlanningArtifacts(gitRoot, id);
 
       try {
         const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
