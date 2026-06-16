@@ -63,7 +63,7 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T01:41:11.369Z",
+    "updatedAt": "2026-06-16T02:28:21.221Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "blockerReasons": [
       {
@@ -97,7 +97,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.434759,
-        "pricingAsOf": "2026-06-16T01:41:11.415Z"
+        "pricingAsOf": "2026-06-16T02:28:21.468Z"
       }
     },
     "merges": [

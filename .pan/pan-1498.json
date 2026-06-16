@@ -12,7 +12,7 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T01:08:11.030Z",
+    "updatedAt": "2026-06-16T02:28:21.221Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Spec fidelity and constraint compliance passed for bead workspace-k8qiq.",
     "blockerReasons": [
@@ -47,7 +47,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.266088,
-        "pricingAsOf": "2026-06-16T01:08:12.642Z"
+        "pricingAsOf": "2026-06-16T02:28:21.468Z"
       }
     },
     "merges": [

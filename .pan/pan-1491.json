@@ -11,7 +11,7 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T01:41:11.399Z",
+    "updatedAt": "2026-06-16T02:28:21.221Z",
     "reviewNotes": "Approved; no blockers remain after cycle-diff convergence gate",
     "testNotes": "Quality gates passed: install (bun install --frozen-lockfile), typecheck (tsc --noEmit + hooks), frontend-typecheck (npx tsc --noEmit in src/dashboard/frontend), lint (eslint + effect/permissions/skills checks), build (npm run build + dashboard build). Unit tests passed: 543 test files, 5674 tests on core; 3 test files, 30 tests on frontend. No UAT required — test-only hermetic fix (changed provider assertion from toBe('openai') to typeof check to decouple from live config state).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -32,7 +32,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-06-16T01:41:11.421Z"
+        "pricingAsOf": "2026-06-16T02:28:21.467Z"
       }
     },
     "merges": [
