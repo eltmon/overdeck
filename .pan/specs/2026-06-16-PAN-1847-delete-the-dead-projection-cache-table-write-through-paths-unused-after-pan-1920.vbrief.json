@@ -1,0 +1,464 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-16T15:59:52.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1847: delete the dead projection_cache table + write-through paths (unused after PAN-1920)",
+    "updated": "2026-06-16T16:11:25.446Z"
+  },
+  "plan": {
+    "id": "pan-1847",
+    "title": "Delete the dead projection_cache table + write-through paths (unused after PAN-1920)",
+    "status": "proposed",
+    "uid": "25645f1c-b6f8-487c-8dbc-e3314457ac46",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-16T15:59:52.000Z",
+    "updated": "2026-06-16T16:11:25.446Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1847",
+        "label": "PAN-1847",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1920",
+        "label": "PAN-1920 (reconstruction)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1925",
+        "label": "PAN-1925 (events-table follow-up)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "database",
+      "dead-code",
+      "cleanup",
+      "schema-migration"
+    ],
+    "narratives": {
+      "Problem": "After PAN-1920 the entire projection_cache table is dead: ProjectionCache.load() has zero callers (reconstruct-cache.ts never reads it), yet two write-through save() paths still run on every state change — the read-model 'dashboard' snapshot (historically a CPU hog) and the agent-state-service 'agent-runtime:<id>' rows. The original 'reclaim 1.4 GB' premise was empirically disproven: the 12,125 agent-runtime: rows are 1.93 MB (0.14% of the 1379 MB DB); the real ~1 GB is the events table (agent.output_received = 721 MB), tracked separately as PAN-1925.",
+      "Proposal": "Per the no-bandaids/root-cause rule, DELETE the dead table rather than build a GC for a cache nobody reads. Remove both write-through save() paths, delete the projection-cache.ts service module and its imports, stop creating the table (base schema + Bun path + bundled cost hook) and DROP it on existing DBs via a forward migration, then lock the deletion with a regression test. This is zero behavioral change — getSnapshot builds snapshots live via buildSnapshot() and never depended on load().",
+      "NonGoals": "- Do NOT touch the events table or agent.output_received retention (the real ~1 GB; separate issue PAN-1925).\n- Do NOT attempt to reclaim 1.4 GB or 'shrink the DB substantially' — that premise is retired; ~7.5 MB is freed and reclaimed automatically by the existing incremental_vacuum.\n- Do NOT add a VACUUM or VACUUM INTO step (auto_vacuum is already INCREMENTAL with a 15-min reclaimer).\n- Do NOT build a garbage collector / pruner for projection_cache (rejected — deletion supersedes it).\n- Do NOT change runtime behavior: keep the agentRuntimeById reducer fold, the runtime mirror, agent.state_restored, and PAN-1920 reconstruction.\n- Do NOT weaken or edit tests/unit/lib/reconstruct/no-circular-source.test.ts (re-introduction guard).\n- Do NOT edit historical archives under docs/prds/** or vbrief/completed/** that mention projection_cache.\n- Do NOT hand-edit the bundled artifact sync-sources/hooks/record-cost-event.js — regenerate it from source."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Schema removal removes BOTH the base CREATE and the historical 'if (currentVersion < 5)' create block, adds an 'if (currentVersion < 56) DROP TABLE IF EXISTS projection_cache' migration, and bumps SCHEMA_VERSION 55->56.",
+        "rationale": "Removing the base CREATE stops recreation on every DB open; the DROP migration cleans existing DBs once; removing the historical block keeps the regenerated cost hook grep-clean. Verified safe: no migration test migrates a DB from version < 5 or expects projection_cache (schema-migrations.test.ts)."
+      },
+      {
+        "summary": "No VACUUM step is added.",
+        "rationale": "auto_vacuum is already INCREMENTAL and src/lib/database/index.ts:108 reclaims the freelist every 15 minutes; the ~7.5 MB freed by DROP is reclaimed automatically. Disk reclaim is not a goal of this issue."
+      },
+      {
+        "summary": "The bundled cost hook is regenerated from source via 'npm run build:scripts', never hand-edited.",
+        "rationale": "record-cost-event.js is a tsdown bundle that transitively includes schema.ts; editing the source + rebuilding is the only correct way to drop the embedded CREATE TABLE without divergence."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1",
+        "title": "Remove the read-model 'dashboard'-key projection_cache write-through",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/read-model.ts remove the projectionCache declaration (~375), all four `projectionCache?.save(buildSnapshot());` calls (~428, ~463, ~611, ~663), the `initProjectionCache` dynamic import + init assignment (~496-499), and fix the bootstrap comment (~491-492) that claims 'projection_cache write-through continues below'. Preserve every surrounding behavior: the prune+log+state update around 460-465, the checkpoint-reconciliation log around 609-612, and the onIssuesChanged state update around 659-663. buildSnapshot() must remain defined and returned by getSnapshot (~467)."
+        },
+        "items": [
+          {
+            "id": "b1.ac1",
+            "title": "After the change, `grep -n projectionCache src/dashboard/server/read-model.ts` returns no matches (declaration, all four save() calls, the import, and the init are removed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1.ac2",
+            "title": "getSnapshot still returns buildSnapshot() and the prune/log/state-update logic that surrounded the former save() sites is preserved (verifiable from the diff).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1.ac3",
+            "title": "`npm run typecheck` produces no unused-variable or unresolved-import error for read-model.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2",
+        "title": "Remove the agent-state-service 'agent-runtime:' projection_cache write-through",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-state-service.ts remove the DB write only, exactly per the before/after in .pan/drafts/PAN-1847.md: drop `getSharedDb` from the event-store import (~33), the AGENT_RUNTIME_KEY_PREFIX const (~40), the `const db = getSharedDb(); const upsertStmt = ...` block (~107-121), the `UpsertStmt` type alias (~167), the upsertStmt parameter of applyEventToRef and its `for...upsertStmt.run(...)` loop (~189-217), and update the stale comments at ~20 and ~107-112. KEEP applyReducerEvent (the agentRuntimeById fold), setAgentRuntimeMirror(next), and the SubscriptionRef.update return — these drive live UI runtime snapshots. Update the store.subscribe wiring (~149) to call applyEventToRef(ref, ev) with no upsertStmt arg."
+        },
+        "items": [
+          {
+            "id": "b2.ac1",
+            "title": "`grep -nE 'projection_cache|upsertStmt|AGENT_RUNTIME_KEY_PREFIX|getSharedDb|UpsertStmt' src/dashboard/server/services/agent-state-service.ts` returns no matches.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2.ac2",
+            "title": "applyEventToRef still calls applyReducerEvent and Effect.runSync(setAgentRuntimeMirror(next)) and returns next — the reducer fold and runtime mirror update are preserved (verifiable from the diff against the PRD after-snippet).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2.ac3",
+            "title": "tests/contracts/agent-runtime-reducers.test.ts still passes unmodified: applying agent.activity_changed through the reducer produces the same agentRuntimeById entry as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3",
+        "title": "Remove projection_cache wiring from the event store",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/event-store.ts remove the Bun-path `CREATE TABLE IF NOT EXISTS projection_cache (...)` block (~156-163) and the post-init dynamic `import('./services/projection-cache.js').then(({ initProjectionCache }) => initProjectionCache(db))` block (~392-395). Leave the surrounding index creation and store init intact."
+        },
+        "items": [
+          {
+            "id": "b3.ac1",
+            "title": "`grep -n projection_cache src/dashboard/server/event-store.ts` returns no matches and the file no longer imports services/projection-cache.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3.ac2",
+            "title": "openEventDb still creates the events table + indexes and initEventStore still returns the store (no other init step removed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3.ac3",
+            "title": "`npm run typecheck` passes for event-store.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4",
+        "title": "Delete the projection-cache.ts service module and its dedicated unit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete src/dashboard/server/services/projection-cache.ts entirely (createProjectionCache, initProjectionCache, getProjectionCache, load, save, the ProjectionCache interface, CACHE_KEY, FLUSH_DEBOUNCE_MS). Delete tests/dashboard/projection-cache.test.ts (it imports createProjectionCache and tests the deleted service). This bead is safe only after B1, B2, B3 have removed every importer."
+        },
+        "items": [
+          {
+            "id": "b4.ac1",
+            "title": "`ls src/dashboard/server/services/projection-cache.ts` exits non-zero — the service module is deleted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4.ac2",
+            "title": "`ls tests/dashboard/projection-cache.test.ts` exits non-zero — the dedicated test is deleted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4.ac3",
+            "title": "`grep -rn \"services/projection-cache\" src/ tests/` returns no import; `npm run typecheck` and `npm test` report no unresolved-module error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5",
+        "title": "Stop creating projection_cache in the schema; DROP it via a forward migration; regenerate the cost hook",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/database/schema.ts: remove the base-schema `CREATE TABLE IF NOT EXISTS projection_cache (...)` block (~486-492) and the historical `if (currentVersion < 5) { ... CREATE TABLE ... projection_cache ... }` block (~817-827); add `if (currentVersion < 56) { db.exec('DROP TABLE IF EXISTS projection_cache'); }` immediately before `db.pragma(\\`user_version = ${SCHEMA_VERSION}\\`)`; change `SCHEMA_VERSION = 55` to `56` (~24). Then run `npm run build:scripts` to regenerate sync-sources/hooks/record-cost-event.js (tsdown bundles schema.ts) and commit the regenerated artifact."
+        },
+        "items": [
+          {
+            "id": "b5.ac1",
+            "title": "SCHEMA_VERSION equals 56; schema.ts contains no `CREATE TABLE ... projection_cache`; a `DROP TABLE IF EXISTS projection_cache` runs under `if (currentVersion < 56)`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5.ac2",
+            "title": "A fresh DB created through runMigrations has no projection_cache table: `SELECT name FROM sqlite_master WHERE type='table' AND name='projection_cache'` returns no row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5.ac3",
+            "title": "Running runMigrations on a DB seeded at user_version 54 produces user_version 56 and contains no projection_cache table; tests/unit/lib/database/schema-migrations.test.ts still passes unmodified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5.ac4",
+            "title": "After `npm run build:scripts`, `grep -c projection_cache sync-sources/hooks/record-cost-event.js` returns 0, and the regenerated artifact is committed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b6",
+        "title": "Remove the orphaned projection-cache mock from the PAN-1920 boot test",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In tests/unit/dashboard/server/reconstruct-boot.test.ts remove the `vi.mock('.../services/projection-cache.js', ...)` block (~48-51) and the now-unused dbPrepareSpy / getSharedDbMock.mockReturnValue({ prepare: dbPrepareSpy }) scaffolding (~31, ~71) that only existed to satisfy the deleted agent-state-service upsert. No assertion references the upsert, so no assertion is removed. The two PAN-1920 bootstrap tests must stay green."
+        },
+        "items": [
+          {
+            "id": "b6.ac1",
+            "title": "reconstruct-boot.test.ts contains no `vi.mock` of services/projection-cache.js and no dbPrepareSpy that was only feeding the removed projection_cache upsert.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6.ac2",
+            "title": "`npm test` produces a passing result for both PAN-1920 bootstrap tests: the AgentStateService test confirms reconstructCache runs, readFrom does not, and subscribe receives the forward wiring; the ReadModelService test seeds from reconstructCache.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b7",
+        "title": "Add a regression test that locks the projection_cache deletion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a new test (e.g. tests/unit/dashboard/server/projection-cache-removed.test.ts) with two assertions: (1) a fresh DB built via runMigrations has no projection_cache table (sqlite_master query empty); (2) a source guard reading src/dashboard/server/{read-model.ts,event-store.ts,services/agent-state-service.ts} finds no `initProjectionCache`, no `.save(buildSnapshot`, and no `services/projection-cache` import. This locks both halves of the deletion against re-introduction."
+        },
+        "items": [
+          {
+            "id": "b7.ac1",
+            "title": "The new test asserts a fresh DB built via runMigrations has no projection_cache table, and the assertion passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7.ac2",
+            "title": "The new test's source guard verifies no dashboard server file references initProjectionCache, .save(buildSnapshot, or services/projection-cache, and the assertion passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7.ac3",
+            "title": "The new test runs and passes under `npm test`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b8",
+        "title": "Update stale comments that describe projection_cache as a live path",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-06-16T15:59:52.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1847",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1"
+          ],
+          "acJustification": "Comment-accuracy bead made false by the deletion; two mechanical grep/gate ACs suffice."
+        },
+        "narrative": {
+          "Action": "Update the three comments made factually false by the deletion so they no longer describe projection_cache as a live persistence path: src/lib/agent-runtime.ts:6 ('SubscriptionRef + projection_cache'), src/lib/agents.ts:2281 ('SubscriptionRef -> projection_cache rows keyed agent-runtime:<id>'), packages/contracts/src/events.ts:363 ('snapshot from projection_cache. Not emitted by hooks.'). Keep edits minimal and comment-only; do not change code."
+        },
+        "items": [
+          {
+            "id": "b8.ac1",
+            "title": "`grep -n projection_cache src/lib/agent-runtime.ts src/lib/agents.ts packages/contracts/src/events.ts` returns no matches (the stale live-path references are removed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8.ac2",
+            "title": "After the comment-only edits, `npm run typecheck` and `npm run lint` each exits 0 (no code changed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1",
+        "to": "b4",
+        "type": "blocks"
+      },
+      {
+        "from": "b2",
+        "to": "b4",
+        "type": "blocks"
+      },
+      {
+        "from": "b3",
+        "to": "b4",
+        "type": "blocks"
+      },
+      {
+        "from": "b4",
+        "to": "b6",
+        "type": "blocks"
+      },
+      {
+        "from": "b4",
+        "to": "b7",
+        "type": "blocks"
+      },
+      {
+        "from": "b5",
+        "to": "b7",
+        "type": "blocks"
+      },
+      {
+        "from": "b4",
+        "to": "b8",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-16-PAN-1847-delete-the-dead-projection-cache-table-write-through-paths-unused-after-pan-1920.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
