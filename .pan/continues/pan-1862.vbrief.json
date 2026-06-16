@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "issueId": "PAN-1862",
+  "created": "2026-06-14T23:12:36.979Z",
+  "updated": "2026-06-15T00:59:42.001Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-06-14T23:12Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-14T23:12:36.980Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-14T23:13Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-14T23:13:21.099Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-14T23:17Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-14T23:17:29.032Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-14T23:23Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-14T23:23:24.113Z"
+    }
+  ]
+}
