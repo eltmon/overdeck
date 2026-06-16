@@ -155,7 +155,7 @@ async function backfillIssue(
 
     const existing = await readIssueRecord(project, issueId);
     const reviewStatus = getAllReviewStatusesFromDb()[issueId.toUpperCase()] ?? null;
-    const record = await buildIssueRecord(resolved.projectPath, issueId, { reviewStatus });
+    const record = await buildIssueRecord(project, issueId, { reviewStatus });
 
     if (!opts.force && existing && normalizeRecordForCompare(existing) === normalizeRecordForCompare(record)) {
       return { action: 'skipped', reason: 'record unchanged' };

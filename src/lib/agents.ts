@@ -29,6 +29,11 @@ import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
+import {
+  readIssueRecordSync,
+  resolveProjectForIssue,
+  writeAgentHarnessModelSync,
+} from './pan-dir/record.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
 import { getAgent as getAgentFromDb, upsertAgent, listAllAgents, type Agent as DbAgent } from './database/agents-db.js';
@@ -1085,7 +1090,19 @@ export function getAgentStateSync(agentId: string): AgentState | null {
   if (!existsSync(stateFile)) return null;
 
   const content = readFileSync(stateFile, 'utf8');
-  return parseAgentState(content, normalizedId);
+  const state = parseAgentState(content, normalizedId);
+  if (!state) return null;
+
+  // PAN-1919: harness/model are no longer sourced from state.json. Merge from
+  // the per-issue git-tracked record so cross-machine pickup works.
+  const project = resolveProjectForIssue(state.issueId);
+  if (project) {
+    const record = readIssueRecordSync(project, state.issueId);
+    if (record?.harness) state.harness = record.harness;
+    if (record?.model) state.model = record.model;
+  }
+
+  return state;
 }
 
 export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
@@ -1125,6 +1142,20 @@ export function saveAgentStateSync(state: AgentState): void {
   upsertAgent(agentStateToDbAgent(state));
   writeAgentStateJsonSync(state);
 
+  // PAN-1919: mirror harness/model into the per-issue git-tracked record so
+  // they travel with the branch. Done synchronously at save time; auto-commit
+  // is suppressed here because spawn paths explicitly queue the commit.
+  if (state.harness && state.model) {
+    const project = resolveProjectForIssue(state.issueId);
+    if (project) {
+      try {
+        writeAgentHarnessModelSync(project, state.issueId, state.harness, state.model);
+      } catch (err) {
+        console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
+      }
+    }
+  }
+
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
@@ -1159,6 +1190,20 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       catch: (cause) => toAgentFsError('write', stateFile, cause),
     });
     recordFeatureRegistryAgentState(state);
+
+    // PAN-1919: mirror harness/model into the per-issue git-tracked record.
+    if (state.harness && state.model) {
+      const project = resolveProjectForIssue(state.issueId);
+      if (project) {
+        const writeAgentHarnessModel = yield* Effect.promise(() =>
+          import('./pan-dir/record.js').then((m) => m.writeAgentHarnessModel)
+        );
+        yield* Effect.tryPromise({
+          try: () => writeAgentHarnessModel(project, state.issueId, state.harness!, state.model!),
+          catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
+        });
+      }
+    }
 
     if (oldStatus && oldStatus !== state.status) {
       logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);

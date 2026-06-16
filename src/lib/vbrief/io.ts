@@ -21,7 +21,15 @@ import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
-import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { readWorkspaceContinue } from '../pan-dir/continue.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  readIssueRecord,
+  readIssueRecordSync,
+  resolveProjectForIssue,
+  writeStatusOverrideSync,
+} from '../pan-dir/record.js';
+import type { ProjectConfig } from '../projects.js';
 import type { WorkspaceContinueState } from '../pan-dir/types.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import { parseVBriefFilename } from './lifecycle.js';
@@ -259,9 +267,23 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
   return merged;
 }
 
+function resolveProjectForWorkspace(workspacePath: string): ProjectConfig | null {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return null;
+  return resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+}
+
+function readStatusOverridesSync(workspacePath: string): Record<string, string> | undefined {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return undefined;
+  const project = resolveProjectForWorkspace(workspacePath);
+  if (!project) return undefined;
+  return readIssueRecordSync(project, issueId)?.statusOverrides;
+}
+
 /**
  * Reads the vBRIEF plan for a workspace, returning a merged view with
- * statusOverrides applied from the workspace continue file.
+ * statusOverrides applied from the per-issue record.
  * Returns null if no plan exists on main or locally.
  */
 export function readWorkspacePlanSync(workspacePath: string): VBriefDocument | null {
@@ -269,9 +291,9 @@ export function readWorkspacePlanSync(workspacePath: string): VBriefDocument | n
   if (!planPath) return null;
   const doc = readPlanSync(planPath);
 
-  const continueState = readWorkspaceContinueSync(workspacePath);
-  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
-    return applyStatusOverrides(doc, continueState.statusOverrides);
+  const overrides = readStatusOverridesSync(workspacePath);
+  if (overrides && Object.keys(overrides).length > 0) {
+    return applyStatusOverrides(doc, overrides);
   }
   return doc;
 }
@@ -328,8 +350,8 @@ function checkPlanStatus(
 
 
 /**
- * Updates the status of a specific item by writing to the workspace
- * continue file's `statusOverrides` map. Does NOT mutate the spec on main.
+ * Updates the status of a specific item by writing to the per-issue record's
+ * `statusOverrides` map. Does NOT mutate the spec on main.
  * No-ops gracefully if no plan exists for this workspace.
  */
 export function updateItemStatus(workspacePath: string, itemId: string, status: VBriefItemStatus): void {
@@ -340,29 +362,17 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item) return;
 
-  const continueState: WorkspaceContinueState = readWorkspaceContinueSync(workspacePath) ?? {
-    version: '1' as const,
-    issueId: issueIdFromWorkspacePath(workspacePath) ?? 'UNKNOWN',
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
-    gitState: {},
-    decisions: [],
-    hazards: [],
-    resumePoint: null,
-    beadsMapping: {},
-    sessionHistory: [],
-  };
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return;
+  const project = resolveProjectForWorkspace(workspacePath);
+  if (!project) return;
 
-  const overrides = { ...continueState.statusOverrides };
-  overrides[itemId] = status;
-  continueState.statusOverrides = overrides;
-
-  writeWorkspaceContinueSync(workspacePath, continueState);
+  writeStatusOverrideSync(project, issueId, itemId, status);
 }
 
 /**
- * Updates the status of a specific subItem by writing to the workspace
- * continue file's `statusOverrides` map. Uses `itemId.subItemId` as the key.
+ * Updates the status of a specific subItem by writing to the per-issue record's
+ * `statusOverrides` map. Uses `itemId.subItemId` as the key.
  * Does NOT mutate the spec on main.
  * No-ops gracefully if the file, item, or subItem doesn't exist.
  */
@@ -384,24 +394,12 @@ export function updateSubItemStatus(
   const subItem = subItemsOf(item).find(s => s.id === subItemId || s.id === fullSubId);
   if (!subItem) return;
 
-  const continueState: WorkspaceContinueState = readWorkspaceContinueSync(workspacePath) ?? {
-    version: '1' as const,
-    issueId: issueIdFromWorkspacePath(workspacePath) ?? 'UNKNOWN',
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
-    gitState: {},
-    decisions: [],
-    hazards: [],
-    resumePoint: null,
-    beadsMapping: {},
-    sessionHistory: [],
-  };
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return;
+  const project = resolveProjectForWorkspace(workspacePath);
+  if (!project) return;
 
-  const overrides = { ...continueState.statusOverrides };
-  overrides[fullSubId] = status;
-  continueState.statusOverrides = overrides;
-
-  writeWorkspaceContinueSync(workspacePath, continueState);
+  writeStatusOverrideSync(project, issueId, fullSubId, status);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -494,7 +492,7 @@ export const findPlan = (
 /**
  * Effect variant of readWorkspacePlanAsync. Returns null when there's no plan
  * for the workspace; otherwise returns the merged document with statusOverrides
- * applied. IO/decoding failures surface as typed errors.
+ * applied from the per-issue record. IO/decoding failures surface as typed errors.
  */
 export const readWorkspacePlan = (
   workspacePath: string,
@@ -504,9 +502,19 @@ export const readWorkspacePlan = (
     if (!planPath) return null;
     const doc = yield* readPlan(planPath);
 
-    const continueState = yield* readWorkspaceContinue(workspacePath);
-    if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
-      return applyStatusOverrides(doc, continueState.statusOverrides);
+    const issueId = issueIdFromWorkspacePath(workspacePath);
+    const overrides = issueId
+      ? yield* Effect.tryPromise({
+          try: async () => {
+            const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+            const record = await readIssueRecord(project, issueId);
+            return record?.statusOverrides;
+          },
+          catch: (cause) => new FsError({ path: workspacePath, operation: 'readIssueRecord', cause }),
+        })
+      : undefined;
+    if (overrides && Object.keys(overrides).length > 0) {
+      return applyStatusOverrides(doc, overrides);
     }
     return doc;
   });

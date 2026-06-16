@@ -1,5 +1,5 @@
 /**
- * Tests for PAN-1908 per-issue permanent-record writer.
+ * Tests for PAN-1908 / PAN-1919 per-issue git-tracked record.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -56,7 +56,7 @@ describe('buildIssueRecord', () => {
     rmSync(projectRoot, { recursive: true, force: true });
   });
 
-  it('projects durable continue subset and excludes runtime-only fields', async () => {
+  it('projects durable continue subset and folds in runtime fields (PAN-1919)', async () => {
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
       join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
@@ -65,24 +65,24 @@ describe('buildIssueRecord', () => {
         gitState: { branch: 'feature/pan-1908', sha: 'abc123', dirty: false },
         decisions: [{ id: 'D1', summary: 'keep state.json', recordedAt: '2026-01-01' }],
         hazards: [{ id: 'H1', summary: 'big PR', mitigation: 'audit' }],
-        resumePoint: { beadId: 'infra-record-writer' },
-        sessionHistory: [{ reason: 'work', note: 'did stuff' }],
+        resumePoint: { description: 'resume here', beadId: 'infra-record-writer' },
+        sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
         agentModel: 'claude-opus-4-8',
-        beadsMapping: {},
+        beadsMapping: { 'item-1': ['bead-a'] },
       }),
     );
 
-    const record = await buildIssueRecord(projectRoot, 'PAN-1908');
+    const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908');
 
     expect(record.issueId).toBe('PAN-1908');
     expect(record.decisions).toHaveLength(1);
     expect(record.hazards).toHaveLength(1);
+    expect(record.resumePoint).toEqual({ description: 'resume here', beadId: 'infra-record-writer' });
+    expect(record.beadsMapping).toEqual({ 'item-1': ['bead-a'] });
+    expect(record.sessionHistory).toHaveLength(1);
     expect(record.feedback).toEqual([]);
     expect(record).not.toHaveProperty('continue');
-    expect(record).not.toHaveProperty('resumePoint');
-    expect(record).not.toHaveProperty('sessionHistory');
     expect(record).not.toHaveProperty('agentModel');
-    expect(record).not.toHaveProperty('beadsMapping');
     expect(record).not.toHaveProperty('gitState');
   });
 
@@ -110,7 +110,7 @@ describe('buildIssueRecord', () => {
       updatedAt: '2026-06-15T00:00:00.000Z',
     };
 
-    const record = await buildIssueRecord(projectRoot, 'PAN-1908', { reviewStatus });
+    const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908', { reviewStatus });
 
     expect(record.pipeline.issueId).toBe('PAN-1908');
     expect(record.pipeline.reviewStatus).toBe('passed');
@@ -133,7 +133,7 @@ describe('buildIssueRecord', () => {
       updatedAt: '2026-06-15T00:00:00.000Z',
     };
 
-    const record = await buildIssueRecord(projectRoot, 'PAN-1908', { reviewStatus });
+    const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908', { reviewStatus });
 
     expect(record.pipeline).not.toHaveProperty('verificationCycleCount');
     expect(record.pipeline).not.toHaveProperty('mergeRetryCount');
@@ -167,7 +167,7 @@ describe('buildIssueRecord', () => {
       ],
     });
 
-    const record = await buildIssueRecord(projectRoot, 'PAN-1908', { closedAt: '2026-06-15T01:00:00.000Z' });
+    const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908', { closedAt: '2026-06-15T01:00:00.000Z' });
 
     expect(record.closeOut.merges).toEqual([
       'https://github.com/eltmon/panopticon-cli/pull/1908',
@@ -204,7 +204,7 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
     };
   }
 
-  it('writes to the project path by default', () => {
+  it('writes to .pan/records under the project path by default (tests fallback)', () => {
     const project = makeProject();
     const path = writeIssueRecordSync(project, 'PAN-1908', {
       issueId: 'PAN-1908',
@@ -213,48 +213,21 @@ describe('writeIssueRecordSync / queueIssueRecordCommit', () => {
       closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
     });
 
-    expect(path).toBe(join(tmp, '.pan', 'pan-1908.json'));
+    expect(path).toBe(join(tmp, '.pan', 'records', 'pan-1908.json'));
     expect(path).toContain('pan-1908.json');
   });
 
-  it('writes to a polyrepo infra repo when pan_records.repo is set', () => {
-    mkdirSync(join(tmp, 'infra'), { recursive: true });
-    const project = makeProject({
-      workspace: {
-        type: 'polyrepo',
-        repos: [{ name: 'infra', path: 'infra' }],
-      },
-      pan_records: { repo: 'infra', path: '.pan/records' },
-    });
-
-    const path = writeIssueRecordSync(project, 'PAN-1908', {
-      issueId: 'PAN-1908',
-      schemaVersion: 1,
-      pipeline: { issueId: 'PAN-1908', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-06-15T00:00:00.000Z' },
-      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
-    });
-
-    expect(path).toBe(join(tmp, 'infra', '.pan', 'records', 'pan-1908.json'));
-  });
-
-  it('queues auto-commit against the infra repo', () => {
-    mkdirSync(join(tmp, 'infra'), { recursive: true });
-    const project = makeProject({
-      workspace: {
-        type: 'polyrepo',
-        repos: [{ name: 'infra', path: 'infra' }],
-      },
-      pan_records: { repo: 'infra', path: '.pan/records' },
-    });
-    const recordPath = join(tmp, 'infra', '.pan', 'records', 'pan-1908.json');
+  it('queues auto-commit against the project path', () => {
+    const project = makeProject();
+    const recordPath = join(tmp, '.pan', 'records', 'pan-1908.json');
 
     queueIssueRecordCommit(project, 'PAN-1908', recordPath);
 
     expect(mockQueueAutoCommit).toHaveBeenCalledWith({
-      projectRoot: join(tmp, 'infra'),
-      repoRoot: join(tmp, 'infra'),
+      projectRoot: tmp,
+      repoRoot: tmp,
       paths: [recordPath],
-      subject: 'chore(records): update PAN-1908 permanent record',
+      subject: 'chore(records): update PAN-1908 per-issue record',
     });
   });
 });
@@ -349,8 +322,8 @@ describe('getIssueRecordPath', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('defaults to .pan/<issue>.json', () => {
+  it('defaults to .pan/records/<issue>.json', () => {
     const project: ProjectConfig = { name: 'Test', path: tmp };
-    expect(getIssueRecordPath(project, 'PAN-1908')).toBe(join(tmp, '.pan', 'pan-1908.json'));
+    expect(getIssueRecordPath(project, 'PAN-1908')).toBe(join(tmp, '.pan', 'records', 'pan-1908.json'));
   });
 });

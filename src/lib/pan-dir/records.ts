@@ -1,22 +1,15 @@
 /**
- * PAN-1908: per-issue permanent-record writer.
+ * PAN-1908 / PAN-1919: per-issue permanent-record builder.
  *
- * Produces a single JSON file per issue containing the durable subset of
- * pipeline state that belongs in the infra repo:
- *   - continue: durable subset of the workspace continue file
- *   - pipeline: durable review_status verdicts
- *   - closeOut: usage, merges, ranOn (populated at close-out time)
- *   - owner: URI lease metadata
- *
- * The writer is deliberately read-only w.r.t. the live orchestrator: it reads
- * SQLite + the continue file and writes a JSON record. Callers decide when to
- * build, write, and commit the record.
+ * Builds a single JSON record per issue from SQLite (pipeline verdicts, usage,
+ * merges) plus the legacy project-side continue file. The actual read/write/path
+ * helpers live in `record.ts` (PAN-1919 single-writer module) and write the
+ * record onto the feature branch at `<workspace>/.pan/records/<issue>.json`.
  */
 
-import { existsSync } from 'node:fs';
-import { mkdirSync, writeFileSync, promises as fsp } from 'node:fs';
 import { hostname } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { promises as fsp } from 'node:fs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 import {
@@ -26,100 +19,57 @@ import {
 import { getMergeSetSync } from '../merge-set.js';
 import {
   getProjectSync,
-  resolveInfraRepo,
   resolveProjectFromIssueSync,
   type ProjectConfig,
 } from '../projects.js';
-import { queueAutoCommit } from './auto-commit.js';
 import type { ReviewStatus } from '../review-status.js';
+import type {
+  ContinueBeadsMapping,
+  ContinueDecision,
+  ContinueFeedbackEntry,
+  ContinueHazard,
+  ContinueResumePoint,
+  ContinueSessionEntry,
+} from '../vbrief/continue-state.js';
+import {
+  getIssueRecordPath,
+  queueIssueRecordCommit,
+  readIssueRecord,
+  writeIssueRecordSync,
+  type PanIssueRecord,
+  type PanIssueCloseOutRecord,
+  type PanIssuePipelineRecord,
+  type PanIssueUsageRecord,
+} from './record.js';
 
-
-
-export interface PanIssueContinueRecord {
-  issueId: string;
-  branch?: string;
-  decisions?: Array<{ id: string; summary: string; recordedAt: string }>;
-  hazards?: Array<{ id: string; summary: string; mitigation: string }>;
-}
-
-export interface PanIssuePipelineRecord {
-  issueId: string;
-  reviewStatus: string;
-  testStatus: string;
-  verificationStatus?: string;
-  inspectStatus?: string;
-  mergeStatus?: string;
-  readyForMerge: boolean;
-  reviewNotes?: string;
-  testNotes?: string;
-  verificationNotes?: string;
-  inspectNotes?: string;
-  mergeNotes?: string;
-  blockerReasons?: unknown[];
-  prUrl?: string;
-  prNumber?: number;
-  prHeadSha?: string;
-  reviewedAtCommit?: string;
-  lastVerifiedCommit?: string;
-  autoMerge?: boolean;
-  deaconIgnored?: boolean;
-  deaconIgnoredAt?: string;
-  deaconIgnoredReason?: string;
-  reviewerVerdicts?: unknown;
-  updatedAt: string;
-}
-
-export interface PanIssueUsageModelRecord {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-}
-
-export interface PanIssueUsageRecord {
-  byStage: Record<string, Record<string, PanIssueUsageModelRecord>>;
-  totals: Record<string, PanIssueUsageModelRecord>;
-  costAtCloseOut?: { usd: number; pricingAsOf: string };
-}
-
-export interface PanIssueCloseOutRecord {
-  usage: PanIssueUsageRecord;
-  merges: string[];
-  ranOn: string;
-  closedAt?: string;
-}
-
-export interface PanIssueOwnerRecord {
-  uri?: string;
-  claimedAt?: string;
-  expiresAt?: string;
-}
-
-export interface PanIssueRecord {
-  issueId: string;
-  schemaVersion: number;
-  decisions?: Array<{ id: string; summary: string; recordedAt: string }>;
-  hazards?: Array<{ id: string; summary: string; mitigation: string }>;
-  feedback?: unknown[];
-  pipeline: PanIssuePipelineRecord;
-  closeOut: PanIssueCloseOutRecord;
-  owner?: string;
-}
+export type {
+  PanIssueRecord,
+  PanIssueCloseOutRecord,
+  PanIssuePipelineRecord,
+  PanIssueUsageRecord,
+} from './record.js';
 
 // ─── Continue projection ──────────────────────────────────────────────────────
 
 interface ContinueFile {
   issueId?: string;
   gitState?: { branch?: string };
-  decisions?: Array<{ id: string; summary: string; recordedAt: string }>;
-  hazards?: Array<{ id: string; summary: string; mitigation: string }>;
-  feedback?: unknown[];
+  decisions?: ContinueDecision[];
+  hazards?: ContinueHazard[];
+  resumePoint?: ContinueResumePoint | null;
+  beadsMapping?: ContinueBeadsMapping;
+  sessionHistory?: ContinueSessionEntry[];
+  feedback?: ContinueFeedbackEntry[];
+  agentModel?: string;
 }
 
-function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'feedback'> {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback'> {
   return {
     decisions: raw?.decisions,
     hazards: raw?.hazards,
+    resumePoint: raw?.resumePoint,
+    beadsMapping: raw?.beadsMapping,
+    sessionHistory: raw?.sessionHistory,
     feedback: raw?.feedback ?? [],
   };
 }
@@ -189,13 +139,7 @@ function projectMerges(issueId: string): string[] {
 
 // ─── Record builder ───────────────────────────────────────────────────────────
 
-export interface BuildIssueRecordOptions {
-  closedAt?: string;
-  owner?: string;
-  reviewStatus?: ReviewStatus | null;
-}
-
-async function readContinueText(projectRoot: string, issueId: string): Promise<string | null> {
+async function readLegacyContinueText(projectRoot: string, issueId: string): Promise<string | null> {
   const path = join(projectRoot, '.pan', 'continues', `${issueId.toLowerCase()}.vbrief.json`);
   try {
     return await fsp.readFile(path, 'utf-8');
@@ -204,21 +148,29 @@ async function readContinueText(projectRoot: string, issueId: string): Promise<s
   }
 }
 
+export interface BuildIssueRecordOptions {
+  closedAt?: string;
+  owner?: string;
+  reviewStatus?: ReviewStatus | null;
+}
+
 export async function buildIssueRecord(
-  projectRoot: string,
+  project: ProjectConfig,
   issueId: string,
   opts: BuildIssueRecordOptions = {},
 ): Promise<PanIssueRecord> {
-  const rawContinueText = await readContinueText(projectRoot, issueId);
-  const continueSubset = projectContinue(rawContinueText ? (JSON.parse(rawContinueText) as ContinueFile) : null);
+  const existing = await readIssueRecord(project, issueId);
+  const legacyContinueText = await readLegacyContinueText(project.path, issueId);
+  const continueSubset = projectContinue(legacyContinueText ? (JSON.parse(legacyContinueText) as ContinueFile) : null);
   const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null);
   const usageRecord = projectUsage(issueId);
   const merges = projectMerges(issueId);
 
   return {
-    issueId,
+    issueId: issueId.toUpperCase(),
     schemaVersion: 1,
     ...continueSubset,
+    ...existing,
     pipeline: pipelineRecord,
     closeOut: {
       usage: usageRecord,
@@ -226,125 +178,31 @@ export async function buildIssueRecord(
       ranOn: hostname(),
       closedAt: opts.closedAt,
     },
-    owner: opts.owner,
+    owner: opts.owner ?? existing?.owner,
   };
 }
 
-// ─── Record writer ────────────────────────────────────────────────────────────
-
-export function getIssueRecordPath(project: ProjectConfig, issueId: string): string {
-  const { repoPath, recordsPath } = resolveInfraRepo(project);
-  return join(repoPath, recordsPath, `${issueId.toLowerCase()}.json`);
-}
-
-export function writeIssueRecordSync(
-  project: ProjectConfig,
-  issueId: string,
-  record: PanIssueRecord,
-): string {
-  const path = getIssueRecordPath(project, issueId);
-  const dir = dirname(path);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-  writeFileSync(path, JSON.stringify(record, null, 2), 'utf-8');
-  return path;
-}
-
-export async function readIssueRecord(
-  project: ProjectConfig,
-  issueId: string,
-): Promise<PanIssueRecord | null> {
-  const path = getIssueRecordPath(project, issueId);
-  try {
-    const raw = await fsp.readFile(path, 'utf-8');
-    return JSON.parse(raw) as PanIssueRecord;
-  } catch {
-    return null;
-  }
-}
+// Re-export core record I/O from the PAN-1919 single-writer module.
+export {
+  getIssueRecordPath,
+  writeIssueRecordSync,
+  readIssueRecord,
+  queueIssueRecordCommit,
+} from './record.js';
 
 // ─── Owner-URI lease (PAN-1908, CP-3) ─────────────────────────────────────────
 
-/** Build this node's owner URI: pan://host[:port]. */
-export function buildOwnUri(): string {
-  const port = process.env.PANOPTICON_PORT ? `:${process.env.PANOPTICON_PORT}` : '';
-  return `pan://${hostname()}${port}`;
-}
-
-export interface ClaimResult {
-  ok: boolean;
-  owner?: string;
-}
+export {
+  buildOwnUri,
+  claimIssueOwner,
+  clearIssueOwner,
+  type ClaimResult,
+} from './record.js';
 
 /**
- * Claim ownership of an issue by writing this node's URI into the per-issue
- * record. Refuses if the record already has a different owner URI (minimal
- * single-machine correctness: the operator must clear stale owners manually;
- * multi-node liveness/heartbeat is out of scope).
- */
-export async function claimIssueOwner(
-  project: ProjectConfig,
-  issueId: string,
-  ownUri: string = buildOwnUri(),
-): Promise<ClaimResult> {
-  const record = (await readIssueRecord(project, issueId)) ?? {
-    issueId,
-    schemaVersion: 1,
-    pipeline: {
-      issueId,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: new Date().toISOString(),
-    },
-    closeOut: {
-      usage: { byStage: {}, totals: {} },
-      merges: [],
-      ranOn: hostname(),
-    },
-  };
-
-  if (record.owner && record.owner !== ownUri) {
-    return { ok: false, owner: record.owner };
-  }
-
-  record.owner = ownUri;
-  writeIssueRecordSync(project, issueId, record);
-  queueIssueRecordCommit(project, issueId, getIssueRecordPath(project, issueId));
-  return { ok: true, owner: ownUri };
-}
-
-/** Release ownership of an issue at close-out (or manual override). */
-export async function clearIssueOwner(
-  project: ProjectConfig,
-  issueId: string,
-): Promise<void> {
-  const record = await readIssueRecord(project, issueId);
-  if (!record) return;
-  delete record.owner;
-  writeIssueRecordSync(project, issueId, record);
-  queueIssueRecordCommit(project, issueId, getIssueRecordPath(project, issueId));
-}
-
-export function queueIssueRecordCommit(
-  project: ProjectConfig,
-  issueId: string,
-  recordPath: string,
-): void {
-  const { repoPath } = resolveInfraRepo(project);
-  queueAutoCommit({
-    projectRoot: repoPath,
-    repoRoot: repoPath,
-    paths: [recordPath],
-    subject: `chore(records): update ${issueId.toUpperCase()} permanent record`,
-  });
-}
-
-/**
- * PAN-1908: rebuild and queue the per-issue permanent record for a given issue.
- * Fire-and-forget: failures are logged, never thrown, so review-status writes
- * stay synchronous and fast.
+ * PAN-1908 / PAN-1919: rebuild and queue the per-issue permanent record for a
+ * given issue. Fire-and-forget: failures are logged, never thrown, so
+ * review-status writes stay synchronous and fast.
  */
 export async function updateIssueRecordForIssue(
   issueId: string,
@@ -356,7 +214,7 @@ export async function updateIssueRecordForIssue(
     const project = getProjectSync(resolved.projectKey);
     if (!project) return;
 
-    const record = await buildIssueRecord(resolved.projectPath, issueId, { reviewStatus });
+    const record = await buildIssueRecord(project, issueId, { reviewStatus });
     const recordPath = writeIssueRecordSync(project, issueId, record);
     queueIssueRecordCommit(project, issueId, recordPath);
   } catch (err) {

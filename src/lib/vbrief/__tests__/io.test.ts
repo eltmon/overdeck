@@ -64,6 +64,26 @@ function writeWorkspaceDraft(doc: VBriefDocument): string {
   return planPath;
 }
 
+function writeRecord(statusOverrides: Record<string, string>): void {
+  const recordsDir = join(WORKSPACE_PATH, '.pan', 'records');
+  mkdirSync(recordsDir, { recursive: true });
+  writeFileSync(join(recordsDir, `${ISSUE_ID.toLowerCase()}.json`), JSON.stringify({
+    issueId: ISSUE_ID,
+    schemaVersion: 2,
+    created: '2026-01-01T00:00:00Z',
+    updated: '2026-01-01T00:00:00Z',
+    pipeline: {
+      issueId: ISSUE_ID,
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      readyForMerge: false,
+      updatedAt: '2026-01-01T00:00:00Z',
+    },
+    closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    statusOverrides,
+  }, null, 2));
+}
+
 beforeEach(() => {
   PROJECT_ROOT = join(tmpdir(), `vbrief-io-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_PATH = join(PROJECT_ROOT, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
@@ -262,7 +282,7 @@ describe('updateItemStatus', () => {
     expect(item2?.status).toBe('in_progress');
   });
 
-  it('writes status to continue.json statusOverrides (not the spec)', () => {
+  it('writes status to per-issue record statusOverrides (not the spec)', () => {
     writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
     updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
 
@@ -332,21 +352,7 @@ describe('updateSubItemStatus', () => {
   it('applies compact subItem status overrides whose keys equal dotted subItem IDs', () => {
     const doc = makePlanWithSubItems();
     writePlanDoc(doc);
-    const panDir = join(WORKSPACE_PATH, '.pan');
-    mkdirSync(panDir, { recursive: true });
-    writeFileSync(join(panDir, 'continue.json'), JSON.stringify({
-      version: '1',
-      issueId: ISSUE_ID,
-      created: '2026-01-01T00:00:00Z',
-      updated: '2026-01-01T00:00:00Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-      statusOverrides: { 'item-1.ac1': 'completed' },
-    }));
+    writeRecord({ 'item-1.ac1': 'completed' });
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
@@ -356,21 +362,7 @@ describe('updateSubItemStatus', () => {
   it('applies compact status overrides to v0.6 items children', () => {
     const doc = makePlanWithItems();
     writePlanDoc(doc);
-    const panDir = join(WORKSPACE_PATH, '.pan');
-    mkdirSync(panDir, { recursive: true });
-    writeFileSync(join(panDir, 'continue.json'), JSON.stringify({
-      version: '1',
-      issueId: ISSUE_ID,
-      created: '2026-01-01T00:00:00Z',
-      updated: '2026-01-01T00:00:00Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-      statusOverrides: { 'item-1.ac1': 'completed' },
-    }));
+    writeRecord({ 'item-1.ac1': 'completed' });
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = subItemsOf(updated.plan.items[0]).find(s => s.id === 'item-1.ac1');

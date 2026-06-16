@@ -25,7 +25,12 @@ import {
   type TaskCommandOptions,
   type TaskOperationResult,
 } from './dag.js';
-import { findPlanSync, readWorkspaceContinueSync, readWorkspacePlanSync, writeWorkspaceContinueSync } from './io.js';
+import { findPlanSync, readWorkspacePlanSync } from './io.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  resolveProjectForIssue,
+  writeStatusOverridesSync,
+} from '../pan-dir/record.js';
 
 function assertSingleWriter(planPath: string, writerId: string): void {
   const owner = activePlanWriters.get(planPath);
@@ -100,27 +105,18 @@ function writePlanFileAtomic(planPath: string, doc: VBriefDocument): void {
   renameSync(tmp, planPath);
 }
 
-/** Mirror a task operation's status changes into the workspace continue file so canonical readers see them. */
-function mirrorTaskOperationToContinueFile(
+/** Mirror a task operation's status changes into the per-issue record so canonical readers see them. */
+function mirrorTaskOperationToRecord(
   workspacePath: string,
   itemId: string,
   status: VBriefItemStatus,
   subItemIds?: string[],
 ): void {
-  const continueState = readWorkspaceContinueSync(workspacePath) ?? {
-    version: '1' as const,
-    issueId: '',
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
-    gitState: {},
-    decisions: [],
-    hazards: [],
-    resumePoint: null,
-    beadsMapping: {},
-    sessionHistory: [],
-  };
-  const overrides = { ...continueState.statusOverrides };
-  overrides[itemId] = status;
+  const issueId = workspacePath.match(/feature-([a-z]+-\d+)$/i)?.[1]?.toUpperCase();
+  if (!issueId) return;
+  const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+
+  const overrides: Record<string, string> = { [itemId]: status };
 
   // Derive affected child items from the plan for canonical overlay
   const doc = readWorkspacePlanSync(workspacePath);
@@ -137,8 +133,7 @@ function mirrorTaskOperationToContinueFile(
     }
   }
 
-  continueState.statusOverrides = overrides;
-  writeWorkspaceContinueSync(workspacePath, continueState);
+  writeStatusOverridesSync(project, issueId, overrides);
 }
 
 /** Persist a task operation to workspace .pan/spec.vbrief.json with CAS + single-writer guard. */
@@ -149,12 +144,12 @@ export function applyTaskOperationToPlanFile(planPath: string, operation: Persis
     const current = readPlanFile(planPath);
     const result = applyTaskOperation(current, operation);
     writePlanFileAtomic(planPath, result.doc);
-    // PAN-977: also update canonical continue-state overlay. When the planPath
-    // is a canonical spec on main (PAN-1124), dirname(dirname(planPath)) yields
-    // the project root, not the workspace root. Callers must pass the correct
-    // workspacePath so the mirror lands in <workspace>/.pan/continue.json.
+    // PAN-977 / PAN-1919: also update canonical per-issue record overlay. When
+    // the planPath is a canonical spec on main (PAN-1124), dirname(dirname(planPath))
+    // yields the project root, not the workspace root. Callers must pass the
+    // correct workspacePath so the mirror lands in <workspace>/.pan/records/<issue>.json.
     const wsPath = workspacePath ?? dirname(dirname(planPath));
-    mirrorTaskOperationToContinueFile(wsPath, operation.itemId, result.item.status, operation.subItemIds);
+    mirrorTaskOperationToRecord(wsPath, operation.itemId, result.item.status, operation.subItemIds);
     return result;
   } finally {
     releasePlanWriter(planPath, operation.writerId);
@@ -196,8 +191,8 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
     return item;
   }
 
-  // Mutations write to the canonical spec on main (PAN-1124) AND to the continue
-  // file statusOverrides so canonical readers see the change.
+  // Mutations write to the canonical spec on main (PAN-1124) AND to the
+  // per-issue record statusOverrides so canonical readers see the change.
   const planPath = findPlanSync(options.workspacePath);
   if (!planPath) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
   const doc = readPlanFile(planPath);
