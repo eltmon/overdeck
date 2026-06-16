@@ -77,15 +77,17 @@
   ],
   "feedback": [],
   "created": "2026-06-16T16:16:39.356Z",
-  "updated": "2026-06-16T17:41:16.357Z",
+  "updated": "2026-06-16T17:43:11.095Z",
   "pipeline": {
     "issueId": "PAN-1847",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T17:41:16.259Z",
+    "updatedAt": "2026-06-16T17:43:11.073Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (28846ms):\n\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n- Preparing workspace for PAN-1872...\n⚠ Could not sync main: Sync-main produced 1 conflict(s) in PAN-1872: tests/foo.test.ts. Resolve manually in the workspace, then re-run sync-main. Conflicts: tests/foo.test.ts.\n✔ Agent spawned: agent-pan-1872\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n FAIL  |root| src/lib/database/__tests__/pending-auto-merges-schema.test.ts > pending auto-merges schema > uses current schema version and creates pending_auto_merges on fresh init\nAssertionError: expected 56 to be 55 // Object.is equality\n\n- Expected\n+ Received\n\n- 55\n+ 56\n\n ❯ src/lib/database/__tests__/pending-auto-merges-schema.test.ts:29:28\n     27|     makeTestHome('pan-pending-auto-merges-fresh');\n     28|\n     29|     expect(SCHEMA_VERSION).toBe(55);\n       |                            ^\n     30|     const db = getDatabase();\n     31|     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VE…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1930"
   },
   "closeOut": {
@@ -110,7 +112,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.646973,
-        "pricingAsOf": "2026-06-16T17:41:16.357Z"
+        "pricingAsOf": "2026-06-16T17:43:11.095Z"
       }
     },
     "merges": [
