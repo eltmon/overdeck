@@ -379,6 +379,22 @@ export async function initEventStore(): Promise<EventStore> {
     if (purged > 0) {
       console.log(`[event-store] Purged ${purged} oversized issues.snapshot events from persistent store`);
     }
+
+    // One-time migration: purge agent.output_received rows that were persisted
+    // before the poller switched to emitOnly. Terminal output is ephemeral and
+    // reconstructable from tmux, so these rows are safe to delete.
+    const purgedOutput = store.purgeType('agent.output_received');
+    if (purgedOutput > 0) {
+      console.log(`[event-store] Purged ${purgedOutput} agent.output_received events from persistent store`);
+      try {
+        db.exec('PRAGMA incremental_vacuum');
+      } catch (err) {
+        // Non-fatal: the 15-minute periodic reclaimer in src/lib/database/index.ts
+        // is the backstop for returning freed pages to the OS.
+        console.error('[event-store] incremental_vacuum failed (non-fatal):', err);
+      }
+    }
+
     _store = store;
     setActivityEventStoreProvider(() => store);
     return store;
