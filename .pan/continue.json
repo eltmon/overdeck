@@ -2,23 +2,71 @@
   "version": "1",
   "issueId": "PAN-1847",
   "created": "2026-06-16T15:35:46.876Z",
-  "updated": "2026-06-16T17:55:00.000Z",
-  "gitState": { "branch": "feature/pan-1847", "sha": "7320a378a5", "dirty": true },
+  "updated": "2026-06-16T17:41:10.708Z",
+  "gitState": {
+    "branch": "feature/pan-1847",
+    "sha": "7320a378a5",
+    "dirty": true
+  },
   "agentModel": "agent:claude-opus-4-8",
   "decisions": [
-    { "id": "D1", "summary": "PAN-1847 = delete the dead projection_cache table + both write-through save() paths (root-cause, NOT a GC). Operator-confirmed Option 1. The original 'prune rows + VACUUM to reclaim 1.4 GB' premise is RETIRED: the 12,125 agent-runtime: rows are 1.93 MB (0.14% of the 1379 MB DB); the table is fully unread after PAN-1920 (load() has zero callers).", "recordedAt": "2026-06-16T15:59:52.000Z" },
-    { "id": "D2", "summary": "Schema removal shape: remove the base CREATE (schema.ts:486-492) AND the historical 'if (currentVersion < 5)' create (817-827); add 'if (currentVersion < 56) DROP TABLE IF EXISTS projection_cache'; bump SCHEMA_VERSION 55->56. Verified safe: no migration test migrates from version <5 or expects projection_cache (schema-migrations.test.ts).", "recordedAt": "2026-06-16T15:59:52.000Z" },
-    { "id": "D3", "summary": "No VACUUM. auto_vacuum is already INCREMENTAL with a 15-min incremental_vacuum reclaimer (src/lib/database/index.ts:108). The ~7.5 MB freed by DROP is reclaimed automatically. Disk reclaim is explicitly NOT a goal of this issue.", "recordedAt": "2026-06-16T15:59:52.000Z" },
-    { "id": "D4", "summary": "Regenerate sync-sources/hooks/record-cost-event.js from source via 'npm run build:scripts' (tsdown bundles schema.ts into it). NEVER hand-edit the .js artifact. Commit the regenerated artifact.", "recordedAt": "2026-06-16T15:59:52.000Z" },
-    { "id": "D5", "summary": "Keep tests/unit/lib/reconstruct/no-circular-source.test.ts untouched — its forbidden-strings list (projection_cache, projectionCache.load) guards against re-introduction and stays green. Keep agent.state_restored event + RUNTIME_EVENT_TYPES + the reducer fold; only the DB write is removed.", "recordedAt": "2026-06-16T15:59:52.000Z" },
-    { "id": "D6", "summary": "The real ~1 GB disk hog is the events table (agent.output_received = 721 MB), tracked as the SEPARATE issue PAN-1925. Strictly out of scope here.", "recordedAt": "2026-06-16T15:59:52.000Z" }
+    {
+      "id": "D1",
+      "summary": "PAN-1847 = delete the dead projection_cache table + both write-through save() paths (root-cause, NOT a GC). Operator-confirmed Option 1. The original 'prune rows + VACUUM to reclaim 1.4 GB' premise is RETIRED: the 12,125 agent-runtime: rows are 1.93 MB (0.14% of the 1379 MB DB); the table is fully unread after PAN-1920 (load() has zero callers).",
+      "recordedAt": "2026-06-16T15:59:52.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Schema removal shape: remove the base CREATE (schema.ts:486-492) AND the historical 'if (currentVersion < 5)' create (817-827); add 'if (currentVersion < 56) DROP TABLE IF EXISTS projection_cache'; bump SCHEMA_VERSION 55->56. Verified safe: no migration test migrates from version <5 or expects projection_cache (schema-migrations.test.ts).",
+      "recordedAt": "2026-06-16T15:59:52.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "No VACUUM. auto_vacuum is already INCREMENTAL with a 15-min incremental_vacuum reclaimer (src/lib/database/index.ts:108). The ~7.5 MB freed by DROP is reclaimed automatically. Disk reclaim is explicitly NOT a goal of this issue.",
+      "recordedAt": "2026-06-16T15:59:52.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Regenerate sync-sources/hooks/record-cost-event.js from source via 'npm run build:scripts' (tsdown bundles schema.ts into it). NEVER hand-edit the .js artifact. Commit the regenerated artifact.",
+      "recordedAt": "2026-06-16T15:59:52.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Keep tests/unit/lib/reconstruct/no-circular-source.test.ts untouched — its forbidden-strings list (projection_cache, projectionCache.load) guards against re-introduction and stays green. Keep agent.state_restored event + RUNTIME_EVENT_TYPES + the reducer fold; only the DB write is removed.",
+      "recordedAt": "2026-06-16T15:59:52.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "The real ~1 GB disk hog is the events table (agent.output_received = 721 MB), tracked as the SEPARATE issue PAN-1925. Strictly out of scope here.",
+      "recordedAt": "2026-06-16T15:59:52.000Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "The bundled cost hook record-cost-event.js embeds the full schema and re-creates projection_cache via CREATE TABLE IF NOT EXISTS. If not regenerated, the table reappears and FR-4 fails.", "mitigation": "After editing schema.ts, run 'npm run build:scripts'; verify 'grep projection_cache sync-sources/hooks/record-cost-event.js' is empty; commit the artifact (see D4)." },
-    { "id": "H2", "summary": "In agent-state-service.ts applyEventToRef, over-deletion that removes the SubscriptionRef.update reducer fold or setAgentRuntimeMirror(next) would silently break LIVE UI runtime snapshots while still passing typecheck and the contracts reducer test.", "mitigation": "Remove ONLY the upsertStmt prep + the for...upsertStmt.run loop. Keep applyReducerEvent + setAgentRuntimeMirror + the ref update. Use the exact before/after in the PRD; B2 ACs assert the fold + mirror lines remain." },
-    { "id": "H3", "summary": "Deleting projection-cache.ts before its importers are removed breaks the build (read-model.ts, event-store.ts, agent-state-service.ts import it).", "mitigation": "Edge ordering: B1, B2, B3 all block B4 (the module deletion). Each of B1-B3 leaves the tree green on its own." },
-    { "id": "H4", "summary": "reconstruct-boot.test.ts mocks '...projection-cache.js'; once the module is deleted the mock targets a nonexistent path, and dbPrepareSpy scaffolding becomes orphaned.", "mitigation": "B6 (blocked by B4) removes the vi.mock block + the now-unused dbPrepareSpy/getSharedDb().prepare scaffolding. No assertion checks the upsert, so no assertion is removed — only scaffolding." },
-    { "id": "H5", "summary": "The v55->v56 DROP runs on the live 1.4 GB DB. DROP of a ~2 MB table is fast and within a normal migration; a pre-v55 file snapshot already exists (panopticon.db.v54-backfill-snapshot).", "mitigation": "DROP TABLE IF EXISTS is a no-op if absent; no full VACUUM (D3). Migration tests from v52/53/54 must reach user_version=56 green." }
+    {
+      "id": "H1",
+      "summary": "The bundled cost hook record-cost-event.js embeds the full schema and re-creates projection_cache via CREATE TABLE IF NOT EXISTS. If not regenerated, the table reappears and FR-4 fails.",
+      "mitigation": "After editing schema.ts, run 'npm run build:scripts'; verify 'grep projection_cache sync-sources/hooks/record-cost-event.js' is empty; commit the artifact (see D4)."
+    },
+    {
+      "id": "H2",
+      "summary": "In agent-state-service.ts applyEventToRef, over-deletion that removes the SubscriptionRef.update reducer fold or setAgentRuntimeMirror(next) would silently break LIVE UI runtime snapshots while still passing typecheck and the contracts reducer test.",
+      "mitigation": "Remove ONLY the upsertStmt prep + the for...upsertStmt.run loop. Keep applyReducerEvent + setAgentRuntimeMirror + the ref update. Use the exact before/after in the PRD; B2 ACs assert the fold + mirror lines remain."
+    },
+    {
+      "id": "H3",
+      "summary": "Deleting projection-cache.ts before its importers are removed breaks the build (read-model.ts, event-store.ts, agent-state-service.ts import it).",
+      "mitigation": "Edge ordering: B1, B2, B3 all block B4 (the module deletion). Each of B1-B3 leaves the tree green on its own."
+    },
+    {
+      "id": "H4",
+      "summary": "reconstruct-boot.test.ts mocks '...projection-cache.js'; once the module is deleted the mock targets a nonexistent path, and dbPrepareSpy scaffolding becomes orphaned.",
+      "mitigation": "B6 (blocked by B4) removes the vi.mock block + the now-unused dbPrepareSpy/getSharedDb().prepare scaffolding. No assertion checks the upsert, so no assertion is removed — only scaffolding."
+    },
+    {
+      "id": "H5",
+      "summary": "The v55->v56 DROP runs on the live 1.4 GB DB. DROP of a ~2 MB table is fast and within a normal migration; a pre-v55 file snapshot already exists (panopticon.db.v54-backfill-snapshot).",
+      "mitigation": "DROP TABLE IF EXISTS is a no-op if absent; no full VACUUM (D3). Migration tests from v52/53/54 must reach user_version=56 green."
+    }
   ],
   "resumePoint": {
     "description": "All beads for PAN-1847 are complete. Workspace is clean; 38 relevant test files with 313 tests pass; typecheck and lint pass. Next action is to push the feature branch and run `pan done pan-1847`.",
@@ -86,6 +134,11 @@
       "reason": "work",
       "note": "Final verification for PAN-1847: ran targeted vitest suites (tests/unit/dashboard/server, tests/unit/lib/database, packages/contracts) — 38 files, 313 tests passed. Typecheck (tsc --noEmit) and lint pass. Workspace is clean. Ready to push and pan done.",
       "agentModel": "agent:pi:kimi-k2.7-code"
+    },
+    {
+      "timestamp": "2026-06-16T17:41:10.707Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": []
