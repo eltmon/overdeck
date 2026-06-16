@@ -131,7 +131,8 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
               └─────────────────────────────────┘
                    ▲                         ▲
             ONE read door             ONE write door
-       state-resolver /api/state    record writer / write-surface
+     one resolver PER DOMAIN        record writer / write-surface
+     (issues, agents, convos…)
               (#1936)                       (#1921)
                    ▲                         ▲
       ┌────────────┴───────────┬─────────────┴────────────┐
@@ -144,8 +145,10 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
 2. **One sync layer**: reconstruction (#1920) rebuilds the DB from sources; the writer mirrors writes back
    to git for durability/travel.
 3. The **DB is the one surface** running code uses — a cache, never the truth.
-4. **One read door** (#1936) + **one write door** (#1921). Reads go through the resolver; writes go
-   through the single writer.
+4. **One read door** (#1936) + **one write door** (#1921). Reads go through **one canonical resolver per
+   domain** (issues, agents, conversations, …) — "state" is **not** a domain, it's a property every
+   entity has, so there is no `/api/state`; each real domain owns its read. Writes go through the single
+   writer.
 5. A **CI guard** makes direct DB / filesystem / GitHub access *outside the two doors* fail the build — so
    nobody can ever add a 9th read path or a 22nd verdict-writer again.
 
@@ -156,7 +159,7 @@ recovery breaking. (#1921 is meant to be the single write surface; it is not bui
 | #1920 ✅ | the sync layer (sources → DB) |
 | #1919 | the unified per-issue **record** — durable truth in git |
 | #1921 | the **one write door** |
-| #1936 | the **one read door** |
+| #1936 | the **read door** — one canonical resolver per domain (no `/api/state`) |
 | #1922 | verdicts become a durable source of truth, not DB-only |
 | #1929 / #1931 / #1932 | fix the sync/write path that today corrupts the record |
 

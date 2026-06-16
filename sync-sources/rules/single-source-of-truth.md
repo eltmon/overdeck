@@ -7,8 +7,13 @@ Every piece of canonical state — issue status, plans, verdicts, agent runtime,
 has **exactly one read path and one write path**. Code, agents, the CLI, and the dashboard reach state
 ONLY through:
 
-- **the read door** — the state-resolver API (`/api/state/*` + the RPC `StateGroup`); and
+- **the read door** — **one canonical resolver per domain** (issues, agents, conversations, …): a
+  read of a domain goes through that domain's resolver, never a store directly; and
 - **the write door** — the single record writer / write-surface.
+
+"State" is **not** a domain — it is a cross-cutting property every entity has. There is no `/api/state`;
+there is an issues resolver, an agents resolver, a conversations resolver, etc., each the only thing that
+touches a store for its domain.
 
 No route handler, agent, script, or hook may read or write the SQLite DB, the `.pan/` filesystem,
 `state.json`, or GitHub issue state **directly** for canonical state. The DB is a disposable cache,
