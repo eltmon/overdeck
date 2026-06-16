@@ -2,7 +2,7 @@
   "issueId": "PAN-1847",
   "schemaVersion": 2,
   "created": "2026-06-16T16:16:39.356Z",
-  "updated": "2026-06-16T17:00:38.648Z",
+  "updated": "2026-06-16T17:40:57.734Z",
   "pipeline": {
     "issueId": "PAN-1847",
     "reviewStatus": "pending",
@@ -19,5 +19,38 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "pi",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "b8": "completed",
+    "b8.ac1": "completed",
+    "b8.ac2": "completed",
+    "b7": "completed",
+    "b7.ac1": "completed",
+    "b7.ac2": "completed",
+    "b7.ac3": "completed",
+    "b6": "completed",
+    "b6.ac1": "completed",
+    "b6.ac2": "completed",
+    "b4": "completed",
+    "b4.ac1": "completed",
+    "b4.ac2": "completed",
+    "b4.ac3": "completed",
+    "b5": "completed",
+    "b5.ac1": "completed",
+    "b5.ac2": "completed",
+    "b5.ac3": "completed",
+    "b5.ac4": "completed",
+    "b3": "completed",
+    "b3.ac1": "completed",
+    "b3.ac2": "completed",
+    "b3.ac3": "completed",
+    "b2": "completed",
+    "b2.ac1": "completed",
+    "b2.ac2": "completed",
+    "b2.ac3": "completed",
+    "b1": "completed",
+    "b1.ac1": "completed",
+    "b1.ac2": "completed",
+    "b1.ac3": "completed"
+  }
 }
