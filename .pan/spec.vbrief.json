@@ -1,0 +1,228 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-16T20:00:13.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1925: stop persisting agent.output_received durably (events table ~1 GB / 721 MB of terminal output)",
+    "updated": "2026-06-16T20:04:12.653Z"
+  },
+  "plan": {
+    "id": "pan-1925",
+    "title": "perf(dashboard): events table ~1 GB — agent.output_received (721 MB of terminal output) persisted durably",
+    "status": "proposed",
+    "uid": "128e99ed-3c51-47a9-9ae3-9bbe46435b9e",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-16T20:00:13.000Z",
+    "updated": "2026-06-16T20:04:12.653Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1925",
+        "label": "PAN-1925",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1919",
+        "label": "PAN-1919 (state-model epic)",
+        "type": "issue"
+      },
+      {
+        "uri": "reference/state-model.mdx",
+        "label": "State Model",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "performance",
+      "event-store",
+      "state-model",
+      "sqlite"
+    ],
+    "narratives": {
+      "Problem": "The events table in ~/.panopticon/panopticon.db is ~1 GB, dominated by agent.output_received: ~264k rows / 721 MB of agent terminal output, all within the 7-day window (this is the rate, not unbounded history). Per reference/state-model.mdx, agent terminal output is ephemeral and reconstructable from tmux — classified 'Live activity … cache only'. Persisting it as durable events is the smell. The live terminal UI streams from tmux via /ws/terminal, and the god-view buffer is filled from the live in-memory event stream — neither needs the persisted rows.",
+      "Proposal": "Issue Option 1 (preferred): stop persisting agent.output_received durably. (1) The agent-output poller emits via the existing eventStore.emitOnly() (in-memory only, sequence -1) instead of appendAsync(); the event still reaches every live consumer because streamEvents is backed by store.subscribe(). (2) initEventStore runs a one-time purgeType('agent.output_received') (mirroring the issues.snapshot purge) to delete the ~264k existing rows, then PRAGMA incremental_vacuum to return freed pages to the OS (Node prod has auto_vacuum=INCREMENTAL). (3) agent.output_received stays in the public SSE catalog but becomes live-only; formatFrame omits the SSE id: line for sequence < 0 so emitOnly frames never poison Last-Event-ID resume.",
+      "NonGoals": "- Option 2 (per-type shortened retention window) — rejected; it keeps the write churn.\n- Removing agent.output_received from the public SSE catalog — external consumers keep the live feed; only replay changes.\n- Adding agent.output_received to the readFromStmt exclusion list (event-store.ts:187) — unnecessary after purge; downstream defensive code.\n- Changing the 7-day global retention window or the existing VACUUM machinery in src/lib/database/index.ts.\n- The /ws/terminal raw PTY terminal path — unaffected; it never used the event log.\n- projection_cache — that is #1847's scope."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose issue Option 1 (stop persisting) over Option 2 (per-type retention).",
+        "rationale": "Option 1 is the root-cause fix aligned with the state model (terminal output is ephemeral), reuses the existing emitOnly + purgeType primitives and the issues.snapshot migration precedent, and removes the write entirely rather than just shortening how long churn is kept."
+      },
+      {
+        "summary": "Reclaim freed disk with PRAGMA incremental_vacuum (conditional on rows purged), not a second full VACUUM.",
+        "rationale": "The Node production DB already runs auto_vacuum=INCREMENTAL with a periodic reclaimer (src/lib/database/index.ts:96-122); incremental_vacuum returns the freed pages immediately and is far lighter than rewriting the whole DB with VACUUM."
+      },
+      {
+        "summary": "Keep agent.output_received public (live-only) and fix SSE formatFrame to omit id: for sequence < 0, rather than removing the event from the catalog.",
+        "rationale": "Preserves the live feed for external consumers (no-loss), and the id-omission is the SSE-spec-correct way to keep a non-persisted event from poisoning Last-Event-ID resume."
+      }
+    ],
+    "items": [
+      {
+        "id": "emit-only",
+        "title": "Emit agent.output_received stream-only via emitOnly() instead of persisting with appendAsync()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-16T20:00:13.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/agent-output-service.ts pollOnce() (lines 124-137), replace the persisting write `await eventStore.appendAsync(event as never)` (and its surrounding try/catch) with the in-memory-only `eventStore.emitOnly(event as never)`. emitOnly is synchronous, returns void, and does not throw, so remove the try/catch and the await. Add a short comment that terminal output is ephemeral (state model) and reconstructable from tmux. Update the producer test src/dashboard/server/services/__tests__/agent-output-service.test.ts to mock `emitOnly` instead of `appendAsync` and update every assertion (mockEmitOnly called/not-called, event type/payload). Verified end-to-end: streamEvents (domain-services.ts:280) is backed by store.subscribe(), so emitOnly still feeds RPC subscribeAgentOutput (ws-rpc.ts:627), subscribeIssueEvents, the SSE live tail, and the frontend god view; the reducer (event-reducers.ts:534) and frontend recoveryCoordinator (recoveryCoordinator.ts:72-75) already handle sequence -1."
+        },
+        "items": [
+          {
+            "id": "emit-only.ac1",
+            "title": "pollOnce emits agent.output_received via eventStore.emitOnly() and never calls appendAsync() for this event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-only.ac2",
+            "title": "The emitted event preserves type 'agent.output_received' and payload { agentId, lines } (the diffed new lines)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-only.ac3",
+            "title": "pollOnce persists no agent.output_received row to the events table — zero durable writes while agents produce output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-only.ac4",
+            "title": "Updated producer test asserts emitOnly is called (and appendAsync is not) for new lines, is not called when output is unchanged, and is not called for non-tmuxActive agents; npm test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "purge-migration",
+        "title": "One-time startup purge of existing agent.output_received rows + immediate page reclamation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-16T20:00:13.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/event-store.ts initEventStore(), inside the .then((db) => …) after the existing issues.snapshot purge (~line 381), add `const purgedOutput = store.purgeType('agent.output_received');` and, when purgedOutput > 0, log the count and run `db.exec('PRAGMA incremental_vacuum')` inside a try/catch (non-fatal; the 15-min periodic reclaimer in src/lib/database/index.ts is the backstop). The purge is safe to run unconditionally — purgeType is a no-op (0 rows) once the poller no longer persists. Do NOT add agent.output_received to the readFromStmt exclusion list at event-store.ts:187. Add a unit test that seeds agent.output_received rows in a temp event store, runs the purge path, and asserts the rows are deleted (count -> 0) and a second run deletes 0."
+        },
+        "items": [
+          {
+            "id": "purge-migration.ac1",
+            "title": "On startup, initEventStore deletes all pre-existing agent.output_received rows from the events table via purgeType('agent.output_received')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "purge-migration.ac2",
+            "title": "When rows were purged, PRAGMA incremental_vacuum runs so freed pages return to the OS (Node production path, auto_vacuum=INCREMENTAL); wrapped so a pragma failure is non-fatal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "purge-migration.ac3",
+            "title": "Unit test: seeding agent.output_received rows then running the purge leaves 0 such rows; a second run deletes 0 (idempotent no-op)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "purge-migration.ac4",
+            "title": "Preserves the readFromStmt exclusion list at event-store.ts:187 unchanged — agent.output_received is NOT added and no per-type retention window is introduced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sse-frame-id",
+        "title": "SSE: omit id: for in-memory-only (sequence < 0) frames; document agent.output_received as live-only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-16T20:00:13.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/events.ts formatFrame() (lines 84-92), only include the SSE `id: <sequence>` line when event.sequence >= 0; emit no id: line for sequence < 0 (emitOnly events carry sequence -1). Per the SSE spec, omitting id: leaves the client's Last-Event-ID unchanged, so a live-only agent.output_received frame can no longer disable replay for other event types on the same connection (the replay guard at events.ts:177 requires since >= 0). Persisted rows are AUTOINCREMENT >= 1, so real-event resume is unaffected. Update docs/EXTERNAL-EVENT-STREAM.md: change the agent.output_received catalog row (line 99) and/or the Retention & Replay section to mark it live-only — streamed in real time but not persisted, so ?since=/Last-Event-ID replay will NOT include it. Add a unit test for formatFrame covering sequence -1 (no id: line) and sequence >= 1 (id: line present)."
+        },
+        "items": [
+          {
+            "id": "sse-frame-id.ac1",
+            "title": "formatFrame produces an SSE frame with no 'id:' line when sequence < 0, and a frame with 'id: <sequence>' when sequence >= 0 (unit test covers both branches)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sse-frame-id.ac2",
+            "title": "Live SSE consumers still receive agent.output_received frames over /events/stream (the event remains in PUBLIC_CATALOG and passes matchesFilter)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sse-frame-id.ac3",
+            "title": "docs/EXTERNAL-EVENT-STREAM.md marks agent.output_received as live-only — streamed live but not persisted/replayable via ?since= or Last-Event-ID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sse-frame-id",
+        "to": "emit-only",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-16-PAN-1925-perf-dashboard-events-table-1-gb-agent-output-received-721-mb-of-terminal-output-persisted-durably.vbrief.json"
+    }
+  }
+}
