@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-1920",
+  "schemaVersion": 2,
+  "created": "2026-06-16T14:38:40.821Z",
+  "updated": "2026-06-16T14:38:40.821Z",
+  "pipeline": {
+    "issueId": "PAN-1920",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T14:38:40.821Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "pi",
+  "model": "kimi-k2.7-code"
+}
