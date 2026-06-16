@@ -21,7 +21,7 @@ import { encodeClaudeProjectDir, getPanopticonHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 55;
+export const SCHEMA_VERSION = 56;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -483,14 +483,6 @@ export function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_agents_issue
       ON agents(issue_id);
 
-    -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
-    CREATE TABLE IF NOT EXISTS projection_cache (
-      key        TEXT PRIMARY KEY,
-      data       TEXT NOT NULL,     -- JSON-serialized DashboardSnapshot
-      sequence   INTEGER NOT NULL,  -- Last event sequence applied
-      updated_at TEXT NOT NULL      -- ISO timestamp
-    );
-
     -- ===== Conversations (PAN-416: Mission Control conversation launcher) =====
     CREATE TABLE IF NOT EXISTS conversations (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -811,18 +803,6 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
       CREATE INDEX IF NOT EXISTS idx_events_timestamp
         ON events(timestamp);
-    `);
-  }
-
-  // v4 → v5: add projection_cache table (PAN-437: instant dashboard startup)
-  if (currentVersion < 5) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS projection_cache (
-        key        TEXT PRIMARY KEY,
-        data       TEXT NOT NULL,
-        sequence   INTEGER NOT NULL,
-        updated_at TEXT NOT NULL
-      );
     `);
   }
 
@@ -1628,6 +1608,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     } catch (err) {
       console.warn('[schema] agents-table backfill failed:', err instanceof Error ? err.message : String(err));
     }
+  }
+
+  // v55 → v56: projection_cache table is dead after PAN-1920 / PAN-1847
+  if (currentVersion < 56) {
+    db.exec(`DROP TABLE IF EXISTS projection_cache`);
   }
 
   // After all migrations, set the version

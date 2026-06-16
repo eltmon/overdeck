@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1847",
   "created": "2026-06-16T15:35:46.876Z",
-  "updated": "2026-06-16T17:35:00.000Z",
+  "updated": "2026-06-16T17:40:00.000Z",
   "gitState": { "branch": "feature/pan-1847", "sha": "7320a378a5", "dirty": true },
   "agentModel": "agent:claude-opus-4-8",
   "decisions": [
@@ -21,9 +21,9 @@
     { "id": "H5", "summary": "The v55->v56 DROP runs on the live 1.4 GB DB. DROP of a ~2 MB table is fast and within a normal migration; a pre-v55 file snapshot already exists (panopticon.db.v54-backfill-snapshot).", "mitigation": "DROP TABLE IF EXISTS is a no-op if absent; no full VACUUM (D3). Migration tests from v52/53/54 must reach user_version=56 green." }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-owjvx (remove orphaned projection-cache mock and dbPrepareSpy scaffolding from reconstruct-boot.test.ts). Test passes; stage, commit, close the bead, then advance to the next unblocked bead.",
-    "beadId": "workspace-owjvx",
-    "filesToRead": ["tests/unit/dashboard/server/reconstruct-boot.test.ts"]
+    "description": "Implementing bead workspace-amq7f (schema migration to stop creating projection_cache and DROP existing). SCHEMA_VERSION bumped to 56, CREATE blocks removed, DROP migration added; `npm run build:scripts` regenerated record-cost-event.js. Note: the bundled artifact still contains the DROP string because runMigrations is bundled into the cost hook; this is recorded as a deviation. Stage, commit, close the bead, then advance to the next unblocked bead.",
+    "beadId": "workspace-amq7f",
+    "filesToRead": ["src/lib/database/schema.ts", "sync-sources/hooks/record-cost-event.js"]
   },
   "beadsMapping": {},
   "sessionHistory": [
@@ -61,6 +61,12 @@
       "timestamp": "2026-06-16T17:35:00.000Z",
       "reason": "work",
       "note": "Completed bead workspace-owjvx: removed the orphaned projection-cache vi.mock and the now-unused dbPrepareSpy/getSharedDb scaffolding from reconstruct-boot.test.ts. Verified grep returns no matches and the two PAN-1920 bootstrap tests still pass.",
+      "agentModel": "agent:pi:kimi-k2.7-code"
+    },
+    {
+      "timestamp": "2026-06-16T17:40:00.000Z",
+      "reason": "work",
+      "note": "Completed bead workspace-amq7f: bumped SCHEMA_VERSION to 56, removed base and historical CREATE TABLE projection_cache blocks from schema.ts, added v55->v56 DROP TABLE IF EXISTS projection_cache migration, regenerated sync-sources/hooks/record-cost-event.js via `npm run build:scripts`. schema-migrations.test.ts passes. Deviation: the bundled cost hook still contains the DROP string because runMigrations is bundled into the standalone script; no CREATE TABLE remains.",
       "agentModel": "agent:pi:kimi-k2.7-code"
     }
   ],
