@@ -48,6 +48,26 @@ All Panopticon orchestration state lives under `.pan/` — a single dot-director
   context.md                ← FEATURE-CONTEXT for Rally story agents
 ```
 
+#### Infra repo (where permanent records live — see `pan_records` config)
+
+```
+.pan/
+  specs/                    ← immutable vBRIEF specs (one per issue)
+  continues/                ← durable continue subset (decisions/hazards/feedback)
+  pan-1908.json             ← per-issue permanent record: continue + pipeline + closeOut + owner
+  pan-1909.json
+```
+
+The infra repo is declared per project in `projects.yaml`:
+
+```yaml
+pan_records:
+  repo: "."       # monorepo: "."; polyrepo: a repo name from workspace.repos
+  path: .pan      # subdir inside that repo
+```
+
+Per-issue records include `pipeline` (durable verdicts from `review_status`), `closeOut` (usage by stage, merges, ranOn), and `owner` (URI lease). See [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md).
+
 ### PRD → Spec Lifecycle
 
 PRDs and vBRIEFs are distinct artifacts that flow through the same pipeline:
@@ -278,6 +298,9 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 | `plan.tags` | NO | Tags for categorization |
 | `plan.narratives` | NO | Problem/Proposal/NonGoals/Constraint/Risk narratives |
 | `plan.narratives.NonGoals` | NO | Explicitly out-of-scope behaviors, one per line prefixed `- `, or `"none"` if genuinely nothing. Review enforces these as must-not constraints. |
+| `plan.pipeline` | NO | Runtime-derived durable verdict block; lives in the per-issue permanent record, not the spec |
+| `plan.closeOut` | NO | Close-out aggregate; lives in the per-issue permanent record, not the spec |
+| `plan.owner` | NO | Owner-URI lease; lives in the per-issue permanent record, not the spec |
 
 #### `plan.status` Enum
 
@@ -411,6 +434,27 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 The legacy `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories at the project root are still read by `findLegacyVBriefByIssue` so in-flight work from before the cutover keeps resolving. All writes target `.pan/specs/` only, and lifecycle status changes are atomic field flips on a single file — files do NOT move between directories.
 
 Continue files on the main side live at `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.pan/continue.json` and includes `statusOverrides` for item/subItem status tracking.
+
+### Per-issue permanent record (PAN-1908)
+
+In addition to the vBRIEF spec and continue file, every in-flight issue has a single durable record in the infra repo at `.pan/<recordsPath>/<issue-lowercase>.json` (for example `.pan/pan-1908.json`). This record is autocommitted on durable transitions.
+
+It contains:
+
+| Field | Source | Writable by |
+|-------|--------|-------------|
+| `issueId` | issue id | read-only |
+| `schemaVersion` | record format version | read-only |
+| `decisions` | continue file | work agent / planning agent |
+| `hazards` | continue file | work agent / planning agent |
+| `feedback` | continue file | work agent / planning agent |
+| `pipeline` | durable `review_status` columns | review-status upsert path |
+| `closeOut` | cost events + merge set | close-out flow |
+| `owner` | URI lease | spawn/claim/close-out flow |
+
+The `pipeline` block carries the durable verdicts (`reviewStatus`, `testStatus`, `inspectStatus`, `mergeStatus`, `readyForMerge`, `prUrl`/`prNumber`/`prHeadSha`, `reviewedAtCommit`, `lastVerifiedCommit`, `autoMerge`, `deaconIgnored`, etc.). The `closeOut` block carries `usage.byStage[stage][provider/model] = {input, output, cacheRead, cacheWrite}`, `usage.totals`, `costAtCloseOut`, `merges[]` (URL strings), `ranOn`, and `closedAt`.
+
+The infra repo and subpath are declared per project in `projects.yaml` under `pan_records: { repo, path }`. See [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md).
 
 ---
 

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
@@ -31,6 +31,8 @@ import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } fr
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
+import { getAgent as getAgentFromDb, upsertAgent, listAllAgents, type Agent as DbAgent } from './database/agents-db.js';
+import { agentStateToDbAgent } from './database/agent-mappers.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -53,7 +55,7 @@ import { getFlywheelActiveRunId } from './database/app-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import { sendGracefulRestartWarning } from './graceful-restart.js';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity, AgentStatus } from '@panctl/contracts';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -616,22 +618,10 @@ export function resolveAgentTargetSync(input: string): string | null {
   if (getAgentStateSync(canonicalAgentId)) return canonicalAgentId;
 
   try {
-    if (!existsSync(AGENTS_DIR)) return canonicalAgentId;
     const wantedIssueId = issueId.toUpperCase();
-    const matches: string[] = [];
-    for (const entry of readdirSync(AGENTS_DIR, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const stateFile = join(AGENTS_DIR, entry.name, 'state.json');
-      if (!existsSync(stateFile)) continue;
-      try {
-        const parsed = JSON.parse(readFileSync(stateFile, 'utf-8')) as { issueId?: string };
-        if (parsed.issueId?.toUpperCase() === wantedIssueId) {
-          matches.push(entry.name);
-        }
-      } catch {
-        // Skip unreadable state files.
-      }
-    }
+    const matches = listAllAgents()
+      .filter((agent) => agent.issueId.toUpperCase() === wantedIssueId)
+      .map((agent) => agent.id);
     if (matches.length === 1) return matches[0].toLowerCase();
     return canonicalAgentId;
   } catch {
@@ -883,8 +873,6 @@ export interface AgentState {
   workspace: string;
   /** Coding-agent harness this agent runs under (PAN-636). */
   harness?: RuntimeName;
-  /** Codex launch mode for compatibility with legacy one-shot agents. */
-  codexMode?: 'exec' | 'tui' | 'work-tui';
   /** Unified role primitive (PAN-1048). */
   role: Role;
   model: string;
@@ -922,9 +910,6 @@ export interface AgentState {
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
   workType?: string; // Current work type ID
-  preSpawnStashRef?: string;
-  preSpawnStashMessage?: string;
-  preSpawnBaselineHead?: string;
 
   /**
    * Whether this work agent was launched with the experimental Claude Code
@@ -984,7 +969,6 @@ function cleanAgentState(raw: AgentState): AgentState {
     issueId: raw.issueId,
     workspace: raw.workspace,
     harness: raw.harness,
-    codexMode: raw.codexMode,
     role: raw.role,
     model: raw.model,
     status: raw.status,
@@ -1008,9 +992,6 @@ function cleanAgentState(raw: AgentState): AgentState {
     branch: raw.branch,
     costSoFar: raw.costSoFar,
     sessionId: raw.sessionId,
-    preSpawnStashRef: raw.preSpawnStashRef,
-    preSpawnStashMessage: raw.preSpawnStashMessage,
-    preSpawnBaselineHead: raw.preSpawnBaselineHead,
     roleRunHead: raw.roleRunHead,
     channelsEnabled: raw.channelsEnabled,
     supervisorEnabled: raw.supervisorEnabled,
@@ -1042,8 +1023,64 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
+function dbAgentToAgentState(agent: DbAgent): AgentState {
+  return cleanAgentState({
+    id: agent.id,
+    issueId: agent.issueId,
+    workspace: agent.workspace,
+    role: agent.role as Role,
+    model: agent.model ?? '',
+    status: agent.status as AgentState['status'],
+    startedAt: agent.startedAt ?? new Date().toISOString(),
+    harness: agent.harness ? (agent.harness as RuntimeName) : undefined,
+    lastActivity: agent.lastActivity ?? undefined,
+    lastResumeAt: agent.lastResumeAt ?? undefined,
+    stoppedAt: agent.stoppedAt ?? undefined,
+    stoppedByUser: agent.stoppedByUser ?? undefined,
+    stoppedByPause: agent.stoppedByPause ?? undefined,
+    kickoffDelivered: agent.kickoffDelivered ?? undefined,
+    paused: agent.paused ?? undefined,
+    pausedReason: agent.pausedReason ?? undefined,
+    pausedAt: agent.pausedAt ?? undefined,
+    troubled: agent.troubled ?? undefined,
+    troubledAt: agent.troubledAt ?? undefined,
+    consecutiveFailures: agent.consecutiveFailures ?? undefined,
+    firstFailureInRunAt: agent.firstFailureInRunAt ?? undefined,
+    lastFailureAt: agent.lastFailureAt ?? undefined,
+    lastFailureReason: agent.lastFailureReason ?? undefined,
+    lastFailureNextRetryAt: agent.lastFailureNextRetryAt ?? undefined,
+    branch: agent.branch ?? undefined,
+    costSoFar: agent.costSoFar ?? undefined,
+    sessionId: agent.sessionId ?? undefined,
+    phase: agent.phase ? (agent.phase as AgentState['phase']) : undefined,
+    workType: agent.workType ?? undefined,
+    roleRunHead: agent.roleRunHead ?? undefined,
+    channelsEnabled: agent.channelsEnabled ?? undefined,
+    supervisorEnabled: agent.supervisorEnabled ?? undefined,
+    deliveryMethod: agent.deliveryMethod ? (agent.deliveryMethod as AgentState['deliveryMethod']) : undefined,
+    flywheelRunId: agent.flywheelRunId ?? undefined,
+    reviewSubRole: agent.reviewSubRole ?? undefined,
+    reviewRunId: agent.reviewRunId ?? undefined,
+    reviewOutputPath: agent.reviewOutputPath ?? undefined,
+    reviewSynthesisAgentId: agent.reviewSynthesisAgentId ?? undefined,
+    reviewDeadlineAt: agent.reviewDeadlineAt ?? undefined,
+    reviewMonitorSignaled: agent.reviewMonitorSignaled
+      ? (agent.reviewMonitorSignaled as AgentState['reviewMonitorSignaled'])
+      : undefined,
+    reviewRetryAttempt: agent.reviewRetryAttempt ?? undefined,
+    hostOverride: agent.hostOverride ?? undefined,
+    inspectSubRole: agent.inspectSubRole ?? undefined,
+  });
+}
+
 export function getAgentStateSync(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
+
+  // PAN-1908: authoritative runtime registry is the agents table. Fall back to
+  // state.json only while pre-migration directories have not been backfilled.
+  const dbAgent = getAgentFromDb(normalizedId);
+  if (dbAgent) return dbAgentToAgentState(dbAgent);
+
   const stateFile = join(getAgentDir(normalizedId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
@@ -1051,42 +1088,47 @@ export function getAgentStateSync(agentId: string): AgentState | null {
   return parseAgentState(content, normalizedId);
 }
 
-
 export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
-  const normalizedId = normalizeAgentId(agentId);
-  const stateFile = join(getAgentDir(normalizedId), 'state.json');
-  if (!existsSync(stateFile)) return Effect.succeed(null);
-
-  return Effect.tryPromise({
-    try: () => readFile(stateFile, 'utf-8'),
-    catch: (cause) => toAgentFsError('read', stateFile, cause),
-  }).pipe(Effect.map((content) => parseAgentState(content, normalizedId)));
+  return Effect.try({
+    try: () => getAgentStateSync(agentId),
+    catch: (cause) => toAgentFsError('read', `agents-db:${agentId}`, cause),
+  });
 };
 
-export function saveAgentStateSync(state: AgentState): void {
-  const dir = getAgentDir(state.id);
-  mkdirSync(dir, { recursive: true });
-
-  // Detect status transition for audit trail
-  const oldState = getAgentStateSync(state.id);
-  const oldStatus = oldState?.status;
-
+function prepareAgentStateForSave(state: AgentState): AgentState {
   if (state.status === 'running' || state.status === 'starting') {
     delete state.stoppedAt;
   } else if (state.status === 'stopped' && !state.stoppedAt) {
     state.stoppedAt = new Date().toISOString();
   }
+  return state;
+}
 
+export function writeAgentStateJsonSync(state: AgentState): void {
+  const dir = getAgentDir(state.id);
+  mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'state.json'),
     JSON.stringify(cleanAgentState(state), null, 2)
   );
+}
+
+export function saveAgentStateSync(state: AgentState): void {
+  // Detect status transition for audit trail
+  const oldState = getAgentStateSync(state.id);
+  const oldStatus = oldState?.status;
+
+  prepareAgentStateForSave(state);
+
+  // PAN-1908: write the authoritative row to SQLite and keep state.json as the
+  // rollback/rebuild source through the cutover (D2/CP-2).
+  upsertAgent(agentStateToDbAgent(state));
+  writeAgentStateJsonSync(state);
 
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
 }
-
 
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
@@ -1106,6 +1148,11 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     } else if (state.status === 'stopped' && !state.stoppedAt) {
       state.stoppedAt = new Date().toISOString();
     }
+
+    yield* Effect.try({
+      try: () => upsertAgent(agentStateToDbAgent(state)),
+      catch: (cause) => toAgentFsError('write', `agents-db:${state.id}`, cause),
+    });
 
     yield* Effect.tryPromise({
       try: () => writeFileAsync(stateFile, JSON.stringify(cleanAgentState(state), null, 2)),
@@ -1510,15 +1557,6 @@ export async function deliverAgentMessage(
   let resolvedMethod = deliveryMethod;
   try {
     const state = await Effect.runPromise(getAgentState(normalizedId));
-    // Legacy Codex exec agents were headless one-shot processes; route those
-    // through `codex exec resume`. Persistent work-tui agents use the normal
-    // supervisor/channels/tmux delivery ladder below.
-    if (state?.harness === 'codex' && state.codexMode !== 'work-tui') {
-      const { CodexRuntimeSync } = await import('./runtimes/codex.js');
-      const rt = new CodexRuntimeSync();
-      await rt.sendMessage(normalizedId, message);
-      return { ok: true, path: 'codex' };
-    }
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
   } catch {
@@ -3246,7 +3284,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     issueId,
     workspace,
     harness: resolvedHarness,
-    codexMode: resolvedHarness === 'codex' ? 'work-tui' : undefined,
     role,
     model: selectedModel,
     status: 'starting',
@@ -3430,30 +3467,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
-  // Legacy codex exec specialists wrote a rollout before exiting; capture that
-  // thread-id for old exec launches only. Codex work-tui sessions write their
-  // rollout after the first delivered prompt, so this pre-prompt poll would
-  // only delay kickoff.
-  if (resolvedHarness === 'codex' && state.codexMode !== 'work-tui') {
-    const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId: writeCodexThreadId } =
-      await import('./runtimes/codex.js');
-    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
-    const rolloutPath = await waitForCodexRollout(codexHomeForAgent, 30000);
-    if (rolloutPath) {
-      const threadId = extractThreadIdFromRollout(rolloutPath);
-      if (threadId) {
-        writeCodexThreadId(agentId, threadId);
-        try {
-          await writeFile(join(getAgentDir(agentId), 'session.id'), threadId, 'utf-8');
-        } catch (err) {
-          console.warn(`[spawnRun] Failed to update session.id with codex thread-id for ${agentId}:`, err instanceof Error ? err.message : String(err));
-        }
-      }
-    } else {
-      console.warn(`[spawnRun] Codex specialist ${agentId}: rollout did not appear within 30s — thread-id not captured`);
-    }
-  }
-
   if (prompt) {
     if (shouldDeliverPromptViaPi) {
       try {
@@ -3577,21 +3590,16 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   // Create state
-  const existingState = getAgentStateSync(agentId);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
     workspace: options.workspace,
     harness: resolvedHarness,
-    codexMode: resolvedHarness === 'codex' ? 'work-tui' : undefined,
     role,
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
-    preSpawnStashRef: existingState?.preSpawnStashRef,
-    preSpawnStashMessage: existingState?.preSpawnStashMessage,
-    preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
     hostOverride: options.allowHost || undefined,
   };
 
@@ -3888,32 +3896,38 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
   const tmuxSessions = listSessionsSync();
   const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-  const agents: (AgentState & { tmuxActive: boolean })[] = [];
+  // PAN-1908: authoritative registry is the agents table; no directory scan.
+  return listAllAgents().map((agent) => {
+    const state = dbAgentToAgentState(agent);
+    const normalizedId = normalizeAgentId(state.id);
+    return {
+      ...state,
+      id: normalizedId,
+      tmuxActive: tmuxNames.has(normalizedId),
+    };
+  });
+}
 
-  // Read all agent states
-  if (!existsSync(AGENTS_DIR)) return agents;
-
-  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory());
-
-  for (const dir of dirs) {
-    const state = getAgentStateSync(dir.name);
-    if (state) {
-      const normalizedId = normalizeAgentId(state.id || dir.name);
-      agents.push({
-        ...state,
-        id: normalizedId,
-        tmuxActive: tmuxNames.has(normalizedId),
-      });
-    }
-  }
-
-  return agents;
+/**
+ * PAN-1908: list all agents in the SQLite registry with optional filtering.
+ * This is the replacement for enumerating ~/.panopticon/agents/ directories.
+ */
+export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
+  const agents = listAllAgents();
+  return agents
+    .map(dbAgentToAgentState)
+    .filter((state) => {
+      if (options?.status && state.status !== options.status) return false;
+      if (options?.role && state.role !== options.role) return false;
+      return true;
+    });
 }
 
 
 export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
+    // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
+    //
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
     // session on the `panopticon` socket. Run this from a one-off `tsx -e`/CLI
     // process that lacks access to that socket and `listSessions()` returns
@@ -3930,30 +3944,15 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     const tmuxSessions = yield* listSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-    if (!existsSync(AGENTS_DIR)) return [];
-
-    const entries = yield* Effect.tryPromise({
-      try: () => readdir(AGENTS_DIR),
-      catch: (cause) => toAgentFsError('readdir', AGENTS_DIR, cause),
-    }).pipe(Effect.orElseSucceed(() => [] as string[]));
-
-    const states = yield* Effect.forEach(
-      entries,
-      (entry) => getAgentState(entry).pipe(
-        Effect.map((state) => {
-          if (!state) return null;
-          const normalizedId = normalizeAgentId(state.id || entry);
-          return {
-            ...state,
-            id: normalizedId,
-            tmuxActive: tmuxNames.has(normalizedId),
-          };
-        }),
-      ),
-      { concurrency: 'unbounded' },
-    );
-
-    return states.filter((state): state is AgentState & { tmuxActive: boolean } => state !== null);
+    return listAllAgents().map((agent) => {
+      const state = dbAgentToAgentState(agent);
+      const normalizedId = normalizeAgentId(state.id);
+      return {
+        ...state,
+        id: normalizedId,
+        tmuxActive: tmuxNames.has(normalizedId),
+      };
+    });
   });
 
 /**
@@ -4405,9 +4404,6 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
-    if (fallbackHarness === 'codex') {
-      agentState.codexMode = 'work-tui';
-    }
     await assertWorkspaceStackHealthyForSpawn(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       resumeRole,
@@ -4421,7 +4417,6 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
-    saveAgentStateSync(agentState);
     const fallbackContent = generateLauncherScriptSync({
       role: resumeRole,
       workingDir: agentState.workspace,
@@ -4775,11 +4770,6 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const legacyHarnessMigrated =
       !hasSessionOrigin && priorHarness !== undefined && priorHarness !== effectiveHarness;
     agentState.harness = effectiveHarness;
-    if (effectiveHarness === 'codex') {
-      agentState.codexMode = 'work-tui';
-    } else {
-      delete agentState.codexMode;
-    }
     const supervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, model, effectiveHarness);
     saveAgentStateSync(agentState);
     const resumeDriftReasons = sessionResumeDriftReasons(runtimeState, model, effectiveHarness);
@@ -5274,11 +5264,6 @@ export async function recoverAgent(
   const recoveryCodexFields = recoveryHarness === 'codex'
     ? getCodexLauncherFields(normalizedId, state.model, state.workspace)
     : {};
-  if (recoveryHarness === 'codex') {
-    state.codexMode = 'work-tui';
-  } else {
-    delete state.codexMode;
-  }
   const recoveryLauncherContent = generateLauncherScriptSync({
     role: recoveryRole,
     workingDir: state.workspace,

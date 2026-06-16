@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 //#region gh-issue-trailer-hook.ts
 const FLYWHEEL_RUN_ID_PATTERN = /^RUN-\d+$/;

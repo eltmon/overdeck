@@ -65,6 +65,7 @@ import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
 import { getAgentState, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
+import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
@@ -1567,16 +1568,29 @@ const postIssueAbortRoute = HttpRouter.add(
     }
     const eventStore = yield* EventStoreService;
 
+    // PAN-1908: capture agent state before destruction so the stopped event can
+    // be projected through the transactional boundary after the reset succeeds.
+    const workAgentId = `agent-${id.toLowerCase()}`;
+    const planningAgentId = `planning-${id.toLowerCase()}`;
+    const workAgentStateBeforeAbort = yield* getAgentState(workAgentId);
+
     const result = yield* Effect.promise(() => runDestructiveIssueLifecycle(id, 'reset', { deleteWorkspace: true }));
 
     if (result.success) {
-      for (const agentId of [`agent-${id.toLowerCase()}`, `planning-${id.toLowerCase()}`]) {
-        yield* eventStore.append({
+      // PAN-1908: write-through projection for the real work agent.
+      if (workAgentStateBeforeAbort) {
+        yield* saveAgentStateAndEmitEventProgram(workAgentStateBeforeAbort, {
           type: 'agent.stopped',
           timestamp: new Date().toISOString(),
-          payload: { agentId },
-        } as any).pipe(Effect.catch(() => Effect.void));
+          payload: { agentId: workAgentId, issueId: workAgentStateBeforeAbort.issueId },
+        }).pipe(Effect.catch(() => Effect.void));
       }
+      // Planning sessions are not agents in the runtime registry; keep raw emit.
+      yield* eventStore.append({
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: planningAgentId },
+      } as any).pipe(Effect.catch(() => Effect.void));
       yield* eventStore.append({
         type: 'issue.statusChanged',
         timestamp: new Date().toISOString(),
@@ -1617,6 +1631,13 @@ const postIssueResetRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const { deleteWorkspace = true } = body as any || {};
+
+    // PAN-1908: capture agent state before destruction so the stopped event can
+    // be projected through the transactional boundary after the reset succeeds.
+    const workAgentId = `agent-${id.toLowerCase()}`;
+    const planningAgentId = `planning-${id.toLowerCase()}`;
+    const workAgentStateBeforeReset = yield* getAgentState(workAgentId);
+
     const encoder = new TextEncoder();
     const nodeStream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -1638,15 +1659,24 @@ const postIssueResetRoute = HttpRouter.add(
         });
 
         if (result.success) {
-          for (const agentId of [`agent-${id.toLowerCase()}`, `planning-${id.toLowerCase()}`]) {
+          // PAN-1908: write-through projection for the real work agent.
+          if (workAgentStateBeforeReset) {
             try {
-              await Effect.runPromise(eventStore.append({
+              saveAgentStateAndEmitEvent(workAgentStateBeforeReset, {
                 type: 'agent.stopped',
                 timestamp: new Date().toISOString(),
-                payload: { agentId },
-              } as any));
+                payload: { agentId: workAgentId, issueId: workAgentStateBeforeReset.issueId },
+              });
             } catch { /* non-fatal */ }
           }
+          // Planning sessions are not agents in the runtime registry; keep raw emit.
+          try {
+            await Effect.runPromise(eventStore.append({
+              type: 'agent.stopped',
+              timestamp: new Date().toISOString(),
+              payload: { agentId: planningAgentId },
+            } as any));
+          } catch { /* non-fatal */ }
           await Effect.runPromise(eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),
@@ -2094,11 +2124,16 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     yield* lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catch(() => Effect.void));
 
     // 7. Emit events
-    yield* eventStore.append({
-      type: 'agent.stopped',
-      timestamp: new Date().toISOString(),
-      payload: { agentId: `agent-${issueLower}` },
-    } as any);
+    // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+    // append in one SQLite transaction.
+    const restartAgentState = yield* getAgentState(`agent-${issueLower}`);
+    if (restartAgentState) {
+      yield* saveAgentStateAndEmitEventProgram(restartAgentState, {
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: `agent-${issueLower}`, issueId: restartAgentState.issueId },
+      });
+    }
     yield* eventStore.append({
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
@@ -2318,6 +2353,13 @@ const postIssueDeepWipeRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     const { deleteWorkspace = true } = body as any || {};
+
+    // PAN-1908: capture agent state before destruction so the stopped event can
+    // be projected through the transactional boundary after the wipe succeeds.
+    const workAgentId = `agent-${id.toLowerCase()}`;
+    const planningAgentId = `planning-${id.toLowerCase()}`;
+    const workAgentStateBeforeWipe = yield* getAgentState(workAgentId);
+
     const encoder = new TextEncoder();
     const nodeStream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -2344,15 +2386,24 @@ const postIssueDeepWipeRoute = HttpRouter.add(
             kind: 'deep_wipe',
             source: 'dashboard',
           })));
-          for (const agentId of [`agent-${id.toLowerCase()}`, `planning-${id.toLowerCase()}`]) {
+          // PAN-1908: write-through projection for the real work agent.
+          if (workAgentStateBeforeWipe) {
             try {
-              await Effect.runPromise(eventStore.append({
+              saveAgentStateAndEmitEvent(workAgentStateBeforeWipe, {
                 type: 'agent.stopped',
                 timestamp: new Date().toISOString(),
-                payload: { agentId },
-              } as any));
+                payload: { agentId: workAgentId, issueId: workAgentStateBeforeWipe.issueId },
+              });
             } catch { /* non-fatal */ }
           }
+          // Planning sessions are not agents in the runtime registry; keep raw emit.
+          try {
+            await Effect.runPromise(eventStore.append({
+              type: 'agent.stopped',
+              timestamp: new Date().toISOString(),
+              payload: { agentId: planningAgentId },
+            } as any));
+          } catch { /* non-fatal */ }
           await Effect.runPromise(eventStore.append({
             type: 'issue.statusChanged',
             timestamp: new Date().toISOString(),

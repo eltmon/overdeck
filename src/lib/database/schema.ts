@@ -14,12 +14,14 @@
  * @effect/sql-sqlite-bun is deferred to PAN-447.
  */
 
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import type { SqliteDatabase } from './driver.js';
-import { encodeClaudeProjectDir } from '../paths.js';
+import { encodeClaudeProjectDir, getPanopticonHome } from '../paths.js';
+import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 54;
+export const SCHEMA_VERSION = 55;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -427,6 +429,60 @@ export function initSchema(db: SqliteDatabase): void {
       ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
       WHERE json_type(payload, '$.issueId') = 'text';
 
+    -- ===== Agents (PAN-1908: authoritative runtime registry) =====
+    CREATE TABLE IF NOT EXISTS agents (
+      id            TEXT PRIMARY KEY,
+      issue_id      TEXT NOT NULL,
+      role          TEXT NOT NULL,
+      status        TEXT NOT NULL,
+      workspace     TEXT NOT NULL,
+      harness       TEXT,
+      model         TEXT,
+      branch        TEXT,
+      session_id    TEXT,
+      started_at    TEXT,
+      last_activity TEXT,
+      last_resume_at TEXT,
+      stopped_at    TEXT,
+      stopped_by_user INTEGER,
+      stopped_by_pause INTEGER,
+      kickoff_delivered INTEGER,
+      host_override INTEGER,
+      cost_so_far   REAL,
+      phase         TEXT,
+      work_type     TEXT,
+      paused        INTEGER,
+      paused_reason TEXT,
+      paused_at     TEXT,
+      troubled      INTEGER,
+      troubled_at   TEXT,
+      consecutive_failures INTEGER,
+      first_failure_in_run_at TEXT,
+      last_failure_at TEXT,
+      last_failure_reason TEXT,
+      last_failure_next_retry_at TEXT,
+      flywheel_run_id TEXT,
+      role_run_head TEXT,
+      review_sub_role TEXT,
+      review_run_id TEXT,
+      review_synthesis_agent_id TEXT,
+      review_output_path TEXT,
+      review_deadline_at TEXT,
+      review_monitor_signaled TEXT,
+      review_retry_attempt INTEGER,
+      inspect_sub_role TEXT,
+      delivery_method TEXT,
+      supervisor_enabled INTEGER,
+      channels_enabled INTEGER,
+      updated_at    TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agents_status_role
+      ON agents(status, role);
+
+    CREATE INDEX IF NOT EXISTS idx_agents_issue
+      ON agents(issue_id);
+
     -- ===== Projection Cache (PAN-437: instant dashboard startup) =====
     CREATE TABLE IF NOT EXISTS projection_cache (
       key        TEXT PRIMARY KEY,
@@ -682,7 +738,7 @@ export function initSchema(db: SqliteDatabase): void {
  * Run schema migrations if the database version is older than SCHEMA_VERSION.
  * This function handles upgrading from older schema versions.
  */
-export function runMigrations(db: SqliteDatabase): void {
+export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
   if (currentVersion === SCHEMA_VERSION) {
@@ -1483,6 +1539,95 @@ export function runMigrations(db: SqliteDatabase): void {
     try {
       db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
     } catch { /* already exists */ }
+  }
+
+  // v54 → v55: add authoritative agents runtime registry (PAN-1908)
+  if (currentVersion < 55) {
+    // Safety net: snapshot the database before the migration touches agents
+    // data, so an operator can fall back to the pre-cutover state if the new
+    // event-driven registry misbehaves. The snapshot is a one-time file copy
+    // made before any schema change or backfill runs.
+    try {
+      const resolvedDbPath = dbPath ?? join(getPanopticonHome(), 'panopticon.db');
+      const snapshotPath = `${resolvedDbPath}.v54-backfill-snapshot`;
+      if (existsSync(resolvedDbPath) && !existsSync(snapshotPath)) {
+        const source = readFileSync(resolvedDbPath);
+        writeFileSync(snapshotPath, source);
+        console.log(`[schema] Snapshot created: ${snapshotPath}`);
+      }
+    } catch (err) {
+      console.warn('[schema] Failed to create pre-v55 snapshot:', err instanceof Error ? err.message : String(err));
+    }
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id            TEXT PRIMARY KEY,
+        issue_id      TEXT NOT NULL,
+        role          TEXT NOT NULL,
+        status        TEXT NOT NULL,
+        workspace     TEXT NOT NULL,
+        harness       TEXT,
+        model         TEXT,
+        branch        TEXT,
+        session_id    TEXT,
+        started_at    TEXT,
+        last_activity TEXT,
+        last_resume_at TEXT,
+        stopped_at    TEXT,
+        stopped_by_user INTEGER,
+        stopped_by_pause INTEGER,
+        kickoff_delivered INTEGER,
+        host_override INTEGER,
+        cost_so_far   REAL,
+        phase         TEXT,
+        work_type     TEXT,
+        paused        INTEGER,
+        paused_reason TEXT,
+        paused_at     TEXT,
+        troubled      INTEGER,
+        troubled_at   TEXT,
+        consecutive_failures INTEGER,
+        first_failure_in_run_at TEXT,
+        last_failure_at TEXT,
+        last_failure_reason TEXT,
+        last_failure_next_retry_at TEXT,
+        flywheel_run_id TEXT,
+        role_run_head TEXT,
+        review_sub_role TEXT,
+        review_run_id TEXT,
+        review_synthesis_agent_id TEXT,
+        review_output_path TEXT,
+        review_deadline_at TEXT,
+        review_monitor_signaled TEXT,
+        review_retry_attempt INTEGER,
+        inspect_sub_role TEXT,
+        delivery_method TEXT,
+        supervisor_enabled INTEGER,
+        channels_enabled INTEGER,
+        updated_at    TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_agents_status_role
+        ON agents(status, role);
+
+      CREATE INDEX IF NOT EXISTS idx_agents_issue
+        ON agents(issue_id);
+    `);
+
+    // PAN-1908: one-time backfill from legacy state.json files into the new
+    // agents table. This is the only permitted directory enumeration; it runs
+    // once during the v54→v55 migration and is idempotent by agent id.
+    try {
+      const result = backfillAgentsFromStateJsonSync(db);
+      if (result.processed > 0 || result.markedStopped > 0) {
+        console.log(
+          `[schema] Backfilled agents table: ${result.processed} rows, ` +
+          `${result.markedStopped} marked stopped (no live tmux session)`
+        );
+      }
+    } catch (err) {
+      console.warn('[schema] agents-table backfill failed:', err instanceof Error ? err.message : String(err));
+    }
   }
 
   // After all migrations, set the version

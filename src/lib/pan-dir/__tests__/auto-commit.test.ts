@@ -97,6 +97,41 @@ describe('auto-commit', () => {
     }),
   );
 
+  it.effect('commits to repoRoot when provided (PAN-1908 infra repo)', () =>
+    Effect.gen(function* () {
+      const infraTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-infra-'));
+      try {
+        execSync('git init -q', { cwd: infraTmp });
+        execSync('git config user.email t@e.t', { cwd: infraTmp });
+        execSync('git config user.name "Test"', { cwd: infraTmp });
+        execSync('git config commit.gpgsign false', { cwd: infraTmp });
+        writeFileSync(join(infraTmp, 'README.md'), 'seed');
+        execSync('git add README.md', { cwd: infraTmp });
+        execSync('git commit -q -m "init"', { cwd: infraTmp });
+        execSync('git branch -M main', { cwd: infraTmp });
+        execSync('git remote add origin .', { cwd: infraTmp });
+
+        mkdirSync(join(infraTmp, '.pan', 'records'), { recursive: true });
+        const path = join(infraTmp, '.pan', 'records', 'pan-1908.json');
+        writeFileSync(path, '{}');
+
+        queueAutoCommit({
+          projectRoot: tmp,
+          repoRoot: infraTmp,
+          paths: [path],
+          subject: 'chore(records): update PAN-1908',
+        });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+        const log = execSync('git log --oneline -1', { cwd: infraTmp, encoding: 'utf-8' });
+        expect(log).toContain('chore(records): update PAN-1908');
+      } finally {
+        rmSync(infraTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
   it.effect('is a no-op outside a git repo', () =>
     Effect.gen(function* () {
       const noGitTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-nogit-'));

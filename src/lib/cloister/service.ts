@@ -8,6 +8,7 @@
 import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth, HealthSummary } from './health.js';
+import type { EventStore } from '../../dashboard/server/event-store.js';
 import { loadCloisterConfigSync } from './config.js';
 import {
   getAgentHealth,
@@ -416,6 +417,83 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
       return null;
   }
 }async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
+  // PAN-1908: reactive agent liveness — deacon handles agent.stopped and
+  // agent.heartbeat_dead events instead of scanning agent directories.
+  if (event.type === 'agent.stopped') {
+    const payload = event.payload as { agentId?: string } | undefined;
+    const agentId = payload?.agentId;
+    if (agentId) {
+      const { handleAgentStoppedEvent, handleAgentStoppedForOrphanReviewerSessions } = await import('./deacon.js');
+      const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
+      handleAgentLifecycleEventForIdleStack(agentId);
+      await Promise.all([
+        handleAgentStoppedEvent(agentId),
+        handleAgentStoppedForOrphanReviewerSessions(agentId),
+      ]);
+    }
+    return;
+  }
+  if (event.type === 'agent.started') {
+    const payload = event.payload as { agentId?: string } | undefined;
+    const agentId = payload?.agentId;
+    if (agentId) {
+      const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
+      handleAgentLifecycleEventForIdleStack(agentId);
+    }
+    return;
+  }
+  if (event.type === 'agent.heartbeat_dead') {
+    const payload = event.payload as { agentId?: string } | undefined;
+    const agentId = payload?.agentId;
+    if (agentId) {
+      const { handleAgentHeartbeatDeadEvent } = await import('./deacon.js');
+      await handleAgentHeartbeatDeadEvent(agentId, 'event');
+    }
+    return;
+  }
+
+  // PAN-1908: reactive review-status handlers — deacon handles review lifecycle
+  // events instead of scanning directories / the review-status DB.
+  if (event.type === 'review.coordinator.died') {
+    const payload = event.payload as { issueId?: string; sessionName?: string; reason?: string } | undefined;
+    const issueId = payload?.issueId;
+    if (issueId) {
+      const { handleReviewCoordinatorDied } = await import('./deacon.js');
+      await handleReviewCoordinatorDied(issueId, payload?.sessionName ?? '', payload?.reason ?? '');
+    }
+    return;
+  }
+  if (event.type === 'work.completed') {
+    const payload = event.payload as { issueId?: string } | undefined;
+    const issueId = payload?.issueId;
+    if (issueId) {
+      const { handleWorkCompleted } = await import('./deacon.js');
+      await handleWorkCompleted(issueId);
+    }
+    // Fall through to onIssueStateChange for in_review dispatch.
+  }
+
+  // PAN-1908: reactive reconcilers — deacon handles issue.statusChanged events
+  // for closed issues and proposed specs instead of patrol scans.
+  if (event.type === 'issue.statusChanged') {
+    const payload = event.payload as { issueId?: string; status?: string; canonicalStatus?: string } | undefined;
+    const issueId = payload?.issueId;
+    const canonicalStatus = payload?.canonicalStatus?.toLowerCase();
+    const status = payload?.status?.toLowerCase();
+    if (issueId) {
+      if (canonicalStatus === 'closed' || status === 'closed') {
+        const { handleIssueStatusChangedClosed } = await import('./closed-issue-reaper.js');
+        await handleIssueStatusChangedClosed(issueId);
+        return;
+      }
+      if (canonicalStatus === 'todo' || status === 'planned' || status === 'todo') {
+        const { handleOrphanProposedSpec } = await import('./orphan-proposed-reconciler.js');
+        await handleOrphanProposedSpec(issueId);
+        // Fall through to onIssueStateChange in case it drives role dispatch.
+      }
+    }
+  }
+
   const change = issueStateChangeFromDomainEvent(event);
   if (!change) return;
   await Effect.runPromise(onIssueStateChange(change.issueId, change.state));
@@ -577,6 +655,7 @@ export class CloisterService {
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
   private domainEventUnsubscribe: (() => void) | null = null;
+  private eventStore: EventStore | null = null;
 
   // ─── Status cache ────────────────────────────────────────────────────────────
   // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
@@ -825,6 +904,7 @@ export class CloisterService {
     try {
       const { initEventStore } = await import('../../dashboard/server/event-store.js');
       const store = await initEventStore();
+      this.eventStore = store;
       this.domainEventUnsubscribe = store.subscribe((event) => {
         void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
           console.error('[cloister] Reactive lifecycle event handling failed:', error);
@@ -1319,6 +1399,21 @@ export class CloisterService {
     this.emit({ type: 'agent_crashed', agentId, crashCount: tracker.crashCount });
     console.log(`🔔 Agent ${agentId} crashed (crash #${tracker.crashCount})`);
 
+    // PAN-1908: emit agent.heartbeat_dead so the event-driven deacon recovery
+    // can mark the agent stopped and resume it with the proper gates, rather
+    // than Cloister scheduling its own auto-restart in parallel.
+    if (this.eventStore) {
+      try {
+        this.eventStore.append({
+          type: 'agent.heartbeat_dead',
+          timestamp: new Date().toISOString(),
+          payload: { agentId, issueId: agentState.issueId, sessionId: agentState.sessionId },
+        });
+      } catch (err) {
+        console.error(`[cloister] Failed to emit heartbeat_dead for ${agentId}:`, err);
+      }
+    }
+
     // Check if we've exceeded max retries
     if (tracker.crashCount > config.max_retries) {
       tracker.gaveUp = true;
@@ -1327,7 +1422,8 @@ export class CloisterService {
       return;
     }
 
-    // Calculate backoff delay
+    // Calculate backoff delay for logging/mass-death tracking only — the actual
+    // resume is handled by the deacon's agent.heartbeat_dead handler.
     const backoffIndex = Math.min(tracker.crashCount - 1, config.backoff_seconds.length - 1);
     const backoffSeconds = config.backoff_seconds[backoffIndex];
     const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000);
@@ -1341,24 +1437,8 @@ export class CloisterService {
     });
 
     console.log(
-      `🔔 Will restart ${agentId} in ${backoffSeconds}s (attempt ${tracker.crashCount}/${config.max_retries})`
+      `🔔 Deacon will recover ${agentId} via heartbeat_dead (attempt ${tracker.crashCount}/${config.max_retries}, backoff ${backoffSeconds}s)`
     );
-
-    // Schedule restart after backoff
-    setTimeout(async () => {
-      try {
-        await this.restartAgent(agentId);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.emit({
-          type: 'agent_restart_failed',
-          agentId,
-          crashCount: tracker!.crashCount,
-          error: errorMessage,
-        });
-        console.error(`🔔 Failed to restart ${agentId}:`, error);
-      }
-    }, backoffSeconds * 1000);
   }
 
   /**

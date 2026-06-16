@@ -52,11 +52,11 @@ documented follow-up in PAN-1248.
 
 ### Deacon orphan-detection races new agent spawn (observed RUN-1 tick 2)
 
-When `pan plan <id> --auto` (or any spawn route) creates an agent state directory and starts the tmux session, the Deacon's orphan-recovery patrol can fire before the tmux session is fully up and mark the agent `stopped` with reason "orphaned: tmux session missing at boot". The agent still runs to completion (verified — PAN-1235 planning finalized + auto-promoted despite state.json being marked stopped at spawn+0ms), but the dashboard and any consumers of agent state see a misleading "stopped" while the agent is actually running.
+When `pan plan <id> --auto` (or any spawn route) creates an agent state directory and starts the tmux session, the Deacon's orphan-recovery patrol can fire before the tmux session is fully up and mark the agent `stopped` with reason "orphaned: tmux session missing at boot". The agent still runs to completion (verified — PAN-1235 planning finalized + auto-promoted despite the runtime status row being marked stopped at spawn+0ms), but the dashboard and any consumers of agent state see a misleading "stopped" while the agent is actually running.
 
 **Why it matters.** Cosmetic for now, but if any downstream system uses agent state as the source of truth for "should I restart this", it could double-spawn or skip restarts. PAN-1213 (synthesis→review-status bridge) is the same family of bug. Worth a dedicated fix that gates orphan-detection on a minimum age since `startedAt`.
 
-**How to apply.** When you see "agent stopped immediately after spawn" but the workspace artifacts still appear, do not panic — check the actual artifacts (spec file, beads, commit log) rather than trusting state.json alone.
+**How to apply.** When you see "agent stopped immediately after spawn" but the workspace artifacts still appear, do not panic — check the actual artifacts (spec file, beads, commit log) rather than trusting a single status source. Runtime status now lives in the SQLite `agents` table.
 
 ### GitHub App credential config fails ENOTDIR in worktrees (observed RUN-3)
 
@@ -115,14 +115,14 @@ history (`git log --follow docs/FLYWHEEL-STATE.md`).
   (`pan reload` for deacon/server code) → observed firing in the deacon log. "landed != live."
   `pan reload` mid-run is low-risk when the build is incremental — panopticon-socket agents
   survive; only the server/deacon restart. (RUN-15, RUN-18, RUN-32 t10)
-- **Ground truth for "is this agent running" is tmux (`tmux -L panopticon ls`), not state.json.**
+- **Ground truth for "is this agent running" is tmux (`tmux -L panopticon ls`), not any single state file.**
   Ghosts show `status: running` with no session, especially after a `--no-resume` boot. (RUN-34 t1)
 - **Confirm a squash-merge landed with `git merge-base --is-ancestor <mergeCommit> origin/main`** —
   the "N commits not on main" branch-ahead count is a normal squash artifact, not "unmerged". (RUN-34 t3)
 - **Always use `gh issue create --body-file`** for bodies containing backticks/quotes/parens —
   inline `--body '...'` breaks shell parsing and can execute body fragments as commands. (RUN-32 t12)
 - **swap-full ≠ memory pressure** when RAM is ample — it's cold-page eviction, not imminent OOM. (RUN-20, RUN-32)
-- **Stale `Boot --no-resume` gates persist in state.json across reboots** and mislead. Verify the
+- **Stale `Boot --no-resume` gates persist in the SQLite `agents` table and `state.json` across reboots** and mislead. Verify the
   real resume policy from the live dashboard cmdline (`ps aux | grep dashboard/server.js`), not the
   per-agent gate. Re-enabling auto-resume needs a restart WITH resume on (not just the deacon process up). (RUN-32 t1, RUN-34 t4)
 - **Re-landing playbook for an approved-but-conflict-stranded fix:** reopen its PR + `pan start <id>
@@ -197,7 +197,7 @@ Run config: `minAgents=2`, `maxAgents=20`, `effort=xhigh`, `scope=all-tracked-pr
   (NOT `--no-resume`); deacon Running, auto-start enabled.
 - **"Boot --no-resume" gates on stopped agents are STALE.** `pan status` shows dozens
   of old agents (incl. MIN-831 at 3245 min) gated `Boot --no-resume`, but the current
-  boot has no `--no-resume` flag. The gate persists in state.json across reboots and
+  boot has no `--no-resume` flag. The gate persists across reboots and
   misleads — do not read it as the live resume policy. Verify the dashboard cmdline
   (`ps aux | grep dashboard/server.js`) for the real policy.
 - **Only live productive agent was a WEDGED review convoy: PAN-1803.** Parent
@@ -548,9 +548,9 @@ cannot recover them either. Surfaced as openQuestion + high `review`/`resume`
 suggestions; did not over-launch (re-spawning stalled work via `pan start` without
 diagnosing the stall risks duplicate/conflicting work — same restraint as RUN-33).
 
-### Mass ghosting + zombie convoys (ground truth = tmux, not state.json)
+### Mass ghosting + zombie convoys (ground truth = tmux, not a stale state file)
 
-~60 agent `state.json` files said `status: running` with NO tmux session (ghosts
+~60 agent status rows said `status: running` with NO tmux session (ghosts
 from before the restart; --no-resume leaves them). Real tmux = 11 sessions:
 PAN-1658 review convoy (5) + PAN-1802 review convoy (5) + agent-pan-1827-test (1).
 **Both PAN-1658 and PAN-1802 are `merged` + `verifying-on-main`** — so their running
@@ -736,7 +736,7 @@ red-main strike.
 
 ## RUN-35 ticks 1–4 (compacted 2026-06-14; full detail in git)
 
-- **t1–2 — pipeline unfrozen, stranded set diagnosed.** Deacon running, boot-gates cleared. 9 review-passed PRs stranded on stale (red-main-era) bases; deacon auto-resume only fires on pending review-feedback + the merge-train reconciler only touches already-queued-ready PRs → nothing re-rebases a blocked PR (**PAN-1240** = canonical fix). Filed **PAN-1887** (GitLab auto-merge is GitHub-only) + **PAN-1888** (work-agent-stop-hook still reads legacy review-status.json). PAN-1845 reached in-review (#1886) with a fully-STOPPED convoy (PAN-1614 class). Verified PAN-1883/1884 closures clean.
+- **t1–2 — pipeline unfrozen, stranded set diagnosed.** Deacon running, boot-gates cleared. 9 review-passed PRs stranded on stale (red-main-era) bases; deacon auto-resume only fires on pending review-feedback + the merge-train reconciler only touches already-queued-ready PRs → nothing re-rebases a blocked PR (**PAN-1240** = canonical fix). Filed **PAN-1887** (GitLab auto-merge is GitHub-only) + **PAN-1888** (work-agent-stop-hook still reads legacy review-status.json; superseded by PAN-1908 — runtime review/test/merge state now lives in SQLite and durable verdicts in the infra repo's `.pan/` records). PAN-1845 reached in-review (#1886) with a fully-STOPPED convoy (PAN-1614 class). Verified PAN-1883/1884 closures clean.
 - **t3 — operator strike-directive + correction.** Rule: `auto_pickup_backlog=false` does NOT block urgent pipeline repair; default to `pan strike` for scoped unblockers. CORRECTION: the 8 stranded PRs GENUINELY conflict (GitHub `mergeable=CONFLICTING`, not stale flags). Struck **PAN-1872** (`pan start` toUpperCase crash on sync-main conflict — the meta-unblocker for re-entering conflicted PRs). The "dashboard restart storm" was a misread — those are workspace-container peers (`PANOPTICON_DISABLE_DEACON=1`), not a duel.
 - **t4 — PAN-1872 fixed, drain keystone started.** Operator fixed+closed PAN-1872 (`7297d2469`, on main, +regression tests — complete, no follow-up needed). Confirmed the fix is in dist → `pan start` spawns into conflicted workspaces. Re-entered **PAN-1614** (#1630) to rebase — the convoy-recovery keystone whose landing+reload unblocks PAN-1845 + future stalled convoys.
 

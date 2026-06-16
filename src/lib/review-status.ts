@@ -16,6 +16,7 @@ import {
   getReviewStatusFromDb,
 } from './database/review-status-db.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
+import { updateIssueRecordForIssue } from './pan-dir/records.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -69,7 +70,6 @@ export interface ReviewStatus {
   autoMerge?: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;
-  queuePosition?: number | null;
   prUrl?: string;
   /** PAN-905: HEAD commit SHA of the tracked PR for webhook identity validation */
   prHeadSha?: string;
@@ -108,8 +108,6 @@ export interface ReviewStatus {
   deaconIgnoredAt?: string;
   /** Optional free-form reason shown alongside the ignore toggle. */
   deaconIgnoredReason?: string;
-  /** Commits at time of review request — used to detect new commits after review */
-  lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
   // PAN-1531: reviewTempStashRef / reviewTempStashMessage / reviewTempStashSequence
   // removed. The review pipeline no longer stashes uncommitted work — the
   // dirty-worktree gate refuses pan done / pan review request before review
@@ -340,6 +338,11 @@ export function setReviewStatusSync(
   // for live runtime pipeline state. Do not mirror this into canonical vBRIEF
   // specs: PAN-1124 makes .pan/specs immutable after planning except plan.status.
   dbUpsert(updated);
+
+  // PAN-1908: project durable review_status verdicts into the infra repo's
+  // per-issue permanent record. Fire-and-forget so the SQLite write path stays
+  // synchronous and fast; queueAutoCommit debounces bursts into one commit.
+  void updateIssueRecordForIssue(issueId, updated);
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 

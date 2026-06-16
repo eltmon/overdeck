@@ -27,6 +27,17 @@ export interface IssueRoutingRule {
 }
 
 /**
+ * PAN-1908: where per-issue permanent records (vBRIEF continue + pipeline +
+ * close-out + owner lease) are committed in git.
+ */
+export interface PanRecordsConfig {
+  /** Repo name from workspace.repos[] (polyrepo) or "." (monorepo/default). */
+  repo?: string;
+  /** Subdirectory within the infra repo (default: ".pan"). */
+  path?: string;
+}
+
+/**
  * Workspace configuration (imported from workspace-config.ts for full details)
  */
 export interface WorkspaceConfig {
@@ -148,6 +159,11 @@ export interface ProjectConfig {
    * Defaults to ".pan/events".
    */
   events_path?: string;
+  /**
+   * PAN-1908: infra-repo declaration for git-backed per-issue permanent records.
+   * Defaults to the project repo itself (monorepo) when absent.
+   */
+  pan_records?: PanRecordsConfig;
 }
 
 /** Resolve the issue prefix for a project. */
@@ -312,6 +328,36 @@ export function findProjectByPathSync(workspacePath: string): ProjectConfig | nu
  * @param labels - Array of label names from the Linear issue
  * @returns The resolved path (may differ from project.path based on routing rules)
  */
+/**
+ * PAN-1908: resolve the infra-repo checkout path and records subdir for a project.
+ *
+ * - monorepo / missing pan_records: repoPath = project.path, recordsPath = .pan
+ * - polyrepo with pan_records.repo: look up named repo in workspace.repos[]
+ * - pan_records.repo = ".": repoPath = project.path
+ */
+export function resolveInfraRepo(project: ProjectConfig): {
+  repoPath: string;
+  recordsPath: string;
+} {
+  const recordsPath = project.pan_records?.path ?? '.pan';
+  const repoName = project.pan_records?.repo;
+
+  if (!repoName || repoName === '.') {
+    return { repoPath: project.path, recordsPath };
+  }
+
+  const repos = project.workspace?.repos ?? [];
+  const matching = repos.find(r => r.name === repoName);
+  if (!matching) {
+    throw new Error(
+      `Project pan_records.repo "${repoName}" not found in workspace.repos. ` +
+      `Available repos: ${repos.map(r => r.name).join(', ') || 'none'}`
+    );
+  }
+
+  return { repoPath: resolve(project.path, matching.path), recordsPath };
+}
+
 export function resolveProjectPath(project: ProjectConfig, labels: string[] = []): string {
   if (!project.issue_routing || project.issue_routing.length === 0) {
     return project.path;

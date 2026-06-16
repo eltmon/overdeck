@@ -318,9 +318,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
       });
 
       expect(openaiState.harness).toBe('codex');
-      expect(openaiState.codexMode).toBe('work-tui');
       expect(kimiState.harness).toBe('pi');
-      expect(kimiState.codexMode).toBeUndefined();
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
     } finally {

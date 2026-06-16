@@ -20,7 +20,8 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfigSync, saveCloisterConfigSync } from '../../../lib/cloister/config.js';
 import { emergencyBrake } from '../../../lib/cloister/concurrency.js';
-import { EventStoreService } from '../services/domain-services.js';
+import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
+import { getAgentState } from '../../../lib/agents.js';
 import { httpHandler } from './http-handler.js';
 
 // Read the request body as unknown JSON
@@ -82,18 +83,23 @@ const postCloisterEmergencyStopRoute = HttpRouter.add(
   'POST',
   '/api/cloister/emergency-stop',
   httpHandler(Effect.gen(function* () {
-    const eventStore = yield* EventStoreService;
     const killedAgents = yield* Effect.try({
       try: () => getCloisterService().emergencyStop(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     const ts = new Date().toISOString();
     for (const agentId of killedAgents) {
-      yield* eventStore.append({
-        type: 'agent.stopped',
-        timestamp: ts,
-        payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
-      });
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction. Cloister already stopped the agents,
+      // so re-upsert the latest row to make the event atomic.
+      const state = yield* getAgentState(agentId);
+      if (state) {
+        yield* saveAgentStateAndEmitEventProgram(state, {
+          type: 'agent.stopped',
+          timestamp: ts,
+          payload: { agentId, issueId: state.issueId || agentId.replace(/^agent-/, '').toUpperCase() },
+        });
+      }
     }
     return jsonResponse({ success: true, message: 'Emergency stop executed', killedAgents });
   })),
@@ -108,18 +114,23 @@ const postCloisterBrakeRoute = HttpRouter.add(
   'POST',
   '/api/cloister/brake',
   httpHandler(Effect.gen(function* () {
-    const eventStore = yield* EventStoreService;
     const result = yield* Effect.try({
       try: () => emergencyBrake(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     const ts = new Date().toISOString();
     for (const agentId of result.stopped) {
-      yield* eventStore.append({
-        type: 'agent.stopped',
-        timestamp: ts,
-        payload: { agentId, issueId: agentId.replace(/^agent-/, '').toUpperCase() },
-      });
+      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
+      // append in one SQLite transaction. emergencyBrake already stopped the
+      // agents, so re-upsert the latest row to make the event atomic.
+      const state = yield* getAgentState(agentId);
+      if (state) {
+        yield* saveAgentStateAndEmitEventProgram(state, {
+          type: 'agent.stopped',
+          timestamp: ts,
+          payload: { agentId, issueId: state.issueId || agentId.replace(/^agent-/, '').toUpperCase() },
+        });
+      }
     }
     return jsonResponse({ success: true, message: `Trimmed ${result.before} → ${result.remaining} work agents`, ...result });
   })),

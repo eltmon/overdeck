@@ -108,6 +108,10 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
   getSharedIssueService: () => issueServiceMock,
 }));
 
+vi.mock('../../services/agent-projection.js', () => ({
+  saveAgentStateAndEmitEventProgram: vi.fn(() => Effect.void),
+}));
+
 vi.mock('../../review-status.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../review-status.js')>();
   return {

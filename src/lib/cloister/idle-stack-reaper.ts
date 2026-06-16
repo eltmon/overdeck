@@ -55,6 +55,27 @@ export function __resetIdleStackReaperState(): void {
   firstIdleAt.clear();
 }
 
+function issueLowerFromAgentId(agentId: string): string | null {
+  const match = agentId.match(/^agent-([a-z0-9]+-\d+)/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+/**
+ * PAN-1908: clear the idle-stack grace clock for an issue when its agent
+ * lifecycle changes (started / stopped). The patrol safety net still reaps
+ * stacks whose clock has elapsed, but events drive the reset.
+ */
+export function handleAgentLifecycleEventForIdleStack(agentId: string): void {
+  const issueLower = issueLowerFromAgentId(agentId);
+  if (issueLower) {
+    firstIdleAt.delete(issueLower);
+  }
+}
+
+export function resetIdleStackGraceClock(issueLower: string): void {
+  firstIdleAt.delete(issueLower);
+}
+
 export interface IdleStackReaperDeps {
   /** Names of currently-running docker containers. */
   listContainerNames: () => Promise<string[]>;

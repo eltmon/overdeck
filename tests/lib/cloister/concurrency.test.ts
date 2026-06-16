@@ -33,6 +33,7 @@ describe('concurrency governor — config + counting', () => {
     vi.resetModules();
     vi.doUnmock('../../../src/lib/cloister/config.js');
     vi.doUnmock('../../../src/lib/agents.js');
+    vi.doUnmock('../../../src/lib/database/agents-db.js');
   });
 
   it('falls back to safe defaults when config omits/garbles concurrency', async () => {
@@ -47,16 +48,21 @@ describe('concurrency governor — config + counting', () => {
     expect(limits.exemptOperatorStarted).toBe(true); // defaults to true
   });
 
-  it('counts only tmux-alive agents, grouped into work vs advancing', async () => {
+  it('counts status=running agents from the agents table, grouped into work vs advancing', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [
-        { role: 'work', tmuxActive: true },
-        { role: 'work', tmuxActive: false }, // dead — ignored
-        { role: 'review', tmuxActive: true },
-        { role: 'ship', tmuxActive: true },
-        { role: 'plan', tmuxActive: true }, // neither work nor advancing
-      ],
+      listRunningAgentsSync: () => [],
+    }));
+    vi.doMock('../../../src/lib/database/agents-db.js', () => ({
+      countAgentsByStatus: (status: string) => {
+        if (status !== 'running') return {};
+        return {
+          work: 1,
+          review: 1,
+          ship: 1,
+          plan: 1, // neither work nor advancing
+        };
+      },
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, total: 3 });

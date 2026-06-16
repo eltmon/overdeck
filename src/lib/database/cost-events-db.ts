@@ -300,6 +300,60 @@ export function queryCostEvents(opts: {
 }
 
 /**
+ * PAN-1908: get raw token counts grouped by pipeline stage and provider/model.
+ * Returns byStage[session_type][provider/model] = { input, output, cacheRead, cacheWrite }.
+ */
+export function getCostBreakdownByStageAndModel(
+  issueId: string,
+): {
+  byStage: Record<string, Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>>;
+  totals: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>;
+} {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT
+      CASE WHEN session_type IS NULL OR session_type = 'unknown' THEN 'other' ELSE session_type END as stage,
+      COALESCE(provider || '/' || model, 'unknown') as provider_model,
+      SUM(input) as input,
+      SUM(output) as output,
+      SUM(cache_read) as cache_read,
+      SUM(cache_write) as cache_write
+    FROM cost_events
+    WHERE UPPER(issue_id) = UPPER(?)
+    GROUP BY stage, provider_model
+  `).all(issueId) as Array<{
+    stage: string;
+    provider_model: string;
+    input: number;
+    output: number;
+    cache_read: number;
+    cache_write: number;
+  }>;
+
+  const byStage: Record<string, Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>> = {};
+  const totals: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {};
+
+  for (const row of rows) {
+    if (!byStage[row.stage]) byStage[row.stage] = {};
+    byStage[row.stage][row.provider_model] = {
+      input: row.input,
+      output: row.output,
+      cacheRead: row.cache_read,
+      cacheWrite: row.cache_write,
+    };
+
+    const t = totals[row.provider_model] ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+    t.input += row.input;
+    t.output += row.output;
+    t.cacheRead += row.cache_read;
+    t.cacheWrite += row.cache_write;
+    totals[row.provider_model] = t;
+  }
+
+  return { byStage, totals };
+}
+
+/**
  * Get aggregated costs by issue.
  */
 export function getCostsByIssueFromDb(): Record<string, IssueAggregate> {

@@ -775,9 +775,13 @@ describe('flywheel run payload helpers', () => {
 
   beforeEach(async () => {
     panopticonHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-routes-'));
+    process.env.PANOPTICON_HOME = panopticonHome;
+    resetDatabase();
   });
 
   afterEach(async () => {
+    resetDatabase();
+    delete process.env.PANOPTICON_HOME;
     await rm(panopticonHome, { recursive: true, force: true });
   });
 

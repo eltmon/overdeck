@@ -14,9 +14,6 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { exec } from 'node:child_process';
-import { readdir, readFile, access } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -26,6 +23,8 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { DockerStatsCollector } from '../../../lib/docker-stats.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { httpHandler } from './http-handler.js';
+import { listAgentStates, type AgentState } from '../../../lib/agents.js';
+import { listSessionsSync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -56,58 +55,22 @@ function formatUptime(startedAt: string): string {
 
 // ─── Route: GET /api/resources ────────────────────────────────────────────────
 
-const getResourcesRoute = HttpRouter.add(
-  'GET',
-  '/api/resources',
-  httpHandler(Effect.gen(function* () {
+/** Build the GET /api/resources response from the SQLite agents table. */
+export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
+  return Effect.gen(function* () {
     const collector = dockerStatsCollector;
     const containers = collector ? collector.getStats() : [];
     const stoppedContainers: unknown[] = [];
 
-    // Gather active agents using async FS
-    const agentsDir = join(homedir(), '.panopticon', 'agents');
-    const agents: Record<string, unknown>[] = [];
-
-    // Wrap I/O so its fallback lives in the SUCCESS channel — using
-    // `Effect.tryPromise({ catch: () => fallback })` instead routes `fallback`
-    // through the FAILURE channel, so `yield*` re-raises and the surrounding
-    // `if (!stateText) continue;` is dead code. That bug fired on every poll
-    // where any agent's state.json was missing or briefly being rewritten, and
-    // since this route is polled every 5s, it manufactured a steady stream of
-    // `Effect.fail(null)` defects that hit `httpHandler`'s catchCause and spammed
-    // the dashboard log + stole event-loop time formatting Cause.pretty.
-    const agentsDirExists = yield* Effect.promise(() =>
-      access(agentsDir).then(() => true, () => false),
-    );
-
-    if (agentsDirExists) {
-      const names = yield* Effect.promise(() =>
-        readdir(agentsDir).catch(() => [] as string[]),
-      );
-
-      // Read every agent's state.json with bounded concurrency rather than one
-      // await at a time. This route is polled every 5s per open panel; with
-      // hundreds of accumulated agent dirs the old sequential loop made it take
-      // 20-25s under disk contention and stalled the event loop (PAN-1711).
-      const stateTexts = yield* Effect.all(
-        names.map((name) =>
-          Effect.promise(() =>
-            readFile(join(agentsDir, name, 'state.json'), 'utf-8').catch(
-              () => null as string | null,
-            ),
-          ),
-        ),
-        { concurrency: 24 },
-      );
-
-      for (const stateText of stateTexts) {
-        if (!stateText) continue;
-        try {
-          const state = JSON.parse(stateText) as Record<string, unknown>;
-          if (state.status !== 'stopped') agents.push(state);
-        } catch { /* skip malformed */ }
-      }
-    }
+    // PAN-1908: authoritative agent registry is the SQLite agents table.
+    // Read active agent states from the table and cross-check tmux liveness.
+    const tmuxSessionNames = new Set(listSessionsSync().map(s => s.name));
+    const agents: Record<string, unknown>[] = listAgentStates()
+      .filter((state: AgentState) => state.status !== 'stopped')
+      .map((state: AgentState) => ({
+        ...state,
+        hasLiveTmuxSession: tmuxSessionNames.has(state.id),
+      }));
 
     return jsonResponse({
       containers,
@@ -117,7 +80,13 @@ const getResourcesRoute = HttpRouter.add(
       agents,
       updatedAt: new Date().toISOString(),
     });
-  })),
+  });
+}
+
+const getResourcesRoute = HttpRouter.add(
+  'GET',
+  '/api/resources',
+  httpHandler(getResourcesEffect()),
 );
 
 // ─── Route: GET /api/resources/:containerId/history ──────────────────────────
@@ -229,7 +198,7 @@ const deleteDockerContainerRoute = HttpRouter.add(
       try: () => execAsync(`docker rm "${id}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true });
   })),
 );
@@ -245,7 +214,7 @@ const postPruneContainersRoute = HttpRouter.add(
       try: () => execAsync('docker container prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true, output: stdout.trim() });
   })),
 );
@@ -268,7 +237,7 @@ const deleteDockerNetworkRoute = HttpRouter.add(
       try: () => execAsync(`docker network rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true });
   })),
 );
@@ -291,7 +260,7 @@ const deleteDockerVolumeRoute = HttpRouter.add(
       try: () => execAsync(`docker volume rm "${name}" 2>&1`, { encoding: 'utf-8', timeout: 10000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true });
   })),
 );
@@ -307,7 +276,7 @@ const postPruneVolumesRoute = HttpRouter.add(
       try: () => execAsync('docker volume prune -f 2>&1', { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true, output: stdout.trim() });
   })),
 );
@@ -330,7 +299,7 @@ const postRestartContainerRoute = HttpRouter.add(
       try: () => execAsync(`docker restart "${id}"`, { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true, container: id, output: stdout.trim() });
   })),
 );
@@ -353,7 +322,7 @@ const postStartContainerRoute = HttpRouter.add(
       try: () => execAsync(`docker start "${id}"`, { encoding: 'utf-8', timeout: 30000 }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
-    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: 0, networks: 0 } } });
+    yield* eventStore.append({ type: 'resources.updated', timestamp: new Date().toISOString(), payload: { resources: { containers: dockerStatsCollector ? dockerStatsCollector.getStats() : [] } } });
     return jsonResponse({ ok: true, container: id, output: stdout.trim() });
   })),
 );

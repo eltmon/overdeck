@@ -428,4 +428,184 @@ describe('schema migrations', () => {
     expect(row.forge).toBe('github');
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
+
+  // ── v54 → v55: agents runtime registry (PAN-1908) ─────────────────────────
+
+  const EXPECTED_AGENTS_COLUMNS = [
+    'id',
+    'issue_id',
+    'role',
+    'status',
+    'workspace',
+    'harness',
+    'model',
+    'branch',
+    'session_id',
+    'started_at',
+    'last_activity',
+    'last_resume_at',
+    'stopped_at',
+    'stopped_by_user',
+    'stopped_by_pause',
+    'kickoff_delivered',
+    'host_override',
+    'cost_so_far',
+    'phase',
+    'work_type',
+    'paused',
+    'paused_reason',
+    'paused_at',
+    'troubled',
+    'troubled_at',
+    'consecutive_failures',
+    'first_failure_in_run_at',
+    'last_failure_at',
+    'last_failure_reason',
+    'last_failure_next_retry_at',
+    'flywheel_run_id',
+    'role_run_head',
+    'review_sub_role',
+    'review_run_id',
+    'review_synthesis_agent_id',
+    'review_output_path',
+    'review_deadline_at',
+    'review_monitor_signaled',
+    'review_retry_attempt',
+    'inspect_sub_role',
+    'delivery_method',
+    'supervisor_enabled',
+    'channels_enabled',
+    'updated_at',
+  ];
+
+  it('fresh initSchema creates the agents table with every PRD §5.1 column and indexes', () => {
+    initSchema(db);
+
+    const table = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='agents'`)
+      .get() as { name: string } | undefined;
+    expect(table?.name).toBe('agents');
+
+    const cols = db.prepare('PRAGMA table_info(agents)').all<{ name: string }>();
+    const names = cols.map((c) => c.name);
+    for (const col of EXPECTED_AGENTS_COLUMNS) {
+      expect(names).toContain(col);
+    }
+
+    const idCol = cols.find((c) => c.name === 'id');
+    expect(idCol?.pk).toBe(1);
+
+    const idxStatusRole = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_agents_status_role'`)
+      .get() as { name: string } | undefined;
+    expect(idxStatusRole?.name).toBe('idx_agents_status_role');
+
+    const idxIssue = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_agents_issue'`)
+      .get() as { name: string } | undefined;
+    expect(idxIssue?.name).toBe('idx_agents_issue');
+
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('fresh agents table preserves channels_enabled and omits codexMode/preSpawnStash columns', () => {
+    initSchema(db);
+
+    const names = db
+      .prepare('PRAGMA table_info(agents)')
+      .all<{ name: string }>()
+      .map((c) => c.name);
+
+    expect(names).toContain('channels_enabled');
+    expect(names).not.toContain('codexMode');
+    expect(names).not.toContain('codex_mode');
+    expect(names).not.toContain('preSpawnStashRef');
+    expect(names).not.toContain('pre_spawn_stash_ref');
+    expect(names).not.toContain('preSpawnStashMessage');
+    expect(names).not.toContain('pre_spawn_stash_message');
+    expect(names).not.toContain('preSpawnBaselineHead');
+    expect(names).not.toContain('pre_spawn_baseline_head');
+  });
+
+  it('v54 → v55: creates agents table idempotently on an existing database', () => {
+    db.pragma('user_version = 54');
+    db.exec(`
+      CREATE TABLE review_status (
+        issue_id TEXT PRIMARY KEY,
+        review_status TEXT NOT NULL DEFAULT 'pending',
+        updated_at TEXT NOT NULL
+      );
+    `);
+
+    const before = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='agents'`)
+      .get() as { name: string } | undefined;
+    expect(before).toBeUndefined();
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const table = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='agents'`)
+      .get() as { name: string } | undefined;
+    expect(table?.name).toBe('agents');
+
+    const cols = db.prepare('PRAGMA table_info(agents)').all<{ name: string }>();
+    const names = cols.map((c) => c.name);
+    for (const col of EXPECTED_AGENTS_COLUMNS) {
+      expect(names).toContain(col);
+    }
+
+    expect(
+      db
+        .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_agents_status_role'`)
+        .get() as { name: string } | undefined,
+    ).toBeDefined();
+    expect(
+      db
+        .prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_agents_issue'`)
+        .get() as { name: string } | undefined,
+    ).toBeDefined();
+
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v54 → v55: re-running migrations preserves existing agents rows', () => {
+    db.pragma('user_version = 54');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id TEXT PRIMARY KEY,
+        issue_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        status TEXT NOT NULL,
+        workspace TEXT NOT NULL,
+        channels_enabled INTEGER,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    db.prepare(
+      `INSERT INTO agents (id, issue_id, role, status, workspace, channels_enabled, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run('agent-pan-1908', 'PAN-1908', 'work', 'running', '/workspaces/feature-pan-1908', 0, '2026-06-15T00:00:00.000Z');
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const row = db.prepare(`SELECT id, issue_id, role, status, workspace, channels_enabled FROM agents WHERE id = ?`).get('agent-pan-1908') as {
+      id: string;
+      issue_id: string;
+      role: string;
+      status: string;
+      workspace: string;
+      channels_enabled: number;
+    };
+    expect(row).toBeDefined();
+    expect(row.id).toBe('agent-pan-1908');
+    expect(row.issue_id).toBe('PAN-1908');
+    expect(row.status).toBe('running');
+    expect(row.channels_enabled).toBe(0);
+
+    const count = db.prepare(`SELECT COUNT(*) AS n FROM agents`).get() as { n: number };
+    expect(count.n).toBe(1);
+  });
 });

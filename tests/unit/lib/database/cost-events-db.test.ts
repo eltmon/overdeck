@@ -34,6 +34,7 @@ import {
   getDailyTrends,
   getModelRollup,
   getAgentRollup,
+  getCostBreakdownByStageAndModel,
 } from '../../../../src/lib/database/cost-events-db.js';
 
 // ============== Helpers ==============
@@ -44,10 +45,13 @@ function insertEvent(overrides: {
   agentId?: string;
   issueId?: string;
   model?: string;
+  provider?: string;
   sessionType?: string;
   cost?: number;
   input?: number;
   output?: number;
+  cache_read?: number;
+  cache_write?: number;
   ts?: string;
   requestId?: string;
   sessionId?: string;
@@ -63,12 +67,12 @@ function insertEvent(overrides: {
     overrides.agentId ?? 'agent-x',
     overrides.issueId ?? 'PAN-TEST',
     overrides.sessionType ?? 'work',
-    'anthropic',
+    overrides.provider ?? 'anthropic',
     overrides.model ?? 'claude-sonnet-4-6',
     overrides.input ?? 100,
     overrides.output ?? 50,
-    0,
-    0,
+    overrides.cache_read ?? 0,
+    overrides.cache_write ?? 0,
     overrides.cost ?? 0.001,
     overrides.requestId ?? `req-${id}`,
     overrides.sessionId ?? null,
@@ -308,5 +312,38 @@ describe('getAgentRollup', () => {
     for (let i = 1; i < costs.length; i++) {
       expect(costs[i - 1]).toBeGreaterThanOrEqual(costs[i]);
     }
+  });
+});
+
+// ============== getCostBreakdownByStageAndModel (PAN-1908) ==============
+
+describe('getCostBreakdownByStageAndModel', () => {
+  it('returns empty breakdown when no events match', () => {
+    const result = getCostBreakdownByStageAndModel('PAN-NOTHING');
+    expect(result.byStage).toEqual({});
+    expect(result.totals).toEqual({});
+  });
+
+  it('buckets raw token counts by stage and provider/model', () => {
+    insertEvent({ issueId: 'PAN-BREAK', sessionType: 'work', provider: 'anthropic', model: 'claude-opus-4-8', input: 1000, output: 200, cache_read: 300, cache_write: 40 });
+    insertEvent({ issueId: 'PAN-BREAK', sessionType: 'work', provider: 'anthropic', model: 'claude-opus-4-8', input: 500, output: 100, cache_read: 150, cache_write: 20 });
+    insertEvent({ issueId: 'PAN-BREAK', sessionType: 'review', provider: 'openai', model: 'gpt-5.5', input: 800, output: 160, cache_read: 200, cache_write: 10 });
+
+    const result = getCostBreakdownByStageAndModel('PAN-BREAK');
+
+    expect(result.byStage.work['anthropic/claude-opus-4-8']).toEqual({ input: 1500, output: 300, cacheRead: 450, cacheWrite: 60 });
+    expect(result.byStage.review['openai/gpt-5.5']).toEqual({ input: 800, output: 160, cacheRead: 200, cacheWrite: 10 });
+
+    expect(result.totals['anthropic/claude-opus-4-8']).toEqual({ input: 1500, output: 300, cacheRead: 450, cacheWrite: 60 });
+    expect(result.totals['openai/gpt-5.5']).toEqual({ input: 800, output: 160, cacheRead: 200, cacheWrite: 10 });
+  });
+
+  it('routes unknown session_type into stage "other" without dropping rows', () => {
+    insertEvent({ issueId: 'PAN-OTHER-STAGE', sessionType: 'unknown', provider: 'anthropic', model: 'claude-haiku-4-5', input: 50, output: 10, cache_read: 5, cache_write: 1 });
+
+    const result = getCostBreakdownByStageAndModel('PAN-OTHER-STAGE');
+
+    expect(result.byStage.other).toBeDefined();
+    expect(result.byStage.other['anthropic/claude-haiku-4-5']).toEqual({ input: 50, output: 10, cacheRead: 5, cacheWrite: 1 });
   });
 });

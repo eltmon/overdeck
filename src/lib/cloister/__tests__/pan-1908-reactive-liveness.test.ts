@@ -1,0 +1,242 @@
+/**
+ * Tests for PAN-1908 reactive agent liveness: handleAgentStoppedEvent and
+ * handleAgentHeartbeatDeadEvent replace the directory-scan patrol steps.
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
+
+const mockGetAgentStateSync = vi.fn();
+const mockSaveAgentState = vi.fn();
+const mockSaveAgentStateSync = vi.fn();
+const mockResumeAgent = vi.fn();
+const mockRecordAgentFailure = vi.fn();
+const mockResetAgentFailureCount = vi.fn();
+const mockMarkAgentRunningState = vi.fn();
+const mockSessionExists = vi.fn();
+const mockSessionExistsSync = vi.fn();
+const mockKillSession = vi.fn();
+const mockListPaneValues = vi.fn();
+const mockGetReviewStatusSync = vi.fn();
+const mockGetAgentRuntimeStateSync = vi.fn();
+const mockWorkResumeSlotsAvailable = vi.fn();
+const mockCountRunningAgents = vi.fn();
+const mockGetConcurrencyLimits = vi.fn();
+const mockIsIssueClosed = vi.fn();
+
+vi.mock('effect', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('effect')>();
+  return { ...actual };
+});
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: (path: string) => {
+      if (path === '/tmp/workspace') return true;
+      if (path.startsWith('/tmp/agents/')) return false;
+      return actual.existsSync(path);
+    },
+  };
+});
+
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    loadavg: () => [0.5, 0.5, 0.5],
+    cpus: () => Array.from({ length: 8 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+  };
+});
+
+vi.mock('../../../lib/agents.js', () => ({
+  getAgentStateSync: (...args: unknown[]) => mockGetAgentStateSync(...args),
+  getAgentState: (...args: unknown[]) => Effect.succeed(mockGetAgentStateSync(...args)),
+  saveAgentState: (...args: unknown[]) => mockSaveAgentState(...args),
+  saveAgentStateSync: (...args: unknown[]) => mockSaveAgentStateSync(...args),
+  resumeAgent: (...args: unknown[]) => mockResumeAgent(...args),
+  recordAgentFailure: (...args: unknown[]) => mockRecordAgentFailure(...args),
+  resetAgentFailureCount: (...args: unknown[]) => mockResetAgentFailureCount(...args),
+  markAgentRunningState: (...args: unknown[]) => mockMarkAgentRunningState(...args),
+  getAgentRuntimeStateSync: (...args: unknown[]) => mockGetAgentRuntimeStateSync(...args),
+  getAgentDir: (id: string) => `/tmp/agents/${id}`,
+  normalizeAgentId: (id: string) => id,
+}));
+
+vi.mock('../../../lib/tmux.js', () => ({
+  sessionExists: (...args: unknown[]) => Effect.succeed(mockSessionExists(...args)),
+  sessionExistsSync: (...args: unknown[]) => mockSessionExistsSync(...args),
+  killSession: (...args: unknown[]) => Effect.succeed(mockKillSession(...args)),
+  killSessionSync: (...args: unknown[]) => mockKillSession(...args),
+  listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
+}));
+
+vi.mock('../../../lib/review-status.js', () => ({
+  getReviewStatusSync: (...args: unknown[]) => mockGetReviewStatusSync(...args),
+  loadReviewStatuses: () => ({}),
+}));
+
+vi.mock('../../../lib/cloister/concurrency.js', () => ({
+  workResumeSlotsAvailable: (...args: unknown[]) => mockWorkResumeSlotsAvailable(...args),
+  countRunningAgents: () => mockCountRunningAgents(),
+  getConcurrencyLimits: () => mockGetConcurrencyLimits(),
+  resetPatrolDispatchBudget: vi.fn(),
+  tryReserveAdvancingSlot: () => true,
+  canDispatchAdvancing: () => true,
+}));
+
+vi.mock('../issue-closed.js', () => ({
+  isIssueClosed: (...args: unknown[]) => mockIsIssueClosed(...args),
+}));
+
+vi.mock('../../../lib/activity-logger.js', () => ({
+  emitActivityEntry: vi.fn(),
+  emitActivityEntrySync: vi.fn(),
+  emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
+}));
+
+vi.mock('../../../lib/persistent-logger.js', () => ({
+  logDeaconEvent: vi.fn(),
+  logDeaconEventSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
+  logAgentLifecycleSync: vi.fn(),
+}));
+
+vi.mock('../../../lib/database/agents-db.js', () => ({
+  listAllAgents: vi.fn(() => []),
+}));
+
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: () => ({ active: false, since: null }),
+}));
+
+import {
+  handleAgentStoppedEvent,
+  handleAgentHeartbeatDeadEvent,
+} from '../deacon.js';
+
+function makeState(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'agent-pan-1908',
+    issueId: 'PAN-1908',
+    workspace: '/tmp/workspace',
+    harness: 'claude-code',
+    role: 'work',
+    model: 'claude-sonnet-4-6',
+    status: 'stopped',
+    startedAt: '2026-06-15T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('PAN-1908 reactive liveness handlers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAgentStateSync.mockReturnValue(null);
+    mockSaveAgentState.mockReturnValue(Effect.void);
+    mockResumeAgent.mockResolvedValue({ success: true });
+    mockRecordAgentFailure.mockReturnValue(Effect.succeed(null));
+    mockResetAgentFailureCount.mockReturnValue(undefined);
+    mockMarkAgentRunningState.mockImplementation((s: any) => { s.status = 'running'; });
+    mockSessionExists.mockResolvedValue(false);
+    mockSessionExistsSync.mockReturnValue(false);
+    mockKillSession.mockResolvedValue(undefined);
+    mockListPaneValues.mockResolvedValue(['0']);
+    mockGetReviewStatusSync.mockReturnValue(undefined);
+    mockGetAgentRuntimeStateSync.mockReturnValue(null);
+    mockWorkResumeSlotsAvailable.mockReturnValue(6);
+    mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
+    mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
+    mockIsIssueClosed.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('handleAgentStoppedEvent', () => {
+    it('returns null and skips non-existent agents', async () => {
+      mockGetAgentStateSync.mockReturnValue(null);
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('resumes a stopped work agent with pending review feedback', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+        verificationStatus: 'pending',
+        readyForMerge: false,
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBe('agent-pan-1908');
+      expect(mockResumeAgent).toHaveBeenCalledWith('agent-pan-1908');
+    });
+
+    it('does not resume a deliberately killed agent without completed marker', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ stoppedByUser: true }));
+      mockGetReviewStatusSync.mockReturnValue({
+        issueId: 'PAN-1908',
+        reviewStatus: 'blocked',
+        testStatus: 'pending',
+      });
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+
+    it('defers when concurrency slots are exhausted', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState());
+      mockGetReviewStatusSync.mockReturnValue({ reviewStatus: 'blocked' });
+      mockWorkResumeSlotsAvailable.mockReturnValue(0);
+
+      const result = await handleAgentStoppedEvent('agent-pan-1908');
+
+      expect(result).toBeNull();
+      expect(mockResumeAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleAgentHeartbeatDeadEvent', () => {
+    it('marks a running work agent stopped and records failure', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
+    });
+
+    it('skips agents that are already stopped', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState());
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions).toEqual([]);
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('skips running agents with a live tmux session', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
+      mockSessionExistsSync.mockReturnValue(true);
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions).toEqual([]);
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+  });
+});

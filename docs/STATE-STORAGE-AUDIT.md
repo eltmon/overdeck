@@ -1,10 +1,17 @@
 # State Storage Audit — review-status and the `~/.panopticon` surface
 
-**Status:** Pass 1 (inventory + design direction). Author: orchestrator conversation, 2026-06-14.
+**Status:** Resolved by [PAN-1908](https://github.com/eltmon/panopticon-cli/issues/1908). Author: orchestrator conversation, 2026-06-14.
 **Trigger:** investigation into why 11 issues showed BLOCKED in the Flywheel emit but not the
 Command Deck tree. That investigation surfaced a misdiagnosed substrate bug ([PAN-1883](https://github.com/eltmon/panopticon-cli/issues/1883))
 and a deeper question: how much `~/.panopticon` state is authoritative vs. vestigial,
 and what should the storage model actually be.
+
+> **Resolution note:** The authoritative-source questions raised here were settled by
+> [PAN-1908](https://github.com/eltmon/panopticon-cli/issues/1908): agent runtime state now lives in the SQLite `agents` table in
+> `~/.panopticon/panopticon.db`, durable per-issue records live in the git-backed infra repo
+> under `.pan/` records, and tmux on the `panopticon` socket remains the liveness oracle. See
+> [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the current model. This audit is kept
+> as historical context for the design rationale, but its Pass 2 action items are superseded.
 
 ## Confidence legend
 
