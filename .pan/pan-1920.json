@@ -6,10 +6,11 @@
     "issueId": "PAN-1920",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T14:54:20.150Z",
+    "updatedAt": "2026-06-16T14:55:57.132Z",
+    "verificationNotes": "Verification FAILED at test (12229ms):\n\nuld not sync main: Sync-main produced 1 conflict(s) in PAN-1872: tests/foo.test.ts. Resolve manually in the workspace, then re-run sync-main. Conflicts: tests/foo.test.ts.\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n✔ Agent spawned: agent-pan-1872\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1924"
   },
   "closeOut": {
@@ -34,7 +35,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0043048,
-        "pricingAsOf": "2026-06-16T14:54:20.184Z"
+        "pricingAsOf": "2026-06-16T14:55:57.233Z"
       }
     },
     "merges": [
