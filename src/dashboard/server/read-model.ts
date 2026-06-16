@@ -493,10 +493,10 @@ export const ReadModelServiceLive = Layer.effect(
       const { reconstructCache } = yield* Effect.promise(() =>
         import('../../lib/reconstruct/reconstruct-cache.js'),
       );
-      const { getProjectionCache } = yield* Effect.promise(
+      const { initProjectionCache } = yield* Effect.promise(
         () => import('./services/projection-cache.js'),
       );
-      projectionCache = getProjectionCache();
+      projectionCache = initProjectionCache(getDatabase() as unknown as import('./event-store.js').DbAdapter);
 
       const result = yield* Effect.promise(() => reconstructCache(getDatabase()));
 
