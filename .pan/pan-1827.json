@@ -9,7 +9,7 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T06:26:29.189Z",
+    "updatedAt": "2026-06-16T06:34:19.243Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "Ran npm run typecheck, npm run lint, npm run test. All gates passed: 605 test files, 6349 tests passed (51 skipped). Pi resolver regression tests verified: resolvePiSessionPath implementation, pi harness dispatch before claude fallback, strike-/inspect- prefix guard in /messages fallback, codex/claude-code regression coverage. All acceptance criteria met.",
     "blockerReasons": [
@@ -58,7 +58,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.596072,
-        "pricingAsOf": "2026-06-16T06:26:29.227Z"
+        "pricingAsOf": "2026-06-16T06:34:19.405Z"
       }
     },
     "merges": [
