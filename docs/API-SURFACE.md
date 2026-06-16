@@ -100,12 +100,66 @@ issue* — are each smeared across 2–5 modules, and the **reads have no shared
 from DB / `.pan/` / GitHub inconsistently. This is the API-layer twin of the in-DB and filesystem-vs-DB
 duplication.
 
-## The fix (companion design issue)
+## The write side — even worse than reads
 
-A single, documented **source-of-truth read API** — one door (e.g. `/api/state/*` or an RPC `StateGroup`)
-that *internally* resolves the canonical state from the one surface the state-model effort builds (the
-SQLite cache, backed by git + GitHub), so **no caller — AI, CLI, or dashboard — reaches into the DB,
-filesystem, or GitHub directly.** The scattered read endpoints in §A–G become thin shims over it (or are
-retired). Mutations stay where they are but route their writes through the single write-surface (#1921).
+Reads are scattered; writes are **uncontrolled**. Approximate write-path call-site counts (`git grep`):
 
-See the design issue for the proposed shape, the endpoints it consolidates, and acceptance.
+| Canonical state | Written from | Store |
+|---|---|---|
+| Verdicts (`review_status`) | **21 sites** | DB |
+| Event log (`events`) | **27 sites** | DB |
+| GitHub issue status / labels — written **directly** | **19 sites** | GitHub |
+| Agent runtime (`agents` table) | 5 sites | DB |
+| `state.json` (harness/model/status) | ~50 files touch it | filesystem |
+| `.pan/` (continue / record / spec / statusOverrides) | ~36 files touch it | git/filesystem |
+
+There is **no single writer**. The same fact is written from dozens of call sites, to multiple stores,
+with nothing enforcing consistency — so the stores drift, race, and corrupt. This is the root cause of
+the recurring state/pipeline bugs: stale state, agents disagreeing, the "half-files/half-DB" problem,
+recovery breaking. (#1921 is meant to be the single write surface; it is not built yet.)
+
+## End state — the target architecture (the whole point)
+
+```
+        SOURCES OF TRUTH   (durable · travel with the repo · survive a DB wipe)
+  GitHub (issue/PR status) · git .pan/records (plans, decisions, verdicts) · JSONL · tmux
+                          │  ▲
+                  ONE sync layer   (reconstruction #1920 hydrates ▼ ;  writer mirrors ▲ to git)
+                          ▼  │
+              ┌─────────────────────────────────┐
+              │   SQLite DB  —  the ONE surface   │    (a cache; rebuildable from sources)
+              └─────────────────────────────────┘
+                   ▲                         ▲
+            ONE read door             ONE write door
+       state-resolver /api/state    record writer / write-surface
+              (#1936)                       (#1921)
+                   ▲                         ▲
+      ┌────────────┴───────────┬─────────────┴────────────┐
+    AIs / agents        dashboard frontend             the CLI
+       └──── all go through the two doors; NOTHING touches DB/fs/GitHub directly ────┘
+```
+
+**The five rules that make it true:**
+1. Durable truth lives **only** in the sources (GitHub, git `.pan/records`, JSONL, tmux). They travel.
+2. **One sync layer**: reconstruction (#1920) rebuilds the DB from sources; the writer mirrors writes back
+   to git for durability/travel.
+3. The **DB is the one surface** running code uses — a cache, never the truth.
+4. **One read door** (#1936) + **one write door** (#1921). Reads go through the resolver; writes go
+   through the single writer.
+5. A **CI guard** makes direct DB / filesystem / GitHub access *outside the two doors* fail the build — so
+   nobody can ever add a 9th read path or a 22nd verdict-writer again.
+
+**How every open state-model issue maps to this end state:**
+
+| Issue | Its role in the end state |
+|---|---|
+| #1920 ✅ | the sync layer (sources → DB) |
+| #1919 | the unified per-issue **record** — durable truth in git |
+| #1921 | the **one write door** |
+| #1936 | the **one read door** |
+| #1922 | verdicts become a durable source of truth, not DB-only |
+| #1929 / #1931 / #1932 | fix the sync/write path that today corrupts the record |
+
+When these land and the CI guard is in place, there is exactly **one way in and one way out** for every
+piece of state. That is the end state — and the reason the recurring bugs stop is that drift becomes
+*structurally impossible*, not just discouraged.
