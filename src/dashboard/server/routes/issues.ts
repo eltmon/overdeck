@@ -240,7 +240,7 @@ function getInternalDashboardOrigin(): string {
   return process.env['PANOPTICON_INTERNAL_DASHBOARD_URL'] ?? `http://127.0.0.1:${port}`;
 }
 
-function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): CompletePlanningAutoSpawnResult['workAgentSkipReason'] {
+function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): NonNullable<CompletePlanningAutoSpawnResult['workAgentSkipReason']> {
   const error = typeof body['error'] === 'string' ? body['error'] : '';
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';
@@ -1876,11 +1876,11 @@ const postIssueReopenRoute = HttpRouter.add(
           const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
           if (existsSync(workspacePath) && await Effect.runPromise(findPlan(workspacePath))) {
             try {
-              const { stdout: bdCheck } = await Effect.runPromise(withBdMutex(() => execFileAsync(
+              const { stdout: bdCheck } = await Effect.runPromise(withBdMutex(() => Effect.promise(() => execFileAsync(
                 'bd',
                 ['list', '--json', '-l', issueLower, '--limit', '1'],
                 { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
-              )));
+              ))));
               const existing = JSON.parse(bdCheck.trim() || '[]');
               if (existing.length === 0) {
                 const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
@@ -2196,7 +2196,7 @@ const postIssueMoveStatusRoute = HttpRouter.add(
     };
     const issueState = canonicalToIssueState[targetStatus];
 
-    const shadowResult = yield* Effect.promise(() => updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus));
+    const shadowResult = yield* updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus);
 
     const issueDataService = getIssueDataService();
     // Refresh the in-memory shadow-state cache so subsequent getIssues() calls
@@ -2943,11 +2943,11 @@ const getIssueBeadsRoute = HttpRouter.add(
     const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
       try {
         const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await Effect.runPromise(withBdMutex(() => execFileAsync('bd', ['list', '--json', '-l', id.toLowerCase(), '--status', 'all', '--limit', '0'], {
+        const { stdout } = await Effect.runPromise(withBdMutex(() => Effect.promise(() => execFileAsync('bd', ['list', '--json', '-l', id.toLowerCase(), '--status', 'all', '--limit', '0'], {
           cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
-        })));
+        }))));
         return { beads: JSON.parse(stdout || '[]'), querySource: 'local' };
       } catch (bdError: any) {
         console.error('bd search failed:', bdError.message);

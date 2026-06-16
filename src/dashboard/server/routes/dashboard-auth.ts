@@ -148,7 +148,7 @@ function hasValidCsrfToken(headers: HeaderMap): boolean {
 
 export function rejectUnsafeDashboardMutationRequest(
   request: HttpServerRequest.HttpServerRequest,
-): Response | null {
+): HttpServerResponse.HttpServerResponse | null {
   const authError = rejectUnauthorizedDashboardRequest(request);
   if (authError) return authError;
 

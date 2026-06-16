@@ -2232,14 +2232,14 @@ const getAgentHandoffSuggestionRoute = HttpRouter.add(
     }
 
     const health = getAgentHealth(id, runtime);
-    const triggers = yield* Effect.promise(() => checkAllTriggers(
+    const triggers = yield* checkAllTriggers(
       id,
       agentState.workspace,
       agentState.issueId,
       agentState.model,
       health,
       loadCloisterConfigSync()
-    ));
+    );
 
     if (triggers.length > 0) {
       const trigger = triggers[0];
@@ -2280,10 +2280,10 @@ const postAgentHandoffRoute = HttpRouter.add(
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const result = yield* Effect.promise(() => performHandoff(id, {
+    const result = yield* performHandoff(id, {
       targetModel,
       reason: reason || 'Manual handoff from dashboard',
-    }));
+    });
 
     if (result.success) {
       return jsonResponse({
@@ -2669,7 +2669,7 @@ const postAgentsRoute = HttpRouter.add(
     emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
     const spawnGuardrails = evaluateSpawnGuardrails(health);
     if (spawnGuardrails.blocked) {
-      emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error, {
+      emitStartAgentPhase(issueId, 'guardrails', 'failure', spawnGuardrails.error ?? 'guardrails blocked', {
         status: spawnGuardrails.status,
         hint: spawnGuardrails.hint,
       });
