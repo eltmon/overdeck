@@ -6,10 +6,10 @@
     "issueId": "PAN-1920",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-16T14:54:14.696Z",
+    "updatedAt": "2026-06-16T14:54:20.150Z",
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1924"
   },
   "closeOut": {
@@ -34,7 +34,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0043048,
-        "pricingAsOf": "2026-06-16T14:54:14.729Z"
+        "pricingAsOf": "2026-06-16T14:54:20.184Z"
       }
     },
     "merges": [
