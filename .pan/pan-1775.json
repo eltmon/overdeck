@@ -62,9 +62,16 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-06-16T06:01:28.337Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T06:02:28.224Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-16T06:02:28.190Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1786",
     "lastVerifiedCommit": "1929ddf158f1729d2838304330ffad1c988b7624"
   },
@@ -90,7 +97,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.434759,
-        "pricingAsOf": "2026-06-16T06:01:28.465Z"
+        "pricingAsOf": "2026-06-16T06:02:28.270Z"
       }
     },
     "merges": [

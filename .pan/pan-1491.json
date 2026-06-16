@@ -10,11 +10,18 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-06-16T06:01:28.243Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T06:02:28.190Z",
     "reviewNotes": "Approved; no blockers remain after cycle-diff convergence gate",
     "testNotes": "Quality gates passed: install (bun install --frozen-lockfile), typecheck (tsc --noEmit + hooks), frontend-typecheck (npx tsc --noEmit in src/dashboard/frontend), lint (eslint + effect/permissions/skills checks), build (npm run build + dashboard build). Unit tests passed: 543 test files, 5674 tests on core; 3 test files, 30 tests on frontend. No UAT required — test-only hermetic fix (changed provider assertion from toBe('openai') to typeof check to decouple from live config state).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-16T06:02:28.189Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1636",
     "reviewedAtCommit": "55250df93a7da0e1fc8fae635b9c1c99a87d4c55",
     "lastVerifiedCommit": "fbdb0be5d4d8274064a03125620a69fb2f88067f"
@@ -25,7 +32,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-06-16T06:01:28.382Z"
+        "pricingAsOf": "2026-06-16T06:02:28.269Z"
       }
     },
     "merges": [

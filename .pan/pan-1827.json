@@ -8,10 +8,17 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-06-16T06:01:28.199Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-16T06:02:28.210Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "Ran npm run typecheck, npm run lint, npm run test. All gates passed: 605 test files, 6349 tests passed (51 skipped). Pi resolver regression tests verified: resolvePiSessionPath implementation, pi harness dispatch before claude fallback, strike-/inspect- prefix guard in /messages fallback, codex/claude-code regression coverage. All acceptance criteria met.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-06-16T06:02:28.190Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1858",
     "lastVerifiedCommit": "197e3b49ab63d07f19c5041d936a868b147a7374"
   },
@@ -51,7 +58,7 @@
       },
       "costAtCloseOut": {
         "usd": 6.596072,
-        "pricingAsOf": "2026-06-16T06:01:28.290Z"
+        "pricingAsOf": "2026-06-16T06:02:28.252Z"
       }
     },
     "merges": [
