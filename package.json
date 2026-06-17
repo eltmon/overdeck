@@ -99,6 +99,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",
+    "test:drizzle-smoke": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck scripts/drizzle-node-sqlite-smoke.ts && node --import tsx scripts/drizzle-node-sqlite-smoke.ts",
     "test:coverage": "vitest run --coverage",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
