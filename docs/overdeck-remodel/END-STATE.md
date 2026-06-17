@@ -137,15 +137,14 @@ was once listed as an open risk; it is now a settled decision.
 
 ## The domain map
 
-The eight original domains resolve, after the audits, into **6 database-cache
-domains plus Config**, which is backed by a file. Transcripts turned out to be a
-shared internal service rather than a domain; Observability turned out to be
-infrastructure; the old Orchestration domain split into Merge and
-Control/Settings. Memory is also a domain, but it sits outside that count of
-six — it was never one of the original eight. The audit surfaced it, and the
-decision is that it stays in scope. So the headline reads cleanly as **8 → 6
-database-cache domains plus Config**, with Memory a seventh small domain whose
-entire database footprint is a single cache table.
+After the audits, the original eight domains distill to six: Transcripts turned
+out to be a shared internal service rather than a domain, Observability turned
+out to be infrastructure, and the old Orchestration domain split into Merge and
+Control/Settings. The audit also surfaced a domain that was never in the original
+eight — Memory — and it stays in scope. That leaves **seven database-cache
+domains** (the six, plus Memory) **and Config**, which is file-backed rather than
+cached. Memory is the smallest: its entire database footprint is a single cache
+table, with its real records living as files on disk.
 
 | # | Domain | Read door | Write door | Source(s) of truth | Cache tables |
 |---|---|---|---|---|---|
