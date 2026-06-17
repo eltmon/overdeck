@@ -1,0 +1,391 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-17T12:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1951: Inspector agent should resume a warm session instead of cold-spawning a new one per bead",
+    "updated": "2026-06-17T12:15:08.874Z"
+  },
+  "plan": {
+    "id": "pan-1951",
+    "title": "Inspector agent should resume a warm session instead of cold-spawning a new one per bead",
+    "status": "proposed",
+    "uid": "e7f2a9b4-3d1c-4e8f-b6a0-d92c5e173f08",
+    "author": "agent:claude-sonnet-4-6",
+    "sequence": 2,
+    "created": "2026-06-17T12:30:00.000Z",
+    "updated": "2026-06-17T12:15:08.874Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1951",
+        "label": "PAN-1951",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "inspector",
+      "warm-session",
+      "resume",
+      "cloister",
+      "deacon"
+    ],
+    "narratives": {
+      "Problem": "Every `pan inspect` run spawns a brand-new cold Claude session with a per-bead session name (`inspect-<issue>-<beadSlug>`), kills any same-name session first, and generates a fresh `randomUUID()`. Each bead inspection pays the full cold-start / re-orientation cost and carries zero context from prior inspections on the same issue. The deacon's crash watchdog uses `sessionExists` alone to detect crashes — after the fix, `remain-on-exit on` keeps the session alive after exit, so `sessionExists` alone is no longer sufficient.",
+      "Proposal": "Change to one persistent session per issue (`inspect-<issueLower>`). Use `claude --resume <savedClaudeSessionId> -p \"$continuationPrompt\"` for all beads after the first, so the inspector retains its JSONL history (architecture knowledge, prior bead context) and Anthropic's prompt cache warmth across inspections. The launcher generator already supports `resumeSessionId` + `promptFile` together (lines 531–554 of `src/lib/launcher-generator.ts`). A new short continuation-prompt template (`inspect-agent-continue.md`) replaces the full 200-line prompt for resumed beads. `remain-on-exit on` keeps the tmux pane open after each print-mode exit so the dead pane is detectable for the next bead's dispatch. The deacon crash watchdog is updated to use `isPaneDead` for accurate liveness detection. Model uniformity guard: if the resolved model changes between beads, force a cold spawn. Context budget: never hard-reset — let Claude's built-in compaction handle growth.",
+      "NonGoals": "- No change to what the inspector judges: per-bead diff scope remains HEAD^..HEAD\n- No fast/deep depth selection changes\n- No PTY supervisor integration for inspect sessions (delivery stays via print-mode -p in the launcher)\n- No deliverAgentMessage for live-process delivery (inspector uses print mode, not interactive mode)\n- No Pi/Codex harness resume — inspect sessions use claude-code only\n- No per-issue override of inspector configuration\n- No context window hard-reset threshold (let compaction handle it)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Continuation prompt = short bead brief (not full prompt re-issued)",
+        "rationale": "Model's full instructions survive in JSONL history; re-issuing 200 lines per bead doubles context growth unnecessarily. Short brief keeps context lean."
+      },
+      {
+        "summary": "Context budget = never hard-reset",
+        "rationale": "Operator explicitly chose 'Never reset'. Claude's built-in compaction handles context growth over a long issue."
+      },
+      {
+        "summary": "BLOCKED retry uses warm resume (same session knows why it blocked)",
+        "rationale": "Resuming the session that issued a BLOCKED verdict gives the inspector its own prior reasoning as context, improving re-inspection accuracy."
+      },
+      {
+        "summary": "Print-mode (-p) approach retained, not interactive mode",
+        "rationale": "Combining --resume with -p is simpler than managing a live interactive session: same launcher code path for cold and warm, no post-spawn delivery timing issues, no PTY supervisor changes."
+      }
+    ],
+    "items": [
+      {
+        "id": "per-issue-session-naming",
+        "title": "Rename inspect session from per-bead to per-issue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Change the tmux session name in `spawnInspectAgentPromise` from `inspect-${issueLower}-${beadSlug}` (line 147 of `src/lib/cloister/inspect-agent.ts`) to `inspect-${issueLower}`. Remove the `beadSlug` local variable (line 146). The `agentDir` at line 188 becomes `~/.panopticon/agents/inspect-<issueLower>/` — correct, it uses `tmuxSession` which is now per-issue. In `src/lib/cloister/deacon.ts`, change `inspectSessionName(issueId: string, beadId: string)` (lines 722–725) to `inspectSessionName(issueId: string)` (drop `beadId` param and `beadSlug`; return `inspect-${issueId.toLowerCase()}`). At line 746, change `const sessionName = beadId ? inspectSessionName(issueId, beadId) : undefined` to `const sessionName = inspectSessionName(issueId)` (always defined). Update `src/lib/cloister/__tests__/inspect-agent.test.ts`: replace all occurrences of `'inspect-pan-1613-workspace-b95lw'` with `'inspect-pan-1613'` in session name assertions, `sessionExists` arg, `createSession` first arg, and `saveAgentState.id` assertion (lines 140, 144, 147, 164)."
+        },
+        "items": [
+          {
+            "id": "per-issue-session-naming.ac1",
+            "title": "spawnInspectAgent returns { tmuxSession: 'inspect-pan-1613' } for issueId 'PAN-1613' regardless of the beadId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-session-naming.ac2",
+            "title": "Given issueId PAN-1613 and beadId workspace-b95lw, createSession receives 'inspect-pan-1613' as its first argument (no beadSlug suffix)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-session-naming.ac3",
+            "title": "saveAgentState receives { id: 'inspect-pan-1613' } (per-issue, not per-bead)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-session-naming.ac4",
+            "title": "deacon.ts inspectSessionName('PAN-1951') returns 'inspect-pan-1951' with no second argument required",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-remain-on-exit",
+        "title": "Set remain-on-exit on the inspect session pane after each spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/lib/cloister/inspect-agent.ts`, add `setOption` and `exactPaneTarget` to the import from `'../tmux.js'` (line 27–31). After the `createSession(...)` call (line 230–235), add: `await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'))`. This mirrors the pattern at `src/lib/agents.ts:3515` and `src/lib/planning/spawn-planning-session.ts:671`. In `src/lib/cloister/__tests__/inspect-agent.test.ts`, add `setOption: vi.fn(() => Effect.succeed(undefined))` to the mocks object and to the `vi.mock('../../tmux.js', ...)` mock block. In the 'spawns inspect normally when the issue is open' test, assert that `mocks.setOption` was called with `(exactPaneTarget('inspect-pan-1613'), 'remain-on-exit', 'on')`. In the 'skips inspect dispatch when the issue is closed' test, assert `mocks.setOption` was NOT called."
+        },
+        "items": [
+          {
+            "id": "inspect-remain-on-exit.ac1",
+            "title": "After createSession, setOption is called with (exactPaneTarget('inspect-pan-1613'), 'remain-on-exit', 'on') on a normal spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-remain-on-exit.ac2",
+            "title": "setOption is NOT called when the issue is closed (skipped dispatch path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-remain-on-exit.ac3",
+            "title": "setOption call uses the Effect variant (returns Effect.succeed(undefined)), not a sync call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-continuation-prompt",
+        "title": "Add short continuation-prompt template and builder for resumed inspector sessions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create `src/lib/cloister/prompts/inspect-agent-continue.md`. The template should: (1) open with '# Continuing inspection — {{issueId}} bead {{beadId}}', (2) state 'You are resuming the warm inspection session for {{issueId}}. Your context from prior bead inspections is in your session history.', (3) include a '## Bead {{beadId}}: What Was Asked' section with `{{beadDescription}}`, (4) include a '## Diff scope' section with `{{diffStats}}` and the git diff command, (5) include the full '## Signal completion' section with `pan tell` and `POST /api/specialists/done` commands (same as `inspect-agent.md` signaling section) with `{{resultStatus}}` and `{{resultNotes}}` placeholders. Do NOT include the Jidoka principle section, the CRITICAL project-path/workspace section, the 'Check 1: Spec Fidelity' / 'Check 2: Constraint Compliance' detailed explanations, or the 'Important Constraints' timeout note — these live in the JSONL history from the initial cold spawn. In `src/lib/cloister/inspect-agent.ts`, add `async function buildInspectContinuationPromptPromise(context: InspectContext): Promise<string>` that reads `inspect-agent-continue.md` from the same `__dirname/prompts/` directory, substitutes the same template variables as `buildInspectPromptPromise` (lines 119–130), but does NOT wrap in the `<!-- panopticon:orchestration-context-start -->` block. Add the Effect variant `export function buildInspectContinuationPrompt(context): Effect.Effect<string, ProcessSpawnError>` wrapping it."
+        },
+        "items": [
+          {
+            "id": "inspect-continuation-prompt.ac1",
+            "title": "buildInspectContinuationPrompt renders {{beadId}}, {{beadDescription}}, {{diffStats}}, {{diffBase}} resolved (no raw template tokens in output)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-continuation-prompt.ac2",
+            "title": "buildInspectContinuationPrompt returns a string that contains the bead heading and does not include the '# Inspect Specialist' role preamble (under 80 lines)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-continuation-prompt.ac3",
+            "title": "Rendered continuation prompt contains the POST /api/specialists/done curl command (verdict signaling is preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-state-persistence",
+        "title": "Save claudeSessionId and sessionModel to runtime.json after each spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/lib/cloister/inspect-agent.ts`, add `getAgentRuntimeStateSync` to the import from `'../agents.js'` (line 40). In the existing `saveAgentRuntimeState` call (lines 237–241), add `claudeSessionId: sessionId` and `sessionModel: model` fields: `saveAgentRuntimeState(tmuxSession, { state: 'active', lastActivity: new Date().toISOString(), currentIssue: context.issueId, claudeSessionId: sessionId, sessionModel: model })`. The `sessionId` here is the UUID passed to `generateLauncherScriptSync` as `sessionId` (from the existing `const sessionId = randomUUID()` at line 195). In `src/lib/cloister/__tests__/inspect-agent.test.ts`, add `getAgentRuntimeStateSync: vi.fn(() => null)` to the mocks object and to the `vi.mock('../../agents.js', ...)` block. Assert that `mocks.saveAgentRuntimeState` is called with an object containing `{ claudeSessionId: expect.stringMatching(/^[0-9a-f-]{36}$/), sessionModel: 'claude-sonnet-4-6' }`."
+        },
+        "items": [
+          {
+            "id": "inspect-state-persistence.ac1",
+            "title": "saveAgentRuntimeState receives { claudeSessionId: expect.stringMatching(uuid-v4), sessionModel: 'claude-sonnet-4-6' } after a normal spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-state-persistence.ac2",
+            "title": "saveAgentRuntimeState preserves the same UUID as the sessionId/resumeSessionId passed to generateLauncherScriptSync (no second UUID is generated)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-state-persistence.ac3",
+            "title": "When the issue is closed, spawnInspectAgent returns { skipped: true } and saveAgentRuntimeState is not invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspect-resume-dispatch",
+        "title": "Implement three-path warm dispatch: cold, resume-same-model, cold-on-model-change",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1951",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "deacon-inspect-liveness"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/lib/cloister/inspect-agent.ts`, rewrite the dispatch block of `spawnInspectAgentPromise` (lines 161–221) to implement three paths. Before the existing `sessionExists` check, add: `const priorState = getAgentRuntimeStateSync(tmuxSession)`. Then compute: `const canResume = priorState?.claudeSessionId != null && priorState?.sessionModel === model`. Replace the always-cold spawn with: if `canResume` → use `buildInspectContinuationPrompt(context)` for the prompt and pass `resumeSessionId: priorState!.claudeSessionId!` to `generateLauncherScriptSync`; if not `canResume` → use `buildInspectPrompt(context)` (existing) and pass `sessionId: randomUUID()` (existing behavior). The `launcherSessionId` local variable (the UUID to save in runtime.json and to return as `runId`) is `priorState!.claudeSessionId!` on resume or the new `randomUUID()` on cold. The `killSession` call stays but moves before the `canResume` check — we always kill the existing dead-pane session before creating a fresh tmux session (whether resuming Claude's JSONL or not). The `createSession`, `setOption`, and `saveAgentRuntimeState` calls are unchanged structurally, now using `launcherSessionId`. In `src/lib/cloister/__tests__/inspect-agent.test.ts`, add three new describe('warm dispatch') tests: (1) 'cold spawns when no prior state' — `getAgentRuntimeStateSync` returns null → `generateLauncherScriptSync` receives object with key `sessionId` but not `resumeSessionId`; (2) 'resumes when prior state has same model' — `getAgentRuntimeStateSync` returns `{ claudeSessionId: 'uuid-1', sessionModel: 'claude-sonnet-4-6' }`, `resolveModel` returns `'claude-sonnet-4-6'` → `generateLauncherScriptSync` receives object with key `resumeSessionId: 'uuid-1'` and `runId` in result is `'uuid-1'`; (3) 'cold spawns on model change' — prior `sessionModel: 'claude-opus-4-8'`, current `'claude-sonnet-4-6'` → `generateLauncherScriptSync` receives object with key `sessionId` (new UUID, not `'uuid-1'`)."
+        },
+        "items": [
+          {
+            "id": "inspect-resume-dispatch.ac1",
+            "title": "With no prior state, generateLauncherScriptSync receives { sessionId: <new-uuid> } (cold path; no resumeSessionId key)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-resume-dispatch.ac2",
+            "title": "With prior state { claudeSessionId: 'uuid-1', sessionModel: 'claude-sonnet-4-6' } and current model 'claude-sonnet-4-6', generateLauncherScriptSync receives { resumeSessionId: 'uuid-1' } and result.runId is 'uuid-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-resume-dispatch.ac3",
+            "title": "With prior state { sessionModel: 'claude-opus-4-8' } and current model 'claude-sonnet-4-6', generateLauncherScriptSync receives { sessionId: <new-uuid> } (model-change forces cold spawn)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspect-resume-dispatch.ac4",
+            "title": "On resume path, buildInspectContinuationPrompt is used (result prompt does NOT contain '# Inspect Specialist' header); on cold path, buildInspectPrompt is used (result prompt contains '# Inspect Specialist')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-inspect-liveness",
+        "title": "Update deacon crash watchdog to use isPaneDead for remain-on-exit sessions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In `src/lib/cloister/deacon.ts`, add `isPaneDead` to the tmux.ts import (near the top of the file where `sessionExists` is imported). In `checkInspectAgentTimeouts` (lines 747–750), replace the crash detection logic with: `const sessionName = inspectSessionName(issueId)` (now always defined, no `beadId` needed; `inspectSessionName` was already changed by bead `per-issue-session-naming`). Then: `const sessionExists_ = await Effect.runPromise(sessionExists(sessionName)).catch(() => false)`. Then: `const paneDead = sessionExists_ ? await Effect.runPromise(isPaneDead(sessionName)).catch(() => false) : false`. Then: `const sessionAlive = sessionExists_ && !paneDead`. Then: `const crashed = !sessionAlive`. The `if (!timedOut && !crashed) continue` check (line 752) and all downstream logic (kill, notify, log) remain unchanged. Also update the `if (sessionName && sessionAlive)` guard at line 770 to just `if (sessionAlive)` (sessionName is always truthy now). Add tests in `src/lib/cloister/__tests__/inspect-agent.test.ts` or a new `deacon-inspect-timeout.test.ts`: (1) 'treats pane-dead session as crashed during inspection' — mock `sessionExists=Effect.succeed(true)`, `isPaneDead=Effect.succeed(true)`, `inspectStatus='inspecting'` → watchdog action is produced; (2) 'does not treat live-running session as crashed' — `sessionExists=true`, `isPaneDead=false` → no watchdog action; (3) 'treats missing session as crashed' — `sessionExists=false` → watchdog action."
+        },
+        "items": [
+          {
+            "id": "deacon-inspect-liveness.ac1",
+            "title": "checkInspectAgentTimeouts fires the watchdog when sessionExists=true and isPaneDead=true (remain-on-exit dead pane) while inspectStatus='inspecting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-inspect-liveness.ac2",
+            "title": "checkInspectAgentTimeouts does NOT fire the watchdog when sessionExists=true and isPaneDead=false (inspector still running) while inspectStatus='inspecting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-inspect-liveness.ac3",
+            "title": "checkInspectAgentTimeouts fires the watchdog when sessionExists=false (session gone entirely) while inspectStatus='inspecting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "per-issue-session-naming",
+        "to": "inspect-resume-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "inspect-remain-on-exit",
+        "to": "inspect-resume-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "inspect-continuation-prompt",
+        "to": "inspect-resume-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "inspect-state-persistence",
+        "to": "inspect-resume-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "per-issue-session-naming",
+        "to": "deacon-inspect-liveness",
+        "type": "blocks"
+      },
+      {
+        "from": "inspect-remain-on-exit",
+        "to": "deacon-inspect-liveness",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-17-PAN-1951-inspector-agent-should-resume-a-warm-session-instead-of-cold-spawning-a-new-one-per-bead.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
