@@ -1,8 +1,7 @@
 /**
  * overdeck.db — the locked cache schema (Drizzle + better-sqlite3, Node-safe).
  *
- * DRAFT. Settled domains are final; `conversations` + `transcripts` are pending
- * the conversation-backing-files audit (per-harness pointer columns may change).
+ * All domains audited and final. This Drizzle schema IS the locked DB schema.
  *
  * Principles:
  *  - This is a DISPOSABLE CACHE. It starts empty on a fresh overdeck.db and is
@@ -85,34 +84,44 @@ export const healthEvents = sqliteTable("health_events", {
   metadata: text("metadata", { mode: "json" }),
 }, (t) => [index("health_agent_ts_idx").on(t.agentId, t.timestamp)]);
 
-/* ─────────────────────── CONVERSATIONS  (DRAFT) ────────────────────
- * The one DB-as-truth exception: irreplaceable metadata, preserved by export
- * (PAN-1937), NOT git. The row is metadata + POINTERS to the sacred on-disk
- * session files (JSONL for claude-code, other shapes for pi/codex). The writer
- * NEVER mutates a backing file. Per-harness pointer columns finalize after the
- * conversation-backing-files audit.
+/* ───────────────────────────── CONVERSATIONS ──────────────────────
+ * The one DB-as-truth exception: irreplaceable metadata, preserved by the
+ * export (PAN-1937 — not yet built), NOT git. The row is pure metadata; the
+ * POINTERS to the sacred on-disk session files live in `conversation_files`.
+ * The writer touches only the DB and creates NEW session files — it never
+ * mutates an existing backing file.
  */
 export const conversations = sqliteTable("conversations", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),                         // operator/favorite key
-  cwd: text("cwd").notNull(),
+  cwd: text("cwd").notNull(),                                    // pointer input (encodes the claude path)
   issueId: text("issue_id").references(() => issues.id),         // nullable (ad-hoc convos)
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-  // POINTER(s) to sacred backing files — PENDING per-harness refinement:
-  claudeSessionId: text("claude_session_id"),                    // claude-code: the session UUID; one-directional, unreconstructable
-  sessionFile: text("session_file"),                             // resolved backing-file path (per-harness)
-  harness: text("harness"),
+  harness: text("harness"),                                      // resolver discriminator
   model: text("model"),
   effort: text("effort"),
-  // metadata:
-  title: text("title"),
+  title: text("title"),                                          // manual title only
   titleSource: text("title_source"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   archivedAt: integer("archived_at", { mode: "timestamp" }),
-  // lineage edges (self-references):
-  handoffDocPath: text("handoff_doc_path"),
+  // lineage edges (self-references) — handoff/clear create NEW conversations:
+  handoffDocPath: text("handoff_doc_path"),                      // → ~/.panopticon/handoffs/ (not git)
   handoffTargetConvId: text("handoff_target_conv_id").references((): AnySQLiteColumn => conversations.id),
   clearedToConvId: text("cleared_to_conv_id").references((): AnySQLiteColumn => conversations.id),
 }, (t) => [index("conversations_issue_idx").on(t.issueId)]);
+
+/* conversation_files — the POINTERS to the sacred backing session files. A
+ * conversation may span >1 file across harness switches; old files are always
+ * preserved (read-only). The locator is harness-specific; the resolved path is
+ * DERIVED (never stored). Part of the export (PAN-1937) — these pointers are
+ * irreplaceable. The writer adds rows + creates new files; it NEVER mutates an
+ * existing backing file. */
+export const conversationFiles = sqliteTable("conversation_files", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  conversationId: text("conversation_id").notNull().references(() => conversations.id),
+  harness: text("harness").notNull(),                            // claude-code | pi | codex | kimi
+  locator: text("locator").notNull(),                            // claude: session UUID · pi: agentId/sessions · codex: threadId
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+}, (t) => [index("conv_files_conv_idx").on(t.conversationId)]);
 
 /* favorites — operator stars, the other half of the irreplaceable set. */
 export const favorites = sqliteTable("favorites", {
@@ -120,15 +129,18 @@ export const favorites = sqliteTable("favorites", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 }, (t) => [primaryKey({ columns: [t.conversationId] })]);
 
-/* ─────────────────────── TRANSCRIPTS  (DRAFT) ──────────────────────
+/* ────────────────────────── TRANSCRIPTS ────────────────────────────
  * Shared internal index over the sacred session files — 100% cache, rebuilt by
- * a read-only scan. NOT a domain (no resolver/pane). Referenced SOFTLY by
- * conversations.claude_session_id and agents.session_id (no FK — this row is a
- * rebuildable cache that may lag the pointer). Per-harness file shapes pending.
+ * a STRICTLY READ-ONLY scan across claude/pi/codex file shapes. NOT a domain
+ * (no resolver/pane). Referenced SOFTLY by conversation_files.locator and
+ * agents.session_id (no FK — a rebuildable cache that may lag the pointer).
+ * Remodel fix: convert conversation-compaction's in-place JSONL append
+ * (conversation-compaction.ts:164) to the fork pattern so this layer never
+ * writes a backing file.
  */
 export const transcripts = sqliteTable("transcripts", {
-  sessionId: text("session_id").primaryKey(),
-  backingFilePath: text("backing_file_path").notNull().unique(), // the sacred file (read-only)
+  backingFilePath: text("backing_file_path").primaryKey(),       // the sacred file (read-only) — universal key
+  sessionId: text("session_id"),                                 // claude session UUID (null for pi/codex)
   harness: text("harness"),
   workspacePath: text("workspace_path"),
   messageCount: integer("message_count"),
