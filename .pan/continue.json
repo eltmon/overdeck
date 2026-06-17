@@ -21,8 +21,8 @@
     { "id": "H5", "summary": "getIssueRecordPath reconstructs the workspace path from project root + workspaces/feature-<id>; container/remote contexts may differ from the live cwd.", "mitigation": "Prefer getIssueRecordPathForWorkspace(workspacePath, issueId) where an explicit workspace path is available; note in the dashboard-route bead." }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-qym88 (cross-machine-resume-test): add an integration test that writes a record on a temp machine-A workspace and reads it on a fresh machine-B temp dir with no SQLite agents row and no state.json, asserting harness/model/statusOverrides/decisions/hazards/sessionHistory survive.",
-    "beadId": "workspace-qym88",
+    "description": "Implement bead workspace-o5ges (update-legacy-continue-tests): update any remaining legacy-continue tests (pan-dir.test.ts, lifecycle-io.test.ts, continue-state.test.ts, full-spec.test.ts) that still assume writeable continues so they pass against the record-based read/write or read-only-legacy behavior.",
+    "beadId": "workspace-o5ges",
     "filesToRead": [".pan/continue.json", ".pan/specs/2026-06-16-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record.vbrief.json"]
   },
   "beadsMapping": {},
@@ -90,6 +90,13 @@
       "content": "Implemented bead workspace-5uk6q (no-remaining-writers-guard-test): extended src/lib/pan-dir/__tests__/record-no-loss.test.ts to assert the record schema carries all legacy fields and added a source-guard test that scans src/ for retired continue writer calls (writeWorkspaceContinue, writeWorkspaceContinueSync, writeContinueFile, deleteContinueFile, writeContinueStateForIssue), excluding tests and the legacy continue-state module. Test passes, confirming no production caller remains.",
       "note": "Closed bead workspace-5uk6q",
       "timestamp": "2026-06-17T10:45:00.000Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-qym88 (cross-machine-resume-test): added an integration test to record-no-loss.test.ts that writes a fully populated record on a temp machine-A workspace, copies the workspace to a fresh machine-B temp dir with no SQLite agents row and no state.json, and reads it back. Asserts harness/model/statusOverrides/decisions/hazards/sessionHistory all survive via the record alone.",
+      "note": "Closed bead workspace-qym88",
+      "timestamp": "2026-06-17T10:55:00.000Z",
       "agentModel": "agent:claude-opus-4-8"
     }
   ],
