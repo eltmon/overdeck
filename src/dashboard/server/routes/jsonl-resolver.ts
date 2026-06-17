@@ -27,7 +27,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { Effect } from 'effect';
-import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir, getPanopticonHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 
@@ -153,17 +153,9 @@ export async function resolveClaudeSessionId(
 /** Read the harness recorded in the agent's state.json, or null when absent. */
 export async function resolveAgentHarness(
   agentId: string,
-  opts: ResolveJsonlPathOptions = {},
+  _opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
-  const stateRaw = await readOptional(join(agentsRoot, agentId, 'state.json'));
-  if (!stateRaw) return null;
-  try {
-    const state = JSON.parse(stateRaw) as { harness?: unknown };
-    return typeof state.harness === 'string' ? state.harness : null;
-  } catch {
-    return null;
-  }
+  return getAgentStateSync(agentId)?.harness ?? null;
 }
 
 /**

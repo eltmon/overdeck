@@ -33,7 +33,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 
-import { getAgentRuntimeState, listRunningAgents } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentStateSync, listRunningAgents } from '../../../lib/agents.js';
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
@@ -279,11 +279,10 @@ export async function fetchActivityDataWithContext(
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
 
-    const stateText = await readOptional(join(agentDir, 'state.json'));
-    if (!stateText) continue;
+    const state = getAgentStateSync(checkId);
+    if (!state) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; runtime?: string; startedAt?: string; createdAt?: string; status?: string };
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
@@ -332,7 +331,7 @@ export async function fetchActivityDataWithContext(
         type: sectionType,
         sessionId: checkId,
         model: state.model || 'unknown',
-        startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
+        startedAt: state.startedAt || new Date().toISOString(),
         duration: state.startedAt ? (() => {
           const ms = Date.now() - new Date(state.startedAt).getTime();
           return Number.isNaN(ms) ? null : Math.floor(ms / 1000);

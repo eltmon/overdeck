@@ -16,6 +16,7 @@ CREATE TABLE `agents` (
 	`paused` integer,
 	`paused_reason` text,
 	`troubled` integer,
+	`channels_enabled` integer,
 	`consecutive_failures` integer DEFAULT 0,
 	`first_failure_in_run_at` integer,
 	`last_failure_next_retry_at` integer,

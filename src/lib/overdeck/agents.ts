@@ -26,6 +26,7 @@ const overdeckAgents = sqliteTable('agents', {
   paused: integer('paused', { mode: 'boolean' }),
   pausedReason: text('paused_reason'),
   troubled: integer('troubled', { mode: 'boolean' }),
+  channelsEnabled: integer('channels_enabled', { mode: 'boolean' }),
   consecutiveFailures: integer('consecutive_failures').default(0),
   firstFailureInRunAt: integer('first_failure_in_run_at', { mode: 'timestamp' }),
   lastFailureNextRetryAt: integer('last_failure_next_retry_at', { mode: 'timestamp' }),
@@ -75,6 +76,7 @@ export const Agent = Schema.Struct({
   paused: Schema.NullOr(Schema.Boolean),
   pausedReason: Schema.NullOr(Schema.String),
   troubled: Schema.NullOr(Schema.Boolean),
+  channelsEnabled: Schema.NullOr(Schema.Boolean),
   consecutiveFailures: Schema.Number,
   firstFailureInRunAt: Schema.NullOr(Schema.Date),
   lastFailureNextRetryAt: Schema.NullOr(Schema.Date),
@@ -220,9 +222,10 @@ export interface AgentWriterServiceShape {
   readonly setDeliveryMethod: (id: AgentId, method: DeliveryMethod) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
   readonly pause:             (id: AgentId, reason?: string) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
   readonly unpause:           (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly markTroubled:      (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly clearTroubled:     (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly recordFailure:     (id: AgentId, reason: string) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
+  readonly markTroubled:       (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
+  readonly clearTroubled:      (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
+  readonly setChannelsEnabled: (id: AgentId, enabled: boolean) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
+  readonly recordFailure:      (id: AgentId, reason: string) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
   readonly recordHealth:      (id: AgentId, ev: HealthEvent) => Effect.Effect<void>;
 }
 
@@ -263,6 +266,7 @@ export const AgentWriterLive = Layer.effect(
           paused: null,
           pausedReason: null,
           troubled: null,
+          channelsEnabled: null,
           consecutiveFailures: 0,
           firstFailureInRunAt: null,
           lastFailureNextRetryAt: null,
@@ -484,6 +488,21 @@ export const AgentWriterLive = Layer.effect(
         return next;
       });
 
+    const setChannelsEnabled: AgentWriterServiceShape['setChannelsEnabled'] = (id, enabled) =>
+      Effect.gen(function* () {
+        const resolver = yield* AgentsResolver;
+        const agent = yield* resolver.get(id);
+        const next: Agent = { ...agent, channelsEnabled: enabled, updatedAt: now() };
+        yield* Effect.promise(() =>
+          db.q.update(overdeckAgents)
+            .set({ channelsEnabled: enabled, updatedAt: next.updatedAt })
+            .where(eq(overdeckAgents.id, id))
+            .run(),
+        );
+        yield* bus.emit({ type: 'agent.channels_enabled_set', payload: { id, enabled } });
+        return next;
+      });
+
     const recordFailure: AgentWriterServiceShape['recordFailure'] = (id, reason) =>
       Effect.gen(function* () {
         const resolver = yield* AgentsResolver;
@@ -532,7 +551,7 @@ export const AgentWriterLive = Layer.effect(
 
     return AgentWriter.of({
       spawn, switchModel, stop, resume, setStatus, setDeliveryMethod,
-      pause, unpause, markTroubled, clearTroubled, recordFailure, recordHealth,
+      pause, unpause, markTroubled, clearTroubled, setChannelsEnabled, recordFailure, recordHealth,
     });
   }),
 );

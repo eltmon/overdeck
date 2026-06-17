@@ -18,6 +18,8 @@ import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerR
 import { ServerConfig } from './config.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
+import { AgentsResolverLive } from '../../lib/overdeck/agents.js';
+import { DbLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { AgentStateServiceLive } from './services/agent-state-service.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
 import { LinearClientOptionalLive } from './services/linear-client.js';
@@ -336,6 +338,19 @@ export const makeRoutesLayer = Layer.mergeAll(
 // ReadModelServiceLive bootstraps during construction (reads lib modules, JSON-cleans).
 // EventStoreServiceLive depends on ReadModelService (wires event subscription → read model).
 
+// ── Overdeck resolver layer (provides AgentsResolver to ReadModelServiceLive) ──
+//
+// Only AgentsResolverLive is wired here: the source-swap targets ReadModel's
+// agent bootstrap only. Writers and other resolvers are wired later as the
+// cutover proceeds route-group by route-group.
+const OverdeckAgentsResolverLive = AgentsResolverLive.pipe(
+  Layer.provide(Layer.mergeAll(DbLive, TmuxLive)),
+);
+
+const ReadModelWithOverdeckLive = ReadModelServiceLive.pipe(
+  Layer.provide(OverdeckAgentsResolverLive),
+);
+
 // ─── Tracker + lifecycle services (PAN-449) ───────────────────────────────────
 // Optional layers: server starts even if tracker keys are not configured.
 // Route handlers that need a tracker service get TrackerNotConfigured if it's absent.
@@ -351,9 +366,9 @@ const IssueLifecycleServiceLive = IssueLifecycleLive.pipe(
 );
 
 const DomainServicesLive = Layer.mergeAll(
-  ReadModelServiceLive,
+  ReadModelWithOverdeckLive,
   AgentStateServiceLive,
-  EventStoreServiceLive.pipe(Layer.provide(ReadModelServiceLive)),
+  EventStoreServiceLive.pipe(Layer.provide(ReadModelWithOverdeckLive)),
   TerminalServiceLive,
   TrackerClientsLive,
   IssueLifecycleServiceLive,

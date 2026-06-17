@@ -28,7 +28,8 @@ import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSna
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 import { listAllAgents } from '../../lib/database/agents-db.js';
-import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js';
+import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
+import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -359,6 +360,43 @@ export interface ReadModelServiceShape {
   readonly bootstrap: Effect.Effect<void>;
 }
 
+// ─── Overdeck → legacy AgentSnapshot adapter ─────────────────────────────────
+//
+// Maps overdeck's 18-field Agent (durable config only) to the legacy
+// AgentSnapshot wire format. Runtime/ephemeral fields (lastActivity, branch,
+// costSoFar, phase, hasPendingQuestion, etc.) start undefined and are filled
+// by in-memory events from the enrichment poller and domain event stream.
+
+function overdeckStatusToLegacy(
+  status: OverdeckAgent['status'],
+): AgentStatus {
+  if (status === 'crashed') return 'error';
+  // 'idle' = agent is alive but waiting (tool-call paused, AUQ, etc.)
+  if (status === 'idle') return 'running';
+  return status; // 'starting' | 'running' | 'stopped' are 1:1
+}
+
+function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
+  return {
+    id: agent.id,
+    issueId: agent.issueId,
+    workspace: agent.workspace || undefined,
+    runtime: agent.harness,
+    model: agent.model,
+    status: overdeckStatusToLegacy(agent.status),
+    startedAt: agent.startedAt?.toISOString(),
+    sessionId: agent.sessionId ?? undefined,
+    role: agent.role,
+    stoppedByUser: agent.stoppedByUser ?? undefined,
+    paused: agent.paused ?? undefined,
+    pausedReason: agent.pausedReason ?? undefined,
+    troubled: agent.troubled ?? undefined,
+    consecutiveFailures: agent.consecutiveFailures,
+    firstFailureInRunAt: agent.firstFailureInRunAt?.toISOString(),
+    lastFailureNextRetryAt: agent.lastFailureNextRetryAt?.toISOString(),
+  };
+}
+
 export class ReadModelService extends Context.Service<
   ReadModelService,
   ReadModelServiceShape
@@ -478,17 +516,24 @@ export const ReadModelServiceLive = Layer.effect(
       Effect.sync(() => state.agentIdBySessionId[sessionId] ?? null);
 
     // ── Bootstrap inline during layer construction ───────────────────────────
+    const agentsResolver = yield* AgentsResolver;
     yield* Effect.gen(function* () {
-      // PAN-1920: bootstrap from durable sources (state.json + tmux + GitHub +
-      // per-issue records). Reconstruction returns agents, runtime snapshots,
-      // derived pipeline phases, and review statuses sourced from the git-backed
-      // per-issue record. The event log and projection_cache are no longer used
-      // as reconstruction inputs.
+      // PAN-1938 source-swap: agents now come from overdeck.db via AgentsResolver.
+      // reconstructCache still runs for reviewStatusByIssueId (which reads
+      // git-backed per-issue records, NOT panopticon.db SQLite cache tables)
+      // and for its side effects (agent-backfill sync, checkpoint cleanup).
       const { reconstructCache } = yield* Effect.promise(() =>
         import('../../lib/reconstruct/reconstruct-cache.js'),
       );
 
-      const result = yield* Effect.promise(() => reconstructCache(getDatabase()));
+      const [overdeckAgents, result] = yield* Effect.all([
+        agentsResolver.list({}),
+        Effect.promise(() => reconstructCache(getDatabase())),
+      ]);
+
+      const agentsById: Record<string, AgentSnapshot> = Object.fromEntries(
+        overdeckAgents.map((a) => [a.id, agentSnapshotFromOverdeck(a)]),
+      );
 
       // ── Sequence from event store (labels the snapshot, not a replay source) ─
       let sequence = 0;
@@ -504,14 +549,14 @@ export const ReadModelServiceLive = Layer.effect(
       state = {
         ...INITIAL_READ_MODEL_STATE,
         sequence,
-        agentsById: result.agentsById,
+        agentsById,
         reviewStatusByIssueId: result.reviewStatusByIssueId,
         issuesRaw: [],
       };
 
       console.log(
-        `[ReadModel] Bootstrapped from sources: ` +
-        `${Object.keys(result.agentsById).length} agents, ` +
+        `[ReadModel] Bootstrapped from overdeck.db: ` +
+        `${Object.keys(agentsById).length} agents, ` +
         `${Object.keys(result.reviewStatusByIssueId).length} review statuses, ` +
         `${result.issuesEnumerated} in-flight issue(s), seq=${sequence}`,
       );

@@ -1321,15 +1321,8 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
           if (agent != null) continue;
         }
 
-        // Check directory age via state.json mtime (or dir mtime as fallback)
-        const stateFile = join(agentDir, 'state.json');
-        let mtime: number;
-
-        if (existsSync(stateFile)) {
-          mtime = statSync(stateFile).mtimeMs;
-        } else {
-          mtime = statSync(agentDir).mtimeMs;
-        }
+        // Check directory age via directory mtime.
+        const mtime = statSync(agentDir).mtimeMs;
 
         const ageMs = now - mtime;
         if (ageMs < effectiveRetentionMs) {
@@ -5577,15 +5570,8 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
 
   for (const agentId of agentDirs) {
     // Only check agents that claim to be running
-    const stateFile = join(AGENTS_DIR, agentId, 'state.json');
-    if (!existsSync(stateFile)) continue;
-    let state: Record<string, unknown>;
-    try {
-      state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-    } catch {
-      continue;
-    }
-    if (state.status !== 'running') continue;
+    const state = getAgentStateSync(agentId);
+    if (!state || state.status !== 'running') continue;
 
     // Check if the tmux session is alive
     if (!sessionExistsSync(agentId)) continue;
@@ -5601,7 +5587,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     if (!output.includes('Invalid signature in thinking block')) continue;
 
     // Corruption detected — recover the agent
-    const issueId = (state.issueId as string | undefined) ?? agentId;
+    const issueId = state.issueId ?? agentId;
     console.error(`[deacon] SIGNATURE CORRUPTION detected in ${agentId} (${issueId}) — recovering`);
     logDeaconEventSync(`checkThinkingSignatureCorruption: corruption detected in ${agentId} (${issueId})`);
     logAgentLifecycleSync(agentId, 'signature corruption detected — recovering: killed session, cleared session.id');
@@ -5618,10 +5604,8 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     }
 
     // Mark agent as stopped
-    state.status = 'stopped';
-    state.stoppedAt = new Date().toISOString();
     try {
-      writeFileSync(stateFile, JSON.stringify(state, null, 2));
+      saveAgentStateSync({ ...state, status: 'stopped', stoppedAt: new Date().toISOString() });
     } catch { /* non-fatal */ }
 
     // Notify server layer so the read model and frontend update
@@ -5845,19 +5829,14 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
 
     // Mark planning agent state as stopped so the UI doesn't show a "running" pill.
     try {
-      const stateFile = join(AGENTS_DIR, planningSession, 'state.json');
-      if (existsSync(stateFile)) {
-        const agentState = JSON.parse(readFileSync(stateFile, 'utf-8'));
-        if (agentState.status === 'running' || agentState.status === 'starting') {
-          const oldStatus = agentState.status;
-          agentState.status = 'stopped';
-          agentState.stoppedAt = new Date().toISOString();
-          writeFileSync(stateFile, JSON.stringify(agentState, null, 2));
-          if (agentStoppedNotifier) {
-            try { agentStoppedNotifier(planningSession); } catch { /* non-fatal */ }
-          }
-          logAgentLifecycleSync(planningSession, `status changed: ${oldStatus} → stopped (orphaned planning session killed)`);
+      const agentState = getAgentStateSync(planningSession);
+      if (agentState && (agentState.status === 'running' || agentState.status === 'starting')) {
+        const oldStatus = agentState.status;
+        saveAgentStateSync({ ...agentState, status: 'stopped', stoppedAt: new Date().toISOString() });
+        if (agentStoppedNotifier) {
+          try { agentStoppedNotifier(planningSession); } catch { /* non-fatal */ }
         }
+        logAgentLifecycleSync(planningSession, `status changed: ${oldStatus} → stopped (orphaned planning session killed)`);
       }
     } catch (err: unknown) {
       const reason = err instanceof Error ? err.message : String(err);

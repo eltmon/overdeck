@@ -338,7 +338,7 @@ function buildReviewRolePrompt(opts: {
           if (synthReviewRunId && synthReviewRunId !== currentRunId) {
             staleRunId = true;
             console.log(
-              `[review-agent] ${reviewSessionName} is stale — runId ${synthState.reviewRunId} != current ${currentRunId}; killing convoy and respawning`,
+              `[review-agent] ${reviewSessionName} is stale — runId ${synthReviewRunId} != current ${currentRunId}; killing convoy and respawning`,
             );
           }
         } catch (probeErr) {

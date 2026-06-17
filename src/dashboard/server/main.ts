@@ -51,6 +51,15 @@ import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-m
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { Layer } from 'effect';
+import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
+import { makeCutoverEffect } from '../../lib/overdeck/cutover.js';
+import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
+import { ProjectsLive } from '../../lib/overdeck/config.js';
+import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
+import { listAllAgents } from '../../lib/database/agents-db.js';
 
 declare const Bun: unknown;
 
@@ -623,6 +632,48 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
     console.log(`[panopticon] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
   }
 }
+
+// ── Overdeck boot: create overdeck.db if needed, seed from panopticon.db ──────
+//
+// Idempotent: runs every boot, but makeCutoverEffect upserts so duplicate runs
+// are safe. panopticon.db is NEVER written — it stays as the rollback backup.
+await (async () => {
+  try {
+    const overdeckDbPath = getOverdeckDatabasePath();
+    const legacyDbPath = join(getPanopticonHome(), 'panopticon.db');
+
+    if (!existsSync(overdeckDbPath)) {
+      createOverdeckDatabase({ dbPath: overdeckDbPath });
+      console.log(`[panopticon] Created overdeck.db at ${overdeckDbPath}`);
+    }
+
+    if (!existsSync(legacyDbPath)) {
+      console.log('[panopticon] No panopticon.db found; skipping overdeck seed');
+      return;
+    }
+
+    // Use running/starting agents' issue IDs as reconstruction sources so their
+    // state is reflected in overdeck.db via Reconstruction.rebuild.
+    const runningAgents = listAllAgents().filter(
+      (a) => a.status === 'running' || a.status === 'starting',
+    );
+    const openIssueIds = new Set(runningAgents.map((a) => a.issueId));
+
+    const cutoverLayer = Layer.mergeAll(ProjectsLive, RecordsLive, TmuxLive);
+    const result = await Effect.runPromise(
+      makeCutoverEffect({ legacyDbPath, sources: { openIssueIds } }).pipe(
+        Effect.provide(cutoverLayer),
+      ),
+    );
+    console.log(
+      `[panopticon] Overdeck seed: ${result.conversationsExported} convs, ` +
+        `${result.agentsUpserted} agents, ${result.issuesUpserted} issues`,
+    );
+  } catch (err) {
+    // Non-fatal: dashboard continues with whatever data is in overdeck.db.
+    console.warn('[panopticon] Overdeck boot seed failed (non-fatal):', err);
+  }
+})();
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 
