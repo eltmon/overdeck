@@ -100,13 +100,17 @@ get fixed, because the door makes their brokenness visible and gives them one
 correct home.
 
 A secondary parity note, surfaced loudly so it is not silently dropped: the
-**budget** feature (`setIssueBudgetSync`, the `budget`/`budgetWarning` fields on
-the by-issue reads) lives ONLY in store B and has **zero live callers**
-(`setIssueBudget` is only re-exported through `costs/index.ts:40,50`). The fields
-are therefore *always* empty (`budget: undefined`, `budgetWarning: false`,
-issues.ts:3953-3954). Deleting store B drops a feature that never functioned —
-clean DELETE, no parity loss. Called out here so the drop is a recorded decision,
-not an omission.
+**store-B per-issue-budget** feature (`setIssueBudgetSync`, the
+`budget`/`budgetWarning` fields on the by-issue reads) lives ONLY in store B and
+has **zero live callers** (`setIssueBudget` is only re-exported through
+`costs/index.ts:40,50`). The fields are therefore *always* empty
+(`budget: undefined`, `budgetWarning: false`, issues.ts:3953-3954). Deleting
+store B drops a feature that never functioned — clean DELETE, no parity loss.
+**This is NOT the `pan cost budget` CLI family** (`budgets.json` via
+`createBudgetSync`/`getAllBudgetsSync`/etc., `lib/cost.ts:429-534`), which is a
+separate, live store with a live caller and is **preserved** behind real Cost
+doors — see §1B. Called out here so the store-B drop is a recorded decision, and
+so the live CLI budget family is not swept up with it.
 
 ---
 
@@ -176,21 +180,47 @@ All collapse to **one** `record(event)` verb (cost-audit §1 "one writer").
 
 | Store | Files / functions | Disposition | Reason |
 |---|---|---|---|
-| **Store B** — `aggregator.ts` `cache.json` | `loadCacheSync`/`saveCacheSync`/`syncCacheSync`/`rebuildCacheSync`/`getCostsForIssueSync`/`getCostsByIssueSync`/`setIssueBudgetSync` (aggregator.ts:70-349) | **DELETE** | A parallel per-issue rollup cache rebuilt from events.jsonl — a second answer to "what did this issue cost" from a different source than store A. `/api/issues/:id/costs` repoints at store A. The dead **budget** feature (zero `setIssueBudget` callers) goes with it — no parity loss (headline). |
+| **Store B** — `aggregator.ts` `cache.json` | `loadCacheSync`/`saveCacheSync`/`syncCacheSync`/`rebuildCacheSync`/`getCostsForIssueSync`/`getCostsByIssueSync`/`setIssueBudgetSync` (aggregator.ts:70-349) | **DELETE** | A parallel per-issue rollup cache rebuilt from events.jsonl — a second answer to "what did this issue cost" from a different source than store A. `/api/issues/:id/costs` repoints at store A. The dead **store-B per-issue-budget** feature (zero `setIssueBudget` callers — the `setIssueBudgetSync` mechanism, NOT the live `pan cost budget` CLI family preserved in §1B) goes with it — no parity loss (headline). |
 | **Store C** — `cost-monitor.ts` `cost-data.json` | `recordCostSync` (cost-monitor.ts:159, **zero callers**) + `getCostSummary` (321) + the `costData` map | **DELETE writer + store** | Never written → `/api/metrics/costs` empty + breaker dead. `checkCostLimits` **re-wires** onto the resolver (headline); `getCostSummary` shape rederived from `byDay`/`byAgent`/`byIssue`. |
 
 ## 1B. CLI verbs (`pan ...`)
 
-**There is no `pan cost` subcommand.** Verified: no `cost` command registered in
-[`src/index.ts`](../../../src/index.ts). The cost-related scripts
-(`scripts/recover-costs.mjs`, `recover-costs-deep.mjs`,
+**`pan cost` IS a live subcommand.** Verified: `createCostCommand()` is
+registered via `program.addCommand(createCostCommand())`
+([`src/cli/index.ts:1342`](../../../src/cli/index.ts)); the command is built in
+[`src/cli/commands/cost.ts:103`](../../../src/cli/commands/cost.ts). It is a real
+user surface and maps to Cost service members with **no loss**.
+
+| Current verb (file:line) | r/w | New door | Reason / backing |
+|---|---|---|---|
+| `pan cost today` (`cost.ts:107`) | reads | **`CostResolver.summary("day")`** | `getDailySummarySync` — a windowed total + per-provider/per-model rollup (cost.ts:114). The resolver's `summary(window)` is exactly this window rollup. |
+| `pan cost week` (`cost.ts:160`) | reads | **`CostResolver.summary("week")`** | `getWeeklySummarySync` — 7-day window total + per-provider + top issues (cost.ts:166). |
+| `pan cost month` (`cost.ts:199`) | reads | **`CostResolver.summary("month")`** | `getMonthlySummarySync` — 30-day window total + per-model + top issues (cost.ts:205). |
+| `pan cost report` (`cost.ts:246`) | reads | **`CostResolver.summary(window)` + report formatting** | `generateReportSync(start, end)` — a date-range report string (cost.ts:261). The resolver returns the numbers; the report string is formatted at the command (presentation stays in the CLI, not the door). |
+| `pan cost issue <id>` (`cost.ts:269`) | reads | **`CostResolver.issueDetail(id)`** | `getCostForIssueFromDb(id)` (store A) with `readIssueCostsSync` fallback (cost.ts:276,284) — one issue's models/stages detail; the resolver's `issueDetail` already serves `GET /api/costs/issue/:id` (§1A). |
+| `pan cost sync` (`cost.ts:447`) | writes | **`CostWriter.reconcile({ source: "wal" })`** | `runCostSync` → `syncWalFromAllProjects` (sync-wal.ts) — imports per-project WALs into store A. The same ingest verb as `POST /api/costs/sync-wal` (§1A), so it folds onto the same writer member. |
+| `pan cost budget create <name>` (`cost.ts:318`) | writes | **`CostWriter.createBudget(spec)`** | `createBudgetSync` → `~/.panopticon/costs/budgets.json` (`lib/cost.ts:452`, `BUDGETS_FILE` cost.ts:429). A **live** store with a live caller (this CLI) — preserved, not deleted. |
+| `pan cost budget list` (`cost.ts:348`) | reads | **`CostResolver.listBudgets()`** (+ `checkBudget` per row) | `getAllBudgetsSync` + `checkBudgetSync` (`lib/cost.ts:478,500`). |
+| `pan cost budget check <id>` (`cost.ts:389`) | reads | **`CostResolver.checkBudget(id)`** | `checkBudgetSync(id)` — limit/spent/remaining/alert (`lib/cost.ts:500`). |
+| `pan cost budget delete <id>` (`cost.ts:428`) | writes | **`CostWriter.deleteBudget(id)`** | `deleteBudgetSync(id)` (`lib/cost.ts:534`). |
+
+**Budget home decision (functional parity).** The `pan cost budget *` family is
+backed by `budgets.json` (`COSTS_DIR/budgets.json`, `lib/cost.ts:429`) via the
+`createBudgetSync`/`getAllBudgetsSync`/`checkBudgetSync`/`deleteBudgetSync`
+functions — a **distinct** store from the store-B `setIssueBudget` per-issue
+rollup that §1A row "Store B" deletes. The CLI budget family has a live caller
+(this command), so "zero live callers" does **not** apply to it. It is preserved
+behind real Cost-domain doors: `CostResolver.listBudgets`/`checkBudget` (reads)
+and `CostWriter.createBudget`/`deleteBudget` (writes), with `budgets.json` as the
+budget store behind the writer. The deleted store-B `setIssueBudget` (§1A,
+"Store B" row) is a separate, genuinely-dead per-issue-budget mechanism and is
+unaffected by this preservation.
+
+The cost-related scripts (`scripts/recover-costs.mjs`, `recover-costs-deep.mjs`,
 `recover-costs-proportional.mjs`, `backfill-costs-pan1570.mts`) and the
-token-spend-report skill are **standalone one-off recovery/backfill tools**, not
-`pan` verbs and not part of the live surface. They are out of scope for the
-domain doors; if ever promoted to a verb, the natural home is
-`CostWriter.reconcile()` / `rebuild()`. Nothing in 1B maps to a Cost service
-member — recorded explicitly so the empty CLI section is a decision, not an
-omission.
+token-spend-report skill remain **standalone one-off recovery/backfill tools** —
+not `pan` verbs and out of scope for the domain doors; if ever promoted, the
+natural home is `CostWriter.reconcile()` / `rebuild()`.
 
 ## 1C. RPC methods (`packages/contracts/src/rpc.ts`)
 
@@ -210,18 +240,19 @@ table — the **Conversations** domain, not `cost_events` (cost-audit §5).
 | Surface | Current sites touching cost | New home |
 |---|---|---|
 | HTTP cost endpoints (cost-audit §5) | **18 across 6 modules** = **14 read + 4 write**. The 14 reads span **5 cost modules** {`costs`, `agents`, `issues`, `metrics`, `specialists`}; the 6th module `discovered-sessions` is the conversation domain (RELOCATE). | reads → **1 `CostResolver`**; writes → **`CostWriter`** |
-| Cost **read** endpoints (the "5 read paths → 1") | **13 across the 5 cost modules** (`costs.ts` 9 reads + `/api/agents/:id/cost` + `/api/issues/:id/costs` + `/api/metrics/costs` + `/api/specialists/:name/cost`), **+1** `discovered-sessions` (6th module, conversation domain) = 14 total | **1 `CostResolver`** (9 methods): of the 13 cost-module reads, **11 → methods** + **2 DELETE** (`experiments`, `specialists`); the +1 `discovered-sessions` → **RELOCATE** to Conversations (outside the 5) |
+| Cost **read** endpoints (the "5 read paths → 1") | **13 across the 5 cost modules** (`costs.ts` 9 reads + `/api/agents/:id/cost` + `/api/issues/:id/costs` + `/api/metrics/costs` + `/api/specialists/:name/cost`), **+1** `discovered-sessions` (6th module, conversation domain) = 14 total | **1 `CostResolver`** (9 event-cost methods; +2 budget reads from §1B = 11 total): of the 13 cost-module reads, **11 → methods** + **2 DELETE** (`experiments`, `specialists`); the +1 `discovered-sessions` → **RELOCATE** to Conversations (outside the 5) |
 | Cost stores | **4** (A SQLite · B `cache.json` · C `cost-data.json` · ad-hoc re-parse) | **1** (store A behind the resolver); B + C + re-parser DELETE |
 | HTTP ingest/maintenance endpoints | **4** (`reconcile`, `sync-wal`, `rebuild`, `deduplicate`) | **`CostWriter`** verbs `reconcile`/`rebuild`; `deduplicate` DELETE (structural) |
 | Ingest call-sites (in-process) | **4** (`appendCostEventSync`, `insertCostEvents`, `insertCostEvent`, pi/codex parsers) | **1 `CostWriter.record(event)`** (with archive fan-out + dedup) |
-| CLI verbs | **0** (`pan cost` does not exist) | n/a |
+| CLI verbs (`pan cost`) | **10** (`today`/`week`/`month`/`report`/`issue`/`sync` + `budget` create/list/check/delete) | reads → **`CostResolver`** (`summary`/`issueDetail`/`listBudgets`/`checkBudget`); writes → **`CostWriter`** (`reconcile`/`createBudget`/`deleteBudget`) — §1B |
 | RPC methods over `cost_events` | **0** (the 2 existing are Conversations) | **1 new `cost.subscribe`** stream |
 
 **DELETED outright** (5): `GET /api/costs/experiments` (caveman, 0/395,910),
 `GET /api/specialists/:name/cost` (hardcoded zero stub), `POST /api/costs/deduplicate`
-(dedup is structural), **store B** (`aggregator.ts` cache.json + the dead budget
-feature), **store C** (`cost-monitor.ts` cost-data.json + the zero-caller
-`recordCostSync`).
+(dedup is structural), **store B** (`aggregator.ts` cache.json + the dead
+store-B per-issue-budget feature `setIssueBudgetSync` — **not** the live
+`pan cost budget` CLI family, §1B), **store C** (`cost-monitor.ts` cost-data.json
++ the zero-caller `recordCostSync`).
 
 **Relocated, not lost** (the no-loss integrity column): conversation-cost
 (`/api/discovered-sessions/cost`, `getConversationCost*`) → **Conversations**.
@@ -368,9 +399,11 @@ export class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
 
 ## 2.2 `CostResolver` — the read door (`Context.Service`)
 
-Nine methods, one per Part-1 §1A read row (the 5-module / 18-endpoint collapse).
-All are computed-on-read `GROUP BY`s over store A — there is no materialized
-rollup table (cost-audit §3).
+Eleven methods: nine per Part-1 §1A read row (the 5-module / 18-endpoint
+collapse) plus two budget reads from the CLI parity (§1B). The nine event-cost
+methods are computed-on-read `GROUP BY`s over store A — there is no materialized
+rollup table (cost-audit §3). The two budget methods read the separate
+`budgets.json` store (`lib/cost.ts:429`), not `cost_events`.
 
 ```ts
 export class CostResolver extends Context.Service<CostResolver, {
@@ -392,6 +425,10 @@ export class CostResolver extends Context.Service<CostResolver, {
   readonly byProject: () => Effect.Effect<ReadonlyArray<Rollup>>
   // GET /api/costs/stream — recent events (live form streams via cost.subscribe)
   readonly recent:    (limit: number, since?: Date) => Effect.Effect<ReadonlyArray<CostEvent>>
+  // pan cost budget list — reads the budgets.json store (getAllBudgetsSync, lib/cost.ts:478)
+  readonly listBudgets: () => Effect.Effect<ReadonlyArray<Budget>>
+  // pan cost budget check <id> — limit/spent/remaining/alert (checkBudgetSync, lib/cost.ts:500)
+  readonly checkBudget: (id: string) => Effect.Effect<BudgetStatus, BudgetNotFound>
 }>()("overdeck/CostResolver") {}
 
 export const CostResolverLayer = Layer.effect(CostResolver, Effect.gen(function* () {
@@ -435,17 +472,26 @@ export const CostResolverLayer = Layer.effect(CostResolver, Effect.gen(function*
 
   return CostResolver.of({
     summary, byIssue, issueDetail, byDay, byModel, byAgent,
-    byBackgroundSource, byProject, recent,
+    byBackgroundSource, byProject, recent, listBudgets, checkBudget,
   })
 }))
 ```
 
+> **Budget verbs read a second store.** `listBudgets`/`checkBudget` read
+> `budgets.json` (`COSTS_DIR/budgets.json`, `lib/cost.ts:429`) via
+> `getAllBudgetsSync`/`checkBudgetSync` — a small JSON file, not `cost_events`.
+> It is modeled the same way Memory models `memory-search.db` as a second store
+> behind one resolver: the budget store stays distinct, the read door is shared.
+> `Budget`/`BudgetStatus`/`BudgetNotFound` are Schemas/errors over that store's
+> shape (`CostBudget` in `lib/cost.ts`).
+
 ## 2.3 `CostWriter` — the write door (`Context.Service`)
 
-Three verbs, derived from Part-1 §1A writes + ingest call-sites: `record`
-(absorbs the 4 ingest sites), `reconcile` (the catch-up sweep — **PAN-1935 lands
-here**), `rebuild` (full recompute). `deduplicate` is **not** a verb — dedup is
-structural, applied inside `record()`.
+Five verbs. Three over `cost_events`, derived from Part-1 §1A writes + ingest
+call-sites: `record` (absorbs the 4 ingest sites), `reconcile` (the catch-up
+sweep — **PAN-1935 lands here**), `rebuild` (full recompute). `deduplicate` is
+**not** a verb — dedup is structural, applied inside `record()`. Two over the
+`budgets.json` store, from the CLI parity (§1B): `createBudget`, `deleteBudget`.
 
 ```ts
 export class CostWriter extends Context.Service<CostWriter, {
@@ -463,6 +509,11 @@ export class CostWriter extends Context.Service<CostWriter, {
   // full rebuild of store A from the archive union; recomputes `cost` from
   // tokens (stored USD has a legacy bug — locked schema 169-171).
   readonly rebuild: () => Effect.Effect<{ events: number }, CostIngestError>
+
+  // pan cost budget create <name> — writes budgets.json (createBudgetSync, lib/cost.ts:452)
+  readonly createBudget: (spec: BudgetSpec) => Effect.Effect<Budget, CostIngestError>
+  // pan cost budget delete <id> — removes from budgets.json (deleteBudgetSync, lib/cost.ts:534)
+  readonly deleteBudget: (id: string) => Effect.Effect<void, BudgetNotFound>
 }>()("overdeck/CostWriter") {}
 
 export const CostWriterLayer = Layer.effect(CostWriter, Effect.gen(function* () {
@@ -673,18 +724,24 @@ endpoint is invented; nothing real from the current surface is lost.
 The arithmetic, all derivable from the Part 1 tables: **18 cost-touching HTTP
 endpoints across 6 modules = 14 read + 4 write** (matches cost-audit §5).
 
-- **14 read endpoints → 1 `CostResolver`** (9 methods). Of the 14: **11 →
-  methods**, **2 DELETE** (`experiments`, `specialists/:name/cost`), **1
-  RELOCATE** (`discovered-sessions` → Conversations).
+- **14 read endpoints → 1 `CostResolver`** (9 event-cost methods; the CLI adds 2
+  budget reads, §1B, for 11 total). Of the 14: **11 → methods**, **2 DELETE**
+  (`experiments`, `specialists/:name/cost`), **1 RELOCATE**
+  (`discovered-sessions` → Conversations).
   - The task's **"5 read paths → 1"** = the 5 *cost* modules {`costs`, `agents`,
     `issues`, `metrics`, `specialists`} → the one resolver. `discovered-sessions`
     is the 6th module (conversation domain), correctly **outside** the 5.
 - **4 write endpoints → `CostWriter`**: `reconcile`, `rebuild` (verbs);
   `sync-wal` folds into `reconcile`; `deduplicate` DELETE (structural).
 - **4 in-process ingest call-sites → 1 `CostWriter.record`**.
-- **4 cost stores → 1** (store A; B + C + the ad-hoc re-parser deleted).
-- **0 cost CLI verbs**, **0 cost RPC methods today → 1 new `cost.subscribe`**.
+- **4 cost stores → 1** (store A; B + C + the ad-hoc re-parser deleted). The
+  live `budgets.json` budget store is a **5th** store, preserved behind
+  `CostWriter`/`CostResolver` budget verbs (§1B) — not part of the collapse-to-A.
+- **10 cost CLI verbs** (`pan cost today/week/month/report/issue/sync` +
+  `budget create/list/check/delete`) → `CostResolver`/`CostWriter` members (§1B);
+  **0 cost RPC methods today → 1 new `cost.subscribe`**.
 - **5 DELETED**: `experiments`, `specialists/:name/cost`, `deduplicate`, store B
-  (+ dead budget), store C (+ dead `recordCostSync`).
+  (+ dead store-B per-issue `setIssueBudget` — **not** the live CLI budget
+  family), store C (+ dead `recordCostSync`).
 - **2 dead writes fixed for parity**: the cost-limit breaker (re-wired onto the
   resolver) and native pi/codex ingest (PAN-1935 — routed into `reconcile`).

@@ -99,11 +99,15 @@ automatically. Purely-internal errors may use `Data.TaggedError("Tag")<{…}>`
 
 We do **not** use `@effect/sql` — its only SQLite adapter is Bun-only and the
 dashboard is **Node-22-only**. The cache is **Drizzle ORM + `better-sqlite3`**
-(both run on Node), wrapped behind one Effect `Db` service. **Dependency note:**
-`better-sqlite3` is already installed, but **`drizzle-orm` and `drizzle-kit` are
-NOT yet dependencies — they must be added**, and a compile smoke-test (a tiny
-`sqliteTable` + `.references()` + a partial `uniqueIndex(...).where(sql\`…\`)` +
-the better-sqlite3 driver under Node 22) should be the first build step. Drizzle
+(both run on Node), wrapped behind one Effect `Db` service. **Dependency gate (hard
+acceptance gate, not a TODO):** **none** of `drizzle-orm`, `drizzle-kit`, or
+`better-sqlite3` are root `package.json` dependencies today (verified: root
+`package.json` has `effect@4.0.0-beta.73` but no drizzle/better-sqlite3 entry) —
+**all three must be added** as the first cutover step, and a compile smoke-test (a
+tiny `sqliteTable` + `.references()` + a partial `uniqueIndex(...).where(sql\`…\`)` +
+FK enforcement (`PRAGMA foreign_keys=ON`) + one resolver/writer transaction, run
+on the **better-sqlite3 driver under Node 22**) must pass **before any domain code
+is written**. The dashboard is Node-22-only, so the smoke test runs on Node, not Bun. Drizzle
 gives schema-as-code with real foreign keys, generated migrations (`drizzle-kit`),
 and type-safe queries; Effect wraps the calls so the rest of the stack stays fully
 Effect. The Drizzle schema *is* the locked DB schema (`overdeck-schema.ts`).
@@ -266,6 +270,42 @@ const issues = RpcGroup.make(
 
 Event push uses `Stream.callback(q => Queue.offerUnsafe(q, ev))`; periodic ticks
 use `Stream.tick("15 seconds")`.
+
+## 8.5. Non-data process services — the live-runtime door
+
+Some real work is **not a cache read and not a cache write**: it acts on a live
+process, not on the domain cache. Message delivery (bytes into Claude's PTY),
+tmux spawn/stop/resume/restart, approval/permission keystrokes, the
+permission-prompt request/respond exchange, and Cloister PROC operations
+(emergency-stop, brake) all touch the live tmux process or an external delivery
+transport — they mutate **no cache row**, so they are neither a Resolver nor a
+Writer.
+
+These are modeled as **non-data process services** — `Context.Service`s that sit
+*beside* the two data doors, not inside them:
+
+| Service | Owns | Backing primitive |
+|---|---|---|
+| `DeliveryService` | message/keystroke delivery to a live agent | `deliverAgentMessage` (`src/lib/agents.ts:1595`) |
+| `ConversationRuntime` | conversation tmux spawn/stop/resume/restart, delivery, approval keystrokes, attachments, pending-input scan | tmux + `deliverAgentMessage` |
+| `CloisterRuntime` | Cloister PROC ops (emergency-stop, brake) that fan out to `AgentWriter.stop` | `getCloisterService()` |
+| `AgentPermissions` | the permission-prompt request/respond exchange (read-model + EventBus + delivery) | `processPermissionResponse` (`src/dashboard/server/routes/agent-permissions.ts:82`) |
+
+**The rule.** A controller's `R` may contain these process services, but **never**
+a raw helper. Controllers depend on `DeliveryService`, not on `deliverAgentMessage`
+directly; on `ConversationRuntime`/`CloisterRuntime`, not on tmux helpers; on the
+EventBus through a service, not on event-store helpers. Reaching past a process
+service to `src/lib/agents.ts`, the tmux library, or the event store is the same
+boundary violation as a controller importing `Db` — it just isn't caught by the
+`Db`-in-`R` compile check, so it is enforced by review and by these named-service
+rows in each domain doc. Every `RESIDUE` row in a domain doc must name a concrete
+process-service **method** (e.g. `DeliveryService.tell`, `AgentPermissions.resolve`),
+never a bare module name.
+
+A process service that *also* mutates cache columns as a side effect (e.g.
+`ConversationRuntime` setting `status`/`tmux_session`) does so through the
+domain's Writer for those columns — the process side and the cache side stay on
+their own doors.
 
 ## 9. The checklist for adding a domain
 

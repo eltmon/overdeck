@@ -73,7 +73,8 @@ output of this audit:
    agent" is reachable through **three doors over the same concept**:
    - `agents.ts` (**40** endpoints — API-SURFACE §B's "35" counts only
      `Route:`-header routes; 5 more are registered in `agentsRouteLayer`:
-     work-complete, stuck, classify-completion, permission-request/response) —
+     work-complete, stuck, classify-completion, `permissions/request`,
+     `permissions/:requestId/respond`) —
      the modern surface (`pause/unpause/untroubled/resume/stop/restart/suspend/
      recover/switch-model/delivery-method/message/tell` …).
    - `specialists.ts` (**31** endpoints) — a **legacy** model of the *same*
@@ -194,16 +195,16 @@ Legend used in reasons: **AUDIT** = [`../investigations/agents-state-audit.md`](
 | `POST /api/agents/:id/delivery-method` (a.ts:3729 → `setAgentDeliveryMethod`) | writes | **`AgentWriter.setDeliveryMethod(id, method)`** | `agents.delivery_method` (absorbs the two transport booleans, AUDIT rows 106-108). |
 | `POST /api/agents/:id/reset-session` (a.ts:3663) | writes | **`AgentWriter.switchModel(id, sameModel)`** (session-clear path) | Clears saved session so the next spawn is fresh — the session-clear half of switch-model with no model change → same verb. |
 | `POST /api/agents/:id/heartbeat` (a.ts:1240) | writes | **`AgentWriter.recordHealth(id, event)`** | Typed runtime-event ingestion. Today it emits an `agent.*` DomainEvent into `health_events`; the route delegates to the **one writer** (not a direct DB write) so the health projection has a single mutator. |
-| `POST /api/agents/:id/poke` (a.ts:1153) | writes | **RESIDUE → delivery** (§1E) | Nudge keystroke to the live tmux process; a process action, not a cache write. |
-| `POST /api/agents/:id/message` (a.ts:1024) | writes | **RESIDUE → delivery** (§1E) | `deliverAgentMessage`; process action. |
-| `POST /api/agents/:id/tell` (a.ts:1028) | writes | **RESIDUE → delivery** (§1E) | Same delivery primitive (shared handler with `/message`). |
+| `POST /api/agents/:id/poke` (a.ts:1153) | writes | **RESIDUE → `DeliveryService.poke`** (§1G) | Nudge keystroke to the live tmux process; a process action, not a cache write. |
+| `POST /api/agents/:id/message` (a.ts:1024) | writes | **RESIDUE → `DeliveryService.tell`** (§1G) | `deliverAgentMessage`; process action. |
+| `POST /api/agents/:id/tell` (a.ts:1028) | writes | **RESIDUE → `DeliveryService.tell`** (§1G) | Same delivery primitive (shared handler with `/message`). |
 | `POST /api/agents/:id/answer-question` (a.ts:1190) | writes | **RELOCATE → Q&A (AskUserQuestion)** | Answers an in-flight AUQ; the Q&A surface. Residue §1E. |
 | `POST /api/agents/:id/handoff` (a.ts:2265) | writes | **RELOCATE → Conversations** | Spawns a handoff conversation; Conversations domain. |
 | `POST /api/agents/:id/work-complete` (registered a.ts:3868) | writes | **RELOCATE → Issues (IssueWriter.advance "in_review")** | Work-complete is the *stage* move to review (issues.md `done` row); not an agents-cache write. |
 | `POST /api/agents/:id/stuck` (registered a.ts:3869) | writes | **RELOCATE → Orchestration (review-run `stuck`)** | `stuck` is ephemeral review-run runtime (`review_runs.stuck`, [`../overdeck-schema.ts`](../overdeck-schema.ts) 360), not an agents column. |
 | `POST /api/agents/:id/classify-completion` (registered a.ts:3870) | writes | **RELOCATE → Orchestration** | Completion-classification helper feeding the verdict pipeline; Orchestration. |
-| `POST /internal/agents/:id/permission-request` (registered a.ts:3871) | writes | **RELOCATE → agent-permissions** | Permission-prompt plumbing; the `agent-permissions` module (API-SURFACE §1, "real surface" list). Residue §1E. |
-| `POST /api/agents/:id/permission-response` (registered a.ts:3872) | writes | **RELOCATE → agent-permissions** | Permission decision; same module. |
+| `POST /api/internal/agents/:id/permissions/request` (a.ts:1367, registered a.ts:3871) | writes | **RELOCATE → `AgentPermissionsWriter.request`** | Records a pending permission prompt: appends `agent.permission_requested` + `agent.waiting_started` events (a.ts:1418,1431). A non-data process service (§1G), not an `AgentWriter` cache verb. |
+| `POST /api/agents/:id/permissions/:requestId/respond` (a.ts:1452, registered a.ts:3872) | writes | **RELOCATE → `AgentPermissionsWriter.resolve`** | Persists the allow/deny decision then **delivers** it (a.ts:1476-1506 via `processPermissionResponse`, `agent-permissions.ts:82`). 4 failure modes (below). Process service (§1G). |
 
 ## 1B. HTTP — `specialists.ts` (31) — the legacy second surface (the key consolidation)
 
@@ -264,7 +265,7 @@ and writer take a host/tier so a remote agent is just an agent with
 | `POST /api/remote/workspaces/:issueId/agent/start` (r.ts:248) | writes | **`AgentWriter.spawn(..., { host: "fly", tier })`** | Spawn the agent on the remote host → the one spawn verb with a host arg (`host_override`). |
 | `POST /api/remote/workspaces/:issueId/agent/stop` (r.ts:286) | writes | **`AgentWriter.stop(id)`** | Stop the remote agent → the one stop verb. |
 | `GET /api/remote/workspaces/:issueId/agent/output` (r.ts:312) | reads | **RELOCATE → Transcripts** | Remote pane output; Transcripts plane (same as local `/output`). |
-| `POST /api/remote/workspaces/:issueId/agent/tell` (r.ts:340) | writes | **RESIDUE → delivery** (§1E) | Message to the remote agent process; the delivery residue, host-aware. |
+| `POST /api/remote/workspaces/:issueId/agent/tell` (r.ts:340) | writes | **RESIDUE → `DeliveryService.tell`** (§1G, host-aware) | Message to the remote agent process; the delivery residue, host-aware. |
 
 ## 1D. CLI verbs (`pan ...`) — issue-keyed, resolved to the work agent
 
@@ -283,7 +284,7 @@ bridge between the issue-keyed CLI and the agent-keyed writer.
 | `pan resume <id>` (cli/index.ts:451) | writes | **`AgentWriter.resume(id, { host?, compact? })`** | Resume from saved session; `--host` → spawn-on-host (`host_override`), `--compact` → fresh-session reseed. |
 | `pan recover [id]` (cli/index.ts:459) | writes | **`AgentWriter.resume(id)`** (orphan path) | Recover crashed/stopped; `--all` loops the verb; `--model` → switchModel-then-resume. |
 | `pan restart <id>` (cli/index.ts:350) | writes | **`AgentWriter.stop(id)` then `.resume(id)`** | Composed from the two verbs. |
-| `pan tell <id> <msg>` (cli/index.ts:400) | writes | **RESIDUE → delivery** (§1E) | Message delivery to the live process. |
+| `pan tell <id> <msg>` (cli/index.ts:400) | writes | **RESIDUE → `DeliveryService.tell`** (§1G) | Message delivery to the live process. |
 | `pan show <id>` (cli/index.ts:304) | reads | **aggregate → recomposed** (Agents + Issues + Cost) | God-view; cross-domain (matches issues.md `pan show`). |
 | `pan status` (cli/index.ts:585) | reads | **aggregate → recomposed** | System overview; cross-domain (matches issues.md `pan status`). |
 | `pan switch-model` (operator; HTTP `switch-model`, no top-level CLI verb) | writes | **`AgentWriter.switchModel(id, model)`** | Listed in the task; the operator action is the `switch-model` route — the writer verb is the same. |
@@ -309,7 +310,8 @@ The live agent slice of `pan.subscribeDomainEvents` (rpc.ts:35) is fed by
 > `agents.ts = 35`, but that counts only `// ─── Route:`-header routes. The
 > `agentsRouteLayer` registration (a.ts:3855-3896) wires **40** — 5 more without a
 > header comment: `work-complete`, `stuck`, `classify-completion`,
-> `permission-request`, `permission-response`. §1A enumerates all **40**. The
+> `permissions/request`, `permissions/:requestId/respond`. §1A enumerates all
+> **40**. The
 > three-surface total is therefore **80**, not 75. This doc uses 40/80.
 
 | Surface | Current sites touching agent runtime | New home |
@@ -343,8 +345,8 @@ Per-surface disposition tally (count the §1A/§1B/§1C rows):
   (CLAUDE.md: "Legacy specialist wake/session/queue machinery has been removed").
   The plane is not a 5th endpoint; it is the surface the 4 belong to.
 - **RESIDUE — 4 endpoints** (§1G): `agents/:id/message`, `/tell`, `/poke`, and
-  remote `agent/tell` — live-process delivery, behind a delivery service, not a
-  cache door.
+  remote `agent/tell` — live-process delivery, behind the **`DeliveryService`**
+  non-data process service (CONVENTIONS §8.5), not a cache door.
 - **RELOCATED, not lost (the no-loss integrity column) — 44 endpoints:** the
   entire review-run half of `specialists.ts`
   (runs/grace/context/complete/restart/terminate) + `agents/:id/stuck` +
@@ -352,8 +354,9 @@ Per-surface disposition tally (count the §1A/§1B/§1C rows):
   + `:type/status` + `work-complete` → **Issues**; remote workspace start/stop +
   `git-info` + `files` → **Workspace**; output/conversation/activity/timeline →
   **Transcripts/Observability**; cost → **Cost**; handoff(+suggestion) →
-  **Conversations**; pending-questions/answer-question + permission-request/response
-  → **Q&A / agent-permissions**; remote `status` + `models/resolve` →
+  **Conversations**; pending-questions/answer-question → **Q&A**;
+  `permissions/request` + `permissions/:requestId/respond` → the **`AgentPermissions`**
+  process service (§1G item 3, CONVENTIONS §8.5); remote `status` + `models/resolve` →
   **Infra/Settings**.
 
 The 80 → (28 kept = 17 members) + 44 relocated + 4 residue + 4 deleted
@@ -368,16 +371,43 @@ they live behind a thin delivery/process verb (or a sibling domain), explicitly
 
 1. **Message delivery** (`/message`, `/tell`, `/poke`, remote `/agent/tell`,
    `pan tell`). The single primitive is `deliverAgentMessage(agentId, message,
-   caller?)` (CLAUDE.md "PTY supervisor" section: supervisor → channels → tmux).
-   It mutates **no cache row** — it pushes bytes into Claude's PTY. This is the
-   main residue. It is a **delivery service**, parallel to but outside the read/
-   write doors (like the raw `/ws/terminal` WebSocket bypassing Effect RPC).
+   caller?)` (`src/lib/agents.ts:1595`; CLAUDE.md "PTY supervisor" section:
+   supervisor → channels → tmux). It mutates **no cache row** — it pushes bytes
+   into Claude's PTY. This is the main residue. It is modeled as the
+   **`DeliveryService`** non-data process service (CONVENTIONS §8.5) — `tell`
+   (message/tell, host-aware for the remote variant) and `poke` (nudge keystroke)
+   — parallel to but outside the read/write doors (like the raw `/ws/terminal`
+   WebSocket bypassing Effect RPC). Controllers depend on `DeliveryService`, never
+   on `deliverAgentMessage` directly.
 2. **Q&A (AskUserQuestion)** (`/pending-questions` read, `/answer-question`
    write). The in-flight-AUQ surface (project memory `project_auq_dashboard_pipeline`)
    is its own concern; relocates to the Q&A surface, not the agents cache.
-3. **Permission prompts** (`/permission-request`, `/permission-response`).
-   Relocate to the `agent-permissions` module — they gate harness tool calls,
-   orthogonal to agent identity/lifecycle.
+3. **Permission prompts** (`POST /api/internal/agents/:id/permissions/request`,
+   a.ts:1367; `POST /api/agents/:id/permissions/:requestId/respond`, a.ts:1452).
+   These gate harness tool calls — orthogonal to agent identity/lifecycle — and
+   are a real read-model + delivery surface, so they are modeled as an **explicit
+   `AgentPermissions` non-data process service** (CONVENTIONS §8.5), **not** a
+   module-name relocation:
+   - **`AgentPermissionsResolver.pending`** — the pending-request read, served from
+     the read-model (the `agent.permission_requested`/`agent.waiting_started`
+     events appended at a.ts:1418,1431).
+   - **`AgentPermissionsWriter.request(agentId, prompt)`** — append the request
+     events.
+   - **`AgentPermissionsWriter.resolve(agentId, requestId, behavior)`** — persist
+     the decision then deliver it; backed by `processPermissionResponse`
+     (`agent-permissions.ts:82`), which depends on EventBus (append) + a delivery
+     dependency (`deliverDecision`).
+
+   It distinguishes **4 failure modes** (preserve all four):
+   **(1)** duplicate request — an already-resolved request re-delivers idempotently
+   (`getResolvedDecision` path, `agent-permissions.ts:145-175`); a re-resolve to a
+   *different* behavior is a 409 conflict;
+   **(2)** wrong-agent response — request belongs to another agent → **409**
+   (`agent-permissions.ts:91-98`);
+   **(3)** persistence failure — `appendResolutionEvents` throws → **500**
+   (`agent-permissions.ts:120-127`);
+   **(4)** delivery failure — `deliverDecision` throws → **502**
+   (`agent-permissions.ts:131-141`).
 4. **Handoff** (`/handoff`, `/handoff/suggestion`). Spawns a *conversation*;
    relocates to Conversations.
 5. **The `runtime.json` plane** is read (not a column). `getRuntime` reads the

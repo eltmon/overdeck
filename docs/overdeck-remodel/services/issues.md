@@ -428,7 +428,13 @@ export const IssuesResolverLayer = Layer.effect(IssuesResolver, Effect.gen(funct
   // both boot-time repair sweeps (review-audit "ready_for_merge" DERIVE).
   const readyForMerge = (i: Issue): boolean =>
     i.reviewOutcome === "passed"
-    && i.testOutcome === "passed"
+    // NO-LOSS: live setReviewStatus treats a SKIPPED test as ready when review
+    // passed and verification did not fail (review-status.ts:282-286 uses
+    // `testStatus === 'passed' || testStatus === 'skipped'`; the boot repair
+    // sweep at review-status.ts:517-526 uses the same rule). Requiring
+    // `=== "passed"` here would drop every skipped-test issue from
+    // `pan review pending --ready` — a behavior regression. Mirror the OR.
+    && (i.testOutcome === "passed" || i.testOutcome === "skipped")
     && i.verificationOutcome !== "failed"
     && i.stage !== "merging" && i.stage !== "verifying_on_main"
     && i.stage !== "closed"  && i.blockers.length === 0
@@ -442,6 +448,14 @@ export const IssuesResolverLayer = Layer.effect(IssuesResolver, Effect.gen(funct
   return IssuesResolver.of({ get, list, getPlan })
 }))
 ```
+
+> **No-loss test (skipped-test parity).** Construct an issue with
+> `reviewOutcome === "passed"`, `testOutcome === "skipped"`, and
+> `verificationOutcome === "pending"` (not yet failed), `stage` in a pre-merge
+> stage, no blockers, and assert `list({ readyForMerge: true })` **includes** it.
+> The `pending` verification value is the load-bearing choice — it proves the
+> predicate uses `!== "failed"` (admits pending), not `=== "passed"`, matching
+> live `setReviewStatus` (`review-status.ts:282-286`).
 
 ## 2.4 `IssueWriter` — the write door (`Context.Service`)
 

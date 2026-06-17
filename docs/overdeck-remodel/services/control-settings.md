@@ -132,7 +132,7 @@ Stores legend: **AS** = `app_settings` · **IP** = `issue_policy` (today
 = `cloister.toml` · **PROC** = in-process Cloister/Flywheel service · **GH/AUTH**
 = GitHub / external provider auth.
 
-## 1A. HTTP endpoints — `settings.ts` (16)
+## 1A. HTTP endpoints — `settings.ts` (20 route objects; 16 API-SURFACE-counted)
 
 The single most important Part-1 fact: **only `ui-theme` even *touches* a
 settings file**, and **none of the 16 touch `app_settings`/`issue_policy`**.
@@ -187,13 +187,13 @@ Agents-health read.
 
 | Current endpoint (file:line) | r/w | New home | Reason / backing store |
 |---|---|---|---|
-| `GET /api/cloister/status` (`cloister.ts:40`) | reads | **aggregate → recomposed** (PROC service status) | `service.getStatus()` — live runtime status, not a stored fact. Recompose at controller from the runtime service. |
-| `POST /api/cloister/start` (`cloister.ts:54`) | writes | **RELOCATE → runtime service (PROC)** | `service.start()` — starts the in-process watchdog loop; no durable store mutated. A runtime op, not an AS write. |
-| `POST /api/cloister/stop` (`cloister.ts:68`) | writes | **RELOCATE → runtime service (PROC)** | `service.stop()` — stops the loop; no store. |
+| `GET /api/cloister/status` (`cloister.ts:40`) | reads | **`CloisterRuntime.getStatus()`** (recomposed at controller) | `service.getStatus()` — live runtime status, not a stored fact. Controller recomposes from `CloisterRuntime.getStatus()` + the AS pause flag. |
+| `POST /api/cloister/start` (`cloister.ts:54`) | writes | **RESIDUE → `CloisterRuntime.start()`** (§1J item 2) | `service.start()` — starts the in-process watchdog loop; no durable store mutated. A runtime op, not an AS write. |
+| `POST /api/cloister/stop` (`cloister.ts:68`) | writes | **RESIDUE → `CloisterRuntime.stop()`** (§1J item 2) | `service.stop()` — stops the loop; no store. |
 | `POST /api/cloister/emergency-stop` (`cloister.ts:82`) | writes | **`SettingsWriter.emergencyStop()` → delegates AgentWriter.stop ×N** | Kills ALL agents (`getCloisterService().emergencyStop()` + per-agent `agent.stopped` events, 82-105). **Agent lifecycle = AgentWriter**; SettingsWriter only orchestrates the call. No AS flag. (Headline residue.) |
 | `POST /api/cloister/brake` (`cloister.ts:113`) | writes | **`SettingsWriter.brake()` → delegates AgentWriter.stop ×N** | Trims work agents to the cap (`emergencyBrake()` + per-agent `agent.stopped`, 113-137). Agent lifecycle = AgentWriter. No AS flag. (Headline residue.) |
-| `POST /api/cloister/resume-spawns` (`cloister.ts:141`) | writes | **RELOCATE → runtime service (PROC)** | `service.resumeSpawns()` — in-memory spawn-pause toggle on the live service; no durable store. |
-| `GET /api/cloister/spawn-status` (`cloister.ts:155`) | reads | **RELOCATE → runtime service (PROC)** | `service.isSpawnPaused()` — in-memory flag read. |
+| `POST /api/cloister/resume-spawns` (`cloister.ts:141`) | writes | **RESIDUE → `CloisterRuntime.resumeSpawns()`** (§1J item 2) | `service.resumeSpawns()` — in-memory spawn-pause toggle on the live service; no durable store. |
+| `GET /api/cloister/spawn-status` (`cloister.ts:155`) | reads | **RESIDUE → `CloisterRuntime.isSpawnPaused()`** (§1J item 2) | `service.isSpawnPaused()` — in-memory flag read. |
 | `GET /api/cloister/config` (`cloister.ts:169`) | reads | **FILE-CONFIG** (`cloister.toml`) | `loadCloisterConfigSync()` → `~/.panopticon/cloister.toml` (`cloister/config.ts:15,450`). A file, not AS. |
 | `PUT /api/cloister/config` (`cloister.ts:180`) | writes | **FILE-CONFIG** | `saveCloisterConfigSync(updates)` + `service.reloadConfig()` (TOML). Not AS. |
 | `GET /api/cloister/agents/health` (`cloister.ts:198`) | reads | **RELOCATE → Agents (health)** | `service.getAllAgentHealth()` — per-agent health (API-SURFACE §G Agents/health). |
@@ -275,9 +275,9 @@ table (schema 327-332) — **a column relocation that preserves the verb**.
 |---|---|---|---|
 | `pan admin cloister freeze` (`cli/commands/cloister/freeze.ts:19`) | writes | **`SettingsWriter.setDeaconPaused(true)`** | `setDeaconGloballyPaused(true)` (AS). |
 | `pan admin cloister unfreeze` (`cli/commands/cloister/freeze.ts:29`) | writes | **`SettingsWriter.setDeaconPaused(false)`** | `setDeaconGloballyPaused(false)` (AS). |
-| `pan admin cloister status` (`cloister/index.ts:21`) | reads | **aggregate → recomposed** (PROC service) | Live watchdog status + AS pause flag. |
-| `pan admin cloister start` (`cloister/index.ts:28`) | writes | **RELOCATE → runtime service (PROC)** | Starts the loop; no durable store. |
-| `pan admin cloister stop` (`cloister/index.ts:34`) | writes | **RELOCATE → runtime service (PROC)** | Stops the loop. |
+| `pan admin cloister status` (`cloister/index.ts:21`) | reads | **`CloisterRuntime.getStatus()`** (recomposed) | Live watchdog status + AS pause flag. |
+| `pan admin cloister start` (`cloister/index.ts:28`) | writes | **RESIDUE → `CloisterRuntime.start()`** (§1J item 2) | Starts the loop; no durable store. |
+| `pan admin cloister stop` (`cloister/index.ts:34`) | writes | **RESIDUE → `CloisterRuntime.stop()`** (§1J item 2) | Stops the loop. |
 | `pan admin cloister emergency-stop` (`cloister/index.ts:40`) | writes | **`SettingsWriter.emergencyStop()` → AgentWriter.stop ×N** | `stopCommand({emergency:true})` kills agents. Agent lifecycle = AgentWriter. |
 | `pan admin cloister brake` (`cloister/index.ts:46`) | writes | **`SettingsWriter.brake()` → AgentWriter.stop ×N** | `brakeCommand` trims agents. Agent lifecycle = AgentWriter. |
 | `pan flywheel start` (`cli/commands/flywheel.ts:940`) | writes | **`SettingsWriter.startFlywheel(brief)` → flag + AgentWriter.spawn** | AS flag + orchestrator spawn. |
@@ -330,12 +330,12 @@ preserved; do not conflate them.
 | Surface | Current sites | New home |
 |---|---|---|
 | `settings.ts` HTTP (16) | 16 | **0 data-domain methods** — all FILE-CONFIG (config.yaml/ui-theme.json/openrouter-favorites) or RELOCATE (provider-auth, OpenRouter, Conversations-search). No loss. |
-| `cloister.ts` HTTP (10) | 10 | **2 SettingsWriter verbs** (`emergencyStop`, `brake` — both delegating AgentWriter) + 4 runtime-PROC relocates + 2 FILE-CONFIG (cloister.toml) + 1 Agents-health relocate + 1 recomposed status |
+| `cloister.ts` HTTP (10) | 10 | **2 SettingsWriter verbs** (`emergencyStop`, `brake` — both delegating AgentWriter) + 4 `CloisterRuntime` PROC residue (`start`/`stop`/`resumeSpawns`/`isSpawnPaused`) + 2 FILE-CONFIG (cloister.toml) + 1 Agents-health relocate + 1 recomposed status |
 | `misc.ts` deacon (2) | 2 | **1 resolver read (`isDeaconPaused`) + 1 writer verb (`setDeaconPaused`)** |
 | `flywheel.ts` HTTP (~30 routes) | ~30 | **2 resolver reads (`getFlywheelConfig`, `getFlywheelRuntime`) + 5 writer verbs** (config + start/pause/resume/abort) ; the rest **RELOCATE to Merge** (11 auto-merge/queue/UAT) or **flywheel telemetry** (runs/report/brief/stats/status) |
 | per-issue policy HTTP (`workspaces.ts`, 3) | 3 | **2 SettingsWriter verbs** (`setDeaconIgnored`, `setAutoMerge`) + 1 runtime relocate (`unstick` → `review_runs`) |
 | `projects.ts` Config HTTP (4) | 4 | **1 ConfigResolver read field + 1 FILE-CONFIG write** + 2 recomposed session-trees |
-| CLI verbs | ~17 control/settings/config verbs | **~8 SettingsWriter verbs + 2 resolver reads** ; runtime-PROC (cloister start/stop) + telemetry (stats/report/emit) relocate ; `pan project` = FILE-CONFIG |
+| CLI verbs | ~17 control/settings/config verbs | **~8 SettingsWriter verbs + 2 resolver reads** ; `CloisterRuntime` PROC residue (cloister start/stop) + telemetry (stats/report/emit) relocate ; `pan project` = FILE-CONFIG |
 | RPC | 1 (`subscribeFlywheelStatus`) | `flywheel.subscribeStatus` (Settings RPC) + recomposed run-state |
 
 **The honest collapse count.** This is **consolidation + relocation, not a
@@ -378,9 +378,13 @@ After the collapse, the surfaces that touch this domain but are **not** a clean
 2. **In-process PROC operations with no durable store** — `cloister start/stop/
    resume-spawns`, `spawn-status`, `cloister status`, `flywheel current/state/
    status`. These mutate or read the **live runtime service**, not a table. They
-   relocate to a thin runtime-service door / recompose at the controller; they are
-   not resolver/writer members because there is nothing in `overdeck.db` for them
-   to read or write.
+   are modeled as the **`CloisterRuntime`** non-data process service (CONVENTIONS
+   §8.5) — `start`/`stop`/`resumeSpawns`/`isSpawnPaused`/`getStatus` over the live
+   watchdog — which the controller depends on instead of reaching for
+   `getCloisterService()` directly; status endpoints recompose at the controller
+   from `CloisterRuntime.getStatus()` + the AS pause flag. They are not
+   resolver/writer members because there is nothing in `overdeck.db` for them to
+   read or write.
 3. **File-backed config that is not `projects.yaml`** — `config.yaml`
    (`settings.ts` GET/PUT), `cloister.toml` (`cloister/config.ts`),
    `ui-theme.json`, the flywheel brief file. Preserved as thin file doors

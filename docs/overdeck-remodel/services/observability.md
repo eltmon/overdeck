@@ -26,7 +26,22 @@ current methods, now sourced from the EventBus + read-model:
 
 - `getSnapshot` — the current read-model snapshot (labelled with the latest event `sequence`).
 - `subscribeDomainEvents` — the live `Stream` of domain events (the `.changes` of the read-model / the bus stream).
-- `replayEvents(fromSequence)` — gap-fill between a client's snapshot and now. Called only with `snapshot.sequence`, never from 0.
+- `replayEvents(fromSequence)` — gap-fill between a client's snapshot and now.
+  The RPC contract accepts an **arbitrary** caller-provided `fromSequence`
+  (`packages/contracts/src/rpc.ts:255-259`); the live handler passes it straight
+  to `eventStore.readFrom(input.fromSequence)` (`ws-rpc.ts:661-664`). In practice
+  the dashboard calls it with `snapshot.sequence`, but the schema does not pin
+  that — so with tiered retention (below) a `fromSequence` older than the retained
+  window is reachable and must be handled, not silently returned partial.
+
+  **Replay-gap contract (must land in the RPC schema before `events` is trimmed):**
+  when `fromSequence` is older than the oldest retained event, `replayEvents`
+  returns a typed `ReplayGap` / `SnapshotRequired` error (a
+  `Schema.TaggedErrorClass` on the `error` channel of `ReplayEventsRpc`), **not** a
+  truncated event array. On that error the client refreshes via `getSnapshot` and
+  resubscribes from the new snapshot sequence. Adding the error to the schema is a
+  hard prerequisite of retention: trimming `events` without it turns a too-old
+  replay into silent missing-event corruption of the client read-model.
 
 There is **no HttpApiGroup** for Observability and **no domain controller** — the
 EventBus is wired into the server bootstrap `Layer`, and the RPC group delegates
@@ -39,6 +54,9 @@ to it. Writers receive `EventBus` in their `R`; nothing else does.
 - **Retention** is periodic + tiered (live-stream-only types retained hours;
   lifecycle/review/cost types kept to an analytics floor), replacing today's
   startup-only compaction that leaves `events` unbounded between restarts.
+  Because tiered retention can trim past a connected client's last snapshot
+  sequence, it is gated on the replay-gap contract above: ship the
+  `ReplayGap`/`SnapshotRequired` error first, trim second.
 - **Phase-duration metrics** that today are derived only from `events` (and vanish
   when it's trimmed) move to the per-issue `closeOut` record so they survive — the
   one piece of durable truth that was hiding in the transport.

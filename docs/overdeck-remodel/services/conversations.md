@@ -57,11 +57,21 @@
 - **Writer / write door** — the one `Context.Service` allowed to *mutate* the
   domain's cache (`ConversationWriter`). Writes **only** the DB and creates
   **new** backing files; never mutates an existing one.
-- **TranscriptsResolver** — the shared **read-only** service that parses a backing
-  file across harness shapes and rebuilds the disposable `transcripts` index. Not
-  a domain (no writer that owns durable truth, no pane). Consumed by both
-  Conversations and Agents. "Read-only" means **toward the sacred files** — it
-  may rebuild its own cache index.
+- **TranscriptsResolver** — the shared **read-only** read door over the
+  `transcripts` index: `list`/`get`/`stats`/`search`/`parse`/`resolveFiles`/`watch`.
+  It parses a backing file across harness shapes and **reads** the disposable
+  `transcripts` index. "Read-only" means it never mutates the index *or* the
+  sacred files. Consumed by both Conversations and Agents.
+- **TranscriptsWriter** — the shared **write door** (cache-maintenance) over the
+  same `transcripts` index: `rebuild`/`scan`/`enrich`/`embed` plus index/FTS
+  invalidation. The `transcripts` index is 100% cache (no durable source to
+  mirror), so per CONVENTIONS §5 rule 2 the writer has **no source-first step 1**
+  — the cache write IS the whole write. But it is still a *separate door*: the
+  two-door rule (CONVENTIONS §0) requires that the *mutator* of a cache is not the
+  same service called the resolver. `scan`/`enrich`/`embed` are real writes — they
+  rebuild rows, append LLM summaries, and write embeddings — so they live behind
+  `TranscriptsWriter`, never the resolver. "No durable source" justifies "no step
+  1", **not** "no writer".
 - **The fork primitive** — the single "create a fresh UUID backing file +
   register a `conversation_files` pointer" path. Every file-creating verb
   (handoff, clear, summary-fork, switch-model, compaction) routes through it.
@@ -200,10 +210,15 @@ backing file (read-only) · **TX** = the disposable `transcripts` index (was
 ## 1B. Transcript / discovered-sessions HTTP — `discovered-sessions.ts` (12)
 
 The Transcript index (`transcripts`, was `discovered_sessions`) is **100% cache**
-(audit §2). Its reads are `TranscriptsResolver` methods; its rebuild/enrich/embed
-operations are **cache-maintenance** that the resolver owns (there is no durable
-source to mirror, so no separate writer — CONVENTIONS §5 rule 2: "pure-cache
-domains have no step 1").
+(audit §2). Its reads are `TranscriptsResolver` methods; its rebuild/scan/enrich/
+embed operations are **cache-maintenance writes** behind a separate
+`TranscriptsWriter`. The index has no durable source to mirror, so per
+CONVENTIONS §5 rule 2 the writer has **no source-first step 1** — the cache write
+is the whole write. That removes step 1, **not the write door**: the two-door
+rule (CONVENTIONS §0) still requires the mutator be a distinct service from the
+resolver. `scan`/`enrich`/`embed` rebuild rows, append LLM summaries, and write
+embeddings — real cache writes — so they map to `TranscriptsWriter`, never the
+read door.
 
 | Current endpoint | r/w | New door | Reason |
 |---|---|---|---|
@@ -215,24 +230,24 @@ domains have no step 1").
 | `GET /api/discovered-sessions/config` (`discovered-sessions.ts:706`) | reads | **RELOCATE → Settings** | Conversations/enrichment config; Settings domain. |
 | `PUT /api/discovered-sessions/config` (`discovered-sessions.ts:725`) | writes | **RELOCATE → Settings** | Same. |
 | `POST /api/discovered-sessions/test-connection` (`discovered-sessions.ts:751`) | writes | **RELOCATE → Settings** | Provider connectivity probe; not transcript state. |
-| `POST /api/discovered-sessions/scan` (`discovered-sessions.ts:480`) | writes (cache) | **`TranscriptsResolver.rebuild(dirs?)`** | The scan that rebuilds the whole index from JSONL (read-only over the sacred files). Cache-maintenance, not a source write. |
-| `POST /api/discovered-sessions/enrich` (`discovered-sessions.ts:571`) | writes (cache) | **`TranscriptsResolver.enrich(...)`** (opt-in, costs LLM $) | LLM summaries/tags — a search **nicety**, not load-bearing (audit Q2). Lazy/opt-in, never blocking. |
-| `POST /api/discovered-sessions/:id/enrich` (`discovered-sessions.ts:400`) | writes (cache) | **`TranscriptsResolver.enrich(id)`** | Per-row enrich; same. |
-| `POST /api/discovered-sessions/embed` (`discovered-sessions.ts:657`) | writes (cache) | **`TranscriptsResolver.embed(...)`** (opt-in, costs $) | Embeddings for semantic search (audit §2d). Regenerable. |
+| `POST /api/discovered-sessions/scan` (`discovered-sessions.ts:480`) | writes (cache) | **`TranscriptsWriter.scan(dirs?)`** (alias `rebuild`) | The scan that rebuilds the whole index from JSONL (read-only over the sacred files; writes the index). Cache-maintenance write, not a source write. |
+| `POST /api/discovered-sessions/enrich` (`discovered-sessions.ts:571`) | writes (cache) | **`TranscriptsWriter.enrich(...)`** (opt-in, costs LLM $) | LLM summaries/tags — a search **nicety**, not load-bearing (audit Q2). Lazy/opt-in, never blocking. Writes the index. |
+| `POST /api/discovered-sessions/:id/enrich` (`discovered-sessions.ts:400`) | writes (cache) | **`TranscriptsWriter.enrich(id)`** | Per-row enrich; same. |
+| `POST /api/discovered-sessions/embed` (`discovered-sessions.ts:657`) | writes (cache) | **`TranscriptsWriter.embed(...)`** (opt-in, costs $) | Embeddings for semantic search (audit §2d). Regenerable. Writes the index. |
 
 ## 1C. CLI verbs (`pan ...`)
 
 | Current verb | r/w | New door | Reason |
 |---|---|---|---|
-| `pan conversations scan [dirs]` (`conversations/index.ts:28`) | writes (cache) | **`TranscriptsResolver.rebuild`** | Same engine as the HTTP scan. |
+| `pan conversations scan [dirs]` (`conversations/index.ts:28`) | writes (cache) | **`TranscriptsWriter.scan`** (alias `rebuild`) | Same engine as the HTTP scan. |
 | `pan conversations search [query]` (`conversations/index.ts:45`) | reads | **`TranscriptsResolver.search`** | FTS over the index. |
 | `pan conversations list` (`conversations/index.ts:74`) | reads | **`TranscriptsResolver.list`** | Index list with filters. |
 | `pan conversations show <id>` (`conversations/index.ts:88`) | reads | **`TranscriptsResolver.get`** | Single index row. |
 | `pan conversations current` (`conversations/index.ts:103`) | reads | **`ConversationsResolver.getCurrent()`** | The conversation you are running inside (deterministic, no scan). |
 | `pan conversations jsonl <conv-id>` (`conversations/index.ts:95`) | reads | **`TranscriptsResolver.resolveFile(conv)`** | Prints the backing-file path. **Today uses the claude-only `resolveConversationTranscript` (surface #4, backing-files §2.4)** — folds into the one harness-aware resolver so it can't route a pi/codex conv down a claude path. |
 | `pan conversations cost` (`conversations/index.ts:111`) | reads | **RELOCATE → Cost** | Estimated-cost rollup; Cost domain. |
-| `pan conversations enrich [ids]` (`conversations/index.ts:134`) | writes (cache) | **`TranscriptsResolver.enrich`** | Opt-in LLM enrichment. |
-| `pan conversations embed [ids]` (`conversations/index.ts:121`) | writes (cache) | **`TranscriptsResolver.embed`** | Opt-in embeddings. |
+| `pan conversations enrich [ids]` (`conversations/index.ts:134`) | writes (cache) | **`TranscriptsWriter.enrich`** | Opt-in LLM enrichment. |
+| `pan conversations embed [ids]` (`conversations/index.ts:121`) | writes (cache) | **`TranscriptsWriter.embed`** | Opt-in embeddings. |
 | `pan conversations format` (`conversations/index.ts`) | reads | **`TranscriptsResolver.serialize(conv)`** | Serializes the transcript to text (the adapter's `serializeTranscript`). |
 | `pan handoff [conv] [focus...]` (`index.ts:435`, `handoffCommand`) | writes | **`ConversationWriter.handoff(source, target, doc)`** (+ RELOCATE spawn) | Authors a handoff doc (to `~/.panopticon/handoffs/`), **creates a NEW conversation + new backing file** (fork primitive), records the lineage edge (`recordConversationHandoff`, `conversations-db.ts:739`). Spawn relocates. |
 | `pan unarchive-conversation <query>` (`index.ts:446`) | writes | **`ConversationWriter.unarchive`** | Restore by name/title match. |
@@ -241,12 +256,12 @@ domains have no step 1").
 
 | Current RPC method | r/w | New door | Reason |
 |---|---|---|---|
-| `pan.scanConversations` (`rpc.ts:24`) | writes (cache) | **`TranscriptsResolver.rebuild`** via RPC | Same engine; RPC delegates to the same resolver (HTTP & RPC cannot diverge, CONVENTIONS §8). |
+| `pan.scanConversations` (`rpc.ts:24`) | writes (cache) | **`TranscriptsWriter.scan`** (alias `rebuild`) via RPC | Same engine; RPC delegates to the same writer (HTTP & RPC cannot diverge, CONVENTIONS §8). |
 | `pan.searchConversations` (`rpc.ts:25`) | reads | **`TranscriptsResolver.search`** | FTS. |
 | `pan.listDiscoveredSessions` (`rpc.ts:26`) | reads | **`TranscriptsResolver.list`** | Index list. |
 | `pan.getDiscoveredSession` (`rpc.ts:27`) | reads | **`TranscriptsResolver.get`** | Single index row. |
-| `pan.enrichSessions` (`rpc.ts:28`) | writes (cache) | **`TranscriptsResolver.enrich`** | Opt-in. |
-| `pan.embedSessions` (`rpc.ts:29`) | writes (cache) | **`TranscriptsResolver.embed`** | Opt-in. |
+| `pan.enrichSessions` (`rpc.ts:28`) | writes (cache) | **`TranscriptsWriter.enrich`** | Opt-in. |
+| `pan.embedSessions` (`rpc.ts:29`) | writes (cache) | **`TranscriptsWriter.embed`** | Opt-in. |
 | `pan.getConversationCost` (`rpc.ts:30`) | reads | **RELOCATE → Cost** | Cost domain. |
 | `pan.getConversationCostByWorkspace` (`rpc.ts:31`) | reads | **RELOCATE → Cost** | Cost domain. |
 | `pan.getConversationStats` (`rpc.ts:32`) | reads | **`TranscriptsResolver.stats`** | Index rollup. |
@@ -490,12 +505,14 @@ export const ConversationsResolverLayer = Layer.effect(ConversationsResolver, Ef
 }))
 ```
 
-## 2.3 `TranscriptsResolver` — the shared read-only service (`Context.Service`)
+## 2.3 `TranscriptsResolver` — the shared read door (`Context.Service`)
 
-Not a domain (no durable source, no pane). It **reads** sacred backing files
-across harness shapes and **rebuilds its own disposable index** (`transcripts`,
-was `discovered_sessions`). It has **no method that writes a backing file** —
-that is how "read-only toward the sacred files" becomes mechanically true.
+Not a full domain (no durable source, no pane), but it still splits into the two
+doors. The **resolver reads** sacred backing files across harness shapes and
+**reads its disposable index** (`transcripts`, was `discovered_sessions`). It has
+**no method that writes a backing file OR the index** — that is how "read-only"
+becomes mechanically true. The cache-maintenance writes (`scan`/`enrich`/`embed`)
+live on `TranscriptsWriter` (§2.3.1).
 
 It **formalizes the existing `getTranscriptAdapter(harness)`**
 (`src/lib/conversations/transcript-adapter.ts:259` — a harness-keyed adapter with
@@ -533,20 +550,43 @@ export class TranscriptsResolver extends Context.Service<TranscriptsResolver, {
   readonly list:   (f: ConversationFilter)    => Effect.Effect<ReadonlyArray<Transcript>>
   readonly stats:  ()                         => Effect.Effect<{ count: number; managed: number }>
   readonly search: (query: string)            => Effect.Effect<ReadonlyArray<Transcript>>  // FTS5
-  // ── cache-maintenance (rebuild the index from JSONL; NEVER writes a JSONL) ──
-  readonly rebuild: (dirs?: ReadonlyArray<string>) => Effect.Effect<{ scanned: number }>   // the scan
-  readonly enrich:  (ids?: ReadonlyArray<string>)  => Effect.Effect<{ enriched: number }>  // opt-in, LLM $
-  readonly embed:   (ids?: ReadonlyArray<string>)  => Effect.Effect<{ embedded: number }>  // opt-in, $
+  // NOTE: scan/enrich/embed are WRITES — they live on TranscriptsWriter (§2.3.1),
+  // not here. The resolver reads the index; it never mutates it.
 }>()("overdeck/TranscriptsResolver") {}
 ```
 
-> **Why no `TranscriptWriter`.** There is no durable source for the index to
-> mirror to (CONVENTIONS §5 rule 2: pure-cache domains have no source-first step),
-> and — critically — there must be **no** method anywhere that writes a backing
-> file. `rebuild`/`enrich`/`embed` are cache-maintenance on the `transcripts`
-> table; they read JSONL and write only the index. Folding them into the resolver
-> (rather than a writer) keeps the "Transcripts never writes a sacred file"
-> invariant a property of the type surface, not a convention.
+## 2.3.1 `TranscriptsWriter` — the shared cache-maintenance write door (`Context.Service`)
+
+The mutator of the `transcripts` index. The index is 100% cache with no durable
+source, so per CONVENTIONS §5 rule 2 there is **no source-first step 1** — the
+cache write is the whole write. But the two-door rule (CONVENTIONS §0) still
+requires the mutator be a **separate service** from the resolver: a write must not
+be reachable through the read door. `scan` rebuilds rows from JSONL, `enrich`
+appends LLM summaries/tags, `embed` writes embeddings — all real index writes, and
+all opt-in. None writes a backing/sacred file; they read JSONL and write only the
+index (and its FTS/embedding sidecars).
+
+```ts
+export class TranscriptsWriter extends Context.Service<TranscriptsWriter, {
+  // POST …/scan + pan conversations scan + pan.scanConversations — rebuild the
+  // index from JSONL. `rebuild` is kept as an alias for callers that named it so.
+  readonly scan:    (dirs?: ReadonlyArray<string>) => Effect.Effect<{ scanned: number }>
+  readonly rebuild: (dirs?: ReadonlyArray<string>) => Effect.Effect<{ scanned: number }>   // alias of scan
+  // POST …/enrich (+ /:id/enrich) — opt-in LLM summaries/tags (costs $)
+  readonly enrich:  (ids?: ReadonlyArray<string>)  => Effect.Effect<{ enriched: number }>
+  // POST …/embed — opt-in embeddings for semantic search (costs $)
+  readonly embed:   (ids?: ReadonlyArray<string>)  => Effect.Effect<{ embedded: number }>
+}>()("overdeck/TranscriptsWriter") {}
+```
+
+> **Why a writer, not "no writer".** The earlier draft folded these onto the
+> resolver, reasoning "pure-cache domain ⇒ no writer". That misreads CONVENTIONS
+> §5 rule 2, which removes only the source-first **step 1** for pure-cache domains
+> — it does not collapse the two doors into one. The "Transcripts never writes a
+> sacred file" invariant is preserved by `TranscriptsWriter` touching only the
+> index, exactly as the resolver reads only the index/files. Controllers that scan
+> /enrich/embed take `TranscriptsWriter` in their `R`; read controllers take
+> `TranscriptsResolver`.
 
 ## 2.4 `ConversationWriter` — the write door (`Context.Service`)
 
@@ -840,7 +880,7 @@ level.
 | `ConversationsResolver.getHandoffDoc` | §1A `GET /api/conversations/:name/handoff-doc` |
 | `TranscriptsResolver.parse` / `resolveFiles` / `serialize` / `watch` | §1A `/messages`, `/message-locator`; §1C `jsonl`, `format`; §1D `subscribeConversationMessages` |
 | `TranscriptsResolver.list`/`get`/`stats`/`search` | §1B + §1C + §1D discovered-sessions reads |
-| `TranscriptsResolver.rebuild`/`enrich`/`embed` | §1B scan/enrich/embed; §1C; §1D `scanConversations`/`enrichSessions`/`embedSessions` |
+| `TranscriptsWriter.scan` (alias `rebuild`)/`enrich`/`embed` | §1B scan/enrich/embed; §1C; §1D `scanConversations`/`enrichSessions`/`embedSessions` |
 | `ConversationWriter.create` | §1A `POST /api/conversations` |
 | `ConversationWriter.archive` (+ DELETE alias) | §1A `POST …/archive`, `DELETE …/:name` |
 | `ConversationWriter.unarchive` | §1A `POST …/unarchive`; §1C `pan unarchive-conversation` |
