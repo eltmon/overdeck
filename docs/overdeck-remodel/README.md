@@ -31,3 +31,4 @@ only what we genuinely **NEED**.
 | [`investigations/review-state-audit.md`](investigations/review-state-audit.md) | Of all the review/verification/merge state fields, which do we actually NEED? | in progress |
 | [`investigations/pipeline-transitions.md`](investigations/pipeline-transitions.md) | What are the canonical pipeline stages, and every way an agent moves between them? | done |
 | [`investigations/agents-state-audit.md`](investigations/agents-state-audit.md) | Of all the agent runtime fields (table + `state.json`), which do we actually NEED? Does `state.json` survive? | in progress |
+| [`investigations/orchestration-config-audit.md`](investigations/orchestration-config-audit.md) | Of the orchestration (merge/deacon/flywheel) + projects/config tables, which do we NEED? SOURCE-OF-TRUTH vs CACHE vs DEAD? One domain or several? | done |

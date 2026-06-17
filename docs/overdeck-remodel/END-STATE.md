@@ -46,10 +46,10 @@ Everything else in the DB is **cache** (rebuildable) or **dead** (deleted).
 | Review/merge state | 49 fields (36 "kept") | **~5–8 durable verdict** fields on the issue; the rest → Orchestration runtime or deleted |
 | Agent state | 44-col table **+ `state.json` plane (48 files)** | **18 fields**, no `state.json` |
 | `ready_for_merge` + repair sweeps | a stored column + 2 boot-time repair sweeps | **derived**, sweeps deleted |
-| ⏳ Conversations/Transcripts | 2 overlapping entities | (audit pending) |
-| ⏳ Cost | 396k rows + scattered rollups | (audit pending) |
-| ⏳ Observability | 622k unbounded `events` | (audit pending) |
-| ⏳ Orchestration/Config | ~13 tables (many empty) | (audit pending) |
+| Conversations/Transcripts | 30-col table + 9 satellite tables | **14 durable fields + favorites**; transcript subsystem **100% cache**; cost stored 3× → 1× |
+| Cost | 396k rows, **4 cost stores** (3 redundant), 1.4 GB | 14/20 cols; **one resolver**; 3 stores deleted; ~90-day retention |
+| Observability | 624k unbounded `events`; 2 modules for `health_events` | **infra, not a domain** — thin EventBus; tiered retention; `health_events` → Agents |
+| Orchestration/Config | 16 tables (6 dead) | **6 tables deleted**; Orchestration → **Merge + Control/Settings**; Config = `projects.yaml` (file) |
 
 ---
 
@@ -98,21 +98,29 @@ audits and are flagged ⏳ OPEN.
 | 1 | **Issues** | `IssuesResolver` | `IssueWriter` (`advance`, `hold`) | GitHub + `.pan/records` | issue/verdict cache |
 | 2 | **Agents** | `AgentsResolver` | `AgentWriter` | tmux + `.pan/records` | agent cache |
 | 3 | **Conversations** | `ConversationsResolver` | `ConversationWriter` | `.pan/records` (metadata) + JSONL | conversation cache |
-| 4 | **Transcripts** ⏳ | `TranscriptsResolver` | (index writer) | JSONL | transcript index/FTS |
-| 5 | **Cost** | `CostResolver` | `CostWriter` (ingest) | JSONL usage (+ API billing?) | cost events |
-| 6 | **Projects/Config** | `ConfigResolver` | `ConfigWriter` | `projects.yaml` + config files | settings cache |
-| 7 | **Observability** ⏳ | `EventsResolver`? | event emitter | derived / ephemeral | events, health |
-| 8 | **Orchestration** ⏳ | `OrchestrationResolver` | control commands | DB flags + GitHub | merge-train, queue |
+| 4 | **Cost** | `CostResolver` | `CostWriter` (ingest) | JSONL usage (+ API billing?) | cost events |
+| 5 | **Merge** | `MergeResolver` (`merge-set.ts`) | `MergeWriter` | GitHub PR state + `projects.yaml` | `merge_sets`, `merge_queue`, `pending_auto_merges`, `uat_generations` |
+| 6 | **Control/Settings** | `SettingsResolver` (`app-settings.ts`) | `SettingsWriter` | DB flags (reset-at-cutover) | `app_settings` + per-issue policy (`deaconIgnored`, `autoMerge`) |
 
-**Open boundary questions (audits resolving):**
-- **(4) Transcript** — standalone domain with its own resolver, or an internal
-  index/service shared by Issues-Agents-Conversations? *Conversations+Transcripts
-  audit decides.*
-- **(7) Observability** — a real domain (queryable resolver) or pure infra (an
-  event bus + read-model, no domain surface)? Hinges on whether `events` is
-  event-sourced truth or disposable pub/sub. *Observability audit decides.*
-- **(8) Orchestration** — one domain or several (merge-train / deacon-control /
-  flywheel)? *Orchestration+Config audit decides.*
+**File-backed resolver** (a domain with no DB cache): **Config** — `projects.yaml`
+is the source of truth (`loadProjectsConfig`, mtime-cached); survives any DB wipe,
+no table, no DB writer.
+
+**Not domains** (no resolver, no pane — internal services / infra):
+
+| Piece | What it is | Backing |
+|---|---|---|
+| **Transcripts** | shared internal index — where Conversation (`claudeSessionId`) + Agent (`sessionId`) converge to compute derived facts once per JSONL | `discovered_sessions` + FTS (100% cache) |
+| **Observability** | a thin **EventBus** (live-stream transport) + a health side-log | `events` (4 cols), `health_events` → folds into Agents |
+| **Memory** *(candidate)* | persistent knowledge / checkpoints — surfaced by audit, not in the original eight | `transcript_checkpoints`, `src/lib/memory/*` |
+
+**Boundary questions — all three resolved:**
+- **(4) Transcript → service, not a domain.** 100% cache, rebuilt from the JSONL scan.
+- **(7) Observability → infra, not a domain.** `events` is disposable pub/sub (4 proofs); a thin EventBus.
+- **Orchestration → TWO domains, not one or three.** Merge (cache; `merge-set.ts` is already one-resolver/one-writer) + Control/Settings (`app_settings` flags). Deacon and flywheel are NOT separate data domains — they persist only as flags.
+- **(NEW) Memory — needs a decision:** an Overdeck domain, or out of scope? *Flag for the operator.*
+
+**Net: 8 → 6 DB-cache domains + Config (file-backed).**
 
 Cross-cutting reminder, per the tenet: **"state" is not a domain.** Every entity
 *has* a status; there is no `/api/state` and no state resolver.
@@ -239,49 +247,189 @@ the Orchestration section)*.
 
 ---
 
-## 5. Domain: Conversations  ⏳ (audit in flight)
+## 5. Domain: Conversations  ✅ (audited)
 
-Entity = a thin durable metadata record (name/title, archive, fork/handoff
-lineage, favorites, issue/cwd binding) + a **Transcript** (derived). The
-durable part is the only irreplaceable DB data (PAN-1937 export target). Open:
-does conversation metadata become a git `.pan/records`-style durable artifact
-(keeping the DB purely disposable), or stay the one DB-as-truth exception?
-*Conversations+Transcripts audit fills this.*
+Evidence: [`investigations/conversations-transcripts-audit.md`](investigations/conversations-transcripts-audit.md).
+`conversations` is **30 cols, not 35** — 5 fields the brief listed actually live
+on `discovered_sessions` and only surface via a LEFT JOIN. Entity = a thin
+durable metadata record + a Transcript (derived, §6). The durable part is the
+**only** irreplaceable DB data — the exact PAN-1937 export target.
 
-## 6. Domain: Transcripts  ⏳ (audit in flight)
+### 5.1 Entity — `Conversation`
 
-The shared, JSONL-derived substrate under Conversations *and* Agents
-(`discovered_sessions` is already a universal transcript index). Open: standalone
-domain vs internal index/service. *Audit decides.*
+| Group | Fields | Note |
+|---|---|---|
+| **Durable / EXPORT (14)** | `name`, `cwd`, `issueId`, `createdAt`, **`claudeSessionId`**, `title` (manual only), `titleSource`, `model`, `effort`, `harness`, `archivedAt`, + lineage edges `handoffDocPath`, `handoffTargetConvId`, `clearedToConvId` | must survive a wipe. **`claudeSessionId` is the single most important field** — the conversation↔transcript link is one-directional (the JSONL never names the conversation back), so it is **unreconstructable** after a wipe |
+| **+ `favorites` table** | operator stars, keyed by conversation `name` | the other half of the irreplaceable set |
+| **Derived-cache (DROP)** | `tmuxSession`, `status`, `endedAt`, `lastAttachedAt`, `totalCost`, `totalTokens`, `titleSeed`, all `fork*` (provisioning/recovery is transient), `deliveryMethod`, `spawnError`, `forkFallbackReason` | rebuilds from JSONL / tmux / Cost. `messageCount`/`models`/`tokens` aren't even stored here today (JOINed from `discovered_sessions`) |
+| **Dead (4)** | per audit | delete |
 
-## 7. Domain: Cost  ⏳ (audit in flight)
+### 5.2 The durable-home call
 
-Likely pure cache rebuildable from JSONL usage; rollups become
-derived-on-read, not stored; must fix the pi/kimi capture gap (PAN-1935);
-consolidate ~5 read endpoints into one resolver. *Cost audit fills this.*
+Only ~14 fields + `favorites` are irreplaceable — small enough that the clean
+move is to make them a **git `.pan/records`-style durable artifact** (mirroring
+the Issue record), so the DB stays purely disposable and the PAN-1937 export
+becomes "write the record," not "preserve a special table." Alternative: keep
+Conversations as the one DB-as-truth exception. *Recommend the git-record option;
+operator's call.*
 
-## 8. Domain: Projects/Config  ⏳ (audit in flight)
+### 5.3 Duplication to delete
 
-Source of truth is `projects.yaml` + config files; `app_settings` is a small
-cache. *Orchestration+Config audit fills this.*
+**Cost is stored 3×** — `conversations.total_cost`, `discovered_sessions.
+estimated_cost`, and `SUM(cost_events)` (the code already cross-checks them via
+`validateEstimatedCost`). Delete the two conversation copies; the Cost domain
+derives it once.
 
-## 9. Domain: Observability  ⏳ (audit in flight)
+### 5.4 Controller — `ConversationsApi` (`HttpApiGroup`)
 
-Hinges on whether `events` is event-sourced truth or disposable pub/sub. If
-pub/sub, this is infra (event bus + read-model), not a domain. *Observability
-audit decides.*
+```ts
+‹fill from ARCHITECTURE-CONVENTIONS.md›
+```
 
-## 10. Domain: Orchestration  ⏳ (audit in flight)
+## 6. Transcripts — a shared service, **not a domain**  ✅ (resolved)
 
-The control plane: merge-train/queue, deacon, flywheel — plus the review-run
-runtime and per-issue policy flags (`deacon_ignored`, `auto_merge`) that the
-god-tables were squatting. Open: one domain or several; many candidate tables
-are empty (possibly dead features to delete). *Orchestration+Config audit fills
-this.*
+The Transcript subsystem (`discovered_sessions` + `_files`/`_tools`/`_tags` +
+`sessions_fts` + `session_embeddings`) is **100% disposable cache**, rebuilt
+entirely by the JSONL scan. It is **not** a navigable domain — no resolver, no
+pane. It is the internal index where **Conversation** (by `claudeSessionId`) and
+**Agent** (by `agents.sessionId`) converge to compute derived facts (counts,
+models, tokens) **once per JSONL**. That single convergence point is what lets us
+delete the duplicated derived fields elsewhere.
+
+- **Two live search systems** exist — session-level (`sessions_fts` +
+  `session_embeddings`) vs a separate chunk-level `conversation-search/` with its
+  **own** `~/.panopticon/conversations/embeddings.db`. Prime consolidation
+  target (the chunk store is out of scope of the in-DB tables — flagged).
+- **Enrichment** (`summary`, `tags`, `enrichment_level`) is a search nicety, not
+  load-bearing — no pipeline/deacon gate reads it. Regenerable; costs API $.
+- **`transcript_checkpoints` does not belong here** — only `src/lib/memory/*`
+  reads it. It's the **Memory** candidate domain (see map). `processed_sessions`
+  + `transcript_checkpoints` are dedup guards, safe to wipe only with their
+  paired store.
+
+## 7. Domain: Cost  ✅ (audited)
+
+Evidence: [`investigations/cost-audit.md`](investigations/cost-audit.md). **14 of 20
+columns NEEDed** (5 are 0%-populated `tldr_*`/`caveman_variant` — delete). **Pure
+CACHE**, but rebuilt from a **union of three durable artifacts**, not one JSONL:
+`reconcile(~/.claude transcripts) ∪ replay(~/.panopticon/costs/events.jsonl) ∪
+import(per-project WALs)`, deduped on `request_id`.
+
+- **Four parallel cost stores today; three are redundant.** Keep the SQLite
+  GROUP-BYs behind one `CostResolver`; **delete** `aggregator.ts` `cache.json`,
+  `cost-monitor.ts` `cost-data.json` (writer `recordCostSync` has **zero callers**
+  — the cost-limit breaker is silently dead), the `/api/agents/:id/cost` re-parse,
+  and the `/api/specialists/:name/cost` hardcoded-zero stub.
+- **Keep `closeOut.usage`** — the durable per-issue total in the permanent record
+  (correctly a snapshot, not a live second source).
+- **Recompute `cost` from tokens on rebuild** — the stored USD has a confirmed
+  legacy bug (2025-12 values ~110× inflated, capped at exactly $50).
+- **pi/kimi gap (PAN-1935):** kimi *is* captured under Claude Code; the real gap
+  is harness-native pi/codex — both ingest paths are hardcoded to
+  `~/.claude/projects/`. The parsers (`pi-parser.ts`, `codex-parser.ts`) exist but
+  feed live display only. Fix: extend the one reconciler to sweep pi/codex dirs.
+- **Retention:** none today (no `DELETE FROM cost_events` exists). Bound to ~90
+  days in the DB (closed-issue rows are ephemera — `closeOut.usage` keeps the
+  total); `events.jsonl` + git WALs are the unbounded archive.
+
+Attribution keys: `issueId` (primary), `agentId`, `sessionId`, `model`+`provider`,
+`sessionType`. (Quality is lossy: 12.5% `UNKNOWN` issue; `request_id` NULL on 66%.)
+
+## 8. Domain: Config  ✅ (audited)
+
+Evidence: [`investigations/orchestration-config-audit.md`](investigations/orchestration-config-audit.md).
+**`projects.yaml` is the source of truth — a file, not the DB.** The resolver is
+`loadProjectsConfig` (mtime-cached); no DB table backs project config, so it
+survives any wipe untouched and there is no DB writer (edits are file edits).
+Runtime control flags are a *separate* concern — see Control/Settings (§10.2).
+
+## 9. Observability — **infra, not a domain**  ✅ (resolved)
+
+Evidence: [`investigations/observability-audit.md`](investigations/observability-audit.md).
+**`events` is a disposable pub/sub cache, NOT event-sourced** — four
+primary-source proofs (PAN-1920 rebuilds the read-model from the real sources,
+not the log; `replayEvents` only gap-fills between a snapshot and now; the log is
+routinely truncated and emits unpersisted events). It can start empty.
+
+- **`events` (4 cols — `sequence`, `type`, `timestamp`, `payload`): a thin
+  EventBus** for the dashboard's live stream. No resolver, no domain surface.
+  Retention today is **startup-only → unbounded between restarts**; make it
+  **periodic + tiered** (3 live-stream-only types are 79% of rows → retain hours;
+  lifecycle/review/cost types → an analytics floor).
+- **`health_events` (7 cols): fold into the Agent domain** as an optional
+  projection (drop `previous_state` — derivable from the adjacent row). Cleanup
+  has **never run** (zero callers); wire the 7-day purge into the periodic job.
+  Two modules manage this one table — delete the dead `cloister/database.ts`
+  duplicate.
+
+**⚠ The pipeline phase-duration metrics are the one non-disposable thing trapped
+in `events`** (see §11) — relocate them to the per-issue `closeOut` record before
+`events` can be aggressively bounded.
+
+## 10. Domains: Merge + Control/Settings  ✅ (audited)
+
+Evidence: [`investigations/orchestration-config-audit.md`](investigations/orchestration-config-audit.md).
+The old "Orchestration" splits into two; deacon and flywheel are **not** separate
+data domains (they persist only as flags).
+
+### 10.1 Merge
+`merge_sets` / `merge_set_repos` / `merge_queue` / `pending_auto_merges`
+(+ `uat_generations`, + `git_operations` as an op-log). **All CACHE** —
+`merge_sets` rebuilds structure from `projects.yaml` (`buildMergeSetForIssueSync`)
+and gate outcomes from forge PR state; the durable record mirrors only
+`artifactUrl`. `merge-set.ts` already satisfies one-resolver/one-writer.
+**`uat_generations` belongs here, not Issues** (its writer is the merge-train
+`uat-train.ts`).
+
+### 10.2 Control/Settings
+`app_settings` (the `deacon.*` + `flywheel.*` flags) plus the per-issue policy
+squatters `deaconIgnored` / `autoMerge` evicted from `review_status`. Single
+accessor `app-settings.ts` is already at target shape. **Caveat:** these flags
+are source-of-truth-in-DB that nothing rebuilds — *acceptable to reset at cutover*
+(see §11).
+
+### 10.3 The review-run runtime
+The cluster evicted from `agents`/`review_status` (run id, synthesis agent,
+output path, deadline, monitor-signaled, retry, sub-role + the retry
+counters/breakers) lands here as **ephemeral orchestration runtime** — pure
+cache, dies with the run. How much survives is a function of how simple we make
+the review engine.
 
 ---
 
-## 11. Cross-cutting conventions (→ `ARCHITECTURE-CONVENTIONS.md`)
+## 11. Cutover-critical findings
+
+### Source-of-truth hiding in the "disposable" cache
+The DB-is-pure-cache claim holds **only after** three items get a durable home or
+a conscious reset — they are the only things the audits found that don't rebuild:
+
+| Item | Trapped today in | Fix before cutover |
+|---|---|---|
+| **Conversation metadata** (14 fields + `favorites`) | `conversations` / `favorites` rows | export to a git `.pan/records` artifact (recommended) so it travels (PAN-1937) |
+| **Pipeline per-phase durations** (flywheel scorecard) | derived only `FROM events`; vanish on wipe | write final phase timings into the per-issue `closeOut` record (Issues) |
+| **Control flags** (`deacon.globally_paused`, `flywheel.active_run_id`) | `app_settings` — nothing rebuilds them | **acceptable to reset** at cutover (fresh DB → deacon unpaused, no active run) — but make it a conscious decision |
+
+Everything else is genuinely rebuildable or deletable.
+
+### Tables to delete outright
+Six dead tables (some must be removed from `schema.ts` or `overdeck.db` recreates them):
+`issue_state` (abandoned shadow-state prototype) · `api_cache`, `rate_limits`
+(**orphans** — the real tables live in a separate `~/.panopticon/cache.db`;
+delete from `schema.ts`) · `auto_merge` (table), `label_sync_audit`, `outbox`
+(legacy / phantom, zero refs). `flywheel_substrate_bugs` → drop unless flywheel
+success metrics are a NEED. Plus the structural deletions already booked:
+`state.json` (48 files), the 8 status axes, ~148 transition sites,
+`ready_for_merge` + its 2 repair sweeps, and 3 of 4 cost stores.
+
+### The Effect-stack risk to decide
+`effect/unstable/sql` ships the abstractions but **no SQLite driver**, and the
+only sqlite adapter (`@effect/sql-sqlite-bun`) is **Bun-only** — colliding with
+the hard **dashboard-is-Node-22-only** rule. Resolution: wrap the existing
+`node:sqlite` driver behind an Effect `SqlClient` interface (keeps Node-22),
+*or* port/find a node sqlite driver for `effect/unstable/sql`. **Operator
+decision before standardizing the cache layer.**
+
+## 12. Cross-cutting conventions (→ `ARCHITECTURE-CONVENTIONS.md`)
 
 - Entities are `@effect/schema`; IDs are branded; states are literal unions.
 - Every store access is a `Service` method returning an `Effect`; `Sql` is a
