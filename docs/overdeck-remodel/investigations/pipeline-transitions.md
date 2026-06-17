@@ -49,6 +49,27 @@ todo → planning → planned/proposed → working → in-review → testing
                            · deacon-ignored · cancelled
 ```
 
+### 1a-def. Spine stages — definition + entry/exit conditions
+
+The ten happy-path stages, each as the operator means them. "Entry/exit" name
+the *logical* condition; the physical writes that realize them are in §2.
+
+| Stage | One-line meaning | Entry condition | Exit condition |
+|---|---|---|---|
+| **todo** | Issue exists, no plan, no work | Issue opened / reset / wiped | Planning starts |
+| **planning** | Planning agent is producing a vBRIEF | `start-planning` spawns plan role (`IssueState=in_planning`) | Planning completes or aborts |
+| **planned/proposed** | Plan exists, awaiting start | `complete-planning` writes `plan.status=proposed` + beads | `pan start` (or auto-start) |
+| **working** | A work agent is implementing beads | `plan.status=running`, `IssueState=in_progress`, work agent running | Work agent signals done |
+| **in-review** | Code review role is judging the diff | `work.completed` event → review role dispatched (`reviewStatus=reviewing`) | Review verdict (approved / blocked) |
+| **testing** | Test role runs automated + UAT verification | `review.approved` event → test role (`testStatus=testing`) | Test verdict (passed / failed / skipped) |
+| **verifying/UAT** | Pre-merge verification gate / human UAT batch | `verificationStatus=running` or UAT assembled | Gate passes → ready-for-merge |
+| **merging** | Merge queue is landing the branch | `readyForMerge=true` + merge dispatched (`mergeStatus=queued/merging`) | Merge lands or fails |
+| **verifying-on-main** | Merged; awaiting post-merge verification | `postMergeLifecycle` sets `mergeStatus=merged`, `IssueState=verifying_on_main` | Close-out |
+| **closed** | Work complete, issue closed out | `pan close` / close-out: `plan.status=completed`, issue closed | (terminal; reopen re-enters at todo) |
+
+Side-states (paused/troubled/stuck/blocked/deacon-ignored/cancelled) are
+orthogonal toggles — see §1c.
+
 ### 1b. The axes that compose a stage
 
 | # | Axis (enum) | Values | Store | Writer of record | Source |
@@ -88,10 +109,12 @@ todo → planning → planned/proposed → working → in-review → testing
   cache*, not *logical stage transitions* — there is still **no single
   transition controller**. The closest thing, `transitionTo`, covers only
   axis 1/1b (tracker state) and never touches axes 2–7.
-- `status_history` (`schema.ts:272`, `type ∈ 'review'|'test'|'merge'`) logs
-  **only** review/test/merge sub-status. It does **not** capture `IssueState`
-  transitions, `plan.status`, agent lifecycle, or any side-flag. The audit
-  below is the **union** of all axes, not just `status_history` writers.
+- `status_history` (`schema.ts:272`) logs sub-status only. The schema comment
+  says `type ∈ 'review'|'test'|'merge'`, but the `StatusHistoryEntry` interface
+  (`review-status.ts:30`) is broader — `'review'|'test'|'merge'|'inspect'|'uat'`.
+  Either way it captures **none** of `IssueState` transitions, `plan.status`,
+  agent lifecycle, or side-flags. The audit below is the **union** of all axes,
+  not just `status_history` writers.
 - `docs/AGENT-STATE-PLANES.md` is accurate on *where* state lives (3 planes) but
   silent on *how many writers* mutate each plane. That count is the finding here.
 
@@ -155,10 +178,10 @@ and — critically — **emits reactive EV** (`review.approved` / `test.passed`,
 
 | From → To (sub-status) | Trigger (invoker) | Code location | Stores |
 |---|---|---|---|
-| review `pending→reviewing` | review-agent dispatch | `src/lib/cloister/review-agent.ts` (via setReviewStatus) | RS, REC, SH, EV |
+| review `pending→reviewing` | review-agent dispatch | `src/lib/cloister/review-agent.ts:417` | RS, REC, SH, EV |
 | review `reviewing→passed` | review verdict (approve) | `src/dashboard/server/routes/workspaces.ts:3494`; CLI `src/cli/commands/specialists/done.ts` | RS, REC, SH, **EV: review.approved** |
 | review `reviewing→failed/blocked` | review verdict (block) | `specialists.ts` done handler | RS, REC, SH |
-| test `pending→testing` | test dispatch | `src/lib/cloister/test-agent-queue.ts` | RS, REC, SH, EV |
+| test `pending→testing` | test dispatch | `src/lib/cloister/test-agent-queue.ts:90` | RS, REC, SH, EV |
 | test `testing→passed` | test verdict | `workspaces.ts:3939`; `specialists.ts:584`,`:981`; CLI `done.ts` | RS, REC, SH, **EV: test.passed** |
 | test `→skipped` | verification-gate skip | `src/lib/cloister/test-status-green-ci-reconciler.ts` | RS, REC |
 | merge `pending→queued/merging` | merge queue / approve | `workspaces.ts` merge route ~`:5676`; `done.ts:563` | RS, REC, SH |
@@ -223,7 +246,7 @@ Reactive event emission lives in `setReviewStatusSync`
 | From → To | Trigger | Code location | Stores |
 |---|---|---|---|
 | any → todo (deep-wipe) | `deep-wipe` route | `src/dashboard/server/routes/issues.ts:2345` | GH, RS(del), AG, SJ, SPEC(ws), branches |
-| any → todo (wipe CLI) | `pan wipe` | `src/cli/commands/` wipe | GH, RS, AG, SJ |
+| any → todo (wipe CLI) | `pan wipe` | `src/cli/commands/wipe.ts` | GH, RS, AG, SJ |
 | closed → reopened | `pan reopen` / route | `src/lib/reopen.ts`; `issues.ts` reopen | GH, RS, EV |
 | running → stopped (kill) | `pan kill` | `src/cli/commands/` kill | AG, SJ, EV (workspace preserved) |
 | → closed (close-out) | `pan close` / close-out route | `issues.ts:2556`; `src/lib/lifecycle/close-issue.ts` | GH, RS(clear), SPEC(completed), EV |
@@ -246,11 +269,15 @@ called from many places, the helper is one *function* but N *trigger sites*.
 | Side-flag (stuck/troubled/paused/ignored) writers | **~52** | `rg 'setStuck\|markTroubled\|paused: true\|deacon_ignored'` prod |
 | `plan.status` writers | **1 function** (`updateSpecStatus`), ~4 call sites | §2d |
 | Reactive event→role dispatch edges | **9** | §2e |
-| **Distinct trigger sites (union, approx.)** | **≈ 200+** | sum of the above, de-duped by file:line |
-| **Distinct logical (from→to) pairs** | **≈ 18** | §5 below |
+| **Distinct trigger sites (real dedup)** | **≈ 148** | combined grep of all transition verbs (`setReviewStatusSync`, `transitionTo`, `transitionIssueTo*`, label ops, `updateSpecStatus`, reactive emits, stuck/ignored writers), tests + defs excluded, piped to `awk -F: '{print $1":"$2}' \| sort -u` |
+| **Distinct (from→to) pairs** | **≈ 38** | unique from→to strings across all axes in §2 (sub-status granularity) |
+| **Minimal legal moves** | **≈ 15** | §5 — 9 spine + 6 failure/terminal edges |
 
-The gap between **~200 trigger sites** and **~18 logical moves** is the sprawl
-the remodel deletes.
+The descending tiers — **~148 trigger sites → ~38 distinct pairs → ~15 legal
+moves** — are the sprawl story. 148 places fire 38 logically-distinct moves that
+*should* be 15. The two collapses (148→38 by deduping redundant call sites,
+38→15 by unifying sub-status axes into stage advances) are what the remodel
+deletes.
 
 ---
 
@@ -295,9 +322,11 @@ the remodel deletes.
 
 ## 5. Collapsed logical moves — the minimal set (PART B §3)
 
-All ~200 trigger sites collapse to **~18 logical (from→to) moves**, which
-further collapse to **one linear advance chain + a handful of failure/terminal
-edges**:
+The ~148 trigger sites express **~38 distinct (from→to) pairs** (§3), which
+collapse to **~15 logical moves** — one linear advance chain + a handful of
+failure/terminal edges. The 38→15 collapse merges the per-axis sub-status pairs
+(review/test/merge/verify/inspect/uat each `pending→active→passed`) into the
+single stage advance they collectively signal:
 
 ### Forward advances (the spine)
 1. `todo → planning` (start planning)
