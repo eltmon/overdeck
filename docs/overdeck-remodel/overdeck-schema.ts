@@ -20,6 +20,7 @@ import {
   sqliteTable, text, integer, real, primaryKey, index, uniqueIndex,
   type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 /* ───────────────────────────── ISSUES ─────────────────────────────
  * Mirror of the durable .pan/records pipeline block. The single `stage`
@@ -77,7 +78,7 @@ export const agents = sqliteTable("agents", {
  * (previous_state dropped — derivable from the adjacent ordered row.) */
 export const healthEvents = sqliteTable("health_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  agentId: text("agent_id").notNull().references(() => agents.id),
+  agentId: text("agent_id"),                                     // soft pointer — no FK; rows outlive their prunable agent
   timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
   state: text("state").notNull(),
   source: text("source"),
@@ -123,11 +124,15 @@ export const conversationFiles = sqliteTable("conversation_files", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 }, (t) => [index("conv_files_conv_idx").on(t.conversationId)]);
 
-/* favorites — operator stars, the other half of the irreplaceable set. */
+/* favorites — operator stars, the other half of the irreplaceable set.
+ * Polymorphic (live schema.ts:532-538): type='conversation'|'project', itemId =
+ * conversation NAME (the name-keyed export contract) or project path. No FK —
+ * itemId is a portable name/path, not a row id. UNIQUE(type,itemId) → composite PK. */
 export const favorites = sqliteTable("favorites", {
-  conversationId: text("conversation_id").notNull().references(() => conversations.id),
+  type: text("type").notNull(),                                  // 'conversation' | 'project'
+  itemId: text("item_id").notNull(),                             // conversation name or project path
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-}, (t) => [primaryKey({ columns: [t.conversationId] })]);
+}, (t) => [primaryKey({ columns: [t.type, t.itemId] })]);
 
 /* ────────────────────────── TRANSCRIPTS ────────────────────────────
  * Shared internal index over the sacred session files — 100% cache, rebuilt by
@@ -166,8 +171,8 @@ export const transcripts = sqliteTable("transcripts", {
 export const costEvents = sqliteTable("cost_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   ts: integer("ts", { mode: "timestamp" }).notNull(),
-  issueId: text("issue_id").references(() => issues.id),          // nullable (12.5% UNKNOWN today)
-  agentId: text("agent_id").references(() => agents.id),          // nullable
+  issueId: text("issue_id"),                                     // soft pointer — no FK; nullable (12.5% UNKNOWN; rows outlive purged issues)
+  agentId: text("agent_id"),                                     // soft pointer — no FK; nullable (rows outlive prunable agents)
   sessionId: text("session_id"),
   sessionType: text("session_type"),
   provider: text("provider"),
@@ -182,13 +187,17 @@ export const costEvents = sqliteTable("cost_events", {
 }, (t) => [
   index("cost_issue_idx").on(t.issueId),
   index("cost_ts_idx").on(t.ts),
+  // the entire idempotency guarantee for re-import — without it reconciler
+  // re-runs double-count (cost-audit.md; live schema.ts:197-198).
+  uniqueIndex("cost_request_id_idx").on(t.requestId).where(sql`request_id IS NOT NULL`),
 ]);
 
 /* ───────────────────────────── MERGE ───────────────────────────────
  * All CACHE — structure rebuilds from projects.yaml, gate outcomes from forge
  * PR state. The merge-train (uat-train.ts) owns these, NOT Issues. Columns
- * verified against the live schema; the UAT members/held-out/resolutions JSON
- * arrays are normalized into a real join table (the "use FKs properly" fix).
+ * verified against the live schema; the UAT members/held-out JSON arrays are
+ * normalized into uat_generation_members and the cardinality-distinct
+ * resolutions into uat_generation_resolutions (the "use FKs properly" fix).
  */
 export const mergeSets = sqliteTable("merge_sets", {
   issueId: text("issue_id").primaryKey().references(() => issues.id),  // one merge set per issue
@@ -243,7 +252,12 @@ export const pendingAutoMerges = sqliteTable("pending_auto_merges", {
   scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
   mergedAt: integer("merged_at", { mode: "timestamp" }),
   failureReason: text("failure_reason"),
-}, (t) => [index("pending_auto_merges_issue_idx").on(t.issueId)]);
+}, (t) => [
+  index("pending_auto_merges_issue_idx").on(t.issueId),
+  // one active auto-merge per issue — prevents scheduling two concurrent merges
+  // for the same issue (live schema.ts:574-575).
+  uniqueIndex("pending_auto_merges_active_issue_idx").on(t.issueId).where(sql`status IN ('pending','merging')`),
+]);
 
 /* an assembled UAT batch branch `uat/<codename>-<mmdd>` — the batch NAME is the
  * identity (PK). */
@@ -259,14 +273,37 @@ export const uatGenerations = sqliteTable("uat_generations", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 }, (t) => [index("uat_status_idx").on(t.status)]);
 
-/* the issues in a batch — replaces the members/held_out/resolutions JSON arrays
- * with real FKs. */
+/* the issues in a batch — replaces the members/held_out JSON arrays with real
+ * columns. Member attrs trace to UatGenerationMember + UatGenerationHeldOut
+ * (uat-generations-db.ts:34-56). `role` discriminates member vs held_out: member
+ * rows carry title/branch/headSha/mergeOrder/pr/prUrl; held_out rows carry reason
+ * (+ optional branch/headSha). `resolutions` is a SEPARATE entity (spans multiple
+ * issues) → uatGenerationResolutions below. */
 export const uatGenerationMembers = sqliteTable("uat_generation_members", {
   uatName: text("uat_name").notNull().references(() => uatGenerations.name),
   issueId: text("issue_id").notNull().references(() => issues.id),
   role: text("role").notNull().default("member"),                  // member | held_out
-  resolution: text("resolution", { mode: "json" }),                // conflict resolution vs already-merged members
+  title: text("title"),                                            // member only (not derivable; held_out lacks it)
+  branch: text("branch"),                                          // member: required · held_out: optional
+  headSha: text("head_sha"),                                       // staleness key (member: required · held_out: optional)
+  mergeOrder: integer("merge_order"),                              // member only — 1-based merge position
+  pr: integer("pr"),                                               // member only — optional PR number
+  prUrl: text("pr_url"),                                           // member only — optional
+  reason: text("reason"),                                          // held_out only — human-readable exclusion reason
 }, (t) => [primaryKey({ columns: [t.uatName, t.issueId] })]);
+
+/* cross-feature conflicts resolved on the batch branch (UatGenerationResolution,
+ * uat-generations-db.ts:58-64). A resolution spans MULTIPLE issues, so it is its
+ * own entity keyed by an autoincrement id (not a per-member attribute). The
+ * member being merged + the already-merged members it collided with live in the
+ * issueIds JSON array. */
+export const uatGenerationResolutions = sqliteTable("uat_generation_resolutions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  uatName: text("uat_name").notNull().references(() => uatGenerations.name),
+  issueIds: text("issue_ids", { mode: "json" }).notNull(),         // the colliding issues (>1)
+  files: text("files", { mode: "json" }).notNull(),                // resolved files
+  commitSha: text("commit_sha").notNull(),                         // the resolution commit
+}, (t) => [index("uat_resolutions_uat_idx").on(t.uatName)]);
 
 /* ──────────────────────── CONTROL / SETTINGS ───────────────────────
  * app_settings = deacon.*/flywheel.* runtime flags (source-of-truth-in-DB,
@@ -286,6 +323,40 @@ export const issuePolicy = sqliteTable("issue_policy", {
   updatedAt: integer("updated_at", { mode: "timestamp" }),
 });
 
+/* ─────────────────────────── ORCHESTRATION ─────────────────────────
+ * EPHEMERAL REVIEW-RUN RUNTIME — pure cache, no durable value. This is the home
+ * for the MOVE→Orchestration columns that the review monitor / deacon recovery
+ * loop branch-reads during a LIVE review cycle, but which are NOT part of the
+ * durable verdict (that lives in `issues`). Keyed by issueId (one row per issue
+ * = the current cycle): the review-run pointers (from the live `agents` table,
+ * schema.ts:466-472) and the ephemeral recovery counters (from the live
+ * `review_status` table, schema.ts:224/231/232/238/239/245/247/249/251/253).
+ * A convoy has multiple per-agent sub-role reviewers; this row holds only the
+ * current cycle's values — it is NOT convoy history. Rebuilds on each cycle.
+ */
+export const reviewRuns = sqliteTable("review_runs", {
+  issueId: text("issue_id").primaryKey().references(() => issues.id),
+  // review-run pointers (live agents:466-472)
+  reviewRunId: text("review_run_id"),                            // agents.review_run_id
+  reviewSubRole: text("review_sub_role"),                        // agents.review_sub_role
+  reviewSynthesisAgentId: text("review_synthesis_agent_id"),     // agents.review_synthesis_agent_id — soft pointer, no FK
+  reviewOutputPath: text("review_output_path"),                  // agents.review_output_path
+  reviewDeadlineAt: integer("review_deadline_at", { mode: "timestamp" }), // agents.review_deadline_at
+  reviewMonitorSignaled: text("review_monitor_signaled"),        // agents.review_monitor_signaled — TEXT in live, not a flag
+  reviewRetryAttempt: integer("review_retry_attempt"),           // agents.review_retry_attempt
+  // ephemeral recovery counters (live review_status)
+  verificationCycleCount: integer("verification_cycle_count").default(0), // review_status:224
+  autoRequeueCount: integer("auto_requeue_count").default(0),    // review_status:231
+  mergeRetryCount: integer("merge_retry_count").default(0),      // review_status:232
+  testRetryCount: integer("test_retry_count").default(0),        // review_status:249
+  reviewRetryCount: integer("review_retry_count").default(0),    // review_status:251
+  stuck: integer("stuck", { mode: "boolean" }).notNull().default(false), // review_status:238
+  stuckReason: text("stuck_reason"),                             // review_status:239
+  reviewSpawnedAt: integer("review_spawned_at", { mode: "timestamp" }), // review_status:245
+  conflictResolutionDispatchedAt: integer("conflict_resolution_dispatched_at", { mode: "timestamp" }), // review_status:247
+  recoveryStartedAt: integer("recovery_started_at", { mode: "timestamp" }), // review_status:253
+});
+
 /* ───────────────────────────── MEMORY ──────────────────────────────
  * Memory's real records are FILES on disk (~/.panopticon/memory/...). Its only
  * panopticon.db table is this pure-cache dedup cursor + claim-lease. 11 NEED
@@ -296,10 +367,10 @@ export const transcriptCheckpoints = sqliteTable("transcript_checkpoints", {
   sessionId: text("session_id").primaryKey(),
   transcriptPath: text("transcript_path").notNull(),
   lastOffset: integer("last_offset").notNull().default(0),       // dedup cursor
-  claimOwner: text("claim_owner"),
-  claimLeaseUntil: integer("claim_lease_until", { mode: "timestamp" }),
-  claimToken: text("claim_token"),
-  claimedAt: integer("claimed_at", { mode: "timestamp" }),
+  claimOwner: text("claim_owner"),                               // lease holder (checkpoints.ts:104,132)
+  claimFrom: integer("claim_from"),                              // leased byte range start (checkpoints.ts:225)
+  claimTo: integer("claim_to"),                                  // leased byte range end (checkpoints.ts:226)
+  claimExpiresAt: integer("claim_expires_at", { mode: "timestamp" }), // 60s lease-steal predicate (checkpoints.ts:104)
   midTurnCountInCurrentTurn: integer("mid_turn_count_in_current_turn").default(0),
   lastMidTurnAt: integer("last_mid_turn_at", { mode: "timestamp" }),
   projectId: text("project_id"),
