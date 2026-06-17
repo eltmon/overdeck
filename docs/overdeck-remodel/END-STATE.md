@@ -1,12 +1,15 @@
 # Overdeck — End-State Architecture (DRAFT)
 
-> **Status:** working draft. The architecture and the two fully-audited domains
-> (Issues, Agents) are firm. Sections marked ⏳ are being filled from in-flight
-> current-state audits; Effect code blocks are marked `‹fill from
-> ARCHITECTURE-CONVENTIONS.md›` until the Effect v4-beta idiom audit lands.
-> Companion docs: [`ARCHITECTURE-CONVENTIONS.md`](ARCHITECTURE-CONVENTIONS.md)
-> (the Effect house style) and [`investigations/`](investigations/) (the
-> evidence base).
+> **Status:** complete first draft for review. All six current-state audits are
+> folded in and the Effect v4-beta idioms are verified. What remain are *open
+> decisions* (not gaps), called out inline and summarized in §11. Companion docs:
+> [`ARCHITECTURE-CONVENTIONS.md`](ARCHITECTURE-CONVENTIONS.md) (the Effect house
+> style) and [`investigations/`](investigations/) (the evidence base).
+>
+> **Open decisions for the operator:** (1) which gates the pipeline keeps
+> (review / test / verification / inspect / UAT — §3.4); (2) is **Memory** an
+> Overdeck domain or out of scope (§2); (3) the Node-22 vs `@effect/sql` SQLite
+> driver (§11); (4) conversation metadata → git record vs DB-as-truth (§5.2).
 
 ## 0. The thesis
 
@@ -191,13 +194,13 @@ finalizing 3.2/3.3.*
 
 ### 3.5 Controller — `IssuesApi` (`HttpApiGroup`)
 
-```ts
-‹fill from ARCHITECTURE-CONVENTIONS.md — HttpApiGroup "issues":
-   GET  /issues                      → list (filter)            → Issue[]
-   GET  /issues/:id                  → get                      → Issue | IssueNotFound
-   POST /issues/:id/advance          → advance(to, reason)      → Issue | IllegalTransition
-   POST /issues/:id/hold             → hold(flag, on, reason)   → Issue ›
-```
+- `GET  /issues` → `list(filter)` → `Issue[]`
+- `GET  /issues/:id` → `get` → `Issue | IssueNotFound`
+- `POST /issues/:id/advance` → `advance(to, reason)` → `Issue | IllegalTransition`
+- `POST /issues/:id/hold` → `hold(flag, on, reason)` → `Issue`
+
+Full Effect form (entity, errors, resolver, writer, controller) is the worked
+example in [`ARCHITECTURE-CONVENTIONS.md`](ARCHITECTURE-CONVENTIONS.md) §2–§7.
 
 ---
 
@@ -241,9 +244,11 @@ the Orchestration section)*.
 
 ### 4.4 Controller — `AgentsApi` (`HttpApiGroup`)
 
-```ts
-‹fill from ARCHITECTURE-CONVENTIONS.md›
-```
+- `GET  /agents` → `list(filter)` → `Agent[]`
+- `GET  /agents/:id` → `get` → `Agent | AgentNotFound`
+- `POST /agents/:id/{stop|pause|unpause|resume}` → writer verb → `Agent`
+- `POST /agents/:id/{troubled|untroubled}` → writer verb → `Agent`
+- `GET  /agents/:id/health-history` → health projection → `HealthEvent[]`
 
 ---
 
@@ -282,9 +287,11 @@ derives it once.
 
 ### 5.4 Controller — `ConversationsApi` (`HttpApiGroup`)
 
-```ts
-‹fill from ARCHITECTURE-CONVENTIONS.md›
-```
+- `GET  /conversations` → `list` → `Conversation[]`
+- `GET  /conversations/:id` → `get` → `Conversation | ConversationNotFound`
+- `POST /conversations/:id/{archive|favorite|unfavorite}` → writer → `Conversation`
+- `POST /conversations/:id/handoff` → writer (lineage edge) → `Conversation`
+- transcript body served by the Transcript service (by `claudeSessionId`)
 
 ## 6. Transcripts — a shared service, **not a domain**  ✅ (resolved)
 
@@ -441,3 +448,43 @@ decision before standardizing the cache layer.**
 - The writer mirrors durable fields to the git record in the same boundary as
   the cache write — never a fire-and-forget mirror (the current silent-divergence
   bug).
+
+## 13. The cache schema — `overdeck.db` ERD
+
+The physical projection of the domains. **~14 cache tables, down from 35** — the
+6 dead tables deleted, the duplicate-entity tables collapsed. **Foreign keys are
+ENFORCED** (today: zero). Every table is a disposable cache mirror of a source.
+
+```
+issues(id PK)                                         ── mirror of .pan/records pipeline block
+  ├─< agents(id PK, issue_id →issues)
+  │      └─< health_events(id PK, agent_id →agents)   ── folded in from Observability
+  ├─< conversations(id PK, issue_id →issues, NULLable) ── mirror of .pan/records (conv metadata)
+  │      ├─< favorites(conversation_name →conversations)
+  │      └── handoff_target_conv_id / cleared_to_conv_id →conversations (self-edges)
+  ├─< cost_events(id PK, issue_id →issues?, agent_id →agents?)
+  └─< merge_sets(id PK, issue_id →issues)
+         ├─< merge_set_repos(merge_set_id →merge_sets)
+         └─< uat_generations(id PK, issue_id →issues)
+
+transcripts(session_id PK)                            ── = discovered_sessions; 100% cache from JSONL
+  ├── transcripts_fts (FTS5 satellite)
+  └── referenced by conversations.claude_session_id and agents.session_id
+
+merge_queue · pending_auto_merges                     ── Merge: sequential lock + cooldown
+app_settings(key PK, value)                           ── Control/Settings: deacon.*/flywheel.* + per-issue policy
+events(sequence PK, type, timestamp, payload)         ── Observability EventBus (tiered retention)
+```
+
+Per-table NEED columns are in each domain section (§3–§10). **Deleted from the
+schema** (or `overdeck.db` respawns them): `issue_state`, `api_cache`,
+`rate_limits`, `auto_merge`, `label_sync_audit`, `outbox`,
+`flywheel_substrate_bugs`, `status_history` (→ derivable from `events`),
+`session_embeddings` + enrichment (search niceties — optional), and the
+`discovered_session_*` satellites (collapse into `transcripts`).
+
+### Controllers not shown inline (same `HttpApiGroup` shape, conventions §7)
+- **Cost** — `GET /cost?by={issue|agent|model|project}` (one resolver replacing today's 5 endpoints).
+- **Merge** — `GET /merge/queue`, `POST /merge/{enqueue|next}`.
+- **Settings** — `GET/PUT /settings/:key`, `POST /issues/:id/{ignore|automerge}`.
+- **Config** — `GET /projects` (read-only, file-backed over `projects.yaml`).
