@@ -2802,6 +2802,16 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
+        // PAN-1928: model switching is allowed only for brand-new conversations
+        // that have not yet started a session. Once a session exists, switching
+        // would tear down the live session and destroy accumulated context.
+        if (conv.claudeSessionId) {
+          return jsonResponse(
+            { error: 'Model is locked once a conversation has started. Start a new conversation to use a different model.' },
+            { status: 400 },
+          );
+        }
+
         const model = typeof body['model'] === 'string' && body['model'].trim()
           ? body['model'].trim()
           : (conv.model ?? undefined);

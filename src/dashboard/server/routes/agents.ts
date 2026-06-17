@@ -3777,78 +3777,12 @@ const postAgentSwitchModelRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/switch-model',
   httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
-    const eventStore = yield* EventStoreService;
-
-    const { model: rawNewModel } = body as { model?: string; message?: string };
-    let newModel: string;
-    try {
-      newModel = requireModelOverrideSync(rawNewModel);
-    } catch (err) {
-      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
-    }
-
-    const agentState = yield* getAgentState(id);
-    if (!agentState) {
-      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
-    }
-
-    const previousModel = agentState.model ?? '';
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
-
-    // Stop running agent if alive
-    if (lifecycle.hasLiveTmuxSession) {
-      yield* stopAgent(id);
-      // PAN-1908: write-through projection — agents-row upsert + lifecycle event
-      // append in one SQLite transaction. stopAgent already saved state, but
-      // repeating the upsert here makes the event append atomic.
-      const stateAfterStop = yield* getAgentState(id);
-      if (stateAfterStop) {
-        yield* saveAgentStateAndEmitEventProgram(stateAfterStop, {
-          type: 'agent.stopped',
-          timestamp: new Date().toISOString(),
-          payload: { agentId: id, issueId: stateAfterStop.issueId || agentState.issueId },
-        });
-      }
-    }
-
-    const agentDir = getAgentDir(id);
-
-    // Clear session tracking files
-    yield* Effect.promise(() => rm(join(agentDir, 'session.id'), { force: true }));
-    yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true }));
-
-    // Clear claudeSessionId from runtime.json (preserve other fields)
-    const runtimeFile = join(agentDir, 'runtime.json');
-    if (existsSync(runtimeFile)) {
-      try {
-        const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'));
-        const runtime = JSON.parse(runtimeContent);
-        delete runtime.claudeSessionId;
-        yield* Effect.promise(() => writeFile(runtimeFile, JSON.stringify(runtime, null, 2)));
-      } catch { /* non-fatal */ }
-    }
-
-    // Kill zombie tmux session if exists
-    yield* killSession(id).pipe(Effect.catch(() => Effect.void));
-
-    // Update model in state.json
-    const stateFile = join(agentDir, 'state.json');
-    if (existsSync(stateFile)) {
-      try {
-        const stateContent = yield* Effect.promise(() => readFile(stateFile, 'utf-8'));
-        const state = JSON.parse(stateContent);
-        state.model = newModel;
-        yield* Effect.promise(() => writeFile(stateFile, JSON.stringify(state, null, 2)));
-      } catch { /* non-fatal */ }
-    }
-
-    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.model_switched', { previousModel, newModel }));
-    invalidateAgentsCache();
-
-    return jsonResponse({ success: true, agentId: id, previousModel, newModel });
+    // PAN-1928: pipeline agents must never switch model. Their model is fixed
+    // at spawn; switching tears down the live session and destroys context.
+    return jsonResponse(
+      { error: 'Model switching is not allowed for agents. Spawn a new agent to use a different model.' },
+      { status: 400 },
+    );
   })),
 );
 

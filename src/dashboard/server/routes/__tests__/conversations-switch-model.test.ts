@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -147,296 +147,72 @@ describe('POST /api/conversations/:name/switch-model', () => {
     rmSync(testHome, { recursive: true, force: true });
   });
 
-  it('does not append a compact boundary for a 206k-token same-harness switch that fits the inferred target window', async () => {
+  it('allows switching the model of a brand-new conversation before the first message', async () => {
     const cwd = join(testHome, 'workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
-    const sessionId = '206k-session';
-    const sessionFile = sessionFilePath(cwd, sessionId);
-    mkdirSync(join(sessionFile, '..'), { recursive: true });
-    writeFileSync(sessionFile, [
-      JSON.stringify({
-        type: 'user',
-        message: { role: 'user', content: [{ type: 'text', text: 'Keep all of this context' }] },
-      }),
-      JSON.stringify({
-        type: 'assistant',
-        timestamp: '2026-06-10T00:00:00.000Z',
-        message: {
-          role: 'assistant',
-          model: 'claude-opus-4-8',
-          content: [{ type: 'text', text: 'Still in context' }],
-          usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      }),
-    ].join('\n') + '\n');
-
+    const { createConversation, getConversationByName } = await import('../../../../lib/database/conversations-db.js');
     createConversation({
-      name: 'switch-regression',
-      tmuxSession: 'conv-switch-regression',
+      name: 'fresh-conversation',
+      tmuxSession: 'conv-fresh-conversation',
       cwd,
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       harness: 'claude-code',
-      claudeSessionId: sessionId,
     });
 
-    const response = await postSwitchModel('switch-regression', { model: 'claude-fable-5' });
+    const response = await postSwitchModel('fresh-conversation', { model: 'claude-fable-5' });
 
     expect(response.status).toBe(200);
     expect(decodeJsonResponse(response)).toMatchObject({
       model: 'claude-fable-5',
       harness: 'claude-code',
-      sessionAlive: true,
     });
-    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
-      'conv-switch-regression',
-      '/model claude-fable-5',
-      'conversation-switch-model',
-      'auto',
-    );
+    expect(getConversationByName('fresh-conversation')?.model).toBe('claude-fable-5');
     expect(killSessionMock).not.toHaveBeenCalled();
     expect(createSessionMock).not.toHaveBeenCalled();
-    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
   });
 
-  it('falls back to respawn when Tier 1 delivery fails', async () => {
-    deliverAgentMessageMock.mockRejectedValueOnce(new Error('MessageDeliveryFailed: socket missing'));
-    const cwd = join(testHome, 'fallback-workspace');
+  it('rejects switching when the conversation already has a session', async () => {
+    const cwd = join(testHome, 'workspace');
     mkdirSync(cwd, { recursive: true });
 
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
-    const sessionId = 'fallback-session';
-    const sessionFile = sessionFilePath(cwd, sessionId);
-    mkdirSync(join(sessionFile, '..'), { recursive: true });
-    writeFileSync(sessionFile, [
-      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Keep context' }] } }),
-      JSON.stringify({
-        type: 'assistant',
-        timestamp: '2026-06-10T00:00:00.000Z',
-        message: {
-          role: 'assistant',
-          model: 'claude-opus-4-8',
-          content: [{ type: 'text', text: 'Still in context' }],
-          usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      }),
-    ].join('\n') + '\n');
-
     createConversation({
-      name: 'switch-fallback',
-      tmuxSession: 'conv-switch-fallback',
+      name: 'started-conversation',
+      tmuxSession: 'conv-started-conversation',
       cwd,
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-4-6',
       harness: 'claude-code',
-      claudeSessionId: sessionId,
+      claudeSessionId: 'started-session',
     });
 
-    const response = await postSwitchModel('switch-fallback', { model: 'claude-fable-5' });
+    const response = await postSwitchModel('started-conversation', { model: 'claude-fable-5' });
 
-    expect(response.status).toBe(200);
-    expect(killSessionMock).toHaveBeenCalledWith('conv-switch-fallback');
-    expect(createSessionMock).toHaveBeenCalled();
-    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
-  });
-
-  it('keeps default-model Anthropic switches in Tier 1 when provider exports only unset env', async () => {
-    getProviderExportsForModelMock.mockResolvedValue([
-      'unset ANTHROPIC_BASE_URL',
-      'unset ANTHROPIC_AUTH_TOKEN',
-      'unset OPENAI_API_KEY',
-    ].join('\n') + '\n');
-    const cwd = join(testHome, 'default-model-anthropic-workspace');
-    mkdirSync(cwd, { recursive: true });
-
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
-    const sessionId = 'default-model-anthropic-session';
-    const sessionFile = sessionFilePath(cwd, sessionId);
-    mkdirSync(join(sessionFile, '..'), { recursive: true });
-    writeFileSync(sessionFile, [
-      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Default Anthropic conversation' }] } }),
-      JSON.stringify({
-        type: 'assistant',
-        timestamp: '2026-06-10T00:00:00.000Z',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Still in context' }],
-          usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      }),
-    ].join('\n') + '\n');
-
-    createConversation({
-      name: 'switch-default-anthropic',
-      tmuxSession: 'conv-switch-default-anthropic',
-      cwd,
-      model: null,
-      harness: 'claude-code',
-      claudeSessionId: sessionId,
-    });
-
-    const response = await postSwitchModel('switch-default-anthropic', { model: 'claude-fable-5' });
-
-    expect(response.status).toBe(200);
-    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
-      'conv-switch-default-anthropic',
-      '/model claude-fable-5',
-      'conversation-switch-model',
-      'auto',
-    );
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response).error).toMatch(/locked/i);
     expect(killSessionMock).not.toHaveBeenCalled();
     expect(createSessionMock).not.toHaveBeenCalled();
-    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
   });
 
-  it('respawns default-model conversations when switching to a routed provider target', async () => {
-    getProviderExportsForModelMock.mockImplementation(async (model: string) => (
-      model === 'gpt-5.5' ? 'export ANTHROPIC_BASE_URL=http://127.0.0.1:4545\nexport ANTHROPIC_AUTH_TOKEN=proxy-token' : ''
-    ));
-    const cwd = join(testHome, 'default-model-routed-workspace');
+  it('rejects switching when the conversation already has messages', async () => {
+    const cwd = join(testHome, 'workspace');
     mkdirSync(cwd, { recursive: true });
 
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
-    const sessionId = 'default-model-routed-session';
-    const sessionFile = sessionFilePath(cwd, sessionId);
-    mkdirSync(join(sessionFile, '..'), { recursive: true });
-    writeFileSync(sessionFile, [
-      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Default model conversation' }] } }),
-      JSON.stringify({
-        type: 'assistant',
-        timestamp: '2026-06-10T00:00:00.000Z',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Small context' }],
-          usage: { input_tokens: 1_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      }),
-    ].join('\n') + '\n');
-
     createConversation({
-      name: 'switch-default-routed',
-      tmuxSession: 'conv-switch-default-routed',
+      name: 'messaged-conversation',
+      tmuxSession: 'conv-messaged-conversation',
       cwd,
-      model: null,
+      model: 'claude-sonnet-4-6',
       harness: 'claude-code',
-      claudeSessionId: sessionId,
+      claudeSessionId: 'messaged-session',
     });
 
-    const response = await postSwitchModel('switch-default-routed', { model: 'gpt-5.5' });
+    const response = await postSwitchModel('messaged-conversation', { model: 'claude-fable-5' });
 
-    expect(response.status).toBe(200);
-    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
-    expect(killSessionMock).toHaveBeenCalledWith('conv-switch-default-routed');
-    expect(createSessionMock).toHaveBeenCalled();
-    expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
-  });
-
-  it('does not treat an echoed /model command as Tier 1 statusline confirmation', async () => {
-    vi.useFakeTimers();
-    try {
-      capturePaneMock.mockImplementation(() => Effect.succeed([
-        '/model claude-fable-5',
-        'error: failed to switch to Claude Fable 5',
-        'Claude Opus 4.8 (claude-opus-4-8)',
-        'ctx 10% cost $0.0000',
-      ].join('\n')));
-      const cwd = join(testHome, 'echo-workspace');
-      mkdirSync(cwd, { recursive: true });
-
-      const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-      const { sessionFilePath } = await import('../../../../lib/paths.js');
-      const sessionId = 'echo-session';
-      const sessionFile = sessionFilePath(cwd, sessionId);
-      mkdirSync(join(sessionFile, '..'), { recursive: true });
-      writeFileSync(sessionFile, [
-        JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Keep context' }] } }),
-        JSON.stringify({
-          type: 'assistant',
-          timestamp: '2026-06-10T00:00:00.000Z',
-          message: {
-            role: 'assistant',
-            model: 'claude-opus-4-8',
-            content: [{ type: 'text', text: 'Still in context' }],
-            usage: { input_tokens: 206_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-          },
-        }),
-      ].join('\n') + '\n');
-
-      createConversation({
-        name: 'switch-echo',
-        tmuxSession: 'conv-switch-echo',
-        cwd,
-        model: 'claude-opus-4-8',
-        harness: 'claude-code',
-        claudeSessionId: sessionId,
-      });
-
-      const responsePromise = postSwitchModel('switch-echo', { model: 'claude-fable-5' });
-      await vi.waitFor(() => {
-        expect(capturePaneMock).toHaveBeenCalled();
-      });
-      await vi.advanceTimersByTimeAsync(5_500);
-      const response = await responsePromise;
-
-      expect(response.status).toBe(200);
-      expect(deliverAgentMessageMock).toHaveBeenCalledWith(
-        'conv-switch-echo',
-        '/model claude-fable-5',
-        'conversation-switch-model',
-        'auto',
-      );
-      expect(killSessionMock).toHaveBeenCalledWith('conv-switch-echo');
-      expect(createSessionMock).toHaveBeenCalled();
-      expect(readFileSync(sessionFile, 'utf8')).not.toContain('"subtype":"compact_boundary"');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('appends a compact boundary when the same-harness switch exceeds the target window threshold', async () => {
-    const cwd = join(testHome, 'over-window-workspace');
-    mkdirSync(cwd, { recursive: true });
-
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
-    const { sessionFilePath } = await import('../../../../lib/paths.js');
-    const sessionId = 'over-window-session';
-    const sessionFile = sessionFilePath(cwd, sessionId);
-    mkdirSync(join(sessionFile, '..'), { recursive: true });
-    writeFileSync(sessionFile, [
-      JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Too much context' }] } }),
-      JSON.stringify({
-        type: 'assistant',
-        timestamp: '2026-06-10T00:00:00.000Z',
-        message: {
-          role: 'assistant',
-          model: 'claude-opus-4-8',
-          content: [{ type: 'text', text: 'Large context still in transcript' }],
-          usage: { input_tokens: 900_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-        },
-      }),
-    ].join('\n') + '\n');
-
-    createConversation({
-      name: 'switch-over-window',
-      tmuxSession: 'conv-switch-over-window',
-      cwd,
-      model: 'claude-opus-4-8',
-      harness: 'claude-code',
-      claudeSessionId: sessionId,
-    });
-
-    const response = await postSwitchModel('switch-over-window', { model: 'claude-fable-5' });
-    const finalContent = readFileSync(sessionFile, 'utf8');
-
-    expect(response.status).toBe(200);
-    expect(deliverAgentMessageMock).not.toHaveBeenCalled();
-    expect(killSessionMock).toHaveBeenCalledWith('conv-switch-over-window');
-    expect(createSessionMock).toHaveBeenCalled();
-    expect(finalContent).toContain('"subtype":"compact_boundary"');
-    expect(finalContent).toContain('"preTokens":900000');
+    expect(response.status).toBe(400);
+    expect(decodeJsonResponse(response).error).toMatch(/locked/i);
+    expect(killSessionMock).not.toHaveBeenCalled();
+    expect(createSessionMock).not.toHaveBeenCalled();
   });
 });
