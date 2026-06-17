@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Beads Rail — Issue Cockpit mockup (PAN-1938)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@500&display=swap" rel="stylesheet" />
+<style>
+  /* ── Real dashboard tokens (copied from src/dashboard/frontend/src/index.css, light block) ── */
+  :root {
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f8fa;
+    --popover: #ffffff;
+
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --accent: color-mix(in srgb, black 4%, transparent);
+
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+
+    --border: color-mix(in srgb, black 8%, transparent);
+
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --info: #3b82f6;            /* machine working */
+    --info-foreground: #1d4ed8;
+    --success: #10b981;         /* outcome: done */
+    --success-foreground: #047857;
+    --warning: #f59e0b;
+    --signal-review: #a855f7;
+    --signal-cost: #06b6d4;
+
+    --mono: "DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, color-mix(in srgb, var(--info) 5%, transparent), transparent),
+      var(--background);
+    color: var(--foreground);
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .wordmark { font-family: "Space Grotesk", sans-serif; font-weight: 500; letter-spacing: -0.01em; }
+  .mono { font-family: var(--mono); }
+  .muted { color: var(--muted-foreground); }
+
+  /* ── Caption strip ── */
+  .caption {
+    max-width: 1420px; margin: 18px auto 0; padding: 12px 18px;
+    border: 1px dashed var(--border); border-radius: 14px;
+    background: color-mix(in srgb, var(--info) 5%, var(--card));
+    color: var(--foreground); font-size: 12.5px;
+  }
+  .caption b { font-weight: 500; }
+  .caption .chip { display:inline-flex; align-items:center; gap:6px; }
+  .pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--info); position: relative; display:inline-block; }
+  .pulse-dot::after {
+    content:""; position:absolute; inset:-4px; border-radius:50%;
+    border: 2px solid color-mix(in srgb, var(--info) 60%, transparent);
+    animation: ring 1.6s ease-out infinite;
+  }
+  @keyframes ring { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.6); opacity: 0; } }
+
+  /* ── App shell ── */
+  .app { max-width: 1420px; margin: 14px auto 60px; padding: 0 18px; }
+  .topbar {
+    display:flex; align-items:center; gap:14px; padding: 8px 4px 16px;
+    color: var(--muted-foreground); font-size: 12px;
+  }
+  .topbar .wordmark { color: var(--foreground); font-size: 15px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .navitem { padding: 4px 8px; border-radius: 8px; }
+  .topbar .navitem.active { background: var(--accent); color: var(--foreground); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; }
+
+  /* ── Issue header ── */
+  .ihead { padding: 16px 18px; border-radius: 22px; }
+  .crumb { font-size: 11px; color: color-mix(in srgb, var(--muted-foreground) 80%, transparent); }
+  .crumb b { color: var(--muted-foreground); font-weight: 500; }
+  .titlerow { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:6px; }
+  .iid { font-family: var(--mono); font-size: 13px; color: var(--foreground); }
+  .ititle { font-size: 16px; margin: 0; line-height: 1.3; max-width: 760px; }
+  .sub { margin-top: 3px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, var(--muted-foreground) 70%, transparent); }
+  .headtop { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; }
+  .headstats { margin-left:auto; display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
+
+  .stat { border:1px solid var(--border); border-radius: 12px; padding: 6px 10px; min-width: 64px; }
+  .stat .k { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+  .stat .v { font-size: 12px; margin-top: 2px; }
+
+  .btn { border:1px solid var(--border); background: var(--card); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight:500; color: var(--foreground); cursor: pointer; }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: transparent; }
+  .icon-btn { border:1px solid var(--border); background: var(--card); border-radius: 8px; width: 32px; height: 32px; display:grid; place-items:center; cursor:pointer; color: var(--muted-foreground); }
+
+  /* pill (phase) */
+  .pill { display:inline-flex; align-items:center; gap:6px; height: 22px; padding: 0 9px; border-radius: var(--radius-sm); font-size: 11px; font-weight:500; }
+  .pill.info { background: color-mix(in srgb, var(--info) 8%, transparent); border: 1px solid color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+
+  /* pipeline bar */
+  .pipeline { margin-top: 16px; display:flex; gap:6px; }
+  .phase { flex:1; }
+  .phase .bar { height: 6px; border-radius: 99px; background: var(--accent); }
+  .phase.done .bar { background: var(--success); }
+  .phase.active .bar { background: var(--info); }
+  .phase .lbl { margin-top: 5px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); text-align:center; }
+  .phase.active .lbl { color: var(--info-foreground); }
+  .phase.done .lbl { color: var(--success-foreground); }
+
+  .gates { margin-top: 12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .gate { display:inline-flex; align-items:center; gap:6px; font-size: 11px; color: var(--muted-foreground); border:1px solid var(--border); border-radius: 8px; padding: 4px 8px; }
+  .gate .g-ok { color: var(--success-foreground); }
+  .gate .g-wait { color: var(--muted-foreground); }
+
+  /* ── Body 3-column grid ── */
+  .body { display:grid; grid-template-columns: 300px minmax(0,1fr) 332px; gap: 14px; align-items: start; margin-top: 14px; }
+  @media (max-width: 1180px) { .body { grid-template-columns: 1fr; } }
+
+  /* left tree lane */
+  .lane { padding: 10px; border-radius: 20px; background: color-mix(in srgb, var(--card-2) 70%, var(--card)); }
+  .lane .lane-h { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 4px 8px 8px; }
+  .tree-row { display:flex; align-items:center; gap:8px; padding: 7px 8px; border-radius: 10px; font-size: 12.5px; }
+  .tree-row.sel { background: var(--accent); }
+  .tree-row.indent { margin-left: 14px; }
+  .tree-row.indent2 { margin-left: 28px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); flex: none; }
+  .dot.info { background: var(--info); }
+  .dot.success { background: var(--success); }
+  .tree-row .small { font-size: 10px; color: var(--muted-foreground); margin-left:auto; }
+
+  /* center main */
+  .main { border-radius: 20px; background: color-mix(in srgb, var(--card) 92%, var(--accent)); }
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid var(--border); padding: 8px 12px 0; }
+  .tab { position: relative; top: 1px; padding: 8px 12px; font-size: 12px; font-weight:500; color: var(--muted-foreground); border: 1px solid transparent; border-radius: 10px 10px 0 0; cursor:pointer; white-space:nowrap; }
+  .tab.active { color: var(--foreground); background: var(--card); border-color: var(--border); border-bottom-color: var(--card); }
+  .tab .badge-x { color: var(--destructive-foreground); margin-left: 5px; font-size: 11px; }
+  .removed { opacity: 0.42; position: relative; }
+  .removed::after { content:""; position:absolute; left:8px; right:8px; top:50%; border-top: 1.5px solid var(--destructive); }
+  .ghost-note { margin-left: 6px; font-size: 9px; color: var(--destructive-foreground); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .main-body { padding: 16px; display:grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 1480px) { .main-body { grid-template-columns: 1fr; } }
+  .panel { border:1px solid var(--border); border-radius: 16px; padding: 14px; background: var(--card); }
+  .panel h3 { margin: 0 0 10px; font-size: 12px; font-weight:500; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+  .kv { display:flex; justify-content:space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .kv:last-child { border-bottom: none; }
+  .kv .muted { color: var(--muted-foreground); }
+  .blocker { border:1px solid color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 6%, var(--card)); border-radius: 14px; padding: 12px 14px; grid-column: 1 / -1; }
+  .blocker .lead { display:flex; align-items:center; gap:8px; font-size:12px; color: var(--info-foreground); }
+
+  /* ── RIGHT: Beads rail (the change) ── */
+  .beads { padding: 0; border-radius: 20px; overflow: hidden; position: sticky; top: 14px; }
+  .beads-h { display:flex; align-items:center; gap:10px; padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  .beads-h .t { font-size: 13px; }
+  .beads-h .counts { margin-left:auto; display:flex; gap:10px; font-size: 11px; color: var(--muted-foreground); align-items:center; }
+  .count { display:inline-flex; align-items:center; gap:5px; }
+  .count .d { width:7px; height:7px; border-radius:50%; }
+  .count .d.open { background: var(--muted-foreground); }
+  .count .d.active { background: var(--info); }
+  .count .d.done { background: var(--success); }
+  .beads-h .icon-btn { width: 26px; height: 26px; }
+
+  .rail { padding: 8px 10px 14px; position: relative; }
+  .group-h { display:flex; align-items:center; gap:8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 12px 6px 6px; }
+  .group-h .line { flex:1; height:1px; background: var(--border); }
+
+  /* spine */
+  .spine { position: relative; padding-left: 26px; }
+  .spine::before { content:""; position:absolute; left: 11px; top: 6px; bottom: 6px; width: 2px; background: var(--border); border-radius: 2px; }
+
+  .bead { position: relative; margin: 6px 0; padding: 9px 10px; border-radius: 12px; border: 1px solid transparent; }
+  .bead .node { position:absolute; left: -20px; top: 12px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 2px solid var(--muted-foreground); display:grid; place-items:center; }
+  .bead .node svg { width: 8px; height: 8px; }
+  .bead .ttl { font-size: 12.5px; line-height: 1.35; }
+  .bead .meta { margin-top: 6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+
+  /* done */
+  .bead.done .ttl { color: var(--muted-foreground); }
+  .bead.done .node { background: var(--success); border-color: var(--success); color: #fff; }
+
+  /* open */
+  .bead.open:hover { background: var(--accent); }
+  .bead.open .node { border-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent); }
+
+  /* ACTIVE — the agent is working here (blue = machine working) */
+  .bead.active {
+    border-color: color-mix(in srgb, var(--info) 38%, transparent);
+    background: color-mix(in srgb, var(--info) 7%, var(--card));
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--info) 16%, transparent), 0 8px 24px -16px color-mix(in srgb, var(--info) 70%, transparent);
+    padding: 12px 12px;
+    margin: 10px 0;
+  }
+  .bead.active::before { content:""; position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius: 3px; background: var(--info); }
+  .bead.active .node { border-color: var(--info); background: var(--card); }
+  .bead.active .node .pulse-dot { width: 7px; height: 7px; }
+  .bead.active .ttl { color: var(--foreground); }
+  .working-tag { display:inline-flex; align-items:center; gap:6px; font-size: 10px; font-weight:500; color: var(--info-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+  .agent-line { margin-top: 6px; font-size: 11px; color: var(--muted-foreground); display:flex; align-items:center; gap:6px; }
+
+  /* badges */
+  .bdg { display:inline-flex; align-items:center; height: 18px; padding: 0 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight:500; border:1px solid var(--border); color: var(--muted-foreground); background: transparent; }
+  .bdg.diff { } /* taxonomy → neutral, per style guide */
+  .bdg.ac { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+  .bdg.ac.done { color: var(--success-foreground); border-color: color-mix(in srgb, var(--success) 32%, transparent); background: color-mix(in srgb, var(--success) 8%, transparent); }
+  .blocked-note { margin-top:6px; font-size: 10px; color: var(--muted-foreground); display:flex; align-items:center; gap:5px; }
+
+  .more { text-align:center; font-size: 11px; color: var(--muted-foreground); padding: 8px; border:1px dashed var(--border); border-radius: 10px; margin: 6px 4px; cursor:pointer; }
+
+  .legend { margin: 22px auto 0; max-width: 1420px; padding: 0 18px; }
+  .legend .card { padding: 14px 16px; }
+  .legend h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); }
+  .legend ul { margin: 0; padding-left: 18px; }
+  .legend li { margin: 4px 0; font-size: 12.5px; }
+  .legend code { font-family: var(--mono); font-size: 11.5px; background: var(--accent); padding: 1px 5px; border-radius: 5px; }
+  .swatch { display:inline-block; width: 10px; height:10px; border-radius: 3px; vertical-align: middle; margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<div class="caption">
+  <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;">
+    <span class="chip"><span class="pulse-dot"></span> <b>Mockup — Beads moved out of the tab into a persistent right rail.</b></span>
+    <span class="muted">The <b style="color:var(--info-foreground)">blue, pulsing</b> bead is the one the agent is working on right now (bd&nbsp;status&nbsp;<code class="mono" style="font-size:11px">in_progress</code>). Done above it, upcoming below.</span>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- top bar -->
+  <div class="topbar">
+    <span class="wordmark">Panopticon</span>
+    <span class="navitem">Command Deck</span>
+    <span class="navitem active">Issues</span>
+    <span class="navitem">Pipeline</span>
+    <span class="navitem">Agents</span>
+    <span class="spacer"></span>
+    <span class="muted">edward.becker</span>
+  </div>
+
+  <!-- issue header -->
+  <div class="card ihead">
+    <div class="headtop">
+      <div style="min-width:0;">
+        <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+        <div class="titlerow">
+          <span class="iid">PAN-1938</span>
+          <h1 class="ititle">OVERDECK: the Panopticon data-architecture remodel + rebrand (big bang)</h1>
+          <span class="pill info"><span class="pulse-dot" style="width:7px;height:7px"></span> In&nbsp;Progress</span>
+        </div>
+        <div class="sub">Issue Cockpit · Mission Control</div>
+      </div>
+      <div class="headstats">
+        <div class="stat"><div class="k">Branch</div><div class="v mono">feature/pan-1938</div></div>
+        <div class="stat"><div class="k">PR / CI</div><div class="v">#1962 · 8/9 ✓</div></div>
+        <div class="stat"><div class="k">Cost</div><div class="v">$41.79</div></div>
+        <button class="btn">MERGE</button>
+        <button class="icon-btn">⋯</button>
+      </div>
+    </div>
+
+    <!-- pipeline -->
+    <div class="pipeline">
+      <div class="phase done"><div class="bar"></div><div class="lbl">Plan</div></div>
+      <div class="phase active"><div class="bar"></div><div class="lbl">Work</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Review</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Test</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">CI</div></div>
+      <div class="phase"><div class="bar"></div><div class="lbl">Merge</div></div>
+    </div>
+
+    <!-- gates -->
+    <div class="gates">
+      <span class="gate"><span class="g-ok">✓</span> Typecheck</span>
+      <span class="gate"><span class="g-ok">✓</span> Lint</span>
+      <span class="gate"><span class="g-wait">○</span> Tests pending</span>
+      <span class="gate"><span class="g-wait">○</span> Review not started</span>
+    </div>
+  </div>
+
+  <!-- 3-column body -->
+  <div class="body">
+
+    <!-- LEFT: agent tree lane -->
+    <aside class="card lane">
+      <div class="lane-h">Issue tree</div>
+      <div class="tree-row sel"><span class="dot info"></span> PAN-1938 <span class="small">running</span></div>
+      <div class="tree-row indent"><span class="dot success"></span> planning <span class="small mono">opus</span></div>
+      <div class="tree-row indent"><span class="dot info"></span> work · slot 1 <span class="small mono">gpt-5.5</span></div>
+      <div class="tree-row indent2"><span class="dot info"></span> session <span class="small mono">live</span></div>
+      <div class="tree-row indent"><span class="dot"></span> review <span class="small">idle</span></div>
+      <div class="tree-row indent"><span class="dot"></span> test <span class="small">idle</span></div>
+    </aside>
+
+    <!-- CENTER: tabbed main (Beads tab removed) -->
+    <section class="card main">
+      <div class="tabs">
+        <span class="tab active">Overview</span>
+        <span class="tab">Review</span>
+        <span class="tab">Test</span>
+        <span class="tab">PR &amp; CI</span>
+        <span class="tab">Conversation</span>
+        <span class="tab">Diff</span>
+        <span class="tab">PRD / Plan</span>
+        <span class="tab removed">Beads<span class="ghost-note">→ moved to rail</span></span>
+        <span class="tab">Activity</span>
+        <span class="tab">History</span>
+      </div>
+      <div class="main-body">
+        <div class="blocker">
+          <div class="lead"><span class="pulse-dot" style="width:7px;height:7px"></span> Now — agent is implementing bead <span class="mono" style="color:var(--foreground)">workspace-7t2k</span></div>
+          <div class="muted" style="margin-top:6px;font-size:12px;">Relocate every remaining direct-store caller onto its door; delete dead paths. Last commit 3&nbsp;min ago · 4 files changed.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Now</h3>
+          <div class="kv"><span class="muted">Active agent</span><span class="mono">work · gpt-5.5</span></div>
+          <div class="kv"><span class="muted">Phase</span><span>Work</span></div>
+          <div class="kv"><span class="muted">Beads done</span><span>21 / 28</span></div>
+          <div class="kv"><span class="muted">Last activity</span><span class="muted">3 min ago</span></div>
+        </div>
+
+        <div class="panel">
+          <h3>Issue</h3>
+          <div class="kv"><span class="muted">Priority</span><span>P2</span></div>
+          <div class="kv"><span class="muted">Labels</span><span class="muted">epic · remodel</span></div>
+          <div class="kv"><span class="muted">Opened</span><span class="muted">Jun 16</span></div>
+          <div class="kv"><span class="muted">Spec</span><span class="muted">active</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Beads rail (the change) -->
+    <aside class="card beads">
+      <div class="beads-h">
+        <span class="t">Beads</span>
+        <span class="counts">
+          <span class="count"><span class="d open"></span>6</span>
+          <span class="count"><span class="d active"></span>1</span>
+          <span class="count"><span class="d done"></span>21</span>
+          <button class="icon-btn" title="Refresh">⟳</button>
+        </span>
+      </div>
+
+      <div class="rail">
+        <!-- completed group (collapsed) -->
+        <div class="group-h">21 completed <span class="line"></span></div>
+        <div class="spine">
+          <div class="bead done">
+            <div class="node">✓</div>
+            <div class="ttl">Re-wire the dead cost-limit breaker + ingest pi/codex cost</div>
+            <div class="meta"><span class="bdg diff">complex</span></div>
+          </div>
+          <div class="bead done">
+            <div class="node">✓</div>
+            <div class="ttl">Build gate G3 — the remodel-wide no-loss matrix</div>
+            <div class="meta"><span class="bdg diff">complex</span></div>
+          </div>
+          <div class="bead done">
+            <div class="node">✓</div>
+            <div class="ttl">Wire the server bootstrap Layer (compose all domain + infra Live)</div>
+            <div class="meta"><span class="bdg diff">complex</span></div>
+          </div>
+          <div class="more">↑ show 18 earlier completed beads</div>
+
+          <!-- ACTIVE — what the agent is working on now -->
+          <div class="group-h" style="color:var(--info-foreground)">working now <span class="line" style="background:color-mix(in srgb, var(--info) 32%, transparent)"></span></div>
+          <div class="bead active">
+            <div class="node"><span class="pulse-dot"></span></div>
+            <div class="working-tag"><span class="pulse-dot" style="width:7px;height:7px"></span> Agent working</div>
+            <div class="ttl" style="margin-top:6px;">Relocate every remaining direct-store caller onto its door; delete dead paths</div>
+            <div class="agent-line"><span class="mono" style="color:var(--info-foreground)">work · gpt-5.5</span> · started 11 min ago</div>
+            <div class="meta">
+              <span class="bdg diff">expert</span>
+              <span class="bdg ac">3/7 AC</span>
+            </div>
+          </div>
+
+          <!-- upcoming / open -->
+          <div class="group-h">6 upcoming <span class="line"></span></div>
+          <div class="bead open">
+            <div class="node"></div>
+            <div class="ttl">Build gate G4 — the sacred-file invariant check</div>
+            <div class="meta"><span class="bdg diff">medium</span></div>
+          </div>
+          <div class="bead open">
+            <div class="node"></div>
+            <div class="ttl">Build gate G5 — the PAN-1937 conversation-metadata export</div>
+            <div class="meta"><span class="bdg diff">complex</span></div>
+          </div>
+          <div class="bead open">
+            <div class="node"></div>
+            <div class="ttl">Convert conversation-compaction to the fork pattern (sacred files)</div>
+            <div class="meta"><span class="bdg diff">medium</span></div>
+          </div>
+          <div class="bead open">
+            <div class="node"></div>
+            <div class="ttl">Switch on the import-boundary CI guard; retire old access paths</div>
+            <div class="meta"><span class="bdg diff">medium</span></div>
+          </div>
+          <div class="bead open">
+            <div class="node"></div>
+            <div class="ttl">Cut the app over to the fresh overdeck.db (parity pass per domain)</div>
+            <div class="meta"><span class="bdg diff">expert</span></div>
+            <div class="blocked-note">⤷ blocked by 4 upstream beads</div>
+          </div>
+          <div class="bead open">
+            <div class="node"></div>
+            <div class="ttl">Rename Panopticon → Overdeck (code, DB name, DNS, docs) — final pass</div>
+            <div class="meta"><span class="bdg diff">complex</span></div>
+            <div class="blocked-note">⤷ blocked by 5 upstream beads</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- design notes / legend -->
+<div class="legend">
+  <div class="card">
+    <h4>What changed &amp; how it maps to the code</h4>
+    <ul>
+      <li><b>Beads leaves the tab strip.</b> Remove <code>{ id: 'beads', label: 'Beads' }</code> from <code>TABS</code> and the <code>activeTab === 'beads'</code> branch in <code>IssueMissionControl.tsx</code> (shown struck-through above).</li>
+      <li><b>New third grid column.</b> <code>.missionBody</code> in <code>cockpitBody.module.css</code> goes from <code>minmax(280px,344px) minmax(0,1fr)</code> to add a <code>~332px</code> beads rail. The rail reuses <code>BeadsTasksPanel</code>'s data hook (<code>GET /api/issues/:id/beads</code>).</li>
+      <li><b>"Working now" is real data, not invented.</b> The beads endpoint already returns bd <code>status</code> = <code>open</code> | <code>in_progress</code> | <code>closed</code> plus <code>startedAt</code>. The <code>in_progress</code> bead is the highlight — no new backend needed (the frontend <code>BeadTask</code> type just needs <code>'in_progress'</code> added to its union).</li>
+    </ul>
+    <h4 style="margin-top:14px;">Color discipline (per <code>design/style-guide/STYLE-GUIDE.md</code>)</h4>
+    <ul>
+      <li><span class="swatch" style="background:var(--info)"></span><b>Blue = a machine is working</b> → the active bead, the pulse. Not green.</li>
+      <li><span class="swatch" style="background:var(--success)"></span><b>Emerald = outcome/done</b> → completed beads.</li>
+      <li><span class="swatch" style="background:var(--muted-foreground)"></span><b>Neutral = rest state</b> → upcoming beads, difficulty labels (taxonomy stays neutral).</li>
+      <li>One colored signal per row · DM Sans 500 · mono only for IDs/branch/model · <code>rounded-sm</code> badges, no pills.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
