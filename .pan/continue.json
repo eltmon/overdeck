@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-16T20:35:21.496Z",
-  "updated": "2026-06-17T10:30:00.000Z",
-  "gitState": { "branch": "feature/pan-1919", "sha": "fb2995afd9", "dirty": true },
+  "updated": "2026-06-17T11:05:00.000Z",
+  "gitState": { "branch": "feature/pan-1919", "sha": "ab382df9f7", "dirty": true },
   "decisions": [
     { "id": "D1", "summary": "Foundation already landed in commit e9914c9429 (record schema superset, src/lib/pan-dir/record.ts writer, sync-path status-override writer/reader, harness/model mirror, no-loss test — 63 related tests green). This plan scopes ONLY the remaining gaps + verification; the work agent verifies-and-completes, does not rebuild the foundation.", "recordedAt": "2026-06-16T20:51:21.000Z" },
     { "id": "D2", "summary": "Record name = 'record' at <workspace>/.pan/records/<issue>.json on the feature branch (already implemented). Unifies with the PAN-1908 records plane; retires the 'continues' name the maintainer disliked.", "recordedAt": "2026-06-16T20:51:21.000Z" },
