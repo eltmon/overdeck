@@ -1,0 +1,46 @@
+{
+  "issueId": "PAN-1938",
+  "schemaVersion": 2,
+  "feedback": [],
+  "created": "2026-06-17T07:57:37.707Z",
+  "updated": "2026-06-17T09:16:12.017Z",
+  "pipeline": {
+    "issueId": "PAN-1938",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "inspectStatus": "passed",
+    "readyForMerge": false,
+    "updatedAt": "2026-06-17T09:16:11.809Z",
+    "inspectNotes": "Bead workspace-l3b8u implements the Issues vertical slice: IssuesResolver (get/list/getPlan), IssueWriter (advance/setPr/setBlockers, no hold()), IssuesApi HttpApiGroup, source-first write ordering, skipped-test readyForMerge parity, and ~15 legal stage transitions."
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 439,
+            "output": 13641,
+            "cacheRead": 2271293,
+            "cacheWrite": 18175
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 439,
+          "output": 13641,
+          "cacheRead": 2271293,
+          "cacheWrite": 18175
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 1.59246,
+        "pricingAsOf": "2026-06-17T09:16:12.017Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.5"
+}

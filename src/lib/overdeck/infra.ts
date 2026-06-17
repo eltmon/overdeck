@@ -244,6 +244,7 @@ export interface CostArchiveServiceShape {
 export class CostArchive extends Context.Service<CostArchive, CostArchiveServiceShape>()('overdeck/CostArchive') {}
 
 export type FtsStatement = Readonly<{
+  method?: 'all' | 'exec' | 'get' | 'run';
   sql: string;
   params?: ReadonlyArray<unknown>;
 }>;
