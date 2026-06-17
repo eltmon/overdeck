@@ -1,21 +1,136 @@
 {
   "issueId": "PAN-1919",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Foundation already landed in commit e9914c9429 (record schema superset, src/lib/pan-dir/record.ts writer, sync-path status-override writer/reader, harness/model mirror, no-loss test — 63 related tests green). This plan scopes ONLY the remaining gaps + verification; the work agent verifies-and-completes, does not rebuild the foundation.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Record name = 'record' at <workspace>/.pan/records/<issue>.json on the feature branch (already implemented). Unifies with the PAN-1908 records plane; retires the 'continues' name the maintainer disliked.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Pipeline verdicts: keep the existing 'pipeline' mirror field (PanIssuePipelineRecord, from PAN-1908) in the record but do NOT expand verdict handling here. Making verdicts reconstruction-safe is PAN-1922. This issue keeps the record about WORK progress.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Backfill targets only IN-FLIGHT issues (live workspace/branch). The 132 historical closed .pan/continues/ files remain read-only legacy and are NOT migrated — resume only matters for in-flight work.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Continues become READ-ONLY LEGACY, not mass-deleted (AC6's 'removed or read-only legacy' escape hatch). No new writes to workspace continue.json or project .pan/continues/; readers stay for legacy/backfill.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "CI guard and the enforced single-write-surface API are PAN-1921, NOT this issue. Here we only stop legacy writes far enough to make continues read-only, plus a one-shot no-loss assertion test.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "No pan_records entry added to projects.yaml — the record is branch-resident and resolves from the workspace path; backfill's leftover infra-repo coupling is reconciled to the branch path.",
+      "recordedAt": "2026-06-16T20:51:21.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Split-brain already shipped: sync CLI path writes the record (vbrief/io.ts), but the async dashboard path vbrief/dag.ts:867-929 (mirrorTaskOperationToContinueFile) still writes workspace continue.json. Status overrides disagree depending on which path ran.",
+      "mitigation": "Fix dag.ts FIRST (bead fix-async-statusoverride-splitbrain) so both paths converge on writeStatusOverride. No fallback chains — root cause."
+    },
+    {
+      "id": "H2",
+      "summary": "Migrating planning-spawn persistence (spawn-planning-session.ts:598) changes the exact path that wrote THIS session's continue.json.",
+      "mitigation": "After the change, verify a planning session still persists/resumes its sessionHistory via the record."
+    },
+    {
+      "id": "H3",
+      "summary": "Backfill data loss: a wrong field map in records.ts permanently loses state once continues are retired.",
+      "mitigation": "Bead complete-backfill-migration is inspection-gated (requiresInspection); retire-continues bead is blocked on it. Backfill test asserts statusOverrides+harness+model+schemaVersion:2 land."
+    },
+    {
+      "id": "H4",
+      "summary": "The record file lands on main at branch merge (it is git-tracked, not ignored).",
+      "mitigation": "Acceptable — continues already land on main today. Keep record writes on the branch only during work; never commit the record to main mid-work (PAN-1124)."
+    },
+    {
+      "id": "H5",
+      "summary": "getIssueRecordPath reconstructs the workspace path from project root + workspaces/feature-<id>; container/remote contexts may differ from the live cwd.",
+      "mitigation": "Prefer getIssueRecordPathForWorkspace(workspacePath, issueId) where an explicit workspace path is available; note in the dashboard-route bead."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "Planning session for PAN-1919 (--auto). Discovered a plan-after-code situation: commit e9914c9429 already landed the record foundation (schema superset, writer, sync-path wiring, harness/model mirror, no-loss test). No existing spec/beads. Scoped a remaining-work plan of 10 beads: fix async split-brain, route 4 continue-writer surfaces to the record, complete the backfill (inspection-gated), retire continues to read-only legacy, plus no-loss-guard + cross-machine-resume + legacy-test beads.",
+      "note": "Planning session started for PAN-1919",
+      "timestamp": "2026-06-16T20:35:21.496Z",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+  "feedback": [],
   "created": "2026-06-17T06:48:43.917Z",
-  "updated": "2026-06-17T11:03:01.956Z",
+  "updated": "2026-06-17T11:03:24.612Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "running",
+    "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-17T06:48:43.917Z"
+    "updatedAt": "2026-06-17T11:03:24.575Z",
+    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1950"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 5972,
+            "output": 46,
+            "cacheRead": 3,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 18732,
+            "output": 60978,
+            "cacheRead": 6791517,
+            "cacheWrite": 172564
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 5972,
+          "output": 46,
+          "cacheRead": 3,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 18732,
+          "output": 60978,
+          "cacheRead": 6791517,
+          "cacheWrite": 172564
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 6.09736184,
+        "pricingAsOf": "2026-06-17T11:03:24.612Z"
+      }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/panopticon-cli/pull/1950"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "pi",
