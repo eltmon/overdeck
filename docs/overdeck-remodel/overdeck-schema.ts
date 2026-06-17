@@ -327,6 +327,7 @@ export const appSettings = sqliteTable("app_settings", {
 export const issuePolicy = sqliteTable("issue_policy", {
   issueId: text("issue_id").primaryKey().references(() => issues.id),
   deaconIgnored: integer("deacon_ignored", { mode: "boolean" }),
+  deaconIgnoredReason: text("deacon_ignored_reason"),            // displayed reason — keep (functional parity; was dropped as "display-only")
   autoMerge: integer("auto_merge", { mode: "boolean" }),
   updatedAt: integer("updated_at", { mode: "timestamp" }),
 });
