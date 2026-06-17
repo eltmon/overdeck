@@ -99,11 +99,14 @@ automatically. Purely-internal errors may use `Data.TaggedError("Tag")<{…}>`
 
 We do **not** use `@effect/sql` — its only SQLite adapter is Bun-only and the
 dashboard is **Node-22-only**. The cache is **Drizzle ORM + `better-sqlite3`**
-(both Node; `better-sqlite3` is already installed), wrapped behind one Effect `Db`
-service. Drizzle gives schema-as-code with real foreign keys, generated migrations
-(`drizzle-kit`), and type-safe queries; Effect wraps the calls so the rest of the
-stack stays fully Effect. The Drizzle schema *is* the locked DB schema
-(`overdeck-schema.ts`).
+(both run on Node), wrapped behind one Effect `Db` service. **Dependency note:**
+`better-sqlite3` is already installed, but **`drizzle-orm` and `drizzle-kit` are
+NOT yet dependencies — they must be added**, and a compile smoke-test (a tiny
+`sqliteTable` + `.references()` + a partial `uniqueIndex(...).where(sql\`…\`)` +
+the better-sqlite3 driver under Node 22) should be the first build step. Drizzle
+gives schema-as-code with real foreign keys, generated migrations (`drizzle-kit`),
+and type-safe queries; Effect wraps the calls so the rest of the stack stays fully
+Effect. The Drizzle schema *is* the locked DB schema (`overdeck-schema.ts`).
 
 ```ts
 // storage schema — Drizzle (real FKs via .references())

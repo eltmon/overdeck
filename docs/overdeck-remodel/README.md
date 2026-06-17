@@ -18,10 +18,12 @@ genuinely **NEED**.
    transition justifies itself by a concrete decision it drives, or it's deleted.
 2. **Two doors per domain.** One read door (a resolver `Service`) and one write
    door (a writer `Service`); nothing else touches a store. Enforced by Effect's
-   type system — `Sql` is only ever injected into the two doors.
+   type system (the `Db` handle reaches only the two doors) **plus** an
+   import-boundary lint rule on routes/RPC/CLI — types alone don't stop a raw import.
 3. **A tiny set of legal moves**, each behind the domain API.
-4. **Effect all the way down** — `@effect/schema` entities, `@effect/sql` cache,
-   `HttpApiGroup` controllers, typed errors. ("State" is not a domain.)
+4. **Effect all the way down** — `@effect/schema` entities, a **Drizzle +
+   better-sqlite3** cache behind the `Db` service (Node-safe; deliberately *not*
+   `@effect/sql`), `HttpApiGroup` controllers, typed errors. ("State" is not a domain.)
 
 ## Design docs (the deliverable)
 
