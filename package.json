@@ -100,6 +100,8 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "vitest run tests/e2e",
     "test:drizzle-smoke": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --esModuleInterop --skipLibCheck scripts/drizzle-node-sqlite-smoke.ts && node --import tsx scripts/drizzle-node-sqlite-smoke.ts",
+    "test:overdeck-db": "vitest run tests/unit/scripts/create-overdeck-db.test.ts",
+    "db:overdeck:init": "node --import tsx scripts/create-overdeck-db.ts",
     "test:coverage": "vitest run --coverage",
     "docs": "typedoc",
     "docs:watch": "typedoc --watch",
