@@ -391,9 +391,40 @@ export const IssueCost = Schema.Struct({
 })
 export type IssueCost = typeof IssueCost.Type
 
+// ── Budget entities — over the SEPARATE budgets.json store (not cost_events) ──
+// Shape mirrors CostBudget in lib/cost.ts (the live store's record).
+export const BudgetSpec = Schema.Struct({
+  name:           Schema.String,
+  type:           Schema.Literals(["daily","monthly","project","issue","feature"]),
+  limit:          Schema.Number,
+  currency:       Schema.String,           // "USD"
+  alertThreshold: Schema.Number,           // 0..1
+})
+export type BudgetSpec = typeof BudgetSpec.Type
+
+export const Budget = Schema.Struct({
+  ...BudgetSpec.fields,
+  id:      Schema.String,
+  spent:   Schema.Number,
+  enabled: Schema.Boolean,
+})
+export type Budget = typeof Budget.Type
+
+export const BudgetStatus = Schema.Struct({
+  budget:      Budget,
+  percentUsed: Schema.Number,
+  remaining:   Schema.Number,
+  alert:       Schema.Boolean,
+  exceeded:    Schema.Boolean,
+})
+export type BudgetStatus = typeof BudgetStatus.Type
+
 // ── Errors — tagged, in the E channel (CONVENTIONS §3) ─────────────────────
 export class CostIngestError extends Schema.TaggedErrorClass<CostIngestError>()(
   "CostIngestError", { reason: Schema.String },
+) {}
+export class BudgetNotFound extends Schema.TaggedErrorClass<BudgetNotFound>()(
+  "BudgetNotFound", { id: Schema.String },
 ) {}
 ```
 
@@ -482,8 +513,10 @@ export const CostResolverLayer = Layer.effect(CostResolver, Effect.gen(function*
 > `getAllBudgetsSync`/`checkBudgetSync` — a small JSON file, not `cost_events`.
 > It is modeled the same way Memory models `memory-search.db` as a second store
 > behind one resolver: the budget store stays distinct, the read door is shared.
-> `Budget`/`BudgetStatus`/`BudgetNotFound` are Schemas/errors over that store's
-> shape (`CostBudget` in `lib/cost.ts`).
+> The budget verbs take a **`BudgetStore`** handle in their Layer's `R` (alongside
+> `Db`), à la `MemorySearch` — `Db` covers only `cost_events`. `Budget`/
+> `BudgetStatus`/`BudgetSpec`/`BudgetNotFound` (§2.1) are the Schemas/errors over
+> that store's shape (`CostBudget` in `lib/cost.ts`).
 
 ## 2.3 `CostWriter` — the write door (`Context.Service`)
 
@@ -710,14 +743,20 @@ directly.
 | `CostResolver.byBackgroundSource` | §1A `GET /api/costs/background` |
 | `CostResolver.byProject` | §1A `GET /api/costs/summary?project=` (the project dimension) |
 | `CostResolver.recent` | §1A `GET /api/costs/stream`; §1C `cost.subscribe` |
+| `CostResolver.listBudgets` | §1B `pan cost budget list` (reads `budgets.json`) |
+| `CostResolver.checkBudget` | §1B `pan cost budget check <id>` (reads `budgets.json`) |
 | `CostWriter.record` | §1A ingest call-sites: `appendCostEventSync` (events.ts:102), `insertCostEvents` (reconciler.ts:405, sync-wal.ts:65), `insertCostEvent` (memory provider) |
-| `CostWriter.reconcile` | §1A `POST /api/costs/reconcile`, `POST /api/costs/sync-wal`; §1E.2 the pi/codex sweep (PAN-1935) |
+| `CostWriter.reconcile` | §1A `POST /api/costs/reconcile`, `POST /api/costs/sync-wal`; §1B `pan cost sync`; §1E.2 the pi/codex sweep (PAN-1935) |
 | `CostWriter.rebuild` | §1A `POST /api/costs/rebuild` |
+| `CostWriter.createBudget` | §1B `pan cost budget create <name>` (writes `budgets.json`) |
+| `CostWriter.deleteBudget` | §1B `pan cost budget delete <id>` (writes `budgets.json`) |
 | `CostApi` endpoints | one-to-one with the resolver/writer members above |
-| relocated / deleted | §1D rollup — `experiments`/`specialists cost`/`deduplicate`/store B/store C/conversation-cost map to no Cost member by design |
+| relocated / deleted | §1D rollup — `experiments`/`specialists cost`/`deduplicate`/store-B `setIssueBudget`/store C/conversation-cost map to no Cost member by design |
 
-No method reads or writes a column outside the locked `cost_events` table; no
-endpoint is invented; nothing real from the current surface is lost.
+The event-cost methods read/write only the locked `cost_events` table; the four
+budget verbs read/write the separate `budgets.json` store (a second store behind
+the same doors, §2.2). No endpoint is invented; nothing real from the current
+surface is lost — including the live `pan cost budget` CLI family.
 
 ## Collapse counts (the headline numbers)
 
