@@ -47,6 +47,7 @@ import { reconstructCache } from '../../../../src/lib/reconstruct/reconstruct-ca
 import { initEventStore } from '../../../../src/dashboard/server/event-store.js';
 import { AgentStateServiceLive } from '../../../../src/dashboard/server/services/agent-state-service.js';
 import { ReadModelServiceLive } from '../../../../src/dashboard/server/read-model.js';
+import { AgentsResolver } from '../../../../src/lib/overdeck/agents.js';
 
 const reconstructCacheMock = vi.mocked(reconstructCache);
 const initEventStoreMock = vi.mocked(initEventStore);
@@ -72,9 +73,23 @@ describe('AgentStateService bootstrap (PAN-1920)', () => {
   });
 });
 
-describe('ReadModelService bootstrap (PAN-1920)', () => {
-  it('seeds agents and review statuses from reconstructCache', async () => {
-    await Effect.runPromise(Effect.provide(Effect.void, ReadModelServiceLive));
+// Mock AgentsResolver: agents now come from overdeck.db (source-swap PAN-1938),
+// reconstructCache still runs for reviewStatusByIssueId.
+const MockAgentsResolverLive = Layer.succeed(
+  AgentsResolver,
+  AgentsResolver.of({
+    list: (_f) => Effect.succeed([]),
+    get: (_id) => Effect.fail(new Error('not found') as never),
+    isAlive: (_id) => Effect.succeed(false),
+    getRuntime: (_id) => Effect.succeed(null),
+    getHealthHistory: (_id) => Effect.succeed([]),
+  }),
+);
+
+describe('ReadModelService bootstrap (PAN-1938 source-swap)', () => {
+  it('seeds reviewStatuses from reconstructCache and agents from AgentsResolver', async () => {
+    const layer = ReadModelServiceLive.pipe(Layer.provide(MockAgentsResolverLive));
+    await Effect.runPromise(Effect.provide(Effect.void, layer));
     await vi.waitFor(() => expect(reconstructCacheMock).toHaveBeenCalled());
   });
 });

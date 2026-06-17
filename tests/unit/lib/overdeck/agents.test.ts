@@ -28,6 +28,7 @@ type AgentRow = {
   startedAt: Date | null; lastResumeAt: Date | null;
   stoppedByUser: boolean | null; kickoffDelivered: boolean | null;
   paused: boolean | null; pausedReason: string | null; troubled: boolean | null;
+  channelsEnabled: boolean | null;
   consecutiveFailures: number;
   firstFailureInRunAt: Date | null; lastFailureNextRetryAt: Date | null;
   updatedAt: Date;
@@ -204,7 +205,7 @@ function makeAgentRow(id: string, overrides?: Partial<AgentRow>): AgentRow {
     hostOverride: null, deliveryMethod: null,
     startedAt: new Date('2026-01-01T00:00:00Z'), lastResumeAt: null,
     stoppedByUser: null, kickoffDelivered: null,
-    paused: null, pausedReason: null, troubled: null, consecutiveFailures: 0,
+    paused: null, pausedReason: null, troubled: null, channelsEnabled: null, consecutiveFailures: 0,
     firstFailureInRunAt: null, lastFailureNextRetryAt: null,
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
