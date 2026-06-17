@@ -452,7 +452,7 @@ describe('MemoryWriter.createResetMarker', () => {
     // File write first.
     expect(written.markers).toHaveLength(1)
     // FTS insert second.
-    expect(ftsStatements.some((s) => s.includes('INSERT OR REPLACE INTO reset_markers'))).toBe(true)
+    expect(ftsStatements.some((s) => s.includes('INSERT INTO reset_markers'))).toBe(true)
     // Announce third.
     expect(emitted).toContain('memory.reset_marker_created')
   })
@@ -472,16 +472,77 @@ describe('MemoryWriter Layer R type', () => {
 })
 
 describe('MemoryWriter.rebuildIndex', () => {
-  it('returns a stub result (real implementation in workspace-bmvls)', async () => {
-    const { layer: filesLayer } = makeMemoryFilesLayer({})
-    const searchLayer = makeMemorySearchLayer([])
+  it('drops+recreates FTS tables, scans JSONL files, reindexes observations, re-applies markers', async () => {
+    const obs1 = makeObservation({ id: 'obs-001', narrative: 'First observation' })
+    const obs2 = makeObservation({ id: 'obs-002', narrative: 'Second observation' })
+
+    const execStatements: string[] = []
+    const indexedObsIds: string[] = []
+    const insertedMarkerSqls: string[] = []
+
+    const searchLayer = Layer.succeed(
+      MemorySearch,
+      MemorySearch.of({
+        statement: <T>(_projectId: string, stmt: FtsStatement) => {
+          execStatements.push(stmt.sql)
+          return Effect.sync(() => null as T)
+        },
+        transaction: (_projectId: string, stmts: ReadonlyArray<FtsStatement>) =>
+          Effect.sync(() => {
+            // The INSERT into observation_index carries the obs id as the first param.
+            const obsInsert = stmts.find((s) => s.sql.includes('observation_index'))
+            if (obsInsert?.params?.[0]) indexedObsIds.push(obsInsert.params[0] as string)
+            const markerInsert = stmts.find((s) => s.sql.includes('reset_markers'))
+            if (markerInsert) insertedMarkerSqls.push(markerInsert.sql)
+            return [] as unknown[]
+          }),
+      }),
+    )
+
+    const markers = [
+      {
+        id: 'rm-001',
+        scope: 'project' as const,
+        scopeId: 'test-project',
+        fromTimestamp: '2026-06-17T00:00:00.000Z',
+        reason: 'initial',
+        createdAt: '2026-06-17T00:00:00.000Z',
+      },
+    ]
+
+    const { layer: filesLayer } = makeMemoryFilesLayer({
+      markers,
+      observationFiles: {
+        '/tmp/2026-06-17.jsonl': [obs1, obs2],
+      },
+    })
+    // Override listObservationFiles to return our test path.
+    const filesLayerWithFiles = Layer.succeed(
+      MemoryFiles,
+      MemoryFiles.of({
+        appendObservation: (o: unknown) =>
+          Effect.sync(() => ({ jsonlPath: '/tmp/test.jsonl', byteOffset: 0 })),
+        upsertMarkdown: (_o: unknown) => Effect.succeed(undefined),
+        readStatus: (_p: string, _i: string) => Effect.sync(() => null),
+        writeStatus: (_p: string, _i: string, _s: unknown) => Effect.sync(() => undefined),
+        readResetMarkers: (_p: string) => Effect.sync(() => markers as ReadonlyArray<unknown>),
+        writeResetMarker: (_p: string, _m: unknown) => Effect.sync(() => undefined),
+        listObservationFiles: (_p: string) =>
+          Effect.sync(() => ['/tmp/2026-06-17.jsonl'] as ReadonlyArray<string>),
+        readObservationsFile: (path: string) =>
+          Effect.sync(() => (path === '/tmp/2026-06-17.jsonl' ? [obs1, obs2] : []) as ReadonlyArray<unknown>),
+        findByteOffset: (_path: string, id: string) =>
+          Effect.sync(() => (id === 'obs-001' ? 0 : 120)),
+      }),
+    )
+
     const emitted: string[] = []
     const busLayer = makeEventBusLayer(emitted)
     const dbLayer = makeFakeDbLayer()
 
     const layer = MemoryWriterLive.pipe(
       Layer.provide(searchLayer),
-      Layer.provide(filesLayer),
+      Layer.provide(filesLayerWithFiles),
       Layer.provide(busLayer),
       Layer.provide(dbLayer),
     )
@@ -494,6 +555,13 @@ describe('MemoryWriter.rebuildIndex', () => {
     )
 
     expect(result.projectId).toBe('test-project')
-    expect(typeof result.reindexed).toBe('number')
+    // Both observations were reindexed.
+    expect(result.reindexed).toBe(2)
+    expect(indexedObsIds).toContain('obs-001')
+    expect(indexedObsIds).toContain('obs-002')
+    // The drop+recreate exec was called.
+    expect(execStatements.some((s) => s.includes('DROP TABLE IF EXISTS memory_fts'))).toBe(true)
+    // Reset marker was re-applied.
+    expect(execStatements.some((s) => s.includes('INSERT INTO reset_markers'))).toBe(true)
   })
 })

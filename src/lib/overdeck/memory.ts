@@ -588,24 +588,73 @@ function makeIndexStatements(
     },
     {
       method: 'run',
-      sql: `INSERT OR REPLACE INTO observation_index (id, jsonl_path, byte_offset, project_id, issue_id) VALUES (?, ?, ?, ?, ?)`,
-      params: [o.id, jsonlPath, byteOffset, o.projectId, o.issueId],
+      // observation_index schema: (id TEXT, observation_path_jsonl TEXT, byte_offset INTEGER)
+      sql: `INSERT OR REPLACE INTO observation_index (id, observation_path_jsonl, byte_offset) VALUES (?, ?, ?)`,
+      params: [o.id, jsonlPath, byteOffset],
     },
   ]
 }
 
+// reset_markers uses AUTOINCREMENT id — do not include id in the INSERT.
 function makeInsertResetMarkerStatement(marker: ResetMarker): FtsStatement {
   return {
     method: 'run',
-    sql: `INSERT OR REPLACE INTO reset_markers (id, scope, scope_id, from_timestamp, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    params: [
-      marker.id,
-      marker.scope,
-      marker.scopeId,
-      marker.fromTimestamp,
-      marker.reason,
-      marker.createdAt,
-    ],
+    sql: `INSERT INTO reset_markers (scope, scope_id, from_timestamp, reason, created_at) VALUES (?, ?, ?, ?, ?)`,
+    params: [marker.scope, marker.scopeId, marker.fromTimestamp, marker.reason, marker.createdAt],
+  }
+}
+
+// Drops and recreates the three FTS cache tables. Used by rebuildIndex to start fresh.
+// Must run as a single exec (DDL outside transaction) to avoid SQLite FTS5 constraints.
+function dropAndRecreateFtsStatement(): FtsStatement {
+  return {
+    method: 'exec',
+    sql: `
+      DROP TABLE IF EXISTS memory_fts;
+      DROP TABLE IF EXISTS reset_markers;
+      DROP TABLE IF EXISTS observation_index;
+
+      CREATE VIRTUAL TABLE memory_fts USING fts5(
+        content,
+        display_content UNINDEXED,
+        source,
+        branch UNINDEXED,
+        entry_date,
+        entry_time,
+        entry_type,
+        files,
+        tags UNINDEXED,
+        doc_type UNINDEXED,
+        scope UNINDEXED,
+        project_id,
+        workspace_id,
+        issue_id,
+        run_id,
+        session_id,
+        agent_role,
+        agent_harness,
+        tokenize = 'porter unicode61'
+      );
+
+      CREATE TABLE reset_markers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL,
+        scope_id TEXT NOT NULL,
+        from_timestamp TEXT NOT NULL,
+        reason TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_reset_markers_scope ON reset_markers(scope, scope_id, from_timestamp);
+      CREATE INDEX idx_reset_markers_created_at ON reset_markers(created_at);
+
+      CREATE TABLE observation_index (
+        id TEXT PRIMARY KEY,
+        observation_path_jsonl TEXT NOT NULL,
+        byte_offset INTEGER NOT NULL
+      );
+      CREATE INDEX idx_observation_index_path_offset
+        ON observation_index(observation_path_jsonl, byte_offset);
+    `,
   }
 }
 
@@ -788,9 +837,34 @@ export const MemoryWriterLive = Layer.effect(
     const reconcile = () =>
       Effect.succeed(ReconcileResult.make({ reconciled: 0 }))
 
-    // rebuildIndex — STUB. Real implementation in workspace-bmvls (memory-fts-rebuilder).
+    // rebuildIndex — walk JSONL files (source of truth), re-emit every observation
+    // into a fresh memory_fts + observation_index, then re-apply reset_markers.
     const rebuildIndex = (projectId: string) =>
-      Effect.succeed(RebuildResult.make({ projectId, reindexed: 0 }))
+      Effect.gen(function* () {
+        // 1. Drop and recreate the three cache tables.
+        yield* fts.statement<null>(projectId, dropAndRecreateFtsStatement())
+        // 2. Walk every JSONL file and re-index its observations.
+        const filePaths = yield* files.listObservationFiles(projectId)
+        let count = 0
+        yield* Effect.forEach(filePaths, (path) =>
+          Effect.gen(function* () {
+            const observations = yield* files.readObservationsFile(path)
+            yield* Effect.forEach(observations as ReadonlyArray<MemoryObservation>, (o) =>
+              Effect.gen(function* () {
+                const byteOffset = yield* files.findByteOffset(path, o.id)
+                yield* fts.transaction(projectId, makeIndexStatements(o, path, byteOffset))
+                count++
+              }),
+            )
+          }),
+        )
+        // 3. Re-apply reset markers from the file source of truth.
+        const markers = yield* files.readResetMarkers(projectId)
+        yield* Effect.forEach(markers as ReadonlyArray<ResetMarker>, (m) =>
+          fts.statement<null>(projectId, makeInsertResetMarkerStatement(m)),
+        )
+        return RebuildResult.make({ projectId, reindexed: count })
+      })
 
     return MemoryWriter.of({
       extractDelta,
