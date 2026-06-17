@@ -71,18 +71,11 @@ async function detectApiError(sessionId: string): Promise<boolean> {
  */
 async function readReviewerStoppedAt(
   sessionId: string,
-  agentsRoot?: string,
+  _agentsRoot?: string,
 ): Promise<string | undefined> {
   try {
     const state = getAgentStateSync(sessionId);
-    if (state) return state.stoppedAt;
-    // Fallback: read state.json from the provided dir (used in tests with agentsDirOverride)
-    if (agentsRoot) {
-      const raw = await readFile(join(agentsRoot, sessionId, 'state.json'), 'utf-8');
-      const parsed = JSON.parse(raw) as { stoppedAt?: string };
-      return typeof parsed.stoppedAt === 'string' ? parsed.stoppedAt : undefined;
-    }
-    return undefined;
+    return state?.stoppedAt;
   } catch {
     return undefined;
   }

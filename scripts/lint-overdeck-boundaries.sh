@@ -2,18 +2,15 @@
 #
 # lint-overdeck-boundaries.sh — cutover guard for the Overdeck two-door rule.
 #
-# Dormant by default: the remodel is still relocating legacy callers, so `npm
-# run lint` must stay green until the `ci-guard-on` bead flips strict mode. Set
-# PAN_OVERDECK_BOUNDARY_LINT=1 to enforce now.
-#
-# Strict mode fails when route/RPC/CLI/hook/script code imports data stores
-# directly instead of going through a domain resolver/writer service.
+# Strict mode: enforced in CI (PAN_OVERDECK_BOUNDARY_LINT=1 in package.json since ci-guard-on).
+# Fails when route/RPC/CLI/hook/script code imports data stores directly instead
+# of going through a domain resolver/writer service.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 if [[ "${PAN_OVERDECK_BOUNDARY_LINT:-0}" != "1" ]]; then
-  echo "✓ overdeck import-boundary lint authored (strict enforcement disabled until ci-guard-on)"
+  echo "✓ overdeck import-boundary lint: set PAN_OVERDECK_BOUNDARY_LINT=1 to enforce"
   exit 0
 fi
 

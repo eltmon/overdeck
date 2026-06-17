@@ -45,7 +45,7 @@ function runLint(root: string, strict = true): { ok: boolean; output: string } {
 }
 
 describe('lint-overdeck-boundaries.sh', () => {
-  it('stays wired into lint but gated off until cutover', () => {
+  it('exits cleanly when PAN_OVERDECK_BOUNDARY_LINT is not set', () => {
     const root = makeTempRepo();
     installScript(root);
     mkdirSync(join(root, 'src', 'dashboard', 'server', 'routes'), { recursive: true });
@@ -57,7 +57,7 @@ describe('lint-overdeck-boundaries.sh', () => {
 
     const { ok, output } = runLint(root, false);
     expect(ok).toBe(true);
-    expect(output).toContain('strict enforcement disabled until ci-guard-on');
+    expect(output).toContain('PAN_OVERDECK_BOUNDARY_LINT=1');
   });
 
   it('fails strict mode when a route imports the Db handle directly', () => {

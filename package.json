@@ -91,7 +91,7 @@
     "lint:effect": "node scripts/check-effect-versions.mjs",
     "lint:permissions": "bash scripts/lint-permissions.sh",
     "lint:state-writes": "bash scripts/lint-state-writes.sh",
-    "lint:overdeck-boundaries": "bash scripts/lint-overdeck-boundaries.sh",
+    "lint:overdeck-boundaries": "PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh",
     "prelint:skills": "npm run build:contracts && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
     "lint:prompts": "bash scripts/lint-prompts.sh",
