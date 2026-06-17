@@ -81,7 +81,6 @@ describe('backfillIssueRecords', () => {
           name: 'Panopticon',
           path: projectRoot,
           issue_prefix: 'PAN',
-          pan_records: { repo: '.', path: '.pan' },
         },
       },
     });
@@ -102,7 +101,6 @@ describe('backfillIssueRecords', () => {
         name: 'Panopticon',
         path: projectRoot,
         issue_prefix: 'PAN',
-        pan_records: { repo: '.', path: '.pan' },
       };
     });
   });
@@ -111,7 +109,24 @@ describe('backfillIssueRecords', () => {
     rmSync(infraRepo, { recursive: true, force: true });
   });
 
+  function makeWorkspace(root: string, issueId: string): string {
+    const workspacePath = join(root, 'workspaces', `feature-${issueId}`);
+    mkdirSync(workspacePath, { recursive: true });
+    // Workspaces are git worktrees in production; simulate with a nested git repo
+    // on main so the record base path check and auto-commit flush pass.
+    execSync('git init -q', { cwd: workspacePath });
+    execSync('git config user.email t@e.t', { cwd: workspacePath });
+    execSync('git config user.name "Test"', { cwd: workspacePath });
+    execSync('git config commit.gpgsign false', { cwd: workspacePath });
+    writeFileSync(join(workspacePath, 'README.md'), 'seed');
+    execSync('git add README.md', { cwd: workspacePath });
+    execSync('git commit -q -m init', { cwd: workspacePath });
+    execSync('git branch -M main', { cwd: workspacePath });
+    return workspacePath;
+  }
+
   it('produces one record per in-flight issue combining continue and review_status data', async () => {
+    const workspacePath = makeWorkspace(projectRoot, 'pan-1908');
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
       join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
@@ -137,17 +152,18 @@ describe('backfillIssueRecords', () => {
     expect(result.processed).toBe(1);
     expect(result.skipped).toBe(0);
     expect(result.failed).toBe(0);
-    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1908.json'))).toBe(true);
+    expect(existsSync(join(workspacePath, '.pan', 'records', 'pan-1908.json'))).toBe(true);
   });
 
   it('discovers issues from the agents table even without review_status or continue files', async () => {
+    const workspacePath = makeWorkspace(projectRoot, 'pan-1909');
     mockListAllAgents.mockReturnValue([
       {
         id: 'agent-pan-1909',
         issueId: 'PAN-1909',
         role: 'work',
         status: 'running',
-        workspace: '/workspace',
+        workspace: workspacePath,
       },
     ]);
 
@@ -155,10 +171,11 @@ describe('backfillIssueRecords', () => {
 
     expect(result.processed).toBe(1);
     expect(result.details.find((d) => d.issueId === 'PAN-1909')?.action).toBe('written');
-    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1909.json'))).toBe(true);
+    expect(existsSync(join(workspacePath, '.pan', 'records', 'pan-1909.json'))).toBe(true);
   });
 
   it('is idempotent by skipping unchanged records on re-run', async () => {
+    makeWorkspace(projectRoot, 'pan-1908');
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
       join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
@@ -177,19 +194,22 @@ describe('backfillIssueRecords', () => {
   });
 
   it('writes a record for a single issue when --issue-id is passed', async () => {
+    const workspace1908 = makeWorkspace(projectRoot, 'pan-1908');
+    makeWorkspace(projectRoot, 'pan-1909');
     mockListAllAgents.mockReturnValue([
-      { id: 'agent-pan-1908', issueId: 'PAN-1908', role: 'work', status: 'running', workspace: '/w' },
+      { id: 'agent-pan-1908', issueId: 'PAN-1908', role: 'work', status: 'running', workspace: workspace1908 },
       { id: 'agent-pan-1909', issueId: 'PAN-1909', role: 'work', status: 'running', workspace: '/w' },
     ]);
 
     const result = await backfillIssueRecords({ issueId: 'PAN-1908' });
 
     expect(result.processed).toBe(1);
-    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1908.json'))).toBe(true);
-    expect(existsSync(join(infraRepo, '.pan', 'records', 'pan-1909.json'))).toBe(false);
+    expect(existsSync(join(workspace1908, '.pan', 'records', 'pan-1908.json'))).toBe(true);
+    expect(existsSync(join(workspace1908, '.pan', 'records', 'pan-1909.json'))).toBe(false);
   });
 
-  it('commits queued records to the infra repo', async () => {
+  it('commits queued records to the workspace branch', async () => {
+    const workspacePath = makeWorkspace(projectRoot, 'pan-1908');
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
       join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
@@ -197,10 +217,10 @@ describe('backfillIssueRecords', () => {
     );
 
     await backfillIssueRecords();
-    const flushResult = await Effect.runPromise(flushAutoCommits(infraRepo));
+    const flushResult = await Effect.runPromise(flushAutoCommits(workspacePath));
 
     expect(flushResult.committed).toBe(true);
-    const log = execSync('git log --oneline -1', { cwd: infraRepo, encoding: 'utf-8' });
+    const log = execSync('git log --oneline -1', { cwd: workspacePath, encoding: 'utf-8' });
     expect(log).toContain('PAN-1908');
   });
 });

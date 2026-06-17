@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-16T20:35:21.496Z",
-  "updated": "2026-06-16T20:51:21.000Z",
-  "gitState": { "branch": "feature/pan-1919", "sha": "e9914c9429", "dirty": true },
+  "updated": "2026-06-17T07:57:00.000Z",
+  "gitState": { "branch": "feature/pan-1919", "sha": "fb2995afd9", "dirty": true },
   "decisions": [
     { "id": "D1", "summary": "Foundation already landed in commit e9914c9429 (record schema superset, src/lib/pan-dir/record.ts writer, sync-path status-override writer/reader, harness/model mirror, no-loss test — 63 related tests green). This plan scopes ONLY the remaining gaps + verification; the work agent verifies-and-completes, does not rebuild the foundation.", "recordedAt": "2026-06-16T20:51:21.000Z" },
     { "id": "D2", "summary": "Record name = 'record' at <workspace>/.pan/records/<issue>.json on the feature branch (already implemented). Unifies with the PAN-1908 records plane; retires the 'continues' name the maintainer disliked.", "recordedAt": "2026-06-16T20:51:21.000Z" },
@@ -20,15 +20,61 @@
     { "id": "H4", "summary": "The record file lands on main at branch merge (it is git-tracked, not ignored).", "mitigation": "Acceptable — continues already land on main today. Keep record writes on the branch only during work; never commit the record to main mid-work (PAN-1124)." },
     { "id": "H5", "summary": "getIssueRecordPath reconstructs the workspace path from project root + workspaces/feature-<id>; container/remote contexts may differ from the live cwd.", "mitigation": "Prefer getIssueRecordPathForWorkspace(workspacePath, issueId) where an explicit workspace path is available; note in the dashboard-route bead." }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "No unblocked beads remain for PAN-1919; run `bd ready -l pan-1919` to verify or claim the next bead if any exist.",
+    "beadId": null,
+    "filesToRead": [".pan/continue.json", ".pan/specs/2026-06-16-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record.vbrief.json"]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-8",
   "sessionHistory": [
     {
       "reason": "planning",
-      "content": "Planning session for PAN-1919 (--auto). Discovered a plan-after-code situation: commit e9914c9429 already landed the record foundation (schema superset, writer, sync-path wiring, harness/model mirror, no-loss test). No existing spec/beads. Scoped a remaining-work plan of 10 beads: fix async split-brain, route 4 continue-writer surfaces to the record, complete the backfill (inspection-gated), retire continues to read-only legacy, plus no-loss-guard + cross-machine-resume + legacy-test beads.",
+      "content": "Planning session for PAN-1919 (--auto). Discovered a plan-after-code situation: commit e9914c9429 already landed the record foundation (record schema superset, writer, sync-path wiring, harness/model mirror, no-loss test). No existing spec/beads. Scoped a remaining-work plan of 10 beads: fix async split-brain, route 4 continue-writer surfaces to the record, complete the backfill (inspection-gated), retire continues to read-only legacy, plus no-loss-guard + cross-machine-resume + legacy-test beads.",
       "note": "Planning session started for PAN-1919",
       "timestamp": "2026-06-16T20:35:21.496Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-2yrwn (fix-async-statusoverride-splitbrain): rewrote vbrief/dag.ts mirrorTaskOperationToContinueFile as mirrorTaskOperationToRecord, writing statusOverrides to the per-issue record via the new async writeStatusOverrides helper in pan-dir/record.ts. Removed continue.json read/write from the async dashboard path; sync CLI path (dag-cli.ts/io.ts) already wrote the record. Typecheck + targeted tests pass.",
+      "note": "Closed bead workspace-2yrwn",
+      "timestamp": "2026-06-17T06:57:02.226Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-so3r8 (route-done-continue-to-record): replaced done.ts readWorkspaceContinue/writeWorkspaceContinue calls with record reads/writes. recordTestWaiver now appends a decision entry via appendDecisionEntry; end-of-session append uses appendSessionEntry. Added async writeIssueRecord and appendDecisionEntry helpers to pan-dir/record.ts. Updated the corresponding unit test to assert the record file. Typecheck + done tests pass.",
+      "note": "Closed bead workspace-so3r8",
+      "timestamp": "2026-06-17T07:09:05.710Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-0z0y6 (route-planning-continue-to-record): replaced spawn-planning-session.ts writeWorkspaceContinue planning seed with appendSessionEntry to the per-issue record. Updated the launcher init message to point the planning agent at the record file path. Typecheck + spawn-planning-session tests pass.",
+      "note": "Closed bead workspace-0z0y6",
+      "timestamp": "2026-06-17T07:13:47.206Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-3091t (route-cloister-continue-readers-to-record): routed work-agent-prompt.ts feedback and planning-context reads, plus handoff-context.ts continueState read, to the per-issue record via readIssueRecord. Also updated getTrackerContext to use the record file mtime for 'new comments since last state update'. Removed now-unused readWorkspaceContinue and getWorkspacePanPaths imports. Typecheck + cloister prompt/handoff tests pass.",
+      "note": "Closed bead workspace-3091t",
+      "timestamp": "2026-06-17T07:22:15.745Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-nsvkk (route-dashboard-continue-to-record): routed dashboard start-agent continue write to the per-issue record (gitState/model/sessionHistory via readIssueRecord/writeIssueRecord/queueIssueRecordCommit). Routed workspaces state-md read and service-URL discovery to the record file instead of workspace continue.json. Removed dashboard continue-state helper functions and unused imports. Typecheck + dashboard route tests pass.",
+      "note": "Closed bead workspace-nsvkk",
+      "timestamp": "2026-06-17T07:34:58.502Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-fmjxz (complete-backfill-migration): extended records.ts buildIssueRecord to merge workspace continue.json statusOverrides over legacy project .pan/continues/ data and to copy harness/model from the agent state.json. Records now emit schemaVersion:2. Updated records-backfill.ts to target only in-flight issues with a live workspace, decoupled from the infra-repo gate, and use the branch-resident record path. Added/updated tests for statusOverrides, harness/model, and workspace-scoped backfill. Typecheck + targeted tests pass.",
+      "note": "Closed bead workspace-fmjxz",
+      "timestamp": "2026-06-17T07:57:00.000Z",
       "agentModel": "agent:claude-opus-4-8"
     }
   ],

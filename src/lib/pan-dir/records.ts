@@ -9,7 +9,9 @@
 
 import { hostname } from 'node:os';
 import { join } from 'node:path';
-import { promises as fsp } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { readFile as readFileAsync } from 'node:fs/promises';
+import { Effect } from 'effect';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 import {
@@ -17,6 +19,7 @@ import {
   getCostForIssueFromDb,
 } from '../database/cost-events-db.js';
 import { getMergeSetSync } from '../merge-set.js';
+import { getPanopticonHome } from '../paths.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,
@@ -35,12 +38,14 @@ import {
   getIssueRecordPath,
   queueIssueRecordCommit,
   readIssueRecord,
+  RECORD_SCHEMA_VERSION,
   writeIssueRecordSync,
   type PanIssueRecord,
   type PanIssueCloseOutRecord,
   type PanIssuePipelineRecord,
   type PanIssueUsageRecord,
 } from './record.js';
+import { readWorkspaceContinue } from './continue.js';
 
 export type {
   PanIssueRecord,
@@ -61,9 +66,10 @@ interface ContinueFile {
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   agentModel?: string;
+  statusOverrides?: Record<string, string>;
 }
 
-function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback'> {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback' | 'statusOverrides'> {
   return {
     decisions: raw?.decisions,
     hazards: raw?.hazards,
@@ -71,7 +77,32 @@ function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisi
     beadsMapping: raw?.beadsMapping,
     sessionHistory: raw?.sessionHistory,
     feedback: raw?.feedback ?? [],
+    statusOverrides: raw?.statusOverrides,
   };
+}
+
+async function readWorkspaceContinueText(workspacePath: string): Promise<ContinueFile | null> {
+  if (!existsSync(workspacePath)) return null;
+  const state = await Effect.runPromise(
+    readWorkspaceContinue(workspacePath).pipe(Effect.catch(() => Effect.succeed(null))),
+  );
+  return state;
+}
+
+function readAgentStateHarnessModel(issueId: string): Pick<PanIssueRecord, 'harness' | 'model'> | null {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  const statePath = join(getPanopticonHome(), 'agents', agentId, 'state.json');
+  if (!existsSync(statePath)) return null;
+  try {
+    const raw = JSON.parse(readFileSync(statePath, 'utf-8')) as { harness?: string; model?: string };
+    if (!raw.harness && !raw.model) return null;
+    return {
+      harness: raw.harness as PanIssueRecord['harness'],
+      model: raw.model,
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ─── Pipeline projection ──────────────────────────────────────────────────────
@@ -142,7 +173,7 @@ function projectMerges(issueId: string): string[] {
 async function readLegacyContinueText(projectRoot: string, issueId: string): Promise<string | null> {
   const path = join(projectRoot, '.pan', 'continues', `${issueId.toLowerCase()}.vbrief.json`);
   try {
-    return await fsp.readFile(path, 'utf-8');
+    return await readFileAsync(path, 'utf-8');
   } catch {
     return null;
   }
@@ -160,16 +191,36 @@ export async function buildIssueRecord(
   opts: BuildIssueRecordOptions = {},
 ): Promise<PanIssueRecord> {
   const existing = await readIssueRecord(project, issueId);
+  const workspacePath = join(project.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const workspaceContinue = existsSync(workspacePath) ? await readWorkspaceContinueText(workspacePath) : null;
   const legacyContinueText = await readLegacyContinueText(project.path, issueId);
-  const continueSubset = projectContinue(legacyContinueText ? (JSON.parse(legacyContinueText) as ContinueFile) : null);
+  const legacyContinue = legacyContinueText ? (JSON.parse(legacyContinueText) as ContinueFile) : null;
+  // Merge: legacy project-side continue is the base, workspace continue overlays it
+  // (workspace is newer during active work), and the per-issue record overlays both.
+  const mergedContinue: ContinueFile | null = legacyContinue || workspaceContinue
+    ? {
+        ...legacyContinue,
+        ...workspaceContinue,
+        // Concatenate array fields so nothing is lost; workspace entries appended last.
+        decisions: [...(legacyContinue?.decisions ?? []), ...(workspaceContinue?.decisions ?? [])],
+        hazards: [...(legacyContinue?.hazards ?? []), ...(workspaceContinue?.hazards ?? [])],
+        sessionHistory: [...(legacyContinue?.sessionHistory ?? []), ...(workspaceContinue?.sessionHistory ?? [])],
+        feedback: [...(legacyContinue?.feedback ?? []), ...(workspaceContinue?.feedback ?? [])],
+        beadsMapping: { ...(legacyContinue?.beadsMapping ?? {}), ...(workspaceContinue?.beadsMapping ?? {}) },
+        statusOverrides: { ...(legacyContinue?.statusOverrides ?? {}), ...(workspaceContinue?.statusOverrides ?? {}) },
+      }
+    : null;
+  const continueSubset = projectContinue(mergedContinue);
+  const harnessModel = readAgentStateHarnessModel(issueId);
   const pipelineRecord = projectPipeline(issueId, opts.reviewStatus ?? null);
   const usageRecord = projectUsage(issueId);
   const merges = projectMerges(issueId);
 
   return {
     issueId: issueId.toUpperCase(),
-    schemaVersion: 1,
+    schemaVersion: RECORD_SCHEMA_VERSION,
     ...continueSubset,
+    ...harnessModel,
     ...existing,
     pipeline: pipelineRecord,
     closeOut: {
@@ -184,7 +235,9 @@ export async function buildIssueRecord(
 
 // Re-export core record I/O from the PAN-1919 single-writer module.
 export {
+  getIssueRecordBasePath,
   getIssueRecordPath,
+  getIssueWorkspacePath,
   writeIssueRecordSync,
   readIssueRecord,
   queueIssueRecordCommit,

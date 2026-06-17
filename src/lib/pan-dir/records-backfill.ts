@@ -16,13 +16,14 @@ import { getAllReviewStatusesFromDb } from '../database/review-status-db.js';
 import {
   getProjectSync,
   loadProjectsConfigSync,
-  resolveInfraRepo,
   resolveProjectFromIssueSync,
   type ProjectConfig,
 } from '../projects.js';
 import {
   buildIssueRecord,
+  getIssueRecordBasePath,
   getIssueRecordPath,
+  getIssueWorkspacePath,
   queueIssueRecordCommit,
   readIssueRecord,
   writeIssueRecordSync,
@@ -148,9 +149,14 @@ async function backfillIssue(
   }
 
   try {
-    const { repoPath } = resolveInfraRepo(project);
-    if (!existsSync(join(repoPath, '.git'))) {
-      return { action: 'failed', reason: 'infra repo is not a git checkout' };
+    const workspacePath = getIssueWorkspacePath(issueId);
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return { action: 'skipped', reason: 'no live workspace' };
+    }
+
+    const basePath = getIssueRecordBasePath(project, issueId);
+    if (!existsSync(join(basePath, '.git'))) {
+      return { action: 'failed', reason: 'record base path is not a git checkout' };
     }
 
     const existing = await readIssueRecord(project, issueId);

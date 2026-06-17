@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { join } from 'node:path';
 
 import type { ProjectConfig } from '../../projects.js';
@@ -69,21 +69,89 @@ describe('buildIssueRecord', () => {
         sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
         agentModel: 'claude-opus-4-8',
         beadsMapping: { 'item-1': ['bead-a'] },
+        statusOverrides: { 'item-1': 'completed' },
       }),
     );
 
     const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908');
 
     expect(record.issueId).toBe('PAN-1908');
+    expect(record.schemaVersion).toBe(2);
     expect(record.decisions).toHaveLength(1);
     expect(record.hazards).toHaveLength(1);
     expect(record.resumePoint).toEqual({ description: 'resume here', beadId: 'infra-record-writer' });
     expect(record.beadsMapping).toEqual({ 'item-1': ['bead-a'] });
+    expect(record.statusOverrides).toEqual({ 'item-1': 'completed' });
     expect(record.sessionHistory).toHaveLength(1);
     expect(record.feedback).toEqual([]);
     expect(record).not.toHaveProperty('continue');
     expect(record).not.toHaveProperty('agentModel');
     expect(record).not.toHaveProperty('gitState');
+  });
+
+  it('prefers workspace continue.json statusOverrides over legacy project continue', async () => {
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1908');
+    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
+    mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
+    writeFileSync(
+      join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
+      JSON.stringify({
+        issueId: 'PAN-1908',
+        decisions: [{ id: 'D1', summary: 'legacy', recordedAt: '2026-01-01' }],
+        statusOverrides: { 'item-1': 'legacy-status' },
+      }),
+    );
+    writeFileSync(
+      join(workspacePath, '.pan', 'continue.json'),
+      JSON.stringify({
+        version: '1',
+        issueId: 'PAN-1908',
+        created: '2026-01-01T00:00:00.000Z',
+        updated: '2026-01-01T00:00:00.000Z',
+        gitState: {},
+        decisions: [],
+        hazards: [],
+        resumePoint: null,
+        beadsMapping: {},
+        sessionHistory: [],
+        statusOverrides: { 'item-1': 'workspace-status' },
+      }),
+    );
+
+    const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908');
+
+    expect(record.statusOverrides).toEqual({ 'item-1': 'workspace-status' });
+    expect(record.decisions).toEqual([{ id: 'D1', summary: 'legacy', recordedAt: '2026-01-01' }]);
+  });
+
+  it('copies harness/model from state.json when present', async () => {
+    const panHome = mkdtempSync(join(tmpdir(), 'pan-home-'));
+    const prevPanHome = process.env.PANOPTICON_HOME;
+    process.env.PANOPTICON_HOME = panHome;
+    try {
+      const agentDir = join(panHome, 'agents', 'agent-pan-1908');
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(
+        join(agentDir, 'state.json'),
+        JSON.stringify({
+          id: 'agent-pan-1908',
+          issueId: 'PAN-1908',
+          harness: 'pi',
+          model: 'kimi-k2.7-code',
+          role: 'work',
+          status: 'running',
+          startedAt: '2026-01-01T00:00:00.000Z',
+        }),
+      );
+
+      const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908');
+
+      expect(record.harness).toBe('pi');
+      expect(record.model).toBe('kimi-k2.7-code');
+    } finally {
+      process.env.PANOPTICON_HOME = prevPanHome;
+      rmSync(panHome, { recursive: true, force: true });
+    }
   });
 
   it('projects durable review_status verdicts', async () => {
