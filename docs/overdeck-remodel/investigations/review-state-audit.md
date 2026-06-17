@@ -10,6 +10,13 @@ Method: every field traced through its camelCase accessor across `src/`
 (non-test), with the discriminator being **does any read drive control flow**
 (an `if`/`filter`/gate/comparison), not whether the field is "touched".
 
+**Headline counts:** 49 fields audited (39 `review_status` columns + 10 `agents`
+review-run columns). **36 KEEP, 12 DROP, 1 DERIVE.** Of the 36 KEEP: 13 DURABLE
+VERDICT, 19 EPHEMERAL REVIEW-RUN, 4 NEITHER (operator/runtime control). ~2,550
+read+write matches across 154 files touch the `review_status` set, plus ~158
+across 14 files for the agents-table set — that is the complexity surface the
+DROP/DERIVE collapse gets to shrink.
+
 ## Glossary
 
 - **Branch-read** — a read site that feeds an `if`/`filter`/`switch`/comparison
@@ -44,13 +51,14 @@ Method: every field traced through its camelCase accessor across `src/`
 | `test_status` | test pipeline | `mergeGateEligibility` (145); `fixStuckReadyForMerge` (520); deacon test patrol (2497) | Core test outcome; gates merge | **KEEP** | DURABLE VERDICT |
 | `merge_status` | merge flow (workspaces.ts ~5016-5646), postMergeLifecycle | `mergeGateEligibility` (149 "already merged"); `clearStuckMergeStatuses` (483); `stuck-remediation.ts:35` | Merge outcome; `merged` is terminal | **KEEP** | DURABLE VERDICT |
 | `verification_status` | verification-runner.ts (234,365,408,453) | `verificationSatisfied` (123) → `mergeGateEligibility` (148) | Blocks merge only when `'failed'` | **KEEP** | DURABLE VERDICT |
+| `verification_notes` | verification-runner.ts | display only (activity feed, review-status.ts:359 — no `.includes` branch) | Human-readable verification failure text | **DROP** (fold into notes) | — |
 | `verification_cycle_count` | verification-runner.ts (233,364,407) | **verification-runner.ts:194** `currentCycles >= VERIFICATION_MAX_CYCLES` — circuit breaker | Stops infinite verification re-runs | **KEEP** | EPHEMERAL REVIEW-RUN |
 | `verification_max_cycles` | verification-runner.ts — always set to the constant `VERIFICATION_MAX_CYCLES = 10` (29) | **none server-side** — only frontend display (ReviewPipelineSection.tsx:178, PlanDAG.tsx:361) | A stored copy of a compile-time constant | **DROP** (DERIVE from constant) | — |
-| `review_notes` | review pipeline | **deacon.ts:2058** `reviewNotes.includes('failing required checks')` — CI-failure branch | Substring-parsed to classify CI failure (fragile) | **KEEP** (1 verdict-explanation field) | DURABLE VERDICT |
+| `review_notes` | review pipeline | **deacon.ts:2058** `reviewNotes.includes('failing required checks')` — CI-failure branch | Substring-parsed to classify CI failure (fragile) | **KEEP-as-signal** — replace prose with a typed `failureReason` enum (ephemeral run state); keep at most one durable verdict-explanation field | EPHEMERAL REVIEW-RUN |
 | `test_notes` | test pipeline; deacon strand marker (2487) | display only (activity feed, review-status.ts:401) | Human-readable test failure text | **DROP** (fold into one notes field) | — |
-| `merge_notes` | merge flow | **deacon.ts:3652/3735/3880** `mergeNotes.includes(...)` — CI / timeout / push-failure branches | Substring-parsed to classify merge failure | **KEEP** (verdict-explanation) | DURABLE VERDICT |
+| `merge_notes` | merge flow | **deacon.ts:3652/3735/3880** `mergeNotes.includes(...)` — CI / timeout / push-failure branches | Substring-parsed to classify merge failure | **KEEP-as-signal** — replace prose with a typed `mergeFailureReason` enum (ephemeral run state) | EPHEMERAL REVIEW-RUN |
 | `updated_at` | every upsert | `idx_review_status_updated`; ORDER BY; staleness UI | Ordering / "last changed" | **KEEP** | DURABLE VERDICT |
-| `ready_for_merge` | workspaces.ts:3556 (`testStatus==='passed'`→true); ~30 merge-flow sites set false; deacon 3790/3952; recompute sweeps 497/532 | `WHERE ready_for_merge=1` (review-status-db.ts:233; resource-discovery; AwaitingMergePage) | "Awaiting merge" gate / list | **DERIVE** — `fixStuckReadyForMerge` (515) and `clearStuckMergeStatuses` (490) PROVE it is recomputable from `{review_status, test_status, verification_status, merge_status, uat_status}` (identical to `mergeGateEligibility`). The two repair sweeps exist *because* it drifts. Replace the column + `WHERE ready_for_merge=1` with the predicate. | — |
+| `ready_for_merge` | workspaces.ts:3556 (`testStatus==='passed'`→true); ~30 merge-flow sites set false; deacon 3790 & 3952; recompute sweeps 497/532 | `WHERE ready_for_merge=1` (review-status-db.ts:233; resource-discovery; AwaitingMergePage) | "Awaiting merge" gate / list | **DERIVE** — `fixStuckReadyForMerge` (515) and `clearStuckMergeStatuses` (490) PROVE it is recomputable from `{review_status, test_status, verification_status, merge_status}` (identical to `mergeGateEligibility`). **Verified the two deacon `readyForMerge: true` setters (3790, 3952): both are failed-merge *recovery* paths that set `mergeStatus: 'pending'` alongside — i.e. they eagerly re-stamp the SAME derived value (review passed + test passed + verif≠failed + merge pending) after clearing a merge failure. Neither sets it outside the predicate.** Replace the column + `WHERE ready_for_merge=1` with the predicate; both repair sweeps and ~40 `readyForMerge: false` write sites go away. | — |
 | `auto_requeue_count` | deacon auto-requeue path | **deacon.ts:3899** `autoRequeueCount >= 25` — dead-end breaker | Caps auto-requeue attempts | **KEEP** | EPHEMERAL REVIEW-RUN |
 | `merge_retry_count` | deacon merge-retry path | **deacon.ts:3906** `>= FAILED_MERGE_MAX_RETRIES` — merge breaker | Caps merge retries | **KEEP** | EPHEMERAL REVIEW-RUN |
 | `pr_url` | done.ts / merge flow / webhook | `getMergeBlockerReconcileCandidates` (231); flywheel-merge-order; conflict reconcile; many display | Identifies the PR to operate on | **KEEP** | DURABLE VERDICT |
@@ -75,9 +83,18 @@ Method: every field traced through its camelCase accessor across `src/`
 | `inspect_status` | inspect-agent | **deacon.ts:738** `if (inspectStatus !== 'inspecting') continue` | Inspect outcome / patrol gate | **KEEP** | DURABLE VERDICT |
 | `inspect_notes` | inspect-agent | display only | Inspect failure text | **DROP** (fold into notes) | — |
 | `inspect_started_at` | inspect-agent | display only (no timeout branch found) | Timestamp | **DROP** | — |
-| `inspect_bead_id` | inspect-agent | **NONE — zero reads anywhere** | Dead | **DROP** (dead) | — |
+| `inspect_bead_id` | inspect-agent | **written, never consumed for a decision** (zero branch-reads; no `bd close`/lookup use) | None | **DROP** | — |
 | `auto_merge` | setAutoMerge (569) | **auto-merge-eligibility.ts:111** `autoMerge === false` → hold for UAT | Per-issue merge-train routing | **KEEP** | NEITHER — routing policy, belongs with per-issue config not review verdict |
-| `uat_status` *(interface-only, no column)* | UAT flow | `fixStuckReadyForMerge` (526); `clearStuckMergeStatuses` (494) | UAT gate in readyForMerge recompute | **KEEP** | DURABLE VERDICT *(note: typed in ReviewStatus but NOT a `review_status` column — lives only in history/in-memory)* |
+
+> **`uat_status` is NOT a `review_status` column** (so it is excluded from the
+> 39-column count above). It is typed on the `ReviewStatus` interface and read
+> in the `readyForMerge` recompute (`fixStuckReadyForMerge` 526,
+> `clearStuckMergeStatuses` 494), but there is no `uat_status` column, no
+> upsert binding, and `rowToReviewStatus` never restores it — so after any DB
+> round-trip it is always `undefined`, which the gate treats as "pass". Net:
+> there is a UAT gate input that is **not actually persisted or enforced
+> through `readyForMerge`**. If UAT is a real gate it needs a real home; if it
+> isn't, the recompute branches referencing it are dead. Flagged, not counted.
 
 ### Phantom columns listed in the task that do NOT exist
 
@@ -103,8 +120,8 @@ deacon's review monitor *during* a live review run.
 | `review_retry_attempt` | deacon.ts:6013 | **deacon.ts:6237** `if (attempt < 1)` respawn idle reviewer once | Idle-reviewer single-retry gate | **KEEP** | EPHEMERAL REVIEW-RUN |
 | `review_sub_role` | review-agent convoy spawn | **deacon.ts:5684/5983/6031/6158/6268** — sub-role routing for synthesis + signal text | Tags which convoy lane this agent is | **KEEP** | EPHEMERAL REVIEW-RUN |
 | `inspect_sub_role` | inspect-agent.ts:253 | costs/reconciler.ts (cost attribution); spawn tag | Cost/session-type attribution only — no live decision branch found | **DROP** (DERIVE from agent-dir name regex, which reconciler already does at reconciler.ts:140) | — |
-| `flywheel_run_id` | agents.ts:3293 (spawn env) | **concurrency.ts:191** `filter(a => a.flywheelRunId)` — counts flywheel-spawned work for slot accounting | Concurrency slot accounting | **KEEP** | EPHEMERAL REVIEW-RUN (runtime, not a verdict) |
-| `role_run_head` | agents.ts:3547 | **service.ts:232** compares stamped HEAD vs current workspace HEAD (staleness) | Detects whether a role run is stale vs new commits | **KEEP** | NEITHER — work/role-run runtime state, not review-specific; belongs with agent runtime |
+| `flywheel_run_id` | agents.ts:3293 (spawn env) | **concurrency.ts:191** `filter(a => a.flywheelRunId)` — counts flywheel-spawned work for slot accounting | Concurrency slot accounting | **KEEP** | NEITHER — general agent-runtime field (concurrency), not review-run state; keep with agent runtime |
+| `role_run_head` | agents.ts:3547 | **service.ts:232** compares stamped HEAD vs current workspace HEAD (staleness) | Detects whether a role run is stale vs new commits | **KEEP** | NEITHER — general agent-runtime field (staleness), not review-specific; keep with agent runtime |
 
 ---
 
@@ -112,11 +129,23 @@ deacon's review monitor *during* a live review run.
 
 1. **`ready_for_merge` is a derivable cache that the codebase already recomputes
    — twice.** `fixStuckReadyForMerge` and `clearStuckMergeStatuses` both rebuild
-   it from `{review_status, test_status, verification_status, merge_status,
-   uat_status}` — exactly `mergeGateEligibility`'s inputs. The column drifts
-   often enough that two startup repair sweeps exist purely to fix it. Dropping
-   the column and replacing `WHERE ready_for_merge=1` with the predicate removes
-   the column, both repair sweeps, and ~40 `readyForMerge: false` write sites.
+   it from `{review_status, test_status, verification_status, merge_status}` —
+   exactly `mergeGateEligibility`'s inputs. All five `readyForMerge: true`
+   setters were checked: workspaces.ts:3556 (`test=passed`), the two sweeps, and
+   the two deacon recovery paths (3790, 3952) — every one is inside the predicate
+   (the deacon ones pair it with `mergeStatus: 'pending'`, re-stamping the same
+   derived value after a merge failure). Nothing writes `true` outside the
+   predicate, so DERIVE is safe. The column drifts often enough that two startup
+   repair sweeps exist purely to fix it. Dropping it and replacing
+   `WHERE ready_for_merge=1` with the predicate removes the column, both repair
+   sweeps, and ~40 `readyForMerge: false` write sites.
+
+   **Corollary UAT surprise:** the recompute predicate also references
+   `uat_status`, which is NOT a persisted column — `rowToReviewStatus` never
+   restores it, so post-round-trip it is always `undefined` (treated as "pass").
+   There is a UAT gate input that is not actually enforced through
+   `readyForMerge`. Either give UAT a real persisted home or delete the dead
+   recompute branches.
 
 2. **Two of the "columns" in the task list do not exist.** `reviewer_verdicts`
    is a durable-record field (always `undefined` in practice — a dead cast),
