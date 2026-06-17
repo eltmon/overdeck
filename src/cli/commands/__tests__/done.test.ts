@@ -38,34 +38,20 @@ describe('augmentCommentWithWaiver', () => {
 });
 
 describe('recordTestWaiver', () => {
-  it('appends a D-test-waived decision to .pan/continue.json (AC1/AC4)', async () => {
-    const workspacePath = mkdtempSync(join(tmpdir(), 'pan-done-waiver-'));
-    const continuePath = join(workspacePath, '.pan', 'continue.json');
-    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
-    writeFileSync(
-      continuePath,
-      JSON.stringify({
-        version: '1',
-        issueId: 'PAN-1501',
-        created: '2026-01-01T00:00:00.000Z',
-        updated: '2026-01-01T00:00:00.000Z',
-        decisions: [{ id: 'D1', summary: 'Existing decision', recordedAt: '2026-01-01T00:00:00.000Z' }],
-        hazards: [],
-        resumePoint: { description: 'test', beadId: '', filesToRead: [] },
-        beadsMapping: {},
-        agentModel: 'test',
-        sessionHistory: [],
-      }),
-    );
+  it('appends a D-test-waived decision to the per-issue record (AC1/AC4)', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'pan-done-waiver-'));
+    const workspacePath = join(base, 'feature-pan-1501');
+    const recordPath = join(workspacePath, '.pan', 'records', 'pan-1501.json');
+    mkdirSync(join(workspacePath, '.pan', 'records'), { recursive: true });
 
     await recordTestWaiver(workspacePath, 'covered by existing test at abc123');
 
-    const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
-    expect(updated.decisions).toHaveLength(2);
-    expect(updated.decisions[1].id).toBe('D-test-waived');
-    expect(updated.decisions[1].summary).toBe(
+    const updated = JSON.parse(readFileSync(recordPath, 'utf-8'));
+    expect(updated.decisions).toHaveLength(1);
+    expect(updated.decisions[0].id).toBe('D-test-waived');
+    expect(updated.decisions[0].summary).toBe(
       'Test gate waived: covered by existing test at abc123',
     );
-    expect(updated.decisions[1].recordedAt).toMatch(/^\d{4}-/);
+    expect(updated.decisions[0].recordedAt).toMatch(/^\d{4}-/);
   });
 });

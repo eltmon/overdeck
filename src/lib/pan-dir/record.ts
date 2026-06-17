@@ -154,6 +154,14 @@ export function getIssueRecordBasePath(project: ProjectConfig, issueId: string):
 
 // ─── Read / write ─────────────────────────────────────────────────────────────
 
+export async function writeIssueRecord(
+  project: ProjectConfig,
+  issueId: string,
+  record: PanIssueRecord,
+): Promise<string> {
+  return writeIssueRecordSync(project, issueId, record);
+}
+
 export function writeIssueRecordSync(
   project: ProjectConfig,
   issueId: string,
@@ -415,6 +423,21 @@ export async function appendSessionEntry(
 ): Promise<void> {
   const record = await ensureIssueRecord(project, issueId);
   record.sessionHistory = [...(record.sessionHistory ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Append a decision entry to the per-issue record. */
+export async function appendDecisionEntry(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueDecision,
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const record = await ensureIssueRecord(project, issueId);
+  record.decisions = [...(record.decisions ?? []), entry];
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
     queueIssueRecordCommit(project, issueId, recordPath);

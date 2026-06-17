@@ -16,7 +16,13 @@ import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
-import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
+import { issueIdFromWorkspacePath } from '../../lib/vbrief/io.js';
+import {
+  appendDecisionEntry,
+  appendSessionEntry,
+  getProjectConfigFromWorkspacePath,
+  resolveProjectForIssue,
+} from '../../lib/pan-dir/record.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import type { MergeSet } from '../../lib/merge-set.js';
@@ -152,23 +158,16 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
 export async function recordTestWaiver(workspacePath: string, reason: string): Promise<void> {
   try {
-    const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
-    if (!continueState) return;
+    const issueId = issueIdFromWorkspacePath(workspacePath);
+    if (!issueId) return;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
 
     const now = new Date().toISOString();
-    await Effect.runPromise(
-      writeWorkspaceContinue(workspacePath, {
-        ...continueState,
-        decisions: [
-          ...continueState.decisions,
-          {
-            id: 'D-test-waived',
-            summary: `Test gate waived: ${reason}`,
-            recordedAt: now,
-          },
-        ],
-      }),
-    );
+    await appendDecisionEntry(project, issueId, {
+      id: 'D-test-waived',
+      summary: `Test gate waived: ${reason}`,
+      recordedAt: now,
+    });
   } catch (err: any) {
     console.warn(`[pan done] Failed to record test waiver in continue state (non-fatal): ${err?.message ?? err}`);
   }
@@ -500,22 +499,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       comment: options.comment,
     }));
 
-    // Append 'end' session entry to workspace continue state.
+    // Append 'end' session entry to per-issue record.
     try {
-      const continueState = await Effect.runPromise(readWorkspaceContinue(workspacePath));
-      if (continueState) {
+      const issueId = issueIdFromWorkspacePath(workspacePath);
+      if (issueId) {
+        const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
         const now = new Date().toISOString();
-        await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
-          ...continueState,
-          sessionHistory: [
-            ...continueState.sessionHistory,
-            {
-              timestamp: now,
-              reason: 'end',
-              note: options.comment || 'Agent signaled work complete',
-            },
-          ],
-        }));
+        await appendSessionEntry(project, issueId, {
+          timestamp: now,
+          reason: 'end',
+          note: options.comment || 'Agent signaled work complete',
+        });
       }
     } catch (continueErr: any) {
       console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
