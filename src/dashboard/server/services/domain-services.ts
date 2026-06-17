@@ -16,6 +16,7 @@ import { ReadModelService } from '../read-model.js';
 import { startSessionContextWriter } from './session-context-writer.js';
 import { emitActivityDetailedSync } from '../../../lib/activity-logger.js';
 import { captureCheckpoint, diffCheckpointFiles, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
+import { persistCostEventFromDomainEvent } from './cost-event-projection.js';
 import { randomUUID } from 'crypto';
 
 // ─── EventStoreService ────────────────────────────────────────────────────────
@@ -179,6 +180,16 @@ export const EventStoreServiceLive = Layer.effect(
       subscribe: (listener) => store.subscribe((event) => {
         if (shouldRefreshSessionContext(event.type)) listener();
       }),
+    });
+
+    // Persist cost events from non-Claude harnesses (pi/kimi, etc.) into the
+    // canonical cost store. Claude-code agents already write cost events via
+    // the PostToolUse hook; this projection catches the heartbeat-delivered
+    // `cost.event_recorded` events emitted by other harnesses (PAN-1935).
+    store.subscribe((event) => {
+      if (event.type === 'cost.event_recorded') {
+        persistCostEventFromDomainEvent(event);
+      }
     });
 
     // Auto-emit detailed activity entries for state-change domain events.

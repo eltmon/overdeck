@@ -966,6 +966,10 @@ export const CostEventRecordedEvent = Schema.Struct({
     cost: Schema.Number,
     inputTokens: Schema.Number,
     outputTokens: Schema.Number,
+    cacheReadTokens: Schema.optional(Schema.Number),
+    cacheWriteTokens: Schema.optional(Schema.Number),
+    model: Schema.optional(Schema.String),
+    sessionType: Schema.optional(Schema.String),
   }),
 })
 export type CostEventRecordedEvent = typeof CostEventRecordedEvent.Type

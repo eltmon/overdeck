@@ -116,9 +116,17 @@ export const bodyToEvent = (
         payload: {
           agentId,
           issueId: typeof source['issueId'] === 'string' && source['issueId'] ? source['issueId'] : 'UNKNOWN-0',
-          cost: typeof source['costUsd'] === 'number' ? source['costUsd'] : 0,
+          cost: typeof source['costUsd'] === 'number'
+            ? source['costUsd']
+            : typeof source['cost'] === 'number'
+              ? source['cost']
+              : 0,
           inputTokens: typeof usage['inputTokens'] === 'number' ? usage['inputTokens'] : 0,
           outputTokens: typeof usage['outputTokens'] === 'number' ? usage['outputTokens'] : 0,
+          cacheReadTokens: typeof usage['cacheReadTokens'] === 'number' ? usage['cacheReadTokens'] : undefined,
+          cacheWriteTokens: typeof usage['cacheWriteTokens'] === 'number' ? usage['cacheWriteTokens'] : undefined,
+          model: typeof source['model'] === 'string' && source['model'] ? source['model'] : undefined,
+          sessionType: typeof source['agentRole'] === 'string' && source['agentRole'] ? source['agentRole'] : undefined,
         },
       };
     }
