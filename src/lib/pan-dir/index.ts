@@ -39,7 +39,6 @@ export {
   ensureWorkspacePanDir,
   getWorkspacePanPaths,
   readWorkspaceContinue,
-  writeWorkspaceContinue,
 } from './continue.js'
 
 export { appendSession, readSessions } from './sessions.js'
@@ -57,11 +56,9 @@ export {
 } from './drafts.js'
 export { readWorkspaceContext, writeWorkspaceContext } from './context.js'
 export {
-  deleteContinueFile,
   getContinueFilePath,
   getContinuesDir,
   hasContinueFile,
   listContinueFiles,
   readContinueFile,
-  writeContinueFile,
 } from './continues.js'

@@ -15,8 +15,7 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'fs';
-import { randomBytes } from 'crypto';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
@@ -97,29 +96,6 @@ export function readWorkspaceContinueSync(workspacePath: string): WorkspaceConti
   } catch {
     return null;
   }
-}
-
-/**
- * Write the workspace continue file synchronously via temp-file + rename, matching
- * the atomic-write contract of `pan-dir/continue.ts:writeWorkspaceContinue`
- * (which is now Effect-based and async). Used by the sync `updateItemStatus` /
- * `updateSubItemStatus` CLI call sites; dashboard code should prefer the async
- * Effect API.
- */
-export function writeWorkspaceContinueSync(workspacePath: string, state: WorkspaceContinueState): void {
-  const panDir = join(workspacePath, PAN_DIRNAME);
-  const continuePath = join(panDir, PAN_CONTINUE_FILENAME);
-  mkdirSync(panDir, { recursive: true });
-  const now = new Date().toISOString();
-  const next: WorkspaceContinueState = {
-    ...state,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  const tmp = `${continuePath}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`;
-  writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
-  renameSync(tmp, continuePath);
 }
 
 // ─── Effect-channel typed errors ─────────────────────────────────────────────

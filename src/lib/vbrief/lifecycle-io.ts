@@ -14,7 +14,13 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameS
 import { Effect } from 'effect';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
-import { appendFeedbackEntrySync, appendSessionEntrySync, clearFeedbackSync, continueFilename, readContinueStateSync, writeContinueStateSync, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
+import { type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
+import {
+  appendFeedbackEntrySync,
+  appendSessionEntrySync,
+  clearFeedbackSync,
+  readIssueRecordSync,
+} from '../pan-dir/record.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirsSync,
@@ -483,42 +489,53 @@ export function readContinueStateForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  try {
-    return readContinueStateSync(projectRoot, issueId);
-  } catch {
-    return null;
-  }
-}
-
-export function writeContinueStateForIssue(
-  projectRoot: string,
-  issueId: string,
-  state: ContinueState,
-): void {
-  writeContinueStateSync(projectRoot, issueId, state);
+  const record = readIssueRecordSync({ name: 'LegacyAdapter', path: projectRoot }, issueId);
+  if (!record) return null;
+  const now = new Date().toISOString();
+  return {
+    version: '1',
+    issueId: record.issueId,
+    created: record.created ?? now,
+    updated: record.updated ?? now,
+    gitState: { branch: `feature/${issueId.toLowerCase()}`, sha: '', dirty: false },
+    decisions: record.decisions ?? [],
+    hazards: record.hazards ?? [],
+    resumePoint: record.resumePoint ?? null,
+    beadsMapping: record.beadsMapping ?? {},
+    sessionHistory: record.sessionHistory ?? [],
+    feedback: record.feedback ?? [],
+  };
 }
 
 export function appendContinueSessionEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
-): ContinueState {
-  return appendSessionEntrySync(projectRoot, issueId, entry);
+): void {
+  appendSessionEntrySync(
+    { name: 'LegacyAdapter', path: projectRoot },
+    issueId,
+    { timestamp: new Date().toISOString(), ...entry } as ContinueSessionEntry,
+  );
 }
 
 export function appendFeedbackEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
-): ContinueState {
-  return appendFeedbackEntrySync(projectRoot, issueId, entry);
+): void {
+  appendFeedbackEntrySync(
+    { name: 'LegacyAdapter', path: projectRoot },
+    issueId,
+    entry,
+  );
 }
 
 export function clearFeedbackForIssue(
   projectRoot: string,
   issueId: string,
-): ContinueState | null {
-  return clearFeedbackSync(projectRoot, issueId);
+): void {
+  clearFeedbackSync({ name: 'LegacyAdapter', path: projectRoot }, issueId);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

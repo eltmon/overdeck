@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1919",
   "created": "2026-06-16T20:35:21.496Z",
-  "updated": "2026-06-17T07:57:00.000Z",
+  "updated": "2026-06-17T10:30:00.000Z",
   "gitState": { "branch": "feature/pan-1919", "sha": "fb2995afd9", "dirty": true },
   "decisions": [
     { "id": "D1", "summary": "Foundation already landed in commit e9914c9429 (record schema superset, src/lib/pan-dir/record.ts writer, sync-path status-override writer/reader, harness/model mirror, no-loss test — 63 related tests green). This plan scopes ONLY the remaining gaps + verification; the work agent verifies-and-completes, does not rebuild the foundation.", "recordedAt": "2026-06-16T20:51:21.000Z" },
@@ -21,8 +21,8 @@
     { "id": "H5", "summary": "getIssueRecordPath reconstructs the workspace path from project root + workspaces/feature-<id>; container/remote contexts may differ from the live cwd.", "mitigation": "Prefer getIssueRecordPathForWorkspace(workspacePath, issueId) where an explicit workspace path is available; note in the dashboard-route bead." }
   ],
   "resumePoint": {
-    "description": "No unblocked beads remain for PAN-1919; run `bd ready -l pan-1919` to verify or claim the next bead if any exist.",
-    "beadId": null,
+    "description": "Implement bead workspace-s5h73 (retire-continue-writers-readonly-legacy): route remaining lifecycle-io/session/feedback writes to the per-issue record, remove writer exports from pan-dir/index.ts/continue.ts/continues.ts and vbrief/io.ts, update tests.",
+    "beadId": "workspace-s5h73",
     "filesToRead": [".pan/continue.json", ".pan/specs/2026-06-16-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record.vbrief.json"]
   },
   "beadsMapping": {},
@@ -75,6 +75,14 @@
       "content": "Implemented bead workspace-fmjxz (complete-backfill-migration): extended records.ts buildIssueRecord to merge workspace continue.json statusOverrides over legacy project .pan/continues/ data and to copy harness/model from the agent state.json. Records now emit schemaVersion:2. Updated records-backfill.ts to target only in-flight issues with a live workspace, decoupled from the infra-repo gate, and use the branch-resident record path. Added/updated tests for statusOverrides, harness/model, and workspace-scoped backfill. Typecheck + targeted tests pass.",
       "note": "Closed bead workspace-fmjxz",
       "timestamp": "2026-06-17T07:57:00.000Z",
+      "agentModel": "agent:claude-opus-4-8"
+    }
+  ],
+    {
+      "reason": "bead",
+      "content": "Claimed and began bead workspace-s5h73 (retire-continue-writers-readonly-legacy): routed lifecycle-io session/feedback/clear helpers and remaining callers (reopen.ts, agents.ts, feedback-writer.ts, dashboard issues.ts) to the per-issue record via new sync append/clear helpers in record.ts. Removed writer exports from pan-dir/index.ts, continue.ts, continues.ts, and vbrief/io.ts. Moved test-only workspace continue writer to src/lib/pan-dir/__tests__/legacy-writers.ts. Updated reopen.test.ts to assert record writes instead of legacy continues. Full test suite passes.",
+      "note": "In progress: bead workspace-s5h73",
+      "timestamp": "2026-06-17T10:30:00.000Z",
       "agentModel": "agent:claude-opus-4-8"
     }
   ],

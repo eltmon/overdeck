@@ -429,6 +429,21 @@ export async function appendSessionEntry(
   }
 }
 
+/** Synchronous variant of appendSessionEntry. */
+export function appendSessionEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueSessionEntry,
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.sessionHistory = [...(record.sessionHistory ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
 /** Append a decision entry to the per-issue record. */
 export async function appendDecisionEntry(
   project: ProjectConfig,
@@ -453,6 +468,35 @@ export async function appendFeedbackEntry(
 ): Promise<void> {
   const record = await ensureIssueRecord(project, issueId);
   record.feedback = [...(record.feedback ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Synchronous variant of appendFeedbackEntry. */
+export function appendFeedbackEntrySync(
+  project: ProjectConfig,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [...(record.feedback ?? []), entry];
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
+/** Clear all feedback entries from the per-issue record. */
+export function clearFeedbackSync(
+  project: ProjectConfig,
+  issueId: string,
+  opts: WriteStatusOverrideOptions = {},
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.feedback = [];
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
     queueIssueRecordCommit(project, issueId, recordPath);

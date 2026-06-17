@@ -31,9 +31,9 @@ import {
   writeFeedback,
   writeSpec,
   writeWorkspaceContext,
-  writeWorkspaceContinue,
   type WorkspaceContinueState,
 } from '../index.js'
+import { writeWorkspaceContinue } from './legacy-writers.js'
 import type { VBriefDocument } from '../../vbrief/types.js'
 
 let TEST_DIR: string

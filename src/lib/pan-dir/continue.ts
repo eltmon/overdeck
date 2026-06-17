@@ -1,5 +1,4 @@
 import { join } from 'path'
-import { randomBytes } from 'crypto'
 import { Effect, FileSystem } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
@@ -13,10 +12,6 @@ import {
   PAN_SPEC_FILENAME,
   PAN_CONTEXT_FILENAME,
 } from './types.js'
-
-function uniqueTmpPath(path: string): string {
-  return `${path}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`
-}
 
 function workspacePanPaths(workspacePath: string): WorkspacePanPaths {
   const panDir = join(workspacePath, PAN_DIRNAME)
@@ -101,36 +96,5 @@ export function readWorkspaceContinue(
       },
       catch: (cause) => new FsError({ path: continuePath, operation: 'parse', cause }),
     })
-  }).pipe(Effect.provide(NodeFileSystem.layer))
-}
-
-export function writeWorkspaceContinue(
-  workspacePath: string,
-  state: WorkspaceContinueState,
-): Effect.Effect<WorkspaceContinueState, FsError> {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const { continuePath, panDir, feedbackDir } = workspacePanPaths(workspacePath)
-    yield* fs.makeDirectory(panDir, { recursive: true }).pipe(
-      Effect.mapError((cause) => new FsError({ path: panDir, operation: 'makeDirectory', cause })),
-    )
-    yield* fs.makeDirectory(feedbackDir, { recursive: true }).pipe(
-      Effect.mapError((cause) => new FsError({ path: feedbackDir, operation: 'makeDirectory', cause })),
-    )
-    const now = new Date().toISOString()
-    const next: WorkspaceContinueState = {
-      ...state,
-      version: '1',
-      created: state.created || now,
-      updated: now,
-    }
-    const tmp = uniqueTmpPath(continuePath)
-    yield* fs.writeFileString(tmp, JSON.stringify(next, null, 2)).pipe(
-      Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),
-    )
-    yield* fs.rename(tmp, continuePath).pipe(
-      Effect.mapError((cause) => new FsError({ path: continuePath, operation: 'rename', cause })),
-    )
-    return next
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }

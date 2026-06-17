@@ -4,7 +4,7 @@
     "created": "2026-06-16T20:51:21.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
-    "updated": "2026-06-17T08:10:00.000Z"
+    "updated": "2026-06-17T10:30:00.000Z"
   },
   "plan": {
     "id": "pan-1919",
@@ -12,9 +12,9 @@
     "status": "in_progress",
     "uid": "02b495bd-49d3-40e0-8d37-7c5c14ead517",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-16T20:51:21.000Z",
-    "updated": "2026-06-17T08:10:00.000Z",
+    "updated": "2026-06-17T10:30:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1919",
@@ -89,7 +89,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "fix-async-statusoverride-splitbrain.ac2",
@@ -98,7 +98,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "fix-async-statusoverride-splitbrain.ac3",
@@ -107,10 +107,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           }
         ],
-        "completed": "2026-06-17T08:10:00.000Z"
+        "completed": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "route-done-continue-to-record",
@@ -138,7 +138,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-done-continue-to-record.ac2",
@@ -147,7 +147,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-done-continue-to-record.ac3",
@@ -156,10 +156,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           }
         ],
-        "completed": "2026-06-17T08:10:00.000Z"
+        "completed": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "route-planning-continue-to-record",
@@ -187,7 +187,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-planning-continue-to-record.ac2",
@@ -196,7 +196,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-planning-continue-to-record.ac3",
@@ -205,10 +205,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           }
         ],
-        "completed": "2026-06-17T08:10:00.000Z"
+        "completed": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "route-cloister-continue-readers-to-record",
@@ -236,7 +236,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-cloister-continue-readers-to-record.ac2",
@@ -245,7 +245,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-cloister-continue-readers-to-record.ac3",
@@ -254,10 +254,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           }
         ],
-        "completed": "2026-06-17T08:10:00.000Z"
+        "completed": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "route-dashboard-continue-to-record",
@@ -285,7 +285,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-dashboard-continue-to-record.ac2",
@@ -294,7 +294,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "route-dashboard-continue-to-record.ac3",
@@ -303,10 +303,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           }
         ],
-        "completed": "2026-06-17T08:10:00.000Z"
+        "completed": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "complete-backfill-migration",
@@ -337,7 +337,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "complete-backfill-migration.ac2",
@@ -346,7 +346,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "complete-backfill-migration.ac3",
@@ -355,7 +355,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "complete-backfill-migration.ac4",
@@ -364,7 +364,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           },
           {
             "id": "complete-backfill-migration.ac5",
@@ -373,15 +373,15 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-06-17T08:10:00.000Z"
+            "completed": "2026-06-17T10:30:00.000Z"
           }
         ],
-        "completed": "2026-06-17T08:10:00.000Z"
+        "completed": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "retire-continue-writers-readonly-legacy",
         "title": "Retire continues to read-only legacy (stop all production writes)",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -429,7 +429,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "started": "2026-06-17T10:30:00.000Z"
       },
       {
         "id": "no-remaining-writers-guard-test",

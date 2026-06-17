@@ -4,6 +4,10 @@ import { Effect } from 'effect';
  *
  * Uses an in-memory SQLite DB (injected via database/index.js mock) so no
  * JSON files are needed and the test path matches the production SQLite path.
+ *
+ * PAN-1919: reopen now writes the resume breadcrumb to the per-issue record
+ * (<workspace>/.pan/records/<issue>.json) instead of the legacy project-side
+ * .pan/continues/ file.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -248,39 +252,39 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  // PAN-946 regression: when a continue file already exists at the canonical path,
-  // reopen MUST append the resume breadcrumb to that file rather than creating
-  // a new one alongside a lifecycle directory.
-  describe('lifecycle-aware continue file appends', () => {
-    function seedContinueFile(projectRoot: string, issueId: string): string {
-      const continueDir = join(projectRoot, '.pan', 'continues');
-      mkdirSync(continueDir, { recursive: true });
-      const continuePath = join(continueDir, `${issueId.toLowerCase()}.vbrief.json`);
+  // PAN-946 regression / PAN-1919 update: reopen MUST append the resume
+  // breadcrumb to the per-issue record, not to a legacy continue file.
+  describe('record-based resume breadcrumb appends', () => {
+    function recordPath(projectRoot: string, issueId: string): string {
+      // When the workspace directory does not exist, getIssueRecordBasePath
+      // falls back to the project root (test context). Production always has
+      // a workspace, but the fallback path is still the canonical record store.
+      return join(projectRoot, '.pan', 'records', `${issueId.toLowerCase()}.json`);
+    }
+
+    function seedRecordFile(projectRoot: string, issueId: string): string {
+      const path = recordPath(projectRoot, issueId);
+      mkdirSync(join(path, '..'), { recursive: true });
       writeFileSync(
-        continuePath,
+        path,
         JSON.stringify({
-          version: '1',
-          issueId,
+          issueId: issueId.toUpperCase(),
+          schemaVersion: 2,
           created: '2026-05-04T00:00:00Z',
           updated: '2026-05-04T00:00:00Z',
-          gitState: {},
-          decisions: [],
-          hazards: [],
-          resumePoint: null,
-          beadsMapping: {},
           sessionHistory: [
             { timestamp: '2026-05-04T00:00:00Z', reason: 'planning', note: 'initial seed' },
           ],
         }),
         'utf-8',
       );
-      return continuePath;
+      return path;
     }
 
-    it('appends to a continue file in .pan/continues/ rather than creating a new one', async () => {
+    it('appends to the per-issue record rather than a legacy continue file', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
-      const continuePath = seedContinueFile(projectRoot, 'PAN-901');
-      const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-901.vbrief.json');
+      const recordFile = seedRecordFile(projectRoot, 'PAN-901');
+      const legacyContinuePath = join(projectRoot, '.pan', 'continues', 'pan-901.vbrief.json');
       projectStub = { projectPath: projectRoot };
 
       seedStatus({
@@ -291,11 +295,11 @@ describe('reopenWorkspaceState', () => {
       const result = await Effect.runPromise(reopenWorkspaceState('PAN-901', wsDir, { reason: 'redo merge' }));
       expect(result.continueFileUpdated).toBe(true);
 
-      // Active dir must NOT have been auto-created with a fresh continue file.
-      expect(existsSync(activeContinuePath)).toBe(false);
+      // Legacy continue file must NOT be created or modified.
+      expect(existsSync(legacyContinuePath)).toBe(false);
 
-      // Existing continue file in .pan/continues/ should have grown by exactly one entry.
-      const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
+      // Record should have grown by exactly one entry.
+      const updated = JSON.parse(readFileSync(recordFile, 'utf-8'));
       expect(updated.sessionHistory.length).toBe(2);
       const last = updated.sessionHistory[1];
       expect(last.reason).toBe('resume');
@@ -309,10 +313,10 @@ describe('reopenWorkspaceState', () => {
       rmSync(projectRoot, { recursive: true, force: true });
     });
 
-    it('appends to existing continue file without creating one in vbrief/active/', async () => {
+    it('creates the per-issue record when none exists and does not touch legacy paths', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
-      const continuePath = seedContinueFile(projectRoot, 'PAN-902');
-      const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-902.vbrief.json');
+      const recordFile = recordPath(projectRoot, 'PAN-902');
+      const legacyContinuePath = join(projectRoot, '.pan', 'continues', 'pan-902.vbrief.json');
       projectStub = { projectPath: projectRoot };
 
       seedStatus({
@@ -322,11 +326,12 @@ describe('reopenWorkspaceState', () => {
 
       await Effect.runPromise(reopenWorkspaceState('PAN-902', wsDir));
 
-      expect(existsSync(activeContinuePath)).toBe(false);
+      expect(existsSync(legacyContinuePath)).toBe(false);
+      expect(existsSync(recordFile)).toBe(true);
 
-      const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
-      expect(updated.sessionHistory.length).toBe(2);
-      expect(updated.sessionHistory[1].reason).toBe('resume');
+      const updated = JSON.parse(readFileSync(recordFile, 'utf-8'));
+      expect(updated.sessionHistory.length).toBe(1);
+      expect(updated.sessionHistory[0].reason).toBe('resume');
 
       rmSync(wsDir, { recursive: true, force: true });
       rmSync(projectRoot, { recursive: true, force: true });
