@@ -63,7 +63,8 @@ function makeWiredFakeDb() {
       if (prop === 'select') {
         return (_fields?: Record<string, unknown>) => ({
           from: (_table: unknown) => ({
-            where: (_cond: unknown) => makeQueryResult([]),
+            // where returns current rows so checkDuplicate can detect existing sourceFiles
+            where: (_cond: unknown) => makeQueryResult(rows),
             groupBy: (..._args: unknown[]) => makeQueryResult([]),
             orderBy: (..._args: unknown[]) => makeQueryResult(rows),
             limit: (n: number) => makeQueryResult(rows.slice(0, n)),
@@ -401,7 +402,7 @@ describe('CostWriter — record persists to archive then DB then bus', () => {
     });
   });
 
-  it('reconcile() returns { imported: 0 } (stub)', async () => {
+  it('reconcile() returns { imported: 0 } for default (claude) source', async () => {
     const { dbLayer, busLayer, archiveLayer } = makeWiredFakeDb();
     const layer = CostWriterLive.pipe(
       Layer.provide(dbLayer),

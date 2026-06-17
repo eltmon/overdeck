@@ -12,6 +12,11 @@ import { Effect } from 'effect';
 import { FsError } from '../errors.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
+import {
+  getAgentRollup,
+  getDailyTrends,
+  getCostForIssueFromDb,
+} from '../database/cost-events-db.js';
 
 /**
  * Cost alert level
@@ -194,13 +199,11 @@ export function checkCostLimits(
     alert_threshold: 0.8,
   }
 ): CostAlert[] {
-  checkDailyReset();
-
   const alerts: CostAlert[] = [];
   const now = new Date().toISOString();
 
-  // Check per-agent limit
-  const agentCost = costData.perAgent.get(agentId) || 0;
+  // Read agent cost from DB (the single source of truth for recorded spend)
+  const agentCost = getAgentRollup().find(r => r.agentId === agentId)?.totalCost ?? 0;
   if (config.per_agent_usd > 0) {
     const agentPercent = agentCost / config.per_agent_usd;
 
@@ -227,9 +230,9 @@ export function checkCostLimits(
     }
   }
 
-  // Check per-issue limit
+  // Read issue cost from DB
   if (issueId && config.per_issue_usd > 0) {
-    const issueCost = costData.perIssue.get(issueId) || 0;
+    const issueCost = getCostForIssueFromDb(issueId)?.totalCost ?? 0;
     const issuePercent = issueCost / config.per_issue_usd;
 
     if (issuePercent >= 1.0) {
@@ -255,15 +258,16 @@ export function checkCostLimits(
     }
   }
 
-  // Check daily total limit
+  // Read today's total from DB (sum of today's events)
   if (config.daily_total_usd > 0) {
-    const dailyPercent = costData.dailyTotal / config.daily_total_usd;
+    const dailyTotal = getDailyTrends({ days: 1 }).reduce((sum, t) => sum + t.totalCost, 0);
+    const dailyPercent = dailyTotal / config.daily_total_usd;
 
     if (dailyPercent >= 1.0) {
       alerts.push({
         type: 'daily_total',
         level: 'limit_reached',
-        currentCost: costData.dailyTotal,
+        currentCost: dailyTotal,
         limit: config.daily_total_usd,
         percentUsed: dailyPercent * 100,
         timestamp: now,
@@ -272,7 +276,7 @@ export function checkCostLimits(
       alerts.push({
         type: 'daily_total',
         level: 'warning',
-        currentCost: costData.dailyTotal,
+        currentCost: dailyTotal,
         limit: config.daily_total_usd,
         percentUsed: dailyPercent * 100,
         timestamp: now,

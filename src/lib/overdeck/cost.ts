@@ -1,3 +1,6 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { Context, Effect, Layer, Schema } from 'effect';
 import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
@@ -12,6 +15,22 @@ import {
   deleteBudgetSync,
 } from '../cost.js';
 import type { CostBudget } from '../cost.js';
+import { parsePiSessionSync } from '../cost-parsers/pi-parser.js';
+import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
+import { getPanopticonHome } from '../paths.js';
+
+// ── Filesystem helpers ────────────────────────────────────────────────────────
+
+function walkJsonl(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const result: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) result.push(...walkJsonl(full));
+    else if (entry.name.endsWith('.jsonl')) result.push(full);
+  }
+  return result;
+}
 
 // ── Local Drizzle table definition ───────────────────────────────────────────
 // Mirrors the locked schema (docs/overdeck-remodel/overdeck-schema.ts:173-195).
@@ -432,13 +451,24 @@ export const CostWriterLive = Layer.effect(
     const archive = yield* CostArchive;
     const bus = yield* EventBus;
 
-    // Stub: full dedup logic (request_id UNIQUE + 60s-window heuristic) deferred
-    // to workspace-3zhmy which owns the cost-limit breaker + ingest repair.
-    const isDuplicate = (_e: CostEvent): boolean => false;
+    // Dedup by sourceFile: pi/codex sessions carry a file path but no requestId,
+    // so the UNIQUE(request_id) constraint doesn't catch re-imports of the same file.
+    const checkDuplicate = (e: CostEvent) =>
+      Effect.gen(function* () {
+        if (e.sourceFile == null) return false;
+        const existing = yield* Effect.promise(() =>
+          q
+            .select({ id: costEventsTable.id })
+            .from(costEventsTable)
+            .where(eq(costEventsTable.sourceFile, e.sourceFile!))
+            .limit(1),
+        );
+        return (existing as unknown[]).length > 0;
+      });
 
     const record = (event: CostEvent) =>
       Effect.gen(function* () {
-        if (isDuplicate(event)) return;
+        if (yield* checkDuplicate(event)) return;
 
         // 1. DURABLE ARCHIVE FIRST — events.jsonl + WAL. Archive decides no-op
         //    vs append by event source (transcript-backed events are no-ops).
@@ -471,11 +501,67 @@ export const CostWriterLive = Layer.effect(
         yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
       });
 
-    // Stub — pi/codex sweep (PAN-1935) and full reconcile logic land in
-    // workspace-3zhmy (blocked by this bead).
-    const reconcile = (_opts?: { source?: 'claude' | 'pi' | 'codex' | 'wal' }) =>
+    // Catch-up sweep for pi/codex session files.
+    // Walks PANOPTICON_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
+    // PANOPTICON_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
+    // parses each with the existing parsers, and feeds into record() (which deduplicates).
+    const reconcile = (opts?: { source?: 'claude' | 'pi' | 'codex' | 'wal' }) =>
       Effect.gen(function* () {
-        return { imported: 0 };
+        const source = opts?.source ?? 'claude';
+        if (source !== 'pi' && source !== 'codex') return { imported: 0 };
+
+        const agentsDir = join(getPanopticonHome(), 'agents');
+        const agentNames = yield* Effect.sync(() => {
+          if (!existsSync(agentsDir)) return [] as string[];
+          return readdirSync(agentsDir, { withFileTypes: true })
+            .filter(e => e.isDirectory())
+            .map(e => e.name);
+        });
+
+        let imported = 0;
+
+        for (const agentName of agentNames) {
+          const sessionRoot =
+            source === 'pi'
+              ? join(agentsDir, agentName, 'sessions')
+              : join(agentsDir, agentName, 'codex-home', 'sessions');
+
+          const sessionFiles = yield* Effect.sync(() => walkJsonl(sessionRoot));
+
+          for (const sessionFile of sessionFiles) {
+            const session = yield* Effect.sync(() =>
+              source === 'pi'
+                ? parsePiSessionSync(sessionFile)
+                : parseCodexSessionSync(sessionFile),
+            );
+            if (!session) continue;
+
+            const event: CostEvent = {
+              ts:          new Date(session.startTime),
+              issueId:     null,
+              agentId:     agentName,
+              sessionId:   session.sessionId,
+              sessionType: source,
+              provider:    null,
+              model:       session.model ?? null,
+              input:       session.usage.inputTokens,
+              output:      session.usage.outputTokens,
+              cacheRead:   session.usage.cacheReadTokens ?? 0,
+              cacheWrite:  0,
+              cost:        session.cost_v2 ?? session.cost,
+              requestId:   null,
+              sourceFile:  sessionFile,
+            };
+
+            const wasDuplicate = yield* checkDuplicate(event);
+            if (!wasDuplicate) {
+              yield* record(event);
+              imported++;
+            }
+          }
+        }
+
+        return { imported };
       });
 
     // Stub — full rebuild (recomputes cost from tokens) deferred to
