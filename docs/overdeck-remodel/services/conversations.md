@@ -67,10 +67,21 @@
   (handoff, clear, summary-fork, switch-model, compaction) routes through it.
   Backed today by `summary-fork.ts` (`reserveSummaryForkSession` → `randomUUID()`)
   and `session-format-converter.ts` (harness switch → new file).
+- **ConversationRuntime** — the live-session control surface for a conversation:
+  tmux spawn/stop/resume/restart, message + keystroke delivery, attachment
+  staging, and the live needs-you/pending-input scan. **This section introduces
+  it as a NEW sibling service, retained in scope** — it is the conversation's
+  *process* half, the way `AgentWriter.spawn` is the agent's process half
+  (CONVENTIONS splits lifecycle-stage from process). It is **not** AgentWriter:
+  conversations are not in the `agents` table (no `issueId` FK; rows
+  `conv-<name>`). It mutates tmux + the CACHE columns (`status`, `tmux_session`,
+  `delivery_method` — all audited CACHE), never the irreplaceable metadata. Kept
+  thin and separate so `ConversationWriter` owns only durable metadata.
 - **Relocate** — a disposition: the current endpoint/verb is **not lost and not
-  Conversations' to own**; it maps to a *sibling* surface — chiefly the
-  **ConversationRuntime / delivery** surface (tmux lifecycle + message delivery),
-  or Transcripts, or Diffs. Distinct from DELETE (genuinely dropped).
+  the metadata writer's to own**; it maps to a *sibling* surface — chiefly
+  **ConversationRuntime** (above), or Transcripts, or Diffs, or Cost. Distinct
+  from DELETE (genuinely dropped). (Runtime is in-domain-scope-but-different-door,
+  not shipped to another team; Diffs/Cost are other domains.)
 - **Aggregate read** — a cross-cutting read (the enriched list) that **recomposes**
   Conversation metadata + Transcripts-derived facts at the controller. Not a
   single stored shape.
@@ -161,7 +172,7 @@ backing file (read-only) · **TX** = the disposable `transcripts` index (was
 | `PATCH /api/conversations/:name` (`conversations.ts:3453`) | writes | **`ConversationWriter.retitle(name, title)`** | `patchConversationTitle` → `updateConversationTitle` sets `title`/`title_source='manual'` (audit: manual title is SOURCE-OF-TRUTH). |
 | `POST /api/conversations/:name/retitle` (`conversations.ts:4769`) | writes | **`ConversationWriter.retitle(...)`** | Duplicate title door (AI/auto retitle) → one verb; `title_source` distinguishes manual vs regenerable. |
 | `POST /api/conversations/:name/archive` (`conversations.ts:3515`) | writes | **`ConversationWriter.archive(name)`** (+ RELOCATE stop) | Sets `archived_at` (SOURCE-OF-TRUTH), removes the favorite, cleans attachments; the runtime **stop** (`stopConversationRuntime`) relocates. Archiving is the ONLY removal — convs are never hard-deleted (line 2623 comment). |
-| `DELETE /api/conversations/:name` (`conversations.ts:3478`) | writes | **FOLD → `ConversationWriter.archive`** | **Verbatim alias for archive** — identical body (stop → markEnded → archive → removeFavorite → cleanup, lines 3494-3499). Keep the HTTP `DELETE` verb as a thin alias mapping to `archive` so existing clients don't break; it adds no behavior. |
+| `DELETE /api/conversations/:name` (`conversations.ts:3478`) | writes | **FOLD → `ConversationWriter.archive` (idempotent variant)** | Same effect as archive (stop → markEnded → archive → removeFavorite → cleanup, lines 3494-3499) with **one difference**: `DELETE` has no "already archived" guard (it archives unconditionally → idempotent 200), whereas `POST …/archive` returns 400 if `conv.archivedAt` is already set (line 3530). Keep the HTTP `DELETE` verb as a thin alias, but have the alias **swallow `AlreadyArchived`** (return success) to preserve DELETE's current idempotent behavior — a deliberate, documented behavior match, not "identical bodies." |
 | `POST /api/conversations/:name/unarchive` (`conversations.ts:3559`) | writes | **`ConversationWriter.unarchive(name)`** | Clears `archived_at`. The inverse of archive; a real write the named-verb list omits — kept. |
 | `POST /api/conversations/:name/favorite` (`conversations.ts:3663`) | writes | **`ConversationWriter.setFavorite('conversation', name)`** | Inserts a `favorites` row (SOURCE-OF-TRUTH). |
 | `DELETE /api/conversations/:name/favorite` (`conversations.ts:3692`) | writes | **`ConversationWriter.unsetFavorite('conversation', name)`** | Deletes the `favorites` row. |
@@ -239,7 +250,7 @@ domains have no step 1").
 | `pan.getConversationCost` (`rpc.ts:30`) | reads | **RELOCATE → Cost** | Cost domain. |
 | `pan.getConversationCostByWorkspace` (`rpc.ts:31`) | reads | **RELOCATE → Cost** | Cost domain. |
 | `pan.getConversationStats` (`rpc.ts:32`) | reads | **`TranscriptsResolver.stats`** | Index rollup. |
-| `pan.subscribeConversationMessages` (`rpc.ts:39`) | reads (stream) | **`TranscriptsResolver.watch(conv)`** (stream) | Live JSONL tail across harness shapes (`ws-rpc.ts:690-710`: claude/pi/codex dispatch). Read-only over the sacred file. |
+| `pan.subscribeConversationMessages` (`rpc.ts:39`) | reads (stream) | **`TranscriptsResolver.watch(subject)`** (stream) | Live JSONL tail across harness shapes (`ws-rpc.ts:690-710`: claude/pi/codex dispatch). Also streams **bare `agent-`/`planning-` ids that have NO conversations row** (`ws-rpc.ts:701`) — so `watch` takes a `TranscriptSubject` (conv **or** agent id), not only a `Conversation`. Read-only over the sacred file. |
 | `pan.subscribeProjectSessionTree` (`rpc.ts:40`) | reads (stream) | **aggregate → recomposed** (Conversations + Agents presence) | The session tree spans both conversations and agents; recompose, don't fold into one. |
 
 ## 1E. Rollup of the collapse (the §1D-analog)
@@ -391,6 +402,24 @@ export const ConversationFilter = Schema.Struct({
 })
 export type ConversationFilter = typeof ConversationFilter.Type
 
+// ── The Transcript index entity — decodes a real `transcripts` row (schema 148-163) ──
+// 100% CACHE; the read shape for TranscriptsResolver.get/list/stats/search.
+export const Transcript = Schema.Struct({
+  backingFilePath: Schema.String,                 // PK — the sacred file (read-only)
+  sessionId:       Schema.NullOr(Schema.String),  // claude UUID (null for pi/codex)
+  harness:         Schema.NullOr(Harness),
+  workspacePath:   Schema.NullOr(Schema.String),
+  messageCount:    Schema.NullOr(Schema.Number),
+  models:          Schema.NullOr(Schema.Array(Schema.String)),
+  tokenInput:      Schema.NullOr(Schema.Number),
+  tokenOutput:     Schema.NullOr(Schema.Number),
+  firstTs:         Schema.NullOr(Schema.Date),
+  lastTs:          Schema.NullOr(Schema.Date),
+  panIssueId:      Schema.NullOr(Schema.String),
+  panAgentId:      Schema.NullOr(Schema.String),
+})
+export type Transcript = typeof Transcript.Type
+
 // ── Errors — tagged, in the E channel ───────────────────────────────────────
 export class ConversationNotFound extends Schema.TaggedErrorClass<ConversationNotFound>()(
   "ConversationNotFound", { name: ConversationName },
@@ -484,23 +513,30 @@ export const ParsedTranscript = Schema.Struct({
   lastTs:  Schema.NullOr(Schema.Date),
 })
 
+// a backing-file locator — accepts a Conversation OR a bare agent/planning id
+// (subscribeConversationMessages streams agent transcripts with NO conversations
+// row, ws-rpc.ts:701). The resolver dispatches on whichever it gets.
+export const TranscriptSubject = Schema.Union([Conversation, ConversationName /* = agent/planning id */])
+export type TranscriptSubject = typeof TranscriptSubject.Type
+
 export class TranscriptsResolver extends Context.Service<TranscriptsResolver, {
   // ── resolve / parse the SACRED files (read-only) ──
   // ALL backing files for a conversation (residue §1F.3), harness-aware:
-  readonly resolveFiles: (conv: Conversation) => Effect.Effect<ReadonlyArray<string>>
+  readonly resolveFiles: (subject: TranscriptSubject) => Effect.Effect<ReadonlyArray<string>>
   // the canonical transcript read (GET …/messages) — dispatches claude/pi/codex:
-  readonly parse:        (conv: Conversation) => Effect.Effect<ParsedTranscript>
-  readonly serialize:    (conv: Conversation) => Effect.Effect<string>          // pan conversations format
-  readonly watch:        (conv: Conversation) => Stream.Stream<ParsedTranscript> // subscribeConversationMessages
-  // ── the disposable INDEX (transcripts table) — reads ──
-  readonly get:    (id: string)  => Effect.Effect<unknown>
-  readonly list:   (f: unknown)  => Effect.Effect<ReadonlyArray<unknown>>
-  readonly stats:  ()            => Effect.Effect<unknown>
-  readonly search: (q: string)   => Effect.Effect<ReadonlyArray<unknown>>       // FTS5
+  readonly parse:        (subject: TranscriptSubject) => Effect.Effect<ParsedTranscript>
+  readonly serialize:    (subject: TranscriptSubject) => Effect.Effect<string>          // pan conversations format
+  // subscribeConversationMessages — also serves bare agent-/planning- ids (no conv row):
+  readonly watch:        (subject: TranscriptSubject) => Stream.Stream<ParsedTranscript>
+  // ── the disposable INDEX (transcripts table) — reads, decoded to Transcript ──
+  readonly get:    (key: string)              => Effect.Effect<Transcript>
+  readonly list:   (f: ConversationFilter)    => Effect.Effect<ReadonlyArray<Transcript>>
+  readonly stats:  ()                         => Effect.Effect<{ count: number; managed: number }>
+  readonly search: (query: string)            => Effect.Effect<ReadonlyArray<Transcript>>  // FTS5
   // ── cache-maintenance (rebuild the index from JSONL; NEVER writes a JSONL) ──
-  readonly rebuild: (dirs?: ReadonlyArray<string>) => Effect.Effect<unknown>     // the scan
-  readonly enrich:  (ids?: ReadonlyArray<string>)  => Effect.Effect<unknown>     // opt-in, LLM $
-  readonly embed:   (ids?: ReadonlyArray<string>)  => Effect.Effect<unknown>     // opt-in, $
+  readonly rebuild: (dirs?: ReadonlyArray<string>) => Effect.Effect<{ scanned: number }>   // the scan
+  readonly enrich:  (ids?: ReadonlyArray<string>)  => Effect.Effect<{ enriched: number }>  // opt-in, LLM $
+  readonly embed:   (ids?: ReadonlyArray<string>)  => Effect.Effect<{ embedded: number }>  // opt-in, $
 }>()("overdeck/TranscriptsResolver") {}
 ```
 
@@ -543,17 +579,32 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly setModel:   (name: ConversationName, model: string)   => Effect.Effect<Conversation, ConversationNotFound>
   readonly setHarness: (name: ConversationName, harness: Harness) => Effect.Effect<Conversation, ConversationNotFound>
 
-  // ── the FORK PRIMITIVE — the ONLY way a new backing file is created ──
-  // handoff / clear / summary-fork / switch-model(harness) / compaction all route here.
-  // creates a NEW UUID session file (summary-fork.ts / session-format-converter.ts),
-  // inserts a conversation_files pointer, optionally creates a NEW conversation,
-  // and records the lineage edge. NEVER opens an existing file for write.
-  readonly forkNewFile: (opts: {
-    source: ConversationName;
-    kind: "handoff" | "clear" | "summary" | "harness-switch" | "compaction";
-    newHarness?: Harness; docPath?: string;
-  }) => Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>
+  // ── the four file-creating verbs (the task's enumerated set) ──
+  // EACH is a thin public delegate to the ONE private fork mechanism below;
+  // they differ only in lineage edge + whether a NEW conversation is spawned.
+  // handoff — author a doc, spawn a NEW conv + file, set handoff_target_conv_id:
+  readonly handoff: (source: ConversationName, target: ConversationName, docPath: string) =>
+    Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>
+  // clear — /clear lineage: spawn a sibling conv + file, set cleared_to_conv_id
+  // (the conversation-lifecycle.ts:299 write):
+  readonly clear: (source: ConversationName) =>
+    Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>
+  // summaryFork — summary/plain fork: new conv + file seeded from a summary:
+  readonly summaryFork: (source: ConversationName, opts: { mode: "summary" | "plain"; model?: string }) =>
+    Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>
+  // compact — convert conversation-compaction.ts:164's in-place append to a fork:
+  // seed a NEW file from the compact boundary, retarget the SAME conversation:
+  readonly compact: (name: ConversationName) =>
+    Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>
 }>()("overdeck/ConversationWriter") {}
+
+// ── the ONE private fork mechanism — the ONLY way a new backing file is made ──
+// NOT a public verb; the four verbs above delegate to it. Creates a fresh UUID
+// session file (summary-fork.ts / session-format-converter.ts), inserts a
+// conversation_files pointer, optionally creates a NEW conversation, records the
+// lineage edge. NEVER opens an existing file for write. (A harness switch from
+// setHarness also routes through it.)
+type ForkKind = "handoff" | "clear" | "summary" | "plain" | "harness-switch" | "compaction"
 
 export const ConversationWriterLayer = Layer.effect(ConversationWriter, Effect.gen(function* () {
   const { q } = yield* Db                         // the conversations/favorites/conversation_files tables ONLY
@@ -585,11 +636,12 @@ export const ConversationWriterLayer = Layer.effect(ConversationWriter, Effect.g
     yield* bus.emit({ type: "conversation.favorited", payload: { type, itemId } })
   })
 
-  // forkNewFile — the sacred-invariant heart. Reads the source file READ-ONLY,
-  // writes a FRESH file, inserts the pointer, records lineage. Converts the lone
-  // in-place compaction append (§1F.2) into this path.
+  // forkNewFile — the PRIVATE sacred-invariant heart. Reads the source file
+  // READ-ONLY, writes a FRESH file, inserts the pointer, records lineage. The
+  // four public verbs (handoff/clear/summaryFork/compact) delegate here; this is
+  // also where the lone in-place compaction append (§1F.2) is converted to a fork.
   const forkNewFile = (opts: {
-    source: ConversationName; kind: "handoff"|"clear"|"summary"|"harness-switch"|"compaction";
+    source: ConversationName; kind: ForkKind;
     newHarness?: Harness; docPath?: string;
   }) => Effect.gen(function* () {
     const resolver = yield* ConversationsResolver
@@ -619,10 +671,20 @@ export const ConversationWriterLayer = Layer.effect(ConversationWriter, Effect.g
     return { conversation: newConv, backingFile }
   })
 
+  // the four PUBLIC file-creating verbs — thin delegates to forkNewFile.
+  const handoff     = (source: ConversationName, target: ConversationName, docPath: string) =>
+    forkNewFile({ source, kind: "handoff", docPath })
+  const clear       = (source: ConversationName) => forkNewFile({ source, kind: "clear" })
+  const summaryFork = (source: ConversationName, opts: { mode: "summary" | "plain"; model?: string }) =>
+    forkNewFile({ source, kind: opts.mode })
+  const compact     = (name: ConversationName)   => forkNewFile({ source: name, kind: "compaction" })
+
   // create / unarchive / retitle / setModel / setHarness / unsetFavorite follow
-  // the same DB-row-is-the-commit-point pattern (omitted for brevity).
+  // the same DB-row-is-the-commit-point pattern (omitted for brevity). setHarness
+  // also calls forkNewFile({ kind: "harness-switch" }) when the harness changes.
   return ConversationWriter.of({ create, archive, unarchive, setFavorite, unsetFavorite,
-                                 retitle, setModel, setHarness, forkNewFile })
+                                 retitle, setModel, setHarness,
+                                 handoff, clear, summaryFork, compact })
 }))
 ```
 
@@ -723,12 +785,13 @@ export const ConversationsApiLive = HttpApiBuilder.group(OverdeckApi, "conversat
    .handle("handoffDoc", ({ path })      => ConversationsResolver.getHandoffDoc(path.name))
    .handle("create",     ({ payload })   => ConversationWriter.create(payload))   // + Runtime.spawn fired after
    .handle("archive",    ({ path })      => ConversationWriter.archive(path.name))
-   .handle("delete",     ({ path })      => ConversationWriter.archive(path.name)) // verbatim alias (§1A fold)
+   .handle("delete",     ({ path })      => ConversationWriter.archive(path.name).pipe(  // §1A fold: idempotent alias
+       Effect.catchTag("AlreadyArchived", () => ConversationsResolver.get(path.name))))   // swallow → 200, matches DELETE today
    .handle("unarchive",  ({ path })      => ConversationWriter.unarchive(path.name))
    .handle("favorite",   ({ path })      => ConversationWriter.setFavorite("conversation", path.name))
    .handle("unfavorite", ({ path })      => ConversationWriter.unsetFavorite("conversation", path.name))
    .handle("retitle",    ({ path, payload }) => ConversationWriter.retitle(path.name, payload.title, "manual"))
-   .handle("summaryFork",({ path, payload }) => ConversationWriter.forkNewFile({ source: path.name, kind: "summary" }))
+   .handle("summaryFork",({ path, payload }) => ConversationWriter.summaryFork(path.name, { mode: payload.forkMode === "plain" ? "plain" : "summary", model: payload.model }))
    .handle("switchModel",({ path, payload }) => /* setModel/setHarness (+ forkNewFile if harness changed) */ ConversationWriter.setModel(path.name, payload.model!)))
 ```
 
@@ -783,8 +846,11 @@ level.
 | `ConversationWriter.unarchive` | §1A `POST …/unarchive`; §1C `pan unarchive-conversation` |
 | `ConversationWriter.setFavorite` / `unsetFavorite` | §1A `POST`/`DELETE …/favorite` |
 | `ConversationWriter.retitle` | §1A `PATCH …/:name`, `POST …/retitle` |
-| `ConversationWriter.setModel` / `setHarness` | §1A `POST …/switch-model` |
-| `ConversationWriter.forkNewFile` | §1A `POST …/summary-fork`, harness-switch arm of `/switch-model`; §1C `pan handoff`; the `/clear` lineage write (`conversation-lifecycle.ts:299`); **the converted `conversation-compaction.ts:164`** |
+| `ConversationWriter.setModel` / `setHarness` | §1A `POST …/switch-model` (harness change → `forkNewFile` via the private mechanism) |
+| `ConversationWriter.summaryFork` | §1A `POST …/summary-fork` |
+| `ConversationWriter.handoff` | §1C `pan handoff` |
+| `ConversationWriter.clear` | the `/clear` lineage write (`conversation-lifecycle.ts:299`) |
+| `ConversationWriter.compact` | **the converted `conversation-compaction.ts:164`** (in-place append → fork) |
 | relocated / deleted | §1E rollup — runtime/delivery → ConversationRuntime; diffs → Diffs; cost → Cost; config → Settings; DEAD set deleted; none map to a Conversations member by design |
 
 No `ConversationsResolver`/`ConversationWriter` method reads or writes a column

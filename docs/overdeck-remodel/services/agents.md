@@ -71,9 +71,11 @@ output of this audit:
 1. **Three parallel control surfaces collapse to one writer.** API-SURFACE §B
    ([`../../API-SURFACE.md`](../../API-SURFACE.md) lines 56-61) proves a "role
    agent" is reachable through **three doors over the same concept**:
-   - `agents.ts` (**35** endpoints) — the modern surface
-     (`pause/unpause/untroubled/resume/stop/restart/suspend/recover/switch-model/
-     delivery-method/message/tell` …).
+   - `agents.ts` (**40** endpoints — API-SURFACE §B's "35" counts only
+     `Route:`-header routes; 5 more are registered in `agentsRouteLayer`:
+     work-complete, stuck, classify-completion, permission-request/response) —
+     the modern surface (`pause/unpause/untroubled/resume/stop/restart/suspend/
+     recover/switch-model/delivery-method/message/tell` …).
    - `specialists.ts` (**31** endpoints) — a **legacy** model of the *same*
      role-agents (`wake/reset/init/report-status/done/auto-complete/terminate/
      grace/runs/spawn` …), built on `LegacySpecialistDefinition`
@@ -274,6 +276,7 @@ bridge between the issue-keyed CLI and the agent-keyed writer.
 |---|---|---|---|
 | `pan start <id>` (cli/index.ts:515) | writes | **`AgentWriter.spawn(...)`** (+ IssueWriter.advance "working") | Spine move 3; the agent spawn (issues.md splits the stage flip to Issues). |
 | `pan kill <id>` (cli/index.ts:405) | writes | **`AgentWriter.stop(id)`** | Stop agent, preserve workspace. |
+| `pan stop` (task-named; no top-level CLI verb — `kill` is the CLI spelling) | writes | **`AgentWriter.stop(id)`** | The HTTP `/stop` / CLI `kill` verb; named in the task, same writer verb. Accounted for, no separate door. |
 | `pan pause <id>` (cli/index.ts:411) | writes | **`AgentWriter.pause(id, reason)`** | `agents.paused`; the `--reason` flag → `paused_reason`. |
 | `pan unpause <id>` (cli/index.ts:417) | writes | **`AgentWriter.unpause(id)`** | Clear the pause gate. |
 | `pan untroubled <id>` (cli/index.ts:422) | writes | **`AgentWriter.clearTroubled(id)`** | Clear the troubled gate + failure counters. |
@@ -302,32 +305,59 @@ The live agent slice of `pan.subscribeDomainEvents` (rpc.ts:35) is fed by
 
 ## 1F. Rollup of the collapse
 
+> **Count correction (caught by this audit).** API-SURFACE §B reports
+> `agents.ts = 35`, but that counts only `// ─── Route:`-header routes. The
+> `agentsRouteLayer` registration (a.ts:3855-3896) wires **40** — 5 more without a
+> header comment: `work-complete`, `stuck`, `classify-completion`,
+> `permission-request`, `permission-response`. §1A enumerates all **40**. The
+> three-surface total is therefore **80**, not 75. This doc uses 40/80.
+
 | Surface | Current sites touching agent runtime | New home |
 |---|---|---|
-| **HTTP — three parallel doors** | **75** (agents 35 + specialists 31 + remote 9) | **5 resolver reads** + **12 writer verbs**; the rest **relocate** (Orchestration / Conversations / Cost / Workspace / Issues / agent-permissions) or **delete** (5 legacy specialist verbs) |
+| **HTTP — three parallel doors** | **80** (agents **40** + specialists 31 + remote 9) | **5 resolver reads** + **12 writer verbs**; the rest **relocate** (Orchestration / Conversations / Cost / Workspace / Issues / agent-permissions) or **delete** (4 legacy specialist endpoints) |
 | CLI verbs enumerated | 14 agent-touching verbs | the same writer set, **issue→agent resolved**; show/status recompose; sync-main relocates |
 | RPC methods enumerated | 4 agent-touching methods | `startAgent`/`deepWipe` → writer verbs; snapshot/workspace-detail recompose |
 | **Squatter columns evicted** | **9** (`review_*` ×7 + `inspect_sub_role` + the review-run half of specialists.ts) | **Orchestration** (`review_runs`/`review_run_agents`) — already in the locked schema |
 | **44 `agents` columns** | the runtime registry | **18-field NEED set** (AUDIT headline: 21 KEEP − 3 MERGE); 10 DROP/DERIVE, 10 MOVE leave the table |
 | `state.json` plane | ~48 files read/write/parse | **DELETED** (AUDIT "DELETE THE PLANE"); the table is the sole runtime store |
 
-**Collapse counts (current → new):**
+**Collapse counts (current → new) — the reconciling equation:**
 
-- **75 HTTP endpoints → 17 Agents members** (5 resolver + 12 writer).
-- **DELETED outright (5):** `specialists/:name/wake`, `:name/reset`,
-  `reset-all`, `:name/init`, and the legacy named-specialist plane they belong to
+> **80 endpoints = 28 kept + 44 relocated + 4 residue + 4 deleted.**
+> The **28 kept** endpoints collapse to **17 Agents members** (5 resolver reads +
+> 12 writer verbs) — a many-to-one fold (e.g. `tmux-alive` + `has-session` →
+> `isAlive`; `stop` + `DELETE` + `suspend` + specialist `kill` + remote
+> `agent/stop` → `stop`).
+
+Per-surface disposition tally (count the §1A/§1B/§1C rows):
+
+| Surface | kept → members | relocated | residue | deleted | total |
+|---|---|---|---|---|---|
+| `agents.ts` | 21 | 16 | 3 | 0 | **40** |
+| `specialists.ts` | 5 | 22 | 0 | 4 | **31** |
+| `remote.ts` | 2 | 6 | 1 | 0 | **9** |
+| **sum** | **28** | **44** | **4** | **4** | **80** |
+
+- **DELETED outright — 4 endpoints:** `specialists/:name/wake`, `:name/reset`,
+  `reset-all`, `:name/init` — **plus the legacy named-specialist plane retired**
   (CLAUDE.md: "Legacy specialist wake/session/queue machinery has been removed").
-- **RELOCATED, not lost (the no-loss integrity column):** the entire review-run
-  half of `specialists.ts` (runs/grace/context/complete/restart/terminate) +
-  `agents/:id/stuck` + `classify-completion` → **Orchestration**; `specialists/done`
-  + `report-status` + `:type/status` + `work-complete` → **Issues**; remote
-  workspace start/stop + `git-info` + `files` → **Workspace**; output/conversation/
-  activity → **Transcripts**; cost → **Cost**; handoff(+suggestion) →
+  The plane is not a 5th endpoint; it is the surface the 4 belong to.
+- **RESIDUE — 4 endpoints** (§1G): `agents/:id/message`, `/tell`, `/poke`, and
+  remote `agent/tell` — live-process delivery, behind a delivery service, not a
+  cache door.
+- **RELOCATED, not lost (the no-loss integrity column) — 44 endpoints:** the
+  entire review-run half of `specialists.ts`
+  (runs/grace/context/complete/restart/terminate) + `agents/:id/stuck` +
+  `classify-completion` → **Orchestration**; `specialists/done` + `report-status`
+  + `:type/status` + `work-complete` → **Issues**; remote workspace start/stop +
+  `git-info` + `files` → **Workspace**; output/conversation/activity/timeline →
+  **Transcripts/Observability**; cost → **Cost**; handoff(+suggestion) →
   **Conversations**; pending-questions/answer-question + permission-request/response
   → **Q&A / agent-permissions**; remote `status` + `models/resolve` →
   **Infra/Settings**.
 
-The 75 → (17 kept + relocated + 5 deleted) reconciles: nothing real is lost.
+The 80 → (28 kept = 17 members) + 44 relocated + 4 residue + 4 deleted
+reconciles: nothing real is lost.
 
 ## 1G. What did NOT fit the resolver/writer model — the genuine residue
 
@@ -736,6 +766,15 @@ export const AgentsApiLive = HttpApiBuilder.group(OverdeckApi, "agents", (h) =>
    .handle("deliveryMethod", ({ path, payload })  => AgentWriter.setDeliveryMethod(path.id, payload.deliveryMethod))
    .handle("heartbeat",      ({ path, payload })  => AgentWriter.recordHealth(path.id, payload)))
 ```
+
+**Three writer verbs are deacon-internal and have no controller endpoint:**
+`markTroubled`, `recordFailure`, `setStatus` are called only by the deacon's
+failure/liveness-reconcile patrols (AUDIT rows 89-95, surprise #1), never by an
+operator over HTTP — so `AgentsApi` exposes **14** endpoints against the writer's
+**12** verbs (5 reads + 9 operator-facing writes = 14; `restart` composes
+`stop`+`resume`, and `reset-session` reuses `switchModel`, so neither is a
+distinct endpoint). The three internal verbs stay on the writer (one mutator per
+domain) but are invoked in-process.
 
 The dashboard's live RPC surface (CONVENTIONS §8) delegates to the **same**
 resolver/writer so HTTP and RPC cannot diverge — `agents.get` / `agents.list`
