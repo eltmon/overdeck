@@ -7,8 +7,11 @@ import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Data, Effect } from 'effect';
 import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus, type VBriefSubItem } from './types.js';
-import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
-import type { WorkspaceContinueState } from '../pan-dir/types.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  resolveProjectForIssue,
+  writeStatusOverrides,
+} from '../pan-dir/record.js';
 
 export interface WaveItem {
   id: string;
@@ -863,8 +866,8 @@ export const writePlanFileAtomic = (planPath: string, doc: VBriefDocument): Effe
     catch: (cause) => liftDagError(planPath, 'writePlanFileAtomic', cause),
   });
 
-/** Mirror a task operation's status changes into the workspace continue file so canonical readers see them. */
-const mirrorTaskOperationToContinueFile = (
+/** Mirror a task operation's status changes into the per-issue record so canonical readers see them. */
+const mirrorTaskOperationToRecord = (
   workspacePath: string,
   itemId: string,
   status: VBriefItemStatus,
@@ -872,22 +875,11 @@ const mirrorTaskOperationToContinueFile = (
   subItemIds?: string[],
 ): Effect.Effect<void, VBriefDagError> =>
   Effect.gen(function* () {
-    const continueState: WorkspaceContinueState = (yield* readWorkspaceContinue(workspacePath).pipe(
-      Effect.catch(() => Effect.succeed(null as WorkspaceContinueState | null)),
-    )) ?? {
-      version: '1' as const,
-      issueId: '',
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [],
-    };
-    const overrides = { ...(continueState.statusOverrides ?? {}) };
-    overrides[itemId] = status;
+    const issueId = workspacePath.match(/feature-([a-z]+-\d+)$/i)?.[1]?.toUpperCase();
+    if (!issueId) return;
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+
+    const overrides: Record<string, string> = { [itemId]: status };
 
     const item = doc.plan.items.find(i => i.id === itemId);
     if (item) {
@@ -900,10 +892,12 @@ const mirrorTaskOperationToContinueFile = (
       }
     }
 
-    continueState.statusOverrides = overrides;
-    yield* writeWorkspaceContinue(workspacePath, continueState);
+    yield* Effect.tryPromise({
+      try: () => writeStatusOverrides(project, issueId, overrides),
+      catch: (cause) => liftDagError(workspacePath, 'mirrorTaskOperationToRecord', cause),
+    });
   }).pipe(
-    Effect.catch((cause) => Effect.fail(liftDagError(workspacePath, 'mirrorTaskOperationToContinueFile', cause))),
+    Effect.catch((cause) => Effect.fail(liftDagError(workspacePath, 'mirrorTaskOperationToRecord', cause))),
   );
 
 export const applyTaskOperationToPlanFile = (
@@ -926,7 +920,7 @@ export const applyTaskOperationToPlanFile = (
       const result = applyTaskOperation(current, operation);
       yield* writePlanFileAtomic(planPath, result.doc);
       const wsPath = workspacePath ?? dirname(dirname(planPath));
-      yield* mirrorTaskOperationToContinueFile(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
+      yield* mirrorTaskOperationToRecord(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
       return result;
     });
 

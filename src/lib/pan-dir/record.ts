@@ -341,6 +341,24 @@ export function writeStatusOverrideSync(
   }
 }
 
+/** Async variant that writes many overrides at once. */
+export async function writeStatusOverrides(
+  project: ProjectConfig,
+  issueId: string,
+  overrides: Record<string, string>,
+  opts: WriteStatusOverrideOptions = {},
+): Promise<void> {
+  const existing = await readIssueRecord(project, issueId);
+  const nextOverrides = { ...(existing?.statusOverrides ?? {}), ...overrides };
+  if (existing && JSON.stringify(existing.statusOverrides) === JSON.stringify(nextOverrides)) return;
+  const record = existing ?? (await ensureIssueRecord(project, issueId));
+  record.statusOverrides = nextOverrides;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  if (opts.autoCommit !== false) {
+    queueIssueRecordCommit(project, issueId, recordPath);
+  }
+}
+
 /** Synchronous variant that writes many overrides at once. */
 export function writeStatusOverridesSync(
   project: ProjectConfig,
