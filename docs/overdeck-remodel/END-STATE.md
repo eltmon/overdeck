@@ -63,8 +63,20 @@ That is the whole thesis. One read door and one write door per domain; a cache
 that owns nothing; four homes that own everything. The remodel makes the
 two-door rule a fact of the type system rather than a guideline you can
 violate — a request handler never receives the database handle in its
-dependencies, only its domain's resolver and writer, so reaching past a door is a
-compile error.
+dependencies, only its domain's resolver and writer, so reaching past a door fails
+to compile. (An import-boundary lint rule closes the one gap the types can't see:
+a handler that raw-imports the database handle directly.)
+
+A word on how literally to take the rest. "Disposable cache" and "four homes" are
+a **mental model**, not a contract to defend line by line. What truly has to
+survive is small: the **code**, and the **conversation JSONL files**, which we
+never touch. Everything else is working state for moving agents through the
+pipeline, and the git records exist mainly so a developer — or another agent — can
+see who has picked up what and roughly where it sits. So the bar for the remodel
+is concrete and unfussy: **keep every piece of functionality the system has today,
+minus the hundred redundant and wrong ways it currently does each thing.** Where a
+fact needs to persist for the product to work, it persists; we don't agonize over
+whether it could theoretically be rebuilt from somewhere else.
 
 ### The deletion scoreboard
 
