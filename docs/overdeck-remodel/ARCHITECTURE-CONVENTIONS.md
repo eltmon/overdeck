@@ -159,8 +159,8 @@ export const IssuesResolverLayer = Layer.effect(IssuesResolver, Effect.gen(funct
 export class IssueWriter extends Context.Service<IssueWriter, {
   readonly advance: (id: IssueId, to: Stage, reason: string) =>
     Effect.Effect<Issue, IssueNotFound | IllegalTransition>
-  readonly hold: (id: IssueId, flag: Hold, on: boolean, reason?: string) =>
-    Effect.Effect<Issue, IssueNotFound>
+  readonly setPr: (id: IssueId, pr: PrRef) => Effect.Effect<Issue, IssueNotFound>
+  readonly setBlockers: (id: IssueId, blockers: Blocker[]) => Effect.Effect<Issue, IssueNotFound>
 }>()("overdeck/IssueWriter") {}
 
 export const IssueWriterLayer = Layer.effect(IssueWriter, Effect.gen(function*() {
@@ -181,7 +181,11 @@ export const IssueWriterLayer = Layer.effect(IssueWriter, Effect.gen(function*()
     yield* bus.emit({ type: "issue.advanced", payload: { id, to, reason } })
     return next
   })
-  return IssueWriter.of({ advance, hold })
+  // setPr / setBlockers follow the same source-first pattern (omitted here).
+  // There is NO generic hold(): cross-domain side-states (paused/troubled → AgentWriter;
+  // deacon-ignored/auto-merge → SettingsWriter) are written by their OWN domain's writer,
+  // never reached into from here — that reach is the exact coupling the doors forbid.
+  return IssueWriter.of({ advance, setPr, setBlockers })
 }))
 ```
 

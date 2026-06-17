@@ -215,14 +215,26 @@ moves to Orchestration) or simply deleted: `ready_for_merge` becomes derived, th
 display-only timestamps go, the dead `inspect_bead_id` goes, and the phantom
 `reviewer_verdicts` and `lifetime_auto_requeue_count` go.
 
-The write door, `IssueWriter`, needs only two verbs, and those ~148 sites
-collapse into them. **`advance(id, toStage, reason)`** checks that the move is one
-of the legal edges, records the new stage and verdicts to the git record, updates
-the cache, and emits `issue.advanced`. It is the only caller of what used to be
-`transitionTo`, `setReviewStatus`, `updateSpecStatus`, and the GitHub-label
-operations. **`hold(id, flag, on, reason)`** toggles an orthogonal side-state —
-paused, troubled, stuck, blocked, cancelled, deacon-ignored — none of which is a
-stage.
+The write door, `IssueWriter`, is built around one dominant verb.
+**`advance(id, toStage, reason)`** checks that the move is one of the legal edges,
+records the new stage and verdicts to the git record, updates the cache, and emits
+`issue.advanced`. By deriving each gate outcome from the edge it takes, it absorbs
+all ~148 transition sites — it is the only caller of what used to be `transitionTo`,
+`setReviewStatus`, `updateSpecStatus`, and the GitHub-label operations. Beyond
+`advance`, only two writes are genuinely facts about the issue itself: **`setPr`**
+(the PR identity) and **`setBlockers`** (the merge-conflict blockers).
+
+Designing this domain caught a real flaw in an earlier draft, and it is worth
+stating because it is the disease the remodel cures. An earlier `hold(flag)` verb
+was meant to toggle the issue's "side-states" — paused, troubled, stuck, blocked,
+cancelled, deacon-ignored. But five of those six are not issue facts:
+`paused`/`troubled` belong to the **Agent** writer, `deacon-ignored`/`auto-merge`
+to the **Settings** writer, `stuck` to the ephemeral review-run runtime, and
+`cancelled` is simply a stage that `advance` reaches. Only `blocked` is an issue
+fact, and it is `setBlockers`. A `hold()` that wrote the others would have to pull
+the `agents` and `issue_policy` tables into the Issues writer's dependencies — the
+exact cross-domain reach the two-door rule forbids. So there is no `hold()`: each
+side-state is written by the one domain that owns it.
 
 There are about fifteen legal moves. The spine is a nine-step line:
 
@@ -252,8 +264,10 @@ The controller is `IssuesApi`:
 
 - `GET /issues` lists issues by filter.
 - `GET /issues/:id` gets one, or returns `IssueNotFound`.
+- `GET /issues/:id/plan` returns the vBRIEF plan.
 - `POST /issues/:id/advance` advances the stage, or returns `IllegalTransition`.
-- `POST /issues/:id/hold` toggles a side-state.
+- `POST /issues/:id/blockers` sets the merge-conflict blockers.
+- `POST /issues/:id/pr` sets the PR identity.
 
 The full Effect form — entity, errors, resolver, writer, controller — is the
 worked example in [`ARCHITECTURE-CONVENTIONS.md`](ARCHITECTURE-CONVENTIONS.md).
