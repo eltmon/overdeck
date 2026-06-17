@@ -13,6 +13,8 @@
  *    zero. Hard FKs are used only where the referenced row is guaranteed to
  *    exist; "soft" pointers to cache-only rows (e.g. transcripts, rebuilt by a
  *    scan and allowed to lag) are plain columns, documented, NOT FK-constrained.
+ *    Hard FKs on issues.id (agents, merge_*, issue_policy) are safe because
+ *    rebuild materializes `issues` rows first.
  *  - Booleans are integer({mode:'boolean'}); timestamps integer({mode:'timestamp'}).
  *  - This Drizzle schema IS the source for drizzle-kit migrations.
  */
@@ -96,7 +98,7 @@ export const conversations = sqliteTable("conversations", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),                         // operator/favorite key
   cwd: text("cwd").notNull(),                                    // pointer input (encodes the claude path)
-  issueId: text("issue_id").references(() => issues.id),         // nullable (ad-hoc convos)
+  issueId: text("issue_id"),                                     // soft pointer — no FK; nullable. Conversations of closed/deleted/ad-hoc issues outlive the issue row.
   harness: text("harness"),                                      // resolver discriminator
   model: text("model"),
   effort: text("effort"),
@@ -193,10 +195,14 @@ export const costEvents = sqliteTable("cost_events", {
 ]);
 
 /* ───────────────────────────── MERGE ───────────────────────────────
- * All CACHE — structure rebuilds from projects.yaml, gate outcomes from forge
- * PR state. The merge-train (uat-train.ts) owns these, NOT Issues. Columns
- * verified against the live schema; the UAT members/held-out JSON arrays are
- * normalized into uat_generation_members and the cardinality-distinct
+ * Mostly CACHE — merge_sets / merge_set_repos / merge_queue / pending_auto_merges
+ * rebuild structure from projects.yaml and gate outcomes from forge PR state.
+ * The uat_generations / _members / _resolutions tables are the EXCEPTION: they
+ * are PERSISTED, auditable pipeline history (an append-only record of what each
+ * UAT batch bundled, held out, and resolved) — kept, NOT re-derived from
+ * projects.yaml. The merge-train (uat-train.ts) owns all of these, NOT Issues.
+ * Columns verified against the live schema; the UAT members/held-out JSON arrays
+ * are normalized into uat_generation_members and the cardinality-distinct
  * resolutions into uat_generation_resolutions (the "use FKs properly" fix).
  */
 export const mergeSets = sqliteTable("merge_sets", {
@@ -252,6 +258,8 @@ export const pendingAutoMerges = sqliteTable("pending_auto_merges", {
   scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
   mergedAt: integer("merged_at", { mode: "timestamp" }),
   failureReason: text("failure_reason"),
+  cancelledAt: integer("cancelled_at", { mode: "timestamp" }),     // live schema.ts:570 — cooldown-window cancellation
+  cancelledBy: text("cancelled_by"),                               // live schema.ts:571
 }, (t) => [
   index("pending_auto_merges_issue_idx").on(t.issueId),
   // one active auto-merge per issue — prevents scheduling two concurrent merges
@@ -324,26 +332,25 @@ export const issuePolicy = sqliteTable("issue_policy", {
 });
 
 /* ─────────────────────────── ORCHESTRATION ─────────────────────────
- * EPHEMERAL REVIEW-RUN RUNTIME — pure cache, no durable value. This is the home
- * for the MOVE→Orchestration columns that the review monitor / deacon recovery
- * loop branch-reads during a LIVE review cycle, but which are NOT part of the
- * durable verdict (that lives in `issues`). Keyed by issueId (one row per issue
- * = the current cycle): the review-run pointers (from the live `agents` table,
- * schema.ts:466-472) and the ephemeral recovery counters (from the live
- * `review_status` table, schema.ts:224/231/232/238/239/245/247/249/251/253).
- * A convoy has multiple per-agent sub-role reviewers; this row holds only the
- * current cycle's values — it is NOT convoy history. Rebuilds on each cycle.
+ * EPHEMERAL REVIEW-RUN RUNTIME — pure cache, no durable value. The home for
+ * the columns the review monitor / deacon recovery loop branch-reads during a
+ * LIVE review cycle but which are NOT part of the durable verdict (that lives
+ * in `issues`). Rebuilds on each cycle.
+ *
+ * A review is a CONVOY of 4 concurrent sub-role lanes
+ * (security/correctness/performance/requirements, review-monitor.ts:22) plus a
+ * synthesis agent. A single issue-keyed row CANNOT represent 4 lanes, so this
+ * splits into two tables:
+ *   - review_runs — one row per run, holding the issue-level recovery counters
+ *     (from live `review_status`, schema.ts:224/231/232/249/251/238/239/245/247/253)
+ *     and the single per-run synthesis pointer (live agents:468).
+ *   - review_run_agents — one row PER reviewer lane, holding the per-agent
+ *     review-run pointers (from live `agents`, schema.ts:466/467/469/470/471/472).
  */
 export const reviewRuns = sqliteTable("review_runs", {
-  issueId: text("issue_id").primaryKey().references(() => issues.id),
-  // review-run pointers (live agents:466-472)
-  reviewRunId: text("review_run_id"),                            // agents.review_run_id
-  reviewSubRole: text("review_sub_role"),                        // agents.review_sub_role
-  reviewSynthesisAgentId: text("review_synthesis_agent_id"),     // agents.review_synthesis_agent_id — soft pointer, no FK
-  reviewOutputPath: text("review_output_path"),                  // agents.review_output_path
-  reviewDeadlineAt: integer("review_deadline_at", { mode: "timestamp" }), // agents.review_deadline_at
-  reviewMonitorSignaled: text("review_monitor_signaled"),        // agents.review_monitor_signaled — TEXT in live, not a flag
-  reviewRetryAttempt: integer("review_retry_attempt"),           // agents.review_retry_attempt
+  runId: text("run_id").primaryKey(),                            // agents.review_run_id — the convoy's run id
+  issueId: text("issue_id").notNull().references(() => issues.id),
+  reviewSynthesisAgentId: text("review_synthesis_agent_id"),     // agents.review_synthesis_agent_id (468) — one synthesis per convoy; soft pointer, no FK (agents are prunable)
   // ephemeral recovery counters (live review_status)
   verificationCycleCount: integer("verification_cycle_count").default(0), // review_status:224
   autoRequeueCount: integer("auto_requeue_count").default(0),    // review_status:231
@@ -355,7 +362,21 @@ export const reviewRuns = sqliteTable("review_runs", {
   reviewSpawnedAt: integer("review_spawned_at", { mode: "timestamp" }), // review_status:245
   conflictResolutionDispatchedAt: integer("conflict_resolution_dispatched_at", { mode: "timestamp" }), // review_status:247
   recoveryStartedAt: integer("recovery_started_at", { mode: "timestamp" }), // review_status:253
-});
+}, (t) => [index("review_runs_issue_idx").on(t.issueId)]);
+
+/* one row PER reviewer lane in a convoy — the per-agent review-run pointers
+ * (live agents:466/469/470/471/472). agentId is a soft pointer (no FK — agents
+ * are prunable). sub_role is one of the 4 convoy lanes (review-monitor.ts:22). */
+export const reviewRunAgents = sqliteTable("review_run_agents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  runId: text("run_id").notNull().references(() => reviewRuns.runId),
+  agentId: text("agent_id"),                                     // soft pointer → agents.id; no FK (rows outlive prunable agents)
+  subRole: text("sub_role"),                                     // agents.review_sub_role (466) — security|correctness|performance|requirements
+  outputPath: text("output_path"),                              // agents.review_output_path (469)
+  deadlineAt: integer("deadline_at", { mode: "timestamp" }),    // agents.review_deadline_at (470)
+  monitorSignaled: text("monitor_signaled"),                    // agents.review_monitor_signaled (471) — TEXT in live, not a flag
+  retryAttempt: integer("retry_attempt"),                       // agents.review_retry_attempt (472)
+}, (t) => [index("review_run_agents_run_idx").on(t.runId)]);
 
 /* ───────────────────────────── MEMORY ──────────────────────────────
  * Memory's real records are FILES on disk (~/.panopticon/memory/...). Its only
@@ -379,6 +400,50 @@ export const transcriptCheckpoints = sqliteTable("transcript_checkpoints", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+/* ─────────────────────── MEMORY SEARCH STORE ───────────────────────
+ * NOT in overdeck.db. This is a SEPARATE, per-project search database at
+ * resolveMemoryRoot(projectId)/memory-search.db (paths.ts:64-65) — one per
+ * project, not the single shared overdeck.db. Modeled here only to document the
+ * Memory search domain end-to-end; it cannot FK into overdeck tables (different
+ * DB) and is NOT counted in the overdeck.db table total.
+ *
+ * The store has three objects (fts-operations.ts:50-98):
+ *   - memory_fts — an FTS5 VIRTUAL table over the on-disk observation files.
+ *     Drizzle does not model FTS5; it is created via raw SQL (like
+ *     transcripts_fts above) and is not declared here.
+ *   - reset_markers — modeled below. Drives search filtering: search.ts:121-128
+ *     excludes any observation older than the newest matching reset marker, so
+ *     a reset hides prior memories without deleting them.
+ *   - observation_index — modeled below. Maps each indexed observation id to its
+ *     backing JSONL file + byte offset, so the FTS index can be rebuilt.
+ *
+ * REQUIRED PIECE (functional parity): an FTS rebuilder that reconstructs
+ * memory_fts (and observation_index) from the on-disk observation JSONL files.
+ * Without it, search functionality is lost after a reset/wipe of memory-search.db
+ * — the observations still exist on disk but become unsearchable. This rebuilder
+ * is the missing piece and must exist.
+ */
+export const resetMarkers = sqliteTable("reset_markers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  scope: text("scope").notNull(),                                // project|workspace|issue|session (search.ts:124-127)
+  scopeId: text("scope_id").notNull(),
+  fromTimestamp: integer("from_timestamp", { mode: "timestamp" }).notNull(), // cutoff: observations at/before this are hidden
+  reason: text("reason"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+}, (t) => [
+  index("reset_markers_scope_idx").on(t.scope, t.scopeId, t.fromTimestamp), // live idx_reset_markers_scope
+  index("reset_markers_created_at_idx").on(t.createdAt),         // live idx_reset_markers_created_at
+]);
+
+export const observationIndex = sqliteTable("observation_index", {
+  id: text("id").primaryKey(),                                   // observation id
+  observationPathJsonl: text("observation_path_jsonl").notNull(), // backing JSONL file
+  byteOffset: integer("byte_offset").notNull(),                  // offset within that file
+}, (t) => [
+  // live idx_observation_index_path_offset (fts-operations.ts:96-97)
+  index("observation_index_path_offset_idx").on(t.observationPathJsonl, t.byteOffset),
+]);
+
 /* ───────────────────────── OBSERVABILITY ───────────────────────────
  * Not a domain — a thin EventBus (disposable pub/sub transport). Tiered
  * retention by type (periodic, not startup-only).
@@ -390,13 +455,37 @@ export const events = sqliteTable("events", {
   payload: text("payload", { mode: "json" }),
 }, (t) => [index("events_type_ts_idx").on(t.type, t.timestamp)]);
 
+/* status_history — KEPT cache table. Pipeline transition history for operator
+ * visibility (the review/test/merge status timeline). NOT safely derivable from
+ * `events` (different granularity + the dedup contract below), so it is kept,
+ * not deleted. Matches live schema.ts:272-287. The live FK targets
+ * review_status(issue_id) (schema.ts:279); review_status is dissolved in
+ * overdeck, so the hard FK is re-pointed to issues.id (rebuild materializes
+ * issues first). The unique index drives INSERT OR IGNORE dedup in
+ * upsertReviewStatus (schema.ts:286-287). */
+export const statusHistory = sqliteTable("status_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  issueId: text("issue_id").notNull().references(() => issues.id), // live FK targets review_status; re-pointed to issues
+  statusType: text("type").notNull(),                            // 'review' | 'test' | 'merge'
+  status: text("status").notNull(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  notes: text("notes"),
+}, (t) => [
+  index("status_history_issue_idx").on(t.issueId, t.timestamp),  // live idx_status_history_issue
+  // INSERT OR IGNORE dedup key (live idx_status_history_unique, schema.ts:286-287)
+  uniqueIndex("status_history_unique_idx").on(t.issueId, t.statusType, t.status, t.timestamp),
+]);
+
 /* ────────────────────────────────────────────────────────────────────
  * DELETED (not modeled — were dead/orphan/duplicate):
  *   issue_state, api_cache, rate_limits, auto_merge, label_sync_audit, outbox,
- *   flywheel_substrate_bugs, status_history (→ derivable from events),
- *   git_operations, session_embeddings, discovered_session_* satellites,
- *   processed_sessions, and the duplicate CREATE TABLE agents block.
+ *   flywheel_substrate_bugs, git_operations, session_embeddings,
+ *   discovered_session_* satellites, processed_sessions, and the duplicate
+ *   CREATE TABLE agents block.
  * NOT in overdeck.db (live elsewhere): the sacred session files (disk),
- *   memory observation files (~/.panopticon/memory), cache.db, memory-search.db,
- *   cost events.jsonl archive, the git .pan/records.
+ *   memory observation files (~/.panopticon/memory), cache.db, the cost
+ *   events.jsonl archive, the git .pan/records. memory-search.db is also a
+ *   separate per-project DB (not overdeck.db); its reset_markers /
+ *   observation_index tables are MODELED above (MEMORY SEARCH STORE section)
+ *   for documentation but are NOT counted in the overdeck.db table total.
  * ──────────────────────────────────────────────────────────────────── */
