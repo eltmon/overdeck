@@ -18,20 +18,25 @@ import { Effect } from 'effect';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { writeFeedbackFile } from './feedback-writer.js';
-import { messageAgent } from '../agents.js';
+import { messageAgent, setAgentPausedSync } from '../agents.js';
 import { findProjectByPathSync } from '../projects.js';
 import { getVBriefACStatusSync } from '../vbrief/beads.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
+import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
 
-export const VERIFICATION_MAX_CYCLES = 10;
+// PAN-1934: cap verification retries at 3 cycles. After this the agent is
+// paused and the issue is escalated to the operator instead of being driven
+// through more silent retry loops.
+export const VERIFICATION_MAX_CYCLES = 3;
 
 export type VerificationRunnerOutcome =
   | { outcome: 'passed' }
   | { outcome: 'skipped'; reason: string }
   | { outcome: 'failed'; failedCheck: string; cycleCount: number; maxCycles: number }
+  | { outcome: 'max_cycles_reached'; failedCheck: string; cycleCount: number; maxCycles: number }
   | { outcome: 'error'; message: string };
 
 export interface WorkspaceInfo {
@@ -192,10 +197,41 @@ function getSyncTargetBranch(
   const currentCycles = getReviewStatusSync(issueId)?.verificationCycleCount ?? 0;
 
   if (currentCycles >= VERIFICATION_MAX_CYCLES) {
-    const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} cycles exceeded — skipping verification`;
+    const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} verification cycles exceeded — operator escalation`;
     console.log(`[${logPrefix}] ${reason} for ${issueId}`);
-    setReviewStatusSync(issueId, { verificationStatus: 'skipped' });
-    return { outcome: 'skipped', reason };
+
+    const failedCheck = getReviewStatusSync(issueId)?.verificationNotes
+      ? 'verification-gate'
+      : 'verification-gate';
+
+    setReviewStatusSync(issueId, {
+      reviewStatus: 'pending',
+      verificationStatus: 'failed',
+      verificationNotes: reason,
+      verificationCycleCount: currentCycles,
+      verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+    });
+
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    setAgentPausedSync(agentId, `Verification failed ${currentCycles}/${VERIFICATION_MAX_CYCLES} times — needs operator escalation (PAN-1934)`);
+
+    // Surface an operator-visible intervention event so the dashboard/flywheel
+    // can alert a human instead of leaving the agent looping silently.
+    void appendOperatorInterventionEvent({
+      issueId,
+      kind: 'pause',
+      source: 'verification-runner:max-cycles-reached',
+    }).catch((err: unknown) => {
+      console.error(`[${logPrefix}] Failed to append operator intervention for ${issueId}:`, err);
+    });
+
+    // Notify the agent that it must stop and wait for the operator.
+    const escalationMsg = `VERIFICATION ESCALATION for ${issueId}: verification has failed ${currentCycles}/${VERIFICATION_MAX_CYCLES} times and has been paused for operator review. Do NOT continue retrying. A human will inspect the failing check and decide next steps.`;
+    void messageAgent(agentId, escalationMsg).catch((err: unknown) => {
+      console.error(`[${logPrefix}] Failed to send max-cycles message to ${agentId}:`, err);
+    });
+
+    return { outcome: 'max_cycles_reached', failedCheck, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
   }
 
   setReviewStatusSync(issueId, { verificationStatus: 'running' });

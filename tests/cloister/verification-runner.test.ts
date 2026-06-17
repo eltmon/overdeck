@@ -16,6 +16,8 @@ const {
   runQualityGatesMock,
   writeFeedbackFileMock,
   messageAgentMock,
+  setAgentPausedMock,
+  appendOperatorInterventionEventMock,
   findProjectByPathMock,
   existsSyncMock,
 } = vi.hoisted(() => ({
@@ -26,6 +28,8 @@ const {
   runQualityGatesMock: vi.fn(),
   writeFeedbackFileMock: vi.fn(),
   messageAgentMock: vi.fn(),
+  setAgentPausedMock: vi.fn(),
+  appendOperatorInterventionEventMock: vi.fn().mockResolvedValue(undefined),
   findProjectByPathMock: vi.fn(),
   existsSyncMock: vi.fn(),
 }));
@@ -81,6 +85,11 @@ vi.mock('../../src/lib/cloister/feedback-writer.js', () => ({
 
 vi.mock('../../src/lib/agents.js', () => ({
   messageAgent: messageAgentMock,
+  setAgentPausedSync: setAgentPausedMock,
+}));
+
+vi.mock('../../src/lib/operator-interventions.js', () => ({
+  appendOperatorInterventionEvent: appendOperatorInterventionEventMock,
 }));
 
 vi.mock('../../src/lib/projects.js', () => ({
@@ -142,14 +151,37 @@ describe('runVerificationForIssue', () => {
   });
 
   describe('circuit breaker', () => {
-    it('returns skipped and sets verificationStatus:skipped when at max cycles', async () => {
+    it('returns max_cycles_reached, pauses agent, and escalates to operator when at max cycles', async () => {
       getReviewStatusMock.mockReturnValue({ verificationCycleCount: VERIFICATION_MAX_CYCLES });
 
       const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
 
-      expect(result.outcome).toBe('skipped');
-      expect(setReviewStatusMock).toHaveBeenCalledWith(issueId, { verificationStatus: 'skipped' });
+      expect(result.outcome).toBe('max_cycles_reached');
+      expect(setReviewStatusMock).toHaveBeenCalledWith(
+        issueId,
+        expect.objectContaining({
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationCycleCount: VERIFICATION_MAX_CYCLES,
+          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+        }),
+      );
       expect(runQualityGatesMock).not.toHaveBeenCalled();
+      expect(setAgentPausedMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('needs operator escalation'),
+      );
+      expect(appendOperatorInterventionEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          issueId,
+          kind: 'pause',
+          source: 'verification-runner:max-cycles-reached',
+        }),
+      );
+      expect(messageAgentMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('Do NOT continue retrying'),
+      );
     });
 
     it('runs verification when cycles are below max', async () => {
