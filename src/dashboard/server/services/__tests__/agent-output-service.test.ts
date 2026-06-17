@@ -11,8 +11,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
+const mockEmitOnly = vi.hoisted(() => vi.fn((_event: unknown) => undefined))
 const mockAppendAsync = vi.hoisted(() => vi.fn((_event: unknown) => Promise.resolve(1)))
-const mockEventStore = { appendAsync: mockAppendAsync }
+const mockEventStore = { emitOnly: mockEmitOnly, appendAsync: mockAppendAsync }
 
 vi.mock('../../event-store.js', () => ({
   getEventStore: () => mockEventStore,
@@ -89,7 +90,7 @@ describe('diffLines', () => {
 describe('AgentOutputService', () => {
   beforeEach(() => {
     stopAgentOutputService()
-    mockAppendAsync.mockClear()
+    mockEmitOnly.mockClear()
     mockCapturePane.mockClear()
     mockListRunningAgents.mockClear()
   })
@@ -110,8 +111,9 @@ describe('AgentOutputService', () => {
 
     // First poll
     await pollOnce(state)
-    expect(mockAppendAsync).toHaveBeenCalledTimes(1)
-    const firstCall = mockAppendAsync.mock.calls[0]![0] as {
+    expect(mockEmitOnly).toHaveBeenCalledTimes(1)
+    expect(mockAppendAsync).not.toHaveBeenCalled()
+    const firstCall = mockEmitOnly.mock.calls[0]![0] as {
       type: string
       payload: { agentId: string; lines: string[] }
     }
@@ -121,8 +123,9 @@ describe('AgentOutputService', () => {
 
     // Second poll — new line
     await pollOnce(state)
-    expect(mockAppendAsync).toHaveBeenCalledTimes(2)
-    const secondCall = mockAppendAsync.mock.calls[1]![0] as {
+    expect(mockEmitOnly).toHaveBeenCalledTimes(2)
+    expect(mockAppendAsync).not.toHaveBeenCalled()
+    const secondCall = mockEmitOnly.mock.calls[1]![0] as {
       type: string
       payload: { agentId: string; lines: string[] }
     }
@@ -139,10 +142,11 @@ describe('AgentOutputService', () => {
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
     await pollOnce(state)
-    expect(mockAppendAsync).toHaveBeenCalledTimes(1)
+    expect(mockEmitOnly).toHaveBeenCalledTimes(1)
 
-    mockAppendAsync.mockClear()
+    mockEmitOnly.mockClear()
     await pollOnce(state)
+    expect(mockEmitOnly).not.toHaveBeenCalled()
     expect(mockAppendAsync).not.toHaveBeenCalled()
   })
 
@@ -155,6 +159,7 @@ describe('AgentOutputService', () => {
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
     await pollOnce(state)
+    expect(mockEmitOnly).not.toHaveBeenCalled()
     expect(mockAppendAsync).not.toHaveBeenCalled()
   })
 
@@ -170,14 +175,15 @@ describe('AgentOutputService', () => {
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
     await pollOnce(state)
-    expect(mockAppendAsync).toHaveBeenCalledTimes(1)
+    expect(mockEmitOnly).toHaveBeenCalledTimes(1)
     expect(state.lastOutput.has('agent-pan-test')).toBe(true)
 
-    mockAppendAsync.mockClear()
+    mockEmitOnly.mockClear()
     await pollOnce(state)
     // Agent stopped, state cleaned up
     expect(state.lastOutput.has('agent-pan-test')).toBe(false)
     expect(mockCapturePane).toHaveBeenCalledTimes(1)
+    expect(mockEmitOnly).not.toHaveBeenCalled()
     expect(mockAppendAsync).not.toHaveBeenCalled()
   })
 
@@ -190,6 +196,7 @@ describe('AgentOutputService', () => {
     const state = { timer: null, lastOutput: new Map<string, string>() }
 
     await pollOnce(state)
+    expect(mockEmitOnly).not.toHaveBeenCalled()
     expect(mockAppendAsync).not.toHaveBeenCalled()
   })
 })

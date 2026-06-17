@@ -81,14 +81,18 @@ function isPublicEventType(type: string): boolean {
   return (PUBLIC_CATALOG as readonly string[]).includes(type);
 }
 
-function formatFrame(event: StoredEvent): string {
+export function formatFrame(event: StoredEvent): string {
   const data = JSON.stringify({
     type: event.type,
     sequence: event.sequence,
     timestamp: event.timestamp,
     payload: event.payload,
   });
-  return `event: ${event.type}\nid: ${event.sequence}\ndata: ${data}\n\n`;
+  // In-memory-only events (emitOnly) carry sequence -1. Omit the SSE id: line
+  // for those frames so they do not advance the client's Last-Event-ID cursor;
+  // persisted rows use AUTOINCREMENT >= 1, so real-event replay is unaffected.
+  const idLine = event.sequence >= 0 ? `id: ${event.sequence}\n` : '';
+  return `event: ${event.type}\n${idLine}data: ${data}\n\n`;
 }
 
 function getHeader(
