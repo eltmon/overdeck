@@ -1,12 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { openDatabase, type SqliteDatabase } from '../src/lib/database/driver.js';
-import { getPanopticonHome, packageRoot } from '../src/lib/paths.js';
+import {
+  getOverdeckDatabasePath,
+  OVERDECK_MIGRATION_PATH,
+  OVERDECK_TABLE_COUNT,
+} from '../src/lib/overdeck/paths.js';
 
-export const OVERDECK_TABLE_COUNT = 24;
-export const OVERDECK_MIGRATION_PATH = join(packageRoot, 'drizzle', 'overdeck', '0000_overdeck_init.sql');
+export { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH, OVERDECK_TABLE_COUNT };
 
 export interface CreateOverdeckDatabaseOptions {
   dbPath?: string;
@@ -17,10 +20,6 @@ export interface CreateOverdeckDatabaseOptions {
 export interface CreateOverdeckDatabaseResult {
   dbPath: string;
   tableCount: number;
-}
-
-export function getOverdeckDatabasePath(): string {
-  return join(getPanopticonHome(), 'overdeck.db');
 }
 
 function migrationStatements(migrationPath: string): string[] {
