@@ -1,0 +1,1571 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-17T07:08:54.000Z",
+    "updated": "2026-06-17T07:08:54.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1938: Overdeck \u2014 the Panopticon data-architecture remodel + rebrand (big-bang)"
+  },
+  "plan": {
+    "id": "pan-1938",
+    "title": "Overdeck: the Panopticon data-architecture remodel + rebrand (big-bang)",
+    "status": "proposed",
+    "uid": "0dc557c8-0493-4a6a-b460-e98d39a7ab5c",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 1,
+    "created": "2026-06-17T07:08:54.000Z",
+    "updated": "2026-06-17T07:08:54.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1938",
+        "label": "PAN-1938",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/overdeck-remodel/PRD.md",
+        "label": "Overdeck PRD (execution plan)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/overdeck-remodel/END-STATE.md",
+        "label": "End-state architecture",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/overdeck-remodel/overdeck-schema.ts",
+        "label": "Locked Drizzle schema (24 tables)",
+        "type": "spec"
+      },
+      {
+        "uri": "docs/overdeck-remodel/ARCHITECTURE-CONVENTIONS.md",
+        "label": "Effect v4 house style",
+        "type": "doc"
+      },
+      {
+        "uri": "docs/overdeck-remodel/services/",
+        "label": "Per-domain API tier (8 docs)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "architecture",
+      "data-model",
+      "effect",
+      "drizzle",
+      "sqlite",
+      "big-bang",
+      "rebrand",
+      "two-door"
+    ],
+    "narratives": {
+      "Problem": "Panopticon's recurring state and pipeline bugs all trace to one disease: a single fact is written from many places with no owner, so the stores drift \u2014 a 35-table SQLite junk-drawer with zero enforced foreign keys, god-tables, duplicate entities, ~8 status axes, and ~148 transition sites. Full diagnosis: docs/overdeck-remodel/END-STATE.md.",
+      "Proposal": "Rebuild on a fresh, empty overdeck.db (panopticon.db kept untouched as backup \u2014 a low-risk big-bang, not a migration), all-in on Effect v4-beta with Drizzle over node:sqlite/bun:sqlite. One read door (resolver Service) and one write door (writer Service) per domain; nothing else touches a store, enforced by Effect's type system plus an import-boundary lint rule. Seven DB-cache domains (Issues, Agents, Conversations, Cost, Merge, Control/Settings, Memory) + file-backed Config; Transcripts is a shared read service and Observability is the EventBus \u2014 neither is a domain. The bar is FUNCTIONAL PARITY: keep every behavior the system has today minus the hundred redundant and wrong ways it does each thing. The full spec is the design package referenced in the PRD (docs/overdeck-remodel/); this plan sequences it behind build gates G1-G6. Finally, rename Panopticon -> Overdeck.",
+      "NonGoals": "- Backward compatibility or data migration from panopticon.db.\n- Defending the 'disposable cache / four homes' model as a literal contract \u2014 it is a mental model; the contract is functional parity.\n- Re-deriving any design already specified in the package.\n- Mutating conversation JSONL backing files or memory observation files (sacred, read-only).\n- Splitting the rebrand into a separate effort \u2014 it folds in as the final phase."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Model allocation: GPT-5.5 builds Phase 0 foundations + the Phase 1 Issues vertical slice; kimi-2.7 builds the six Phase-2 domains in parallel; opus (orchestrator) gates each domain at merge. Applied at spawn via per-domain pan agents, NOT baked into model routing.",
+        "rationale": "Operator's explicit cost-aware allocation (GPT-5.5 low on tokens). Provider-default harness routing \u2014 no --harness override for CLIProxy-routed models (PAN-1865)."
+      },
+      {
+        "summary": "The build gates (G1 Drizzle-proven, G2 slice-compiles, G3 no-loss matrix, G4 sacred-file, G5 PAN-1937 export, G6 replay-gap) are encoded as `blocks` edges so createBeadsFromVBrief lowers them into bd dependencies \u2014 bd ready cannot hand out a domain bead until the slice (G2) is closed.",
+        "rationale": "The slice-first safety guarantee must be mechanical, not advisory; verified createBeadsFromVBrief (src/lib/vbrief/beads.ts) lowers blocks edges to bd deps with a reconciliation/repair pass."
+      },
+      {
+        "summary": "Issues writer is advance(id,toStage,reason) + setPr + setBlockers \u2014 NO generic hold(); side-states route to their owning domain's writer (paused/troubled -> Agents, deacon-ignored/auto-merge -> Settings, stuck -> review_runs, cancelled -> stage).",
+        "rationale": "Five of six side-states are not issue facts; the vertical-slice exercise caught the hold() error."
+      },
+      {
+        "summary": "All infra Service Tags (Db, EventBus, Records, Tmux, Forge, Projects, CostArchive, MemorySearch, MemoryFiles) are defined up front in the infra-layer bead so the six domains compile independently against Tags; domain-specific Live layers are built inside their owning domain beads and composed at Phase-3 wiring.",
+        "rationale": "No domain writer's R includes another domain's Service Tag (verified against the services/*.md ./infra import lines), so defining infra Tags early removes cross-domain compile coupling and enables true parallel Phase-2 work."
+      }
+    ],
+    "items": [
+      {
+        "id": "add-drizzle-deps",
+        "title": "Add drizzle-orm + drizzle-kit (only these \u2014 node:sqlite is built-in)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `drizzle-orm` and `drizzle-kit` to package.json. Do NOT add `better-sqlite3` (dropped in PAN-1579) or `@effect/sql` (Bun-only). `node:sqlite`/`bun:sqlite` are runtime built-ins. Per docs/overdeck-remodel/ARCHITECTURE-CONVENTIONS.md \u00a71, \u00a74."
+        },
+        "items": [
+          {
+            "id": "add-drizzle-deps.ac1",
+            "title": "Given `bun install`, package.json resolves `drizzle-orm` and `drizzle-kit` as dependencies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-drizzle-deps.ac2",
+            "title": "When dependencies are audited, no `better-sqlite3` or `@effect/sql` is present (PAN-1579; @effect/sql is Bun-only).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drizzle-smoke-test",
+        "title": "Build gate G1 \u2014 prove Drizzle works over node:sqlite on Node 22",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "create-overdeck-db",
+            "infra-layer",
+            "issues-domain"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Write a throwaway compile+run smoke-test proving Drizzle works over the runtime-bundled `node:sqlite` on Node 22: `sqliteTable` with `.references()` foreign keys, a partial `uniqueIndex(...).where(...)`, `PRAGMA foreign_keys=ON` enforcement, and one resolver->writer round-trip transaction. This is build gate G1 \u2014 it confirms Drizzle's node:sqlite adapter before any domain code is written. Decided fallback if a pinned Drizzle lacks the adapter: wrap the existing src/lib/database/driver.ts (PRD \u00a78)."
+        },
+        "items": [
+          {
+            "id": "drizzle-smoke-test.ac1",
+            "title": "Given Node 22 and `node:sqlite`, the smoke-test compiles under `tsc` and the run passes green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drizzle-smoke-test.ac2",
+            "title": "Given `PRAGMA foreign_keys=ON`, a parent-row delete with a live child reference rejects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drizzle-smoke-test.ac3",
+            "title": "Given a partial `uniqueIndex(...).where(...)`, a duplicate on the filtered subset rejects and a row outside it passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "create-overdeck-db",
+        "title": "Create the fresh, empty overdeck.db from the locked schema",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the fresh, empty `overdeck.db` from docs/overdeck-remodel/overdeck-schema.ts (24 tables; foreign keys enforced via `PRAGMA foreign_keys=ON`), starting empty. The memory-search tables live in a separate `memory-search.db` per the schema. The old `panopticon.db` is left untouched as the rollback backup. Per PRD FR-3."
+        },
+        "items": [
+          {
+            "id": "create-overdeck-db.ac1",
+            "title": "Creating `overdeck.db` from the schema produces all 24 tables and the database starts empty.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-overdeck-db.ac2",
+            "title": "Given `PRAGMA foreign_keys=ON`, a referencing insert with a missing parent rejects.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-overdeck-db.ac3",
+            "title": "The build preserves `panopticon.db` unmodified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "import-boundary-lint",
+        "title": "Author the import-boundary lint rule (enforcement on at cutover)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Author the import-boundary lint rule that fails the build when route/RPC/CLI/hook/script code imports a store directly (the `Db` handle, raw `.pan/`/`state.json` access, or GitHub for canonical state) instead of going through a domain resolver/writer. The rule is authored now; enforcement is switched on at cutover (see `ci-guard-on`). Per ARCHITECTURE-CONVENTIONS.md \u00a70, \u00a75; PRD FR-5, NFR-3."
+        },
+        "items": [
+          {
+            "id": "import-boundary-lint.ac1",
+            "title": "Given a route handler that imports the `Db` handle directly, the lint rule fails the build.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "import-boundary-lint.ac2",
+            "title": "The lint rule passes code that reaches data only through a resolver/writer Service.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "import-boundary-lint.ac3",
+            "title": "Given the rule wired into `npm run lint`, it stays gated off until `ci-guard-on` enables it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "infra-layer",
+        "title": "Build the shared ./infra module (Db, EventBus, Records + domain-infra Tags)",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "issues-domain",
+            "agents-domain",
+            "conversations-domain",
+            "cost-domain",
+            "merge-domain",
+            "control-settings-domain",
+            "memory-domain",
+            "config-resolver",
+            "observability-eventbus-rpc",
+            "process-services"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the shared `./infra` module that every domain imports: the `Db` Service (Drizzle over node:sqlite Live), `EventBus` (Tag + Live over the event store), and `Records` (git `.pan/records` writer Tag + Live); plus the Service Tags/interfaces for the domain-specific infra (`Tmux`, `Forge`, `Projects`, `CostArchive`, `MemorySearch`, `MemoryFiles`) whose Live layers are built inside their owning domain beads. Defining all infra Tags here lets the six domains compile independently. Per ARCHITECTURE-CONVENTIONS.md \u00a71, \u00a74, \u00a78; every services/*.md imports from `./infra`."
+        },
+        "items": [
+          {
+            "id": "infra-layer.ac1",
+            "title": "`./infra` exposes `Db`, `EventBus`, and `Records` Services and each Live layer resolves.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infra-layer.ac2",
+            "title": "Given the `./infra` Tags for `Tmux`/`Forge`/`Projects`/`CostArchive`/`MemorySearch`/`MemoryFiles`, each owning domain bead provides the Live later.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infra-layer.ac3",
+            "title": "Under `tsc`, only resolver/writer Layers acquire the `Db` handle \u2014 the two-door boundary blocks any other acquirer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issues-domain",
+        "title": "Build gate G2 \u2014 the Issues vertical slice proves the conventions",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "agents-domain",
+            "conversations-domain",
+            "cost-domain",
+            "merge-domain",
+            "control-settings-domain",
+            "memory-domain"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the Issues domain end-to-end as the vertical slice that proves the conventions before scaling: the issue entity Schema, `IssuesResolver` (read door), `IssueWriter` (write door \u2014 `advance(id, toStage, reason)` + `setPr` + `setBlockers`; NO generic `hold()` \u2014 side-states route to their owning domain), and `IssuesApi` (HttpApiGroup), compiling under `tsc` with a resolver->writer->resolver round-trip. This is build gate G2 \u2014 the six remaining domains do not start until it compiles. Spec: docs/overdeck-remodel/services/issues.md."
+        },
+        "items": [
+          {
+            "id": "issues-domain.ac1",
+            "title": "Given Node 22, the Issues entity Schema, `IssuesResolver`, `IssueWriter`, and `IssuesApi` compile under `tsc` and the build passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-domain.ac2",
+            "title": "`IssueWriter.advance(id, toStage, reason)` persists a stage transition source-first and the resolver returns the new stage.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-domain.ac3",
+            "title": "Given the writer surface, it exposes only `advance`/`setPr`/`setBlockers` and rejects any generic `hold()`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issues-domain.ac4",
+            "title": "Given the slice, no route/RPC/CLI reads or writes the issues store outside the two doors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-domain",
+        "title": "Build the Agents domain (resolver + writer + Tmux Live)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the Agents domain per docs/overdeck-remodel/services/agents.md: `AgentsResolver` (read door over the `agents` table \u2014 the authoritative runtime registry) and `AgentWriter` (its verbs incl. `switchModel` source-first), building the `Tmux` Live (liveness oracle). Agent status is the tmux/cache projection \u2014 there is no `advance()` analog. Permission prompts relocate to the `AgentPermissions` process service (built in `process-services`)."
+        },
+        "items": [
+          {
+            "id": "agents-domain.ac1",
+            "title": "When the dashboard lists agents, `AgentsResolver` returns them from the `agents` table with no `state.json` directory scan.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-domain.ac2",
+            "title": "`AgentWriter.switchModel(id, model)` stops the session, clears it, and persists the new model source-first.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-domain.ac3",
+            "title": "Every `/api/agents/*` write maps to an `AgentWriter` verb or a named relocate, and the no-loss map records each.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversations-domain",
+        "title": "Build Conversations + the shared Transcripts read service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Build Conversations + Transcripts per docs/overdeck-remodel/services/conversations.md: `ConversationsResolver` + `ConversationsWriter` over the DB-as-truth metadata (soft `issueId`), and the shared `TranscriptsResolver` (read-only over JSONL backing files) + `TranscriptsWriter` (scan/enrich/embed). The writer NEVER mutates a conversation backing file (FR-6, sacred files); `TranscriptsResolver` is read-only."
+        },
+        "items": [
+          {
+            "id": "conversations-domain.ac1",
+            "title": "Given the two-door rule (CONVENTIONS \u00a70), `ConversationsResolver` and `ConversationsWriter` resolve as distinct Services.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-domain.ac2",
+            "title": "`TranscriptsResolver` exposes only reads and no write path persists changes to a conversation JSONL file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversations-domain.ac3",
+            "title": "Given the no-loss map, conversation/favorites/file-pointer metadata reads and writes route through the two doors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-domain",
+        "title": "Build the Cost domain (5 read paths -> 1 resolver)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the Cost domain per docs/overdeck-remodel/services/cost.md: collapse the five read paths into one `CostResolver`, with `CostWriter` over `cost_events` and the `CostArchive` Live (events.jsonl + WAL). Preserve the budget surface and map the `pan cost` CLI (incl. the task-required by-project dimension). The dead cost-limit breaker + pi/codex ingest are repaired separately in `cost-breaker-ingest`."
+        },
+        "items": [
+          {
+            "id": "cost-domain.ac1",
+            "title": "`CostResolver` returns all cost reads (by-day/by-agent/by-issue/by-project) from one door.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-domain.ac2",
+            "title": "Every `pan cost` CLI subcommand routes onto `CostResolver` and no second cost read path survives.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-domain.ac3",
+            "title": "`CostWriter` persists each cost event to `cost_events` and the `CostArchive`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-domain",
+        "title": "Build the Merge domain (resolver + writer + Forge Live)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the Merge domain per docs/overdeck-remodel/services/merge.md: `MergeResolver` + `MergeWriter` over `merge_sets`/`merge_queue`/`pending_auto_merges`/`uat_*`, building the `Forge` Live (GitHub/GitLab). The `readyForMerge` predicate includes test=skipped. The auto-merge FLAG lives in Settings (`issue_policy`); only the merge SCHEDULE lives in Merge. `Projects` Live comes from `config-resolver`."
+        },
+        "items": [
+          {
+            "id": "merge-domain.ac1",
+            "title": "`MergeResolver.readyForMerge` returns true when review is approved and test passes or is skipped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-domain.ac2",
+            "title": "`MergeWriter` reads the auto-merge flag from Settings and stores no auto-merge column in a Merge table.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-domain.ac3",
+            "title": "Every merge-train RPC/route read resolves merge state through `MergeResolver` only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "control-settings-domain",
+        "title": "Build the Control/Settings domain (app_settings + issue_policy)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Build Control/Settings per docs/overdeck-remodel/services/control-settings.md: `SettingsResolver` + `SettingsWriter` over the `app_settings` + `issue_policy` tables (flywheel flags, deacon-ignore, auto-merge flag). No `Records` \u2014 settings are cache-only. The deacon freeze + per-issue ignore are settings, not issue fields."
+        },
+        "items": [
+          {
+            "id": "control-settings-domain.ac1",
+            "title": "`SettingsResolver.getFlywheelConfig()` returns `autoPickupBacklog`/`requireUatBeforeMerge`/`mergeTrainEnabled` from `app_settings`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-settings-domain.ac2",
+            "title": "`SettingsWriter` persists `app_settings`/`issue_policy` as the only writer and its `R` excludes `Records`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-settings-domain.ac3",
+            "title": "`SettingsWriter` persists the deacon-ignore and auto-merge flags; no Issues verb writes them.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-domain",
+        "title": "Build the Memory domain (unified search over memory-search.db)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Build Memory per docs/overdeck-remodel/services/memory.md: `MemoryResolver` + `MemoryWriter` over the separate `memory-search.db` (reset_markers, observation_index), building `MemorySearch` + `MemoryFiles` Live. Unify the search paths into one resolver. The FTS `rebuildIndex(projectId)` writer verb is built separately in `memory-fts-rebuilder`. Observation files are sacred \u2014 never mutated."
+        },
+        "items": [
+          {
+            "id": "memory-domain.ac1",
+            "title": "`MemoryResolver` returns memory search results from one door over `memory-search.db`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-domain.ac2",
+            "title": "`MemoryWriter`'s `R` resolves to `Db | MemorySearch | MemoryFiles | EventBus` and it preserves every observation file unmodified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-domain.ac3",
+            "title": "The live `memory.*` event stream resolves through Observability/EventBus, not a Memory read door.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-resolver",
+        "title": "Build the file-backed Config resolver (projects.yaml)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the file-backed Config resolver: the `Projects`/`Config` Live over `projects.yaml` (the `Projects` Tag is declared in `infra-layer`). Config is file-backed, not a DB-cache domain. Merge consumes `Projects` at runtime. Per docs/overdeck-remodel/END-STATE.md."
+        },
+        "items": [
+          {
+            "id": "config-resolver.ac1",
+            "title": "Given an issue ID, the Config resolver reads `projects.yaml` and returns the matching project.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-resolver.ac2",
+            "title": "`Projects` Live resolves the Tag that `MergeWriter` requires.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observability-eventbus-rpc",
+        "title": "Build the Observability RPC surface over the EventBus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the Observability RPC surface per docs/overdeck-remodel/services/observability.md: the RPC group (`getSnapshot`/`subscribeDomainEvents`/`replayEvents`) delegating to the `EventBus` (Tag+Live in `infra-layer`) + read-model. Observability is infra (an EventBus), not a domain. The replay-gap typed error is added separately in `observability-replay-gap` (G6)."
+        },
+        "items": [
+          {
+            "id": "observability-eventbus-rpc.ac1",
+            "title": "`subscribeDomainEvents` emits domain events from the `EventBus`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observability-eventbus-rpc.ac2",
+            "title": "`replayEvents` returns gap-fill replay over the `events` transport, not a domain read.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observability-eventbus-rpc.ac3",
+            "title": "Writers receive `EventBus` in their `R` and nothing else receives it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "process-services",
+        "title": "Build the non-data process services (Delivery, runtimes, AgentPermissions)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the non-data process services per ARCHITECTURE-CONVENTIONS.md \u00a78.5: `DeliveryService`, `ConversationRuntime`, `CloisterRuntime`, and `AgentPermissions` (the relocated permission request/resolve flow from the agents routes). These are process services, not cache doors \u2014 they depend on `EventBus` + delivery, not on the `Db` handle."
+        },
+        "items": [
+          {
+            "id": "process-services.ac1",
+            "title": "`AgentPermissions` exposes `request`/`resolve`/`pending` and persists each prompt via the EventBus, not a cache verb.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "process-services.ac2",
+            "title": "A permission response persists then sends to the agent, and the four failure modes each resolve.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "process-services.ac3",
+            "title": "When a process service runs, it acquires no `Db` handle directly.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-reconstruction",
+        "title": "Build the reconstruction/sync layer (rebuild overdeck.db from sources)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "readmodel-wiring",
+            "cutover-overdeck-db"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the reconstruction/sync layer that rebuilds the empty `overdeck.db` from the sources of truth: GitHub (issue/PR status), git `.pan/records` (per-issue records), JSONL (conversations/transcripts), and tmux (liveness). Writers persist source-first then update the cache; reconstruction is the self-healing path that makes the cache disposable. Must cover in-flight/active issues at cutover (PRD \u00a78 sequencing)."
+        },
+        "items": [
+          {
+            "id": "sync-reconstruction.ac1",
+            "title": "Given a fresh `overdeck.db`, reconstruction repopulates issues/agents/merge state from GitHub + `.pan/records` + tmux.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-reconstruction.ac2",
+            "title": "Given an in-flight issue with an active workspace, reconstruction restores its pipeline stage and the resolver returns it intact.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-reconstruction.ac3",
+            "title": "Re-running reconstruction produces no duplicate rows (idempotent).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readmodel-wiring",
+        "title": "Wire the server bootstrap Layer (compose all domain + infra Live)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire the dashboard server bootstrap Layer: provide every domain resolver/writer Live + infra Live, route the read-model off the EventBus, and expose the HttpApiGroups + RPC. This is where all domain Layers compose into the running server (Node 22, dist build \u2014 never Bun)."
+        },
+        "items": [
+          {
+            "id": "readmodel-wiring.ac1",
+            "title": "When the dashboard server boots, it provides every domain Layer and returns reads through resolvers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readmodel-wiring.ac2",
+            "title": "The read-model updates from EventBus events and runs no direct store polling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readmodel-wiring.ac3",
+            "title": "`/ws/rpc` getSnapshot returns a complete cross-domain snapshot recomposed from resolvers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-1937-export",
+        "title": "Build gate G5 \u2014 the PAN-1937 conversation-metadata export",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "cutover-overdeck-db"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the PAN-1937 conversation-metadata export (currently unbuilt) that preserves the irreplaceable `conversations`/`favorites`/`conversation_files` metadata across the cutover to the fresh `overdeck.db`. This is build gate G5 \u2014 without it the conversation metadata is lost at cutover. The JSONL backing files themselves are never touched."
+        },
+        "items": [
+          {
+            "id": "pan-1937-export.ac1",
+            "title": "The export records the `conversations`, `favorites`, and `conversation_files` rows from `panopticon.db`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1937-export.ac2",
+            "title": "Importing the export into `overdeck.db` preserves the metadata set (round-trip).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-1937-export.ac3",
+            "title": "Given the export and import, every conversation JSONL backing file stays unmodified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-matrix",
+        "title": "Build gate G3 \u2014 the remodel-wide no-loss matrix",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Assemble the remodel-wide no-loss matrix: every current HTTP endpoint, CLI verb, and RPC method maps to a new door OR to a named DELETE/RELOCATE with a reason \u2014 aggregating the Part-1 no-loss maps from the eight services/*.md AND covering the cross-domain/aggregate surfaces none of them own. This is build gate G3 \u2014 the API surface is not locked until the matrix is complete. Per PRD FR-2."
+        },
+        "items": [
+          {
+            "id": "no-loss-matrix.ac1",
+            "title": "The matrix records every endpoint/CLI verb/RPC method with a door or a named delete/relocate.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-matrix.ac2",
+            "title": "A test fails when any current surface stays unaccounted for in the matrix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-matrix.ac3",
+            "title": "The matrix records named drops (e.g. `pan cost budget` store-B, `flywheel_substrate_bugs`) as decisions, not silent losses.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-compaction-fork",
+        "title": "Convert conversation-compaction to the fork pattern (sacred files)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Convert `conversation-compaction` to the fork pattern so it never rewrites an existing conversation JSONL backing file (sacred-file invariant, FR-6). Per docs/overdeck-remodel/services/conversations.md."
+        },
+        "items": [
+          {
+            "id": "conversation-compaction-fork.ac1",
+            "title": "Compaction produces a forked conversation and preserves the original JSONL file unmodified.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-compaction-fork.ac2",
+            "title": "`ConversationsResolver` resolves the forked conversation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sacred-file-guard",
+        "title": "Build gate G4 \u2014 the sacred-file invariant check",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "cutover-overdeck-db"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the sacred-file invariant check (build gate G4): a test/guard asserting no production code path writes an existing conversation transcript or memory observation file. Covers Conversations + Memory. Must pass before cutover."
+        },
+        "items": [
+          {
+            "id": "sacred-file-guard.ac1",
+            "title": "The guard fails the build when any production code writes an existing transcript or observation file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sacred-file-guard.ac2",
+            "title": "The guard covers both conversation JSONL files and memory observation files.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-breaker-ingest",
+        "title": "Re-wire the dead cost-limit breaker + ingest pi/codex cost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Re-wire the dead cost-limit breaker so the budget actually gates spend, and ingest native pi/codex cost (PAN-1935) into `cost_events`. Per docs/overdeck-remodel/services/cost.md and the cost audit."
+        },
+        "items": [
+          {
+            "id": "cost-breaker-ingest.ac1",
+            "title": "When spend exceeds a configured cost limit, the wired breaker blocks further spend.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breaker-ingest.ac2",
+            "title": "Native pi/codex usage records into `cost_events` and shows in `CostResolver` totals.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-fts-rebuilder",
+        "title": "Build the MemoryWriter.rebuildIndex FTS rebuilder (missing capability)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the `MemoryWriter.rebuildIndex(projectId)` FTS rebuilder (the missing capability per memory-audit surprise 3). Per docs/overdeck-remodel/services/memory.md."
+        },
+        "items": [
+          {
+            "id": "memory-fts-rebuilder.ac1",
+            "title": "Given observation files, `MemoryWriter.rebuildIndex(projectId)` produces a fresh per-project FTS index.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-fts-rebuilder.ac2",
+            "title": "After a rebuild, `MemoryResolver` search returns the re-indexed observations.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "observability-replay-gap",
+        "title": "Build gate G6 \u2014 replay-gap typed error before events retention",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the typed `ReplayGap`/`SnapshotRequired` error to the Observability RPC schema BEFORE any `events` retention/trim is enabled (build gate G6). A client replaying past a trimmed offset gets a typed error telling it to re-snapshot, not silent data loss. Per docs/overdeck-remodel/services/observability.md."
+        },
+        "items": [
+          {
+            "id": "observability-replay-gap.ac1",
+            "title": "When the requested offset predates retention, `replayEvents` returns a typed `ReplayGap`/`SnapshotRequired` error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "observability-replay-gap.ac2",
+            "title": "The RPC schema contains the `ReplayGap`/`SnapshotRequired` error before `events` retention is enabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relocate-direct-callers",
+        "title": "Relocate every remaining direct-store caller onto its door; delete dead paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Relocate every remaining direct-store caller (route/RPC/CLI/hook/script touching the DB, `.pan/`, `state.json`, or GitHub for canonical state) onto its domain door, then delete the now-dead tables and redundant access paths in the END-STATE deletion scoreboard. This is the big sweep that makes the two-door boundary real before the CI guard turns on."
+        },
+        "items": [
+          {
+            "id": "relocate-direct-callers.ac1",
+            "title": "Given the sweep, no production code reads or writes a store outside a resolver/writer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relocate-direct-callers.ac2",
+            "title": "The change deletes the dead tables and redundant paths in the deletion scoreboard.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relocate-direct-callers.ac3",
+            "title": "The net diff deletes substantially more code than it adds (NFR-2).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cutover-overdeck-db",
+        "title": "Cut the app over to the fresh overdeck.db (parity pass per domain)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "issueLabel": "pan-1938",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "ci-guard-on",
+            "rebrand-overdeck"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Cut the app over to the fresh `overdeck.db`: point the runtime at it, run reconstruction to populate in-flight state, and verify a functional-parity pass per domain. `panopticon.db` stays untouched as the rollback backup. Gated by reconstruction + G4 (sacred-file-guard) + G5 (pan-1937-export) + G6 (observability-replay-gap)."
+        },
+        "items": [
+          {
+            "id": "cutover-overdeck-db.ac1",
+            "title": "Given the fresh `overdeck.db`, the app boots and passes a per-domain functional-parity pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-overdeck-db.ac2",
+            "title": "After cutover, reconstruction shows in-flight pipeline/agent state present (active issues covered).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cutover-overdeck-db.ac3",
+            "title": "The cutover preserves `panopticon.db` intact and unmodified as a backup.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-guard-on",
+        "title": "Switch on the import-boundary CI guard; retire old access paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Switch on the import-boundary CI guard (NFR-3) so any direct store access outside the two doors fails the build, and retire the old access paths. Gated by `relocate-direct-callers` (the guard cannot pass until every caller is relocated) and cutover."
+        },
+        "items": [
+          {
+            "id": "ci-guard-on.ac1",
+            "title": "`npm run lint`/CI fails on any direct store access outside a door.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-guard-on.ac2",
+            "title": "With the guard enabled and all callers relocated, the build passes green.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rebrand-overdeck",
+        "title": "Rename Panopticon -> Overdeck (code, DB name, DNS, docs) \u2014 final pass",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-17T07:08:54.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1938",
+          "requiresInspection": false,
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Rename Panopticon -> Overdeck across the codebase, the DB filename, DNS, and docs, sequenced so nothing half-renamed ships. This is the final pass, after the data remodel has cut over. `panopticon.db` is retained as the rollback backup; the live DB is `overdeck.db`. Per PRD FR-9."
+        },
+        "items": [
+          {
+            "id": "rebrand-overdeck.ac1",
+            "title": "The rebrand renames user-facing names, the DB filename, DNS, and docs to `Overdeck` and blocks any half-renamed surface from shipping.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rebrand-overdeck.ac2",
+            "title": "The rebrand preserves `panopticon.db` as a backup and the live DB resolves to `overdeck.db`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "add-drizzle-deps",
+        "to": "drizzle-smoke-test",
+        "type": "blocks"
+      },
+      {
+        "from": "drizzle-smoke-test",
+        "to": "create-overdeck-db",
+        "type": "blocks"
+      },
+      {
+        "from": "drizzle-smoke-test",
+        "to": "infra-layer",
+        "type": "blocks"
+      },
+      {
+        "from": "create-overdeck-db",
+        "to": "infra-layer",
+        "type": "blocks"
+      },
+      {
+        "from": "infra-layer",
+        "to": "issues-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "import-boundary-lint",
+        "to": "issues-domain",
+        "type": "informs"
+      },
+      {
+        "from": "issues-domain",
+        "to": "agents-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "conversations-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "cost-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "merge-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "control-settings-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "memory-domain",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "config-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "observability-eventbus-rpc",
+        "type": "blocks"
+      },
+      {
+        "from": "issues-domain",
+        "to": "process-services",
+        "type": "blocks"
+      },
+      {
+        "from": "config-resolver",
+        "to": "merge-domain",
+        "type": "informs"
+      },
+      {
+        "from": "agents-domain",
+        "to": "process-services",
+        "type": "informs"
+      },
+      {
+        "from": "issues-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "control-settings-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-domain",
+        "to": "sync-reconstruction",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-reconstruction",
+        "to": "readmodel-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "observability-eventbus-rpc",
+        "to": "readmodel-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "config-resolver",
+        "to": "readmodel-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "process-services",
+        "to": "readmodel-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-domain",
+        "to": "pan-1937-export",
+        "type": "blocks"
+      },
+      {
+        "from": "readmodel-wiring",
+        "to": "no-loss-matrix",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-matrix",
+        "to": "relocate-direct-callers",
+        "type": "blocks"
+      },
+      {
+        "from": "readmodel-wiring",
+        "to": "relocate-direct-callers",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-domain",
+        "to": "conversation-compaction-fork",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-compaction-fork",
+        "to": "sacred-file-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "conversations-domain",
+        "to": "sacred-file-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-domain",
+        "to": "sacred-file-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-domain",
+        "to": "cost-breaker-ingest",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-domain",
+        "to": "memory-fts-rebuilder",
+        "type": "blocks"
+      },
+      {
+        "from": "observability-eventbus-rpc",
+        "to": "observability-replay-gap",
+        "type": "blocks"
+      },
+      {
+        "from": "sync-reconstruction",
+        "to": "cutover-overdeck-db",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-1937-export",
+        "to": "cutover-overdeck-db",
+        "type": "blocks"
+      },
+      {
+        "from": "sacred-file-guard",
+        "to": "cutover-overdeck-db",
+        "type": "blocks"
+      },
+      {
+        "from": "observability-replay-gap",
+        "to": "cutover-overdeck-db",
+        "type": "blocks"
+      },
+      {
+        "from": "relocate-direct-callers",
+        "to": "cutover-overdeck-db",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-breaker-ingest",
+        "to": "cutover-overdeck-db",
+        "type": "informs"
+      },
+      {
+        "from": "memory-fts-rebuilder",
+        "to": "cutover-overdeck-db",
+        "type": "informs"
+      },
+      {
+        "from": "cutover-overdeck-db",
+        "to": "ci-guard-on",
+        "type": "blocks"
+      },
+      {
+        "from": "relocate-direct-callers",
+        "to": "ci-guard-on",
+        "type": "blocks"
+      },
+      {
+        "from": "cutover-overdeck-db",
+        "to": "rebrand-overdeck",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-guard-on",
+        "to": "rebrand-overdeck",
+        "type": "informs"
+      }
+    ]
+  }
+}
