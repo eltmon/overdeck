@@ -17,7 +17,7 @@ import {
   packageRoot,
 } from '../../lib/paths.js';
 import { cleanupClosedIssueAgentDirectories } from '../../lib/agent-directory-cleanup.js';
-import { normalizeAgentId } from '../../lib/agents.js';
+import { normalizeAgentId, getAgentStateSync } from '../../lib/agents.js';
 import { readPiCodexCredential } from '../../lib/pi-codex-auth.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { CacheService } from '../../dashboard/server/services/cache-service.js';
@@ -345,11 +345,9 @@ function readDoctorAgentStates(agentsDir: string): DoctorAgentState[] {
   const states: DoctorAgentState[] = [];
   for (const dir of readdirSync(agentsDir, { withFileTypes: true })) {
     if (!dir.isDirectory()) continue;
-    const statePath = join(agentsDir, dir.name, 'state.json');
-    if (!existsSync(statePath)) continue;
     try {
-      const state = JSON.parse(readFileSync(statePath, 'utf8')) as DoctorAgentState;
-      states.push({ ...state, id: stringField(state.id) ?? dir.name });
+      const state = getAgentStateSync(dir.name);
+      if (state) states.push(state);
     } catch {
       // Ignore unreadable agent state; other doctor checks surface broader FS health.
     }
@@ -521,12 +519,11 @@ function countBeadsForIssue(projectPath: string, issueId: string): number {
   }
 }
 
-function hasInFlightAgent(issueId: string, agentsDir: string, tmuxSessionNames: string[]): boolean {
+function hasInFlightAgent(issueId: string, _agentsDir: string, tmuxSessionNames: string[]): boolean {
   const agentId = `agent-${issueId.toLowerCase()}`;
   if (tmuxSessionNames.includes(agentId)) return true;
 
-  const statePath = join(agentsDir, agentId, 'state.json');
-  const state = existsSync(statePath) ? readJsonFile(statePath) as DoctorAgentState | null : null;
+  const state = getAgentStateSync(agentId);
   return state?.status === 'starting' || state?.status === 'running';
 }
 
