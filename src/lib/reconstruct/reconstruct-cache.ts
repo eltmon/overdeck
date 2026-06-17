@@ -16,6 +16,7 @@ import type {
   ReviewStatusSnapshot,
 } from '@panctl/contracts';
 import type { SqliteDatabase } from '../database/driver.js';
+import { getDatabase } from '../database/index.js';
 import { backfillAgentsFromStateJsonSync } from '../database/agent-backfill.js';
 import { listAllAgents } from '../database/agents-db.js';
 import { listRunningAgents, type AgentState } from '../agents.js';
@@ -419,4 +420,8 @@ export async function reconstructCache(
     reviewStatusByIssueId,
     phaseByIssueId,
   };
+}
+
+export function reconstructCacheAuto(opts?: ReconstructOptions): Promise<ReconstructResult> {
+  return reconstructCache(getDatabase(), opts);
 }
