@@ -1,5 +1,5 @@
 /**
- * overdeck.db — the locked cache schema (Drizzle + better-sqlite3, Node-safe).
+ * overdeck.db — the locked cache schema (Drizzle over node:sqlite/bun:sqlite, PAN-1579, Node-safe).
  *
  * All domains audited and final. This Drizzle schema IS the locked DB schema.
  *

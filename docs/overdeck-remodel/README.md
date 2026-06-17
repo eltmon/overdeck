@@ -21,9 +21,10 @@ genuinely **NEED**.
    type system (the `Db` handle reaches only the two doors) **plus** an
    import-boundary lint rule on routes/RPC/CLI — types alone don't stop a raw import.
 3. **A tiny set of legal moves**, each behind the domain API.
-4. **Effect all the way down** — `@effect/schema` entities, a **Drizzle +
-   better-sqlite3** cache behind the `Db` service (Node-safe; deliberately *not*
-   `@effect/sql`), `HttpApiGroup` controllers, typed errors. ("State" is not a domain.)
+4. **Effect all the way down** — `@effect/schema` entities, a **Drizzle over
+   node:sqlite/bun:sqlite** cache behind the `Db` service (Node-safe; PAN-1579;
+   deliberately *not* `@effect/sql`), `HttpApiGroup` controllers, typed errors.
+   ("State" is not a domain.)
 
 ## Design docs (the deliverable)
 

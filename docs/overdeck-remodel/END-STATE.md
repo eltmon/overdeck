@@ -115,7 +115,7 @@ dangerous.
    reconstruction        rebuild the cache from the homes
           ▼  │           the writer mirrors durable state back to its home
    ┌──────────────────────────────────────────────┐
-   │   overdeck.db   (Drizzle + better-sqlite3)    │   ← a CACHE. starts empty. disposable.
+   │   overdeck.db   (Drizzle / node:sqlite)       │   ← a CACHE. starts empty. disposable.
    └──────────────────────────────────────────────┘
         ▲                              ▲
    READ DOOR                      WRITE DOOR
@@ -140,7 +140,9 @@ check covers the non-Effect code (CLI scripts and hooks) the type system can't
 reach.
 
 One point deserves emphasis because the old design got it wrong. The cache layer
-is **Drizzle ORM on top of `better-sqlite3`**, wrapped behind a single Effect
+is **Drizzle ORM on top of the runtime-bundled `node:sqlite` (Node) /
+`bun:sqlite` (Bun)** — the same driver the codebase standardized on in PAN-1579
+when it dropped the ABI-locked native SQLite driver — wrapped behind a single Effect
 `Db` service. It is deliberately **not** `@effect/sql`: that library's only
 SQLite adapter is Bun-only, and the dashboard is Node-22-only, so `@effect/sql`
 cannot run here. The Drizzle schema in
