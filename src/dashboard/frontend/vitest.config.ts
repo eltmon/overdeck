@@ -18,6 +18,9 @@ export default defineConfig({
       path.resolve(__dirname, 'src/**/*.{test,spec}.{ts,tsx}'),
     ],
     exclude: ['**/node_modules/**', '**/dist/**', '**/tests/**'],
+    // PAN-1918: per-test cap so one leaky test (open handle, never-settling
+    // async, etc.) fails fast instead of hanging the entire frontend suite.
+    testTimeout: 30000,
   },
   resolve: {
     alias: {

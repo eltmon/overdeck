@@ -189,6 +189,35 @@ jobs:
           DASHBOARD_URL: http://localhost:3011
         run: cd src/dashboard/frontend && npm run test:playwright
 
+  frontend-test:
+    runs-on: ubuntu-latest
+    name: Frontend vitest suite
+    timeout-minutes: 15  # PAN-1918: full frontend suite must fail fast; a single open handle cannot wedge the required check.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build shared packages
+        run: |
+          npm run build:contracts
+          npm run build:pi-extension
+
+      - name: Run frontend vitest suite
+        run: npm --prefix ./src/dashboard/frontend run test
+
   clean-install:
     runs-on: ubuntu-latest
     name: Clean install + server smoke test
