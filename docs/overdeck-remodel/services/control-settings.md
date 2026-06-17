@@ -315,7 +315,15 @@ preserved; do not conflate them.
 
 | Current RPC method (file:line) | r/w | New home | Reason |
 |---|---|---|---|
-| `pan.subscribeFlywheelStatus` (`contracts/rpc.ts:401`; `ws-rpc.ts:592`) | reads (stream) | **`SettingsApi` RPC `flywheel.subscribeStatus`** (+ recomposed run-state) | Streams the latest flywheel status. Reads `flywheel.active_run_id` (AS, `ws-rpc.ts:596`) then `readCurrentLatestFlywheelStatus` (run-state telemetry). The AS slice maps to the Settings RPC subscription; the run-state snapshot recomposes. HTTP & RPC cannot diverge ([CONVENTIONS §8](../ARCHITECTURE-CONVENTIONS.md)). |
+| `pan.subscribeFlywheelStatus` (`contracts/rpc.ts:401`; `ws-rpc.ts:592`) | reads (stream) | **`SettingsApi` RPC `flywheel.subscribeStatus`** (+ recomposed run-state) | Streams the latest flywheel status. The AS slice — `flywheel.active_run_id` (`ws-rpc.ts:596`) + `flywheel.globally_paused` — maps to **`SettingsResolver.getFlywheelRuntime()`** (§2.2); the per-run snapshot `readCurrentLatestFlywheelStatus` recomposes from run-state telemetry at the controller. HTTP & RPC cannot diverge ([CONVENTIONS §8](../ARCHITECTURE-CONVENTIONS.md)). |
+
+> **Why `getFlywheelRuntime` is a distinct resolver read, not "just recompose."**
+> The `flywheel current`/`state` reads (§1D) and this RPC subscription branch-read
+> `flywheel.active_run_id` + `flywheel.globally_paused` from `app_settings`
+> (`flywheel-run-state.ts:204`). "Recompose at the controller" still has to pull
+> the AS slice from *some* door — the controller never touches `Db`. So that slice
+> is `SettingsResolver.getFlywheelRuntime()`; the run-state snapshot (telemetry) is
+> the only part that recomposes.
 
 ## 1I. Rollup of the collapse
 
@@ -324,7 +332,7 @@ preserved; do not conflate them.
 | `settings.ts` HTTP (16) | 16 | **0 data-domain methods** — all FILE-CONFIG (config.yaml/ui-theme.json/openrouter-favorites) or RELOCATE (provider-auth, OpenRouter, Conversations-search). No loss. |
 | `cloister.ts` HTTP (10) | 10 | **2 SettingsWriter verbs** (`emergencyStop`, `brake` — both delegating AgentWriter) + 4 runtime-PROC relocates + 2 FILE-CONFIG (cloister.toml) + 1 Agents-health relocate + 1 recomposed status |
 | `misc.ts` deacon (2) | 2 | **1 resolver read (`isDeaconPaused`) + 1 writer verb (`setDeaconPaused`)** |
-| `flywheel.ts` HTTP (~30 routes) | ~30 | **2 resolver reads + ~5 writer verbs** (config + start/pause/resume/abort) ; the rest **RELOCATE to Merge** (11 auto-merge/queue/UAT) or **flywheel telemetry** (runs/report/brief/stats/status) |
+| `flywheel.ts` HTTP (~30 routes) | ~30 | **2 resolver reads (`getFlywheelConfig`, `getFlywheelRuntime`) + 5 writer verbs** (config + start/pause/resume/abort) ; the rest **RELOCATE to Merge** (11 auto-merge/queue/UAT) or **flywheel telemetry** (runs/report/brief/stats/status) |
 | per-issue policy HTTP (`workspaces.ts`, 3) | 3 | **2 SettingsWriter verbs** (`setDeaconIgnored`, `setAutoMerge`) + 1 runtime relocate (`unstick` → `review_runs`) |
 | `projects.ts` Config HTTP (4) | 4 | **1 ConfigResolver read field + 1 FILE-CONFIG write** + 2 recomposed session-trees |
 | CLI verbs | ~17 control/settings/config verbs | **~8 SettingsWriter verbs + 2 resolver reads** ; runtime-PROC (cloister start/stop) + telemetry (stats/report/emit) relocate ; `pan project` = FILE-CONFIG |
@@ -335,22 +343,25 @@ preserved; do not conflate them.
 ([audit Surprise 3](../investigations/orchestration-config-audit.md) — "already at
 target shape"):
 
-- **`SettingsResolver`: 3 read members** (`isDeaconPaused`, `getFlywheelConfig`,
-  `getPolicy`) — collapsing the deacon-pause read, the flywheel-config read, and
-  the per-issue policy fields scattered across `misc.ts` + `flywheel.ts` +
-  `review_status`.
-- **`SettingsWriter`: 9 write verbs** — `setDeaconPaused`, `setFlywheelConfig`,
+- **`SettingsResolver`: 4 read members** (`isDeaconPaused`, `getFlywheelConfig`,
+  `getFlywheelRuntime`, `getPolicy`) — collapsing the deacon-pause read, the
+  flywheel-config read, the flywheel runtime flags (`active_run_id` +
+  `globally_paused`, §1H), and the per-issue policy fields scattered across
+  `misc.ts` + `flywheel.ts` + `review_status`.
+- **`SettingsWriter`: 10 write verbs** — `setDeaconPaused`, `setFlywheelConfig`,
+  `setDeaconIgnored`, `setAutoMerge` (the latter two on `issue_policy`),
   `startFlywheel`, `pauseFlywheel`, `resumeFlywheel`, `abortFlywheel`,
-  `emergencyStop`, `brake`, `setDeaconIgnored`, `setAutoMerge` (the last two on
-  `issue_policy`; the four flywheel-lifecycle + the two cloister-agent verbs each
-  also delegate to AgentWriter — see §2.4).
+  `emergencyStop`, `brake` (the four flywheel-lifecycle + the two cloister-agent
+  verbs each also delegate to AgentWriter — see §2.4).
 - **`ConfigResolver`: 1 read member** (`getProject` / `listProjects`) over
   `projects.yaml`, no writer.
 
-**DELETED outright** (0). Unlike Issues, nothing here is a redundant read door or
-dead endpoint that drops — every surface either becomes a door, relocates to a
-sibling data domain, becomes a file door, or recomposes. Functional parity is the
-operator goal; nothing is lost.
+**DELETED outright** (0 endpoints). Unlike Issues, no surface here is a redundant
+read door or dead endpoint that drops — every endpoint/verb becomes a door,
+relocates to a sibling data domain, becomes a file door, or recomposes. Functional
+parity is the operator goal. The **one durable field** that does not survive is
+`deaconIgnoredReason` (the locked `issue_policy` table has no reason column) —
+named as an explicit accept-loss in §1J item 5, not a silent drop.
 
 ## 1J. What did NOT fit a clean Control/Settings *data*-domain door — the genuine residue
 
@@ -378,8 +389,23 @@ After the collapse, the surfaces that touch this domain but are **not** a clean
 4. **`stuck`/`unstick`** — ephemeral review-run runtime (`review_runs`, schema
    360-361), not `app_settings`/`issue_policy`. Same disposition `issues.md` gave
    it; lands in the Orchestration/review-run runtime, not here.
+5. **`deaconIgnoredReason` — the one genuine accept-loss.** Today
+   `deacon-ignore`'s `reason` is *persisted* (`review_status.deaconIgnoredReason`,
+   returned at `workspaces.ts:4741`). The **locked `issue_policy` table** (schema
+   327-332) has **no reason column**, so `setDeaconIgnored` carries `reason` only
+   into the `settings.policy_changed` **event**, not durable storage. This is a
+   small, deliberate parity loss — the durable reason field is dropped; the toggle
+   itself and its event-side reason are preserved. Named here so the no-loss audit
+   is honest rather than silently lossy. (If the reason must stay durable, add a
+   `deacon_ignored_reason` column to `issue_policy` — a schema change, flagged for
+   the schema owner, not assumed here.)
+6. **`restart_announcer.last_announced_ts`** — an `app_settings` key with **no
+   HTTP/CLI/RPC surface**: it is written internally by the restart announcer via
+   the same `setFlag` primitive and read internally; no operator-facing door
+   exists or is needed. Listed for completeness; not a resolver/writer member.
 
-Everything else is a clean AS / IP / YAML read or write. Nothing real is lost.
+Everything else is a clean AS / IP / YAML read or write. The single durable
+parity loss (`deaconIgnoredReason`, item 5) is named above, not silent.
 
 ---
 
@@ -418,6 +444,14 @@ export const FlywheelConfigPatch = Schema.Struct({
   mergeTrainEnabled:     Schema.optional(Schema.Boolean),
 })
 export type FlywheelConfigPatch = typeof FlywheelConfigPatch.Type
+
+// ── Flywheel RUNTIME flags — distinct from config (app_settings, §1H) ─────────
+// active_run_id: the live run id (ws-rpc.ts:596) · paused: flywheel.globally_paused
+export const FlywheelRuntime = Schema.Struct({
+  activeRunId: Schema.NullOr(Schema.String),
+  paused:      Schema.Boolean,
+})
+export type FlywheelRuntime = typeof FlywheelRuntime.Type
 
 // ── Per-issue policy — the issue_policy row (schema 327-332) ──────────────────
 // autoMerge: true=fast lane · false=hold for UAT · null=clear to project default
@@ -461,15 +495,21 @@ Three read members, tracing to Part-1: `isDeaconPaused` (§1B), `getFlywheelConf
 
 ```ts
 export class SettingsResolver extends Context.Service<SettingsResolver, {
-  readonly isDeaconPaused:   () => Effect.Effect<boolean>
+  readonly isDeaconPaused:    () => Effect.Effect<boolean>
   readonly getFlywheelConfig: () => Effect.Effect<FlywheelConfig>
-  readonly getPolicy:        (id: IssueId) => Effect.Effect<IssuePolicy>   // defaults if no row
+  readonly getFlywheelRuntime: () => Effect.Effect<FlywheelRuntime>   // active_run_id + paused (§1H)
+  readonly getPolicy:         (id: IssueId) => Effect.Effect<IssuePolicy>   // defaults if no row
 }>()("overdeck/SettingsResolver") {}
 
 export const SettingsResolverLayer = Layer.effect(SettingsResolver, Effect.gen(function* () {
   const { q } = yield* Db   // Drizzle handle — appears ONLY in resolver/writer Layer R
 
   // app_settings is a KV table; a flag read is a keyed select with a JSON value.
+  // The default mirrors today's accessor (app-settings.ts), NOT a blanket false:
+  //   deacon.globally_paused           → false   (app-settings.ts:61-71)
+  //   flywheel.auto_pickup_backlog     → false   (app-settings.ts:110)
+  //   flywheel.require_uat_before_merge→ TRUE    (app-settings.ts:123,126 — v !== 'false')
+  //   merge_train_enabled              → false   (app-settings.ts:142)
   const flag = (key: string, dflt: boolean) => Effect.sync(() => {
     const row = q.select().from(appSettings).where(eq(appSettings.key, key)).get()
     return row?.value === undefined || row.value === null ? dflt : Boolean(row.value)
@@ -479,9 +519,21 @@ export const SettingsResolverLayer = Layer.effect(SettingsResolver, Effect.gen(f
 
   const getFlywheelConfig = () => Effect.gen(function* () {
     const autoPickupBacklog     = yield* flag("flywheel.auto_pickup_backlog", false)
-    const requireUatBeforeMerge = yield* flag("flywheel.require_uat_before_merge", false)
+    const requireUatBeforeMerge = yield* flag("flywheel.require_uat_before_merge", true)  // default TRUE
     const mergeTrainEnabled     = yield* flag("merge_train_enabled", false)
     return { autoPickupBacklog, requireUatBeforeMerge, mergeTrainEnabled }   // flywheel.ts:222-228
+  })
+
+  // The flywheel RUNTIME flags — distinct from the 3-flag config contract above.
+  // active_run_id is read by the RPC subscription (ws-rpc.ts:596) and by
+  // flywheel current/state; globally_paused is branch-read in flywheel-run-state.ts:204.
+  const getFlywheelRuntime = () => Effect.gen(function* () {
+    const paused = yield* flag("flywheel.globally_paused", false)
+    const activeRunId = yield* Effect.sync(() => {
+      const row = q.select().from(appSettings).where(eq(appSettings.key, "flywheel.active_run_id")).get()
+      return (row?.value as string | null | undefined) ?? null
+    })
+    return { activeRunId, paused }
   })
 
   const getPolicy = (id: IssueId) => Effect.sync(() => {
@@ -490,7 +542,7 @@ export const SettingsResolverLayer = Layer.effect(SettingsResolver, Effect.gen(f
     return { issueId: id, deaconIgnored: Boolean(row?.deaconIgnored), autoMerge: row?.autoMerge ?? null }
   })
 
-  return SettingsResolver.of({ isDeaconPaused, getFlywheelConfig, getPolicy })
+  return SettingsResolver.of({ isDeaconPaused, getFlywheelConfig, getFlywheelRuntime, getPolicy })
 }))
 ```
 
@@ -691,6 +743,9 @@ export const SettingsApi = HttpApiGroup.make("settings")
   .add(HttpApiEndpoint.get("getFlywheelConfig", "/flywheel/config", {
     success: FlywheelConfig,
   }))
+  .add(HttpApiEndpoint.get("getFlywheelRuntime", "/flywheel/state", {
+    success: FlywheelRuntime,   // the AS slice of flywheel current/state + the RPC subscription
+  }))
   .add(HttpApiEndpoint.get("getPolicy", "/issues/:id/policy", {
     params:  Schema.Struct({ id: IssueId }),
     success: IssuePolicy,
@@ -745,6 +800,7 @@ export const OverdeckApi = HttpApi.make("overdeck")
 export const SettingsApiLive = HttpApiBuilder.group(OverdeckApi, "settings", (h) =>
   h.handle("getDeaconPause",   ()             => SettingsResolver.isDeaconPaused().pipe(Effect.map((paused) => ({ paused }))))
    .handle("getFlywheelConfig", ()            => SettingsResolver.getFlywheelConfig())
+   .handle("getFlywheelRuntime", ()           => SettingsResolver.getFlywheelRuntime())
    .handle("getPolicy",        ({ path })     => SettingsResolver.getPolicy(path.id))
    .handle("setDeaconPause",   ({ payload })  => SettingsWriter.setDeaconPaused(payload.paused).pipe(Effect.as({ paused: payload.paused })))
    .handle("setFlywheelConfig",({ payload })  => SettingsWriter.setFlywheelConfig(payload))
@@ -805,6 +861,7 @@ git for these flags.
 |---|---|
 | `SettingsResolver.isDeaconPaused` | §1B `GET /api/deacon/pause` (`misc.ts:780`) |
 | `SettingsResolver.getFlywheelConfig` | §1D `GET /api/flywheel/config` (`flywheel.ts:542`) |
+| `SettingsResolver.getFlywheelRuntime` | §1D `GET /api/flywheel/current`/`state` (`flywheel.ts:520,978`); §1H `pan.subscribeFlywheelStatus` AS slice (`ws-rpc.ts:596`) |
 | `SettingsResolver.getPolicy` | §1E `GET /api/review/:id/status` policy fields; §1F `getPolicy` recompose |
 | `ConfigResolver.getProject` / `listProjects` | §1G `GET /api/projects/:key/auto-merge-default` (`projects.ts:577`); audit §4 (loadProjectsConfigSync) |
 | `SettingsWriter.setDeaconPaused` | §1B `POST /api/deacon/pause` (`misc.ts:798`); §1F `pan admin cloister freeze`/`unfreeze` (`freeze.ts:19,29`) |
