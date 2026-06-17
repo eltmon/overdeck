@@ -28,7 +28,7 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -494,11 +494,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         const errorMsg = `Workspace creation failed: ${err.message}`;
         console.error(`[start-planning] ABORTING: ${errorMsg}`);
         progress(1, 'Creating workspace', errorMsg, 'error');
-        await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
-          id: sessionName, issueId: issue.identifier, workspace: workspacePath,
-          status: 'error', error: errorMsg,
-          startedAt: new Date().toISOString(), role: 'plan', location: workspaceLocation,
-        }, null, 2));
+        const existingErrState = getAgentStateSync(sessionName);
+        if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
         return { success: false, error: errorMsg };
       }
     }
@@ -678,15 +675,22 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Update agent state to running ──────────────────────────────────────
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
-    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify(buildPlanningAgentState({
-      sessionName,
-      issueId: issue.identifier,
-      workspacePath,
-      model: planningModel,
-      harness: effectiveHarness,
-      workspaceLocation,
-      autoSpawnOnFinalize,
-    }), null, 2));
+    {
+      const baseState = getAgentStateSync(sessionName);
+      saveAgentStateSync({
+        ...(baseState ?? { id: sessionName, issueId: issue.identifier, workspace: workspacePath, startedAt: new Date().toISOString() }),
+        model: planningModel,
+        status: 'running',
+        role: 'plan',
+        harness: effectiveHarness,
+      });
+      if (autoSpawnOnFinalize) {
+        await writeFile(
+          join(agentStateDir, 'auto-spawn-on-finalize.json'),
+          JSON.stringify({ autoSpawnOnFinalize: true }),
+        );
+      }
+    }
 
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 
@@ -695,18 +699,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
   } catch (err: any) {
     console.error(`[start-planning] Agent spawn failed for ${issue.identifier}:`, err);
-    // Update state file to reflect failure
     try {
-      await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
-        id: sessionName,
-        issueId: issue.identifier,
-        workspace: workspacePath,
-        status: 'error',
-        error: err.message,
-        startedAt: new Date().toISOString(),
-        role: 'plan',
-        location: workspaceLocation,
-      }, null, 2));
+      const existingCatchState = getAgentStateSync(sessionName);
+      if (existingCatchState) saveAgentStateSync({ ...existingCatchState, status: 'error' });
     } catch { /* ignore state write errors */ }
     return { success: false, error: err.message };
   }
