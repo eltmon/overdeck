@@ -14,8 +14,11 @@ import {
   Observability,
   ObservabilityLive,
   ObservabilityRpcGroup,
+  ReplayEventsError,
   ReplayEventsRpc,
+  SnapshotRequired,
   SubscribeDomainEventsRpc,
+  makeObservabilityLive,
 } from '../../../../src/lib/overdeck/observability.js';
 
 let tempDirs: string[] = [];
@@ -84,9 +87,34 @@ describe('overdeck Observability RPC surface', () => {
     expect(result.snapshot.sequence).toBe(2);
   });
 
+  it('fails replay with SnapshotRequired when the requested offset predates retained events', async () => {
+    const dbPath = makeDbPath();
+
+    const failure = await Effect.runPromiseExit(
+      Effect.gen(function* () {
+        const bus = yield* EventBus;
+        const observability = yield* Observability;
+        yield* bus.emit({ type: 'agent.started', payload: { agentId: 'agent-1' } });
+        yield* bus.emit({ type: 'agent.stopped', payload: { agentId: 'agent-1' } });
+        return yield* observability.replayEvents(0);
+      }).pipe(
+        Effect.provide(makeObservabilityLive({ oldestRetainedSequence: 2 })),
+        Effect.provide(EventBusLive),
+        Effect.provide(makeDbLive(dbPath)),
+      ),
+    );
+
+    expect(failure._tag).toBe('Failure');
+    if (failure._tag === 'Failure') {
+      expect(String(failure.cause)).toContain(SnapshotRequired.name);
+      expect(String(failure.cause)).toContain('Replay offset predates retained events');
+    }
+  });
+
   it('declares the RPC group over snapshot, subscribe, and replay methods', () => {
     expect(ObservabilityRpcGroup).toBeDefined();
     expect(SubscribeDomainEventsRpc).toBeDefined();
     expect(ReplayEventsRpc).toBeDefined();
+    expect(ReplayEventsRpc.errorSchema).toBe(ReplayEventsError);
   });
 });

@@ -23,10 +23,31 @@ export const ReplayEventsInput = Schema.Struct({
 });
 export type ReplayEventsInput = typeof ReplayEventsInput.Type;
 
+export class ReplayGap extends Schema.TaggedErrorClass<ReplayGap>()(
+  'ReplayGap',
+  {
+    requestedFromSequence: Schema.Number,
+    oldestAvailableSequence: Schema.Number,
+    message: Schema.String,
+  },
+) {}
+
+export class SnapshotRequired extends Schema.TaggedErrorClass<SnapshotRequired>()(
+  'SnapshotRequired',
+  {
+    requestedFromSequence: Schema.Number,
+    snapshotSequence: Schema.Number,
+    message: Schema.String,
+  },
+) {}
+
+export const ReplayEventsError = Schema.Union([ReplayGap, SnapshotRequired]);
+export type ReplayEventsError = typeof ReplayEventsError.Type;
+
 export interface ObservabilityServiceShape {
   readonly getSnapshot: Effect.Effect<DashboardSnapshot>;
   readonly subscribeDomainEvents: Stream.Stream<DomainEvent>;
-  readonly replayEvents: (fromSequence: number) => Effect.Effect<ReadonlyArray<DomainEvent>>;
+  readonly replayEvents: (fromSequence: number) => Effect.Effect<ReadonlyArray<DomainEvent>, ReplayEventsError>;
 }
 
 export class Observability extends Context.Service<Observability, ObservabilityServiceShape>()(
@@ -42,25 +63,47 @@ function toDomainEvent(event: StoredOverdeckEvent): DomainEvent {
   };
 }
 
-export const ObservabilityLive = Layer.effect(
-  Observability,
-  Effect.gen(function* () {
-    const bus = yield* EventBus;
+export interface ObservabilityLiveOptions {
+  readonly oldestRetainedSequence?: number;
+}
 
-    return Observability.of({
-      getSnapshot: bus.getLatestSequence.pipe(
-        Effect.map((sequence) => ({
-          sequence,
-          generatedAt: new Date(),
-        })),
-      ),
-      subscribeDomainEvents: bus.stream.pipe(Stream.map(toDomainEvent)),
-      replayEvents: (fromSequence) => bus.readFrom(fromSequence).pipe(
-        Effect.map((events) => events.map(toDomainEvent)),
-      ),
-    });
-  }),
-);
+export function makeObservabilityLive(options: ObservabilityLiveOptions = {}): Layer.Layer<Observability, never, EventBus> {
+  const oldestRetainedSequence = options.oldestRetainedSequence ?? 0;
+  const minimumReplayFromSequence = Math.max(0, oldestRetainedSequence - 1);
+
+  return Layer.effect(
+    Observability,
+    Effect.gen(function* () {
+      const bus = yield* EventBus;
+
+      return Observability.of({
+        getSnapshot: bus.getLatestSequence.pipe(
+          Effect.map((sequence) => ({
+            sequence,
+            generatedAt: new Date(),
+          })),
+        ),
+        subscribeDomainEvents: bus.stream.pipe(Stream.map(toDomainEvent)),
+        replayEvents: (fromSequence) =>
+          fromSequence < minimumReplayFromSequence
+            ? bus.getLatestSequence.pipe(
+              Effect.flatMap((snapshotSequence) =>
+                Effect.fail(new SnapshotRequired({
+                  requestedFromSequence: fromSequence,
+                  snapshotSequence,
+                  message: 'Replay offset predates retained events; refresh the snapshot before replaying.',
+                })),
+              ),
+            )
+            : bus.readFrom(fromSequence).pipe(
+              Effect.map((events) => events.map(toDomainEvent)),
+            ),
+      });
+    }),
+  );
+}
+
+export const ObservabilityLive = makeObservabilityLive();
 
 export const GetSnapshotRpc = Rpc.make('pan.getSnapshot', {
   payload: Schema.Struct({}),
@@ -76,6 +119,7 @@ export const SubscribeDomainEventsRpc = Rpc.make('pan.subscribeDomainEvents', {
 export const ReplayEventsRpc = Rpc.make('pan.replayEvents', {
   payload: ReplayEventsInput,
   success: Schema.Array(DomainEvent),
+  error: ReplayEventsError,
 });
 
 export const ObservabilityRpcGroup = RpcGroup.make(
