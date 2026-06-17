@@ -532,7 +532,7 @@ describe('settings-api', () => {
       expect(yamlContent).toContain('harness: codex');
     });
 
-    it('getDefaultConversationModelApi prefers stored defaultConversationModel over provider heuristics', () => {
+    it('getDefaultConversationModelApi returns the configured defaultConversationModel', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -551,6 +551,26 @@ describe('settings-api', () => {
       });
       const model = getDefaultConversationModelApi();
       expect(model).toBe('claude-haiku-4-5');
+    });
+
+    it('getDefaultConversationModelApi returns undefined when no default is configured', () => {
+      vi.mocked(loadConfigSync).mockReturnValueOnce({
+        config: {
+          preset: 'balanced',
+          enabledProviders: new Set(['openai']),
+          apiKeys: {},
+          overrides: {},
+          geminiThinkingLevel: 3,
+          tmux: { configMode: 'managed' as const },
+          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
+          trackerKeys: {},
+          tts: makeTtsConfig(),
+          openrouterFavorites: [],
+        } as any,
+        migration: null,
+      });
+      const model = getDefaultConversationModelApi();
+      expect(model).toBeUndefined();
     });
 
     it('should convert ApiSettingsConfig to YAML format', async () => {
@@ -668,7 +688,7 @@ describe('settings-api', () => {
   });
 
   describe('getDefaultConversationModelApi', () => {
-    it('returns a MiniMax model when only MiniMax is enabled', () => {
+    it('returns undefined when no default conversation model is configured', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -684,10 +704,10 @@ describe('settings-api', () => {
         migration: null,
       });
       const model = getDefaultConversationModelApi();
-      expect(model).toContain('minimax');
+      expect(model).toBeUndefined();
     });
 
-    it('returns an OpenAI model when OpenAI is enabled (takes precedence over MiniMax)', () => {
+    it('returns the configured default regardless of enabled providers', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -700,14 +720,15 @@ describe('settings-api', () => {
           trackerKeys: {},
           tts: makeTtsConfig(),
           openrouterFavorites: [],
+          defaultConversationModel: 'gemini-3.1-pro-preview',
         } as any,
         migration: null,
       });
       const model = getDefaultConversationModelApi();
-      expect(model).toContain('gpt');
+      expect(model).toBe('gemini-3.1-pro-preview');
     });
 
-    it('returns a Google model when only Google is enabled', () => {
+    it('does not silently fall back to a hardcoded model based on enabled providers', () => {
       vi.mocked(loadConfigSync).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -724,88 +745,7 @@ describe('settings-api', () => {
         migration: null,
       });
       const model = getDefaultConversationModelApi();
-      expect(model).toContain('gemini');
-    });
-
-    it('returns a Kimi model when only Kimi is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['kimi']),
-          apiKeys: { kimi: 'kimi-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toContain('kimi');
-    });
-
-    it('returns a ZAI model when only ZAI is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['zai']),
-          apiKeys: { zai: 'zai-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toContain('glm');
-    });
-
-    it('returns a DashScope model when only DashScope is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['dashscope']),
-          apiKeys: { dashscope: 'dashscope-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).toBe('qwen3-coder-plus');
-    });
-
-    it('does not return claude-sonnet-4-6 when Anthropic is disabled and Google is enabled', () => {
-      vi.mocked(loadConfigSync).mockReturnValueOnce({
-        config: {
-          preset: 'balanced',
-          enabledProviders: new Set(['google']),
-          apiKeys: { google: 'google-test-key' },
-          overrides: {},
-          geminiThinkingLevel: 3,
-          tmux: { configMode: 'managed' as const },
-          conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
-          trackerKeys: {},
-          tts: makeTtsConfig(),
-          openrouterFavorites: [],
-        } as any,
-        migration: null,
-      });
-      const model = getDefaultConversationModelApi();
-      expect(model).not.toContain('claude');
-      expect(model).not.toContain('sonnet');
+      expect(model).toBeUndefined();
     });
   });
 });

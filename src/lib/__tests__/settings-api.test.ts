@@ -151,29 +151,48 @@ describe('getDefaultConversationModelApi', () => {
     mockLoadConfig.mockReturnValue(baseConfig());
   });
 
-  it('defaults to Claude Sonnet when OpenAI is not enabled', async () => {
+  it('returns the explicit default_conversation_model when configured', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ defaultConversationModel: 'claude-opus-4-7' }));
+
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('claude-sonnet-4-6');
-    expect(mockResolveModelId).toHaveBeenCalledWith('claude-sonnet-4-6');
+    expect(getDefaultConversationModelApi()).toBe('claude-opus-4-7');
+    expect(mockResolveModelId).toHaveBeenCalledWith('claude-opus-4-7');
   });
 
-  it('defaults to GPT-5.5 when OpenAI is enabled', async () => {
+  it('returns undefined when no default conversation model is configured', async () => {
+    const { getDefaultConversationModelApi } = await import('../settings-api.js');
+
+    expect(getDefaultConversationModelApi()).toBeUndefined();
+  });
+
+  it('does not silently fall back to a hardcoded model based on enabled providers', async () => {
     mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['anthropic', 'openai']) }));
 
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('gpt-5.5');
-    expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.5');
+    expect(getDefaultConversationModelApi()).toBeUndefined();
+  });
+});
+
+describe('requireDefaultConversationModelApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLoadConfig.mockReturnValue(baseConfig());
   });
 
-  it('defaults to Qwen3 Coder Plus when only DashScope is enabled', async () => {
-    mockLoadConfig.mockReturnValue(baseConfig({ enabledProviders: new Set(['dashscope']) }));
+  it('returns the explicit default_conversation_model when configured', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ defaultConversationModel: 'claude-opus-4-7' }));
 
-    const { getDefaultConversationModelApi } = await import('../settings-api.js');
+    const { requireDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('qwen3-coder-plus');
-    expect(mockResolveModelId).toHaveBeenCalledWith('qwen3-coder-plus');
+    expect(requireDefaultConversationModelApi()).toBe('claude-opus-4-7');
+  });
+
+  it('throws when no default conversation model is configured', async () => {
+    const { requireDefaultConversationModelApi, NoDefaultConversationModelError } = await import('../settings-api.js');
+
+    expect(() => requireDefaultConversationModelApi()).toThrow(NoDefaultConversationModelError);
   });
 });
 
