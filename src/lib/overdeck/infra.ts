@@ -20,7 +20,7 @@ import {
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getPanopticonHome } from '../paths.js';
-import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession } from '../tmux.js';
+import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
 import { getOverdeckDatabasePath } from './paths.js';
 
 export const overdeckEvents = sqliteTable('events', {
@@ -224,6 +224,8 @@ export interface TmuxServiceShape {
   readonly sessionExists: (sessionName: string) => Effect.Effect<boolean>;
   readonly killSession: (sessionName: string) => Effect.Effect<void>;
   readonly readRuntimeJson: (agentId: string) => Effect.Effect<unknown>;
+  /** Returns session names of all active agent-* tmux sessions. Never fails — returns [] on error. */
+  readonly listSessions: () => Effect.Effect<ReadonlyArray<string>>;
 }
 
 export class Tmux extends Context.Service<Tmux, TmuxServiceShape>()('overdeck/Tmux') {}
@@ -245,6 +247,11 @@ export const TmuxLive = Layer.succeed(
           return null;
         }
       }),
+    listSessions: () =>
+      getAgentSessions().pipe(
+        Effect.map((sessions) => sessions.map((s) => s.name)),
+        Effect.catch(() => Effect.succeed([] as readonly string[])),
+      ),
   }),
 );
 

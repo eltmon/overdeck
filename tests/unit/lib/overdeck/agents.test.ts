@@ -154,6 +154,7 @@ function makeFakeTmux(opts?: { sessionAlive?: boolean; runtimeJson?: unknown }) 
       sessionExists: (_name) => Effect.succeed(sessionAlive),
       killSession:   (name)  => Effect.sync(() => { killedSessions.push(name); }),
       readRuntimeJson: (_id) => Effect.succeed(runtime),
+      listSessions:    ()    => Effect.succeed([]),
     }),
   );
   return { killedSessions, tmuxLayer };
