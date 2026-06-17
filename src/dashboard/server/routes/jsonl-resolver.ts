@@ -153,8 +153,18 @@ export async function resolveClaudeSessionId(
 /** Read the harness recorded in the agent's state.json, or null when absent. */
 export async function resolveAgentHarness(
   agentId: string,
-  _opts: ResolveJsonlPathOptions = {},
+  opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
+  if (opts.agentsDirOverride) {
+    const stateRaw = await readOptional(join(opts.agentsDirOverride, agentId, 'state.json'));
+    if (!stateRaw) return null;
+    try {
+      const state = JSON.parse(stateRaw) as { harness?: unknown };
+      return typeof state.harness === 'string' ? state.harness : null;
+    } catch {
+      return null;
+    }
+  }
   return getAgentStateSync(agentId)?.harness ?? null;
 }
 
