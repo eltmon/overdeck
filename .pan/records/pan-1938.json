@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-17T07:57:37.707Z",
-  "updated": "2026-06-17T09:16:12.017Z",
+  "updated": "2026-06-17T12:23:48.816Z",
   "pipeline": {
     "issueId": "PAN-1938",
     "reviewStatus": "pending",
@@ -41,6 +41,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5"
+  "harness": "pi",
+  "model": "kimi-k2.7-code"
 }
