@@ -334,14 +334,6 @@ export function initSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
       ON transcript_checkpoints(project_id, issue_id, workspace_id);
 
-    -- ===== API Cache =====
-    CREATE TABLE IF NOT EXISTS api_cache (
-      key         TEXT PRIMARY KEY,
-      value       TEXT NOT NULL,  -- JSON string
-      expires_at  TEXT,
-      created_at  TEXT NOT NULL
-    );
-
     -- ===== App Settings (global key/value) =====
     -- Generic persisted settings that survive restarts. Currently used for the
     -- global deacon pause flag; add keys here rather than spawning new tables
@@ -376,14 +368,6 @@ export function initSchema(db: SqliteDatabase): void {
 
     CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
       ON uat_generations(project_root, created_at DESC);
-
-    -- ===== Rate Limits =====
-    CREATE TABLE IF NOT EXISTS rate_limits (
-      service     TEXT PRIMARY KEY,
-      requests    INTEGER NOT NULL DEFAULT 0,
-      window_start TEXT NOT NULL,
-      limit_per_window INTEGER NOT NULL DEFAULT 1000
-    );
 
     CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
       issue_id               TEXT PRIMARY KEY,

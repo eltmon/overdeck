@@ -29,6 +29,8 @@ EXCLUDES=(
   ':!src/**/__tests__/**'
   ':!tests/**'
   ':!*.md'
+  ':!scripts/create-overdeck-db.ts'
+  ':!scripts/drizzle-node-sqlite-smoke.ts'
 )
 
 comment_filter() {
