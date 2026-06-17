@@ -164,7 +164,7 @@ export const transcripts = sqliteTable("transcripts", {
 
 /* ───────────────────────────── COST ────────────────────────────────
  * Pure cache, rebuilt from a union of sacred transcripts + ~/.panopticon cost
- * archives. 14 NEED cols (5 zero-populated tldr_*/caveman dropped). `cost` is
+ * archives. 14 NEED cols (5 zero-populated tldr_ / caveman dropped). `cost` is
  * recomputed from tokens on rebuild (stored USD has a legacy bug). The durable
  * per-issue TOTAL lives in the git record's closeOut, not here.
  */
@@ -306,7 +306,7 @@ export const uatGenerationResolutions = sqliteTable("uat_generation_resolutions"
 }, (t) => [index("uat_resolutions_uat_idx").on(t.uatName)]);
 
 /* ──────────────────────── CONTROL / SETTINGS ───────────────────────
- * app_settings = deacon.*/flywheel.* runtime flags (source-of-truth-in-DB,
+ * app_settings = deacon.* / flywheel.* runtime flags (source-of-truth-in-DB,
  * reset at cutover). issue_policy = the per-issue squatters evicted from
  * review_status.
  */
