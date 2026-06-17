@@ -89,6 +89,13 @@ export function registerDbCommands(program: Command): void {
     .option('--force', 'Overwrite records even if unchanged')
     .option('--verbose', 'Log each processed issue')
     .action(backfillRecordsCommand);
+
+  db.command('restore-verdicts')
+    .description('Rebuild review_status verdicts from per-issue records + live GitHub PR state (PAN-1922)')
+    .option('--issue-id <id>', 'Restore only this issue')
+    .option('--dry-run', 'Show what would be restored without writing')
+    .option('--verbose', 'Log each processed issue')
+    .action(restoreVerdictsCommand);
 }
 
 async function snapshotCommand(options: {
@@ -669,8 +676,12 @@ async function rebuildCommand(options: { verbose?: boolean }): Promise<void> {
     const phases = Object.entries(r.phaseCounts)
       .map(([p, n]) => `${p}=${n}`)
       .join(' ');
+
+    const { restoreReviewStatusFromRecords } = await import('../../lib/pan-dir/verdict-restore.js');
+    const verdictResult = await restoreReviewStatusFromRecords({ verbose: options.verbose });
+
     spinner.succeed(
-      `Reconstructed: ${r.issuesEnumerated} in-flight issue(s), ${r.agentsRebuilt} agent(s); phases ${phases}`,
+      `Reconstructed: ${r.issuesEnumerated} in-flight issue(s), ${r.agentsRebuilt} agent(s), ${verdictResult.restored} verdict(s) restored; phases ${phases}`,
     );
   } catch (error: any) {
     spinner.fail(`Reconstruct failed: ${error.message}`);
@@ -707,6 +718,39 @@ async function backfillRecordsCommand(options: {
     }
   } catch (error: any) {
     spinner.fail(`Records backfill failed: ${error.message}`);
+    process.exitCode = 1;
+  }
+}
+
+async function restoreVerdictsCommand(options: {
+  issueId?: string;
+  dryRun?: boolean;
+  verbose?: boolean;
+}): Promise<void> {
+  const spinner = ora('Restoring review_status verdicts from per-issue records...').start();
+
+  try {
+    const { restoreReviewStatusFromRecords } = await import('../../lib/pan-dir/verdict-restore.js');
+    const result = await restoreReviewStatusFromRecords({
+      issueId: options.issueId,
+      dryRun: options.dryRun,
+      verbose: options.verbose,
+    });
+
+    spinner.succeed(
+      `Verdict restore complete: ${result.restored} restored, ${result.skipped} skipped, ${result.failed} failed`
+    );
+
+    if (result.failed > 0) {
+      for (const detail of result.details) {
+        if (detail.action === 'failed') {
+          console.log(chalk.red(`  ${detail.issueId}: ${detail.reason}`));
+        }
+      }
+      process.exitCode = 1;
+    }
+  } catch (error: any) {
+    spinner.fail(`Verdict restore failed: ${error.message}`);
     process.exitCode = 1;
   }
 }

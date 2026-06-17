@@ -93,7 +93,7 @@ function collectReviewStatusIssueIds(): Set<string> {
   return ids;
 }
 
-async function collectInFlightIssueIds(projects: ProjectConfig[]): Promise<Set<string>> {
+export async function collectInFlightIssueIds(projects: ProjectConfig[]): Promise<Set<string>> {
   const ids = collectAgentIssueIds();
   for (const id of collectReviewStatusIssueIds()) ids.add(id);
 
