@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
+
 import { Context, Effect, Layer, Queue, Stream } from 'effect';
 import { asc, gt, sql } from 'drizzle-orm';
 import { drizzle, type RemoteCallback, type SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
@@ -15,6 +18,7 @@ import {
   type PanIssueRecord,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
+import { packageRoot } from '../paths.js';
 import { getOverdeckDatabasePath } from './paths.js';
 
 export const overdeckEvents = sqliteTable('events', {
@@ -194,6 +198,7 @@ export const EventBusLive = Layer.effect(
 export interface RecordsServiceShape {
   readonly writeIssue: (project: ProjectConfig, issueId: string, record: PanIssueRecord) => Effect.Effect<string>;
   readonly readIssue: (project: ProjectConfig, issueId: string) => Effect.Effect<PanIssueRecord | null>;
+  readonly readSpec: (planRef: string) => Effect.Effect<unknown>;
 }
 
 export class Records extends Context.Service<Records, RecordsServiceShape>()('overdeck/Records') {}
@@ -203,6 +208,11 @@ export const RecordsLive = Layer.succeed(
   Records.of({
     writeIssue: (project, issueId, record) => Effect.sync(() => writeIssueRecordSync(project, issueId, record)),
     readIssue: (project, issueId) => Effect.sync(() => readIssueRecordSync(project, issueId)),
+    readSpec: (planRef) =>
+      Effect.sync(() => {
+        const path = isAbsolute(planRef) ? planRef : join(packageRoot, planRef);
+        return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+      }),
   }),
 );
 

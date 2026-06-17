@@ -141,7 +141,8 @@ describe('overdeck infra', () => {
         const records = yield* Records;
         const path = yield* records.writeIssue(project, 'PAN-1938', sampleRecord('PAN-1938'));
         const record = yield* records.readIssue(project, 'PAN-1938');
-        return { path, record };
+        const spec = yield* records.readSpec('package.json');
+        return { path, record, spec };
       }).pipe(Effect.provide(RecordsLive)),
     );
 
@@ -149,6 +150,7 @@ describe('overdeck infra', () => {
     expect(JSON.parse(readFileSync(result.path, 'utf8')).issueId).toBe('PAN-1938');
     expect(result.record?.issueId).toBe('PAN-1938');
     expect(result.record?.schemaVersion).toBe(RECORD_SCHEMA_VERSION);
+    expect(result.spec).toMatchObject({ name: '@panctl/cli' });
   });
 
   it('exports the domain infra tags whose Live layers are supplied by owning domains', () => {
