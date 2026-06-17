@@ -2,19 +2,19 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-17T07:08:54.000Z",
-    "updated": "2026-06-17T07:08:54.000Z",
+    "updated": "2026-06-17T07:57:42.451Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1938: Overdeck \u2014 the Panopticon data-architecture remodel + rebrand (big-bang)"
+    "description": "Plan for PAN-1938: Overdeck — the Panopticon data-architecture remodel + rebrand (big-bang)"
   },
   "plan": {
     "id": "pan-1938",
     "title": "Overdeck: the Panopticon data-architecture remodel + rebrand (big-bang)",
-    "status": "proposed",
+    "status": "running",
     "uid": "0dc557c8-0493-4a6a-b460-e98d39a7ab5c",
     "author": "agent:claude-opus-4-8",
-    "sequence": 1,
+    "sequence": 4,
     "created": "2026-06-17T07:08:54.000Z",
-    "updated": "2026-06-17T07:08:54.000Z",
+    "updated": "2026-06-17T07:57:42.451Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1938",
@@ -58,21 +58,21 @@
       "two-door"
     ],
     "narratives": {
-      "Problem": "Panopticon's recurring state and pipeline bugs all trace to one disease: a single fact is written from many places with no owner, so the stores drift \u2014 a 35-table SQLite junk-drawer with zero enforced foreign keys, god-tables, duplicate entities, ~8 status axes, and ~148 transition sites. Full diagnosis: docs/overdeck-remodel/END-STATE.md.",
-      "Proposal": "Rebuild on a fresh, empty overdeck.db (panopticon.db kept untouched as backup \u2014 a low-risk big-bang, not a migration), all-in on Effect v4-beta with Drizzle over node:sqlite/bun:sqlite. One read door (resolver Service) and one write door (writer Service) per domain; nothing else touches a store, enforced by Effect's type system plus an import-boundary lint rule. Seven DB-cache domains (Issues, Agents, Conversations, Cost, Merge, Control/Settings, Memory) + file-backed Config; Transcripts is a shared read service and Observability is the EventBus \u2014 neither is a domain. The bar is FUNCTIONAL PARITY: keep every behavior the system has today minus the hundred redundant and wrong ways it does each thing. The full spec is the design package referenced in the PRD (docs/overdeck-remodel/); this plan sequences it behind build gates G1-G6. Finally, rename Panopticon -> Overdeck.",
-      "NonGoals": "- Backward compatibility or data migration from panopticon.db.\n- Defending the 'disposable cache / four homes' model as a literal contract \u2014 it is a mental model; the contract is functional parity.\n- Re-deriving any design already specified in the package.\n- Mutating conversation JSONL backing files or memory observation files (sacred, read-only).\n- Splitting the rebrand into a separate effort \u2014 it folds in as the final phase."
+      "Problem": "Panopticon's recurring state and pipeline bugs all trace to one disease: a single fact is written from many places with no owner, so the stores drift — a 35-table SQLite junk-drawer with zero enforced foreign keys, god-tables, duplicate entities, ~8 status axes, and ~148 transition sites. Full diagnosis: docs/overdeck-remodel/END-STATE.md.",
+      "Proposal": "Rebuild on a fresh, empty overdeck.db (panopticon.db kept untouched as backup — a low-risk big-bang, not a migration), all-in on Effect v4-beta with Drizzle over node:sqlite/bun:sqlite. One read door (resolver Service) and one write door (writer Service) per domain; nothing else touches a store, enforced by Effect's type system plus an import-boundary lint rule. Seven DB-cache domains (Issues, Agents, Conversations, Cost, Merge, Control/Settings, Memory) + file-backed Config; Transcripts is a shared read service and Observability is the EventBus — neither is a domain. The bar is FUNCTIONAL PARITY: keep every behavior the system has today minus the hundred redundant and wrong ways it does each thing. The full spec is the design package referenced in the PRD (docs/overdeck-remodel/); this plan sequences it behind build gates G1-G6. Finally, rename Panopticon -> Overdeck.",
+      "NonGoals": "- Backward compatibility or data migration from panopticon.db.\n- Defending the 'disposable cache / four homes' model as a literal contract — it is a mental model; the contract is functional parity.\n- Re-deriving any design already specified in the package.\n- Mutating conversation JSONL backing files or memory observation files (sacred, read-only).\n- Splitting the rebrand into a separate effort — it folds in as the final phase."
     },
     "autoDecisions": [
       {
         "summary": "Model allocation: GPT-5.5 builds Phase 0 foundations + the Phase 1 Issues vertical slice; kimi-2.7 builds the six Phase-2 domains in parallel; opus (orchestrator) gates each domain at merge. Applied at spawn via per-domain pan agents, NOT baked into model routing.",
-        "rationale": "Operator's explicit cost-aware allocation (GPT-5.5 low on tokens). Provider-default harness routing \u2014 no --harness override for CLIProxy-routed models (PAN-1865)."
+        "rationale": "Operator's explicit cost-aware allocation (GPT-5.5 low on tokens). Provider-default harness routing — no --harness override for CLIProxy-routed models (PAN-1865)."
       },
       {
-        "summary": "The build gates (G1 Drizzle-proven, G2 slice-compiles, G3 no-loss matrix, G4 sacred-file, G5 PAN-1937 export, G6 replay-gap) are encoded as `blocks` edges so createBeadsFromVBrief lowers them into bd dependencies \u2014 bd ready cannot hand out a domain bead until the slice (G2) is closed.",
+        "summary": "The build gates (G1 Drizzle-proven, G2 slice-compiles, G3 no-loss matrix, G4 sacred-file, G5 PAN-1937 export, G6 replay-gap) are encoded as `blocks` edges so createBeadsFromVBrief lowers them into bd dependencies — bd ready cannot hand out a domain bead until the slice (G2) is closed.",
         "rationale": "The slice-first safety guarantee must be mechanical, not advisory; verified createBeadsFromVBrief (src/lib/vbrief/beads.ts) lowers blocks edges to bd deps with a reconciliation/repair pass."
       },
       {
-        "summary": "Issues writer is advance(id,toStage,reason) + setPr + setBlockers \u2014 NO generic hold(); side-states route to their owning domain's writer (paused/troubled -> Agents, deacon-ignored/auto-merge -> Settings, stuck -> review_runs, cancelled -> stage).",
+        "summary": "Issues writer is advance(id,toStage,reason) + setPr + setBlockers — NO generic hold(); side-states route to their owning domain's writer (paused/troubled -> Agents, deacon-ignored/auto-merge -> Settings, stuck -> review_runs, cancelled -> stage).",
         "rationale": "Five of six side-states are not issue facts; the vertical-slice exercise caught the hold() error."
       },
       {
@@ -83,7 +83,7 @@
     "items": [
       {
         "id": "add-drizzle-deps",
-        "title": "Add drizzle-orm + drizzle-kit (only these \u2014 node:sqlite is built-in)",
+        "title": "Add drizzle-orm + drizzle-kit (only these — node:sqlite is built-in)",
         "status": "pending",
         "priority": "high",
         "created": "2026-06-17T07:08:54.000Z",
@@ -96,7 +96,7 @@
           ]
         },
         "narrative": {
-          "Action": "Add `drizzle-orm` and `drizzle-kit` to package.json. Do NOT add `better-sqlite3` (dropped in PAN-1579) or `@effect/sql` (Bun-only). `node:sqlite`/`bun:sqlite` are runtime built-ins. Per docs/overdeck-remodel/ARCHITECTURE-CONVENTIONS.md \u00a71, \u00a74."
+          "Action": "Add `drizzle-orm` and `drizzle-kit` to package.json. Do NOT add `better-sqlite3` (dropped in PAN-1579) or `@effect/sql` (Bun-only). `node:sqlite`/`bun:sqlite` are runtime built-ins. Per docs/overdeck-remodel/ARCHITECTURE-CONVENTIONS.md §1, §4."
         },
         "items": [
           {
@@ -119,7 +119,7 @@
       },
       {
         "id": "drizzle-smoke-test",
-        "title": "Build gate G1 \u2014 prove Drizzle works over node:sqlite on Node 22",
+        "title": "Build gate G1 — prove Drizzle works over node:sqlite on Node 22",
         "status": "pending",
         "priority": "critical",
         "created": "2026-06-17T07:08:54.000Z",
@@ -139,7 +139,7 @@
           ]
         },
         "narrative": {
-          "Action": "Write a throwaway compile+run smoke-test proving Drizzle works over the runtime-bundled `node:sqlite` on Node 22: `sqliteTable` with `.references()` foreign keys, a partial `uniqueIndex(...).where(...)`, `PRAGMA foreign_keys=ON` enforcement, and one resolver->writer round-trip transaction. This is build gate G1 \u2014 it confirms Drizzle's node:sqlite adapter before any domain code is written. Decided fallback if a pinned Drizzle lacks the adapter: wrap the existing src/lib/database/driver.ts (PRD \u00a78)."
+          "Action": "Write a throwaway compile+run smoke-test proving Drizzle works over the runtime-bundled `node:sqlite` on Node 22: `sqliteTable` with `.references()` foreign keys, a partial `uniqueIndex(...).where(...)`, `PRAGMA foreign_keys=ON` enforcement, and one resolver->writer round-trip transaction. This is build gate G1 — it confirms Drizzle's node:sqlite adapter before any domain code is written. Decided fallback if a pinned Drizzle lacks the adapter: wrap the existing src/lib/database/driver.ts (PRD §8)."
         },
         "items": [
           {
@@ -229,7 +229,7 @@
           ]
         },
         "narrative": {
-          "Action": "Author the import-boundary lint rule that fails the build when route/RPC/CLI/hook/script code imports a store directly (the `Db` handle, raw `.pan/`/`state.json` access, or GitHub for canonical state) instead of going through a domain resolver/writer. The rule is authored now; enforcement is switched on at cutover (see `ci-guard-on`). Per ARCHITECTURE-CONVENTIONS.md \u00a70, \u00a75; PRD FR-5, NFR-3."
+          "Action": "Author the import-boundary lint rule that fails the build when route/RPC/CLI/hook/script code imports a store directly (the `Db` handle, raw `.pan/`/`state.json` access, or GitHub for canonical state) instead of going through a domain resolver/writer. The rule is authored now; enforcement is switched on at cutover (see `ci-guard-on`). Per ARCHITECTURE-CONVENTIONS.md §0, §5; PRD FR-5, NFR-3."
         },
         "items": [
           {
@@ -288,7 +288,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build the shared `./infra` module that every domain imports: the `Db` Service (Drizzle over node:sqlite Live), `EventBus` (Tag + Live over the event store), and `Records` (git `.pan/records` writer Tag + Live); plus the Service Tags/interfaces for the domain-specific infra (`Tmux`, `Forge`, `Projects`, `CostArchive`, `MemorySearch`, `MemoryFiles`) whose Live layers are built inside their owning domain beads. Defining all infra Tags here lets the six domains compile independently. Per ARCHITECTURE-CONVENTIONS.md \u00a71, \u00a74, \u00a78; every services/*.md imports from `./infra`."
+          "Action": "Build the shared `./infra` module that every domain imports: the `Db` Service (Drizzle over node:sqlite Live), `EventBus` (Tag + Live over the event store), and `Records` (git `.pan/records` writer Tag + Live); plus the Service Tags/interfaces for the domain-specific infra (`Tmux`, `Forge`, `Projects`, `CostArchive`, `MemorySearch`, `MemoryFiles`) whose Live layers are built inside their owning domain beads. Defining all infra Tags here lets the six domains compile independently. Per ARCHITECTURE-CONVENTIONS.md §1, §4, §8; every services/*.md imports from `./infra`."
         },
         "items": [
           {
@@ -309,7 +309,7 @@
           },
           {
             "id": "infra-layer.ac3",
-            "title": "Under `tsc`, only resolver/writer Layers acquire the `Db` handle \u2014 the two-door boundary blocks any other acquirer.",
+            "title": "Under `tsc`, only resolver/writer Layers acquire the `Db` handle — the two-door boundary blocks any other acquirer.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -319,7 +319,7 @@
       },
       {
         "id": "issues-domain",
-        "title": "Build gate G2 \u2014 the Issues vertical slice proves the conventions",
+        "title": "Build gate G2 — the Issues vertical slice proves the conventions",
         "status": "pending",
         "priority": "critical",
         "created": "2026-06-17T07:08:54.000Z",
@@ -342,7 +342,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build the Issues domain end-to-end as the vertical slice that proves the conventions before scaling: the issue entity Schema, `IssuesResolver` (read door), `IssueWriter` (write door \u2014 `advance(id, toStage, reason)` + `setPr` + `setBlockers`; NO generic `hold()` \u2014 side-states route to their owning domain), and `IssuesApi` (HttpApiGroup), compiling under `tsc` with a resolver->writer->resolver round-trip. This is build gate G2 \u2014 the six remaining domains do not start until it compiles. Spec: docs/overdeck-remodel/services/issues.md."
+          "Action": "Build the Issues domain end-to-end as the vertical slice that proves the conventions before scaling: the issue entity Schema, `IssuesResolver` (read door), `IssueWriter` (write door — `advance(id, toStage, reason)` + `setPr` + `setBlockers`; NO generic `hold()` — side-states route to their owning domain), and `IssuesApi` (HttpApiGroup), compiling under `tsc` with a resolver->writer->resolver round-trip. This is build gate G2 — the six remaining domains do not start until it compiles. Spec: docs/overdeck-remodel/services/issues.md."
         },
         "items": [
           {
@@ -395,7 +395,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build the Agents domain per docs/overdeck-remodel/services/agents.md: `AgentsResolver` (read door over the `agents` table \u2014 the authoritative runtime registry) and `AgentWriter` (its verbs incl. `switchModel` source-first), building the `Tmux` Live (liveness oracle). Agent status is the tmux/cache projection \u2014 there is no `advance()` analog. Permission prompts relocate to the `AgentPermissions` process service (built in `process-services`)."
+          "Action": "Build the Agents domain per docs/overdeck-remodel/services/agents.md: `AgentsResolver` (read door over the `agents` table — the authoritative runtime registry) and `AgentWriter` (its verbs incl. `switchModel` source-first), building the `Tmux` Live (liveness oracle). Agent status is the tmux/cache projection — there is no `advance()` analog. Permission prompts relocate to the `AgentPermissions` process service (built in `process-services`)."
         },
         "items": [
           {
@@ -446,7 +446,7 @@
         "items": [
           {
             "id": "conversations-domain.ac1",
-            "title": "Given the two-door rule (CONVENTIONS \u00a70), `ConversationsResolver` and `ConversationsWriter` resolve as distinct Services.",
+            "title": "Given the two-door rule (CONVENTIONS §0), `ConversationsResolver` and `ConversationsWriter` resolve as distinct Services.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -577,7 +577,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build Control/Settings per docs/overdeck-remodel/services/control-settings.md: `SettingsResolver` + `SettingsWriter` over the `app_settings` + `issue_policy` tables (flywheel flags, deacon-ignore, auto-merge flag). No `Records` \u2014 settings are cache-only. The deacon freeze + per-issue ignore are settings, not issue fields."
+          "Action": "Build Control/Settings per docs/overdeck-remodel/services/control-settings.md: `SettingsResolver` + `SettingsWriter` over the `app_settings` + `issue_policy` tables (flywheel flags, deacon-ignore, auto-merge flag). No `Records` — settings are cache-only. The deacon freeze + per-issue ignore are settings, not issue fields."
         },
         "items": [
           {
@@ -623,7 +623,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build Memory per docs/overdeck-remodel/services/memory.md: `MemoryResolver` + `MemoryWriter` over the separate `memory-search.db` (reset_markers, observation_index), building `MemorySearch` + `MemoryFiles` Live. Unify the search paths into one resolver. The FTS `rebuildIndex(projectId)` writer verb is built separately in `memory-fts-rebuilder`. Observation files are sacred \u2014 never mutated."
+          "Action": "Build Memory per docs/overdeck-remodel/services/memory.md: `MemoryResolver` + `MemoryWriter` over the separate `memory-search.db` (reset_markers, observation_index), building `MemorySearch` + `MemoryFiles` Live. Unify the search paths into one resolver. The FTS `rebuildIndex(projectId)` writer verb is built separately in `memory-fts-rebuilder`. Observation files are sacred — never mutated."
         },
         "items": [
           {
@@ -747,7 +747,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build the non-data process services per ARCHITECTURE-CONVENTIONS.md \u00a78.5: `DeliveryService`, `ConversationRuntime`, `CloisterRuntime`, and `AgentPermissions` (the relocated permission request/resolve flow from the agents routes). These are process services, not cache doors \u2014 they depend on `EventBus` + delivery, not on the `Db` handle."
+          "Action": "Build the non-data process services per ARCHITECTURE-CONVENTIONS.md §8.5: `DeliveryService`, `ConversationRuntime`, `CloisterRuntime`, and `AgentPermissions` (the relocated permission request/resolve flow from the agents routes). These are process services, not cache doors — they depend on `EventBus` + delivery, not on the `Db` handle."
         },
         "items": [
           {
@@ -797,7 +797,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build the reconstruction/sync layer that rebuilds the empty `overdeck.db` from the sources of truth: GitHub (issue/PR status), git `.pan/records` (per-issue records), JSONL (conversations/transcripts), and tmux (liveness). Writers persist source-first then update the cache; reconstruction is the self-healing path that makes the cache disposable. Must cover in-flight/active issues at cutover (PRD \u00a78 sequencing)."
+          "Action": "Build the reconstruction/sync layer that rebuilds the empty `overdeck.db` from the sources of truth: GitHub (issue/PR status), git `.pan/records` (per-issue records), JSONL (conversations/transcripts), and tmux (liveness). Writers persist source-first then update the cache; reconstruction is the self-healing path that makes the cache disposable. Must cover in-flight/active issues at cutover (PRD §8 sequencing)."
         },
         "items": [
           {
@@ -841,7 +841,7 @@
           ]
         },
         "narrative": {
-          "Action": "Wire the dashboard server bootstrap Layer: provide every domain resolver/writer Live + infra Live, route the read-model off the EventBus, and expose the HttpApiGroups + RPC. This is where all domain Layers compose into the running server (Node 22, dist build \u2014 never Bun)."
+          "Action": "Wire the dashboard server bootstrap Layer: provide every domain resolver/writer Live + infra Live, route the read-model off the EventBus, and expose the HttpApiGroups + RPC. This is where all domain Layers compose into the running server (Node 22, dist build — never Bun)."
         },
         "items": [
           {
@@ -872,7 +872,7 @@
       },
       {
         "id": "pan-1937-export",
-        "title": "Build gate G5 \u2014 the PAN-1937 conversation-metadata export",
+        "title": "Build gate G5 — the PAN-1937 conversation-metadata export",
         "status": "pending",
         "priority": "high",
         "created": "2026-06-17T07:08:54.000Z",
@@ -889,7 +889,7 @@
           ]
         },
         "narrative": {
-          "Action": "Build the PAN-1937 conversation-metadata export (currently unbuilt) that preserves the irreplaceable `conversations`/`favorites`/`conversation_files` metadata across the cutover to the fresh `overdeck.db`. This is build gate G5 \u2014 without it the conversation metadata is lost at cutover. The JSONL backing files themselves are never touched."
+          "Action": "Build the PAN-1937 conversation-metadata export (currently unbuilt) that preserves the irreplaceable `conversations`/`favorites`/`conversation_files` metadata across the cutover to the fresh `overdeck.db`. This is build gate G5 — without it the conversation metadata is lost at cutover. The JSONL backing files themselves are never touched."
         },
         "items": [
           {
@@ -920,7 +920,7 @@
       },
       {
         "id": "no-loss-matrix",
-        "title": "Build gate G3 \u2014 the remodel-wide no-loss matrix",
+        "title": "Build gate G3 — the remodel-wide no-loss matrix",
         "status": "pending",
         "priority": "high",
         "created": "2026-06-17T07:08:54.000Z",
@@ -933,7 +933,7 @@
           ]
         },
         "narrative": {
-          "Action": "Assemble the remodel-wide no-loss matrix: every current HTTP endpoint, CLI verb, and RPC method maps to a new door OR to a named DELETE/RELOCATE with a reason \u2014 aggregating the Part-1 no-loss maps from the eight services/*.md AND covering the cross-domain/aggregate surfaces none of them own. This is build gate G3 \u2014 the API surface is not locked until the matrix is complete. Per PRD FR-2."
+          "Action": "Assemble the remodel-wide no-loss matrix: every current HTTP endpoint, CLI verb, and RPC method maps to a new door OR to a named DELETE/RELOCATE with a reason — aggregating the Part-1 no-loss maps from the eight services/*.md AND covering the cross-domain/aggregate surfaces none of them own. This is build gate G3 — the API surface is not locked until the matrix is complete. Per PRD FR-2."
         },
         "items": [
           {
@@ -1000,7 +1000,7 @@
       },
       {
         "id": "sacred-file-guard",
-        "title": "Build gate G4 \u2014 the sacred-file invariant check",
+        "title": "Build gate G4 — the sacred-file invariant check",
         "status": "pending",
         "priority": "high",
         "created": "2026-06-17T07:08:54.000Z",
@@ -1112,7 +1112,7 @@
       },
       {
         "id": "observability-replay-gap",
-        "title": "Build gate G6 \u2014 replay-gap typed error before events retention",
+        "title": "Build gate G6 — replay-gap typed error before events retention",
         "status": "pending",
         "priority": "medium",
         "created": "2026-06-17T07:08:54.000Z",
@@ -1280,7 +1280,7 @@
       },
       {
         "id": "rebrand-overdeck",
-        "title": "Rename Panopticon -> Overdeck (code, DB name, DNS, docs) \u2014 final pass",
+        "title": "Rename Panopticon -> Overdeck (code, DB name, DNS, docs) — final pass",
         "status": "pending",
         "priority": "high",
         "created": "2026-06-17T07:08:54.000Z",
@@ -1566,6 +1566,10 @@
         "to": "rebrand-overdeck",
         "type": "informs"
       }
-    ]
-  }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-17-PAN-1938-overdeck-the-panopticon-data-architecture-remodel-rebrand-big-bang.vbrief.json"
+    }
+  },
+  "status": "active"
 }
