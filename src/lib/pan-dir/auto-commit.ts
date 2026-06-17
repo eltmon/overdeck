@@ -330,21 +330,12 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
-    // Rebase onto origin/main so the auto-commit sits on top of any PR
-    // merges that landed on the remote between sync cycles.
-    yield* runGit(['rebase', 'origin/main'], gitRoot).pipe(
-      Effect.matchEffect({
-        onSuccess: () => Effect.void,
-        onFailure: (err) => {
-          console.warn(`[pan-dir/auto-commit] rebase failed for ${branch}: ${err.stderr || err._tag}`);
-          // Abort the rebase so the repo isn't left in a conflicted state.
-          return runGit(['rebase', '--abort'], gitRoot).pipe(
-            Effect.matchEffect({ onSuccess: () => Effect.void, onFailure: () => Effect.void }),
-          );
-        },
-      }),
-    );
-
+    // PAN-1929: never rebase (or otherwise rewrite history) in the shared
+    // primary worktree. The auto-commit is made locally on `main`; integrating
+    // remote commits is left to explicit operator/flywheel merge actions so the
+    // shared tree is never mutated or left in a conflicted state by a background
+    // process. This preserves the original purpose — records reach git durably
+    // — without the "rebase failed for main" hazard.
     return { committed: true };
   });
 }

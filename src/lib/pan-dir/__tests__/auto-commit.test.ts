@@ -47,6 +47,56 @@ describe('auto-commit', () => {
     }),
   );
 
+  it.effect('does not rebase origin/main when remote has moved ahead (PAN-1929)', () =>
+    Effect.gen(function* () {
+      // Create a bare "remote" repo and seed it with the local main commit.
+      const remoteTmp = mkdtempSync(join(tmpdir(), 'pan-autocommit-remote-'));
+      try {
+        execSync('git init -q --bare', { cwd: remoteTmp });
+        execSync(`git push -q ${remoteTmp} main`, { cwd: tmp });
+
+        // Advance origin/main with a commit the local repo will not have.
+        writeFileSync(join(tmp, 'remote-file.md'), 'remote');
+        execSync('git add remote-file.md', { cwd: tmp });
+        execSync('git commit -q -m "remote commit"', { cwd: tmp });
+        execSync(`git push -q ${remoteTmp} main`, { cwd: tmp });
+
+        // Rewind local main to the original commit so origin/main is ahead.
+        const localHeadBefore = execSync('git rev-parse HEAD~1', { cwd: tmp, encoding: 'utf-8' }).trim();
+        execSync(`git reset -q --hard ${localHeadBefore}`, { cwd: tmp });
+
+        // Point local origin at the bare remote and fetch so origin/main is ahead.
+        execSync(`git remote set-url origin ${remoteTmp}`, { cwd: tmp });
+        execSync('git fetch -q origin main', { cwd: tmp });
+
+        mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+        const path = join(tmp, '.pan', 'continues', 'pan-1929.vbrief.json');
+        writeFileSync(path, '{"issue":"PAN-1929"}');
+
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): PAN-1929 no-rebase' });
+        const result = yield* flushAutoCommits(tmp);
+
+        expect(result.committed).toBe(true);
+
+        // The auto-commit must be a direct descendant of the previous local HEAD,
+        // not replayed on top of origin/main.
+        const localHeadAfter = execSync('git rev-parse HEAD', { cwd: tmp, encoding: 'utf-8' }).trim();
+        const parentOfAutoCommit = execSync('git rev-parse HEAD~1', { cwd: tmp, encoding: 'utf-8' }).trim();
+        expect(parentOfAutoCommit).toBe(localHeadBefore);
+        expect(localHeadAfter).not.toBe(localHeadBefore);
+
+        // HEAD must still be on main and must NOT be a descendant of origin/main
+        // (i.e. no rebase happened).
+        const branch = execSync('git branch --show-current', { cwd: tmp, encoding: 'utf-8' }).trim();
+        expect(branch).toBe('main');
+        const mergeBase = execSync('git merge-base HEAD origin/main', { cwd: tmp, encoding: 'utf-8' }).trim();
+        expect(mergeBase).toBe(localHeadBefore);
+      } finally {
+        rmSync(remoteTmp, { recursive: true, force: true });
+      }
+    }),
+  );
+
   it.effect('does not commit when on a non-main branch', () =>
     Effect.gen(function* () {
       execSync('git checkout -q -b feature/foo', { cwd: tmp });
