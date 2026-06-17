@@ -128,6 +128,8 @@
     "chokidar": "^5.0.0",
     "commander": "^12.1.0",
     "conf": "^12.0.0",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
     "effect": "4.0.0-beta.73",
     "execa": "^8.0.1",
     "inquirer": "^9.3.8",
