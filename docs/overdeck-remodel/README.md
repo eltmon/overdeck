@@ -30,8 +30,11 @@ genuinely **NEED**.
 
 | Doc | What |
 |---|---|
-| [`END-STATE.md`](END-STATE.md) | The end-state architecture: domains/entities, the cache ERD, and the API controllers. **Start here.** |
+| [`PRD.md`](PRD.md) | The execution plan — requirements, phased work, build gates, acceptance criteria. **Start here.** References the rest rather than repeating it. |
+| [`END-STATE.md`](END-STATE.md) | The end-state architecture: domains/entities, the cache ERD, and the API controllers. |
+| [`overdeck-schema.ts`](overdeck-schema.ts) | The locked Drizzle schema — every table and field (24 tables). |
 | [`ARCHITECTURE-CONVENTIONS.md`](ARCHITECTURE-CONVENTIONS.md) | The Effect v4-beta house style every domain follows (verified against `4.0.0-beta.73`). |
+| [`services/`](services/) | The per-domain API tier (8 docs): no-loss mapping + resolver/writer/controller. |
 
 ## Investigations (the evidence base)
 
