@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
 import { Context, Effect, Layer, Queue, Stream } from 'effect';
@@ -18,7 +19,8 @@ import {
   type PanIssueRecord,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
-import { packageRoot } from '../paths.js';
+import { packageRoot, getPanopticonHome } from '../paths.js';
+import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession } from '../tmux.js';
 import { getOverdeckDatabasePath } from './paths.js';
 
 export const overdeckEvents = sqliteTable('events', {
@@ -199,6 +201,7 @@ export interface RecordsServiceShape {
   readonly writeIssue: (project: ProjectConfig, issueId: string, record: PanIssueRecord) => Effect.Effect<string>;
   readonly readIssue: (project: ProjectConfig, issueId: string) => Effect.Effect<PanIssueRecord | null>;
   readonly readSpec: (planRef: string) => Effect.Effect<unknown>;
+  readonly writeAgentIdentity: (issueId: string, opts: { harness: string; model: string }) => Effect.Effect<void>;
 }
 
 export class Records extends Context.Service<Records, RecordsServiceShape>()('overdeck/Records') {}
@@ -213,14 +216,37 @@ export const RecordsLive = Layer.succeed(
         const path = isAbsolute(planRef) ? planRef : join(packageRoot, planRef);
         return JSON.parse(readFileSync(path, 'utf8')) as unknown;
       }),
+    writeAgentIdentity: (_issueId, _opts) => Effect.void,
   }),
 );
 
 export interface TmuxServiceShape {
   readonly sessionExists: (sessionName: string) => Effect.Effect<boolean>;
+  readonly killSession: (sessionName: string) => Effect.Effect<void>;
+  readonly readRuntimeJson: (agentId: string) => Effect.Effect<unknown>;
 }
 
 export class Tmux extends Context.Service<Tmux, TmuxServiceShape>()('overdeck/Tmux') {}
+
+export const TmuxLive = Layer.succeed(
+  Tmux,
+  Tmux.of({
+    sessionExists: (name) =>
+      tmuxSessionExists(name).pipe(Effect.catch(() => Effect.succeed(false))),
+    killSession: (name) =>
+      tmuxKillSession(name).pipe(Effect.catch(() => Effect.void)),
+    readRuntimeJson: (agentId) =>
+      Effect.promise(async () => {
+        try {
+          const path = join(getPanopticonHome(), 'agents', agentId, 'runtime.json');
+          const text = await readFile(path, 'utf8');
+          return JSON.parse(text) as unknown;
+        } catch {
+          return null;
+        }
+      }),
+  }),
+);
 
 export interface ForgeServiceShape {
   readonly merge: (input: unknown) => Effect.Effect<unknown>;
