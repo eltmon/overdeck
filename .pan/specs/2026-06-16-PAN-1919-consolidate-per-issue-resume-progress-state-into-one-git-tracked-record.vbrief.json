@@ -4,7 +4,7 @@
     "created": "2026-06-16T20:51:21.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
-    "updated": "2026-06-17T10:55:00.000Z"
+    "updated": "2026-06-17T11:00:00.000Z"
   },
   "plan": {
     "id": "pan-1919",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 4,
     "created": "2026-06-16T20:51:21.000Z",
-    "updated": "2026-06-17T10:55:00.000Z",
+    "updated": "2026-06-17T11:00:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1919",
@@ -548,7 +548,7 @@
       {
         "id": "update-legacy-continue-tests",
         "title": "Update legacy-continue tests for the record",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -567,28 +567,32 @@
           {
             "id": "update-legacy-continue-tests.ac1",
             "title": "The pan-dir.test.ts and lifecycle-io.test.ts suite passes against the record-based read/write or the read-only-legacy behavior of continue.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-17T11:00:00.000Z"
           },
           {
             "id": "update-legacy-continue-tests.ac2",
             "title": "continue-state.test.ts and tests/vbrief/full-spec.test.ts compile and the suite passes after the writer migration",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-17T11:00:00.000Z"
           },
           {
             "id": "update-legacy-continue-tests.ac3",
             "title": "The full vitest suite passes with no new failures attributable to beads 1-7",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-17T11:00:00.000Z"
           }
-        ]
+        ],
+        "completed": "2026-06-17T11:00:00.000Z"
       }
     ],
     "edges": [
