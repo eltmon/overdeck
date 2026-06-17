@@ -124,7 +124,13 @@ import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js'
 import { getWorkAgentLifecycleStateSync } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import {
+  getIssueRecordPathForWorkspace,
+  getProjectConfigFromWorkspacePath,
+  readIssueRecord,
+  resolveProjectForIssue,
+} from '../../../lib/pan-dir/record.js';
 import { generateDailySummary } from '../../../lib/memory/cli.js';
 import { getWorkspacePathForIssue } from '../workspace-paths.js';
 
@@ -207,18 +213,19 @@ async function readWorkspacePlanningMarkdown(
 }
 
 /**
- * Read the workspace `.pan/continue.json` file asynchronously and return it as
- * normalized JSON text, or null when it does not exist.
+ * Read the per-issue record asynchronously and return it as normalized JSON
+ * text, or null when it does not exist.
  */
 async function readWorkspaceContinueFile(
   _projectPath: string,
   workspacePath: string,
-  _issueId: string,
+  issueId: string,
 ): Promise<string | null> {
   try {
-    const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-    const raw = await readFile(continuePath, 'utf-8');
-    return JSON.stringify(JSON.parse(raw), null, 2);
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const record = await readIssueRecord(project, issueId);
+    if (!record) return null;
+    return JSON.stringify(record, null, 2);
   } catch {
     return null;
   }
@@ -1556,12 +1563,12 @@ const getWorkspaceRoute = HttpRouter.add(
         }
 
         let services: { name: string; url?: string }[] = [];
-        const panContinueFile = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+        const recordFile = getIssueRecordPathForWorkspace(workspacePath, issueId);
         const workspaceMd = join(workspacePath, 'WORKSPACE.md');
         const dockerCompose = join(workspacePath, 'docker-compose.yml');
 
-        const urlSourceFile = existsSync(panContinueFile)
-          ? panContinueFile
+        const urlSourceFile = existsSync(recordFile)
+          ? recordFile
           : existsSync(workspaceMd)
           ? workspaceMd
           : null;

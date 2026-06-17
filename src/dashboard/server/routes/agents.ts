@@ -99,14 +99,22 @@ import { canUseHarnessSync } from '../../../lib/harness-policy.js';
 import { getProviderForModelSync } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import {
+  ensureIssueRecord,
+  getProjectConfigFromWorkspacePath,
+  queueIssueRecordCommit,
+  readIssueRecord,
+  resolveProjectForIssue,
+  writeIssueRecord,
+} from '../../../lib/pan-dir/record.js';
 import { findPlan, readPlan } from '../../../lib/vbrief/io.js';
 import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../../../lib/model-validation.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
-import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
+
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
@@ -238,30 +246,6 @@ function updateRegistryForAgentStart(issueId: string, workspacePath: string, age
     agentId,
     status: 'active',
   });
-}
-
-async function readWorkspaceContinueState(workspacePath: string): Promise<ContinueState | null> {
-  const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-  if (!existsSync(continuePath)) return null;
-  const raw = await readFile(continuePath, 'utf-8');
-  return JSON.parse(raw) as ContinueState;
-}
-
-async function writeWorkspaceContinueState(workspacePath: string, state: ContinueState): Promise<ContinueState> {
-  const panDir = join(workspacePath, PAN_DIRNAME);
-  const continuePath = join(panDir, PAN_CONTINUE_FILENAME);
-  await mkdir(panDir, { recursive: true });
-  const now = new Date().toISOString();
-  const next: ContinueState = {
-    ...state,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  const tmpPath = `${continuePath}.tmp`;
-  await writeFile(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
-  await rename(tmpPath, continuePath);
-  return next;
 }
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
@@ -2531,7 +2515,6 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     const workspacePanDir = join(workspacePath, PAN_DIRNAME);
-    const workspacePanContinuePath = join(workspacePanDir, PAN_CONTINUE_FILENAME);
 
     const workspaceBeadsDir = join(workspacePath, '.beads');
     if (!existsSync(workspaceBeadsDir)) {
@@ -2799,7 +2782,7 @@ const postAgentsRoute = HttpRouter.add(
       console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
     }
 
-    if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {
+    if (existsSync(workspacePanDir)) {
       // Commit workspace orchestration artifacts before handing off to the work agent.
       // The entire block is best-effort — never let git errors abort the agent start.
       yield* Effect.gen(function* () {
@@ -2872,7 +2855,7 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    // Write initial continue state (PAN-946: workspace-44p)
+    // Write initial agent start state to the per-issue record.
     try {
       const { stdout: branchOut } = yield* Effect.promise(() => execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' }));
       const { stdout: shaOut } = yield* Effect.promise(() => execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' }));
@@ -2881,34 +2864,23 @@ const postAgentsRoute = HttpRouter.add(
       const sha = shaOut.trim();
       const dirty = dirtyOut.trim().length > 0;
 
-      const existing = yield* Effect.promise(() => readWorkspaceContinueState(workspacePath));
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      const existing = yield* Effect.promise(() => readIssueRecord(project, issueId));
+      const baseRecord = existing ?? (yield* Effect.promise(() => ensureIssueRecord(project, issueId)));
       const now = new Date().toISOString();
-      const next: ContinueState = existing
-        ? {
-            ...existing,
-            issueId,
-            gitState: { branch, sha, dirty },
-            agentModel: spawnModel,
-            sessionHistory: [...existing.sessionHistory, { timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
-          }
-        : {
-            version: '1',
-            issueId,
-            created: now,
-            updated: now,
-            gitState: { branch, sha, dirty },
-            decisions: [],
-            hazards: [],
-            resumePoint: null,
-            beadsMapping: {},
-            agentModel: spawnModel,
-            sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
-            feedback: [],
-          };
-      yield* Effect.promise(() => writeWorkspaceContinueState(workspacePath, next));
-      console.log(`[start-agent] Wrote workspace continue state for ${issueId}`);
+      const startEntry = { timestamp: now, reason: 'start' as const, agentModel: spawnModel };
+      const next = {
+        ...baseRecord,
+        issueId,
+        gitState: { branch, sha, dirty },
+        model: spawnModel,
+        sessionHistory: [...(baseRecord.sessionHistory ?? []), startEntry],
+      };
+      const recordPath = yield* Effect.promise(() => writeIssueRecord(project, issueId, next));
+      queueIssueRecordCommit(project, issueId, recordPath);
+      console.log(`[start-agent] Wrote per-issue record state for ${issueId}`);
     } catch (continueErr: any) {
-      console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+      console.warn(`[start-agent] Failed to write record state (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
     if (isRemote && workspaceMetadata) {
