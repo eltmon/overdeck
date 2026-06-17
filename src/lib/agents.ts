@@ -964,6 +964,10 @@ export function getAgentDir(agentId: string): string {
   return join(getPanopticonHome(), 'agents', agentId);
 }
 
+export function getAgentStateFilePath(agentId: string): string {
+  return join(getAgentDir(agentId), 'state.json');
+}
+
 function isRole(value: unknown): value is Role {
   return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike';
 }

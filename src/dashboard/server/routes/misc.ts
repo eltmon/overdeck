@@ -77,6 +77,8 @@ import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
 import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { getAgentStateFilePath } from '../../../lib/agents.js';
+import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 
 const execAsync = promisify(exec);
 
@@ -465,7 +467,7 @@ const getHealthAgentsRoute = HttpRouter.add(
 
       const agents = await Promise.all(
         agentNames.map(async name => {
-          const stateFile = join(agentsDir, name, 'state.json');
+          const stateFile = getAgentStateFilePath(name);
           const healthFile = join(agentsDir, name, 'health.json');
 
           const healthStatus = await Effect.runPromise(determineHealthStatus(name, stateFile, liveSessions));
@@ -525,16 +527,6 @@ const postHealthAgentPingRoute = HttpRouter.add(
 
         if (!health.alive) {
           return jsonResponse({ success: false, status: 'dead' });
-        }
-
-        const stateFile = join(homedir(), '.panopticon', 'agents', id, 'state.json');
-        if (existsSync(stateFile)) {
-          try {
-            const stateContent = await readFile(stateFile, 'utf-8');
-            const state = JSON.parse(stateContent);
-            state.lastPing = new Date().toISOString();
-            await writeFile(stateFile, JSON.stringify(state, null, 2));
-          } catch {}
         }
 
         return jsonResponse({
@@ -979,25 +971,12 @@ const getPlanningStatusRoute = HttpRouter.add(
       try {
         const projectPath = await getProjectPath(issuePrefix);
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-        let isRemote = false;
-        let vmName = '';
-        const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-        const stateFile = join(agentStateDir, 'state.json');
-
-        let agentStarting = false;
-        try {
-          const stateContent = await readFile(stateFile, 'utf-8').catch(() => null);
-          if (stateContent) {
-            const state = JSON.parse(stateContent);
-            if (state.location === 'remote' && state.vmName) {
-              isRemote = true;
-              vmName = state.vmName;
-            }
-            if (state.status === 'starting') {
-              agentStarting = true;
-            }
-          }
-        } catch {}
+        const remoteState = loadRemoteAgentState(sessionName);
+        const isRemote = !!remoteState;
+        const vmName = remoteState?.vmName ?? '';
+        const { getAgentStateSync } = await import('../../../lib/agents.js');
+        const agentState = getAgentStateSync(sessionName);
+        const agentStarting = agentState?.status === 'starting';
 
         let tmuxSessionAlive = false;
         if (!isRemote) {
@@ -1118,18 +1097,7 @@ const postPlanningMessageRoute = HttpRouter.add(
         }
 
         // Check if session is remote
-        let isRemote = false;
-        const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-        const stateFile = join(agentStateDir, 'state.json');
-        try {
-          const stateContent = await readFile(stateFile, 'utf-8').catch(() => null);
-          if (stateContent) {
-            const state = JSON.parse(stateContent);
-            if (state.location === 'remote' && state.vmName) {
-              isRemote = true;
-            }
-          }
-        } catch {}
+        const isRemote = !!loadRemoteAgentState(sessionName);
 
         // Check if local session exists (skip remote for now)
         let tmuxSessionAlive = false;
