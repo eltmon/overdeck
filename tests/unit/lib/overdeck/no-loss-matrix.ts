@@ -602,4 +602,28 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan flywheel abort',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.abortFlywheel + AgentWriter.stop' },
   { surface: 'pan deacon pause',               kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused(true)' },
   { surface: 'pan deacon unpause',             kind: 'cli', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused(false)' },
+
+  // ── Dead-path deletions (workspace-1ee26) ────────────────────────────────────
+  // Scripts and schema artifacts dropped during the dead-path cleanup pass.
+  // Accounted here so the no-loss audit can verify nothing load-bearing was
+  // silently removed. AC1 (live-caller relocation) was moved to jx0iq scope.
+
+  // scripts/sweep-zombie-specialist-state.ts deleted: swept zombie state.json dirs
+  // for the named-specialist role model, which was fully removed. Not imported or
+  // referenced anywhere in src/ or scripts/ — confirmed by grep.
+  { surface: 'script: sweep-zombie-specialist-state.ts', kind: 'cli', disposition: 'DELETE',       door: 'legacy named-specialist zombie-sweep; specialist role model removed (CLAUDE.md); not referenced anywhere' },
+
+  // api_cache and rate_limits in src/lib/database/schema.ts removed: both tables
+  // have a different schema and live in cache.db (cache-service.ts), not in
+  // panopticon.db. The CREATE TABLE IF NOT EXISTS stubs in schema.ts were orphaned
+  // — the columns don't match and nothing reads them from getDatabase().
+  { surface: 'schema: api_cache (panopticon.db)',        kind: 'cli', disposition: 'DELETE',       door: 'orphaned table stub in schema.ts; real api_cache lives in cache.db with different schema (cache-service.ts)' },
+  { surface: 'schema: rate_limits (panopticon.db)',      kind: 'cli', disposition: 'DELETE',       door: 'orphaned table stub in schema.ts; real rate_limits lives in cache.db with different schema (cache-service.ts)' },
+
+  // scripts/create-overdeck-db.ts and scripts/drizzle-node-sqlite-smoke.ts exempted
+  // from the overdeck boundary lint. These are intentional dev/setup tools that
+  // legitimately import the DB driver directly — they create and smoke-test
+  // overdeck.db itself, so they cannot go through a domain door by definition.
+  { surface: 'script: create-overdeck-db.ts (lint-exempt)',         kind: 'cli', disposition: 'OUT_OF_SCOPE', door: 'intentional infra: creates overdeck.db schema; must reach driver directly; not a production caller' },
+  { surface: 'script: drizzle-node-sqlite-smoke.ts (lint-exempt)',  kind: 'cli', disposition: 'OUT_OF_SCOPE', door: 'intentional infra: smoke-tests overdeck.db driver; must reach driver directly; not a production caller' },
 ];
