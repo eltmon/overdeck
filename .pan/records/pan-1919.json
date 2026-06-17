@@ -2,7 +2,7 @@
   "issueId": "PAN-1919",
   "schemaVersion": 2,
   "created": "2026-06-17T06:48:43.917Z",
-  "updated": "2026-06-17T06:48:43.917Z",
+  "updated": "2026-06-17T09:16:58.801Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "pending",
@@ -19,5 +19,33 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "pi",
-  "model": "kimi-k2.7-code"
+  "model": "kimi-k2.7-code",
+  "statusOverrides": {
+    "fix-async-statusoverride-splitbrain": "completed",
+    "fix-async-statusoverride-splitbrain.ac1": "completed",
+    "fix-async-statusoverride-splitbrain.ac2": "completed",
+    "fix-async-statusoverride-splitbrain.ac3": "completed",
+    "route-done-continue-to-record": "completed",
+    "route-done-continue-to-record.ac1": "completed",
+    "route-done-continue-to-record.ac2": "completed",
+    "route-done-continue-to-record.ac3": "completed",
+    "route-planning-continue-to-record": "completed",
+    "route-planning-continue-to-record.ac1": "completed",
+    "route-planning-continue-to-record.ac2": "completed",
+    "route-planning-continue-to-record.ac3": "completed",
+    "route-cloister-continue-readers-to-record": "completed",
+    "route-cloister-continue-readers-to-record.ac1": "completed",
+    "route-cloister-continue-readers-to-record.ac2": "completed",
+    "route-cloister-continue-readers-to-record.ac3": "completed",
+    "route-dashboard-continue-to-record": "completed",
+    "route-dashboard-continue-to-record.ac1": "completed",
+    "route-dashboard-continue-to-record.ac2": "completed",
+    "route-dashboard-continue-to-record.ac3": "completed",
+    "complete-backfill-migration": "completed",
+    "complete-backfill-migration.ac1": "completed",
+    "complete-backfill-migration.ac2": "completed",
+    "complete-backfill-migration.ac3": "completed",
+    "complete-backfill-migration.ac4": "completed",
+    "complete-backfill-migration.ac5": "completed"
+  }
 }
