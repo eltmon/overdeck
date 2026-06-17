@@ -159,7 +159,15 @@ The full subcommand surface — verified at
 | `pan memory summary <issue>` (`memory.ts:85` → `cli.ts:119` `generateDailySummary`) | writes | **`MemoryWriter.generateSummary(projectId, issueId, date?)`** | Same verb as the HTTP `memory-summary`. Deterministic regen from the day's observations; a cache derivative. |
 | `pan memory doctor` (`memory.ts:99` → `cli.ts:146` `runMemoryDoctor`) | reads | **`MemoryResolver.getHealth(projectId)`** (+ aggregate) | Reads `health.json` per issue + active-agent staleness. A read; the staleness cross-check recomposes with AgentsResolver at the controller (operational telemetry, not Memory state). |
 | `pan memory config` (`memory.ts:126` → `cli.ts:169` `readMemorySettingsSummary`) | reads | **RELOCATE → Settings** | Provider + rollup-threshold are `app_settings`/memory-settings config, not Memory-store state (`settings.ts`). A Settings read. |
-| `pan memory rollup` (palette `palette.ts:84`; CLI alias of summary/status synthesis) | writes | **`MemoryWriter.rollupStatus(projectId, issueId)`** | Forces a status rollup (`rollup.ts:synthesizeStatusRollup` → `commitStatusRollup`). The single status writer. |
+
+> **No `pan memory rollup` CLI verb exists** — verified, the registered
+> subcommands are exactly the six above (`memory.ts` 17/45/66/85/99/126). The
+> "Generate a daily summary…" palette entry (`palette.ts:84`) is a *palette label*
+> that maps to `pan memory summary`. The actual status rollup is **not** a CLI
+> verb at all: it fires **automatically** when pending turns cross
+> `rollupPendingThreshold` (`pending.ts:65 maybeTriggerStatusRollup` →
+> `pending.ts:78`), which is the in-process trigger `MemoryWriter.rollupStatus`
+> traces to (§1D), not a CLI surface.
 
 ## 1C. RPC / event-stream + command-palette surface
 
@@ -197,6 +205,7 @@ orchestrator (memory-audit §5 "Write side — already single-writer").
 | Reconciliation sweep (`reconciliation.ts`) | writes | **`MemoryWriter.reconcile()`** | Catches up offsets for sessions that went away; re-`stat`s transcripts, re-fires `extractDelta` from the stored checkpoint identity (`reconciliation.ts:115`). |
 | `claimTranscriptRange` / `commitTranscriptRange` / `releaseTranscriptRange` (`checkpoints.ts:70/146/215`) | writes | **`MemoryWriter.claimRange` / `commitRange` / `releaseRange`** | The atomic byte-range lease — the internal mechanics of `extractDelta`, exposed as writer verbs because the worker pool / checkpoint-client call them directly (`checkpoint-client.ts`). |
 | `writeObservation` (`observations.ts:22`) | writes | **`MemoryWriter.writeObservation(observation)`** | The single observation writer: JSONL append (truth) + markdown upsert + FTS index, in one locked function. The remodel keeps it whole. |
+| Automatic status rollup at pending-threshold (`pending.ts:65` `maybeTriggerStatusRollup` → `pending.ts:78` `< rollupPendingThreshold`) | writes | **`MemoryWriter.rollupStatus(projectId, issueId)`** | The status rollup is **not** a CLI verb — it fires when pending turns cross the threshold (`rollup.ts:97 synthesizeStatusRollup` → `commitStatusRollup`). The single status writer. |
 
 ## 1E. The DROP / RELOCATE residue
 
@@ -233,7 +242,7 @@ The only deletions are a dead column and a redundant *duplicate* of a kept searc
 | Surface | Current sites | New home |
 |---|---|---|
 | HTTP endpoints | 4 (3 in hooks.ts + 1 in workspaces.ts) | 1 resolver read (`injectPromptTime`) + 3 writer verbs (claim path, `extractDelta`, `generateSummary`) |
-| `pan memory` CLI verbs | 7 (search/status/reset/summary/doctor/config/rollup) | 3 resolver reads (`search`, `getStatus`, `getHealth`) + 3 writer verbs (`createResetMarker`, `generateSummary`, `rollupStatus`); `config` relocates to Settings |
+| `pan memory` CLI verbs | 6 (search/status/reset/summary/doctor/config) | 3 resolver reads (`search`, `getStatus`, `getHealth`) + 2 writer verbs (`createResetMarker`, `generateSummary`); `config` relocates to Settings. `rollupStatus` is NOT a CLI verb — it traces to the §1D automatic pending-threshold trigger |
 | Search implementations | **2** (`cli.ts:71` JSONL-scan + `search.ts:85` FTS) | **1** — `MemoryResolver.search` (FTS), behind CLI + palette + injection |
 | Reset-marker filtering implementations | **2** (`cli.ts:251` JSONL-side + `search.ts:114` SQL) | **1** — the SQL `reset_markers` predicate inside `MemoryResolver.search` |
 | In-process write triggers | poller + stop-hook + reconciliation + claim/commit/release + writeObservation | `MemoryWriter`: `extractDelta`, `reconcile`, `claimRange`/`commitRange`/`releaseRange`, `writeObservation` |
@@ -266,7 +275,7 @@ import {
 import { Db, MemorySearch, MemoryFiles, EventBus } from "./infra"    // see §2.2 for MemorySearch / MemoryFiles
 
 // ── The checkpoint entity — the DB-row decoder AND the cursor read type ─────
-// 11 cols (last_observation_at dropped — overdeck-schema.ts:387).
+// 13 cols (last_observation_at dropped from the live 14 — overdeck-schema.ts:387).
 export const TranscriptCheckpoint = Schema.Struct({
   sessionId:                 Schema.String,
   transcriptPath:            Schema.String,
@@ -345,6 +354,7 @@ export class MemoryFiles extends Context.Service<MemoryFiles, {
   readonly writeResetMarker:  (projectId: string, m: ResetMarker) => Effect.Effect<void>
   readonly listObservationFiles: (projectId: string) => Effect.Effect<ReadonlyArray<string>>  // for rebuildIndex
   readonly readObservationsFile: (path: string) => Effect.Effect<ReadonlyArray<MemoryObservation>>
+  readonly findByteOffset:    (path: string, id: string) => Effect.Effect<number>  // observations.ts:57 — for rebuildIndex
 }>()("overdeck/MemoryFiles") {}
 ```
 
@@ -560,9 +570,12 @@ export const MemoryApi = HttpApiGroup.make("memory")
     params: Schema.Struct({ projectId: Schema.String, issueId: Schema.String }),
     success: Schema.NullOr(MemoryStatus),
   }))
-  .add(HttpApiEndpoint.get("resetMarkers", "/memory/:projectId/reset-markers", {
-    params: Schema.Struct({ projectId: Schema.String }), success: Schema.Array(ResetMarker),
-  }))
+  // NOTE: no GET /reset-markers endpoint — nothing reads markers as a list today
+  // (§1B `reset` only creates; `search` consumes them via the SQL subquery
+  // internally). `MemoryResolver.listResetMarkers` exists for that internal
+  // consumption + `rebuildIndex`'s re-apply, but is NOT exposed over HTTP (the
+  // no-invented-endpoints rule). `MemorySearchHit` (search success) must be
+  // promoted from the search.ts:36 TS interface to a Schema.Struct.
   // ── ingress / writes (the existing agent-hook surface, hooks.ts:258/299/325) ──
   .add(HttpApiEndpoint.post("inject", "/memory/inject", {           // hooks.ts:258 — RAG read composition
     payload: PromptTimeInput, success: PromptTimeResult,
@@ -590,9 +603,8 @@ export const OverdeckApi = HttpApi.make("overdeck").add(IssuesApi).add(MemoryApi
 export const MemoryApiLive = HttpApiBuilder.group(OverdeckApi, "memory", (h) =>
   h.handle("search",       ({ urlParams })     => MemoryResolver.search(urlParams))
    .handle("status",       ({ path })          => MemoryResolver.getStatus(path.projectId, path.issueId))
-   .handle("resetMarkers", ({ path })          => MemoryResolver.listResetMarkers(path.projectId))
    .handle("inject",       ({ payload })       => MemoryResolver.injectPromptTime(payload))
-   .handle("sessionStart", ({ payload })       => MemoryWriter.armSession(payload))
+   .handle("sessionStart", ({ payload })       => MemoryWriter.claimRange(seedClaim(payload)))  // seed/claim first checkpoint (§1A)
    .handle("turn",         ({ payload })       => MemoryWriter.extractDelta(payload))
    .handle("summary",      ({ path, payload }) => MemoryWriter.generateSummary(path.projectId, path.issueId, payload.date))
    .handle("reset",        ({ path, payload }) => MemoryWriter.createResetMarker({ projectId: path.projectId, ...payload }))
@@ -647,7 +659,7 @@ two databases or the file store directly.
 | `MemoryWriter.reconcile` | §1D reconciliation sweep (`reconciliation.ts`) |
 | `MemoryWriter.claimRange` / `commitRange` / `releaseRange` | §1D the lease trio (`checkpoints.ts:70/146/215`) |
 | `MemoryWriter.writeObservation` | §1D the single observation writer (`observations.ts:22`) |
-| `MemoryWriter.rollupStatus` | §1B `pan memory rollup` (`rollup.ts:97`) |
+| `MemoryWriter.rollupStatus` | §1D automatic pending-threshold trigger (`pending.ts:65` → `rollup.ts:97`) — NOT a CLI verb |
 | `MemoryWriter.generateSummary` | §1A `memory-summary` + §1B `pan memory summary` (`cli.ts:119`) |
 | `MemoryWriter.createResetMarker` | §1B `pan memory reset` (`cli.ts:92`) |
 | `MemoryWriter.rebuildIndex` | §1F **the missing capability** (memory-audit surprise 3) — no current row; the required new verb |
@@ -670,11 +682,19 @@ search DB.
   append relocates to a `MemoryWriter.logRagDecision` verb; today it stays
   fire-and-forget telemetry inside the resolver, matching `hooks.ts:258`'s own
   fire-and-forget design.
-- **`armSession` (the `/api/memory/session/start` handler) is thin.** The
-  session-start hook's durable effect is just seeding/claiming the first
-  checkpoint; it is shown as a small writer verb rather than folded into
-  `extractDelta` because it fires before any delta exists. If implementation finds
-  it does nothing durable beyond enabling-state, it collapses into `claimRange`.
+- **`/api/memory/session/start` maps to `claimRange`, not a new verb.** The
+  session-start hook's only durable effect is seeding/claiming the first
+  checkpoint (it fires before any delta exists), so the controller handler calls
+  `MemoryWriter.claimRange(seedClaim(payload))` rather than introducing an
+  `armSession` verb — matching §1A. `seedClaim` is a thin payload adapter, not a
+  door. If implementation finds the hook does nothing durable beyond toggling
+  enabling-state, the handler returns `{ ok: true }` without any writer call.
+- **No Memory rows in `docs/API-SURFACE.md`.** Verified: API-SURFACE has zero
+  Memory/observation/checkpoint/reset-marker entries — Memory's HTTP surface
+  (`/api/memory/inject|session/start|turn`, `memory-summary`) lives un-catalogued
+  in `hooks.ts`/`workspaces.ts`. Reviewers should not expect an API-SURFACE row to
+  cross-check; the Part-1 §1A grounding is `file:line` against the route files
+  directly.
 - **`MemorySearch` and `MemoryFiles` are new door-guarded services, not part of
   the single `Db`.** This is the one place Memory's shape departs from the
   issues.md template, and it is forced by the schema's own note that
