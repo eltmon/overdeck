@@ -22,7 +22,7 @@ import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -148,19 +148,15 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
   return aId.localeCompare(bId);
 }
 
-/** Read the pause gate from an agent's state.json (PAN-1779): specialist
+/** Read the pause gate from an agent's state (PAN-1779): specialist
  *  sessions are built from review history, not state, so the gate must be
  *  looked up separately for them. Returns {} when not paused. */
-async function readSessionPauseFields(
+function readSessionPauseFields(
   sessionId: string,
-): Promise<{ paused?: true; pausedReason?: string; pausedAt?: string }> {
-  const stateText = await readOptional(join(getPanopticonHome(), 'agents', sessionId, 'state.json'));
-  if (!stateText) return {};
-  try {
-    const s = JSON.parse(stateText) as { paused?: boolean; pausedReason?: string; pausedAt?: string };
-    if (s.paused === true) return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
-  } catch { /* malformed state — treat as unpaused */ }
-  return {};
+): { paused?: true; pausedReason?: string; pausedAt?: string } {
+  const s = getAgentStateSync(sessionId);
+  if (!s || s.paused !== true) return {};
+  return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
 }
 
 async function collectSessionTreeNodes(
@@ -198,11 +194,10 @@ async function collectSessionTreeNodes(
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
-    const stateText = await readOptional(join(agentDir, 'state.json'));
-    if (!stateText) continue;
+    const state = getAgentStateSync(checkId);
+    if (!state) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string };
       const isPlanning = checkId.startsWith('planning-');
       const isStrike = checkId.startsWith('strike-');
       const sectionType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
@@ -222,7 +217,7 @@ async function collectSessionTreeNodes(
         sessionId: checkId,
         tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' ? checkId : undefined,
         model: state.model || 'unknown',
-        startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
+        startedAt: state.startedAt || new Date().toISOString(),
         endedAt: undefined,
         duration: state.startedAt
           ? (() => {
@@ -301,7 +296,7 @@ async function collectSessionTreeNodes(
         roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
-        ...(await readSessionPauseFields(orchestratorSessionName)),
+        ...readSessionPauseFields(orchestratorSessionName),
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,
@@ -336,7 +331,7 @@ async function collectSessionTreeNodes(
         presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
-        ...(await readSessionPauseFields(testSessionName)),
+        ...readSessionPauseFields(testSessionName),
       });
     }
 
@@ -359,7 +354,7 @@ async function collectSessionTreeNodes(
         presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
-        ...(await readSessionPauseFields(shipSessionName)),
+        ...readSessionPauseFields(shipSessionName),
       });
     }
   }
