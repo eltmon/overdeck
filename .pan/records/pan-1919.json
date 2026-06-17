@@ -2,7 +2,7 @@
   "issueId": "PAN-1919",
   "schemaVersion": 2,
   "created": "2026-06-17T06:48:43.917Z",
-  "updated": "2026-06-17T09:16:58.801Z",
+  "updated": "2026-06-17T11:03:01.956Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "pending",
@@ -46,6 +46,10 @@
     "complete-backfill-migration.ac2": "completed",
     "complete-backfill-migration.ac3": "completed",
     "complete-backfill-migration.ac4": "completed",
-    "complete-backfill-migration.ac5": "completed"
+    "complete-backfill-migration.ac5": "completed",
+    "update-legacy-continue-tests": "completed",
+    "no-remaining-writers-guard-test": "completed",
+    "cross-machine-resume-test": "completed",
+    "retire-continue-writers-readonly-legacy": "completed"
   }
 }
