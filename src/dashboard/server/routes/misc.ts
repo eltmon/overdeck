@@ -76,6 +76,7 @@ import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
 import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
+import { listAllAgents } from '../../../lib/database/agents-db.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 
 const execAsync = promisify(exec);
@@ -440,7 +441,68 @@ const getGodviewSystemHealthRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/health/agents ───────────────────────────────────────────
+// ─── Route: GET /api/health/agents ─────────────────────────────────────────--
+
+export interface HealthAgentEntry {
+  agentId: string;
+  status: string;
+  reason?: string;
+  lastPing: string;
+  consecutiveFailures: number;
+  killCount: number;
+  contextPercent: number | null;
+}
+
+/**
+ * Build the response payload for GET /api/health/agents.
+ *
+ * PAN-1914: membership comes from the SQLite agents table (PAN-1908),
+ * not from readdir(agentsDir). Per-agent files are still read for
+ * enrichment, but only after the agent is known to the registry.
+ */
+export async function buildHealthAgentsResponse(
+  dbAgents: Array<{ id: string }>,
+  liveSessions: Set<string>,
+  agentsDir: string,
+): Promise<HealthAgentEntry[]> {
+  const agents = await Promise.all(
+    dbAgents.map(async agent => {
+      const name = agent.id;
+      const stateFile = join(agentsDir, name, 'state.json');
+      const healthFile = join(agentsDir, name, 'health.json');
+
+      const healthStatus = await Effect.runPromise(determineHealthStatus(name, stateFile, liveSessions));
+      if (!healthStatus) return null;
+
+      // Only read health.json for agents that survive the status filter —
+      // most agent dirs are stopped/completed and bail out above.
+      let storedHealth = { consecutiveFailures: 0, killCount: 0 };
+      try {
+        const healthContent = await readFile(healthFile, 'utf-8');
+        storedHealth = { ...storedHealth, ...JSON.parse(healthContent) };
+      } catch {}
+
+      let contextPercent: number | null = null;
+      try {
+        const ctxFile = join(agentsDir, name, 'context-pct');
+        const ctxContent = await readFile(ctxFile, 'utf-8');
+        contextPercent = parseInt(ctxContent.trim(), 10) || null;
+      } catch {}
+
+      return {
+        agentId: name,
+        status: healthStatus.status,
+        reason: healthStatus.reason,
+        lastPing: new Date().toISOString(),
+        consecutiveFailures: storedHealth.consecutiveFailures,
+        killCount: storedHealth.killCount,
+        contextPercent,
+      };
+    }),
+  );
+
+  return agents.filter((agent): agent is HealthAgentEntry => agent !== null);
+}
 
 const getHealthAgentsRoute = HttpRouter.add(
   'GET',
@@ -448,57 +510,11 @@ const getHealthAgentsRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const agentsDir = join(homedir(), '.panopticon', 'agents');
-      if (!existsSync(agentsDir)) {
-        return jsonResponse([]);
-      }
-
-      const agentNames = (await readdir(agentsDir)).filter(
-        name =>
-          name.startsWith('agent-') ||
-          name.startsWith('planning-') ||
-          name.startsWith('specialist-'),
-      );
-
+      const dbAgents = listAllAgents();
       // Fetch the live tmux session set ONCE for the whole request — per-agent
       // liveness checks used to fork once per agent dir (~150 forks per poll).
       const liveSessions = new Set(await Effect.runPromise(listSessionNames()));
-
-      const agents = await Promise.all(
-        agentNames.map(async name => {
-          const stateFile = join(agentsDir, name, 'state.json');
-          const healthFile = join(agentsDir, name, 'health.json');
-
-          const healthStatus = await Effect.runPromise(determineHealthStatus(name, stateFile, liveSessions));
-          if (!healthStatus) return null;
-
-          // Only read health.json for agents that survive the status filter —
-          // most agent dirs are stopped/completed and bail out above.
-          let storedHealth = { consecutiveFailures: 0, killCount: 0 };
-          try {
-            const healthContent = await readFile(healthFile, 'utf-8');
-            storedHealth = { ...storedHealth, ...JSON.parse(healthContent) };
-          } catch {}
-
-          let contextPercent: number | null = null;
-          try {
-            const ctxFile = join(agentsDir, name, 'context-pct');
-            const ctxContent = await readFile(ctxFile, 'utf-8');
-            contextPercent = parseInt(ctxContent.trim(), 10) || null;
-          } catch {}
-
-          return {
-            agentId: name,
-            status: healthStatus.status,
-            reason: healthStatus.reason,
-            lastPing: new Date().toISOString(),
-            consecutiveFailures: storedHealth.consecutiveFailures,
-            killCount: storedHealth.killCount,
-            contextPercent,
-          };
-        }),
-      );
-
-      const visibleAgents = agents.filter(agent => agent !== null);
+      const visibleAgents = await buildHealthAgentsResponse(dbAgents, liveSessions, agentsDir);
       return jsonResponse(visibleAgents);
     } catch (error: unknown) {
       console.error('Error fetching health:', error);
