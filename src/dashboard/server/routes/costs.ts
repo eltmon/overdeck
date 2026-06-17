@@ -32,12 +32,15 @@ import {
   getCostForIssueFromDb,
   getDailyTrends,
   getModelRollup,
-  getAgentRollup,
   getCavemanExperimentData,
   getBackgroundCostBySource,
 } from '../../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
+// PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
+// CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
+import { CostResolver } from '../../../lib/overdeck/cost.js';
+import type { IssueId } from '../../../lib/overdeck/cost.js';
 
 // ─── Route: GET /api/costs/summary ───────────────────────────────────────────
 
@@ -282,6 +285,8 @@ const getCostsIssueRoute = HttpRouter.add(
 );
 
 // ─── Route: GET /api/costs/by-agent ──────────────────────────────────────────
+// PAN-1938: served through CostResolver (overdeck read door).
+// Response shape: Rollup[] = { key: agentId, cost, tokens: { input, output, cacheRead, cacheWrite } }
 
 const getCostsByAgentRoute = HttpRouter.add(
   'GET',
@@ -293,11 +298,9 @@ const getCostsByAgentRoute = HttpRouter.add(
       return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
-
-    return yield* Effect.try({
-      try: () => jsonResponse({ agents: getAgentRollup(issueId), issueId: issueId ?? null }),
-      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
-    });
+    const resolver = yield* CostResolver;
+    const agents = yield* resolver.byAgent(issueId as IssueId | undefined);
+    return jsonResponse({ agents, issueId: issueId ?? null });
   })),
 );
 
@@ -316,6 +319,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
+// TODO PAN-1938: migrate to CostWriter once CostArchiveLive is wired.
 
 const postCostsReconcileRoute = HttpRouter.add(
   'POST',

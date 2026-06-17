@@ -19,6 +19,7 @@ import { ServerConfig } from './config.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
 import { AgentsResolverLive } from '../../lib/overdeck/agents.js';
+import { CostResolverLive } from '../../lib/overdeck/cost.js';
 import { DbLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { AgentStateServiceLive } from './services/agent-state-service.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
@@ -338,13 +339,20 @@ export const makeRoutesLayer = Layer.mergeAll(
 // ReadModelServiceLive bootstraps during construction (reads lib modules, JSON-cleans).
 // EventStoreServiceLive depends on ReadModelService (wires event subscription → read model).
 
-// ── Overdeck resolver layer (provides AgentsResolver to ReadModelServiceLive) ──
+// ── Overdeck resolver layers ────────────────────────────────────────────────
 //
-// Only AgentsResolverLive is wired here: the source-swap targets ReadModel's
-// agent bootstrap only. Writers and other resolvers are wired later as the
-// cutover proceeds route-group by route-group.
+// Pattern (PAN-1938): each resolver/writer layer is wired here and added to
+// DomainServicesLive. Route handlers use `yield* XxxResolver` to read from
+// overdeck.db instead of calling legacy DB functions directly.
+//
+// Wiring order: route group converted → add its Live layer here → add to DomainServicesLive.
+// CostWriter deferred until CostArchiveLive is implemented.
 const OverdeckAgentsResolverLive = AgentsResolverLive.pipe(
   Layer.provide(Layer.mergeAll(DbLive, TmuxLive)),
+);
+
+const OverdeckCostResolverLive = CostResolverLive.pipe(
+  Layer.provide(DbLive),
 );
 
 const ReadModelWithOverdeckLive = ReadModelServiceLive.pipe(
@@ -376,6 +384,7 @@ const DomainServicesLive = Layer.mergeAll(
   WorkspaceServiceLive,
   OpenRouterServiceLive,
   PanOpenLive,
+  OverdeckCostResolverLive,
 );
 
 // ─── Full server layer ────────────────────────────────────────────────────────
