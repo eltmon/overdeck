@@ -186,43 +186,87 @@ export const costEvents = sqliteTable("cost_events", {
 
 /* ───────────────────────────── MERGE ───────────────────────────────
  * All CACHE — structure rebuilds from projects.yaml, gate outcomes from forge
- * PR state; the durable record mirrors only artifactUrl. uat_generations lives
- * here (writer is the merge-train), NOT Issues.
+ * PR state. The merge-train (uat-train.ts) owns these, NOT Issues. Columns
+ * verified against the live schema; the UAT members/held-out/resolutions JSON
+ * arrays are normalized into a real join table (the "use FKs properly" fix).
  */
 export const mergeSets = sqliteTable("merge_sets", {
-  id: text("id").primaryKey(),
-  issueId: text("issue_id").notNull().references(() => issues.id),
-  artifactUrl: text("artifact_url"),                             // the one durable datum (mirrored to record)
-  status: text("status"),
+  issueId: text("issue_id").primaryKey().references(() => issues.id),  // one merge set per issue
+  projectKey: text("project_key").notNull(),
+  projectPath: text("project_path").notNull(),
+  workspaceType: text("workspace_type").notNull(),
+  status: text("status").notNull().default("draft"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-}, (t) => [index("merge_sets_issue_idx").on(t.issueId)]);
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+}, (t) => [index("merge_sets_project_idx").on(t.projectKey, t.updatedAt)]);
 
+/* one row per repo in a (polyrepo) merge set; per-repo gate statuses + order. */
 export const mergeSetRepos = sqliteTable("merge_set_repos", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  mergeSetId: text("merge_set_id").notNull().references(() => mergeSets.id),
-  repo: text("repo").notNull(),
-  prUrl: text("pr_url"),
-  status: text("status"),
-});
-
-export const mergeQueue = sqliteTable("merge_queue", {              // sequential merge lock
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  issueId: text("issue_id").notNull().references(() => issues.id),
-  enqueuedAt: integer("enqueued_at", { mode: "timestamp" }).notNull(),
-});
-
-export const pendingAutoMerges = sqliteTable("pending_auto_merges", { // flywheel cooldown queue
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  issueId: text("issue_id").notNull().references(() => issues.id),
-  scheduledFor: integer("scheduled_for", { mode: "timestamp" }),
-});
-
-export const uatGenerations = sqliteTable("uat_generations", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  issueId: text("issue_id").notNull().references(() => issues.id),
+  issueId: text("issue_id").notNull().references(() => mergeSets.issueId),
+  repoKey: text("repo_key").notNull(),
+  repoPath: text("repo_path").notNull(),
+  forge: text("forge").notNull(),
+  sourceBranch: text("source_branch").notNull(),
+  targetBranch: text("target_branch").notNull(),
   artifactUrl: text("artifact_url"),
+  artifactId: text("artifact_id"),
+  reviewStatus: text("review_status").notNull().default("pending"),
+  testStatus: text("test_status").notNull().default("pending"),
+  rebaseStatus: text("rebase_status").notNull().default("pending"),
+  verificationStatus: text("verification_status").notNull().default("pending"),
+  mergeStatus: text("merge_status").notNull().default("pending"),
+  mergeOrder: integer("merge_order").notNull().default(0),
+  required: integer("required", { mode: "boolean" }).notNull().default(true),
+}, (t) => [index("merge_set_repos_issue_idx").on(t.issueId)]);
+
+/* the sequential merge lock (one in-flight merge per project). */
+export const mergeQueue = sqliteTable("merge_queue", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectKey: text("project_key").notNull(),
+  issueId: text("issue_id").notNull().unique().references(() => issues.id),
+  position: integer("position").notNull(),
+  status: text("status").notNull().default("queued"),
+  queuedAt: integer("queued_at", { mode: "timestamp" }).notNull(),
+  startedAt: integer("started_at", { mode: "timestamp" }),
+}, (t) => [index("merge_queue_project_idx").on(t.projectKey, t.position)]);
+
+/* the flywheel cooldown queue (scheduled auto-merges). */
+export const pendingAutoMerges = sqliteTable("pending_auto_merges", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  issueId: text("issue_id").notNull().references(() => issues.id),
+  prUrl: text("pr_url").notNull(),                                  // pr_number derives from this
+  projectKey: text("project_key").notNull(),
+  forge: text("forge").notNull().default("github"),
+  status: text("status").notNull(),                                // pending|merging|blocked|failed|merged|cancelled
+  scheduledMergeAt: integer("scheduled_merge_at", { mode: "timestamp" }).notNull(),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
+  mergedAt: integer("merged_at", { mode: "timestamp" }),
+  failureReason: text("failure_reason"),
+}, (t) => [index("pending_auto_merges_issue_idx").on(t.issueId)]);
+
+/* an assembled UAT batch branch `uat/<codename>-<mmdd>` — the batch NAME is the
+ * identity (PK). */
+export const uatGenerations = sqliteTable("uat_generations", {
+  name: text("name").primaryKey(),                                 // "uat/<codename>-<mmdd>"
+  worktreePath: text("worktree_path").notNull(),
+  projectRoot: text("project_root").notNull(),
+  baseSha: text("base_sha").notNull(),
+  status: text("status").notNull().default("assembling"),
+  stackStartedAt: integer("stack_started_at", { mode: "timestamp" }),
+  cleanedAt: integer("cleaned_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-}, (t) => [index("uat_issue_idx").on(t.issueId)]);
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+}, (t) => [index("uat_status_idx").on(t.status)]);
+
+/* the issues in a batch — replaces the members/held_out/resolutions JSON arrays
+ * with real FKs. */
+export const uatGenerationMembers = sqliteTable("uat_generation_members", {
+  uatName: text("uat_name").notNull().references(() => uatGenerations.name),
+  issueId: text("issue_id").notNull().references(() => issues.id),
+  role: text("role").notNull().default("member"),                  // member | held_out
+  resolution: text("resolution", { mode: "json" }),                // conflict resolution vs already-merged members
+}, (t) => [primaryKey({ columns: [t.uatName, t.issueId] })]);
 
 /* ──────────────────────── CONTROL / SETTINGS ───────────────────────
  * app_settings = deacon.*/flywheel.* runtime flags (source-of-truth-in-DB,
