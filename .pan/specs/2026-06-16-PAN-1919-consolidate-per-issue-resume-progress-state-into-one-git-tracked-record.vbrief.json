@@ -4,17 +4,17 @@
     "created": "2026-06-16T20:51:21.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
-    "updated": "2026-06-16T20:58:05.805Z"
+    "updated": "2026-06-17T08:05:00.000Z"
   },
   "plan": {
     "id": "pan-1919",
     "title": "Consolidate per-issue resume/progress state into ONE git-tracked record",
-    "status": "proposed",
+    "status": "in_progress",
     "uid": "02b495bd-49d3-40e0-8d37-7c5c14ead517",
     "author": "agent:claude-opus-4-8",
     "sequence": 2,
     "created": "2026-06-16T20:51:21.000Z",
-    "updated": "2026-06-16T20:58:05.805Z",
+    "updated": "2026-06-17T08:05:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1919",
@@ -65,7 +65,7 @@
       {
         "id": "fix-async-statusoverride-splitbrain",
         "title": "Fix async dashboard status-override split-brain (dag.ts → record)",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -85,7 +85,7 @@
           {
             "id": "fix-async-statusoverride-splitbrain.ac1",
             "title": "When a task status change is applied through the async dashboard path, the new status persists to .pan/records/<issue>.json statusOverrides (not workspace continue.json)",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -93,7 +93,7 @@
           {
             "id": "fix-async-statusoverride-splitbrain.ac2",
             "title": "After the async path runs, readWorkspacePlan returns the item with the updated status sourced from the record overlay",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -101,7 +101,7 @@
           {
             "id": "fix-async-statusoverride-splitbrain.ac3",
             "title": "No writeWorkspaceContinue call remains on the task-operation mirror path in dag.ts (grep returns no production caller there)",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -111,7 +111,7 @@
       {
         "id": "route-done-continue-to-record",
         "title": "Route done.ts continue read/write to the record",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -130,7 +130,7 @@
           {
             "id": "route-done-continue-to-record.ac1",
             "title": "When done.ts loads resume context, it returns decisions/hazards/resumePoint/sessionHistory sourced from the record (readIssueRecord), not workspace continue.json",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -138,7 +138,7 @@
           {
             "id": "route-done-continue-to-record.ac2",
             "title": "done.ts writes its sessionHistory/resumePoint updates to the record and the write queues a branch commit",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -146,7 +146,7 @@
           {
             "id": "route-done-continue-to-record.ac3",
             "title": "A grep of done.ts returns no readWorkspaceContinue or writeWorkspaceContinue call",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -156,7 +156,7 @@
       {
         "id": "route-planning-continue-to-record",
         "title": "Route planning-spawn continue write to the record",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -175,7 +175,7 @@
           {
             "id": "route-planning-continue-to-record.ac1",
             "title": "spawn-planning-session.ts persists the planning sessionHistory entry to the record instead of workspace continue.json",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -183,7 +183,7 @@
           {
             "id": "route-planning-continue-to-record.ac2",
             "title": "Starting a fresh planning session creates/updates .pan/records/<issue>.json with a reason:\"planning\" sessionHistory entry",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -191,7 +191,7 @@
           {
             "id": "route-planning-continue-to-record.ac3",
             "title": "A grep of spawn-planning-session.ts returns no writeWorkspaceContinue call",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -201,7 +201,7 @@
       {
         "id": "route-cloister-continue-readers-to-record",
         "title": "Route cloister context-builder readers to the record",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -220,7 +220,7 @@
           {
             "id": "route-cloister-continue-readers-to-record.ac1",
             "title": "The work-agent-prompt resume context contains decisions/hazards loaded from the record, not workspace continue.json",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -228,7 +228,7 @@
           {
             "id": "route-cloister-continue-readers-to-record.ac2",
             "title": "The handoff context contains sessionHistory/decisions sourced from the record",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -236,7 +236,7 @@
           {
             "id": "route-cloister-continue-readers-to-record.ac3",
             "title": "A grep of work-agent-prompt.ts and handoff-context.ts returns no readWorkspaceContinue call",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -246,7 +246,7 @@
       {
         "id": "route-dashboard-continue-to-record",
         "title": "Route dashboard routes continue read/write to the record",
-        "status": "pending",
+        "status": "done",
         "priority": "medium",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -265,7 +265,7 @@
           {
             "id": "route-dashboard-continue-to-record.ac1",
             "title": "routes/agents.ts reads/writes continue state via the record (readIssueRecord/writeIssueRecord), not workspace continue.json",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -273,7 +273,7 @@
           {
             "id": "route-dashboard-continue-to-record.ac2",
             "title": "routes/workspaces.ts reads continue state from the record",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -281,7 +281,7 @@
           {
             "id": "route-dashboard-continue-to-record.ac3",
             "title": "No readWorkspaceContinue/writeWorkspaceContinue call remains in routes/agents.ts or routes/workspaces.ts",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -291,7 +291,7 @@
       {
         "id": "complete-backfill-migration",
         "title": "Complete the backfill to cover statusOverrides + harness/model at schemaVersion 2",
-        "status": "pending",
+        "status": "done",
         "priority": "high",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -313,7 +313,7 @@
           {
             "id": "complete-backfill-migration.ac1",
             "title": "buildIssueRecord copies statusOverrides from the workspace continue.json (when present) into the record",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -321,7 +321,7 @@
           {
             "id": "complete-backfill-migration.ac2",
             "title": "buildIssueRecord copies harness/model from state.json (when present) into the record",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -329,7 +329,7 @@
           {
             "id": "complete-backfill-migration.ac3",
             "title": "The backfill produces a record with schemaVersion:2 (matching RECORD_SCHEMA_VERSION), not 1",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -337,7 +337,7 @@
           {
             "id": "complete-backfill-migration.ac4",
             "title": "The backfill saves to the branch record path (.pan/records/<issue>.json) only for in-flight issues with a live workspace, and saves nothing for issues without a workspace",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -345,7 +345,7 @@
           {
             "id": "complete-backfill-migration.ac5",
             "title": "A backfill test on a sample issue passes, confirming decisions/hazards/resumePoint/beadsMapping/sessionHistory/feedback/statusOverrides/harness/model all persist into the record",
-            "status": "pending",
+            "status": "done",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -601,5 +601,5 @@
       "canonicalFilename": "2026-06-16-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "in_progress"
 }
