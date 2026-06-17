@@ -21,8 +21,8 @@
     { "id": "H5", "summary": "getIssueRecordPath reconstructs the workspace path from project root + workspaces/feature-<id>; container/remote contexts may differ from the live cwd.", "mitigation": "Prefer getIssueRecordPathForWorkspace(workspacePath, issueId) where an explicit workspace path is available; note in the dashboard-route bead." }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-5uk6q (no-remaining-writers-guard-test): extend src/lib/pan-dir/__tests__/record-no-loss.test.ts to assert the record schema carries all legacy fields and that no production source file calls the retired continue writers.",
-    "beadId": "workspace-5uk6q",
+    "description": "Implement bead workspace-qym88 (cross-machine-resume-test): add an integration test that writes a record on a temp machine-A workspace and reads it on a fresh machine-B temp dir with no SQLite agents row and no state.json, asserting harness/model/statusOverrides/decisions/hazards/sessionHistory survive.",
+    "beadId": "workspace-qym88",
     "filesToRead": [".pan/continue.json", ".pan/specs/2026-06-16-PAN-1919-consolidate-per-issue-resume-progress-state-into-one-git-tracked-record.vbrief.json"]
   },
   "beadsMapping": {},
@@ -83,6 +83,13 @@
       "content": "Implemented bead workspace-s5h73 (retire-continue-writers-readonly-legacy): routed lifecycle-io session/feedback/clear helpers and remaining callers (reopen.ts, agents.ts, feedback-writer.ts, dashboard issues.ts) to the per-issue record via new sync append/clear helpers in record.ts. Removed writer exports from pan-dir/index.ts, continue.ts, continues.ts, and vbrief/io.ts. Moved test-only workspace continue writer to src/lib/pan-dir/__tests__/legacy-writers.ts. Updated reopen.test.ts to assert record writes instead of legacy continues. Full test suite passes.",
       "note": "Closed bead workspace-s5h73",
       "timestamp": "2026-06-17T10:35:00.000Z",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "bead",
+      "content": "Implemented bead workspace-5uk6q (no-remaining-writers-guard-test): extended src/lib/pan-dir/__tests__/record-no-loss.test.ts to assert the record schema carries all legacy fields and added a source-guard test that scans src/ for retired continue writer calls (writeWorkspaceContinue, writeWorkspaceContinueSync, writeContinueFile, deleteContinueFile, writeContinueStateForIssue), excluding tests and the legacy continue-state module. Test passes, confirming no production caller remains.",
+      "note": "Closed bead workspace-5uk6q",
+      "timestamp": "2026-06-17T10:45:00.000Z",
       "agentModel": "agent:claude-opus-4-8"
     }
   ],

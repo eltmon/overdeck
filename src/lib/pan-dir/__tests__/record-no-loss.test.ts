@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
 import {
   ensureIssueRecordSync,
@@ -116,5 +116,51 @@ describe('PAN-1919 no-loss audit', () => {
       'harness',
       'model',
     ]);
+  });
+
+  it('has no production callers of retired continue writers', () => {
+    const srcRoot = join(process.cwd(), 'src');
+    const legacyStateModule = 'src/lib/vbrief/continue-state.ts';
+
+    const forbidden = [
+      'writeWorkspaceContinue(',
+      'writeWorkspaceContinueSync(',
+      'writeContinueFile(',
+      'deleteContinueFile(',
+      'writeContinueStateForIssue(',
+    ];
+
+    const offenders: string[] = [];
+
+    function scan(dir: string) {
+      for (const entry of readdirSync(dir)) {
+        const fullPath = join(dir, entry);
+        const rel = relative(srcRoot, fullPath);
+
+        if (entry === '__tests__' || entry === '__mocks__') continue;
+        if (entry.endsWith('.test.ts') || entry.endsWith('.spec.ts')) continue;
+        if (rel === legacyStateModule.replace('src/', '')) continue;
+
+        const s = statSync(fullPath);
+        if (s.isDirectory()) {
+          scan(fullPath);
+          continue;
+        }
+        if (!entry.endsWith('.ts') && !entry.endsWith('.tsx') && !entry.endsWith('.js') && !entry.endsWith('.jsx')) {
+          continue;
+        }
+
+        const content = readFileSync(fullPath, 'utf-8');
+        for (const pattern of forbidden) {
+          if (content.includes(pattern)) {
+            offenders.push(`${rel}: ${pattern}`);
+          }
+        }
+      }
+    }
+
+    scan(srcRoot);
+
+    expect(offenders).toEqual([]);
   });
 });

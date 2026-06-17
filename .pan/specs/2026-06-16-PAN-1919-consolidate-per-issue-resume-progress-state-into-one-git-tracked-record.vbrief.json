@@ -4,7 +4,7 @@
     "created": "2026-06-16T20:51:21.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1919: Consolidate per-issue resume/progress state into ONE git-tracked record (retire dual continues + fold in state.json harness/model)",
-    "updated": "2026-06-17T10:35:00.000Z"
+    "updated": "2026-06-17T10:45:00.000Z"
   },
   "plan": {
     "id": "pan-1919",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-8",
     "sequence": 4,
     "created": "2026-06-16T20:51:21.000Z",
-    "updated": "2026-06-17T10:35:00.000Z",
+    "updated": "2026-06-17T10:45:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1919",
@@ -440,7 +440,7 @@
       {
         "id": "no-remaining-writers-guard-test",
         "title": "No-loss / no-remaining-writers assertion test",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-06-16T20:51:21.000Z",
         "metadata": {
@@ -459,28 +459,32 @@
           {
             "id": "no-remaining-writers-guard-test.ac1",
             "title": "The test passes, confirming the record schema contains decisions/hazards/resumePoint/beadsMapping/statusOverrides/sessionHistory/feedback/harness/model",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-17T10:45:00.000Z"
           },
           {
             "id": "no-remaining-writers-guard-test.ac2",
             "title": "The test fails if any production source file (excluding tests/backfill/legacy readers) contains a writeWorkspaceContinue or project-continue writer call",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-17T10:45:00.000Z"
           },
           {
             "id": "no-remaining-writers-guard-test.ac3",
             "title": "The test fails (red) if a new writer of continue.json is reintroduced",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-06-17T10:45:00.000Z"
           }
-        ]
+        ],
+        "completed": "2026-06-17T10:45:00.000Z"
       },
       {
         "id": "cross-machine-resume-test",
