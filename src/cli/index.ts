@@ -45,6 +45,7 @@ import {
 } from './commands/context-layers.js';
 import { restoreCommand } from './commands/restore.js';
 import { backupListCommand, backupCleanCommand } from './commands/backup.js';
+import { exportDataCommand } from './commands/export-data.js';
 import { skillsCommand } from './commands/skills.js';
 import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
@@ -273,6 +274,14 @@ backup
   .description('Remove old backups')
   .option('--keep <count>', 'Number of backups to keep', '10')
   .action(backupCleanCommand);
+
+program
+  .command('export-data')
+  .description('Export portable data bundle (conversations + favorites + optional cost ledger)')
+  .option('--no-cost-ledger', 'Exclude the decoupled cost ledger from the export')
+  .option('--bundle-jsonl', 'Include paths to transcript JSONL files in the export result')
+  .option('--json', 'Output as JSON')
+  .action(exportDataCommand);
 
 program
   .command('skills')
