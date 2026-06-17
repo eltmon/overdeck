@@ -209,7 +209,8 @@ table — the **Conversations** domain, not `cost_events` (cost-audit §5).
 
 | Surface | Current sites touching cost | New home |
 |---|---|---|
-| HTTP cost-read endpoints (API-SURFACE §F) | **18 across 5 modules** (`costs.ts` 13 reads + `/api/agents/:id/cost` + `/api/issues/:id/costs` + `/api/metrics/costs` + `/api/specialists/:name/cost` + `/api/discovered-sessions/cost`) | **1 `CostResolver`** with 9 methods (`summary`, `byIssue`, `issueDetail`, `byDay`, `byModel`, `byAgent`, `byBackgroundSource`, `byProject`, `recent`); 2 DELETE; 1 RELOCATE |
+| HTTP cost endpoints (cost-audit §5) | **18 across 6 modules** = **14 read + 4 write**. The 14 reads span **5 cost modules** {`costs`, `agents`, `issues`, `metrics`, `specialists`}; the 6th module `discovered-sessions` is the conversation domain (RELOCATE). | reads → **1 `CostResolver`**; writes → **`CostWriter`** |
+| Cost **read** endpoints (the "5 read paths → 1") | **13 across the 5 cost modules** (`costs.ts` 9 reads + `/api/agents/:id/cost` + `/api/issues/:id/costs` + `/api/metrics/costs` + `/api/specialists/:name/cost`), **+1** `discovered-sessions` (6th module, conversation domain) = 14 total | **1 `CostResolver`** (9 methods): of the 13 cost-module reads, **11 → methods** + **2 DELETE** (`experiments`, `specialists`); the +1 `discovered-sessions` → **RELOCATE** to Conversations (outside the 5) |
 | Cost stores | **4** (A SQLite · B `cache.json` · C `cost-data.json` · ad-hoc re-parse) | **1** (store A behind the resolver); B + C + re-parser DELETE |
 | HTTP ingest/maintenance endpoints | **4** (`reconcile`, `sync-wal`, `rebuild`, `deduplicate`) | **`CostWriter`** verbs `reconcile`/`rebuild`; `deduplicate` DELETE (structural) |
 | Ingest call-sites (in-process) | **4** (`appendCostEventSync`, `insertCostEvents`, `insertCostEvent`, pi/codex parsers) | **1 `CostWriter.record(event)`** (with archive fan-out + dedup) |
@@ -245,6 +246,15 @@ After the collapse, the parity items that are *not* a pure read or a pure
    that wiring stays (live display is separate functionality). The **new** wiring
    is `CostWriter.reconcile()` calling the same parsers over the pi/codex session
    dirs to feed `record()`. Recorded as the one genuinely missing ingest path.
+   **Archive semantics during reconcile** (an implementer would otherwise guess):
+   today's reconciler writes the DB only and deliberately does **not** re-append
+   to events.jsonl (cost-audit fact #1 — the transcript IS the durable backing for
+   those rows, so a second copy in events.jsonl would be redundant). `record()`
+   preserves that: when the event's durable source is a transcript/session file
+   (`reconcile` path), the archive step is a **no-op** and the transcript is the
+   backing; the events.jsonl/WAL append fires only for transcript-less events
+   (live hook, background-AI) whose only durable home is the archive. Dedup
+   (`request_id` UNIQUE) keeps the union idempotent either way.
 3. **`closeOut.usage`** (the durable per-issue total, records.ts:116-128). NOT a
    Cost door member — it is a **permanent-record projection** that reads cost.
    Today it already reads store A (`getCostBreakdownByStageAndModel` +
@@ -468,9 +478,11 @@ export const CostWriterLayer = Layer.effect(CostWriter, Effect.gen(function* () 
     if (isDuplicate(event)) return
 
     // 1. DURABLE ARCHIVE FIRST — events.jsonl + WAL carry the computed USD
-    //    verbatim (CONVENTIONS §5 ordering). Background-AI rows have no
-    //    transcript, so the archive is their only source — it must come first.
-    yield* archive.append(event)
+    //    verbatim (CONVENTIONS §5 ordering). Background-AI / live-hook rows have
+    //    no transcript, so the archive is their only durable source. For
+    //    transcript-backed reconcile rows the transcript IS the backing, so this
+    //    is a no-op (cost-audit fact #1; see §1E.2) — never a redundant 2nd copy.
+    yield* archive.append(event)   // archive decides no-op vs append by event source
 
     // 2. THEN the cache — synchronous, failure-checked (never fire-and-forget).
     //    UNIQUE(request_id) makes the INSERT idempotent on re-import.
@@ -542,6 +554,9 @@ export const CostApi = HttpApiGroup.make("costs")
   .add(HttpApiEndpoint.get("byBackgroundSource", "/costs/background", {
     urlParams: Schema.Struct({ hours: Schema.optional(Schema.NumberFromString) }), success: Schema.Array(Rollup),
   }))
+  // NEW affordance — grounded in summary?project= (the only project surface
+  // today is a query param); promotes the task-required "by project" dimension
+  // to its own endpoint. The sole net-new URL; everything else preserves a path.
   .add(HttpApiEndpoint.get("byProject", "/costs/by-project", { success: Schema.Array(Rollup) }))
   .add(HttpApiEndpoint.get("recent", "/costs/stream", {
     urlParams: Schema.Struct({ limit: Schema.optional(Schema.NumberFromString), since: Schema.optional(Schema.String) }),
@@ -655,11 +670,19 @@ endpoint is invented; nothing real from the current surface is lost.
 
 ## Collapse counts (the headline numbers)
 
-- **5 modules / 18 read endpoints → 1 `CostResolver`** (9 methods).
+The arithmetic, all derivable from the Part 1 tables: **18 cost-touching HTTP
+endpoints across 6 modules = 14 read + 4 write** (matches cost-audit §5).
+
+- **14 read endpoints → 1 `CostResolver`** (9 methods). Of the 14: **11 →
+  methods**, **2 DELETE** (`experiments`, `specialists/:name/cost`), **1
+  RELOCATE** (`discovered-sessions` → Conversations).
+  - The task's **"5 read paths → 1"** = the 5 *cost* modules {`costs`, `agents`,
+    `issues`, `metrics`, `specialists`} → the one resolver. `discovered-sessions`
+    is the 6th module (conversation domain), correctly **outside** the 5.
+- **4 write endpoints → `CostWriter`**: `reconcile`, `rebuild` (verbs);
+  `sync-wal` folds into `reconcile`; `deduplicate` DELETE (structural).
+- **4 in-process ingest call-sites → 1 `CostWriter.record`**.
 - **4 cost stores → 1** (store A; B + C + the ad-hoc re-parser deleted).
-- **4 ingest call-sites → 1 `CostWriter.record`**.
-- **4 maintenance/ingest HTTP endpoints → 2 verbs** (`reconcile`, `rebuild`;
-  `deduplicate` deleted — structural).
 - **0 cost CLI verbs**, **0 cost RPC methods today → 1 new `cost.subscribe`**.
 - **5 DELETED**: `experiments`, `specialists/:name/cost`, `deduplicate`, store B
   (+ dead budget), store C (+ dead `recordCostSync`).
