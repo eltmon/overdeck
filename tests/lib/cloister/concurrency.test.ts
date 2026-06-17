@@ -77,6 +77,9 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [], // 0 running → all headroom is from the per-patrol budget
     }));
+    vi.doMock('../../../src/lib/database/agents-db.js', () => ({
+      countAgentsByStatus: () => ({}),
+    }));
     const { tryReserveAdvancingSlot, resetPatrolDispatchBudget } = await import('../../../src/lib/cloister/concurrency.js');
 
     resetPatrolDispatchBudget();
