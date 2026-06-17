@@ -80,8 +80,9 @@ Everything else in the DB is **cache** (rebuildable) or **dead** (deleted).
   clients like `GitHub`, `Records`). Returns decoded Schema entities. The *only*
   reader of its domain's cache.
 - **Writer (write door)** — one `Service` per domain. The *only* mutator. It
-  validates the operation, writes the cache **and** mirrors durable state to the
-  git record in one boundary, then emits a domain event.
+  validates the operation, persists to the source of truth (git record / GitHub)
+  first, then updates the cache and emits a domain event. (Ordering, not
+  atomicity — a stale cache self-heals on rebuild.)
 - **Controllers** — one `HttpApiGroup` per domain; the dashboard's `RpcGroup`
   for live reads. Both delegate to the same resolver/writer, so HTTP and RPC
   cannot diverge.
@@ -93,8 +94,9 @@ Everything else in the DB is **cache** (rebuildable) or **dead** (deleted).
 
 ## 2. Domain map
 
-Eight domains. Three boundary questions are being settled by the in-flight
-audits and are flagged ⏳ OPEN.
+The eight original domains, after the audits: **6 DB-cache domains + Config
+(file-backed)**. Transcripts and Observability resolved to a service / infra;
+Orchestration split into two. All boundary questions are resolved (below).
 
 | # | Domain | Read door | Write door | Source(s) of truth | Cache tables |
 |---|---|---|---|---|---|
@@ -178,8 +180,9 @@ failure edges (3): `in_review→working`, `testing→working`, `merging→workin
 out-of-band (3): `any→cancelled`, `closed→todo` (reopen), `any→todo` (wipe).
 
 This kills the drift class outright: there is exactly one function that writes a
-stage, and it writes every store in one boundary (no more GitHub-only path that
-forgets the event; no more three-ways-in-one-function `verifying_on_main`).
+stage — it persists to the source first, then the cache, synchronously and
+failure-checked (no more GitHub-only path that forgets the event; no more
+fire-and-forget mirror; no more three-ways-in-one-function `verifying_on_main`).
 
 ### 3.4 Open product decision (sizes this domain)
 
@@ -436,6 +439,19 @@ the hard **dashboard-is-Node-22-only** rule. Resolution: wrap the existing
 *or* port/find a node sqlite driver for `effect/unstable/sql`. **Operator
 decision before standardizing the cache layer.**
 
+### Gates before building / approving (per the standing no-loss rule)
+1. **Compiled vertical slice first.** These conventions are verified against the
+   installed type-defs *and* the codebase's in-use `Context.Service` (~10 files),
+   but **nothing has been run through `tsc` yet.** Before scaling to all domains,
+   build ONE slice end-to-end (entity → resolver → writer → one endpoint) through
+   the real toolchain. If it compiles, the conventions are proven and
+   copy-pasteable; if not, we learn the gaps (starting with the SQLite driver) now.
+2. **Surface-level no-loss audit.** The column-level NEED/DROP audits are done, but
+   the 280+ HTTP endpoints + CLI verbs + RPC methods collapse to ~20 controllers
+   with **no enumerated "every old affordance → new home, or deliberately dropped
+   because X" mapping yet.** Per the standing no-loss rule, that audit is the gate
+   before approving the controller collapse — the next investigation to run.
+
 ## 12. Cross-cutting conventions (→ `ARCHITECTURE-CONVENTIONS.md`)
 
 - Entities are `@effect/schema`; IDs are branded; states are literal unions.
@@ -445,9 +461,10 @@ decision before standardizing the cache layer.**
   HTTP status.
 - Writes emit domain events on a `Stream`; the read-model is a `SubscriptionRef`
   the dashboard subscribes to.
-- The writer mirrors durable fields to the git record in the same boundary as
-  the cache write — never a fire-and-forget mirror (the current silent-divergence
-  bug).
+- The writer persists to the source of truth (git / GitHub) first, then updates
+  the cache — synchronous and failure-checked, never fire-and-forget. A stale
+  cache self-heals on rebuild; this is *ordering, not* DB+git atomicity (see
+  `ARCHITECTURE-CONVENTIONS.md` §5).
 
 ## 13. The cache schema — `overdeck.db` ERD
 

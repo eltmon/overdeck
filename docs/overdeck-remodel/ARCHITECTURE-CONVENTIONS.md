@@ -15,7 +15,7 @@ outside them:
 | **Entities** | `Schema.Struct` / branded IDs / `Schema.Literals` | one definition; validates API input, decodes DB rows, serializes to the client |
 | **Errors** | `Schema.TaggedErrorClass` (wire) / `Data.TaggedError` (internal) | every failure is typed in the `E` channel |
 | **Read door** | a `Context.Service` (the **Resolver**) | the *only* reader of the domain's cache |
-| **Write door** | a `Context.Service` (the **Writer**) | the *only* mutator; mirrors durable state to git in the same boundary; emits an event |
+| **Write door** | a `Context.Service` (the **Writer**) | the *only* mutator; persists to the source of truth first, then updates the cache; emits an event |
 | **Controller** | one `HttpApiGroup` (+ the RPC group) | delegates to the two services; never touches `Sql` |
 
 The enforcement: the `Sql` service (the cache handle) is provided **only** to
@@ -159,23 +159,36 @@ export const IssueWriterLayer = Layer.effect(IssueWriter, Effect.gen(function*()
   const advance = (id: IssueId, to: Stage, reason: string) => Effect.gen(function*() {
     const issue = yield* /* resolver.get(id) */
     if (!isLegalMove(issue.stage, to)) return yield* Effect.fail(new IllegalTransition({ from: issue.stage, to }))
-    return yield* sql.withTransaction(Effect.gen(function*() {
-      const next = applyMove(issue, to, reason)
-      yield* sql`UPDATE issues SET stage = ${to}, updated_at = ${now} WHERE id = ${id}`
-      yield* records.mirror(next)             // durable mirror, SAME boundary (no fire-and-forget)
-      yield* bus.emit({ type: "issue.advanced", payload: { id, to, reason } })
-      return next
-    }))
+    const next = applyMove(issue, to, reason)
+    // 1. Persist to the SOURCE OF TRUTH first (git record / GitHub). This is the commit point.
+    yield* records.write(next)
+    // 2. Then update the cache. withTransaction keeps multi-row CACHE writes consistent.
+    //    If THIS fails, the cache is briefly stale but self-heals on the next rebuild — git is truth.
+    yield* sql.withTransaction(sql`UPDATE issues SET stage = ${to}, updated_at = ${now} WHERE id = ${id}`)
+    // 3. Announce.
+    yield* bus.emit({ type: "issue.advanced", payload: { id, to, reason } })
+    return next
   })
   return IssueWriter.of({ advance, hold })
 }))
 ```
 
-**House rules for the writer**, both lessons from the current bugs:
-1. The git-record mirror runs **inside** the same `withTransaction` boundary as
-   the cache write — never the current fire-and-forget `void updateIssueRecord`.
-2. There is exactly **one** writer method per logical move. `advance` is the only
-   thing that changes `stage`; it absorbs every one of the ~148 sites.
+**House rules for the writer** — the durability model is *git/GitHub is the
+source, the DB is a rebuildable cache*, so durability is **ordering, not
+atomicity**:
+1. **Source-of-truth first, then cache.** Persist to the domain's source (git
+   record / GitHub) *before* updating the cache — that write is the commit point.
+   The cache update is **synchronous and failure-checked** (logged/retried), never
+   the current fire-and-forget `void updateIssueRecord`. A cache write that fails
+   leaves the cache briefly stale, which **self-heals on the next rebuild** because
+   the source already holds the truth. **Do not** claim DB+git atomicity — a git
+   write inside a SQL transaction is not atomic; ordering + a self-healing cache is
+   the correct, achievable guarantee, and it strictly beats today's silent
+   fire-and-forget divergence.
+2. **Pure-cache domains** (no durable source — the review-run runtime, agent
+   lifecycle gates) have no step 1; the cache write is the whole write.
+3. Exactly **one** writer method per logical move. `advance` is the only thing
+   that changes `stage`; it absorbs every one of the ~148 sites.
 
 ## 6. Wiring — `Layer`
 
