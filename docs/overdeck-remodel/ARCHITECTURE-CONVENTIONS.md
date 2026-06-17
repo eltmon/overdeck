@@ -16,10 +16,10 @@ outside them:
 | **Errors** | `Schema.TaggedErrorClass` (wire) / `Data.TaggedError` (internal) | every failure is typed in the `E` channel |
 | **Read door** | a `Context.Service` (the **Resolver**) | the *only* reader of the domain's cache |
 | **Write door** | a `Context.Service` (the **Writer**) | the *only* mutator; persists to the source of truth first, then updates the cache; emits an event |
-| **Controller** | one `HttpApiGroup` (+ the RPC group) | delegates to the two services; never touches `Sql` |
+| **Controller** | one `HttpApiGroup` (+ the RPC group) | delegates to the two services; never touches `Db` |
 
-The enforcement: the `Sql` service (the cache handle) is provided **only** to
-Resolver and Writer Layers. A controller's `R` never contains `Sql`, so reaching
+The enforcement: the `Db` service (the cache handle) is provided **only** to
+Resolver and Writer Layers. A controller's `R` never contains `Db`, so reaching
 past the door is a **compile error**, not a code-review note.
 
 ## 1. The package fact (v4-beta)
@@ -30,7 +30,8 @@ packages.
 
 ```ts
 import { Effect, Layer, Context, Schema, Data, SubscriptionRef, Stream } from "effect"
-import { SqlClient, SqlSchema } from "effect/unstable/sql"
+import { drizzle } from "drizzle-orm/better-sqlite3"   // cache = Drizzle on Node (NOT @effect/sql — Bun-only)
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core"
 import { HttpApi, HttpApiGroup, HttpApiEndpoint, HttpApiBuilder } from "effect/unstable/httpapi"
 import { Rpc, RpcGroup, RpcServer, RpcSerialization } from "effect/unstable/rpc"
 import { NodeRuntime } from "@effect/platform-node"   // runtime adapter stays separate
@@ -94,36 +95,47 @@ are declared on endpoints so the controller maps them to HTTP status
 automatically. Purely-internal errors may use `Data.TaggedError("Tag")<{…}>`
 (the codebase's existing ~85-site pattern).
 
-## 4. The cache — `@effect/sql`
+## 4. The cache — Drizzle (Node-safe), behind the `Db` service
 
-One `Sql` service wraps `overdeck.db`. Resolvers/Writers acquire `SqlClient`;
-**no raw driver calls anywhere else.**
+We do **not** use `@effect/sql` — its only SQLite adapter is Bun-only and the
+dashboard is **Node-22-only**. The cache is **Drizzle ORM + `better-sqlite3`**
+(both Node; `better-sqlite3` is already installed), wrapped behind one Effect `Db`
+service. Drizzle gives schema-as-code with real foreign keys, generated migrations
+(`drizzle-kit`), and type-safe queries; Effect wraps the calls so the rest of the
+stack stays fully Effect. The Drizzle schema *is* the locked DB schema
+(`overdeck-schema.ts`).
 
 ```ts
-const make = Effect.gen(function*() {
-  const sql = yield* SqlClient.SqlClient
+// storage schema — Drizzle (real FKs via .references())
+export const issues = sqliteTable("issues", {
+  id:    text("id").primaryKey(),
+  stage: text("stage").notNull(),
+  /* … */
+})
 
-  const findById = SqlSchema.findOne({
-    Request: IssueId,
-    Result:  Issue,                                   // rows decode straight into the Schema
-    execute: (id) => sql`SELECT * FROM issues WHERE id = ${id}`,
-  })
+// the Db service — the ONLY holder of the connection
+export class Db extends Context.Service<Db, { readonly q: DrizzleDB }>()("overdeck/Db") {}
+export const DbLive = Layer.effect(Db, Effect.sync(() =>
+  Db.of({ q: drizzle(new Database(dbPath)) })))       // better-sqlite3, Node
 
-  return { findById } as const
+// resolvers/writers use it; better-sqlite3 is synchronous → wrap in Effect.sync:
+const findById = (id: IssueId) => Effect.gen(function*() {
+  const { q } = yield* Db
+  const row = yield* Effect.sync(() => q.select().from(issues).where(eq(issues.id, id)).get())
+  return row ? yield* Schema.decodeUnknown(Issue)(row)
+             : yield* Effect.fail(new IssueNotFound({ id }))
 })
 ```
 
-- Parameterized values only — `` sql`… ${param}` `` (never string-concat).
-- Multi-store writes run in `sql.withTransaction(effect)` so a partial write
-  can't split-brain the cache.
-
-> **⚠ Driver decision (blocks standardizing this layer):** `effect/unstable/sql`
-> has **no SQLite driver**, and `@effect/sql-sqlite-bun` is **Bun-only** — but the
-> dashboard is **Node-22-only** (node-pty + circular-ESM). Resolution: implement a
-> thin `SqlClient` over the existing `node:sqlite` driver (`src/lib/database/
-> driver.ts`) so we get the Effect surface on Node-22. Until that adapter exists,
-> Resolvers/Writers depend on a `Sql` Tag whose Layer is the node:sqlite-backed
-> client. **Operator decision before building cache code.**
+- **Two schemas, one boundary:** Drizzle defines the **storage** shape (tables,
+  FKs, indexes); `@effect/schema` defines the **domain** entity (API + validation).
+  The resolver decodes Drizzle rows → domain entities; they differ on purpose (the
+  cache stores fields the API doesn't expose, and vice-versa).
+- **Foreign keys are real and enforced** (`.references()` + `PRAGMA foreign_keys=ON`).
+- **Migrations** are generated by `drizzle-kit`; for the big-bang we just create
+  the schema fresh on the empty `overdeck.db`.
+- Transactions use `better-sqlite3`'s synchronous `q.transaction(...)` wrapped in
+  `Effect.sync`; the writer's source-first ordering (§5) still applies.
 
 ## 5. The two doors — `Context.Service` + `Layer`
 
@@ -138,7 +150,7 @@ export class IssuesResolver extends Context.Service<IssuesResolver, {
 }>()("overdeck/IssuesResolver") {}
 
 export const IssuesResolverLayer = Layer.effect(IssuesResolver, Effect.gen(function*() {
-  const sql = yield* SqlClient.SqlClient        // dependency → appears in the Layer's R
+  const { q } = yield* Db                       // the Drizzle handle; appears in the Layer's R
   /* … */
   return IssuesResolver.of({ get, list })
 }))
@@ -152,7 +164,7 @@ export class IssueWriter extends Context.Service<IssueWriter, {
 }>()("overdeck/IssueWriter") {}
 
 export const IssueWriterLayer = Layer.effect(IssueWriter, Effect.gen(function*() {
-  const sql     = yield* SqlClient.SqlClient
+  const { q }   = yield* Db                 // the Drizzle handle
   const records = yield* Records            // git .pan/records writer (source of truth)
   const bus     = yield* EventBus
 
@@ -162,9 +174,9 @@ export const IssueWriterLayer = Layer.effect(IssueWriter, Effect.gen(function*()
     const next = applyMove(issue, to, reason)
     // 1. Persist to the SOURCE OF TRUTH first (git record / GitHub). This is the commit point.
     yield* records.write(next)
-    // 2. Then update the cache. withTransaction keeps multi-row CACHE writes consistent.
+    // 2. Then update the cache (one row here; multi-row writes use q.transaction()).
     //    If THIS fails, the cache is briefly stale but self-heals on the next rebuild — git is truth.
-    yield* sql.withTransaction(sql`UPDATE issues SET stage = ${to}, updated_at = ${now} WHERE id = ${id}`)
+    yield* Effect.sync(() => q.update(issues).set({ stage: to, updatedAt: now }).where(eq(issues.id, id)).run())
     // 3. Announce.
     yield* bus.emit({ type: "issue.advanced", payload: { id, to, reason } })
     return next
@@ -196,7 +208,7 @@ atomicity**:
 const DomainLayer = Layer.mergeAll(
   IssuesResolverLayer, IssueWriterLayer,
   AgentsResolverLayer, AgentWriterLayer, /* … */
-).pipe(Layer.provide(SqlLive), Layer.provide(RecordsLive), Layer.provide(EventBusLive))
+).pipe(Layer.provide(DbLive), Layer.provide(RecordsLive), Layer.provide(EventBusLive))
 
 const HttpLive = HttpApiBuilder.serve(OverdeckApi).pipe(Layer.provide(DomainLayer))
 NodeRuntime.runMain(Layer.launch(HttpLive))
@@ -229,7 +241,7 @@ export const IssuesApiLive = HttpApiBuilder.group(OverdeckApi, "issues", (h) =>
    .handle("advance", ({ path, payload }) => IssueWriter.advance(path.id, payload.to, payload.reason)))
 ```
 
-The handler's `R` is `IssuesResolver | IssueWriter` — **not `Sql`**. That's the
+The handler's `R` is `IssuesResolver | IssueWriter` — **not `Db`**. That's the
 compile-time door enforcement.
 
 ## 8. The live surface — RPC + `SubscriptionRef`
@@ -252,11 +264,11 @@ use `Stream.tick("15 seconds")`.
 
 1. **Schema** the entities (branded IDs, `Literals` states) — one definition.
 2. **TaggedErrorClass** the failures.
-3. **Resolver** `Context.Service` — reads only; `Sql` in its Layer's `R`.
+3. **Resolver** `Context.Service` — reads only; `Db` in its Layer's `R`.
 4. **Writer** `Context.Service` — the only mutator; mirrors to git + emits in one
    transaction.
-5. **HttpApiGroup** (+ RPC) — delegate to the two services; never import `Sql`.
-6. **Layer** the resolver + writer, `provide` the shared `Sql`/`Records`/`EventBus`.
+5. **HttpApiGroup** (+ RPC) — delegate to the two services; never import `Db`.
+6. **Layer** the resolver + writer, `provide` the shared `Db`/`Records`/`EventBus`.
 
 If a piece of code wants to read or write this domain and isn't one of these
 five, it's wrong — extend a door, never add a path.
