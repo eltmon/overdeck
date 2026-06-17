@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 import { and, eq, inArray } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApi, HttpApiBuilder, HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
+import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Forge } from './infra.js';
 import { IssueId } from './issues.js';
@@ -871,26 +871,3 @@ export const MergeApi = HttpApiGroup.make('merge')
     error:   Schema.Union([UatGenerationNotFound, UatNotPromotable]),
   }));
 
-// Placeholder Api — MergeApiLive needs a parent HttpApi. Server bootstrap
-// (workspace-m9n4j) will compose this into OverdeckApi; for this bead the
-// mini-api lets the handler types compile.
-const MergeOnlyApi = HttpApi.make('merge-only').add(MergeApi);
-
-export const MergeApiLive = HttpApiBuilder.group(MergeOnlyApi, 'merge', (h) =>
-  h
-    .handle('getMergeSet',        ({ params })          => MergeResolver.use((r) => r.getMergeSet(params.id)))
-    .handle('listQueues',         ()                    => MergeResolver.use((r) => r.listQueues()))
-    .handle('listAutoMerges',     ({ query })           => MergeResolver.use((r) => r.listAutoMerges(query)))
-    .handle('listBlockers',       ()                    => MergeResolver.use((r) => r.listBlockers()))
-    .handle('listUatGenerations', ({ query })           => MergeResolver.use((r) => r.listUatGenerations(query)))
-    .handle('merge',              ({ params })          => MergeWriter.use((w) => w.merge(params.id)))
-    .handle('approveForge',       ({ params })          => MergeWriter.use((w) => w.approveForge(params.id)))
-    .handle('rebaseOntoMain',     ({ params })          => MergeWriter.use((w) => w.rebaseOntoMain(params.id)))
-    .handle('mergeNext',          ({ payload })         => MergeWriter.use((w) => w.mergeNext(payload.projectKey)))
-    .handle('scheduleAutoMerge',  ({ payload })         => MergeWriter.use((w) => w.scheduleAutoMerge(payload)))
-    .handle('cancelAutoMerge',    ({ params, payload }) =>
-      MergeWriter.use((w) => w.cancelAutoMerge(params.id, payload.cancelledBy)))
-    .handle('assembleUat',        ()                    => MergeWriter.use((w) => w.assembleUat({ force: true })))
-    .handle('startUatStack',      ({ params })          => MergeWriter.use((w) => w.startUatStack(params.name)))
-    .handle('promoteUat',         ({ params })          => MergeWriter.use((w) => w.promoteUat(params.name))),
-);

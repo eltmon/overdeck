@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
+import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus } from './infra.js';
 import { IssueId } from './issues.js';

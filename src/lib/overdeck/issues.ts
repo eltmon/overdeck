@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
+import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records } from './infra.js';
 import type { ProjectConfig } from '../projects.js';
@@ -373,4 +373,3 @@ export const IssuesApi = HttpApiGroup.make('issues')
     error: IssueNotFound,
   }));
 
-export const OverdeckApi = HttpApi.make('overdeck').add(IssuesApi);

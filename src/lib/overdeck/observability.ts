@@ -3,6 +3,8 @@ import * as Rpc from 'effect/unstable/rpc/Rpc';
 import * as RpcGroup from 'effect/unstable/rpc/RpcGroup';
 
 import { EventBus, type StoredOverdeckEvent } from './infra.js';
+import { Issue } from './issues.js';
+import { Agent } from './agents.js';
 
 export const DomainEvent = Schema.Struct({
   sequence: Schema.Number,
@@ -15,6 +17,8 @@ export type DomainEvent = typeof DomainEvent.Type;
 export const DashboardSnapshot = Schema.Struct({
   sequence: Schema.Number,
   generatedAt: Schema.Date,
+  issues: Schema.optional(Schema.Array(Issue)),
+  agents: Schema.optional(Schema.Array(Agent)),
 });
 export type DashboardSnapshot = typeof DashboardSnapshot.Type;
 
