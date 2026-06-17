@@ -992,6 +992,7 @@ export async function handleConversationMessage(
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
     const result = await compactConversationNative(compactSessionFile, conv.name);
+    setConversationClaudeSessionId(conv.name, result.forkedSessionId);
     return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
   }
 
@@ -2951,7 +2952,11 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           } else if (harness === 'claude-code') {
             // Same harness, Claude Code: native (Claude-format) compaction is correct
             // only when the tier decision says the active context will not fit.
-            await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
+            const compactionFork = await maybeCompactBeforeRespawn({ sessionFile, cwd, shouldCompact: switchStrategy.compact });
+            if (compactionFork) {
+              resumeSessionId = compactionFork.forkedSessionId;
+              setConversationClaudeSessionId(name, compactionFork.forkedSessionId);
+            }
           }
           // Pi staying on Pi: skip native compaction — it is Claude-format only and
           // would corrupt the Pi JSONL. Pi manages its own context.
