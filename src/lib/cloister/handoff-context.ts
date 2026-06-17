@@ -16,7 +16,11 @@ import { renderPrompt } from './prompts.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
 import { readContinueStateSync, type ContinueState } from '../vbrief/continue-state.js';
-import { readWorkspaceContinue } from '../pan-dir/index.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  readIssueRecord,
+  resolveProjectForIssue,
+} from '../pan-dir/record.js';
 import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
@@ -116,10 +120,14 @@ async function captureFiles(
   issueId: string,
 ): Promise<void> {
   try {
-    // Read the live workspace continue state first, then migration fallbacks.
+    // Read the live per-issue record first, then migration fallbacks.
     let continueState: ContinueState | null = null;
     try {
-      continueState = await Effect.runPromise(readWorkspaceContinue(workspace));
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspace);
+      const record = await readIssueRecord(project, issueId);
+      if (record) {
+        continueState = record as unknown as ContinueState;
+      }
     } catch { /* ignore */ }
     if (!continueState) {
       const resolved = resolveProjectFromIssueSync(issueId);

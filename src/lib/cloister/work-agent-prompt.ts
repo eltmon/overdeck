@@ -6,7 +6,13 @@ import { readContinueState, type ContinueFeedbackEntry } from '../vbrief/continu
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
+import { readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
+import {
+  getIssueRecordPathForWorkspace,
+  getProjectConfigFromWorkspacePath,
+  readIssueRecord,
+  resolveProjectForIssue,
+} from '../pan-dir/record.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
@@ -139,9 +145,10 @@ async function readPendingFeedback(workspacePath: string): Promise<string> {
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
     try {
-      const cont = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-      if (cont?.feedback?.length) {
-        continueEntries.push(...cont.feedback)
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      const record = await readIssueRecord(project, issueId);
+      if (record?.feedback?.length) {
+        continueEntries.push(...record.feedback);
       }
     } catch { /* ignore */ }
   }
@@ -216,11 +223,11 @@ export async function getTrackerContext(
 ): Promise<string> {
   let stateMtime: Date | null = null;
 
-  // Find continue file mtime via workspace `.pan/continue.json` first, then migration fallbacks.
+  // Find state mtime via the per-issue record first, then migration fallbacks.
   try {
-    const workspaceContinuePath = getWorkspacePanPaths(workspacePath).continuePath
-    if (existsSync(workspaceContinuePath)) {
-      stateMtime = statSync(workspaceContinuePath).mtime
+    const recordPath = getIssueRecordPathForWorkspace(workspacePath, issueId);
+    if (existsSync(recordPath)) {
+      stateMtime = statSync(recordPath).mtime;
     }
   } catch { /* ignore */ }
 
@@ -352,16 +359,17 @@ export async function getTrackerContext(
 }
 
 /**
- * Read planning artifacts for an issue from workspace `.pan/continue.json`.
+ * Read planning artifacts for an issue from the per-issue record.
  */
 export async function readPlanningContext(workspacePath: string): Promise<string | null> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
   if (!issueId) return null;
 
   try {
-    const workspaceContinue = await Effect.runPromise(readWorkspaceContinue(workspacePath))
-    if (workspaceContinue) {
-      return JSON.stringify(workspaceContinue, null, 2)
+    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+    const record = await readIssueRecord(project, issueId);
+    if (record) {
+      return JSON.stringify(record, null, 2);
     }
   } catch { /* ignore */ }
 
