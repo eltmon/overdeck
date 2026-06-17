@@ -157,6 +157,7 @@ describe('hasBeadsTasks', () => {
       maxDelayMs: 100,
       random: () => 0,
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
+      lockAlreadyHeld: true,
     })));
 
     expect(results).toHaveLength(5);
