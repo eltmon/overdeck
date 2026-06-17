@@ -232,6 +232,7 @@ export class Forge extends Context.Service<Forge, ForgeServiceShape>()('overdeck
 export interface ProjectsServiceShape {
   readonly list: () => Effect.Effect<ReadonlyArray<ProjectConfig>>;
   readonly get: (projectId: string) => Effect.Effect<ProjectConfig | null>;
+  readonly resolveIssue: (issueId: string) => Effect.Effect<ProjectConfig | null>;
 }
 
 export class Projects extends Context.Service<Projects, ProjectsServiceShape>()('overdeck/Projects') {}
