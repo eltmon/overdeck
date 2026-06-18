@@ -81,9 +81,9 @@ import {
   hasOtherActiveConversationOnTmuxSession,
   type ArchivedConversationListOptions,
   type ArchivedConversationWithEnrichment,
-  type Conversation,
+  type LegacyConversation as Conversation,
   type ForkRequest,
-} from '../../../lib/database/conversations-db.js';
+} from '../../../lib/overdeck/conversations.js';
 import {
   sendRawKeystroke,
   MessageDeliveryFailed,
