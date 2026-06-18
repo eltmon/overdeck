@@ -21,6 +21,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import type { RuntimeName } from '../runtimes/types.js';
 import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
+import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
 // Mirror locked schema (docs/overdeck-remodel/overdeck-schema.ts:97-163).
@@ -971,38 +972,146 @@ function matchesArchivedOptions(conv: ArchivedConversationWithEnrichment, option
 }
 
 export function listArchivedConversationsWithEnrichment(options: ArchivedConversationListOptions = {}): ArchivedConversationWithEnrichment[] {
-  const rows = listArchivedConversations()
-    .map((conv): ArchivedConversationWithEnrichment => ({
-      id: conv.id,
-      name: conv.name,
-      cwd: conv.cwd,
-      issueId: conv.issueId,
-      createdAt: conv.createdAt,
-      claudeSessionId: conv.claudeSessionId,
-      title: conv.title,
-      totalCost: conv.totalCost,
-      archivedAt: conv.archivedAt ?? conv.createdAt,
-      model: conv.model,
-      discoveredJsonlPath: conv.claudeSessionId,
-      discoveredWorkspacePath: conv.cwd,
-      messageCount: null,
-      firstTs: null,
-      lastTs: null,
-      primaryModel: conv.model,
-      tokenInput: null,
-      tokenOutput: null,
-      estimatedCost: null,
-      toolsUsed: null,
-      filesTouched: null,
-      tags: null,
-      summary: null,
-      enrichmentLevel: null,
-      enrichmentFailed: null,
-    }))
-    .filter((conv) => matchesArchivedOptions(conv, options));
-  const offset = Math.max(0, options.offset ?? 0);
-  const limit = options.limit !== undefined ? Math.max(0, options.limit) : undefined;
-  return limit === undefined ? rows.slice(offset) : rows.slice(offset, offset + limit);
+  ensureDiscoveredSessionsSchema();
+  const db = overdeckDb();
+
+  const conditions: string[] = ['c.archived_at IS NOT NULL'];
+  const params: unknown[] = [];
+
+  const lastTs = `COALESCE(ds.last_ts, c.archived_at)`;
+  const firstTs = `COALESCE(ds.first_ts, c.created_at)`;
+  const primaryModel = `COALESCE(ds.primary_model, c.model)`;
+  const estimatedCost = `COALESCE(ds.estimated_cost, c.total_cost)`;
+  const messageCount = `COALESCE(ds.message_count, 0)`;
+  const enrichmentLevel = `COALESCE(ds.enrichment_level, 0)`;
+
+  if (options.workspacePath !== undefined) { conditions.push('c.cwd = ?'); params.push(options.workspacePath); }
+  if (options.primaryModel !== undefined) { conditions.push(`${primaryModel} = ?`); params.push(options.primaryModel); }
+  if (options.issueId !== undefined) { conditions.push('c.issue_id = ?'); params.push(options.issueId); }
+  if (options.since !== undefined) { conditions.push(`${lastTs} >= ?`); params.push(options.since); }
+  if (options.before !== undefined) { conditions.push(`${lastTs} < ?`); params.push(options.before); }
+  if (options.after !== undefined) { conditions.push(`${firstTs} >= ?`); params.push(options.after); }
+  if (options.minCost !== undefined) { conditions.push(`${estimatedCost} >= ?`); params.push(options.minCost); }
+  if (options.maxCost !== undefined) { conditions.push(`${estimatedCost} <= ?`); params.push(options.maxCost); }
+  if (options.minMessages !== undefined) { conditions.push(`${messageCount} >= ?`); params.push(options.minMessages); }
+  if (options.unmanaged === true) { conditions.push('0 = 1'); }
+  if (options.enriched === true) { conditions.push(`${enrichmentLevel} > 0`); }
+  if (options.notEnriched === true) { conditions.push(`${enrichmentLevel} = 0`); }
+  if (options.enrichmentLevel !== undefined) { conditions.push(`${enrichmentLevel} = ?`); params.push(options.enrichmentLevel); }
+  if (options.enrichmentLevelLessThan !== undefined) { conditions.push(`${enrichmentLevel} < ?`); params.push(options.enrichmentLevelLessThan); }
+  if (options.tags?.length) {
+    for (const tag of options.tags) {
+      conditions.push(`EXISTS (SELECT 1 FROM discovered_session_tags dst WHERE dst.session_id = ds.id AND dst.tag = ?)`);
+      params.push(tag);
+    }
+  }
+  if (options.tools?.length) {
+    for (const tool of options.tools) {
+      conditions.push(`EXISTS (SELECT 1 FROM discovered_session_tools dstool WHERE dstool.session_id = ds.id AND dstool.tool = ?)`);
+      params.push(tool);
+    }
+  }
+  if (options.files?.length) {
+    for (const file of options.files) {
+      conditions.push(`EXISTS (SELECT 1 FROM discovered_session_files dsfile WHERE dsfile.session_id = ds.id AND dsfile.file_path = ?)`);
+      params.push(file);
+    }
+  }
+
+  const safeLimit = Number.isFinite(options.limit) && options.limit! >= 0 ? options.limit! : undefined;
+  const safeOffset = Number.isFinite(options.offset) && options.offset! >= 0 ? options.offset! : undefined;
+  const limitClause = safeLimit !== undefined ? 'LIMIT ?' : safeOffset !== undefined ? 'LIMIT -1' : '';
+  const offsetClause = safeOffset !== undefined ? 'OFFSET ?' : '';
+  if (safeLimit !== undefined) params.push(safeLimit);
+  if (safeOffset !== undefined) params.push(safeOffset);
+
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const sql = `
+    SELECT
+      c.rowid AS legacy_id,
+      c.id AS uuid,
+      c.name,
+      c.cwd,
+      c.issue_id,
+      c.created_at,
+      (
+        SELECT cf.locator FROM conversation_files cf
+        WHERE cf.conversation_id = c.id
+        ORDER BY (cf.harness = 'claude-code') DESC, cf.created_at ASC, cf.id ASC
+        LIMIT 1
+      ) AS claude_session_id,
+      c.title,
+      c.total_cost,
+      c.archived_at,
+      c.model,
+      ds.jsonl_path AS discovered_jsonl_path,
+      ds.workspace_path AS discovered_workspace_path,
+      ds.message_count,
+      ds.first_ts,
+      ds.last_ts,
+      ds.primary_model,
+      ds.token_input,
+      ds.token_output,
+      ds.estimated_cost,
+      ds.tools_used,
+      ds.files_touched,
+      ds.tags,
+      ds.summary,
+      ds.enrichment_level,
+      ds.enrichment_failed
+    FROM conversations c
+    LEFT JOIN discovered_sessions ds ON ds.session_id = (
+      SELECT cf.locator FROM conversation_files cf
+      WHERE cf.conversation_id = c.id
+      ORDER BY (cf.harness = 'claude-code') DESC, cf.created_at ASC, cf.id ASC
+      LIMIT 1
+    )
+    ${where}
+    ORDER BY c.archived_at DESC, c.created_at DESC
+    ${limitClause} ${offsetClause}
+  `;
+
+  type RawRow = {
+    legacy_id: number; uuid: string; name: string; cwd: string; issue_id: string | null;
+    created_at: number | string; claude_session_id: string | null; title: string | null;
+    total_cost: number | null; archived_at: number | string | null; model: string | null;
+    discovered_jsonl_path: string | null; discovered_workspace_path: string | null;
+    message_count: number | null; first_ts: string | null; last_ts: string | null;
+    primary_model: string | null; token_input: number | null; token_output: number | null;
+    estimated_cost: number | null; tools_used: string | null; files_touched: string | null;
+    tags: string | null; summary: string | null; enrichment_level: number | null;
+    enrichment_failed: number | null;
+  };
+
+  const rawRows = db.prepare(sql).all(...params) as RawRow[];
+
+  return rawRows.map((r): ArchivedConversationWithEnrichment => ({
+    id: r.legacy_id,
+    name: r.name,
+    cwd: r.cwd,
+    issueId: r.issue_id ?? null,
+    createdAt: toIso(r.created_at) ?? new Date(0).toISOString(),
+    claudeSessionId: r.claude_session_id ?? null,
+    title: r.title ?? null,
+    totalCost: r.total_cost ?? 0,
+    archivedAt: toIso(r.archived_at) ?? toIso(r.created_at) ?? new Date(0).toISOString(),
+    model: r.model ?? null,
+    discoveredJsonlPath: r.discovered_jsonl_path ?? null,
+    discoveredWorkspacePath: r.discovered_workspace_path ?? r.cwd,
+    messageCount: r.message_count ?? null,
+    firstTs: r.first_ts ?? null,
+    lastTs: r.last_ts ?? null,
+    primaryModel: r.primary_model ?? r.model ?? null,
+    tokenInput: r.token_input ?? null,
+    tokenOutput: r.token_output ?? null,
+    estimatedCost: r.estimated_cost ?? null,
+    toolsUsed: r.tools_used ?? null,
+    filesTouched: r.files_touched ?? null,
+    tags: r.tags ?? null,
+    summary: r.summary ?? null,
+    enrichmentLevel: r.enrichment_level ?? null,
+    enrichmentFailed: r.enrichment_failed ?? null,
+  }));
 }
 
 export function listArchivedConversationNames(): string[] {
@@ -1172,7 +1281,7 @@ export function updateForkStatus(name: string, status: string | null, error?: st
 
 export function getStuckForks(): LegacyConversation[] {
   const rows = overdeckDb()
-    .prepare(`${LEGACY_CONVERSATION_SELECT} WHERE c.fork_status = 'pending' AND c.archived_at IS NULL`)
+    .prepare(`${LEGACY_CONVERSATION_SELECT} WHERE c.fork_status IS NOT NULL AND c.fork_status != 'failed' ORDER BY c.created_at ASC`)
     .all() as LegacyConversationRow[];
   return rows.map(rowToLegacyConversation);
 }
