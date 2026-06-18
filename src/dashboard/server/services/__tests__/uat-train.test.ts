@@ -18,8 +18,9 @@ vi.mock('../flywheel-actions.js', () => ({
   readCurrentFlywheelStatusForDashboard: mocks.readCurrentFlywheelStatusForDashboard,
 }));
 
-vi.mock('../../../../lib/database/uat-generations-db.js', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../../../../lib/database/uat-generations-db.js')>();
+// uat-train.ts now imports listUatGenerationsSync from overdeck/merge-sync (not database/uat-generations-db)
+vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../../../lib/overdeck/merge-sync.js')>();
   return {
     ...original,
     listUatGenerationsSync: mocks.listUatGenerationsSync,
