@@ -19,7 +19,7 @@ export const overdeckIssues = sqliteTable('issues', {
   prUrl: text('pr_url'),
   prNumber: integer('pr_number'),
   prHeadSha: text('pr_head_sha'),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const IssueId = Schema.String.pipe(Schema.brand('IssueId'));

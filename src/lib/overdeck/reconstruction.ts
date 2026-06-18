@@ -19,7 +19,7 @@ const agentsTable = sqliteTable('agents', {
   workspace: text('workspace').notNull(),
   harness: text('harness').notNull(),
   model: text('model').notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 // ── Public types ──────────────────────────────────────────────────────────
