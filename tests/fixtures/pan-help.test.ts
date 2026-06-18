@@ -67,7 +67,7 @@ describe('pan --help fixture', () => {
   });
 
   it('keeps singular and plural project add options in sync', () => {
-    const singular = captureCommandHelp('project add --help').replaceAll('pan project add', 'pan projects add');
+    const singular = captureCommandHelp('project add --help').replaceAll('overdeck project add', 'overdeck projects add');
     const plural = captureCommandHelp('projects add --help');
 
     expect(plural).toBe(singular);
