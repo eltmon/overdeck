@@ -173,6 +173,92 @@ export function markMerged(id: number): boolean {
   return result.changes === 1;
 }
 
+/** Drop-in for cancelPending() from pending-auto-merges-db.ts. */
+export function cancelPending(id: number, cancelledBy: string): boolean {
+  const db = getOverdeckDatabaseSync();
+  const result = db.prepare(
+    "UPDATE pending_auto_merges SET status = 'cancelled', cancelled_at = ?, cancelled_by = ? WHERE id = ? AND status IN ('pending','blocked','failed')",
+  ).run(nowMillis(), cancelledBy, id);
+  return result.changes === 1;
+}
+
+/** Drop-in for getActionableAutoMerge() from pending-auto-merges-db.ts. */
+export function getActionableAutoMerge(issueId: string): PendingAutoMerge | null {
+  const db = getOverdeckDatabaseSync();
+  const row = db.prepare(
+    "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging','blocked','failed') ORDER BY id DESC LIMIT 1",
+  ).get(issueId) as OverdeckPendingAutoMergeRow | undefined;
+  return row ? rowToPendingAutoMerge(row) : null;
+}
+
+/** Drop-in for listActiveAutoMerges() from pending-auto-merges-db.ts. */
+export function listActiveAutoMerges(limit = 100): PendingAutoMerge[] {
+  const db = getOverdeckDatabaseSync();
+  const rows = db.prepare(
+    "SELECT * FROM pending_auto_merges WHERE status IN ('pending','merging') ORDER BY scheduled_merge_at ASC, id ASC LIMIT ?",
+  ).all(limit) as OverdeckPendingAutoMergeRow[];
+  return rows.map(rowToPendingAutoMerge);
+}
+
+/** Drop-in for listProblemAutoMerges() from pending-auto-merges-db.ts. */
+export function listProblemAutoMerges(limit = 100): PendingAutoMerge[] {
+  const db = getOverdeckDatabaseSync();
+  const rows = db.prepare(
+    "SELECT * FROM pending_auto_merges WHERE status IN ('blocked','failed') ORDER BY scheduled_merge_at ASC, id ASC LIMIT ?",
+  ).all(limit) as OverdeckPendingAutoMergeRow[];
+  return rows.map(rowToPendingAutoMerge);
+}
+
+export interface ScheduleAutoMergeInput {
+  issueId: string;
+  prUrl: string;
+  prNumber?: number;
+  projectKey: string;
+  forge?: import('../forge.js').ForgeType;
+  scheduledMergeAt: string;
+  scheduledAt?: string;
+}
+
+export interface ScheduleAutoMergeResult {
+  entry: PendingAutoMerge;
+  created: boolean;
+}
+
+/** Drop-in for scheduleAutoMergeWithResult() from pending-auto-merges-db.ts. */
+export function scheduleAutoMergeWithResult(input: ScheduleAutoMergeInput): ScheduleAutoMergeResult {
+  const db = getOverdeckDatabaseSync();
+  // Check for active entry first
+  const existing = db.prepare(
+    "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging') ORDER BY id DESC LIMIT 1",
+  ).get(input.issueId) as OverdeckPendingAutoMergeRow | undefined;
+  if (existing) return { entry: rowToPendingAutoMerge(existing), created: false };
+
+  const scheduledAtMs = millisFromIso(input.scheduledAt ?? new Date().toISOString()) ?? nowMillis();
+  const scheduledMergeAtMs = millisFromIso(input.scheduledMergeAt) ?? nowMillis();
+  try {
+    const result = db.prepare(`
+      INSERT INTO pending_auto_merges (issue_id, pr_url, project_key, forge, status, scheduled_merge_at, scheduled_at)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?)
+    `).run(
+      input.issueId,
+      input.prUrl,
+      input.projectKey,
+      input.forge ?? 'github',
+      scheduledMergeAtMs,
+      scheduledAtMs,
+    );
+    const newRow = db.prepare('SELECT * FROM pending_auto_merges WHERE id = ?').get(Number(result.lastInsertRowid)) as OverdeckPendingAutoMergeRow;
+    return { entry: rowToPendingAutoMerge(newRow), created: true };
+  } catch {
+    // Race: another insert beat us
+    const raced = db.prepare(
+      "SELECT * FROM pending_auto_merges WHERE issue_id = ? AND status IN ('pending','merging') ORDER BY id DESC LIMIT 1",
+    ).get(input.issueId) as OverdeckPendingAutoMergeRow | undefined;
+    if (raced) return { entry: rowToPendingAutoMerge(raced), created: false };
+    throw new Error(`[merge-sync] scheduleAutoMergeWithResult failed for ${input.issueId}`);
+  }
+}
+
 // ── Merge Queue ───────────────────────────────────────────────────────────────
 
 /** Drop-in for getAllActiveQueues() from merge-queue-db.ts. */

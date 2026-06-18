@@ -362,6 +362,7 @@ export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
 export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
 export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
 export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
+export const FLYWHEEL_MERGE_TRAIN_ENABLED_KEY = 'flywheel.merge_train_enabled';
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
@@ -444,6 +445,16 @@ export function isFlywheelRequireUatBeforeMerge(): boolean {
 /** Drop-in for setFlywheelRequireUatBeforeMerge() from app-settings.ts. */
 export function setFlywheelRequireUatBeforeMerge(enabled: boolean): void {
   setSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY, enabled ? 'true' : 'false');
+}
+
+/** Drop-in for isMergeTrainEnabled() from app-settings.ts. */
+export function isMergeTrainEnabled(): boolean {
+  return getSetting(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY) === 'true';
+}
+
+/** Drop-in for setMergeTrainEnabled() from app-settings.ts. */
+export function setMergeTrainEnabled(enabled: boolean): void {
+  setSetting(FLYWHEEL_MERGE_TRAIN_ENABLED_KEY, enabled ? 'true' : 'false');
 }
 
 export const ConfigApi = HttpApiGroup.make('config')

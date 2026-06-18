@@ -39,13 +39,13 @@ import {
   setFlywheelRequireUatBeforeMerge,
   isMergeTrainEnabled,
   setMergeTrainEnabled,
-} from '../../../lib/database/app-settings.js';
+} from '../../../lib/overdeck/control-settings.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { shouldHoldForUat, getProjectAutoMergeDefault, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../lib/review-status.js';
-import { getAllReviewStatusesFromDb } from '../../../lib/database/review-status-db.js';
+import { getAllReviewStatusesFromDb } from '../../../lib/overdeck/review-status-sync.js';
 import { resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import {
   cancelPending,
@@ -56,7 +56,7 @@ import {
   type PendingAutoMerge,
   type ScheduleAutoMergeInput,
   type ScheduleAutoMergeResult,
-} from '../../../lib/database/pending-auto-merges-db.js';
+} from '../../../lib/overdeck/merge-sync.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
