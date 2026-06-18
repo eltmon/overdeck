@@ -33,10 +33,10 @@ import {
 } from '../../../lib/cloister/uat-promote.js';
 import {
   getUatGenerationSync,
+  isMergeTrainEnabled,
   listUatGenerationsSync,
   type UatGeneration,
-} from '../../../lib/database/uat-generations-db.js';
-import { isMergeTrainEnabled } from '../../../lib/database/app-settings.js';
+} from '../../../lib/overdeck/merge-sync.js';
 import { extractACFromDocument } from '../../../lib/vbrief/acceptance-criteria.js';
 import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
 import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';

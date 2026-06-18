@@ -4,7 +4,7 @@ import {
   getAllMergeSetsFromDb,
   getMergeSetFromDb,
   upsertMergeSet as dbUpsert,
-} from './database/merge-set-db.js';
+} from './overdeck/merge-sync.js';
 import type { ForgeType } from './forge.js';
 import { resolveProjectFromIssueSync } from './projects.js';
 import { resolveProjectReposFromResolvedIssueSync } from './project-repos.js';
