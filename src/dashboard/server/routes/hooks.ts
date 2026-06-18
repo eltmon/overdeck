@@ -24,7 +24,7 @@ import { sessionFilePath } from '../../../lib/paths.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
-import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { getConversationByClaudeSessionId } from '../../../lib/overdeck/conversations.js';
 import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
 import { resolveComplianceAdvisoryWarning } from '../../../lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -64,9 +64,9 @@ afterEach(() => {
 });
 
 describe('conversation compaction service', () => {
-  it('appends a compact boundary and continuation summary', async () => {
+  it('creates a forked file with the compact boundary without mutating the source', async () => {
     const sessionFile = join(TEST_HOME, 'session.jsonl');
-    writeFileSync(sessionFile, [
+    const sourceLines = [
       JSON.stringify({
         type: 'user',
         message: { role: 'user', content: [{ type: 'text', text: 'Fix the compact bug' }] },
@@ -79,17 +79,25 @@ describe('conversation compaction service', () => {
           usage: { input_tokens: 1200 },
         },
       }),
-    ].join('\n') + '\n');
+    ].join('\n') + '\n';
+    writeFileSync(sessionFile, sourceLines);
 
     const { compactConversationNative, shouldInterceptManualCompact } = await import('../../services/conversation-compaction.js');
     const result = await compactConversationNative(sessionFile);
 
     expect(result.model).toBe('claude-haiku-4-5');
     expect(result.summary).toContain('This session is being continued from a previous conversation');
+    expect(result.forkedSessionId).toBeTruthy();
+    expect(result.forkedSessionFile).not.toBe(sessionFile);
     expect(shouldInterceptManualCompact('/compact')).toBe(true);
 
-    const finalContent = await import('node:fs/promises').then((fs) => fs.readFile(sessionFile, 'utf-8'));
-    expect(finalContent).toContain('"subtype":"compact_boundary"');
-    expect(finalContent).toContain('This session is being continued from a previous conversation');
+    // Source file must NOT be modified (sacred-file invariant)
+    const sourceContent = await import('node:fs/promises').then((fs) => fs.readFile(sessionFile, 'utf-8'));
+    expect(sourceContent).toBe(sourceLines);
+
+    // Fork file must contain the compact boundary and summary
+    const forkContent = await import('node:fs/promises').then((fs) => fs.readFile(result.forkedSessionFile, 'utf-8'));
+    expect(forkContent).toContain('"subtype":"compact_boundary"');
+    expect(forkContent).toContain('This session is being continued from a previous conversation');
   });
 });

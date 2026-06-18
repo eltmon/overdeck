@@ -29,15 +29,11 @@ import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
-import {
-  readIssueRecordSync,
-  resolveProjectForIssue,
-  writeAgentHarnessModelSync,
-} from './pan-dir/record.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
-import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
-import { getAgent as getAgentFromDb, upsertAgent, listAllAgents, type Agent as DbAgent } from './database/agents-db.js';
-import { agentStateToDbAgent } from './database/agent-mappers.js';
+import { createConversation, getConversationByName, reactivateConversationForSpawn } from './overdeck/conversations.js';
+import { getOverdeckAgentStateSync, listOverdeckAgentStatesSync, saveOverdeckAgentStateSync } from './overdeck/agent-state-sync.js';
+import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from './overdeck/agent-record-sync.js';
+import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from './overdeck/agent-rollback-state.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -56,7 +52,7 @@ import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelIdSync } from './model-validation.js';
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
-import { getFlywheelActiveRunId } from './database/app-settings.js';
+import { getFlywheelActiveRunIdSync } from './overdeck/control-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import { sendGracefulRestartWarning } from './graceful-restart.js';
@@ -82,7 +78,7 @@ function normalizeFlywheelRunId(runId: string | null | undefined): string | unde
 }
 
 function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
-  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
+  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
   return runId
     ? { PANOPTICON_FLYWHEEL_RUN_ID: runId, PANOPTICON_FLYWHEEL_AGENT_ROLE: role }
     : {};
@@ -624,7 +620,7 @@ export function resolveAgentTargetSync(input: string): string | null {
 
   try {
     const wantedIssueId = issueId.toUpperCase();
-    const matches = listAllAgents()
+    const matches = listOverdeckAgentStatesSync()
       .filter((agent) => agent.issueId.toUpperCase() === wantedIssueId)
       .map((agent) => agent.id);
     if (matches.length === 1) return matches[0].toLowerCase();
@@ -964,6 +960,10 @@ export function getAgentDir(agentId: string): string {
   return join(getPanopticonHome(), 'agents', agentId);
 }
 
+export function getAgentStateFilePath(agentId: string): string {
+  return getRollbackAgentStatePath(agentId);
+}
+
 function isRole(value: unknown): value is Role {
   return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike';
 }
@@ -1028,80 +1028,21 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
-function dbAgentToAgentState(agent: DbAgent): AgentState {
-  return cleanAgentState({
-    id: agent.id,
-    issueId: agent.issueId,
-    workspace: agent.workspace,
-    role: agent.role as Role,
-    model: agent.model ?? '',
-    status: agent.status as AgentState['status'],
-    startedAt: agent.startedAt ?? new Date().toISOString(),
-    harness: agent.harness ? (agent.harness as RuntimeName) : undefined,
-    lastActivity: agent.lastActivity ?? undefined,
-    lastResumeAt: agent.lastResumeAt ?? undefined,
-    stoppedAt: agent.stoppedAt ?? undefined,
-    stoppedByUser: agent.stoppedByUser ?? undefined,
-    stoppedByPause: agent.stoppedByPause ?? undefined,
-    kickoffDelivered: agent.kickoffDelivered ?? undefined,
-    paused: agent.paused ?? undefined,
-    pausedReason: agent.pausedReason ?? undefined,
-    pausedAt: agent.pausedAt ?? undefined,
-    troubled: agent.troubled ?? undefined,
-    troubledAt: agent.troubledAt ?? undefined,
-    consecutiveFailures: agent.consecutiveFailures ?? undefined,
-    firstFailureInRunAt: agent.firstFailureInRunAt ?? undefined,
-    lastFailureAt: agent.lastFailureAt ?? undefined,
-    lastFailureReason: agent.lastFailureReason ?? undefined,
-    lastFailureNextRetryAt: agent.lastFailureNextRetryAt ?? undefined,
-    branch: agent.branch ?? undefined,
-    costSoFar: agent.costSoFar ?? undefined,
-    sessionId: agent.sessionId ?? undefined,
-    phase: agent.phase ? (agent.phase as AgentState['phase']) : undefined,
-    workType: agent.workType ?? undefined,
-    roleRunHead: agent.roleRunHead ?? undefined,
-    channelsEnabled: agent.channelsEnabled ?? undefined,
-    supervisorEnabled: agent.supervisorEnabled ?? undefined,
-    deliveryMethod: agent.deliveryMethod ? (agent.deliveryMethod as AgentState['deliveryMethod']) : undefined,
-    flywheelRunId: agent.flywheelRunId ?? undefined,
-    reviewSubRole: agent.reviewSubRole ?? undefined,
-    reviewRunId: agent.reviewRunId ?? undefined,
-    reviewOutputPath: agent.reviewOutputPath ?? undefined,
-    reviewSynthesisAgentId: agent.reviewSynthesisAgentId ?? undefined,
-    reviewDeadlineAt: agent.reviewDeadlineAt ?? undefined,
-    reviewMonitorSignaled: agent.reviewMonitorSignaled
-      ? (agent.reviewMonitorSignaled as AgentState['reviewMonitorSignaled'])
-      : undefined,
-    reviewRetryAttempt: agent.reviewRetryAttempt ?? undefined,
-    hostOverride: agent.hostOverride ?? undefined,
-    inspectSubRole: agent.inspectSubRole ?? undefined,
-  });
-}
-
 export function getAgentStateSync(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
 
-  // PAN-1908: authoritative runtime registry is the agents table. Fall back to
-  // state.json only while pre-migration directories have not been backfilled.
-  const dbAgent = getAgentFromDb(normalizedId);
-  if (dbAgent) return dbAgentToAgentState(dbAgent);
+  const overdeckState = getOverdeckAgentStateSync(normalizedId);
+  if (overdeckState) return cleanAgentState(overdeckState);
 
-  const stateFile = join(getAgentDir(normalizedId), 'state.json');
-  if (!existsSync(stateFile)) return null;
-
-  const content = readFileSync(stateFile, 'utf8');
-  const state = parseAgentState(content, normalizedId);
+  const state = readRollbackAgentStateSync(normalizedId, parseAgentState);
   if (!state) return null;
 
   // PAN-1919: harness/model are no longer sourced from state.json. Merge from
   // the per-issue git-tracked record so cross-machine pickup works.
   if (state.issueId) {
-    const project = resolveProjectForIssue(state.issueId);
-    if (project) {
-      const record = readIssueRecordSync(project, state.issueId);
-      if (record?.harness) state.harness = record.harness;
-      if (record?.model) state.model = record.model;
-    }
+    const record = readAgentHarnessModelRecordSync(state.issueId);
+    if (record?.harness) state.harness = record.harness;
+    if (record?.model) state.model = record.model;
   }
 
   return state;
@@ -1124,12 +1065,7 @@ function prepareAgentStateForSave(state: AgentState): AgentState {
 }
 
 export function writeAgentStateJsonSync(state: AgentState): void {
-  const dir = getAgentDir(state.id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, 'state.json'),
-    JSON.stringify(cleanAgentState(state), null, 2)
-  );
+  writeRollbackAgentStateSync(state, (clean) => JSON.stringify(cleanAgentState(clean), null, 2));
 }
 
 export function saveAgentStateSync(state: AgentState): void {
@@ -1139,22 +1075,17 @@ export function saveAgentStateSync(state: AgentState): void {
 
   prepareAgentStateForSave(state);
 
-  // PAN-1908: write the authoritative row to SQLite and keep state.json as the
-  // rollback/rebuild source through the cutover (D2/CP-2).
-  upsertAgent(agentStateToDbAgent(state));
+  saveOverdeckAgentStateSync(state);
   writeAgentStateJsonSync(state);
 
   // PAN-1919: mirror harness/model into the per-issue git-tracked record so
   // they travel with the branch. Done synchronously at save time; auto-commit
   // is suppressed here because spawn paths explicitly queue the commit.
   if (state.issueId && state.harness && state.model) {
-    const project = resolveProjectForIssue(state.issueId);
-    if (project) {
-      try {
-        writeAgentHarnessModelSync(project, state.issueId, state.harness, state.model);
-      } catch (err) {
-        console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
-      }
+    try {
+      writeAgentHarnessModelRecordSync(state.issueId, state.harness, state.model);
+    } catch (err) {
+      console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
     }
   }
 
@@ -1165,7 +1096,7 @@ export function saveAgentStateSync(state: AgentState): void {
 
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
-  const stateFile = join(dir, 'state.json');
+  const stateFile = getRollbackAgentStatePath(state.id);
 
   return Effect.gen(function* () {
     yield* Effect.tryPromise({
@@ -1183,7 +1114,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     }
 
     yield* Effect.try({
-      try: () => upsertAgent(agentStateToDbAgent(state)),
+      try: () => saveOverdeckAgentStateSync(state),
       catch: (cause) => toAgentFsError('write', `agents-db:${state.id}`, cause),
     });
 
@@ -1195,16 +1126,10 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
 
     // PAN-1919: mirror harness/model into the per-issue git-tracked record.
     if (state.harness && state.model) {
-      const project = resolveProjectForIssue(state.issueId);
-      if (project) {
-        const writeAgentHarnessModel = yield* Effect.promise(() =>
-          import('./pan-dir/record.js').then((m) => m.writeAgentHarnessModel)
-        );
-        yield* Effect.tryPromise({
-          try: () => writeAgentHarnessModel(project, state.issueId, state.harness!, state.model!),
-          catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
-        });
-      }
+      yield* Effect.try({
+        try: () => writeAgentHarnessModelRecordSync(state.issueId, state.harness!, state.model!),
+        catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
+      });
     }
 
     if (oldStatus && oldStatus !== state.status) {
@@ -3943,9 +3868,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
   const tmuxSessions = listSessionsSync();
   const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-  // PAN-1908: authoritative registry is the agents table; no directory scan.
-  return listAllAgents().map((agent) => {
-    const state = dbAgentToAgentState(agent);
+  return listOverdeckAgentStatesSync().map((state) => {
     const normalizedId = normalizeAgentId(state.id);
     return {
       ...state,
@@ -3960,9 +3883,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
  * This is the replacement for enumerating ~/.panopticon/agents/ directories.
  */
 export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
-  const agents = listAllAgents();
-  return agents
-    .map(dbAgentToAgentState)
+  return listOverdeckAgentStatesSync()
     .filter((state) => {
       if (options?.status && state.status !== options.status) return false;
       if (options?.role && state.role !== options.role) return false;
@@ -3991,8 +3912,7 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     const tmuxSessions = yield* listSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-    return listAllAgents().map((agent) => {
-      const state = dbAgentToAgentState(agent);
+    return listOverdeckAgentStatesSync().map((state) => {
       const normalizedId = normalizeAgentId(state.id);
       return {
         ...state,
@@ -4040,7 +3960,7 @@ async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
       if (!stat.isDirectory()) return;
 
       const agentId = normalizeAgentId(entry);
-      const stateFile = join(dirPath, 'state.json');
+      const stateFile = getRollbackAgentStatePath(agentId);
       let raw: { role?: unknown };
       try {
         const contents = await fsp.readFile(stateFile, 'utf8');
@@ -4987,7 +4907,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         const { getReviewStatusSync } = await import('./review-status.js');
         const rs = getReviewStatusSync(agentState.issueId);
         if (rs?.stuck && rs.stuckReason === 'context_overflow') {
-          const { clearWorkspaceStuck } = await import('./database/review-status-db.js');
+          const { clearWorkspaceStuck } = await import('./review-status.js');
           clearWorkspaceStuck(agentState.issueId);
           logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
         }

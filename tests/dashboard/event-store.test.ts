@@ -17,7 +17,7 @@ function makeDb(): DbAdapter {
     CREATE TABLE events (
       sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
       type      TEXT    NOT NULL,
-      timestamp TEXT    NOT NULL,
+      timestamp INTEGER NOT NULL,
       payload   TEXT    NOT NULL DEFAULT '{}'
     )
   `)

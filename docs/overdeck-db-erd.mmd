@@ -1,0 +1,440 @@
+erDiagram
+  AGENTS {
+    text id PK
+    text issue_id
+    text role
+    text status
+    text workspace
+    text session_id
+    text harness
+    text model
+    text host_override
+    text delivery_method
+    integer started_at
+    integer last_resume_at
+    integer stopped_by_user
+    integer stopped_by_pause
+    integer kickoff_delivered
+    integer paused
+    text paused_reason
+    integer troubled
+    integer channels_enabled
+    integer consecutive_failures
+    integer first_failure_in_run_at
+    integer last_failure_next_retry_at
+    integer stopped_at
+    integer paused_at
+    integer troubled_at
+    integer last_activity
+    text last_failure_reason
+    text phase
+    text role_run_head
+    text flywheel_run_id
+    real cost_so_far
+    text review_sub_role
+    text review_run_id
+    text review_synthesis_agent_id
+    text review_output_path
+    integer review_deadline_at
+    text review_monitor_signaled
+    integer review_retry_attempt
+    integer updated_at
+  }
+  APP_SETTINGS {
+    text key PK
+    text value
+    integer updated_at
+  }
+  CONVERSATION_FILES {
+    integer id PK
+    text conversation_id
+    text harness
+    text locator
+    integer created_at
+  }
+  CONVERSATIONS {
+    text id PK
+    text name
+    text cwd
+    text issue_id
+    text harness
+    text model
+    text effort
+    text title
+    text title_source
+    integer created_at
+    integer archived_at
+    text handoff_doc_path
+    text handoff_target_conv_id
+    text cleared_to_conv_id
+    text tmux_session
+    text status
+    text ended_at
+    text last_attached_at
+    text session_file
+    real total_cost
+    integer total_tokens
+    text fork_status
+    text fork_error
+    integer fork_retry_count
+    text fork_request
+    text fork_fallback_reason
+    text delivery_method
+    text spawn_error
+  }
+  COST_EVENTS {
+    integer id PK
+    integer ts
+    text issue_id
+    text agent_id
+    text session_id
+    text session_type
+    text provider
+    text model
+    integer input
+    integer output
+    integer cache_read
+    integer cache_write
+    real cost
+    text request_id
+    text source_file
+  }
+  EVENTS {
+    integer sequence PK
+    text type
+    integer timestamp
+    text payload
+  }
+  FAVORITES {
+    text type PK
+    text item_id PK
+    integer created_at
+  }
+  HEALTH_EVENTS {
+    integer id PK
+    text agent_id
+    integer timestamp
+    text state
+    text source
+    text metadata
+  }
+  ISSUE_POLICY {
+    text issue_id PK
+    integer deacon_ignored
+    text deacon_ignored_reason
+    integer auto_merge
+    integer updated_at
+  }
+  ISSUES {
+    text id PK
+    text stage
+    text review_outcome
+    text test_outcome
+    text verification_outcome
+    text verdict_commit
+    text blockers
+    text plan_ref
+    text pr_url
+    integer pr_number
+    text pr_head_sha
+    integer updated_at
+  }
+  MERGE_QUEUE {
+    integer id PK
+    text project_key
+    text issue_id
+    integer position
+    text status
+    integer queued_at
+    integer started_at
+  }
+  MERGE_SET_REPOS {
+    integer id PK
+    text issue_id
+    text repo_key
+    text repo_path
+    text forge
+    text source_branch
+    text target_branch
+    text artifact_url
+    text artifact_id
+    text review_status
+    text test_status
+    text rebase_status
+    text verification_status
+    text merge_status
+    integer merge_order
+    integer required
+  }
+  MERGE_SETS {
+    text issue_id PK
+    text project_key
+    text project_path
+    text workspace_type
+    text status
+    integer created_at
+    integer updated_at
+  }
+  OBSERVATION_INDEX {
+    text id PK
+    text observation_path_jsonl
+    integer byte_offset
+  }
+  PENDING_AUTO_MERGES {
+    integer id PK
+    text issue_id
+    text pr_url
+    text project_key
+    text forge
+    text status
+    integer scheduled_merge_at
+    integer scheduled_at
+    integer merged_at
+    text failure_reason
+    integer cancelled_at
+    text cancelled_by
+  }
+  RESET_MARKERS {
+    integer id PK
+    text scope
+    text scope_id
+    integer from_timestamp
+    text reason
+    integer created_at
+  }
+  REVIEW_RUN_AGENTS {
+    integer id PK
+    text run_id
+    text agent_id
+    text sub_role
+    text output_path
+    integer deadline_at
+    text monitor_signaled
+    integer retry_attempt
+  }
+  REVIEW_RUNS {
+    text run_id PK
+    text issue_id
+    text review_synthesis_agent_id
+    integer verification_cycle_count
+    integer auto_requeue_count
+    integer merge_retry_count
+    integer test_retry_count
+    integer review_retry_count
+    integer stuck
+    text stuck_reason
+    integer review_spawned_at
+    integer conflict_resolution_dispatched_at
+    integer recovery_started_at
+  }
+  REVIEW_STATUS {
+    text issue_id PK
+    text review_status
+    text test_status
+    text merge_status
+    text inspect_status
+    text inspect_notes
+    text inspect_started_at
+    text inspect_bead_id
+    text verification_status
+    text verification_notes
+    integer verification_cycle_count
+    integer verification_max_cycles
+    text review_notes
+    text test_notes
+    text merge_notes
+    text updated_at
+    integer ready_for_merge
+    integer auto_requeue_count
+    integer merge_retry_count
+    text pr_url
+    text pr_head_sha
+    integer pr_number
+    integer stuck
+    text stuck_reason
+    text stuck_at
+    text stuck_details
+    text reviewed_at_commit
+    text review_spawned_at
+    text conflict_resolution_dispatched_at
+    integer test_retry_count
+    integer review_retry_count
+    text recovery_started_at
+    integer deacon_ignored
+    text deacon_ignored_at
+    text deacon_ignored_reason
+    text blocker_reasons
+    text last_verified_commit
+    text merge_step
+    integer auto_merge
+  }
+  STATUS_HISTORY {
+    integer id PK
+    text issue_id
+    text type
+    text status
+    integer timestamp
+    text notes
+  }
+  TRANSCRIPT_CHECKPOINTS {
+    text session_id PK
+    text transcript_path
+    integer last_offset
+    text claim_owner
+    integer claim_from
+    integer claim_to
+    integer claim_expires_at
+    integer mid_turn_count_in_current_turn
+    integer last_mid_turn_at
+    text project_id
+    text workspace_id
+    text issue_id
+    integer updated_at
+  }
+  TRANSCRIPTS {
+    text backing_file_path PK
+    text session_id
+    text harness
+    text workspace_path
+    integer message_count
+    text models
+    integer token_input
+    integer token_output
+    integer first_ts
+    integer last_ts
+    text pan_issue_id
+    text pan_agent_id
+    integer file_mtime
+    integer scanned_at
+  }
+  UAT_GENERATION_MEMBERS {
+    text uat_name PK
+    text issue_id PK
+    text role
+    text title
+    text branch
+    text head_sha
+    integer merge_order
+    integer pr
+    text pr_url
+    text reason
+  }
+  UAT_GENERATION_RESOLUTIONS {
+    integer id PK
+    text uat_name
+    text issue_ids
+    text files
+    text commit_sha
+  }
+  UAT_GENERATIONS {
+    text name PK
+    text worktree_path
+    text project_root
+    text base_sha
+    text status
+    integer stack_started_at
+    integer cleaned_at
+    integer created_at
+    integer updated_at
+  }
+  DISCOVERED_SESSIONS {
+    integer id PK
+    text jsonl_path UK
+    text session_id
+    text workspace_path
+    text workspace_hash
+    integer message_count
+    text first_ts
+    text last_ts
+    text models_used
+    text primary_model
+    integer token_input
+    integer token_output
+    real estimated_cost
+    text tools_used
+    text files_touched
+    text tags
+    text summary
+    text summary_detailed
+    integer enrichment_level
+    text enrichment_model
+    text enriched_at
+    integer enrichment_failed
+    integer panopticon_managed
+    text pan_issue_id
+    text pan_agent_id
+    integer file_size
+    text file_mtime
+    text scanned_at
+  }
+  DISCOVERED_SESSION_TAGS {
+    integer session_id PK FK
+    text tag PK
+  }
+  DISCOVERED_SESSION_TOOLS {
+    integer session_id PK FK
+    text tool PK
+  }
+  DISCOVERED_SESSION_FILES {
+    integer session_id PK FK
+    text file_path PK
+  }
+  SESSION_EMBEDDINGS {
+    integer session_id PK FK
+    text model PK
+    integer dim
+    blob embedding
+    text created_at
+  }
+  GIT_OPERATIONS {
+    integer id PK
+    text operation
+    text branch
+    text issue_id
+    text before_sha
+    text after_sha
+    text remote_sha
+    text status
+    text error
+    text ts
+  }
+  FLYWHEEL_SUBSTRATE_BUGS {
+    text issue_id PK
+    text filed_at
+    text run_id
+    text filed_by
+    text discovered_in_issue_id
+    text severity
+    text status
+    text fix_merged_at
+    text fix_commit_sha
+    text updated_at
+  }
+
+  AGENTS }o--|| ISSUES : issue_id
+  CONVERSATION_FILES }o--|| CONVERSATIONS : conversation_id
+  %% self-ref: conversations.handoff_target_conv_id -> conversations.id
+  %% self-ref: conversations.cleared_to_conv_id -> conversations.id
+  ISSUE_POLICY }o--|| ISSUES : issue_id
+  MERGE_QUEUE }o--|| ISSUES : issue_id
+  MERGE_SET_REPOS }o--|| MERGE_SETS : issue_id
+  MERGE_SETS }o--|| ISSUES : issue_id
+  PENDING_AUTO_MERGES }o--|| ISSUES : issue_id
+  REVIEW_RUN_AGENTS }o--|| REVIEW_RUNS : run_id
+  REVIEW_RUNS }o--|| ISSUES : issue_id
+  STATUS_HISTORY }o--|| ISSUES : issue_id
+  UAT_GENERATION_MEMBERS }o--|| UAT_GENERATIONS : uat_name
+  UAT_GENERATION_MEMBERS }o--|| ISSUES : issue_id
+  UAT_GENERATION_RESOLUTIONS }o--|| UAT_GENERATIONS : uat_name
+  DISCOVERED_SESSION_TAGS }o--|| DISCOVERED_SESSIONS : session_id
+  DISCOVERED_SESSION_TOOLS }o--|| DISCOVERED_SESSIONS : session_id
+  DISCOVERED_SESSION_FILES }o--|| DISCOVERED_SESSIONS : session_id
+  SESSION_EMBEDDINGS }o--|| DISCOVERED_SESSIONS : session_id
+  COST_EVENTS }o--o{ ISSUES : issue_id  %% logical
+  CONVERSATIONS }o--o{ ISSUES : issue_id  %% logical
+  REVIEW_STATUS }o--o{ ISSUES : issue_id  %% logical
+  GIT_OPERATIONS }o--o{ ISSUES : issue_id  %% logical
+  TRANSCRIPTS }o--o{ ISSUES : pan_issue_id  %% logical
+  DISCOVERED_SESSIONS }o--o{ ISSUES : pan_issue_id  %% logical
+  FLYWHEEL_SUBSTRATE_BUGS }o--o{ ISSUES : discovered_in_issue_id  %% logical
+  AGENTS }o--o{ REVIEW_RUNS : review_run_id  %% logical

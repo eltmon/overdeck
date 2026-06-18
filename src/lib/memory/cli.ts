@@ -19,6 +19,7 @@ import {
 } from './paths.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { readCurrentStatus } from './rollup.js';
+import { getAgentStateSync } from '../agents.js';
 
 const DEFAULT_PROJECT_ID = 'panopticon-cli';
 const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
@@ -426,8 +427,8 @@ async function readActiveAgents(): Promise<Array<{ id: string; issueId: string }
   const agents: Array<{ id: string; issueId: string }> = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const state = await readJsonFile<Record<string, unknown>>(join(agentsDir, entry.name, 'state.json'), {});
-    if ((state.status === 'running' || state.status === 'starting') && typeof state.issueId === 'string') {
+    const state = getAgentStateSync(entry.name);
+    if ((state?.status === 'running' || state?.status === 'starting') && state?.issueId) {
       agents.push({ id: entry.name, issueId: state.issueId });
     }
   }

@@ -8,8 +8,8 @@
  *   - Reports progress via optional callback
  */
 
-import { findDiscoveredSessionIds, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
-import type { ConversationFilter } from '../../database/discovered-sessions-db.js';
+import { findDiscoveredSessionIds, getDiscoveredSessionById } from '../../overdeck/discovered-sessions.js';
+import type { ConversationFilter } from '../../overdeck/discovered-sessions.js';
 import { Effect } from 'effect';
 import { runWithPool } from '../work-pool.js';
 import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';

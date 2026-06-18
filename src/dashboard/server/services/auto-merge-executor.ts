@@ -1,6 +1,6 @@
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
-import { isFlywheelGloballyPaused } from '../../../lib/database/app-settings.js';
 import {
+  isFlywheelGloballyPaused,
   listDuePendingAutoMerges,
   markBlocked,
   markFailed,
@@ -8,7 +8,7 @@ import {
   requeueToPending,
   transitionToMerging,
   type PendingAutoMerge,
-} from '../../../lib/database/pending-auto-merges-db.js';
+} from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;

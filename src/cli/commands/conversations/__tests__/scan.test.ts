@@ -7,28 +7,32 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../../../tests/helpers/overdeck-test-db.js';
 
 // ─── Mock config so we control watchDirs ──────────────────────────────────────
 
-const mockWatchDirs: string[] = [];
+// vi.hoisted runs before vi.mock factories, so mockWatchDirs is safe to
+// reference inside the factory closure.
+const { mockWatchDirs } = vi.hoisted(() => ({ mockWatchDirs: [] as string[] }));
 
-const mockGetConversationsConfig = () => ({
-  watchDirs: mockWatchDirs,
-  scanMaxParallel: null,
-  embeddings: false,
-  embeddingProvider: 'openai',
-  embeddingModel: 'text-embedding-3-small',
-  embeddingAutoOnDeep: false,
-  enrichment: { quickModel: null, deepModel: null, maxParallel: 2, costConfirmThreshold: 1 },
+vi.mock('../../../../lib/config-yaml.js', () => {
+  const cfg = () => ({
+    watchDirs: mockWatchDirs,
+    scanMaxParallel: null,
+    embeddings: false,
+    embeddingProvider: 'openai',
+    embeddingModel: 'text-embedding-3-small',
+    embeddingAutoOnDeep: false,
+    enrichment: { quickModel: null, deepModel: null, maxParallel: 2, costConfirmThreshold: 1 },
+  });
+  return { getConversationsConfig: cfg, getConversationsConfigSync: cfg };
 });
-
-vi.mock('../../../../lib/config-yaml.js', () => ({
-  getConversationsConfig: mockGetConversationsConfig,
-  getConversationsConfigSync: mockGetConversationsConfig,
-}));
 
 // ─── Mock chalk to avoid terminal color codes in assertions ──────────────────
 
@@ -54,29 +58,28 @@ const SESSION_JSONL = [
 
 // ─── Test setup ───────────────────────────────────────────────────────────────
 
-let TEST_HOME: string;
+let odb: OverdeckTestDb;
 let fakeClaudeDir: string;
-
-async function resetDb() {
-  const { resetDatabase } = await import('../../../../lib/database/index.js');
-  resetDatabase();
-}
+let originalHome: string | undefined;
 
 beforeEach(() => {
-  TEST_HOME = join(tmpdir(), `cli-scan-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  fakeClaudeDir = join(TEST_HOME, '.claude', 'projects');
+  odb = setupOverdeckTestDb();
+  // The scanner reads from $HOME/.claude/projects — point HOME at the overdeck home dir
+  originalHome = process.env.HOME;
+  process.env.HOME = odb.home;
+  fakeClaudeDir = join(odb.home, '.claude', 'projects');
   mkdirSync(join(fakeClaudeDir, '-home-user-Projects-watched-app'), { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
-  process.env.HOME = TEST_HOME;
   // Clear mockWatchDirs between tests
   mockWatchDirs.length = 0;
 });
 
-afterEach(async () => {
-  await resetDb();
-  delete process.env.PANOPTICON_HOME;
-  delete process.env.HOME;
-  rmSync(TEST_HOME, { recursive: true, force: true });
+afterEach(() => {
+  if (originalHome !== undefined) {
+    process.env.HOME = originalHome;
+  } else {
+    delete process.env.HOME;
+  }
+  teardownOverdeckTestDb(odb);
   vi.clearAllMocks();
 });
 
@@ -125,7 +128,7 @@ describe('scanAction CLI', () => {
     // Run watched mode with empty watchDirs — should scan nothing
     await scanAction({ mode: 'watched' });
 
-    const { findDiscoveredSessions } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { findDiscoveredSessions } = await import('../../../../lib/overdeck/discovered-sessions.js');
     const sessions = findDiscoveredSessions();
     expect(sessions.length).toBe(0);
   });
@@ -142,7 +145,7 @@ describe('scanAction CLI', () => {
 
     await scanAction({ mode: 'watched' });
 
-    const { findDiscoveredSessions } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { findDiscoveredSessions } = await import('../../../../lib/overdeck/discovered-sessions.js');
     const sessions = findDiscoveredSessions();
     expect(sessions.length).toBeGreaterThanOrEqual(1);
     expect(sessions.some((s) => s.jsonlPath === p)).toBe(true);
@@ -158,7 +161,7 @@ describe('scanAction CLI', () => {
 
     await scanAction({ mode: 'system' });
 
-    const { findDiscoveredSessions } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const { findDiscoveredSessions } = await import('../../../../lib/overdeck/discovered-sessions.js');
     const sessions = findDiscoveredSessions();
     expect(sessions.length).toBeGreaterThanOrEqual(1);
   });

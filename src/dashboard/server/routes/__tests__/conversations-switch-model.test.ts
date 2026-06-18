@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -108,8 +108,8 @@ async function postSwitchModel(conversationName: string, body: Record<string, un
 }
 
 async function resetDb() {
-  const { resetDatabase } = await import('../../../../lib/database/index.js');
-  resetDatabase();
+  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabaseSync();
 }
 
 describe('POST /api/conversations/:name/switch-model', () => {
@@ -151,7 +151,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = '206k-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -206,7 +206,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'fallback-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'fallback-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -251,7 +251,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'default-model-anthropic-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'default-model-anthropic-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -299,7 +299,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'default-model-routed-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'default-model-routed-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -347,7 +347,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
       const cwd = join(testHome, 'echo-workspace');
       mkdirSync(cwd, { recursive: true });
 
-      const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
       const { sessionFilePath } = await import('../../../../lib/paths.js');
       const sessionId = 'echo-session';
       const sessionFile = sessionFilePath(cwd, sessionId);
@@ -397,11 +397,11 @@ describe('POST /api/conversations/:name/switch-model', () => {
     }
   });
 
-  it('appends a compact boundary when the same-harness switch exceeds the target window threshold', async () => {
+  it('compacts to a forked session file when the same-harness switch exceeds the target window threshold', async () => {
     const cwd = join(testHome, 'over-window-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'over-window-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -430,13 +430,22 @@ describe('POST /api/conversations/:name/switch-model', () => {
     });
 
     const response = await postSwitchModel('switch-over-window', { model: 'claude-fable-5' });
-    const finalContent = readFileSync(sessionFile, 'utf8');
 
     expect(response.status).toBe(200);
     expect(deliverAgentMessageMock).not.toHaveBeenCalled();
     expect(killSessionMock).toHaveBeenCalledWith('conv-switch-over-window');
     expect(createSessionMock).toHaveBeenCalled();
-    expect(finalContent).toContain('"subtype":"compact_boundary"');
-    expect(finalContent).toContain('"preTokens":900000');
+
+    // Sacred-file invariant: original session file must NOT be modified
+    const originalContent = readFileSync(sessionFile, 'utf8');
+    expect(originalContent).not.toContain('"subtype":"compact_boundary"');
+
+    // Fork file (new UUID.jsonl in same sessions directory) must contain the compact boundary
+    const sessionsDir = join(sessionFile, '..');
+    const forkFiles = readdirSync(sessionsDir).filter((f: string) => f.endsWith('.jsonl') && f !== `${sessionId}.jsonl`);
+    expect(forkFiles).toHaveLength(1);
+    const forkContent = readFileSync(join(sessionsDir, forkFiles[0]), 'utf8');
+    expect(forkContent).toContain('"subtype":"compact_boundary"');
+    expect(forkContent).toContain('"preTokens":900000');
   });
 });

@@ -607,6 +607,7 @@ program
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Force agent auto-resume even if the shell inherited PANOPTICON_NO_RESUME')
   .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
+  .option('--seed-from-legacy', 'Seed a fresh overdeck.db from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty overdeck.db.')
   .action(async (options) => {
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
@@ -1024,6 +1025,10 @@ program
         }
       : {};
     const dashboardBootEnv = applyBootGateEnv({ ...process.env }, options);
+    if (options.seedFromLegacy) {
+      dashboardBootEnv.PANOPTICON_SEED_FROM_LEGACY = '1';
+      console.log(chalk.yellow('  [--seed-from-legacy] overdeck.db will be seeded from the legacy database (conversations + in-flight state)'));
+    }
 
     if (options.detach) {
       // Run in background

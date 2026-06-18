@@ -1,5 +1,5 @@
 import type { MemoryIdentity } from '@panctl/contracts';
-import { queryMemoryExtractionCostUsd } from '../../database/cost-events-db.js';
+import { queryMemoryExtractionCostUsdSync } from '../../overdeck/cost-sync.js';
 import { updateMemoryHealth } from '../health.js';
 import {
   getExtractionProvider,
@@ -69,7 +69,7 @@ export async function extractWithProviderPolicy<T>(
 }
 
 export async function getTodayMemoryExtractionSpendUsd(identity: Pick<MemoryIdentity, 'issueId'>): Promise<number> {
-  return queryMemoryExtractionCostUsd({
+  return queryMemoryExtractionCostUsdSync({
     issueId: identity.issueId,
     startTs: startOfLocalDayIso(),
   });

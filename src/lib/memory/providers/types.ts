@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { MemoryIdentity } from '@panctl/contracts';
-import { insertCostEvent } from '../../database/cost-events-db.js';
+import { insertCostEventSync } from '../../overdeck/cost-sync.js';
 import type { CostEvent } from '../../costs/events.js';
 
 export interface ExtractionUsage {
@@ -116,7 +116,7 @@ export function recordExtractionCost(input: {
     sessionId: input.identity.sessionId,
   };
 
-  insertCostEvent(event);
+  insertCostEventSync(event);
 }
 
 function getPricing(provider: string, model: string): {

@@ -15,7 +15,7 @@
  * 3-minute cadence; already-blocked mergeability rows use a 10-minute cadence.
  */
 import { Effect } from 'effect';
-import { getMergeBlockerReconcileCandidates } from '../../../lib/database/review-status-db.js';
+import { getMergeBlockerReconcileCandidates } from '../../../lib/overdeck/review-status-sync.js';
 import type { BlockerReason } from '../../../lib/review-status.js';
 import { refreshMergeStateFromGitHub } from '../../../lib/webhook-handlers.js';
 

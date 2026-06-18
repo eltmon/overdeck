@@ -12,8 +12,8 @@ import {
   findEnrichedSessionIdsMissingEmbedding,
   getDiscoveredSessionById,
   insertEmbedding,
-} from '../../database/discovered-sessions-db.js';
-import type { DiscoveredSession } from '../../database/discovered-sessions-db.js';
+} from '../../overdeck/discovered-sessions.js';
+import type { DiscoveredSession } from '../../overdeck/discovered-sessions.js';
 import { Effect } from 'effect';
 import { runWithPool } from '../work-pool.js';
 import { embed } from './providers.js';

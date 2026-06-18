@@ -1,7 +1,7 @@
 /**
  * Event Store — SQLite-backed append-only event log with PubSub (PAN-428)
  *
- * - Persists domain events to panopticon.db `events` table
+ * - Persists domain events to overdeck.db `events` table
  * - In-memory PubSub for live streaming to WebSocket clients
  * - Monotonic, gap-free sequence numbers (SQLite AUTOINCREMENT)
  * - 7-day retention with startup compaction
@@ -17,11 +17,10 @@
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
-import { initWorkspaceDiscoveredSessionsSchema } from '../../lib/database/schema.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
-import type { SqliteDatabase } from '../../lib/database/driver.js';
+import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
+import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -97,7 +96,7 @@ export interface DbAdapter {
 interface EventRow {
   sequence: number;
   type: string;
-  timestamp: string;
+  timestamp: number;
   payload: string;
 }
 
@@ -105,9 +104,17 @@ function rowToStored(row: EventRow): StoredEvent {
   return {
     sequence: row.sequence,
     type: row.type,
-    timestamp: row.timestamp,
+    timestamp: new Date(row.timestamp).toISOString(),
     payload: JSON.parse(row.payload),
   };
+}
+
+function eventTimestampMillis(event: Omit<DomainEvent, 'sequence'>): number {
+  const raw = (event as Record<string, unknown>)['timestamp'];
+  if (raw instanceof Date) return raw.getTime();
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string') return Date.parse(raw);
+  return Date.now();
 }
 
 // ─── Runtime-aware DB initializer ────────────────────────────────────────────
@@ -115,7 +122,7 @@ function rowToStored(row: EventRow): StoredEvent {
 declare const Bun: unknown;
 
 /**
- * Open the panopticon.db database using the appropriate driver for the runtime.
+ * Open the overdeck.db database using the appropriate driver for the runtime.
  * Under Bun: uses bun:sqlite (native, no native addons needed).
  * Under Node: uses the shared getDatabase() which applies migrations.
  */
@@ -124,7 +131,7 @@ export async function openEventDb(): Promise<DbAdapter> {
   if (!existsSync(home)) {
     await mkdir(home, { recursive: true });
   }
-  const dbPath = join(home, 'panopticon.db');
+  const dbPath = getOverdeckDatabasePath();
 
   if (typeof Bun !== 'undefined') {
     // @ts-ignore — bun:sqlite is only available in Bun runtime; guarded by typeof Bun check above
@@ -133,33 +140,11 @@ export async function openEventDb(): Promise<DbAdapter> {
     db.exec('PRAGMA journal_mode = WAL');
     db.exec('PRAGMA foreign_keys = ON');
     db.exec('PRAGMA synchronous = NORMAL');
-    // Ensure required tables exist (Bun doesn't run the shared schema migrations)
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS events (
-        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
-        type      TEXT    NOT NULL,
-        timestamp TEXT    NOT NULL,
-        payload   TEXT    NOT NULL DEFAULT '{}'
-      )
-    `);
-    db.exec(`CREATE INDEX IF NOT EXISTS events_timestamp_idx ON events (timestamp)`);
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
-        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
-        WHERE json_type(payload, '$.issueId') = 'text'
-    `);
-    db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
-        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
-        WHERE json_type(payload, '$.issueId') = 'text'
-    `);
-    initWorkspaceDiscoveredSessionsSchema(db as unknown as SqliteDatabase);
     return db as unknown as DbAdapter;
   } else {
-    // Node.js: use shared database connection — migrations run there
-    const { getDatabase } = await import('../../lib/database/index.js');
-    const db = getDatabase();
-    initWorkspaceDiscoveredSessionsSchema(db);
+    // Node.js: open overdeck.db through the shared overdeck opener so the
+    // hand-maintained migration owns the events table and indexes.
+    const db = getOverdeckDatabaseSync(dbPath);
     return db as unknown as DbAdapter;
   }
 }
@@ -208,7 +193,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   // when high-frequency callers (e.g. enrichment poller) emit many events.
   interface QueuedEvent {
     type: string;
-    timestamp: string;
+    timestamp: number;
     payload: string;
     rawPayload: unknown;
     resolve: (seq: number) => void;
@@ -252,7 +237,7 @@ export function createEventStore(db: DbAdapter): EventStore {
         const stored: StoredEvent = {
           sequence: nextSeq,
           type: q.type,
-          timestamp: q.timestamp,
+          timestamp: new Date(q.timestamp).toISOString(),
           payload: q.rawPayload,
         };
         emitter.emit('event', stored);
@@ -263,8 +248,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function append(event: Omit<DomainEvent, 'sequence'>): number {
-    const timestamp =
-      (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
+    const timestamp = eventTimestampMillis(event);
     const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
     insertStmt.run([event.type, timestamp, payload]);
@@ -275,7 +259,7 @@ export function createEventStore(db: DbAdapter): EventStore {
     const stored: StoredEvent = {
       sequence,
       type: event.type,
-      timestamp,
+      timestamp: new Date(timestamp).toISOString(),
       payload: (event as Record<string, unknown>)['payload'] ?? {},
     };
 
@@ -285,8 +269,7 @@ export function createEventStore(db: DbAdapter): EventStore {
 
   function appendAsync(event: Omit<DomainEvent, 'sequence'>): Promise<number> {
     return new Promise((resolve) => {
-      const timestamp =
-        (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
+      const timestamp = eventTimestampMillis(event);
       const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
 
       writeQueue.push({
@@ -302,12 +285,11 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function emitOnly(event: Omit<DomainEvent, 'sequence'>): void {
-    const timestamp =
-      (event as Record<string, unknown>)['timestamp'] as string ?? new Date().toISOString();
+    const timestamp = eventTimestampMillis(event);
     const stored: StoredEvent = {
       sequence: -1, // sentinel: in-memory only, not persisted
       type: event.type,
-      timestamp,
+      timestamp: new Date(timestamp).toISOString(),
       payload: (event as Record<string, unknown>)['payload'] ?? {},
     };
     emitter.emit('event', stored);
@@ -324,7 +306,7 @@ export function createEventStore(db: DbAdapter): EventStore {
   }
 
   function compact(): void {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const result = compactStmt.run([sevenDaysAgo]);
     if (result.changes > 0) {
       console.log(`[event-store] Compacted ${result.changes} events older than 7 days`);

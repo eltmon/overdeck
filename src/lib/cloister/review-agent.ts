@@ -50,6 +50,7 @@ import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveCo
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
+import { getAgentStateSync } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 /**
@@ -329,16 +330,15 @@ function buildReviewRolePrompt(opts: {
             encoding: 'utf-8',
           });
           const currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
-          const synthStatePath = join(AGENTS_DIR, reviewSessionName, 'state.json');
-          const synthState = JSON.parse(await readFile(synthStatePath, 'utf-8')) as { reviewRunId?: string };
+          const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
           // Stale when the existing session carries a runId that does not match
           // the current HEAD. If it carries no runId at all (legacy session
           // from before this field was persisted), stay conservative and keep
           // the "skip" behaviour so we never kill a genuinely-running review.
-          if (synthState.reviewRunId && synthState.reviewRunId !== currentRunId) {
+          if (synthReviewRunId && synthReviewRunId !== currentRunId) {
             staleRunId = true;
             console.log(
-              `[review-agent] ${reviewSessionName} is stale — runId ${synthState.reviewRunId} != current ${currentRunId}; killing convoy and respawning`,
+              `[review-agent] ${reviewSessionName} is stale — runId ${synthReviewRunId} != current ${currentRunId}; killing convoy and respawning`,
             );
           }
         } catch (probeErr) {

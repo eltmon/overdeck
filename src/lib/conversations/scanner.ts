@@ -20,7 +20,7 @@ import { homedir } from 'os';
 import {
   getDiscoveredSessionByJsonlPath,
   upsertDiscoveredSession,
-} from '../database/discovered-sessions-db.js';
+} from '../overdeck/discovered-sessions.js';
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';

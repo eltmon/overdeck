@@ -3,7 +3,7 @@
  */
 
 import chalk from 'chalk';
-import { getDiscoveredSessionById } from '../../../lib/database/discovered-sessions-db.js';
+import { getDiscoveredSessionById } from '../../../lib/overdeck/discovered-sessions.js';
 
 export async function showAction(id: string, opts: { json?: boolean }): Promise<void> {
   const sessionId = parseInt(id, 10);
