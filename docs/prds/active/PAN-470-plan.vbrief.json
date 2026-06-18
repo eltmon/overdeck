@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-05T18:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-470: Rewrite route handlers to idiomatic Effect — eliminate runSync, try/catch, sync I/O"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-05T18:00:00Z",
     "updated": "2026-04-05T23:15:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/470", "label": "PAN-470", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/470", "label": "PAN-470", "type": "issue" }
     ],
     "tags": ["effect", "refactor", "dashboard-server", "routes", "async"],
     "narratives": {

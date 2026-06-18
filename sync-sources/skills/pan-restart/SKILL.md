@@ -23,7 +23,7 @@ system or kill unrelated dependencies.
 
 ```bash
 # Build first if dashboard server or CLI code changed
-cd ~/Projects/panopticon-cli && npm run build
+cd ~/Projects/overdeck && npm run build
 
 # Dashboard-only restart (safe — leaves CLIProxy, Traefik, TLDR running)
 pan restart

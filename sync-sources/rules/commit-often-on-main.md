@@ -25,6 +25,6 @@ uncommitted change accumulate across many edits.
   still never `git stash`. Commit, discard, or surface; never stash.
 
 This rule is **Overdeck-development-specific** (`scope: dev`). It folds into
-the global managed region only on a panopticon-cli source checkout, so it
+the global managed region only on a overdeck source checkout, so it
 never ships to projects that merely *use* Overdeck — their agents work in
 feature workspaces behind the review pipeline and don't need it.

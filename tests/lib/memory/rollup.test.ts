@@ -19,7 +19,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -131,7 +131,7 @@ describe('memory status rollup synthesis', () => {
 
   it('loads the last 20 observations and last 3 archived statuses from memory storage', async () => {
     const observationsPath = resolveObservationsFile(identity.projectId, identity.issueId, '2026-05-16T00:00:00.000Z');
-    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'));
+    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052/observations'));
     await writeFile(
       observationsPath,
       `${Array.from({ length: 25 }, (_, index) => JSON.stringify(observation(index + 1))).join('\n')}\n`,
@@ -156,7 +156,7 @@ describe('memory status rollup synthesis', () => {
   });
 
   it('scans newest observation files first and stops after the requested limit', async () => {
-    const observationsDir = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations');
+    const observationsDir = join(tempDir!, 'memory/overdeck/PAN-1052/observations');
     await ensureDir(observationsDir);
     await writeFile(
       join(observationsDir, '2026-05-15.jsonl'),
@@ -253,7 +253,7 @@ describe('memory status rollup synthesis', () => {
   it('archives previous status, writes the new status, emits after commit, then clears included pending turns', async () => {
     const previousStatus = { ...baseStatus, name: 'Previous Status' };
     const nextStatus = { ...baseStatus, name: 'Next Status', phase: 'shipping' as const };
-    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
     await writeFile(resolveStatusFile(identity.projectId, identity.issueId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
     const turns = [pendingTurn(1), pendingTurn(2)];
     for (const turn of turns) await writePendingTurn(turn, { loadThreshold: () => 10 });
@@ -281,7 +281,7 @@ describe('memory status rollup synthesis', () => {
   it('leaves pending turns intact when rollup commit fails before the clear step', async () => {
     const previousStatus = { ...baseStatus, name: 'Previous Status' };
     const nextStatus = { ...baseStatus, name: 'Next Status' };
-    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
     await writeFile(resolveStatusFile(identity.projectId, identity.issueId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
     const turn = pendingTurn(1);
     await writePendingTurn(turn, { loadThreshold: () => 10 });
@@ -303,7 +303,7 @@ describe('memory status rollup synthesis', () => {
     await writeFile(join(archiveDir, '2026-05-13_old.json'), JSON.stringify({ ...baseStatus, name: 'Old' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-14_one.json'), JSON.stringify({ ...baseStatus, name: 'One' }), 'utf8');
     await writeFile(join(archiveDir, '2026-05-15_two.json'), JSON.stringify({ ...baseStatus, name: 'Two' }), 'utf8');
-    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
     await writeFile(resolveStatusFile(identity.projectId, identity.issueId), JSON.stringify({ ...baseStatus, name: 'Three' }), 'utf8');
 
     await commitStatusRollup({

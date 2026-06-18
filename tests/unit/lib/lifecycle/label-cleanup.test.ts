@@ -57,7 +57,7 @@ describe('cleanupMergedLabels', () => {
     const ctx = {
       issueId: 'PAN-338',
       projectPath: '/tmp/test',
-      github: { owner: 'eltmon', repo: 'panopticon-cli', number: 338 },
+      github: { owner: 'eltmon', repo: 'overdeck', number: 338 },
     };
 
     it('returns ok with merged label applied', async () => {

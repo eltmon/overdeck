@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-12T00:00:00Z",
-    "author": "panopticon-cli/0.6.0",
+    "author": "overdeck/0.6.0",
     "description": "Plan for PAN-457: Conversation discovery \u2014 index sessions inside and outside Overdeck"
   },
   "plan": {
@@ -16,7 +16,7 @@
     "updated": "2026-04-20T19:14:39.650802Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/457",
+        "uri": "https://github.com/eltmon/overdeck/issues/457",
         "label": "PAN-457",
         "type": "issue"
       }

@@ -5,12 +5,12 @@ OUT_DIR="/tmp/audit-pass3"
 CONTEXT="${OUT_DIR}/contexts/PAN-${ISSUE}.md"
 RESULT="${OUT_DIR}/results/PAN-${ISSUE}.md"
 ERR="${OUT_DIR}/stderr/PAN-${ISSUE}.log"
-cd /home/eltmon/Projects/panopticon-cli
+cd /home/eltmon/Projects/overdeck
 
 # Gather context (fast)
 {
   echo "## ORIGINAL ISSUE BODY"
-  gh issue view "$ISSUE" -R eltmon/panopticon-cli 2>&1
+  gh issue view "$ISSUE" -R eltmon/overdeck 2>&1
   echo
   echo "## MERGE COMMIT(s)"
   git log main --grep "PAN-${ISSUE}\|(#" -n 5 --format="%h %ci %s" 2>&1 | grep -iE "pan-${ISSUE}\\b|(#.*${ISSUE})" | head -5

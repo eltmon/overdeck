@@ -23,7 +23,7 @@
   `universal`), and role files like `roles/flywheel.md` + the startup brief `docs/flywheel-brief.md`.
   `pan sync` renders bundled rules into `~/.claude/CLAUDE.md` (managed region), `pi-global.md`,
   `codex-global.md`.
-- **scope:dev** — folds into the managed region only on a panopticon-cli checkout; never ships to
+- **scope:dev** — folds into the managed region only on a overdeck checkout; never ships to
   projects that merely use Overdeck. **All new bundled rules here are `scope: dev`.**
 
 ---
@@ -179,8 +179,8 @@ index line. **This is local machine state — report it; it is NOT part of the g
 
 ## Related issues this addresses / relates to
 
-- **Addresses the systemic root** behind [#1883](https://github.com/eltmon/panopticon-cli/issues/1883): operational rules that must govern agents
+- **Addresses the systemic root** behind [#1883](https://github.com/eltmon/overdeck/issues/1883): operational rules that must govern agents
   were trapped in conversation memory. Once in `roles/flywheel.md` + `docs/flywheel-brief.md`, the
   red-main/admin-merge rules help the orchestrator avoid the traps that silently empty the merge gate
-  — relating to [#1880](https://github.com/eltmon/panopticon-cli/issues/1880) and the red-main family ([#1824](https://github.com/eltmon/panopticon-cli/issues/1824), [#1783](https://github.com/eltmon/panopticon-cli/issues/1783)).
-- **Sibling fixes** executed together: [#1883](https://github.com/eltmon/panopticon-cli/issues/1883), [#1877](https://github.com/eltmon/panopticon-cli/issues/1877).
+  — relating to [#1880](https://github.com/eltmon/overdeck/issues/1880) and the red-main family ([#1824](https://github.com/eltmon/overdeck/issues/1824), [#1783](https://github.com/eltmon/overdeck/issues/1783)).
+- **Sibling fixes** executed together: [#1883](https://github.com/eltmon/overdeck/issues/1883), [#1877](https://github.com/eltmon/overdeck/issues/1877).

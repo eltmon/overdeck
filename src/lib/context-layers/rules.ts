@@ -5,7 +5,7 @@
  * Each rule carries a `scope:` frontmatter key:
  *
  *   universal — distributed everywhere (relevant to anyone running agents)
- *   dev       — distributed only on a panopticon-cli checkout (rules about
+ *   dev       — distributed only on a overdeck checkout (rules about
  *               developing Overdeck itself)
  *
  * `pan sync` folds the applicable rules into the rendered global CLAUDE.md.
@@ -64,7 +64,7 @@ export function readBundledRules(): BundledRule[] {
  * Render the applicable bundled rules into one CLAUDE.md section.
  *
  * `includeDev` admits `scope: dev` rules — set it from `isDevMode()` so they
- * only fold in on a panopticon-cli checkout. Each rule body is rendered for
+ * only fold in on a overdeck checkout. Each rule body is rendered for
  * the target harness so any `{{#harness:*}}` blocks resolve. Returns '' when
  * no rules apply.
  */

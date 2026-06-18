@@ -47,7 +47,7 @@ Move teardown logic from `workspace-manager.ts` into `lifecycle/teardown-workspa
 Each lifecycle step runs regardless of previous failures. `workflows.approve()` returns a structured result object showing success/failure per step. Callers decide what to do with partial success.
 
 ### D7: Archive Target — Follow Workspace Project
-`archive-planning` archives to the workspace's project repo, not always panopticon-cli. For polyrepo setups, `.planning/` artifacts go to the primary project repo.
+`archive-planning` archives to the workspace's project repo, not always overdeck. For polyrepo setups, `.planning/` artifacts go to the primary project repo.
 
 ### D8: Move review-status.ts to src/lib/
 `src/dashboard/server/review-status.ts` is used by `src/lib/reopen.ts` — it's a lib module in the wrong directory. Move it to `src/lib/review-status.ts` as part of this refactor to clean up the dependency direction. Lifecycle operations will also need it.

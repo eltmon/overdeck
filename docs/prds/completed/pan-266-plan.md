@@ -48,7 +48,7 @@ MYN's 8+ legacy commands in `.claude/commands/` migrate to skills as part of thi
 ### Three-Level Distribution
 
 ```
-REPO SOURCE (panopticon-cli/)
+REPO SOURCE (overdeck/)
   skills/           64 skills (git-tracked)
   dev-skills/       3 dev-only skills
   agents/           8 agent definitions
@@ -315,11 +315,11 @@ Phase 6 (commands → skills) → can run in parallel after Phase 4
 ## References
 
 - **Analysis doc**: `docs/SKILL-DISTRIBUTION-ANALYSIS.md` — comprehensive 912-line analysis with all decisions, inventory, and MYN audit
-- **Original architecture**: [PAN-3](https://github.com/eltmon/panopticon-cli/issues/3)
+- **Original architecture**: [PAN-3](https://github.com/eltmon/overdeck/issues/3)
 - **Symlink bug**: [claude-code#14836](https://github.com/anthropics/claude-code/issues/14836)
-- **Rules analysis**: [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263)
-- **Localias cleanup**: [PAN-264](https://github.com/eltmon/panopticon-cli/issues/264)
-- **Skill categorization**: [PAN-265](https://github.com/eltmon/panopticon-cli/issues/265)
+- **Rules analysis**: [PAN-263](https://github.com/eltmon/overdeck/issues/263)
+- **Localias cleanup**: [PAN-264](https://github.com/eltmon/overdeck/issues/264)
+- **Skill categorization**: [PAN-265](https://github.com/eltmon/overdeck/issues/265)
 - Current sync code: `src/lib/sync.ts`
 - Current install code: `src/cli/commands/install.ts`
 - MYN template: `myn/infra/.agent-template/.claude/`

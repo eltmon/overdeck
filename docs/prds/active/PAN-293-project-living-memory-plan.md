@@ -57,7 +57,7 @@ Configured per-project in `projects.yaml` or `.panopticon.yaml`:
 ```yaml
 # projects.yaml — monorepo (memory in same repo)
 projects:
-  panopticon-cli:
+  overdeck:
     memory:
       path: .panopticon/memory/        # Relative to project root
 
@@ -351,7 +351,7 @@ AT SPAWN (Injection)
 
 ```yaml
 projects:
-  panopticon-cli:
+  overdeck:
     memory:
       path: .panopticon/memory/          # Default for monorepo
       embedder: openai                    # or ollama, huggingface

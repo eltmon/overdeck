@@ -13,7 +13,7 @@ import { recordExtractionCost } from '../../../src/lib/memory/providers/types.js
 import { readPendingTurns } from '../../../src/lib/memory/pending.js';
 
 const identity: MemoryIdentity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -95,7 +95,7 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
       sessionId: observation.sessionId,
       agentRole: observation.agentRole,
     }))).toEqual(Array.from({ length: 6 }, () => ({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1052',
       issueId: 'PAN-1052',
       sessionId: 'session-1',
@@ -203,7 +203,7 @@ async function fileSize(path: string): Promise<number> {
 }
 
 async function readPersistedObservations(): Promise<MemoryObservation[]> {
-  const path = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.jsonl');
+  const path = join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl');
   const raw = await readFile(path, 'utf8');
   return raw.trim().split('\n').map((line) => JSON.parse(line) as MemoryObservation);
 }

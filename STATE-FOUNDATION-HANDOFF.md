@@ -222,4 +222,4 @@ the north star without risking live state.
 PAN-1919 keystone · PAN-1920 (done) · PAN-1921 write-surface · PAN-1847 (merged #1930) ·
 PAN-1922 verdicts (in flight) · PAN-1925 events (in flight) · PAN-1927 model-fallback ·
 PAN-1928 model-switch-lock · PAN-1929 auto-commit-rebase · PAN-1931 force-add · PAN-1932 version-downgrade.
-All on `github.com/eltmon/panopticon-cli/issues/<n>`.
+All on `github.com/eltmon/overdeck/issues/<n>`.

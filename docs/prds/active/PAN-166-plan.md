@@ -1,7 +1,7 @@
 # PAN-166: Rally WSAPI Query Parse Error Fix
 
 **Status:** Planning Complete
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/166
+**Issue:** https://github.com/eltmon/overdeck/issues/166
 **Severity:** High - Rally tracker completely non-functional
 
 ## Problem Statement

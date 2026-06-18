@@ -359,4 +359,4 @@ try {
 - PAN-17: Original async conversion (terminal endpoints)
 - Playwright tests: `src/dashboard/frontend/tests/terminal-latency.spec.ts`
 - Server code: `src/dashboard/server/index.ts`
-- Issue: https://github.com/eltmon/panopticon-cli/issues/35
+- Issue: https://github.com/eltmon/overdeck/issues/35

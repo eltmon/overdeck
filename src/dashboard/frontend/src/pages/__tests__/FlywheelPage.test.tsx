@@ -125,7 +125,7 @@ describe('FlywheelPage', () => {
     expect(screen.getByLabelText('Flywheel control rail')).toBeInTheDocument();
     expect(screen.getByRole('separator', { name: 'Resize flywheel panes' })).toBeInTheDocument();
     expect(screen.getByLabelText('Flywheel conversation column')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md');
+    expect(screen.getByRole('link', { name: 'Flywheel docs' })).toHaveAttribute('href', 'https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md');
     expect(screen.getByTestId('conversation-pane')).toBeInTheDocument();
   });
 
@@ -253,7 +253,7 @@ describe('FlywheelPage', () => {
         return Response.json(cancelled ? [] : [{
           id: 41,
           issueId: 'PAN-1486',
-          prUrl: 'https://github.com/eltmon/panopticon-cli/pull/123',
+          prUrl: 'https://github.com/eltmon/overdeck/pull/123',
           scheduledMergeAt: '2026-05-18T12:03:42.000Z',
           status: 'pending',
         }]);

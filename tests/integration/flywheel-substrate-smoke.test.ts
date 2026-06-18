@@ -290,7 +290,7 @@ describe('flywheel substrate bug smoke', () => {
       intervalMs: 60_000,
       fetchImpl,
       eventStore: eventStore as never,
-      getConfig: () => ({ token: 'ghp_test', repos: [{ owner: 'eltmon', repo: 'panopticon-cli', prefix: 'PAN' }] }),
+      getConfig: () => ({ token: 'ghp_test', repos: [{ owner: 'eltmon', repo: 'overdeck', prefix: 'PAN' }] }),
       now: () => new Date('2026-05-25T12:15:00.000Z'),
     });
 

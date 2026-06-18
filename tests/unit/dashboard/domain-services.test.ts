@@ -183,7 +183,7 @@ describe('EventStoreService', () => {
           observation: {
             id: 'obs-1',
             timestamp: new Date().toISOString(),
-            projectId: 'panopticon-cli',
+            projectId: 'overdeck',
             workspaceId: 'feature-pan-1052',
             issueId: 'PAN-1052',
             runId: 'run-1',

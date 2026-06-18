@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-12T15:34:22Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-655: test(prd-pipeline): add docs/prd-pipeline-test-marker.md"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-12T15:34:22Z",
     "updated": "2026-04-12T15:34:22Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/655", "label": "PAN-655", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/655", "label": "PAN-655", "type": "issue" }
     ],
     "tags": ["test", "pipeline", "smoke-test", "prd"],
     "narratives": {

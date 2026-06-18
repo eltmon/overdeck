@@ -372,7 +372,7 @@ describe('checkStuckAgentRemediation — flywheel orchestrator coverage', () => 
     return {
       id: 'flywheel-orchestrator',
       issueId: '',
-      workspace: '/home/eltmon/Projects/panopticon-cli',
+      workspace: '/home/eltmon/Projects/overdeck',
       role: 'flywheel',
       status: 'running',
       startedAt: '2026-05-23T10:00:00.000Z',

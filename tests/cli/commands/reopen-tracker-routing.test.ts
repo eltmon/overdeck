@@ -49,7 +49,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
    * and NOT to Linear when both trackers are configured.
    *
    * This is the core fix: `pan reopen pan-457` should update the GitHub issue
-   * #457 in eltmon/panopticon-cli, not MIN-848 in Linear.
+   * #457 in eltmon/overdeck, not MIN-848 in Linear.
    */
   it('routes PAN-XXX issues to GitHub (not Linear) when project has github_repo', () => {
     mockLoadProjectsConfig.mockReturnValue({
@@ -57,7 +57,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
         panopticon: {
           name: 'Overdeck',
           path: '/home/user/panopticon',
-          github_repo: 'eltmon/panopticon-cli',
+          github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
         myn: {
@@ -102,7 +102,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
         panopticon: {
           name: 'Overdeck',
           path: '/home/user/panopticon',
-          github_repo: 'eltmon/panopticon-cli',
+          github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
       },
@@ -121,7 +121,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
         panopticon: {
           name: 'Overdeck',
           path: '/home/user/panopticon',
-          github_repo: 'eltmon/panopticon-cli',
+          github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
       },

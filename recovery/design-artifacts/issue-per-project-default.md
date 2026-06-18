@@ -1,6 +1,6 @@
 ## Problem
 
-The per-issue auto-merge toggle ([PAN-1692](https://github.com/eltmon/panopticon-cli/issues/1692)) has a **"default"** state — "follow the project default." But there is no per-project default to follow. The only default that exists is a **single global** app-setting, `flywheel.require_uat_before_merge` (one toggle on the Flywheel page for the whole instance).
+The per-issue auto-merge toggle ([PAN-1692](https://github.com/eltmon/overdeck/issues/1692)) has a **"default"** state — "follow the project default." But there is no per-project default to follow. The only default that exists is a **single global** app-setting, `flywheel.require_uat_before_merge` (one toggle on the Flywheel page for the whole instance).
 
 ## Ask
 
@@ -16,6 +16,6 @@ Add a **per-project** auto-merge / UAT default, so e.g. project A can auto-merge
 
 ## Where it lives
 
-The per-project default setting belongs in the project-settings section ([PAN-1693](https://github.com/eltmon/panopticon-cli/issues/1693)). Relates to [PAN-1691](https://github.com/eltmon/panopticon-cli/issues/1691) (merge train) and [PAN-1692](https://github.com/eltmon/panopticon-cli/issues/1692) (toggle UI).
+The per-project default setting belongs in the project-settings section ([PAN-1693](https://github.com/eltmon/overdeck/issues/1693)). Relates to [PAN-1691](https://github.com/eltmon/overdeck/issues/1691) (merge train) and [PAN-1692](https://github.com/eltmon/overdeck/issues/1692) (toggle UI).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

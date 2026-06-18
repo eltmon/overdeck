@@ -1,7 +1,7 @@
 # Pipeline Transitions — Full Audit
 
 > Evidence base for the Overdeck remodel
-> ([PAN-1938](https://github.com/eltmon/panopticon-cli/issues/1938)).
+> ([PAN-1938](https://github.com/eltmon/overdeck/issues/1938)).
 > **Question:** What are the canonical pipeline stages, and every way an
 > issue/agent moves between them?
 > **Method:** `git grep` / `rg` over `src/`, production code only

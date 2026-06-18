@@ -52,7 +52,7 @@ async function main() {
 
   const manifest = {
     name: 'panopticon-agent',
-    url: 'https://github.com/eltmon/panopticon-cli',
+    url: 'https://github.com/eltmon/overdeck',
     hook_attributes: { url: smeeUrl, active: true },
     redirect_url: CALLBACK_URL,
     callback_urls: [CALLBACK_URL],
@@ -104,7 +104,7 @@ async function main() {
           method: 'POST',
           headers: {
             'Accept': 'application/vnd.github+json',
-            'User-Agent': 'panopticon-cli',
+            'User-Agent': 'overdeck',
           },
         });
 
@@ -151,7 +151,7 @@ async function main() {
           <p>Credentials saved to <code>${APP_DIR}/</code></p>
           <h3>Next: Install the app on your repos</h3>
           <p><a href="${data.html_url}/installations/new" style="font-size:16px;">
-            → Install panopticon-agent on eltmon/panopticon-cli
+            → Install panopticon-agent on eltmon/overdeck
           </a></p>
           <p>You can close this tab after installing.</p>
         `);

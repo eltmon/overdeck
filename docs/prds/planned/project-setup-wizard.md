@@ -451,7 +451,7 @@ for repo in "${REPOS[@]}"; do
 done
 
 # Install Overdeck
-npx panopticon-cli@latest install
+npx overdeck@latest install
 
 # Register project
 pan setup  # Interactive wizard with team template pre-applied

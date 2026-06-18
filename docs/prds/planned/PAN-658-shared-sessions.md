@@ -1,6 +1,6 @@
 # PAN-658 — Shared Sessions v0
 
-**Issue:** [PAN-658](https://github.com/eltmon/panopticon-cli/issues/658)
+**Issue:** [PAN-658](https://github.com/eltmon/overdeck/issues/658)
 **Status:** Planned
 **Date:** 2026-05-21
 **Followups:** agent-session sharing, collaborative markdown editing (PAN-659 lineage), hosted read-only web view
@@ -23,10 +23,10 @@ on the right next step.
 ## Goal
 
 Let a Overdeck host share **one conversation** with other Overdeck users via a
-`panopticon-cli.com/s/<id>` link. Viewers render that conversation live in their own local
+`overdeck.ai/s/<id>` link. Viewers render that conversation live in their own local
 Overdeck dashboard. Delivered as:
 
-1. A new **signaling service** deployed at `panopticon-cli.com` (WebRTC handshake, GitHub OAuth, TURN).
+1. A new **signaling service** deployed at `overdeck.ai` (WebRTC handshake, GitHub OAuth, TURN).
 2. A **host-side WebRTC transport** in the dashboard server, hub for N viewers.
 3. A **viewer-side** shared-conversation surface in the dashboard frontend (browser-native WebRTC).
 4. **Invite-only access control**: host-approval lobby, admit / kick / revoke, per-session block list.
@@ -111,7 +111,7 @@ The viewer side uses **browser-native `RTCPeerConnection`** — no dependency ei
 ### Components
 
 ```
-   HOST machine                  panopticon-cli.com               VIEWER machine
+   HOST machine                  overdeck.ai               VIEWER machine
  ┌────────────────┐          ┌──────────────────────┐         ┌────────────────────┐
  │ dashboard       │  WS      │  signaling service    │   WS    │ dashboard frontend │
  │  server (Node)  │◄────────►│  - room registry      │◄───────►│  (browser)         │
@@ -131,7 +131,7 @@ The viewer side uses **browser-native `RTCPeerConnection`** — no dependency ei
 - **Viewer** — runs their own Overdeck. The **browser** frontend holds one `RTCPeerConnection`
   to the host server and renders the shared conversation. The viewer's local server is a thin
   bootstrap only (receives the join intent, opens the frontend route).
-- **Signaling service** (`panopticon-cli.com`) — new deployable. WebRTC handshake relay, GitHub
+- **Signaling service** (`overdeck.ai`) — new deployable. WebRTC handshake relay, GitHub
   OAuth, TURN credential issuance, room registry. **Never sees conversation content.**
 - **TURN server** — `coturn` for the ~20% of peer pairs that cannot NAT-traverse directly.
 
@@ -167,7 +167,7 @@ subscriber alongside the existing raw-WebSocket clients.
 
 A new deployable workspace: **`services/signaling-service/`** (Bun workspace; Node 22 runtime).
 
-**Hosting:** deploy to `panopticon-cli.com` behind TLS. Recommended target: **Fly.io** (Overdeck
+**Hosting:** deploy to `overdeck.ai` behind TLS. Recommended target: **Fly.io** (Overdeck
 already has Fly tooling and the `pan-fly` skill). `coturn` runs as a companion Fly app or VM. Final
 infra placement is an ops decision to confirm at Phase 1 kickoff.
 
@@ -178,7 +178,7 @@ is small and ephemeral; losing it on a deploy ends in-flight shares (acceptable 
 
 | Method & path | Caller | Purpose |
 |---|---|---|
-| `POST /api/sessions` | host | Create a room. Body `{ conversationId, mode }`. Returns `{ roomId, hostToken, shortCode, joinUrl }`. `joinUrl = https://panopticon-cli.com/s/<shortCode>`. |
+| `POST /api/sessions` | host | Create a room. Body `{ conversationId, mode }`. Returns `{ roomId, hostToken, shortCode, joinUrl }`. `joinUrl = https://overdeck.ai/s/<shortCode>`. |
 | `DELETE /api/sessions/:roomId` | host (`hostToken`) | Revoke the link; tear the room down; drop all participants. |
 | `GET /s/:shortCode` | viewer browser | Join landing page. Triggers GitHub OAuth, then localhost-detect / `pan join` handoff. |
 | `GET /oauth/github/start?room=<shortCode>` | viewer browser | Redirect into GitHub OAuth (`read:user` scope only). |
@@ -236,13 +236,13 @@ There is no fixed-duration link expiry — link lifetime = conversation lifetime
 - **OAuth scope: `read:user` only.** Enough for login + avatar. The collaborative-markdown-editor
   followup may later need `gist`; if so we request that scope then and accept a one-time
   re-consent. We do not ask for gist write access before a feature uses it.
-- The GitHub OAuth app is registered to `panopticon-cli.com` and its client secret lives **only**
+- The GitHub OAuth app is registered to `overdeck.ai` and its client secret lives **only**
   on the signaling service.
 - After OAuth (browser redirect flow) or device flow (CLI), the signaling service mints a
   short-lived **identity JWT**, signed with the service's private key:
 
   ```
-  { iss: "panopticon-cli.com", sub: "<github-user-id>", login, name,
+  { iss: "overdeck.ai", sub: "<github-user-id>", login, name,
     avatar_url, room: "<roomId>", iat, exp }   // exp ~15 min
   ```
 
@@ -499,7 +499,7 @@ All join paths funnel through the same host-approval lobby.
 - **Host:** a "Share this conversation" action in the conversation panel calls
   `POST /api/sessions` (via the host's dashboard server) and surfaces the `/s/<shortCode>` link +
   a participant/lobby management panel.
-- **Viewer:** open the link in a browser → GitHub OAuth on `panopticon-cli.com` → **localhost-detect**:
+- **Viewer:** open the link in a browser → GitHub OAuth on `overdeck.ai` → **localhost-detect**:
   the share page probes for a running local Overdeck at `localhost:<port>` and POSTs the join
   intent there → the local dashboard opens `/#/shared/<roomId>` → lobby.
   A `pan://` protocol handler was considered and rejected (OS-level registration is finicky
@@ -521,7 +521,7 @@ instructs the user to run `pan join <link-or-code>`. **`pan join` auto-starts th
 if it is not already running**, then proceeds to the lobby — so the CLI is the cold-start recovery
 path for an installed-but-not-running viewer. A viewer with **no Overdeck installed at all** must
 install it first; a hosted read-only web view for the truly-uninstalled case is a possible
-followup (it would put conversation content on `panopticon-cli.com`, breaking the no-content
+followup (it would put conversation content on `overdeck.ai`, breaking the no-content
 guarantee) and is out of scope for v0.
 
 ---
@@ -621,7 +621,7 @@ shipped artifact.
 
 ## Acceptance Criteria
 
-- [ ] Host can run "Share this conversation" (dashboard) and get a `panopticon-cli.com/s/<id>` link
+- [ ] Host can run "Share this conversation" (dashboard) and get a `overdeck.ai/s/<id>` link
 - [ ] `pan share <conversationId>` (CLI) prints a working share link + join code
 - [ ] Browser link recipient hits GitHub OAuth, then localhost-detect hands off to their local dashboard
 - [ ] `pan join <link-or-code>` (CLI) authenticates via GitHub device flow and lands in the lobby

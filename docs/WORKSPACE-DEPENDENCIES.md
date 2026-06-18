@@ -48,7 +48,7 @@ In `~/.panopticon/projects.yaml`, projects declare their package manager and wor
 
 ```yaml
 projects:
-  panopticon-cli:
+  overdeck:
     package_manager: bun        # bun | npm | pnpm
     workspace_packages:         # local packages that need building
       - path: packages/contracts

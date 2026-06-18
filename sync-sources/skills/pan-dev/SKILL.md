@@ -81,7 +81,7 @@ If ports are still occupied, kill the specific PIDs shown.
 ### Step 3: Run skills sync (same as pan up)
 
 ```bash
-cd ~/Projects/panopticon-cli && pan sync 2>&1 | tail -3
+cd ~/Projects/overdeck && pan sync 2>&1 | tail -3
 ```
 
 ### Step 4: Start Traefik (if enabled) and regenerate dev-mode config
@@ -100,12 +100,12 @@ Regenerate the Traefik dynamic config in dev mode so the frontend route points
 to Vite (3010) instead of the bundled server (3011):
 ```bash
 OVERDECK_DEV=1 node -e "
-import('~/Projects/panopticon-cli/dist/cli/index.js').catch(()=>{});
-import('~/Projects/panopticon-cli/src/lib/traefik.ts').catch(()=>{});
+import('~/Projects/overdeck/dist/cli/index.js').catch(()=>{});
+import('~/Projects/overdeck/src/lib/traefik.ts').catch(()=>{});
 " 2>/dev/null
 
 # Or, more reliably via tsx:
-cd ~/Projects/panopticon-cli && \
+cd ~/Projects/overdeck && \
   OVERDECK_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generateOverdeckTraefikConfig())" 2>&1
 ```
 
@@ -120,7 +120,7 @@ grep 'host.docker.internal' ~/.panopticon/traefik/dynamic/panopticon.yml
 
 If server code has changed since last build:
 ```bash
-cd ~/Projects/panopticon-cli && npm run build:dashboard:server 2>&1
+cd ~/Projects/overdeck && npm run build:dashboard:server 2>&1
 ```
 
 If unsure, always rebuild — it takes ~2 seconds.
@@ -128,7 +128,7 @@ If unsure, always rebuild — it takes ~2 seconds.
 ### Step 6: Start the API server (background)
 
 ```bash
-cd ~/Projects/panopticon-cli && \
+cd ~/Projects/overdeck && \
   nohup node dist/dashboard/server.js \
   > /tmp/panopticon-server.log 2>&1 &
 echo "Server PID: $!"
@@ -149,7 +149,7 @@ done
 ### Step 8: Start the Vite frontend dev server (background)
 
 ```bash
-cd ~/Projects/panopticon-cli/src/dashboard/frontend && \
+cd ~/Projects/overdeck/src/dashboard/frontend && \
   nohup npx vite --host 0.0.0.0 --port 3010 \
   > /tmp/panopticon-frontend.log 2>&1 &
 echo "Frontend PID: $!"
@@ -170,7 +170,7 @@ done
 ### Step 10: Start TLDR daemon (if .venv exists)
 
 ```bash
-cd ~/Projects/panopticon-cli
+cd ~/Projects/overdeck
 if [ -d .venv ]; then
   pan tldr start 2>/dev/null || echo "TLDR unavailable (non-fatal)"
 fi
@@ -190,7 +190,7 @@ Print:
 The server runs pre-built JS, so after editing `src/dashboard/server/**`:
 
 ```bash
-cd ~/Projects/panopticon-cli && npm run build:dashboard:server
+cd ~/Projects/overdeck && npm run build:dashboard:server
 pkill -f "node.*dist/dashboard/server\.js"
 nohup node dist/dashboard/server.js \
   > /tmp/panopticon-server.log 2>&1 &

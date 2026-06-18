@@ -257,7 +257,7 @@ describe('createBeadsFromVBrief', () => {
       issueId: 'PAN-500',
       title: 'Auto-start round trip',
       body: '- [ ] Create the auto-start bead',
-      url: 'https://github.com/eltmon/panopticon-cli/issues/500',
+      url: 'https://github.com/eltmon/overdeck/issues/500',
     }));
 
     expect(findPlanSync(WORKSPACE_DIR)).toBe(written.projectSpecPath);

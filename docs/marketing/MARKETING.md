@@ -6,7 +6,7 @@
 >
 > **What this is not:** the public docs site. The Mintlify site lives at the repo root
 > (`introduction.mdx`, `quickstart.mdx`, …) and is published at
-> [panopticon-cli.com](https://panopticon-cli.com). This file is internal collateral —
+> [overdeck.ai](https://overdeck.ai). This file is internal collateral —
 > the raw material we draw from when we write external-facing pages, posts, and scripts.
 >
 > Everything here is grounded in shipped functionality. When a claim changes, update it
@@ -427,7 +427,7 @@ Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
 **Calls to action**
 - `npx @overdeck/cli` — no install step.
 - Open Command Deck in your browser in 30 seconds.
-- Read the docs → panopticon-cli.com
+- Read the docs → overdeck.ai
 - Star it on GitHub.
 
 ---
@@ -483,9 +483,9 @@ browser.
 
 ## 14. Quick links
 
-- **Site:** https://panopticon-cli.com
+- **Site:** https://overdeck.ai
 - **npm:** https://www.npmjs.com/package/@overdeck/cli
-- **GitHub:** https://github.com/eltmon/panopticon-cli
+- **GitHub:** https://github.com/eltmon/overdeck
 - **Install:** `npx @overdeck/cli`
 - **Desktop app:** `@overdeck/desktop`
 

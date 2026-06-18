@@ -3027,7 +3027,7 @@ const getConversationMessagesRoute = HttpRouter.add(
         const conv = getConversationByName(name);
 
         // Fall back to specialist session file when name is a specialist tmux session
-        // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
+        // (e.g. specialist-overdeck-merge-agent) and not in the conversations DB.
         let sessionFile: string | null | undefined = conv ? await resolveSessionFile(conv) : undefined;
         if (!conv) {
           const cached = getSpecialistSessionCache(name);

@@ -12,7 +12,7 @@ function agent(overrides: Partial<AgentState & { tmuxActive: boolean }> = {}): A
   return {
     id: 'agent-pan-1052',
     issueId: 'PAN-1052',
-    workspace: '/repo/panopticon-cli/workspaces/feature-pan-1052',
+    workspace: '/repo/overdeck/workspaces/feature-pan-1052',
     harness: 'claude-code',
     role: 'work',
     model: 'claude-sonnet-4-6',
@@ -41,9 +41,9 @@ describe('ClaudeCodeTranscriptSource', () => {
     expect(await source.getActiveTranscripts()).toEqual([{
       agentId: 'agent-pan-1052',
       sessionId: 'session-from-state',
-      transcriptPath: '/repo/panopticon-cli/workspaces/feature-pan-1052/.claude/session-from-state.jsonl',
+      transcriptPath: '/repo/overdeck/workspaces/feature-pan-1052/.claude/session-from-state.jsonl',
       identity: {
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         runId: 'agent-pan-1052',
@@ -127,7 +127,7 @@ describe('PiTranscriptSource', () => {
       sessionId: 'pi-session',
       transcriptPath: '/tmp/pi-session.jsonl',
       identity: {
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         runId: 'agent-pi',

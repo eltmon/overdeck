@@ -1,7 +1,7 @@
 # PAN-1205 — HTML Artifacts
 
-**Issue:** [PAN-1205](https://github.com/eltmon/panopticon-cli/issues/1205)
-**Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
+**Issue:** [PAN-1205](https://github.com/eltmon/overdeck/issues/1205)
+**Parent epic:** [PAN-1200](https://github.com/eltmon/overdeck/issues/1200)
 **Status:** Planned
 **Date:** 2026-05-18
 

@@ -70,7 +70,7 @@ describe('createTracker', () => {
       const config: TrackerConfig = {
         type: 'github',
         owner: 'eltmon',
-        repo: 'panopticon-cli',
+        repo: 'overdeck',
       };
 
       const tracker = createTracker(config);

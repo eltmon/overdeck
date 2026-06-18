@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 async function insertRow(overrides: Partial<Record<string, string>> = {}) {
-  await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+  await withMemoryFtsDatabase('overdeck', (db) => db.prepare(`
     INSERT INTO memory_fts (
       content,
       display_content,
@@ -56,7 +56,7 @@ async function insertRow(overrides: Partial<Record<string, string>> = {}) {
     overrides.tags ?? 'memory,search',
     overrides.doc_type ?? 'observation',
     overrides.scope ?? 'workspace',
-    overrides.project_id ?? 'panopticon-cli',
+    overrides.project_id ?? 'overdeck',
     overrides.workspace_id ?? 'feature-pan-1052',
     overrides.issue_id ?? 'PAN-1052',
     overrides.run_id ?? 'run-1',
@@ -77,12 +77,12 @@ describe('memory FTS search', () => {
     await insertRow({ content: 'other project memory search', project_id: 'other-project' });
     await insertRow({ content: 'other issue memory search', issue_id: 'PAN-999' });
 
-    const hits = await searchMemory({ query: 'memory search', projectId: 'panopticon-cli', issueId: 'PAN-1052', limit: 5 });
+    const hits = await searchMemory({ query: 'memory search', projectId: 'overdeck', issueId: 'PAN-1052', limit: 5 });
 
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({
       content: 'memory search exact hit',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1052',
       issueId: 'PAN-1052',
       tags: ['memory', 'search'],
@@ -98,7 +98,7 @@ describe('memory FTS search', () => {
       await insertRow({ content: `ranked memory search ${index}`, tags: index < 4 ? 'memory' : 'memory,keep' });
     }
 
-    const hits = await searchMemory({ query: 'ranked memory', projectId: 'panopticon-cli', tags: ['keep'], limit: 2 });
+    const hits = await searchMemory({ query: 'ranked memory', projectId: 'overdeck', tags: ['keep'], limit: 2 });
 
     expect(hits.map((hit) => hit.tags)).toEqual([['memory', 'keep'], ['memory', 'keep']]);
   });
@@ -111,7 +111,7 @@ describe('memory FTS search', () => {
       });
     }
 
-    const hits = await searchMemory({ query: 'rerank memory search', projectId: 'panopticon-cli', limit: 2 });
+    const hits = await searchMemory({ query: 'rerank memory search', projectId: 'overdeck', limit: 2 });
 
     expect(hits).toHaveLength(2);
     expect(hits[0]?.tags).toEqual(['memory', 'search']);
@@ -134,7 +134,7 @@ describe('memory FTS search', () => {
 
     const hits = await searchMemory({
       query: 'signal memory search',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       limit: 2,
       now: new Date('2026-05-16T22:00:00.000Z'),
     });
@@ -146,14 +146,14 @@ describe('memory FTS search', () => {
   it('applies latest reset markers unless includeArchived is set', async () => {
     await insertRow({ content: 'archived memory search', entry_time: '20:00:00.000Z' });
     await insertRow({ content: 'current memory search', entry_time: '22:00:00.000Z' });
-    await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+    await withMemoryFtsDatabase('overdeck', (db) => db.prepare(`
       INSERT INTO reset_markers (scope, scope_id, from_timestamp, reason, created_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('issue', 'PAN-1052', '2026-05-16T21:00:00.000Z', 'test reset', '2026-05-16T21:00:00.000Z'));
 
-    expect((await searchMemory({ query: 'memory search', projectId: 'panopticon-cli', issueId: 'PAN-1052' })).map((hit) => hit.content))
+    expect((await searchMemory({ query: 'memory search', projectId: 'overdeck', issueId: 'PAN-1052' })).map((hit) => hit.content))
       .toEqual(['current memory search']);
-    expect((await searchMemory({ query: 'memory search', projectId: 'panopticon-cli', issueId: 'PAN-1052', includeArchived: true })).map((hit) => hit.content).sort())
+    expect((await searchMemory({ query: 'memory search', projectId: 'overdeck', issueId: 'PAN-1052', includeArchived: true })).map((hit) => hit.content).sort())
       .toEqual(['archived memory search', 'current memory search']);
   });
 
@@ -166,7 +166,7 @@ describe('memory FTS search', () => {
 
     const hits = await searchMemory({
       query: 'sibling memory',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1052',
       issueId: 'PAN-1052',
       sibling: true,
@@ -183,7 +183,7 @@ describe('memory FTS search', () => {
 
     expect((await searchMemory({
       query: 'sibling memory',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1052',
       issueId: 'PAN-1052',
       sibling: true,

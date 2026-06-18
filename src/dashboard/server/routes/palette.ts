@@ -245,7 +245,7 @@ function registeredProjectDirs(): ProjectDirMatch[] {
 /**
  * The dashboard project key (`name ?? key`) whose cwd contains this conversation,
  * or null when it is under no registered project. Longest-prefix wins so a
- * workspace path (`…-panopticon-cli-workspaces-feature-x`) resolves to its parent
+ * workspace path (`…-overdeck-workspaces-feature-x`) resolves to its parent
  * project's deck rather than a phantom one.
  */
 function resolveConversationProjectKey(projectId: string, dirs: ProjectDirMatch[]): string | null {

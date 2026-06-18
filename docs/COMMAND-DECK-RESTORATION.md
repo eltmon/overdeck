@@ -459,7 +459,7 @@ Progress notes appended below as slices land (commit hashes).
   `ProjectHome` renders `<ProjectOverview>` in cockpit mode (features present) and keeps the sparse
   launch composition as a load/no-project fallback. Issue-card click adapts `feature →
   handleSelectFeature(feature.issueId)`, the same proven path the rail uses → opens the issue
-  cockpit tab. VERIFIED LIVE on panopticon-cli: swimlanes (Ship/Review/Work/Plan) render with
+  cockpit tab. VERIFIED LIVE on overdeck: swimlanes (Ship/Review/Work/Plan) render with
   status badges + agent dots; clicking PAN-1242's card opened its full issue cockpit tab.
   Mockup `docs/design/command-deck-project-cockpit-v2.html`.
   NEXT — S4 refinement (mockup-alignment): right-column Cost+Fleet card layout, dig tabs

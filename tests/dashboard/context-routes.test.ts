@@ -31,7 +31,7 @@ beforeEach(async () => {
   await writeFile(join(workspacePath, '.pan', 'context', 'workspace.md'), 'workspace context', 'utf-8');
   projects = [
     {
-      key: 'panopticon-cli',
+      key: 'overdeck',
       config: {
         name: 'Overdeck CLI',
         path: projectRoot,
@@ -54,14 +54,14 @@ describe('dashboard context route helpers', () => {
     expect(response.operation).toBe('load');
     expect(response.projects).toEqual([
       expect.objectContaining({
-        projectKey: 'panopticon-cli',
+        projectKey: 'overdeck',
         path: projectRoot,
         workspaceRoot: join(projectRoot, 'workspaces'),
       }),
     ]);
     expect(response.workspaces).toEqual([
       expect.objectContaining({
-        projectKey: 'panopticon-cli',
+        projectKey: 'overdeck',
         path: workspacePath,
         issueId: 'PAN-1201',
       }),
@@ -85,10 +85,10 @@ describe('dashboard context route helpers', () => {
   it('renders draft harness blocks without writing files', async () => {
     const response = await previewContextLayers(projects, {
       operation: 'preview',
-      selectedLayer: { kind: 'workspace', projectKey: 'panopticon-cli', workspacePath },
+      selectedLayer: { kind: 'workspace', projectKey: 'overdeck', workspacePath },
       drafts: [
         {
-          target: { kind: 'project', projectKey: 'panopticon-cli' },
+          target: { kind: 'project', projectKey: 'overdeck' },
           content: 'shared {{#harness:claude}}claude-only{{/harness:claude}}{{#harness:pi}}pi-only{{/harness:pi}}',
         },
       ],
@@ -108,7 +108,7 @@ describe('dashboard context route helpers', () => {
   it('writes only the canonical selected layer file', async () => {
     const response = await saveContextLayer(projects, {
       operation: 'save',
-      target: { kind: 'workspace', projectKey: 'panopticon-cli', workspacePath },
+      target: { kind: 'workspace', projectKey: 'overdeck', workspacePath },
       content: 'updated workspace context',
     }, panHome);
 
@@ -127,7 +127,7 @@ describe('dashboard context route helpers', () => {
       operation: 'save',
       target: {
         kind: 'workspace',
-        projectKey: 'panopticon-cli',
+        projectKey: 'overdeck',
         workspacePath: join(projectRoot, '..', 'outside-workspace'),
       },
       content: 'escape',

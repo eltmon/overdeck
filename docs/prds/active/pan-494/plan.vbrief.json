@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-06T12:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-494: pan start fails if workspace doesn't exist — requires separate pan workspace create"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-06T12:00:00Z",
     "updated": "2026-04-06T12:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/494", "label": "PAN-494", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/494", "label": "PAN-494", "type": "issue" }
     ],
     "tags": ["cli", "bug-fix", "workspace"],
     "narratives": {

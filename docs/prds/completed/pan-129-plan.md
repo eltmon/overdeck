@@ -4,7 +4,7 @@
 
 Add a toggle button to switch between dark and light mode on the Overdeck dashboard, with OS preference detection and localStorage persistence.
 
-**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/129
+**Issue URL:** https://github.com/eltmon/overdeck/issues/129
 **Priority:** Low - nice to have for user comfort
 **Branch:** feature/pan-129
 

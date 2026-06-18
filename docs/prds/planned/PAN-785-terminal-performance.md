@@ -249,7 +249,7 @@ Quality gates:
 
 ## References
 
-- Issue: https://github.com/eltmon/panopticon-cli/issues/785
+- Issue: https://github.com/eltmon/overdeck/issues/785
 - Regression commit: `fdb591af` (feat(terminal): route terminal tmux access through managed context)
 - Pre-regression benchmark: commits prior to `fdb591af` on 2026-04-13
 - Related prior work: PAN-70 (execSync cleanup), PAN-446 (sync FS cleanup in server routes)

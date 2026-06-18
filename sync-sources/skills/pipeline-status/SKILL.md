@@ -98,7 +98,7 @@ AGENTS = Path.home() / ".panopticon" / "agents"
 
 issues_data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
 panissues = [i for i in issues_data
-             if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/panopticon-cli'
+             if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/overdeck'
              and ((i.get('state','') or '').lower().replace(' ','_') in ('in_progress','in_review'))]
 
 db = sqlite3.connect(PANO_DB)
@@ -187,7 +187,7 @@ curl -s http://localhost:3011/api/issues | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 ready = [i for i in data
-         if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/panopticon-cli'
+         if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/overdeck'
          and i.get('readyForMerge') is True
          and (i.get('mergeStatus') or '').lower() != 'merged']
 print(f'\\nAwaiting Merge: {len(ready)} issue(s) ready for human approval')

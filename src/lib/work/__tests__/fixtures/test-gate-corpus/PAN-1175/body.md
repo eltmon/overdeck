@@ -42,7 +42,7 @@ async function resolveParentFeatureBranch(
 ## Reproduction
 
 \`\`\`bash
-cd /home/eltmon/Projects/panopticon-cli
+cd /home/eltmon/Projects/overdeck
 git branch --show-current  # → main
 pan swarm PAN-1148 --auto-advance --max-slots 2
 # → Failed to dispatch any slots for PAN-1148 wave 0.

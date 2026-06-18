@@ -3,7 +3,7 @@
 UAT batch trains keep **one assembled, testable batch of every merge-ready
 feature available at all times**, so a human can exercise the combined result,
 then land exactly what they tested with a single action. Shipped in
-[PAN-1737](https://github.com/eltmon/panopticon-cli/issues/1737); supersedes the
+[PAN-1737](https://github.com/eltmon/overdeck/issues/1737); supersedes the
 disjoint-only "UAT candidate" model from PAN-1691 (see
 [`MERGE-TRAIN.md`](./MERGE-TRAIN.md) for that history) and absorbs the live
 preview stack from PAN-1738.
@@ -29,7 +29,7 @@ tree once, continuously, and automatically.
 
 | Term | Meaning |
 | --- | --- |
-| **Ready set** | All features at the merge gate, in merge order — the flywheel merge queue (`computeMergeQueue`, filtered to `MERGE_GATE_VERBS = {shipping, merging}`, see [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736)). |
+| **Ready set** | All features at the merge gate, in merge order — the flywheel merge queue (`computeMergeQueue`, filtered to `MERGE_GATE_VERBS = {shipping, merging}`, see [PAN-1736](https://github.com/eltmon/overdeck/issues/1736)). |
 | **Generation** | A throwaway `uat/<label>-<codename>-<MMDD>` branch off current main containing **as many ready features as possible, in merge order, with cross-feature conflicts resolved inside the batch**. |
 | **Assembly agent** | A timeboxed headless `claude -p` run (acceptEdits, no shell) that resolves a merge conflict *on the branch* when one feature collides with an already-merged member. Verification, staging, and the merge commit happen in code — the agent only edits files. |
 | **Held out** | A feature excluded from a generation because its conflict could not be resolved confidently (or the agent timed out). Shown on the card with the reason; retried in later generations once the conflicting predecessor merges or its branch changes. |
@@ -112,7 +112,7 @@ merge and holds the feature out. **The assembly never wedges on a conflict.**
 would silently drop commits landed since assembly). It merges the `uat/*` branch
 into main with one no-ff merge in a **throwaway detached worktree** (never the
 primary checkout), pushes, then runs each member issue's post-merge lifecycle
-**exactly once** through the [PAN-328](https://github.com/eltmon/panopticon-cli/issues/328)
+**exactly once** through the [PAN-328](https://github.com/eltmon/overdeck/issues/328)
 in-flight guard (see CLAUDE.md "postMergeLifecycle Idempotency"). GitHub marks
 the per-feature PRs merged automatically because their head commits become
 reachable from main. The promoted generation is reaped; all other live

@@ -84,7 +84,7 @@ describe('palette conversation search', () => {
 
   it('returns conversation hits from an indexed fixture session', async () => {
     const root = tmpDir!;
-    const projectDir = join(root, 'projects', 'panopticon-cli');
+    const projectDir = join(root, 'projects', 'overdeck');
     mkdirSync(projectDir, { recursive: true });
     const sessionFile = join(projectDir, 'session-a.jsonl');
     writeFileSync(sessionFile, jsonlMessage('assistant', 'The needle appears in this fixture transcript.'));
@@ -121,7 +121,7 @@ describe('palette conversation search', () => {
     expect(result.conversations[0]).toMatchObject({
       sessionId: 'session-a',
       conversationId: 'session-a',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       role: 'assistant',
     });
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
@@ -136,13 +136,13 @@ describe('palette conversation search', () => {
       dbPath: join(tmpDir!, 'embeddings.db'),
     };
     vi.mocked(getConversationSearchConfigSync).mockReturnValue(config);
-    vi.mocked(listProjectsSync).mockReturnValue([{ key: 'panopticon-cli' } as ReturnType<typeof listProjectsSync>[number]]);
+    vi.mocked(listProjectsSync).mockReturnValue([{ key: 'overdeck' } as ReturnType<typeof listProjectsSync>[number]]);
     vi.mocked(runMemoryFtsStatement).mockResolvedValue([{
       rowid: 7,
       display_content: 'remember the needle',
       doc_type: 'memory',
       source: 'memory-a',
-      project_id: 'panopticon-cli',
+      project_id: 'overdeck',
       workspace_id: '',
       issue_id: '',
       entry_date: '2026-06-02',
@@ -158,7 +158,7 @@ describe('palette conversation search', () => {
     expect(result.memory).toHaveLength(1);
     expect(result.memory[0]).toMatchObject({
       id: 'memory-a',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       displayContent: 'remember the needle',
     });
     expect(result.memory[0]?.excerptSegments).toContainEqual({ kind: 'match', value: 'needle' });

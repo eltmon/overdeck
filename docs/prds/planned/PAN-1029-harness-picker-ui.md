@@ -1,6 +1,6 @@
 # PAN-1029 — Harness Picker UI
 
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/1029
+**Issue:** https://github.com/eltmon/overdeck/issues/1029
 **Status:** Planned
 **Date:** 2026-05-08
 

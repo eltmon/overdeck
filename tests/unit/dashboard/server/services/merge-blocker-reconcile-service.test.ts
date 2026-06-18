@@ -62,7 +62,7 @@ describe('merge-blocker reconcile service', () => {
     mockGetMergeBlockerReconcileCandidates.mockReturnValue(candidatesEffect([
       candidate({
         issueId: 'PAN-1',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1',
         blockerReasons: [
           { type: 'merge_conflict', summary: 'conflicts', detectedAt: '2026-06-11T08:00:00.000Z' },
         ],
@@ -77,7 +77,7 @@ describe('merge-blocker reconcile service', () => {
     await __reconcileOnceForTests();
 
     expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledTimes(2);
-    expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith('PAN-1', 'eltmon/panopticon-cli', 1);
+    expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith('PAN-1', 'eltmon/overdeck', 1);
   });
 
   it('bounds mergeability-blocker refresh fan-out', async () => {
@@ -90,7 +90,7 @@ describe('merge-blocker reconcile service', () => {
         const number = index + 1;
         return candidate({
           issueId: `PAN-${number}`,
-          prUrl: `https://github.com/eltmon/panopticon-cli/pull/${number}`,
+          prUrl: `https://github.com/eltmon/overdeck/pull/${number}`,
           blockerReasons: [
             { type: 'merge_conflict', summary: 'conflicts', detectedAt: '2026-06-11T08:00:00.000Z' },
           ],
@@ -124,7 +124,7 @@ describe('merge-blocker reconcile service', () => {
     mockGetMergeBlockerReconcileCandidates.mockReturnValue(candidatesEffect([
       candidate({
         issueId: 'PAN-2',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/2',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/2',
         blockerReasons: [
           { type: 'failing_checks', summary: 'CI failed', detectedAt: '2026-06-11T08:00:00.000Z' },
         ],
@@ -141,7 +141,7 @@ describe('merge-blocker reconcile service', () => {
       candidate({
         issueId: 'PAN-3',
         readyForMerge: true,
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/3',
       }),
     ]));
 
@@ -151,6 +151,6 @@ describe('merge-blocker reconcile service', () => {
     await __reconcileOnceForTests();
 
     expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledTimes(2);
-    expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith('PAN-3', 'eltmon/panopticon-cli', 3);
+    expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith('PAN-3', 'eltmon/overdeck', 3);
   });
 });

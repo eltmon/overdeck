@@ -83,7 +83,7 @@ function makeObservation(id: string) {
   return {
     id,
     timestamp: '2026-05-16T12:00:00.000Z',
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     workspaceId: 'feature-pan-1052',
     issueId: 'PAN-1052',
     runId: 'run-1',
@@ -413,7 +413,7 @@ describe('applyEventReducer — memory events', () => {
     const withStatus = applyEventReducer(
       emptyState,
       makeEvent('memory.status_updated', 12, {
-        identity: { projectId: 'panopticon-cli', workspaceId: 'feature-pan-1052', issueId: 'PAN-1052' },
+        identity: { projectId: 'overdeck', workspaceId: 'feature-pan-1052', issueId: 'PAN-1052' },
         status: memoryStatus,
       }),
     )

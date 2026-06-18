@@ -377,7 +377,7 @@ window.showTerminalDebug()  // Print all to console
 
 1. **Start dashboard with debug logging**:
    ```bash
-   cd /Users/eltmon/Projects/panopticon-cli/src/dashboard
+   cd /Users/eltmon/Projects/overdeck/src/dashboard
    DEBUG_TERMINAL=1 npm run dev
    ```
 

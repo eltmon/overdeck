@@ -189,7 +189,7 @@ export const PROJECT_PRDS_PLANNED_SUBDIR = 'planned';
 export const PROJECT_PRDS_COMPLETED_SUBDIR = 'completed';
 
 /**
- * Detect if running from a panopticon-cli checkout (vs an installed package).
+ * Detect if running from a overdeck checkout (vs an installed package).
  *
  * The npm package ships only `dist/` plus the dirs in package.json's `files`
  * array — never `src/`. So the presence of a `src/` directory next to the

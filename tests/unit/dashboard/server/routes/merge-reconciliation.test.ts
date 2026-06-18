@@ -175,7 +175,7 @@ describe('reconcileGitHubMergeStatus', () => {
       testStatus: 'passed',
       readyForMerge: true,
       mergeStatus: 'verifying',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/349',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/349',
     });
     mockIsGitHubAppConfigured.mockReturnValue(false);
 
@@ -189,7 +189,7 @@ describe('reconcileGitHubMergeStatus', () => {
       testStatus: 'passed',
       readyForMerge: true,
       mergeStatus: 'verifying',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/349',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/349',
     });
     mockGetPullRequestState.mockResolvedValue({ merged: true });
 
@@ -209,7 +209,7 @@ describe('reconcileGitHubMergeStatus', () => {
       readyForMerge: true,
       mergeStatus: 'verifying',
       mergeNotes: 'Timed out waiting for GitHub PR #349 to become mergeable',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/349',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/349',
     });
     mockGetPullRequestState.mockResolvedValue({ merged: false, state: 'OPEN' });
 
@@ -228,7 +228,7 @@ describe('reconcileGitHubMergeStatus', () => {
       testStatus: 'passed',
       readyForMerge: true,
       mergeStatus: 'verifying',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/349',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/349',
     });
     mockGetPullRequestState.mockRejectedValue(new Error('boom'));
 

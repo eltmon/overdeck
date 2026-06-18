@@ -11,7 +11,7 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
     isLoading: false,
     data: {
       issueId: 'PAN-1661',
-      pr: { number: 1661, url: 'https://github.com/eltmon/panopticon-cli/pull/1661', headRefName: 'feature/pan-1661', mergeable: 'MERGEABLE', statusCheckRollup: [] },
+      pr: { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', headRefName: 'feature/pan-1661', mergeable: 'MERGEABLE', statusCheckRollup: [] },
       checkRuns: [{ id: 1, name: 'lint', status: 'completed', conclusion: 'success', htmlUrl: 'https://github/checks/1' }],
       summary: { total: 1, passed: 1, failed: 0, running: 0, skipped: 0, pending: 0, cancelled: 0 },
     },

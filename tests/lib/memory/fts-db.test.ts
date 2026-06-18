@@ -29,24 +29,24 @@ describe('memory FTS database', () => {
   it('runs the worker when process cwd is outside the repository', async () => {
     process.chdir(tempDir!);
 
-    await expect(runMemoryFtsStatement('panopticon-cli', {
+    await expect(runMemoryFtsStatement('overdeck', {
       sql: 'SELECT COUNT(*) AS count FROM memory_fts',
       method: 'get',
     })).resolves.toEqual({ count: 0 });
   });
 
   it('opens a project-scoped database lazily and caches the handle', async () => {
-    const first = await getMemoryFtsDatabase('panopticon-cli');
-    const second = await getMemoryFtsDatabase('panopticon-cli');
+    const first = await getMemoryFtsDatabase('overdeck');
+    const second = await getMemoryFtsDatabase('overdeck');
 
-    const dbFile = await stat(resolveFtsDbPath('panopticon-cli'));
+    const dbFile = await stat(resolveFtsDbPath('overdeck'));
 
     expect(first).toBe(second);
     expect(dbFile.isFile()).toBe(true);
   });
 
   it('creates memory_fts with the documented columns and porter unicode61 tokenizer', async () => {
-    const columns = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare('PRAGMA table_info(memory_fts)').all<{ name: string }>());
+    const columns = await withMemoryFtsDatabase('overdeck', (db) => db.prepare('PRAGMA table_info(memory_fts)').all<{ name: string }>());
 
     expect(columns.map((column) => column.name)).toEqual([
       'content',
@@ -69,7 +69,7 @@ describe('memory FTS database', () => {
       'agent_harness',
     ]);
 
-    const matches = await withMemoryFtsDatabase('panopticon-cli', async (db) => {
+    const matches = await withMemoryFtsDatabase('overdeck', async (db) => {
       await db.prepare(`
         INSERT INTO memory_fts (
           content,
@@ -103,7 +103,7 @@ describe('memory FTS database', () => {
         'memory,fts',
         'observation',
         'issue',
-        'panopticon-cli',
+        'overdeck',
         'feature-pan-1052',
         'PAN-1052',
         'run-1',
@@ -116,12 +116,12 @@ describe('memory FTS database', () => {
 
     expect(matches).toHaveLength(1);
 
-    const branchMatches = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare("SELECT rowid FROM memory_fts WHERE memory_fts MATCH 'uniquebranchtoken'").all());
+    const branchMatches = await withMemoryFtsDatabase('overdeck', (db) => db.prepare("SELECT rowid FROM memory_fts WHERE memory_fts MATCH 'uniquebranchtoken'").all());
     expect(branchMatches).toHaveLength(0);
   });
 
   it('creates reset_markers and observation_index tables with lookup indexes', async () => {
-    const tables = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+    const tables = await withMemoryFtsDatabase('overdeck', (db) => db.prepare(`
       SELECT name, sql
       FROM sqlite_master
       WHERE type IN ('table', 'index')
@@ -147,11 +147,11 @@ describe('memory FTS database', () => {
   });
 
   it('is idempotent when the project database is reopened', async () => {
-    await getMemoryFtsDatabase('panopticon-cli');
+    await getMemoryFtsDatabase('overdeck');
     closeMemoryFtsDatabases();
-    await getMemoryFtsDatabase('panopticon-cli');
+    await getMemoryFtsDatabase('overdeck');
 
-    const tableCount = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+    const tableCount = await withMemoryFtsDatabase('overdeck', (db) => db.prepare(`
       SELECT COUNT(*) AS count
       FROM sqlite_master
       WHERE name IN ('memory_fts', 'reset_markers', 'observation_index')

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-12T20:21:08.170Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-540: Remove convoy abstraction, inline parallel review directly into review-agent"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-12T20:21:08.170Z",
     "updated": "2026-04-12T20:21:08.170Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/540", "label": "PAN-540", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/540", "label": "PAN-540", "type": "issue" }
     ],
     "tags": ["refactor", "cleanup", "review-agent", "dashboard"],
     "narratives": {

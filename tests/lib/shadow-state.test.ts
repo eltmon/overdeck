@@ -245,7 +245,7 @@ describe('shadow-state', () => {
     // NOTE: getPendingSyncCount() scans ALL files in ~/.panopticon/shadow-state/, so
     // asserting a global count of 0 is environment-dependent. Tests below use
     // needsSync(id) on the specific issue under test instead.
-    // Tracked in: https://github.com/eltmon/panopticon-cli/issues/683
+    // Tracked in: https://github.com/eltmon/overdeck/issues/683
     it('should not count fresh issues as needing sync', async () => {
       const id = getUniqueId('nosync');
       await Effect.runPromise(createShadowState(id, 'open'));

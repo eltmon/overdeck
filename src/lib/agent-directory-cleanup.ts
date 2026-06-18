@@ -39,7 +39,7 @@ export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
  * Examples of legacy names (no longer created):
  *   agent-108, agent-MIN-791, agent-agent-pan-699, agent-pan-test-1
  *   work-pan-208, review-pan-646, test-pan-646, merge-pan-646
- *   conv-20260411-1125, specialist-panopticon-cli-test-agent
+ *   conv-20260411-1125, specialist-overdeck-test-agent
  */
 
 /**

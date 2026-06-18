@@ -8,7 +8,7 @@ import {
 } from '../../../src/lib/memory/extract.js';
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',

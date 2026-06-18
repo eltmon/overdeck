@@ -348,7 +348,7 @@ Read-side status/identity resolvers are already single (`rollup.ts:readCurrentSt
 
 4. **The two search systems disagree by construction.** `pan memory search`
    (JSONL substring scan) and injection (`memory-search.db` bm25) read different
-   stores with different ranking. Live data makes this worse: on `panopticon-cli`
+   stores with different ranking. Live data makes this worse: on `overdeck`
    the FTS `memory_fts` and `observation_index` are **empty (0 rows)** while
    `reset_markers` has 175 and the issue dirs hold only `health.json` + empty
    `rag-runs/` — i.e. observations were reset/never-indexed, so injection finds

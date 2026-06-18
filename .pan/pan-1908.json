@@ -212,7 +212,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-06-16T01:35:04.373Z",
     "inspectNotes": "infra-record-writer: record shape matches PRD §4.1, queueAutoCommit repoRoot target works, preserves debounce/main-only/rebase behavior.",
-    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1911",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/1911",
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-06-15T06:44:32.811Z",
     "deaconIgnoredReason": "reviewers broken — operator: stop at review boundary, no auto-dispatch (2026-06-15)"
@@ -251,7 +251,7 @@
       }
     },
     "merges": [
-      "https://github.com/eltmon/panopticon-cli/pull/1911"
+      "https://github.com/eltmon/overdeck/pull/1911"
     ],
     "ranOn": "eltmon-z790"
   }

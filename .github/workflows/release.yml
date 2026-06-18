@@ -182,7 +182,7 @@ jobs:
 
       # The deprecate step is dropped intentionally: it required a long-lived
       # NPM_TOKEN and OIDC trusted publishing only covers publish, not metadata
-      # writes. panopticon-cli and @eltmon/panctl are already deprecated on
+      # writes. overdeck and @eltmon/panctl are already deprecated on
       # npm (from prior releases) — deprecation is idempotent metadata, not
       # something to re-assert every release.
 

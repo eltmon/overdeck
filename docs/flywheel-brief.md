@@ -18,7 +18,7 @@ You stop when there is no eligible work left and `pan flywheel report` has succe
 
 ## Read first
 
-1. `vision.mdx` (also viewable at panopticon-cli.com/vision) — the strategic north star: why this loop exists today (substrate dev-loop), what v1.0 looks like (user pipeline), the seven readiness criteria, and the `v1.0-required` issues that are the critical path. Read this BEFORE the technical contract — it explains why the rules below look the way they do.
+1. `vision.mdx` (also viewable at overdeck.ai/vision) — the strategic north star: why this loop exists today (substrate dev-loop), what v1.0 looks like (user pipeline), the seven readiness criteria, and the `v1.0-required` issues that are the critical path. Read this BEFORE the technical contract — it explains why the rules below look the way they do.
 2. `packages/contracts/src/flywheel.ts` — the typed `FlywheelStatus` schema you must produce every tick.
 3. `docs/FLYWHEEL-STATE.md` if it exists — durable memory from prior runs. It does not exist before run 1.
 4. `docs/ROLES.md` — the five issue-scoped roles you coordinate (`plan`, `work`, `review`, `test`, `ship`).

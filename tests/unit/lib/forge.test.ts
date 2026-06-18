@@ -40,14 +40,14 @@ import { getForgeAdapter, GITHUB_MERGE_TIMEOUT_MS, parseArtifactRef } from '../.
 
 describe('parseArtifactRef', () => {
   it('parses GitHub pull request URLs', () => {
-    expect(parseArtifactRef('https://github.com/eltmon/panopticon-cli/pull/42')).toEqual({
+    expect(parseArtifactRef('https://github.com/eltmon/overdeck/pull/42')).toEqual({
       forge: 'github',
       number: 42,
     });
   });
 
   it('parses GitHub pull request URLs with trailing segments', () => {
-    expect(parseArtifactRef('https://github.com/eltmon/panopticon-cli/pull/42/files')).toEqual({
+    expect(parseArtifactRef('https://github.com/eltmon/overdeck/pull/42/files')).toEqual({
       forge: 'github',
       number: 42,
     });

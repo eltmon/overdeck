@@ -98,10 +98,10 @@ function createLegacyDb(dbPath: string) {
 
 const FAKE_PROJECT: ProjectConfig = {
   id: 'panopticon',
-  name: 'panopticon-cli',
-  path: '/home/eltmon/Projects/panopticon-cli',
+  name: 'overdeck',
+  path: '/home/eltmon/Projects/overdeck',
   tracker: 'github',
-  github_repo: 'eltmon/panopticon-cli',
+  github_repo: 'eltmon/overdeck',
 } as unknown as ProjectConfig;
 
 function makeFakeProjectsLayer(issueId: string): Layer.Layer<Projects> {

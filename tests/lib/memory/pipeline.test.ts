@@ -6,7 +6,7 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { extractFromTranscriptDelta } from '../../../src/lib/memory/pipeline.js';
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -102,7 +102,7 @@ describe('extractFromTranscriptDelta', () => {
         status: 'committed' as const,
         checkpoint: {
           sessionId: 'session-1',
-          projectId: 'panopticon-cli',
+          projectId: 'overdeck',
           workspaceId: 'feature-pan-1052',
           issueId: 'PAN-1052',
           transcriptPath: '/tmp/session.jsonl',
@@ -360,7 +360,7 @@ function claimedRange(fromOffset: number, toOffset: number) {
     toOffset,
     checkpoint: {
       sessionId: 'session-1',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1052',
       issueId: 'PAN-1052',
       transcriptPath: '/tmp/session.jsonl',

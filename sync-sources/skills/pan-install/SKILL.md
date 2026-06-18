@@ -123,8 +123,8 @@ sudo apt-get install -y git
 
 ```bash
 # Clone the repository (if not already done)
-git clone https://github.com/eltmon/panopticon-cli.git
-cd panopticon-cli
+git clone https://github.com/eltmon/overdeck.git
+cd overdeck
 
 # Install dependencies
 npm install
@@ -185,11 +185,11 @@ Should show all green checkmarks. If not, address any remaining issues.
 **Solutions:**
 ```bash
 # Option 1: Install globally
-cd /path/to/panopticon-cli
+cd /path/to/overdeck
 npm install -g .
 
 # Option 2: Add to PATH in ~/.bashrc or ~/.zshrc
-export PATH="$PATH:/path/to/panopticon-cli/node_modules/.bin"
+export PATH="$PATH:/path/to/overdeck/node_modules/.bin"
 source ~/.bashrc  # or ~/.zshrc
 
 # Option 3: Use npx

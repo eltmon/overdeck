@@ -5,7 +5,7 @@
 // callers can fall back to plain text.
 
 const GITHUB_REPO_BY_PREFIX: Record<string, string> = {
-  PAN: 'eltmon/panopticon-cli',
+  PAN: 'eltmon/overdeck',
   KRUX: 'eltmon/krux',
 };
 

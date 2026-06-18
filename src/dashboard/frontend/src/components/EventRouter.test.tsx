@@ -63,7 +63,7 @@ function memoryObservationEvent(sequence: number, id = 'obs-live'): DomainEvent 
       observation: {
         id,
         timestamp: '2026-05-16T12:00:01.000Z',
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         runId: 'run-1',

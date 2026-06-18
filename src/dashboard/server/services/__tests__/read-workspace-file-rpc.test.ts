@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const projectPath = vi.hoisted(() => ({ value: '' }));
 
 vi.mock('../../../../lib/projects.js', () => ({
-  resolveProjectFromIssue: () => Effect.succeed({ projectPath: projectPath.value, projectKey: 'panopticon-cli' }),
+  resolveProjectFromIssue: () => Effect.succeed({ projectPath: projectPath.value, projectKey: 'overdeck' }),
 }));
 
 import { readWorkspaceFileEffect } from '../read-workspace-file.js';

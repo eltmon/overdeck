@@ -3728,7 +3728,7 @@ Overdeck is distributed via npm for easy installation via `npx`.
 | **Overdeck** | **GitHub** | Open source, community contributions, GitHub Actions, npm provenance |
 | **MYN** | **GitLab** | Private, existing infrastructure |
 
-Overdeck is a standalone open-source project hosted on GitHub at `github.com/eltmon/panopticon-cli`. It has no dependency on MYN's GitLab infrastructure.
+Overdeck is a standalone open-source project hosted on GitHub at `github.com/eltmon/overdeck`. It has no dependency on MYN's GitLab infrastructure.
 
 #### Supply Chain Security (npm Provenance)
 
@@ -3763,7 +3763,7 @@ npm Provenance cryptographically proves that a package was built from a specific
 ┌──────────────────────────────────────────────────────────┐
 │  @overdeck/cli                                          │
 │  ✓ Provenance                                          │
-│    Published from: github.com/eltmon/panopticon-cli   │
+│    Published from: github.com/eltmon/overdeck   │
 │    Commit: abc123...                                     │
 │    Workflow: .github/workflows/publish.yml               │
 │    Build: https://github.com/.../actions/runs/12345      │
@@ -3811,11 +3811,11 @@ permissions:
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eltmon/panopticon-cli.git"
+    "url": "https://github.com/eltmon/overdeck.git"
   },
-  "homepage": "https://github.com/eltmon/panopticon-cli#readme",
+  "homepage": "https://github.com/eltmon/overdeck#readme",
   "bugs": {
-    "url": "https://github.com/eltmon/panopticon-cli/issues"
+    "url": "https://github.com/eltmon/overdeck/issues"
   },
   "bin": {
     "pan": "./dist/cli.js",

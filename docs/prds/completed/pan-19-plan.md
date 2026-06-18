@@ -4,7 +4,7 @@
 
 Running `pan up` fails on macOS with `spawn npm ENOENT` error. This affects users with nvm-managed Node.js installations where the npm binary path isn't resolved correctly when spawning child processes.
 
-**GitHub Issue:** https://github.com/eltmon/panopticon-cli/issues/19
+**GitHub Issue:** https://github.com/eltmon/overdeck/issues/19
 
 ## Root Cause Analysis
 
@@ -29,8 +29,8 @@ const child = spawn('npm', ['run', 'dev'], {
 $ which npm
 /Users/edward.becker/.nvm/versions/node/v20.19.5/bin/npm
 
-$ npm list -g panopticon-cli
-└── panopticon-cli@0.3.2
+$ npm list -g overdeck
+└── overdeck@0.3.2
 ```
 npm IS in the shell PATH, but `spawn('npm', ...)` fails.
 
@@ -153,7 +153,7 @@ const child = spawn('npm', ['run', 'dev'], {
 ## Testing Plan
 
 1. **Manual test on macOS with nvm:**
-   - Install panopticon-cli globally
+   - Install overdeck globally
    - Run `pan up` - should start dashboard
    - Run `pan up --detach` - should start in background
 
@@ -185,7 +185,7 @@ const child = spawn('npm', ['run', 'dev'], {
 
 ## References
 
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/19
+- GitHub Issue: https://github.com/eltmon/overdeck/issues/19
 - Source file: `src/cli/index.ts` lines 87-180
 - Similar pattern: `src/cli/commands/install.ts` `checkCommand()` function
 - Similar pattern: `src/cli/commands/doctor.ts` `checkCommand()` function

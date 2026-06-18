@@ -142,7 +142,7 @@ export interface VBriefDocument {
     created: string;
     /** RFC 3339 date-time */
     updated?: string;
-    /** Tool identifier, e.g. "panopticon-cli/0.6.0" */
+    /** Tool identifier, e.g. "overdeck/0.6.0" */
     author?: string;
     /** Human-readable description of the plan */
     description?: string;

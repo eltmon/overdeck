@@ -743,12 +743,12 @@ This starts the server and opens it in your default browser after 1.5 seconds. U
 ## Getting Help
 
 - **Documentation**: [docs/INDEX.md](INDEX.md)
-- **Issues**: [GitHub Issues](https://github.com/eltmon/panopticon-cli/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/eltmon/panopticon-cli/discussions)
+- **Issues**: [GitHub Issues](https://github.com/eltmon/overdeck/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/eltmon/overdeck/discussions)
 
 ---
 
 <div align="center">
 <p><strong>Made with ❤️ by the Overdeck team</strong></p>
-<p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="INDEX.md">Documentation</a></p>
+<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="INDEX.md">Documentation</a></p>
 </div>

@@ -415,7 +415,7 @@ describe('monitorReviewConvoySignals', () => {
       startedAt: '2026-05-13T00:00:00.000Z',
       reviewRunId: runId,
     } as any);
-    mockGetReviewStatus.mockReturnValue({ issueId: 'PAN-880', reviewStatus: 'reviewing', prUrl: 'https://github.com/eltmon/panopticon-cli/pull/880' } as any);
+    mockGetReviewStatus.mockReturnValue({ issueId: 'PAN-880', reviewStatus: 'reviewing', prUrl: 'https://github.com/eltmon/overdeck/pull/880' } as any);
     mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
 
     const actions = await monitorReviewConvoySignals();
@@ -437,7 +437,7 @@ describe('monitorReviewConvoySignals', () => {
       verdict: 'blocked',
       notes: '[correctness] Missing null check — `src/example.ts:42`',
       workspacePath: '/workspace',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/880',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/880',
     });
     expect(actions).toEqual([
       'Synthesized review for PAN-880 from 4 reviewer reports: blocked',

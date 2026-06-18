@@ -1,7 +1,7 @@
 # PAN-457 — Conversation Discovery & Indexing
 
 **Status:** Planning complete
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/457
+**Issue:** https://github.com/eltmon/overdeck/issues/457
 **Scope:** All 5 phases (scanner + adaptive system scan + tiered enrichment + embeddings + dashboard)
 
 ## Problem

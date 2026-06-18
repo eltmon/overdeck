@@ -405,7 +405,7 @@ tests/integration/project-session-tree.spec.ts
 
 2. **Presence polling cost.** Per-session `getAgentRuntimeStateAsync` + `stat(output.log)` at 1 Hz across many sessions. Mitigation: poll only sessions whose tmux is alive (most are ended); batch via a single sweep per issue; cache mtime stats with a short TTL.
 
-3. **JSONL path resolution.** Claude Code encodes workspace paths in the directory name (e.g. `-home-eltmon-Projects-panopticon-cli`). The encoding rule must match what the running agent uses. Mitigation: reuse `encodeClaudeProjectDir()` from `src/lib/paths.ts` — do not reimplement.
+3. **JSONL path resolution.** Claude Code encodes workspace paths in the directory name (e.g. `-home-eltmon-Projects-overdeck`). The encoding rule must match what the running agent uses. Mitigation: reuse `encodeClaudeProjectDir()` from `src/lib/paths.ts` — do not reimplement.
 
 4. **Reviewer session naming drift.** The `review-<issueId>-<timestamp>-<role>` tmux name format is the contract that lets us split reviewers into nodes. If review fan-out changes its naming, the split breaks silently. Mitigation: parse role from the tmux name in one place (`extractReviewerRole()`) with a unit test, and surface unmatched sessions as `type: 'review'` (no role) rather than dropping them.
 

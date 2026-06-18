@@ -67,14 +67,14 @@ describe('transitionIssueState bare numeric ID guard (PAN-489)', () => {
 
   it('does not skip transition for properly-prefixed issueId', async () => {
     mockFindProjectByPath.mockReturnValue({
-      name: 'panopticon-cli',
-      path: '/projects/panopticon-cli',
-      github_repo: 'eltmon/panopticon-cli',
+      name: 'overdeck',
+      path: '/projects/overdeck',
+      github_repo: 'eltmon/overdeck',
     } as any);
     mockGetIssuePrefix.mockReturnValue(undefined);
     mockCreateTracker.mockReturnValue(mockTracker as any);
 
-    await transitionIssueToInReview('PAN-484', '/projects/panopticon-cli/workspaces/feature-pan-484');
+    await transitionIssueToInReview('PAN-484', '/projects/overdeck/workspaces/feature-pan-484');
 
     expect(mockCreateTracker).toHaveBeenCalled();
   });
@@ -89,16 +89,16 @@ describe('transitionIssueState tracker priority (PAN-489)', () => {
 
   it('uses GitHub when project has github_repo, even with issue_prefix set', async () => {
     mockFindProjectByPath.mockReturnValue({
-      name: 'panopticon-cli',
-      path: '/projects/panopticon-cli',
-      github_repo: 'eltmon/panopticon-cli',
+      name: 'overdeck',
+      path: '/projects/overdeck',
+      github_repo: 'eltmon/overdeck',
       issue_prefix: 'PAN',
     } as any);
     mockGetIssuePrefix.mockReturnValue('PAN');
 
-    await transitionIssueToInReview('PAN-484', '/projects/panopticon-cli/workspaces/feature-pan-484');
+    await transitionIssueToInReview('PAN-484', '/projects/overdeck/workspaces/feature-pan-484');
 
-    expect(mockCreateTracker).toHaveBeenCalledWith({ type: 'github', owner: 'eltmon', repo: 'panopticon-cli' });
+    expect(mockCreateTracker).toHaveBeenCalledWith({ type: 'github', owner: 'eltmon', repo: 'overdeck' });
     expect(mockCreateTrackerFromConfig).not.toHaveBeenCalled();
     expect(mockTracker.transitionIssue).toHaveBeenCalledWith('PAN-484', 'in_review');
   });

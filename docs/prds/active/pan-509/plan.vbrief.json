@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-12T22:40:35Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-509: Inspector panel should show contextually relevant terminal based on pipeline phase"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-12T22:40:35Z",
     "updated": "2026-04-12T22:40:35Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/509", "label": "PAN-509", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/509", "label": "PAN-509", "type": "issue" }
     ],
     "tags": ["frontend", "inspector", "terminal", "pipeline"],
     "narratives": {

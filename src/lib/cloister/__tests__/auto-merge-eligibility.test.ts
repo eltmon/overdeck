@@ -11,7 +11,7 @@ function makeReviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
     mergeStatus: 'pending',
     updatedAt: '2026-05-25T09:00:00.000Z',
     readyForMerge: true,
-    prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+    prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
     ...overrides,
   };
 }
@@ -19,9 +19,9 @@ function makeReviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
 function makePrState(overrides: Partial<GitHubPullRequestState> = {}): GitHubPullRequestState {
   return {
     owner: 'eltmon',
-    repo: 'panopticon-cli',
+    repo: 'overdeck',
     number: 1486,
-    url: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+    url: 'https://github.com/eltmon/overdeck/pull/1486',
     state: 'OPEN',
     merged: false,
     mergeable: true,
@@ -78,7 +78,7 @@ describe('auto-merge eligibility', () => {
 
     await expect(isAutoMergeEligible('PAN-1486', { getReviewStatus, getPullRequestState, getIssueLabels }))
       .resolves.toEqual({ eligible: false, reason: 'CI checks failing on PR HEAD deadbeef' });
-    expect(getPullRequestState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 1486);
+    expect(getPullRequestState).toHaveBeenCalledWith('eltmon', 'overdeck', 1486);
     expect(getIssueLabels).not.toHaveBeenCalled();
   });
 

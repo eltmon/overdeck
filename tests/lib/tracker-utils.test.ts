@@ -36,7 +36,7 @@ describe('resolveTrackerType', () => {
         panopticon: {
           name: 'Overdeck',
           path: '/home/user/panopticon',
-          github_repo: 'eltmon/panopticon-cli',
+          github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
       },
@@ -94,7 +94,7 @@ describe('resolveTrackerType', () => {
         panopticon: {
           name: 'Overdeck',
           path: '/home/user/panopticon',
-          github_repo: 'eltmon/panopticon-cli',
+          github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
       },

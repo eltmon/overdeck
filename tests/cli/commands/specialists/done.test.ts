@@ -32,7 +32,7 @@ describe('specialists done command', () => {
         testStatus: 'pending',
         updatedAt: new Date().toISOString(),
         readyForMerge: false,
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
         ...update,
       };
     });
@@ -59,7 +59,7 @@ describe('specialists done command', () => {
       issueId: 'PAN-1059',
       verdict: 'blocked',
       notes: 'correctness blocker',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
     });
   });
 
@@ -79,7 +79,7 @@ describe('specialists done command', () => {
       issueId: 'PAN-1059',
       verdict: 'failed',
       notes: 'synthesis crashed',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
     });
   });
 

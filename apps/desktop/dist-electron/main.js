@@ -384,7 +384,7 @@ function initializeAutoUpdater(channel = "latest") {
 	electron_updater.autoUpdater.setFeedURL({
 		provider: "github",
 		owner: "eltmon",
-		repo: "panopticon-cli"
+		repo: "overdeck"
 	});
 	electron_updater.autoUpdater.channel = channel;
 	electron_updater.autoUpdater.autoDownload = false;
@@ -660,11 +660,11 @@ function buildMenuTemplate() {
 			{ type: "separator" },
 			{
 				label: "Overdeck on GitHub",
-				click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli")
+				click: () => void electron.shell.openExternal("https://github.com/eltmon/overdeck")
 			},
 			{
 				label: "Report an Issue",
-				click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli/issues")
+				click: () => void electron.shell.openExternal("https://github.com/eltmon/overdeck/issues")
 			}
 		]
 	});

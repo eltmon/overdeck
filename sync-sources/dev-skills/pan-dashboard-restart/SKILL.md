@@ -39,7 +39,7 @@ The dashboard the browser talks to is the **pre-built `dist/dashboard/server.js`
 ## Procedure
 
 ```bash
-cd ~/Projects/panopticon-cli   # the PRIMARY checkout
+cd ~/Projects/overdeck   # the PRIMARY checkout
 
 # 1. Rebuild ONLY if you changed server/lib source (the Node 22 dist is what runs)
 npm run build

@@ -2714,13 +2714,13 @@ export function determineModel(options: { model?: string; role?: Role } = {}): s
  *
  * Resolution order (by project tracker type):
  * 1. github_repo → GitHub Issues (takes priority over issue_prefix, since projects
- *    like panopticon-cli use GitHub Issues with a prefix, not Linear)
+ *    like overdeck use GitHub Issues with a prefix, not Linear)
  * 2. rally_project → Rally
  * 3. issue_prefix (no github_repo) → Linear (covers gitlab+linear and pure-linear projects)
  * 4. gitlab_repo only → warn and skip (GitLab doesn't support label-based state transitions)
  *
  * Precedence rationale: issue_prefix was renamed from linear_team but is now also set on
- * GitHub-hosted projects (e.g. issue_prefix: PAN for panopticon-cli GitHub Issues).
+ * GitHub-hosted projects (e.g. issue_prefix: PAN for overdeck GitHub Issues).
  * github_repo must be checked first so GitHub projects don't misroute to Linear.
  */
 async function transitionIssueState(issueId: string, state: IssueState, workspacePath?: string): Promise<void> {
@@ -2744,7 +2744,7 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
   }
 
   // Project has a GitHub repo — use GitHub Issues tracker.
-  // Checked BEFORE issue_prefix because github_repo projects (e.g. panopticon-cli)
+  // Checked BEFORE issue_prefix because github_repo projects (e.g. overdeck)
   // set issue_prefix for their GitHub Issue prefix (PAN-), not for Linear.
   if (projectConfig.github_repo) {
     const [owner, repo] = projectConfig.github_repo.split('/');

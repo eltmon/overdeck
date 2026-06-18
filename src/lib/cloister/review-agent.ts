@@ -54,7 +54,7 @@ import { getAgentStateSync } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 /**
- * Read a convoy sub-role prompt template from the panopticon-cli install.
+ * Read a convoy sub-role prompt template from the overdeck install.
  *
  * Sub-role prompts are harness-agnostic templates owned by Overdeck. The
  * orchestrator reads them from its own install (packageRoot/roles/) and

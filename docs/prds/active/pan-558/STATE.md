@@ -13,7 +13,7 @@
 ## Architecture
 
 ### Update Server
-GitHub Releases (no custom server needed). `electron-updater` supports GitHub Releases natively with `setFeedURL({ provider: 'github', owner: 'eltmon', repo: 'panopticon-cli' })`.
+GitHub Releases (no custom server needed). `electron-updater` supports GitHub Releases natively with `setFeedURL({ provider: 'github', owner: 'eltmon', repo: 'overdeck' })`.
 
 ### Package Distribution
 - **electron-updater** fetches the latest GitHub Release, compares `app.getVersion()` against the release tag

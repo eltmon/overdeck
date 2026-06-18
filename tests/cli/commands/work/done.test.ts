@@ -333,7 +333,7 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
       artifacts: [{ skipped: false, url: 'https://example.test/pr/714' }],
       mergeSet: {
         workspaceType: 'monorepo',
-        repos: [{ repoKey: 'panopticon-cli', targetBranch: 'main' }],
+        repos: [{ repoKey: 'overdeck', targetBranch: 'main' }],
       },
     });
     mockGetDashboardApiUrl.mockReturnValue('http://localhost:19999');

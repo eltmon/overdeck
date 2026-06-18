@@ -69,7 +69,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   // not the lower form, and includes session families that the prior
   // single-regex didn't cover. PAN-1024 close-out left
   // `review-coordinator-PAN-1024-...` and
-  // `specialist-panopticon-cli-PAN-1024-test-agent` alive (2026-05-09).
+  // `specialist-overdeck-PAN-1024-test-agent` alive (2026-05-09).
   //
   // Patterns we now match (case-insensitive on the issue ID):
   //   - review-coordinator-<ISSUE>-<timestamp>

@@ -72,7 +72,7 @@ describe('GodView selectors', () => {
         'PAN-1052': [{
           id: 'obs-1',
           timestamp: '2026-05-16T20:01:00.000Z',
-          projectId: 'panopticon-cli',
+          projectId: 'overdeck',
           workspaceId: 'feature-pan-1052',
           issueId: 'PAN-1052',
           runId: 'run-1',

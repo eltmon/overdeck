@@ -47,7 +47,7 @@ The planning agent reads the spec as its primary input, explores the codebase, a
 
 Parse the issue ID from the command argument. Determine the project:
 - `MIN-XXX` → MYN project, docs at `~/Projects/myn/docs/`
-- `PAN-XXX` → Overdeck project, docs at `~/Projects/panopticon-cli/docs/`
+- `PAN-XXX` → Overdeck project, docs at `~/Projects/overdeck/docs/`
 
 ### 2. Gather Context
 

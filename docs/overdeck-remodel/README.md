@@ -1,7 +1,7 @@
 # Overdeck Remodel
 
 The Overdeck → **Overdeck** data-architecture remodel
-([PAN-1938](https://github.com/eltmon/panopticon-cli/issues/1938)): collapse a
+([PAN-1938](https://github.com/eltmon/overdeck/issues/1938)): collapse a
 sprawling, drift-prone data layer into one source of truth per domain, rebuilt on
 a fresh, empty `overdeck.db`.
 

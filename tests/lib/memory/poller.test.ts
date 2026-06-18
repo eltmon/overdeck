@@ -13,7 +13,7 @@ vi.mock('../../../src/lib/memory/settings.js', async (importOriginal) => {
 });
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'agent-pan-1052',
@@ -153,7 +153,7 @@ describe('TranscriptPoller', () => {
       readTranscriptSlice: async () => '{"type":"assistant"}\n',
       getTranscriptCheckpoint: () => ({
         sessionId: 'session-1',
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         transcriptPath: '/tmp/session-1.jsonl',
@@ -179,7 +179,7 @@ describe('TranscriptPoller', () => {
       readTranscriptSlice: async () => '{"type":"assistant"}\n',
       getTranscriptCheckpoint: () => ({
         sessionId: 'session-1',
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         transcriptPath: '/tmp/session-1.jsonl',

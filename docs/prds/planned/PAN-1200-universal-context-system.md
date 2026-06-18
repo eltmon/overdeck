@@ -1,6 +1,6 @@
 # PAN-1200 — Universal Context System (Epic)
 
-**Issue:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
+**Issue:** [PAN-1200](https://github.com/eltmon/overdeck/issues/1200)
 **Status:** Planned
 **Date:** 2026-05-18
 **Author:** Ed Becker
@@ -73,10 +73,10 @@ PAN-1052 (in progress) is the **memory-and-observations substrate**: per-turn LL
 
 | # | Title | One-liner |
 |---|---|---|
-| [PAN-1201](https://github.com/eltmon/panopticon-cli/issues/1201) | Hybrid context distribution | Replace devroot with global/project/workspace layers; single-source → harness-specific render |
-| [PAN-1203](https://github.com/eltmon/panopticon-cli/issues/1203) | Overdeck-docs RAG | Ship prebuilt index; UserPromptSubmit hook injects top-k snippets |
-| [PAN-1204](https://github.com/eltmon/panopticon-cli/issues/1204) | Home tab + live briefing | Dashboard landing; live session-context.md; knowledge registry; compliance audit hook (advisory) |
-| [PAN-1205](https://github.com/eltmon/panopticon-cli/issues/1205) | HTML artifacts | `pan artifacts` CLI; real validation; isolated `/s/<slug>` + `/a/<slug>` origins; full provenance |
+| [PAN-1201](https://github.com/eltmon/overdeck/issues/1201) | Hybrid context distribution | Replace devroot with global/project/workspace layers; single-source → harness-specific render |
+| [PAN-1203](https://github.com/eltmon/overdeck/issues/1203) | Overdeck-docs RAG | Ship prebuilt index; UserPromptSubmit hook injects top-k snippets |
+| [PAN-1204](https://github.com/eltmon/overdeck/issues/1204) | Home tab + live briefing | Dashboard landing; live session-context.md; knowledge registry; compliance audit hook (advisory) |
+| [PAN-1205](https://github.com/eltmon/overdeck/issues/1205) | HTML artifacts | `pan artifacts` CLI; real validation; isolated `/s/<slug>` + `/a/<slug>` origins; full provenance |
 
 ## v1 Harness Scope
 

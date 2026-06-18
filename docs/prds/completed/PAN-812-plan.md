@@ -215,7 +215,7 @@ Phase 1: Upgrade beads CLI and verify compatibility
 │ 1a. Install beads v1.0.2 locally                              │
 │ 1b. Verify existing .beads/ databases open without errors     │
 │ 1c. Update pan install to fetch v1.0.2                        │
-│ 1d. Run bd doctor --fix on panopticon-cli repo                │
+│ 1d. Run bd doctor --fix on overdeck repo                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               v
@@ -297,7 +297,7 @@ Phase 5: Optional gate integration (Phase 2+)
 
 - Test `bd batch` with 3+ beads: verify all close or none close
 - Test `bd gate check --dry-run` on a repo with no gates
-- Test `bd doctor --fix` on panopticon-cli repo
+- Test `bd doctor --fix` on overdeck repo
 - Test backward compat: open an old `.beads/` database with v1.0.2
 - Test agent docs: grep all skill files for `bd claim`, `bd move`, `bd refile` — should return zero matches
 - Test `done-preflight.ts` on a workspace with multiple open beads
@@ -329,7 +329,7 @@ Phase 5: Optional gate integration (Phase 2+)
 
 ## References
 
-- Issue: https://github.com/eltmon/panopticon-cli/issues/812
+- Issue: https://github.com/eltmon/overdeck/issues/812
 - Beads repo: https://github.com/gastownhall/beads
 - Current beads skill: `skills/beads/SKILL.md`
 - Overdeck beads guide: `skills/beads-panopticon-guide/SKILL.md`

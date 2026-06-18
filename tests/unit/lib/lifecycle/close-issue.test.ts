@@ -57,7 +57,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const results = await closeIssue(ctx);
@@ -70,7 +70,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const results = await closeIssue(ctx);
@@ -89,7 +89,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const results = await closeIssue(ctx);
@@ -116,7 +116,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const results = await closeIssue(ctx, { applyLabel: true });
@@ -131,7 +131,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       await closeIssue(ctx, { applyLabel: true });
@@ -150,7 +150,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const results = await closeIssue(ctx, { applyLabel: false });
@@ -166,7 +166,7 @@ describe('close-issue', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: '/tmp/test',
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const results = await closeIssue(ctx, { labelOnly: true });

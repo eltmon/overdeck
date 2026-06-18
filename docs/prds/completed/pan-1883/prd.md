@@ -213,8 +213,8 @@ Optional because `merge-blockers` already gives agents a sanctioned surface.
 
 - **Directly resolves** the "Flywheel shows BLOCKED but the Command Deck tree does not match"
   confusion (WI-2) and prevents the misdiagnosis class (WI-1).
-- **Related but NOT resolved:** [#1560](https://github.com/eltmon/panopticon-cli/issues/1560) is about *re-posting commit status on PR head
-  drift*; [#1213](https://github.com/eltmon/panopticon-cli/issues/1213) is about *deacon reset/re-dispatch after rebase*. This issue does
+- **Related but NOT resolved:** [#1560](https://github.com/eltmon/overdeck/issues/1560) is about *re-posting commit status on PR head
+  drift*; [#1213](https://github.com/eltmon/overdeck/issues/1213) is about *deacon reset/re-dispatch after rebase*. This issue does
   not change either mechanism — it only ensures the *correct* status is read/labelled. Leave their
   mechanics to those issues.
-- **Sibling fixes** executed together: [#1877](https://github.com/eltmon/panopticon-cli/issues/1877), [#1884](https://github.com/eltmon/panopticon-cli/issues/1884).
+- **Sibling fixes** executed together: [#1877](https://github.com/eltmon/overdeck/issues/1877), [#1884](https://github.com/eltmon/overdeck/issues/1884).

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-14T13:00:56Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-705: Command taxonomy reorganization: clean up pan's command surface"
   },
   "plan": {
@@ -16,7 +16,7 @@
     "updated": "2026-04-14T13:00:56Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
+        "uri": "https://github.com/eltmon/overdeck/issues/705",
         "label": "PAN-705",
         "type": "issue"
       },

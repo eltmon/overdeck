@@ -60,7 +60,7 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root. It MUST conform 
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "<ISO 8601 timestamp>",
-    "author": "panopticon-cli/<VERSION>",
+    "author": "overdeck/<VERSION>",
     "description": "Plan for <ISSUE-ID>: <issue title>"
   },
   "plan": {

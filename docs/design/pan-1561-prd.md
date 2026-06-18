@@ -1,6 +1,6 @@
 # PAN-1561 — Project-scoped dashboard navigation (PRD)
 
-**Status:** Proposed · **Tracking issue:** [#1561](https://github.com/eltmon/panopticon-cli/issues/1561) · **Evolves:** PAN-1549 (#1549)
+**Status:** Proposed · **Tracking issue:** [#1561](https://github.com/eltmon/overdeck/issues/1561) · **Evolves:** PAN-1549 (#1549)
 
 > Self-contained design spec. Everything an implementer needs is here plus the repo (`src/dashboard/frontend/src/…`, `CLAUDE.md`) and the mockups in `docs/design/pan-1561-*.html`. No prior-conversation or external context is assumed.
 

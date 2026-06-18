@@ -246,4 +246,4 @@ Add toggle in PlanDialog or XTerminal component:
 
 - [xterm.js clipboard addon](https://github.com/xtermjs/xterm.js/tree/master/addons/addon-clipboard)
 - [Browser Clipboard API](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API)
-- Issue: https://github.com/eltmon/panopticon-cli/issues/34
+- Issue: https://github.com/eltmon/overdeck/issues/34

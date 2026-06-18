@@ -97,8 +97,8 @@ describe('pan start sync-main conflict (PAN-1872)', () => {
     vbriefLifecycleMocks.updatePlanStatus.mockReset();
 
     resolveProjectFromIssueSyncMock.mockImplementation(() => ({
-      projectKey: 'panopticon-cli',
-      projectName: 'panopticon-cli',
+      projectKey: 'overdeck',
+      projectName: 'overdeck',
       projectPath: tmpDir,
       linearTeam: 'PAN',
     }));

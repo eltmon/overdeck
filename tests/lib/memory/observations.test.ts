@@ -15,7 +15,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -62,8 +62,8 @@ describe('observation writer', () => {
     const result = await writeObservation(entry);
 
     expect(result).toEqual({
-      jsonlPath: join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.jsonl'),
-      markdownPath: join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.md'),
+      jsonlPath: join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl'),
+      markdownPath: join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.md'),
     });
     expect(observationMarkdownPath(entry)).toBe(result.markdownPath);
 
@@ -81,8 +81,8 @@ describe('observation writer', () => {
     await writeObservation(first);
     await writeObservation(second);
 
-    const jsonlPath = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.jsonl');
-    const markdownPath = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.md');
+    const jsonlPath = join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl');
+    const markdownPath = join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.md');
 
     const jsonlEntries = (await readFile(jsonlPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
     expect(jsonlEntries).toEqual([first]);
@@ -99,14 +99,14 @@ describe('observation writer', () => {
     `).all<Record<string, unknown>>(first.id));
     expect(ftsRows).toEqual([{ source: 'obs-1', display_content: 'Updated summary.' }]);
 
-    const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'));
+    const files = await readdir(join(tempDir!, 'memory/overdeck/PAN-1052/observations'));
     expect(files.sort()).toEqual(['2026-05-16.jsonl', '2026-05-16.md']);
   });
 
   it('repairs small legacy JSONL files with missing observation_index rows before appending', async () => {
     const entry = observation({ summary: 'Legacy indexed summary.' });
-    const jsonlPath = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.jsonl');
-    await mkdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'), { recursive: true });
+    const jsonlPath = join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl');
+    await mkdir(join(tempDir!, 'memory/overdeck/PAN-1052/observations'), { recursive: true });
     await writeFile(jsonlPath, `${JSON.stringify(entry)}\n`, 'utf8');
 
     await writeObservation(observation({ summary: 'Updated legacy summary.' }));

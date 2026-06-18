@@ -1,4 +1,4 @@
-You are doing a pass-3 deep audit of a closed GitHub issue from `eltmon/panopticon-cli`. The previous two audit passes missed real failures by accepting "proxy" evidence that didn't actually match the AC. Pass-3 methodology is STRICT.
+You are doing a pass-3 deep audit of a closed GitHub issue from `eltmon/overdeck`. The previous two audit passes missed real failures by accepting "proxy" evidence that didn't actually match the AC. Pass-3 methodology is STRICT.
 
 ## Rules
 
@@ -18,7 +18,7 @@ You are doing a pass-3 deep audit of a closed GitHub issue from `eltmon/panoptic
 
 5. **For UI ACs**: use the Playwright MCP tools (`mcp__playwright__browser_navigate`, `_snapshot`, `_take_screenshot`) to verify rendering. The dashboard is at `https://pan.localhost`. Save any screenshots to `/tmp/audit-pass3/screenshots/PAN-{ISSUE_NUM}-<view>.png` so they can be attached to the issue comment.
 
-6. **Tool access**: you have full shell access. Use `gh`, `git`, `curl`, `grep`, `cat`, `pan` CLI commands directly. Working dir: `/home/eltmon/Projects/panopticon-cli`. Main HEAD: `c173152f7`.
+6. **Tool access**: you have full shell access. Use `gh`, `git`, `curl`, `grep`, `cat`, `pan` CLI commands directly. Working dir: `/home/eltmon/Projects/overdeck`. Main HEAD: `c173152f7`.
 
 ## Output format
 

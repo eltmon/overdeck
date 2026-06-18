@@ -61,7 +61,7 @@ Required secrets are documented in `.env.example`. API keys for Claude, GitHub, 
 Beads is the task tracking system agents use. The binary is installed by `pan install`, but the database must be initialized once per project:
 
 ```bash
-cd /path/to/panopticon-cli
+cd /path/to/overdeck
 bd init --prefix panopticon
 ```
 
@@ -80,7 +80,7 @@ bd list             # Should show empty list (not a "database not found" error)
 ## Repository Layout
 
 ```
-panopticon-cli/
+overdeck/
 ├── src/
 │   ├── cli/                    # `pan` CLI commands (Commander.js)
 │   ├── dashboard/

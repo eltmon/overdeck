@@ -44,7 +44,7 @@ export function createMemoryCommand(): Command {
   memory
     .command('status <issue>')
     .description('Show current memory status for an issue')
-    .option('--project <id>', 'Project ID', 'panopticon-cli')
+    .option('--project <id>', 'Project ID', 'overdeck')
     .option('--json', 'Output JSON')
     .action(async (issue, options) => {
       const status = await getMemoryStatus(options.project, issue);
@@ -65,7 +65,7 @@ export function createMemoryCommand(): Command {
   memory
     .command('reset <scope> <scopeId>')
     .description('Create a memory reset marker')
-    .option('--project <id>', 'Project ID', 'panopticon-cli')
+    .option('--project <id>', 'Project ID', 'overdeck')
     .requiredOption('--reason <text>', 'Reason for the reset marker')
     .option('--from <iso>', 'Reset from timestamp')
     .option('--json', 'Output JSON')
@@ -84,7 +84,7 @@ export function createMemoryCommand(): Command {
   memory
     .command('summary <issue>')
     .description('Generate a daily markdown memory summary')
-    .option('--project <id>', 'Project ID', 'panopticon-cli')
+    .option('--project <id>', 'Project ID', 'overdeck')
     .option('--date <yyyy-mm-dd>', 'Summary date')
     .option('--json', 'Output JSON')
     .action(async (issue, options) => {
@@ -98,7 +98,7 @@ export function createMemoryCommand(): Command {
   memory
     .command('doctor')
     .description('Print memory health, pending counts, and provider configuration')
-    .option('--project <id>', 'Project ID', 'panopticon-cli')
+    .option('--project <id>', 'Project ID', 'overdeck')
     .option('--json', 'Output JSON')
     .action(async (options) => {
       const result = await runMemoryDoctor({ project: options.project });

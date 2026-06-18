@@ -24,9 +24,9 @@ let testHome: string;
 function schedule(issueId: string, scheduledMergeAt = '2026-05-25T10:00:00.000Z') {
   return scheduleAutoMerge({
     issueId,
-    prUrl: `https://github.com/eltmon/panopticon-cli/pull/${issueId.split('-')[1]}`,
+    prUrl: `https://github.com/eltmon/overdeck/pull/${issueId.split('-')[1]}`,
     prNumber: Number(issueId.split('-')[1]),
-    projectKey: 'panopticon-cli',
+    projectKey: 'overdeck',
     scheduledMergeAt,
     scheduledAt: '2026-05-25T09:00:00.000Z',
   });
@@ -50,9 +50,9 @@ describe('pending auto-merges db', () => {
 
     expect(entry).toMatchObject({
       issueId: 'PAN-1486',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
       prNumber: 1486,
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       status: 'pending',
       scheduledMergeAt: '2026-05-25T10:00:00.000Z',
       scheduledAt: '2026-05-25T09:00:00.000Z',

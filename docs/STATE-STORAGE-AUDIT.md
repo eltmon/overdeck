@@ -1,13 +1,13 @@
 # State Storage Audit — review-status and the `~/.panopticon` surface
 
-**Status:** Resolved by [PAN-1908](https://github.com/eltmon/panopticon-cli/issues/1908). Author: orchestrator conversation, 2026-06-14.
+**Status:** Resolved by [PAN-1908](https://github.com/eltmon/overdeck/issues/1908). Author: orchestrator conversation, 2026-06-14.
 **Trigger:** investigation into why 11 issues showed BLOCKED in the Flywheel emit but not the
-Command Deck tree. That investigation surfaced a misdiagnosed substrate bug ([PAN-1883](https://github.com/eltmon/panopticon-cli/issues/1883))
+Command Deck tree. That investigation surfaced a misdiagnosed substrate bug ([PAN-1883](https://github.com/eltmon/overdeck/issues/1883))
 and a deeper question: how much `~/.panopticon` state is authoritative vs. vestigial,
 and what should the storage model actually be.
 
 > **Resolution note:** The authoritative-source questions raised here were settled by
-> [PAN-1908](https://github.com/eltmon/panopticon-cli/issues/1908): agent runtime state now lives in the SQLite `agents` table in
+> [PAN-1908](https://github.com/eltmon/overdeck/issues/1908): agent runtime state now lives in the SQLite `agents` table in
 > `~/.panopticon/panopticon.db`, durable per-issue records live in the git-backed infra repo
 > under `.pan/` records, and tmux on the `panopticon` socket remains the liveness oracle. See
 > [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the current model. This audit is kept
@@ -43,9 +43,9 @@ The originating incident was **misdiagnosed**. The corrected facts:
   - 1 × in-progress, `review=pending` (PAN-1845)
 - **[V] SQLite already has durable backups.** `~/.panopticon/backups/` holds hourly
   timestamped snapshots (e.g. `2026-06-14T03-32-52Z`). So review-status durability via
-  snapshot **already exists** — contradicting [PAN-1883](https://github.com/eltmon/panopticon-cli/issues/1883)'s "no backup, no reconstruct" premise.
+  snapshot **already exists** — contradicting [PAN-1883](https://github.com/eltmon/overdeck/issues/1883)'s "no backup, no reconstruct" premise.
 
-**Consequence:** [PAN-1883](https://github.com/eltmon/panopticon-cli/issues/1883)'s central claim — *"review-status.json is the canonical store"* —
+**Consequence:** [PAN-1883](https://github.com/eltmon/overdeck/issues/1883)'s central claim — *"review-status.json is the canonical store"* —
 is false. The fix it proposes (back up / atomic-write / reconstruct the JSON file) hardens
 a file the system does not use. The issue must be **re-scoped**, not implemented as written.
 
@@ -74,7 +74,7 @@ attributed it to a JSON wipe.
 | `src/lib/database/review-status-db.ts` | same table | SQLite primitives (upsert/delete/query) | review-status.ts |
 | `src/lib/review-status-json.ts` | `~/.panopticon/review-status.json` | **Vestigial** JSON file ops | **tests + CLI only** — no production importer **[V]** |
 
-**The test-pollution vector (separate bug, [PAN-1877](https://github.com/eltmon/panopticon-cli/issues/1877)):**
+**The test-pollution vector (separate bug, [PAN-1877](https://github.com/eltmon/overdeck/issues/1877)):**
 `tests/lib/cloister/deacon-ci-retry.test.ts` and `pan-344-auto-merge.test.ts` write the
 **real** `~/.panopticon/review-status.json` (path built from `homedir()`), full-overwrite
 it, and restore via a non-crash-safe `afterEach`. This corrupts the vestigial file but —
@@ -162,7 +162,7 @@ This is the "git-backed store + SQLite index" pattern — the same shape beads a
 
 ### 4c. What this resolves (all at once)
 
-- **Durability / reconstruct** — git history. ([PAN-1883](https://github.com/eltmon/panopticon-cli/issues/1883)'s real goal, for free.)
+- **Durability / reconstruct** — git history. ([PAN-1883](https://github.com/eltmon/overdeck/issues/1883)'s real goal, for free.)
 - **Cross-machine sharing & a cluster-ish status view** — git is the sync substrate. No
   event bus, no fan-out infra (explicitly out of scope).
 - **Commit churn (the "why every 60s" concern)** — only durable verdicts commit, and those
@@ -248,21 +248,21 @@ Each is a discrete, scoped investigation (read-only) producing a verified verdic
    references live or migration debris? Output: safe-to-delete list.
 3. **`shadow-state/` pollution check** — is it another test-written real path?
 4. **State-surface classification completion** — resolve every **[P2]** in §5.
-5. **Test-isolation fix ([PAN-1877](https://github.com/eltmon/panopticon-cli/issues/1877))** — env-rootable `.pan`/`~/.panopticon` base path so no
+5. **Test-isolation fix ([PAN-1877](https://github.com/eltmon/overdeck/issues/1877))** — env-rootable `.pan`/`~/.panopticon` base path so no
    test writes a real store; audit the ≥10 offending files.
 
 ---
 
 ## 7. Issue impact
 
-- **[PAN-1883](https://github.com/eltmon/panopticon-cli/issues/1883)** — re-scope. Its premise (JSON is canonical, no backup) is false.
+- **[PAN-1883](https://github.com/eltmon/overdeck/issues/1883)** — re-scope. Its premise (JSON is canonical, no backup) is false.
   Replace with: *"Make per-issue review-status JSON the committed source of truth; demote
   SQLite to a rebuildable cache; split durable vs ephemeral fields; delete the vestigial
   JSON path."*
-- **[PAN-1877](https://github.com/eltmon/panopticon-cli/issues/1877)** — keep as the test-isolation fix; it becomes trivial once the
+- **[PAN-1877](https://github.com/eltmon/overdeck/issues/1877)** — keep as the test-isolation fix; it becomes trivial once the
   storage has an env-rootable base path (same seam).
 - **Merge-conflict reality** — the 11 issues' actual blocker (`merge_conflict` /
-  `failing_checks` vs main) connects to the red-main family ([PAN-1880](https://github.com/eltmon/panopticon-cli/issues/1880), [#1720](https://github.com/eltmon/panopticon-cli/issues/1720),
-  [#1849](https://github.com/eltmon/panopticon-cli/issues/1849)). Out of scope for the storage redesign; tracked separately.
+  `failing_checks` vs main) connects to the red-main family ([PAN-1880](https://github.com/eltmon/overdeck/issues/1880), [#1720](https://github.com/eltmon/overdeck/issues/1720),
+  [#1849](https://github.com/eltmon/overdeck/issues/1849)). Out of scope for the storage redesign; tracked separately.
 - **Out of scope (do not file):** any distributed-control-plane / event-bus / fan-out
   architecture. Git-as-sync is the ceiling.

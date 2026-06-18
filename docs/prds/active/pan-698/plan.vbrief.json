@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-20T22:50:32Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-698: clean up dashboard typography end-to-end",
     "updated": "2026-04-21T00:28:17.462Z"
   },
@@ -17,7 +17,7 @@
     "updated": "2026-04-21T00:28:17.462Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/698",
+        "uri": "https://github.com/eltmon/overdeck/issues/698",
         "label": "PAN-698",
         "type": "issue"
       },

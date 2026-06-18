@@ -101,7 +101,7 @@ describe('buildIssueRecord', () => {
       verificationNotes: 'verified',
       inspectNotes: 'inspected',
       mergeNotes: 'merged',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1908',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1908',
       prNumber: 1908,
       prHeadSha: 'deadbeef',
       reviewedAtCommit: 'abc123',
@@ -164,14 +164,14 @@ describe('buildIssueRecord', () => {
     mockGetMergeSetSync.mockReturnValue({
       issueId: 'PAN-1908',
       repos: [
-        { artifactUrl: 'https://github.com/eltmon/panopticon-cli/pull/1908' },
+        { artifactUrl: 'https://github.com/eltmon/overdeck/pull/1908' },
       ],
     });
 
     const record = await buildIssueRecord({ name: 'Test', path: projectRoot }, 'PAN-1908', { closedAt: '2026-06-15T01:00:00.000Z' });
 
     expect(record.closeOut.merges).toEqual([
-      'https://github.com/eltmon/panopticon-cli/pull/1908',
+      'https://github.com/eltmon/overdeck/pull/1908',
     ]);
     expect(record.closeOut.closedAt).toBe('2026-06-15T01:00:00.000Z');
     expect(record.closeOut.ranOn).toBeTruthy();

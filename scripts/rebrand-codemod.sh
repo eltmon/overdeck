@@ -59,3 +59,19 @@ _apply '@panctl' 's/\@panctl/\@overdeck/g'
 # ===========================================================================
 echo "Family 3: Panopticon -> Overdeck"
 _apply 'Panopticon' 's/Panopticon/Overdeck/g'
+
+# ===========================================================================
+# Family 4 — docs domain:  panopticon-cli.com / panopticon.com  ->  overdeck.ai
+# MUST run before Family 5 so the slug rename doesn't turn it into overdeck.com.
+# ===========================================================================
+echo "Family 4: domain -> overdeck.ai"
+_apply 'panopticon-cli\.com' 's/panopticon-cli\.com/overdeck.ai/g'
+_apply 'panopticon\.com'     's/panopticon\.com/overdeck.ai/g'
+
+# ===========================================================================
+# Family 5 — GitHub repo slug:  panopticon-cli  ->  overdeck
+# (eltmon/panopticon-cli -> eltmon/overdeck, /Projects/panopticon-cli paths, etc.)
+# Distinct from panopticon-agent[bot] (the git bot account, handled/preserved later).
+# ===========================================================================
+echo "Family 5: repo slug panopticon-cli -> overdeck"
+_apply 'panopticon-cli' 's/panopticon-cli/overdeck/g'

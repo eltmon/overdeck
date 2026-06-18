@@ -5,8 +5,8 @@ describe('formatWorkspaceRelativePath', () => {
   it('keeps the workspace basename when formatting a path inside the workspace', () => {
     expect(
       formatWorkspaceRelativePath(
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/dashboard/frontend/src/App.tsx',
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370/src/dashboard/frontend/src/App.tsx',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370',
       ),
     ).toBe('feature-pan-1370/src/dashboard/frontend/src/App.tsx');
   });
@@ -14,8 +14,8 @@ describe('formatWorkspaceRelativePath', () => {
   it('formats the workspace root as the workspace basename', () => {
     expect(
       formatWorkspaceRelativePath(
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370',
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370',
       ),
     ).toBe('feature-pan-1370');
   });
@@ -24,7 +24,7 @@ describe('formatWorkspaceRelativePath', () => {
     expect(
       formatWorkspaceRelativePath(
         '/tmp/other-project/src/index.ts',
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370',
       ),
     ).toBe('/tmp/other-project/src/index.ts');
   });
@@ -32,8 +32,8 @@ describe('formatWorkspaceRelativePath', () => {
   it('ignores trailing separators on the workspace root', () => {
     expect(
       formatWorkspaceRelativePath(
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/index.ts',
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370/src/index.ts',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370/',
       ),
     ).toBe('feature-pan-1370/src/index.ts');
   });
@@ -41,8 +41,8 @@ describe('formatWorkspaceRelativePath', () => {
   it('preserves line and column suffixes', () => {
     expect(
       formatWorkspaceRelativePath(
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370/src/index.ts:12:5',
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370/src/index.ts:12:5',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370',
       ),
     ).toBe('feature-pan-1370/src/index.ts:12:5');
   });
@@ -51,7 +51,7 @@ describe('formatWorkspaceRelativePath', () => {
     expect(
       formatWorkspaceRelativePath(
         './src/index.ts:9',
-        '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1370',
+        '/home/eltmon/Projects/overdeck/workspaces/feature-pan-1370',
       ),
     ).toBe('feature-pan-1370/src/index.ts:9');
   });

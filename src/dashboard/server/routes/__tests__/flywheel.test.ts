@@ -376,9 +376,9 @@ describe('flywheel auto-merge routes', () => {
       mergeStatus: 'pending' as const,
       updatedAt: '2026-05-25T10:00:00.000Z',
       readyForMerge: true,
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
     }),
-    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Overdeck CLI' }) as never,
+    resolveProject: () => ({ projectKey: 'overdeck', projectPath: process.cwd(), projectName: 'Overdeck CLI' }) as never,
     ...overrides,
   });
 
@@ -431,8 +431,8 @@ describe('flywheel auto-merge routes', () => {
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject({
       issueId: 'PAN-1486',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
+      projectKey: 'overdeck',
       forge: 'github',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
@@ -508,7 +508,7 @@ describe('flywheel auto-merge routes', () => {
         updatedAt: '2026-05-25T10:00:00.000Z',
         readyForMerge: true,
         autoMerge: true,
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
       }),
     }));
     expect(result.status).toBe(200);
@@ -550,15 +550,15 @@ describe('flywheel auto-merge routes', () => {
     seedIssue('PAN-2');
     scheduleAutoMergeWithResult({
       issueId: 'PAN-2',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/2',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/2',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:10:00.000Z',
     });
     scheduleAutoMergeWithResult({
       issueId: 'PAN-1',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
     });
@@ -578,8 +578,8 @@ describe('flywheel auto-merge routes', () => {
       seedIssue(`PAN-${1000 + index}`);
       scheduleAutoMergeWithResult({
         issueId: `PAN-${1000 + index}`,
-        prUrl: `https://github.com/eltmon/panopticon-cli/pull/${1000 + index}`,
-        projectKey: 'panopticon-cli',
+        prUrl: `https://github.com/eltmon/overdeck/pull/${1000 + index}`,
+        projectKey: 'overdeck',
         scheduledAt: '2026-05-25T10:00:00.000Z',
         scheduledMergeAt: new Date(Date.parse('2026-05-25T10:00:00.000Z') + index * 1000).toISOString(),
       });
@@ -594,15 +594,15 @@ describe('flywheel auto-merge routes', () => {
     seedIssue('PAN-4');
     const failed = scheduleAutoMergeWithResult({
       issueId: 'PAN-3',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/3',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
     }).entry;
     const blocked = scheduleAutoMergeWithResult({
       issueId: 'PAN-4',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/4',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/4',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:06:00.000Z',
     }).entry;
@@ -640,8 +640,8 @@ describe('flywheel auto-merge routes', () => {
     seedIssue('PAN-1486');
     scheduleAutoMergeWithResult({
       issueId: 'PAN-1486',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
     });
@@ -669,15 +669,15 @@ describe('flywheel auto-merge routes', () => {
     seedIssue('PAN-4');
     const failed = scheduleAutoMergeWithResult({
       issueId: 'PAN-3',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/3',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/3',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
     }).entry;
     const blocked = scheduleAutoMergeWithResult({
       issueId: 'PAN-4',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/4',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/4',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:06:00.000Z',
     }).entry;
@@ -701,8 +701,8 @@ describe('flywheel auto-merge routes', () => {
     seedIssue('PAN-1486');
     const entry = scheduleAutoMergeWithResult({
       issueId: 'PAN-1486',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
-      projectKey: 'panopticon-cli',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
+      projectKey: 'overdeck',
       scheduledAt: '2026-05-25T10:00:00.000Z',
       scheduledMergeAt: '2026-05-25T10:05:00.000Z',
     }).entry;

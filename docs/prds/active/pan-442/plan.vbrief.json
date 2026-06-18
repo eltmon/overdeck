@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-07T18:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-442: Electron desktop app for Overdeck dashboard"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-07T18:00:00Z",
     "updated": "2026-04-07T18:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/442", "label": "PAN-442", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/442", "label": "PAN-442", "type": "issue" }
     ],
     "tags": ["electron", "desktop", "dashboard", "native-app"],
     "narratives": {

@@ -56,7 +56,7 @@ The Flywheel doesn't disappear at v1.0. It changes role: from "exposes our own d
 
 ## Definitions
 
-- **Substrate bug** — a defect in Overdeck itself: a broken route, a misbehaving role prompt, a wrong gate condition, a flaky lifecycle transition, a UI that lies about state. Substrate bugs get filed against `eltmon/panopticon-cli` and fixed through the normal Overdeck pipeline.
+- **Substrate bug** — a defect in Overdeck itself: a broken route, a misbehaving role prompt, a wrong gate condition, a flaky lifecycle transition, a UI that lies about state. Substrate bugs get filed against `eltmon/overdeck` and fixed through the normal Overdeck pipeline.
 - **Work-code bug** — a defect in the application code that an issue agent is producing. Work-code bugs are part of normal pipeline operation and are not a v1.0 signal — review and test agents catch them.
 - **Pipeline run** — one issue's journey from `start` to `merged` (or to `parked`/`cancelled`). The Flywheel may have many issues in flight; each is its own run for measurement purposes.
 - **Pipeline pass** — a single end-to-end completion: plan → work → review → test → ship → merge. A run may go through multiple passes if review or test rejects work and the agent re-submits.
@@ -130,7 +130,7 @@ After: a `flywheel.require_uat_before_merge` config flag, default `true`. When t
 
 This separation matters: "human merges" and "human UATs" are independent constraints. We may want to relax UAT but never auto-merge (the model we want for v1.0). The toggle reflects that.
 
-The "auto-merge" side — automatically clicking MERGE after a cooldown when every gate is green — is tracked separately in [PAN-1418](https://github.com/eltmon/panopticon-cli/issues/1418), and composes orthogonally with this UAT toggle:
+The "auto-merge" side — automatically clicking MERGE after a cooldown when every gate is green — is tracked separately in [PAN-1418](https://github.com/eltmon/overdeck/issues/1418), and composes orthogonally with this UAT toggle:
 
 | `require_uat_before_merge` | PAN-1418 `autoMerge.enabled` | Behavior |
 |---|---|---|
@@ -147,7 +147,7 @@ Both flags live in the `app_settings` SQLite table (same place as `flywheel.glob
 
 ### Humans-only-merge — current state and the gap
 
-On `eltmon/panopticon-cli`, branch protection on `main` requires the two status checks (`panopticon/review`, `panopticon/test`) and conversation resolution. It does **not** include `required_pull_request_reviews`. The "only the owner merges" property is currently enforced by access (you're the sole push collaborator), not by policy.
+On `eltmon/overdeck`, branch protection on `main` requires the two status checks (`panopticon/review`, `panopticon/test`) and conversation resolution. It does **not** include `required_pull_request_reviews`. The "only the owner merges" property is currently enforced by access (you're the sole push collaborator), not by policy.
 
 This is fine today and arguably right while we're in dev-loop mode (no second human to approve from). The policy gap matters later: the moment we add a trusted second person, they can merge without any human approval since the rule isn't there. Formalizing `required_pull_request_reviews: 1` now means the "humans only merge" property is owned by the repo's policy rather than its access list. See [Issue tracking](#tracking-issues) for the optional follow-up.
 
@@ -192,20 +192,20 @@ These caveats are why the criteria are explicitly **DRAFT** and why we plan to r
 
 These are the issues that get us to "tracking the vision fully." Issues marked **MUST** are the minimum bar — without them, we cannot honestly measure whether we're approaching v1.0.
 
-> **Live tracker (source of truth):** [open `v1.0-required` issues](https://github.com/eltmon/panopticon-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22v1.0-required%22) — kept up to date by the `v1.0-required` GitHub label. The table below is a snapshot at adoption time; the linked filter is canonical going forward as issues are added, closed, or re-scoped.
+> **Live tracker (source of truth):** [open `v1.0-required` issues](https://github.com/eltmon/overdeck/issues?q=is%3Aissue+is%3Aopen+label%3A%22v1.0-required%22) — kept up to date by the `v1.0-required` GitHub label. The table below is a snapshot at adoption time; the linked filter is canonical going forward as issues are added, closed, or re-scoped.
 
 | Issue | Title | MUST? | Why |
 |---|---|---|---|
 | (this doc) | Codify Flywheel vision: dev-loop today → v1.0 user pipeline | — | The vision doc itself; merges via this PR |
-| [#1486](https://github.com/eltmon/panopticon-cli/issues/1486) | Flywheel toggles: `auto_pickup_backlog` + `require_uat_before_merge`, persisted at user-machine level, exposed on FlywheelPage | **MUST** | Without these toggles the Flywheel cannot be configured to behave like a v1.0 user pipeline, so we can't measure intervention rate honestly |
-| [#1487](https://github.com/eltmon/panopticon-cli/issues/1487) | Substrate-bug provenance + Flywheel telemetry (bugs-per-run, time-in-stage-vs-complexity, intervention count) | **MUST** | Without this we cannot measure any of the seven v1.0 criteria; everything else is aspirational |
-| [#1491](https://github.com/eltmon/panopticon-cli/issues/1491) | Metric-aware prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect | **MUST** | Today's P-level-only ranking can't actively push us toward v1.0; metric-derived weight makes the bottleneck criterion bubble up. Depends on #1487 |
-| [#1488](https://github.com/eltmon/panopticon-cli/issues/1488) | Formalize humans-only-merge in branch protection (`required_pull_request_reviews: 1` on main) | Nice-to-have | Policy hygiene; the property holds today via access but should be a rule before we trust a second collaborator |
-| [#1489](https://github.com/eltmon/panopticon-cli/issues/1489) | Tune v1.0 readiness criteria after 30 days of telemetry | Deferred | Only meaningful after ~30 days of telemetry from MUST issues above |
+| [#1486](https://github.com/eltmon/overdeck/issues/1486) | Flywheel toggles: `auto_pickup_backlog` + `require_uat_before_merge`, persisted at user-machine level, exposed on FlywheelPage | **MUST** | Without these toggles the Flywheel cannot be configured to behave like a v1.0 user pipeline, so we can't measure intervention rate honestly |
+| [#1487](https://github.com/eltmon/overdeck/issues/1487) | Substrate-bug provenance + Flywheel telemetry (bugs-per-run, time-in-stage-vs-complexity, intervention count) | **MUST** | Without this we cannot measure any of the seven v1.0 criteria; everything else is aspirational |
+| [#1491](https://github.com/eltmon/overdeck/issues/1491) | Metric-aware prioritization — weight substrate-bug suggestions by which v1.0 criterion they affect | **MUST** | Today's P-level-only ranking can't actively push us toward v1.0; metric-derived weight makes the bottleneck criterion bubble up. Depends on #1487 |
+| [#1488](https://github.com/eltmon/overdeck/issues/1488) | Formalize humans-only-merge in branch protection (`required_pull_request_reviews: 1` on main) | Nice-to-have | Policy hygiene; the property holds today via access but should be a rule before we trust a second collaborator |
+| [#1489](https://github.com/eltmon/overdeck/issues/1489) | Tune v1.0 readiness criteria after 30 days of telemetry | Deferred | Only meaningful after ~30 days of telemetry from MUST issues above |
 
 **See also (orthogonal, not on the v1.0 critical path):**
 
-- [PAN-1418](https://github.com/eltmon/panopticon-cli/issues/1418) — opt-in auto-merge with cooldown. Composes with #1486's `require_uat_before_merge` per the truth table above. Currently `needs-discussion`.
+- [PAN-1418](https://github.com/eltmon/overdeck/issues/1418) — opt-in auto-merge with cooldown. Composes with #1486's `require_uat_before_merge` per the truth table above. Currently `needs-discussion`.
 
 ---
 

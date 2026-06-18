@@ -181,7 +181,7 @@ dashboard's lifetime.
    This is the tsx dev-mode fallback for cases where the module is imported
    from a nested path that has been re-exported through multiple barrel files.
 
-See [BUILD.md](https://github.com/eltmon/panopticon-cli/blob/main/docs/BUILD.md#specialist-prompt-templates)
+See [BUILD.md](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates)
 for how the build pipeline copies `*.md` from source to `dist/dashboard/prompts/`.
 
 ## Frontmatter contract
@@ -652,9 +652,9 @@ not an empty object.
 
 ## Further reading
 
-- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/panopticon-cli/blob/main/src/lib/cloister/prompts.ts) — the full loader (~180 lines).
-- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/panopticon-cli/tree/main/src/lib/cloister/prompts) — the current catalogue.
-- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/panopticon-cli/blob/main/src/lib/cloister/__tests__/prompts.test.ts) — loader contract tests + live smoke tests.
-- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/panopticon-cli/blob/main/docs/BUILD.md#specialist-prompt-templates) — how templates are copied into the bundled dashboard.
-- **Specialist pipeline:** [`docs/SPECIALIST_WORKFLOW.md`](https://github.com/eltmon/panopticon-cli/blob/main/docs/SPECIALIST_WORKFLOW.md) — where each template sits in the lifecycle (work → review → test → merge).
+- **Implementation:** [`src/lib/cloister/prompts.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/prompts.ts) — the full loader (~180 lines).
+- **Templates:** [`src/lib/cloister/prompts/`](https://github.com/eltmon/overdeck/tree/main/src/lib/cloister/prompts) — the current catalogue.
+- **Tests:** [`src/lib/cloister/__tests__/prompts.test.ts`](https://github.com/eltmon/overdeck/blob/main/src/lib/cloister/__tests__/prompts.test.ts) — loader contract tests + live smoke tests.
+- **Build pipeline:** [`docs/BUILD.md`](https://github.com/eltmon/overdeck/blob/main/docs/BUILD.md#specialist-prompt-templates) — how templates are copied into the bundled dashboard.
+- **Specialist pipeline:** [`docs/SPECIALIST_WORKFLOW.md`](https://github.com/eltmon/overdeck/blob/main/docs/SPECIALIST_WORKFLOW.md) — where each template sits in the lifecycle (work → review → test → merge).
 - **Mustache.js:** [github.com/janl/mustache.js](https://github.com/janl/mustache.js) — canonical reference for section syntax, context fall-through, and the set of things we deliberately don't use.

@@ -1,6 +1,6 @@
 # PAN-1048: Unify Agent Type System — Role Primitive with Reactive Cloister
 
-**Issue:** [PAN-1048](https://github.com/eltmon/panopticon-cli/issues/1048)
+**Issue:** [PAN-1048](https://github.com/eltmon/overdeck/issues/1048)
 **Author:** Ed Becker
 **Date:** 2026-05-08
 **Status:** Planning
@@ -218,7 +218,7 @@ Example: "Does review quality degrade from opus to sonnet?" Hold role=review and
 {
   "id": "agent-pan-1044",
   "issueId": "PAN-1044",
-  "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044",
+  "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1044",
   "runtime": "claude",
   "harness": "claude-code",
   "model": "claude-sonnet-4-6",
@@ -242,7 +242,7 @@ Three fields (`type`, `agentPhase`, `phase`) for the same concept, none consiste
 {
   "id": "agent-pan-1044",
   "issueId": "PAN-1044",
-  "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044",
+  "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1044",
   "role": "work",
   "model": "claude-sonnet-4-6",
   "harness": "claude-code",

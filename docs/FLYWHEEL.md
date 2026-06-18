@@ -139,7 +139,7 @@ stacks (max 2), and the "UAT batches" card — is documented in
 [`UAT-BATCH-TRAINS.md`](./UAT-BATCH-TRAINS.md). Batch trains are inert until the
 merge-train flag is on and a run is active; the ready set is computed from the
 merge queue (`computeMergeQueue`, gated on `MERGE_GATE_VERBS = {shipping,
-merging}` per [PAN-1736](https://github.com/eltmon/panopticon-cli/issues/1736)).
+merging}` per [PAN-1736](https://github.com/eltmon/overdeck/issues/1736)).
 
 ## Settings → Roles → Flywheel
 

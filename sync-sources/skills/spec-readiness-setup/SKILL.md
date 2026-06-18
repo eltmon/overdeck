@@ -353,7 +353,7 @@ User: setup spec readiness
 User: create readiness wrapper for Acme using Linear
 → Skips tracker question, asks remaining
 
-User: configure spec readiness for our team using GitHub Issues on eltmon/panopticon-cli
+User: configure spec readiness for our team using GitHub Issues on eltmon/overdeck
 → Skips tracker question and repo question
 
 User: spec readiness branding — change colors to #0891b2

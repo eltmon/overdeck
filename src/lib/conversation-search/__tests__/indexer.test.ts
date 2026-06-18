@@ -164,7 +164,7 @@ describe('conversation search indexer', () => {
 
   it('estimates full reindex cost without embedding chunks', async () => {
     const dir = makeTmpDir();
-    const projectDir = join(dir, 'projects', 'panopticon-cli');
+    const projectDir = join(dir, 'projects', 'overdeck');
     const filePath = join(projectDir, 'session-d.jsonl');
     mkdirSync(projectDir, { recursive: true });
     writeFileSync(filePath, line(message('assistant', 'cost estimate text')));

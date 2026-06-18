@@ -104,7 +104,7 @@ describe('isValidAgentDirectoryName', () => {
 
   it('rejects conv-* and specialist-* directories', () => {
     expect(isValidAgentDirectoryName('conv-20260411-1125')).toBe(false);
-    expect(isValidAgentDirectoryName('specialist-panopticon-cli-test-agent')).toBe(false);
+    expect(isValidAgentDirectoryName('specialist-overdeck-test-agent')).toBe(false);
   });
 
   it('rejects unknown names', () => {

@@ -36,39 +36,39 @@ afterEach(async () => {
 
 describe('memory path resolvers', () => {
   it('resolves project and issue memory roots under OVERDECK_HOME', () => {
-    expect(resolveMemoryRoot('panopticon-cli')).toBe(join(tempDir!, 'memory/panopticon-cli'));
-    expect(resolveIssueMemoryRoot('panopticon-cli', 'PAN-1052')).toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    expect(resolveMemoryRoot('overdeck')).toBe(join(tempDir!, 'memory/overdeck'));
+    expect(resolveIssueMemoryRoot('overdeck', 'PAN-1052')).toBe(join(tempDir!, 'memory/overdeck/PAN-1052'));
   });
 
   it('resolves issue-scoped memory artifacts', () => {
-    expect(resolveObservationsFile('panopticon-cli', 'PAN-1052', '2026-05-16T20:00:00.000Z'))
-      .toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.jsonl'));
-    expect(resolvePendingDir('panopticon-cli', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending'));
-    expect(resolveStatusFile('panopticon-cli', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052/status.json'));
-    expect(resolveArchiveDir('panopticon-cli', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052/archive'));
-    expect(resolveSummariesDir('panopticon-cli', 'PAN-1052'))
-      .toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052/summaries'));
-    expect(resolveRagRunsFile('panopticon-cli', 'PAN-1052', new Date('2026-05-16T20:00:00.000Z')))
-      .toBe(join(tempDir!, 'memory/panopticon-cli/PAN-1052/rag-runs/2026-05-16.jsonl'));
+    expect(resolveObservationsFile('overdeck', 'PAN-1052', '2026-05-16T20:00:00.000Z'))
+      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/observations/2026-05-16.jsonl'));
+    expect(resolvePendingDir('overdeck', 'PAN-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/pending'));
+    expect(resolveStatusFile('overdeck', 'PAN-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/status.json'));
+    expect(resolveArchiveDir('overdeck', 'PAN-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/archive'));
+    expect(resolveSummariesDir('overdeck', 'PAN-1052'))
+      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/summaries'));
+    expect(resolveRagRunsFile('overdeck', 'PAN-1052', new Date('2026-05-16T20:00:00.000Z')))
+      .toBe(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs/2026-05-16.jsonl'));
   });
 
   it('resolves workspace checkpoint and project FTS database paths', () => {
     expect(resolveCheckpointFile('/workspace/feature-pan-1052')).toBe('/workspace/feature-pan-1052/.pan/memory-checkpoint.json');
-    expect(resolveFtsDbPath('panopticon-cli')).toBe(join(tempDir!, 'memory/panopticon-cli/memory-search.db'));
+    expect(resolveFtsDbPath('overdeck')).toBe(join(tempDir!, 'memory/overdeck/memory-search.db'));
   });
 
   it('keeps path functions pure and exposes separate idempotent directory helpers', async () => {
-    const file = resolveRagRunsFile('panopticon-cli', 'PAN-1052', '2026-05-16');
+    const file = resolveRagRunsFile('overdeck', 'PAN-1052', '2026-05-16');
     expect(existsSync(join(tempDir!, 'memory'))).toBe(false);
 
     await ensureParentDir(file);
     await ensureParentDir(file);
-    expect(existsSync(join(tempDir!, 'memory/panopticon-cli/PAN-1052/rag-runs'))).toBe(true);
+    expect(existsSync(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs'))).toBe(true);
 
-    const dir = resolvePendingDir('panopticon-cli', 'PAN-1052');
+    const dir = resolvePendingDir('overdeck', 'PAN-1052');
     await ensureDir(dir);
     await ensureDir(dir);
     expect(existsSync(dir)).toBe(true);

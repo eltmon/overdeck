@@ -101,7 +101,7 @@ function createSnapshot(severity: SystemHealthSnapshot['severity']): SystemHealt
             leaked: true,
             killTarget: {
               kind: 'specialist',
-              projectKey: 'panopticon-cli',
+              projectKey: 'overdeck',
               issueId: 'PAN-1',
               specialistType: 'review-agent',
             },

@@ -36,7 +36,7 @@ describe('memory subagent filter', () => {
       transcript_path: '/tmp/session-1.jsonl',
       stop_hook_active: true,
       identity: {
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         runId: 'run-1',
@@ -56,7 +56,7 @@ describe('memory subagent filter', () => {
       toOffset: 120,
       trigger: 'stop-hook',
       identity: expect.objectContaining({
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         sessionId: 'session-1',
       }),
     }));
@@ -172,7 +172,7 @@ describe('memory subagent filter', () => {
       session_id: 'session-1',
       transcript_path: '/tmp/session-1.jsonl',
       identity: {
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         runId: 'run-1',
@@ -205,7 +205,7 @@ describe('memory subagent filter', () => {
       session_id: 'session-1',
       transcript_path: '/tmp/session-1.jsonl',
       identity: {
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
         runId: 'run-1',

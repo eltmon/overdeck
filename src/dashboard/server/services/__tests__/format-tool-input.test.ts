@@ -35,7 +35,7 @@ describe('summarizeToolInputForWorkLog', () => {
     (tool) => {
       expect(
         summarizeToolInputForWorkLog(tool, {
-          file_path: '/home/eltmon/Projects/panopticon-cli/src/dashboard/server/services/conversation-service.ts',
+          file_path: '/home/eltmon/Projects/overdeck/src/dashboard/server/services/conversation-service.ts',
         }),
       ).toBe('conversation-service.ts');
     },
@@ -53,7 +53,7 @@ describe('summarizeToolInputForWorkLog', () => {
     expect(
       summarizeToolInputForWorkLog('Grep', {
         pattern: 'WorkLogEntry',
-        path: '/home/eltmon/Projects/panopticon-cli/src/dashboard',
+        path: '/home/eltmon/Projects/overdeck/src/dashboard',
       }),
     ).toBe('"WorkLogEntry" in dashboard');
   });

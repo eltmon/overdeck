@@ -1,4 +1,4 @@
-# Effect v4-beta Idioms (`4.0.0-beta.73`) — Canonical Patterns for the panopticon-cli Rewrite
+# Effect v4-beta Idioms (`4.0.0-beta.73`) — Canonical Patterns for the overdeck Rewrite
 
 > **Status:** Verified against installed `node_modules` types and live `src/` usage on
 > 2026-06-16. Every signature below was read from

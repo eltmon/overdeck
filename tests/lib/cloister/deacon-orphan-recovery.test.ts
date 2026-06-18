@@ -196,7 +196,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       'PAN-369-REVIEW': {
         reviewStatus: 'pending',
         testStatus: 'pending',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/369',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/369',
       },
       'PAN-369-TEST': {
         reviewStatus: 'passed',
@@ -250,7 +250,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
     mockSpawnRun.mockResolvedValue({ id: 'test-run-1' });
 
     const actions = await checkOrphanedReviewStatuses();
@@ -281,7 +281,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
     mockSpawnRun.mockResolvedValue({ id: 'test-run-1' });
 
     const actions = await checkOrphanedReviewStatuses();
@@ -315,7 +315,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
     mockSpawnRun.mockRejectedValue(new Error('spawn failed'));
 
     const actions = await checkOrphanedReviewStatuses();
@@ -347,7 +347,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
     mockGetWorkspaceStackHealth.mockResolvedValue({
       healthy: false,
       reasons: ['feature-pan-1190-stack-dev-1 service exited (255)'],
@@ -384,7 +384,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
     mockGetWorkspaceStackHealth.mockResolvedValue({
       healthy: false,
       reasons: ['feature-pan-1190-stackfail-server-1 service exited (0)'],
@@ -461,7 +461,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     writeFileSync(completedProcessedPath, '', 'utf-8');
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/workspaces' });
     mockSpawnReviewRoleForIssue.mockResolvedValue({ success: true, message: 'dispatched' });
 
     const actions = await checkOrphanedReviewStatuses();
@@ -502,7 +502,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     writeFileSync(completedProcessedPath, '', 'utf-8');
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/workspaces' });
     mockSpawnReviewRoleForIssue.mockRejectedValue(new Error('spawn failed'));
 
     const actions = await checkOrphanedReviewStatuses();
@@ -526,7 +526,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
         testStatus: 'pending',
         mergeStatus: 'pending',
         readyForMerge: false,
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/999',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/999',
         history: [],
       },
     });
@@ -537,7 +537,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       status: 'stopped',
       stoppedByUser: true,
     });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/workspaces' });
 
     const actions = await checkOrphanedReviewStatuses();
 
@@ -617,7 +617,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
     mockSpawnRun.mockResolvedValue({ id: 'test-run-1' });
 
     await checkOrphanedReviewStatuses();
@@ -641,7 +641,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
         issueId: ISSUE_ID,
         reviewStatus: 'pending',
         testStatus: 'pending',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1',
         readyForMerge: false,
         reviewRetryCount: 0,
         history: [],
@@ -649,7 +649,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     });
 
     mockGetAgentState.mockReturnValue({ workspace });
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/workspaces' });
     mockSpawnReviewRoleForIssue.mockResolvedValue({
       gated: true,
       success: false,

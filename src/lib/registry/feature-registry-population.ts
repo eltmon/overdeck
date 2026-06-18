@@ -242,7 +242,7 @@ function normalizeKey(value: string): string {
 
 function buildClassificationIdentity(issueId: string): MemoryIdentity {
   return {
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     workspaceId: 'feature-registry',
     issueId,
     runId: 'feature-registry-classifier',

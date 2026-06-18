@@ -4,7 +4,7 @@ When you open/click into a project in the dashboard, there is **no clearly-visib
 
 ## How it came up
 
-Surfaced while building the per-issue auto-merge toggle ([PAN-1692](https://github.com/eltmon/panopticon-cli/issues/1692)). The toggle has a "default" state ("follow the project default"), and the natural question — *where do I set that default?* — has no discoverable home in the project view.
+Surfaced while building the per-issue auto-merge toggle ([PAN-1692](https://github.com/eltmon/overdeck/issues/1692)). The toggle has a "default" state ("follow the project default"), and the natural question — *where do I set that default?* — has no discoverable home in the project view.
 
 ## Ask
 

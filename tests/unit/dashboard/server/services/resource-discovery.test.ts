@@ -14,7 +14,7 @@ describe('resource-discovery grouping', () => {
       {
         issueId: 'PAN-200',
         title: 'Second',
-        projectName: 'panopticon-cli',
+        projectName: 'overdeck',
         branch: 'feature/pan-200',
         status: 'idle',
         stateLabel: 'Allocated',
@@ -79,7 +79,7 @@ describe('resource-discovery grouping', () => {
       {
         issueId: 'PAN-100',
         title: 'First',
-        projectName: 'panopticon-cli',
+        projectName: 'overdeck',
         branch: 'feature/pan-100',
         status: 'running',
         stateLabel: 'In Progress',
@@ -119,7 +119,7 @@ describe('resource-discovery grouping', () => {
 
     const grouped = groupResourceAllocatedIssuesByProject(issues);
 
-    expect(grouped.map((project) => project.name)).toEqual(['aaa-project', 'panopticon-cli']);
+    expect(grouped.map((project) => project.name)).toEqual(['aaa-project', 'overdeck']);
     expect(grouped[1]?.features.map((feature) => feature.issueId)).toEqual(['PAN-100', 'PAN-200']);
   });
 });
@@ -130,7 +130,7 @@ describe('resource-discovery sanitization', () => {
       {
         issueId: 'PAN-300',
         title: 'Sanitized',
-        projectName: 'panopticon-cli',
+        projectName: 'overdeck',
         branch: 'feature/pan-300',
         status: 'idle',
         stateLabel: 'Allocated',

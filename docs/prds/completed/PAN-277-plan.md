@@ -15,7 +15,7 @@ Additionally, SageOx should only be used for **Overdeck** (open source, freely s
 ## Decisions Made
 
 ### D1: Per-project `.sageox/`, not devroot-level
-`.sageox/` stays inside `panopticon-cli/` (Overdeck team on sageox.ai). NOT in devroot. NOT in MYN repos. This ensures project isolation and prevents commercial code from leaking.
+`.sageox/` stays inside `overdeck/` (Overdeck team on sageox.ai). NOT in devroot. NOT in MYN repos. This ensures project isolation and prevents commercial code from leaking.
 
 ### D2: Fork SageOx, contribute upstream PR
 Rather than building native Overdeck features, contribute a PR to SageOx that adds explicit project root override and auto-recording. Benefits their project, solves our problem, supports the founder (Milkana Brace, known personally).
@@ -99,7 +99,7 @@ Overdeck creates agent → starts Claude Code in worktree
   → Summary appears on sageox.ai dashboard ✓
 
 Human PRD session from devroot:
-  → SessionStart hook fires: OX_PROJECT_ROOT=.../panopticon-cli ox agent prime --auto-record
+  → SessionStart hook fires: OX_PROJECT_ROOT=.../overdeck ox agent prime --auto-record
   → Context injected, recording started ✓
   → Human iterates on PRD with Claude...
   → Stop hook fires: ox agent <id> session stop
@@ -110,7 +110,7 @@ Human PRD session from devroot:
 
 Claude Code JSONL paths tell us session type without any code:
 - `~/.claude/projects/-home-eltmon-Projects/` → human session from devroot
-- `~/.claude/projects/-home-eltmon-Projects-panopticon-cli-workspaces-feature-pan-*` → agent session
+- `~/.claude/projects/-home-eltmon-Projects-overdeck-workspaces-feature-pan-*` → agent session
 
 SageOx captures both. The sageox.ai dashboard lets you browse/search them.
 
@@ -397,12 +397,12 @@ The devroot hook (managed by PAN-266 mechanism) sets `OX_PROJECT_ROOT` and enabl
     "SessionStart": [
       {
         "matcher": "startup",
-        "command": "if command -v ox >/dev/null 2>&1; then OX_PROJECT_ROOT=/home/eltmon/Projects/panopticon-cli AGENT_ENV=claude-code ox agent prime --auto-record --idempotent 2>&1 || true; fi"
+        "command": "if command -v ox >/dev/null 2>&1; then OX_PROJECT_ROOT=/home/eltmon/Projects/overdeck AGENT_ENV=claude-code ox agent prime --auto-record --idempotent 2>&1 || true; fi"
       }
     ],
     "Stop": [
       {
-        "command": "if command -v ox >/dev/null 2>&1 && [ -n \"$SAGEOX_AGENT_ID\" ]; then OX_PROJECT_ROOT=/home/eltmon/Projects/panopticon-cli ox agent $SAGEOX_AGENT_ID session stop 2>&1 || true; fi"
+        "command": "if command -v ox >/dev/null 2>&1 && [ -n \"$SAGEOX_AGENT_ID\" ]; then OX_PROJECT_ROOT=/home/eltmon/Projects/overdeck ox agent $SAGEOX_AGENT_ID session stop 2>&1 || true; fi"
       }
     ]
   }
@@ -464,12 +464,12 @@ The worktree hook template uses these:
 Result: sageox.ai shows all 5 sessions linked under PAN-279
 ```
 
-### Commit `.sageox/` in panopticon-cli
+### Commit `.sageox/` in overdeck
 
 Currently staged but uncommitted. After confirming Overdeck team:
 
 ```bash
-cd ~/Projects/panopticon-cli
+cd ~/Projects/overdeck
 cat .sageox/config.json | jq .team_id
 # Verify Overdeck team, not Mind Your Now
 git add .sageox/
@@ -549,7 +549,7 @@ Overdeck integrates with [SageOx](https://sageox.ai) to capture session reasonin
 # (already at ~/.local/bin/ox)
 
 # One-time: initialize project
-cd ~/Projects/panopticon-cli
+cd ~/Projects/overdeck
 ox init  # associates with team on sageox.ai
 
 # Commit the initialization
@@ -624,7 +624,7 @@ Subject: SageOx feedback from Overdeck integration
 Hi Milkana,
 
 I spent some real time integrating SageOx into Overdeck (my open source
-multi-agent orchestrator — github.com/eltmon/panopticon-cli). Wanted to share
+multi-agent orchestrator — github.com/eltmon/overdeck). Wanted to share
 what I learned and some contributions.
 
 The session capture architecture is really well-designed. The server-side

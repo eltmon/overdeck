@@ -9,13 +9,13 @@ Redesign the Flywheel page with a clear visual hierarchy. Treat the existing sec
 ## Requirements to fold in
 
 - **Clear hierarchy / breathing room** — the current stacked banners read as a glob.
-- **Surface merge-train state** (relates to [PAN-1691](https://github.com/eltmon/panopticon-cli/issues/1691)):
+- **Surface merge-train state** (relates to [PAN-1691](https://github.com/eltmon/overdeck/issues/1691)):
   - For the on-demand **UAT-candidate branch** (the auto-merge-OFF mode that bundles several ready features for one UAT session): show **which features are bundled on it** and the **branch's name**. Today there's no visual indication of either.
   - The merge-queue batch/serialize plan and the per-issue **Merge policy** roster should fit cleanly, not as stacked banners.
 
 ## Relates
 
-- [PAN-1691](https://github.com/eltmon/panopticon-cli/issues/1691) — conflict-aware merge train (the UAT-candidate branch + plan this page should visualize).
-- [PAN-1661](https://github.com/eltmon/panopticon-cli/issues/1661) — Command Deck issue-view remodel (same IA-cleanup spirit; keep consistent).
+- [PAN-1691](https://github.com/eltmon/overdeck/issues/1691) — conflict-aware merge train (the UAT-candidate branch + plan this page should visualize).
+- [PAN-1661](https://github.com/eltmon/overdeck/issues/1661) — Command Deck issue-view remodel (same IA-cleanup spirit; keep consistent).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

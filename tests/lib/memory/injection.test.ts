@@ -21,7 +21,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity: MemoryIdentity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'agent-pan-1052',
@@ -66,7 +66,7 @@ async function writeStatus(value: MemoryStatus = status) {
 }
 
 async function insertRow(overrides: Partial<Record<string, string>> = {}) {
-  await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+  await withMemoryFtsDatabase('overdeck', (db) => db.prepare(`
     INSERT INTO memory_fts (
       content,
       display_content,

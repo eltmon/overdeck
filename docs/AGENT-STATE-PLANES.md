@@ -45,9 +45,9 @@ Each project in `projects.yaml` declares where `.pan/` records are committed:
 
 ```yaml
 projects:
-  panopticon-cli:
+  overdeck:
     name: Overdeck
-    path: /home/eltmon/Projects/panopticon-cli
+    path: /home/eltmon/Projects/overdeck
     issue_prefix: PAN
     pan_records:
       repo: "."

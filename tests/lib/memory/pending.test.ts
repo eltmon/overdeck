@@ -20,7 +20,7 @@ let restoreEnqueuer: (() => void) | null = null;
 let restoreProcessor: (() => void) | null = null;
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -81,13 +81,13 @@ describe('pending turn writer', () => {
 
     expect(result).toEqual({
       fileName: '1778963460123_session_with_spaces_10_100.json',
-      path: join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending/1778963460123_session_with_spaces_10_100.json'),
+      path: join(tempDir!, 'memory/overdeck/PAN-1052/pending/1778963460123_session_with_spaces_10_100.json'),
     });
 
     const raw = await readFile(result.path, 'utf8');
     expect(JSON.parse(raw)).toEqual(turn);
 
-    const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/pending'));
+    const files = await readdir(join(tempDir!, 'memory/overdeck/PAN-1052/pending'));
     expect(files).toEqual(['1778963460123_session_with_spaces_10_100.json']);
   });
 
@@ -98,7 +98,7 @@ describe('pending turn writer', () => {
 
     expect(replay).toEqual(first);
     expect(enqueue).toHaveBeenCalledOnce();
-    expect(await readPendingTurns('panopticon-cli', 'PAN-1052')).toHaveLength(1);
+    expect(await readPendingTurns('overdeck', 'PAN-1052')).toHaveLength(1);
   });
 
   it('triggers a workspace status rollup after the configurable pending threshold is reached', async () => {
@@ -115,7 +115,7 @@ describe('pending turn writer', () => {
     expect(enqueue).toHaveBeenCalledOnce();
     expect(enqueue.mock.calls[0]![0]).toMatchObject({
       identity: {
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         workspaceId: 'feature-pan-1052',
         issueId: 'PAN-1052',
       },
@@ -179,7 +179,7 @@ describe('pending turn writer', () => {
     await writePendingTurn(turnForSession('session-b', 2), { loadThreshold: () => 10 });
     await writePendingTurn(turnForSession('session-a', 1), { loadThreshold: () => 10 });
 
-    expect((await readPendingTurns('panopticon-cli', 'PAN-1052')).map((turn) => turn.identity.sessionId)).toEqual([
+    expect((await readPendingTurns('overdeck', 'PAN-1052')).map((turn) => turn.identity.sessionId)).toEqual([
       'session-a',
       'session-b',
     ]);

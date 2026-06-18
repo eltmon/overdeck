@@ -64,7 +64,7 @@ function makeFeature(issueId: string, sessions?: SessionNodeType[]): ProjectFeat
   return {
     issueId,
     title: issueId,
-    projectName: 'panopticon-cli',
+    projectName: 'overdeck',
     branch: `feature/${issueId.toLowerCase()}`,
     status: 'running',
     stateLabel: 'In Progress',
@@ -81,7 +81,7 @@ describe('ProjectNode', () => {
   it('shows only alive features when alive filter is active', () => {
     render(
       <ProjectNode
-        name="panopticon-cli"
+        name="overdeck"
         features={[
           makeFeature('PAN-854', [makeSession({ presence: 'active', status: 'running' })]),
           makeFeature('PAN-855', [makeSession({ presence: 'ended', status: 'stopped' })]),
@@ -100,7 +100,7 @@ describe('ProjectNode', () => {
   it('shows only failed features when failed filter is active', () => {
     render(
       <ProjectNode
-        name="panopticon-cli"
+        name="overdeck"
         features={[
           makeFeature('PAN-854', [makeSession({ presence: 'active', status: 'running' })]),
           makeFeature('PAN-855', [makeSession({ presence: 'ended', status: 'error' })]),
@@ -121,7 +121,7 @@ describe('ProjectNode', () => {
 
     render(
       <ProjectNode
-        name="panopticon-cli"
+        name="overdeck"
         features={[makeFeature('PAN-854')]}
         selectedFeature={null}
         onSelectFeature={() => {}}
@@ -140,7 +140,7 @@ describe('ProjectNode', () => {
 
     render(
       <ProjectNode
-        name="panopticon-cli"
+        name="overdeck"
         features={[]}
         selectedFeature={null}
         onSelectFeature={() => {}}
@@ -149,9 +149,9 @@ describe('ProjectNode', () => {
     );
 
     expect(screen.queryByText('(no active features)')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /panopticon-cli/i }));
+    fireEvent.click(screen.getByRole('button', { name: /overdeck/i }));
 
-    expect(onSelectProject).toHaveBeenCalledWith('panopticon-cli');
+    expect(onSelectProject).toHaveBeenCalledWith('overdeck');
     expect(screen.getByText('(no active features)')).toBeInTheDocument();
   });
 
@@ -161,22 +161,22 @@ describe('ProjectNode', () => {
 
     render(
       <ProjectNode
-        name="panopticon-cli"
+        name="overdeck"
         features={[makeFeature('PAN-854')]}
         selectedFeature={null}
-        selectedProject="panopticon-cli"
+        selectedProject="overdeck"
         onSelectFeature={() => {}}
         onSelectProject={onSelectProject}
         onNewConversation={onNewConversation}
       />,
     );
 
-    const row = screen.getAllByRole('button', { name: /panopticon-cli/i })[0];
+    const row = screen.getAllByRole('button', { name: /overdeck/i })[0];
     expect(row).toHaveStyle({ background: 'var(--accent)' });
 
     fireEvent.click(screen.getByRole('button', { name: /new conversation/i }));
 
-    expect(onNewConversation).toHaveBeenCalledWith('panopticon-cli');
+    expect(onNewConversation).toHaveBeenCalledWith('overdeck');
     expect(onSelectProject).not.toHaveBeenCalled();
   });
 });

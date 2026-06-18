@@ -1,7 +1,7 @@
 # PAN-57 Planning State
 
 ## Issue Overview
-Create professional documentation website using Mintlify at www.panopticon-cli.com
+Create professional documentation website using Mintlify at www.overdeck.ai
 
 **Key Deliverables:**
 1. High-polish README intro with badges, screenshots, comparison tables
@@ -124,7 +124,7 @@ Map README sections to target .mdx files (migration table provided in issue)
 
 From issue:
 - [ ] Set up Mintlify project with custom theme
-- [ ] Configure domain (www.panopticon-cli.com)
+- [ ] Configure domain (www.overdeck.ai)
 - [ ] Set up GitHub integration for auto-deploy
 - [ ] Add search functionality
 - [ ] Configure analytics
@@ -145,8 +145,8 @@ From issue:
 3. Is the README enhancement (Phase 1) included in this scope, or separate?
 
 ### Technical Setup
-4. Has the Mintlify dashboard been connected to the repo yet (Settings → Git → Select panopticon-cli)?
-5. What's the status of domain configuration (www.panopticon-cli.com)?
+4. Has the Mintlify dashboard been connected to the repo yet (Settings → Git → Select overdeck)?
+5. What's the status of domain configuration (www.overdeck.ai)?
 6. Should we test locally with `npx mintlify dev` before considering this done?
 
 ### Content Strategy
@@ -178,7 +178,7 @@ From issue:
 ### Deployment Status
 **Already connected to Mintlify**
 - Site currently visible at: mindyournow.mintlify.app
-- Domain (www.panopticon-cli.com) purchase in progress - NOT in scope
+- Domain (www.overdeck.ai) purchase in progress - NOT in scope
 - No need to configure Mintlify dashboard connection
 - Just need to create files and verify local dev works
 
@@ -335,7 +335,7 @@ Use `bd ready` to see which tasks are currently unblocked and ready to work on.
 ## Summary for Implementation Agent
 
 ### What You're Building
-A complete Mintlify documentation website for Overdeck at www.panopticon-cli.com (currently visible at mindyournow.mintlify.app while domain purchase completes).
+A complete Mintlify documentation website for Overdeck at www.overdeck.ai (currently visible at mindyournow.mintlify.app while domain purchase completes).
 
 ### Key Files to Create/Modify
 - **18 new .mdx files** in organized directory structure (cli/, features/, configuration/, guides/, reference/)

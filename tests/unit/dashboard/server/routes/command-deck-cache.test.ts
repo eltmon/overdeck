@@ -34,28 +34,28 @@ describe('costCache keying invariants', () => {
 describe('closedIssuesCache keying invariants', () => {
   it('must use a Map keyed by repo string (owner/repo)', () => {
     const cache = new Map<string, { timestamp: number; data: unknown[] }>();
-    cache.set('eltmon/panopticon-cli', { timestamp: Date.now(), data: [{ number: 1, title: 'A' }] });
+    cache.set('eltmon/overdeck', { timestamp: Date.now(), data: [{ number: 1, title: 'A' }] });
     cache.set('eltmon/openclaw', { timestamp: Date.now(), data: [{ number: 2, title: 'B' }] });
 
-    expect(cache.get('eltmon/panopticon-cli')?.data).toHaveLength(1);
+    expect(cache.get('eltmon/overdeck')?.data).toHaveLength(1);
     expect(cache.get('eltmon/openclaw')?.data).toHaveLength(1);
     expect(cache.get('acme/other')).toBeUndefined();
   });
 
   it('must derive repo keys from getGitHubConfig().repos when available', () => {
     const configRepos = [
-      { owner: 'eltmon', repo: 'panopticon-cli' },
+      { owner: 'eltmon', repo: 'overdeck' },
       { owner: 'eltmon', repo: 'openclaw' },
     ];
     const keys = configRepos.map((r) => `${r.owner}/${r.repo}`);
-    expect(keys).toEqual(['eltmon/panopticon-cli', 'eltmon/openclaw']);
+    expect(keys).toEqual(['eltmon/overdeck', 'eltmon/openclaw']);
   });
 
   it('must fall back to the default repo when no config is present', () => {
     const config = null as { repos?: { owner: string; repo: string }[] } | null;
     const repos = config?.repos?.length
       ? config.repos.map((r) => `${r.owner}/${r.repo}`)
-      : ['eltmon/panopticon-cli'];
-    expect(repos).toEqual(['eltmon/panopticon-cli']);
+      : ['eltmon/overdeck'];
+    expect(repos).toEqual(['eltmon/overdeck']);
   });
 });

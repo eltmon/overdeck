@@ -49,7 +49,7 @@ describe('pan briefing command', () => {
     await writeFile(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
       plan: { title: 'Home tab + live session-context briefing' },
     }), 'utf8');
-    const statusPath = resolveStatusFile('panopticon-cli', 'PAN-1204');
+    const statusPath = resolveStatusFile('overdeck', 'PAN-1204');
     await ensureParentDir(statusPath);
     await writeFile(statusPath, JSON.stringify({
       phase: 'building',

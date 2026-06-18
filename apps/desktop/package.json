@@ -6,7 +6,7 @@
   "productName": "Overdeck",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eltmon/panopticon-cli.git"
+    "url": "https://github.com/eltmon/overdeck.git"
   },
   "bin": {
     "panctl": "./bin/panctl.mjs"
@@ -55,7 +55,7 @@
     "publish": {
       "provider": "github",
       "owner": "eltmon",
-      "repo": "panopticon-cli"
+      "repo": "overdeck"
     },
     "files": [
       "dist-electron/**/*",

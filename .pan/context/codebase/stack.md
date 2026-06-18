@@ -23,7 +23,7 @@
   (`tmux -L panopticon`); per-agent state under `~/.panopticon/agents/`;
   harnesses: claude-code (default), pi (multi-provider, FIFO rpc.in), codex
   (OpenAI, `codex exec`).
-- **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/panopticon-cli);
+- **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
   beads (`bd`) for in-repo task tracking; vBRIEF v0.5/0.6 specs in `.pan/specs/`.
 - **Config:** YAML at `~/.panopticon/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +

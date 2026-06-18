@@ -18,7 +18,7 @@ const fixtureProjects: ProjectsConfig = {
       name: 'Overdeck',
       path: '/repo/panopticon',
       issue_prefix: 'PAN',
-      github_repo: 'eltmon/panopticon-cli',
+      github_repo: 'eltmon/overdeck',
     },
     auricle: {
       name: 'Auricle',

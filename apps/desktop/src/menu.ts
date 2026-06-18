@@ -196,18 +196,18 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
         label: "Flywheel Documentation",
         click: () =>
           void shell.openExternal(
-            "https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md",
+            "https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md",
           ),
       },
       {
         label: "Overdeck on GitHub",
         click: () =>
-          void shell.openExternal("https://github.com/eltmon/panopticon-cli"),
+          void shell.openExternal("https://github.com/eltmon/overdeck"),
       },
       {
         label: "Report an Issue",
         click: () =>
-          void shell.openExternal("https://github.com/eltmon/panopticon-cli/issues"),
+          void shell.openExternal("https://github.com/eltmon/overdeck/issues"),
       },
     ],
   });

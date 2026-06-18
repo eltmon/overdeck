@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-15T01:58:14Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-712: fix stale pan work/cloister/specialists refs in .claude/skills/"
   },
   "plan": {
@@ -15,8 +15,8 @@
     "created": "2026-04-15T01:58:14Z",
     "updated": "2026-04-15T01:58:14Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/712", "label": "PAN-712", "type": "issue" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/705", "label": "PAN-705", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/712", "label": "PAN-712", "type": "issue" },
+      { "uri": "https://github.com/eltmon/overdeck/issues/705", "label": "PAN-705", "type": "issue" }
     ],
     "tags": ["docs", "skills", "cleanup", "pan-705-followup"],
     "narratives": {

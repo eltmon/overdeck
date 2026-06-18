@@ -34,7 +34,7 @@ describe('issue closed detection', () => {
     mocks.resolveGitHubIssueSync.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 1613,
     });
     mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ state: 'OPEN' }), stderr: '' });
@@ -61,7 +61,7 @@ describe('issue closed detection', () => {
       'view',
       '1613',
       '--repo',
-      'eltmon/panopticon-cli',
+      'eltmon/overdeck',
       '--json',
       'state',
     ], { encoding: 'utf-8', timeout: 10_000 });

@@ -142,7 +142,7 @@ describe('syncSnapshot', () => {
         observationsByIssueId: { 'PAN-1': [] },
         healthByIssueId: {
           'PAN-1': {
-            projectId: 'panopticon-cli',
+            projectId: 'overdeck',
             issueId: 'PAN-1',
             status: 'healthy',
             reason: null,

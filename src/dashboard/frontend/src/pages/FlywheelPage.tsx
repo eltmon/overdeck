@@ -410,7 +410,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           {effectiveStatus ? `running · ${effectiveStatus.runId}` : isPaused ? 'paused' : 'idle'}
         </span>
         <a
-          href="https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md"
+          href="https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md"
           target="_blank"
           rel="noreferrer"
           aria-label="Flywheel docs"

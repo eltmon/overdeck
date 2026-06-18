@@ -21,7 +21,7 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
   return {
     issueId: 'PAN-1044',
     title: 'Project overview panel',
-    projectName: 'panopticon-cli',
+    projectName: 'overdeck',
     branch: 'feature/pan-1044',
     status: 'open',
     stateLabel: 'Todo',
@@ -162,7 +162,7 @@ describe('bucketFeaturePhase', () => {
 
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', title: 'Blocked review' }),
           makeFeature({ issueId: 'PAN-2', title: 'Dispatch failed' }),
@@ -182,7 +182,7 @@ describe('bucketFeaturePhase', () => {
   it('counts only active work agents in the hero summary', () => {
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
           makeFeature({ issueId: 'PAN-2', agentStatus: 'active' }),
@@ -205,7 +205,7 @@ describe('bucketFeaturePhase', () => {
   it('renders a project-scoped five-tile hero billboard that updates with feature state', () => {
     const { rerender } = render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
           makeFeature({ issueId: 'PAN-2' }),
@@ -226,7 +226,7 @@ describe('bucketFeaturePhase', () => {
 
     rerender(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
           makeFeature({ issueId: 'PAN-2', agentStatus: 'active' }),
@@ -245,7 +245,7 @@ describe('bucketFeaturePhase', () => {
   it('renders project issues with shared command-deck IssueRow and VerbBadge primitives', () => {
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[makeFeature({ issueId: 'PAN-1', agentStatus: 'running' })]}
         issueCosts={{}}
         onSelectFeature={() => {}}
@@ -267,7 +267,7 @@ describe('bucketFeaturePhase', () => {
 
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', title: 'Conflict' }),
           makeFeature({ issueId: 'PAN-2', title: 'Not mergeable' }),
@@ -290,7 +290,7 @@ describe('bucketFeaturePhase', () => {
 
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[makeFeature({ issueId: 'PAN-1', title: 'CI red' })]}
         issueCosts={{}}
         onSelectFeature={() => {}}
@@ -311,7 +311,7 @@ describe('bucketFeaturePhase', () => {
 
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', title: 'Review failed' }),
           makeFeature({ issueId: 'PAN-2', title: 'Review blocked' }),
@@ -342,7 +342,7 @@ describe('bucketFeaturePhase', () => {
 
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[makeFeature({ issueId: 'PAN-1', title: 'Conflict and CI red' })]}
         issueCosts={{}}
         onSelectFeature={() => {}}
@@ -355,7 +355,7 @@ describe('bucketFeaturePhase', () => {
   it('renders partial cost breakdown details without crashing', () => {
     render(
       <ProjectOverview
-        projectName="panopticon-cli"
+        projectName="overdeck"
         features={[makeFeature({ issueId: 'PAN-1' })]}
         issueCosts={{ 'PAN-1': 1.23 }}
         issueCostDetails={{

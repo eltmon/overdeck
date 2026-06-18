@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-05T12:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-406: Workspace detail — replace polling logs with live interactive terminal"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-05T12:00:00Z",
     "updated": "2026-04-05T12:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/406", "label": "PAN-406", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/406", "label": "PAN-406", "type": "issue" }
     ],
     "tags": ["frontend", "terminal", "websocket", "ux"],
     "narratives": {

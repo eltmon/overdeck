@@ -8,7 +8,7 @@ function status(overrides: Partial<ComplianceStatusResult> = {}): ComplianceStat
     mode: 'advisory',
     recentMissCount: 0,
     since: '2026-05-24T12:00:00.000Z',
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     workspaceId: null,
     issueId: null,
     sessionId: null,

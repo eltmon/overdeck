@@ -7,7 +7,7 @@
 - **Issue:** PAN-647
 - **Title:** Command Deck sidebar too wide and low-density at smaller resolutions
 - **Status:** Planning complete, ready for execution
-- **Linear:** https://github.com/eltmon/panopticon-cli/issues/647
+- **Linear:** https://github.com/eltmon/overdeck/issues/647
 
 ## Decisions Made During Planning
 

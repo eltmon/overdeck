@@ -8,7 +8,7 @@ import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../..
 import type { ExtractFromTranscriptDeltaInput } from '../../../src/lib/memory/pipeline.js';
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
 } as const;
@@ -138,7 +138,7 @@ describe('memory reconciliation', () => {
       getAgentState: async () => ({
         id: 'agent-pan-1052',
         issueId: 'PAN-1052',
-        workspace: '/repo/panopticon-cli/workspaces/feature-pan-1052',
+        workspace: '/repo/overdeck/workspaces/feature-pan-1052',
         harness: 'claude-code',
         role: 'work',
         model: 'claude-sonnet-4-6',

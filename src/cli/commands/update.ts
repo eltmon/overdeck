@@ -89,7 +89,7 @@ export async function updateCommand(options: {
 
   if (options.check) {
     console.log(chalk.dim('\nRun `pan update` to install @overdeck/cli.'));
-    console.log(chalk.dim('If you previously installed panopticon-cli or @eltmon/panctl, this migrates you to the new package name.'));
+    console.log(chalk.dim('If you previously installed overdeck or @eltmon/panctl, this migrates you to the new package name.'));
     return;
   }
 
@@ -103,7 +103,7 @@ export async function updateCommand(options: {
 
     console.log(chalk.green(`\n✓ Updated to ${latestVersion}`));
     console.log(chalk.dim('Installed package: @overdeck/cli'));
-    console.log(chalk.dim('If you previously installed panopticon-cli or @eltmon/panctl, npm now resolves to the renamed package.'));
+    console.log(chalk.dim('If you previously installed overdeck or @eltmon/panctl, npm now resolves to the renamed package.'));
 
     // Auto-sync if enabled
     const config = loadConfigSync();
@@ -119,7 +119,7 @@ export async function updateCommand(options: {
       chalk.dim('Try running with sudo: sudo npm install -g @overdeck/cli@latest')
     );
     console.error(
-      chalk.dim('If you were on panopticon-cli or @eltmon/panctl, rerun the install command above to migrate to @overdeck/cli.')
+      chalk.dim('If you were on overdeck or @eltmon/panctl, rerun the install command above to migrate to @overdeck/cli.')
     );
     process.exit(1);
   }

@@ -308,4 +308,4 @@ None - all decisions captured above.
 - PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 5: Specialist Agents)
 - Specialist infrastructure: `/home/eltmon/projects/panopticon/src/lib/cloister/specialists.ts`
 - Approve API: `/home/eltmon/projects/panopticon/src/dashboard/server/index.ts` (line ~2765)
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/29
+- GitHub Issue: https://github.com/eltmon/overdeck/issues/29

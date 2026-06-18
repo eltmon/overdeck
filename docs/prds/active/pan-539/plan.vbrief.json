@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-14T00:00:00.000Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-539: feat: image paste support in activity view conversation"
   },
   "plan": {
@@ -16,7 +16,7 @@
     "updated": "2026-04-14T00:00:00.000Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/539",
+        "uri": "https://github.com/eltmon/overdeck/issues/539",
         "label": "PAN-539",
         "type": "issue"
       }

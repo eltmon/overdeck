@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-12T00:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-653: Hotfix commits on main get silently lost: persistent stuck state, Deacon respect, Activity visibility"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-12T00:00:00Z",
     "updated": "2026-04-12T00:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/653", "label": "PAN-653", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/653", "label": "PAN-653", "type": "issue" }
     ],
     "tags": ["bug", "git", "merge", "kanban", "activity", "deacon", "schema"],
     "narratives": {

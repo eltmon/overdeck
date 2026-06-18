@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-15T00:44:09Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-714: clean up stale .claude/skills/ references and add unit tests for doneCommand/approveCommand"
   },
   "plan": {
@@ -15,8 +15,8 @@
     "created": "2026-04-15T00:44:09Z",
     "updated": "2026-04-15T00:44:09Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/714", "label": "PAN-714", "type": "issue" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/705", "label": "PAN-705 parent reorg", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/714", "label": "PAN-714", "type": "issue" },
+      { "uri": "https://github.com/eltmon/overdeck/issues/705", "label": "PAN-705 parent reorg", "type": "issue" }
     ],
     "tags": ["cleanup", "tests", "pan-705-followup", "skills"],
     "narratives": {
@@ -81,12 +81,12 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "In src/lib/sync.ts (or a helper called from it), after the existing user-level sync, detect whether the current working directory contains a top-level `skills/` tree with one or more SKILL.md files. If so, mirror skills/* into .claude/skills/* — creating missing directories, updating out-of-date SKILL.md files, and removing directories in .claude/skills/ that no longer exist in skills/. Preserve .claude/skills/.gitignore untouched. Report the count of added/updated/removed skills in the sync output. This must be a no-op for any project without a top-level skills/ directory (i.e., every non-panopticon-cli project)."
+          "Action": "In src/lib/sync.ts (or a helper called from it), after the existing user-level sync, detect whether the current working directory contains a top-level `skills/` tree with one or more SKILL.md files. If so, mirror skills/* into .claude/skills/* — creating missing directories, updating out-of-date SKILL.md files, and removing directories in .claude/skills/ that no longer exist in skills/. Preserve .claude/skills/.gitignore untouched. Report the count of added/updated/removed skills in the sync output. This must be a no-op for any project without a top-level skills/ directory (i.e., every non-overdeck project)."
         },
         "subItems": [
           {
             "id": "pan-sync-project-skills.ac1",
-            "title": "Running `pan sync` inside panopticon-cli on a clean tree (after regen-claude-skills) produces no changes to .claude/skills/ and reports 0 added / 0 updated / 0 removed",
+            "title": "Running `pan sync` inside overdeck on a clean tree (after regen-claude-skills) produces no changes to .claude/skills/ and reports 0 added / 0 updated / 0 removed",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },

@@ -129,8 +129,8 @@ const EMPTY_SEARCH: PaletteSearchResponse = { memory: [], observations: [], summ
 
 /**
  * Turn a Claude project-dir id (the cwd with '/' encoded as '-', e.g.
- * `-home-eltmon-Projects-panopticon-cli`) into a human label like
- * `panopticon-cli`, or `panopticon-cli · feature-pan-1053` for a workspace.
+ * `-home-eltmon-Projects-overdeck`) into a human label like
+ * `overdeck`, or `overdeck · feature-pan-1053` for a workspace.
  * The encoding is lossy (a real '-' is indistinguishable from a path separator),
  * so we anchor on the `Projects` segment and fall back to the trailing segment.
  */

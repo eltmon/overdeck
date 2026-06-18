@@ -394,7 +394,7 @@ describe('conversations route — DB integration', () => {
     expect(await hasConversationAttachment('other-conv', uploadedPath)).toBe(false);
 
     // Prose @paths (unmanaged) are allowed to pass through
-    const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
+    const manualPath = '/home/eltmon/Projects/overdeck/README.md';
     const proseResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` });
     expect(proseResponse.status).toBe(200);
     expect(deliverMock).toHaveBeenLastCalledWith('conv-owner-conv', `hello\n@${manualPath}`, 'conversation-message', expect.any(String));
@@ -814,7 +814,7 @@ describe('conversations route — DB integration', () => {
         type: 'assistant',
         message: {
           role: 'assistant',
-          content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/panopticon-cli/src/file.ts' } }],
+          content: [{ type: 'tool_use', id: 'tool-1', name: 'Edit', input: { file_path: '/home/eltmon/Projects/overdeck/src/file.ts' } }],
         },
       }),
     ].join('\n') + '\n');

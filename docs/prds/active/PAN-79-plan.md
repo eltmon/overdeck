@@ -420,7 +420,7 @@ Phase 5: Polish & Migration
 
 ## References
 
-- Issue: https://github.com/eltmon/panopticon-cli/issues/79
+- Issue: https://github.com/eltmon/overdeck/issues/79
 - Current specialists.ts: `src/lib/cloister/specialists.ts`
 - Projects config: `src/lib/projects.ts`
 - PAN-80 (hook-based status): Related lifecycle patterns

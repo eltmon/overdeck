@@ -111,7 +111,7 @@ A failure in either path must leave the user with a recoverable local record of 
 ## References
 
 - Related issue: PAN-739
-- GitHub issue: eltmon/panopticon-cli#739
+- GitHub issue: eltmon/overdeck#739
 - Current optimistic state in frontend:
   - `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx`
   - `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx`

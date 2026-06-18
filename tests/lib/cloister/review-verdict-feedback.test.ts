@@ -39,7 +39,7 @@ describe('deliverReviewVerdictFeedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
-    mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059' });
+    mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' });
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
@@ -68,7 +68,7 @@ describe('deliverReviewVerdictFeedback', () => {
       'gh',
       [
         'api',
-        'repos/eltmon/panopticon-cli/issues/1059/comments',
+        'repos/eltmon/overdeck/issues/1059/comments',
         '--field',
         expect.stringContaining('Request changes for correctness.'),
       ],

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-06T18:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-460: Dashboard rebrand: rename Mission Control, unified design system, fix light/dark mode"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-06T18:00:00Z",
     "updated": "2026-04-06T18:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/460", "label": "PAN-460", "type": "issue" },
+      { "uri": "https://github.com/eltmon/overdeck/issues/460", "label": "PAN-460", "type": "issue" },
       { "uri": "design/prd/PRD-REBRAND.md", "label": "PRD", "type": "document" },
       { "uri": "design/style-guide/STYLE-GUIDE.md", "label": "Style Guide", "type": "document" }
     ],

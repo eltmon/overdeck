@@ -38,7 +38,7 @@ export interface IssueMissionControlProps {
   issueId: string
   title: string
   branch: string
-  /** Active project name for the breadcrumb (e.g. "panopticon-cli"). */
+  /** Active project name for the breadcrumb (e.g. "overdeck"). */
   projectName?: string
   launcher: ReactNode
   agentDock: ReactNode

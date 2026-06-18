@@ -3,16 +3,16 @@ import { identifyOrphanedReviewingIssues, parseSpecialistAgentSession } from '..
 
 describe('parseSpecialistAgentSession', () => {
   it('parses issue-scoped specialist sessions', () => {
-    expect(parseSpecialistAgentSession('specialist-panopticon-cli-PAN-714-review-agent')).toEqual({
-      projectKey: 'panopticon-cli',
+    expect(parseSpecialistAgentSession('specialist-overdeck-PAN-714-review-agent')).toEqual({
+      projectKey: 'overdeck',
       issueId: 'PAN-714',
       specialistType: 'review-agent',
     });
   });
 
   it('parses legacy project-scoped specialist sessions', () => {
-    expect(parseSpecialistAgentSession('specialist-panopticon-cli-review-agent')).toEqual({
-      projectKey: 'panopticon-cli',
+    expect(parseSpecialistAgentSession('specialist-overdeck-review-agent')).toEqual({
+      projectKey: 'overdeck',
       specialistType: 'review-agent',
     });
   });

@@ -6,7 +6,7 @@ import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js
 import { claimTranscriptRange, commitTranscriptRange, getTranscriptCheckpoint, releaseTranscriptRange } from '../../../src/lib/memory/checkpoints.js';
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
 } as const;
@@ -61,7 +61,7 @@ describe('memory transcript checkpoints', () => {
     expect(result.status).toBe('claimed');
     expect(getTranscriptCheckpoint('session-1')).toMatchObject({
       sessionId: 'session-1',
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1052',
       issueId: 'PAN-1052',
       transcriptPath: '/tmp/session-1.jsonl',

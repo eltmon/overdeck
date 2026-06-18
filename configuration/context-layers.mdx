@@ -17,7 +17,7 @@ agents themselves are taught:
 
 | Term | Source file | Use for |
 | --- | --- | --- |
-| **Bundled rule** | `sync-sources/rules/<name>.md` (ships inside the panopticon-cli package) | Engineering rules for **every machine** |
+| **Bundled rule** | `sync-sources/rules/<name>.md` (ships inside the overdeck package) | Engineering rules for **every machine** |
 | **Global layer** (machine context) | `~/.panopticon/context/global.md` | Genuinely **machine-specific** quirks |
 | **Project layer** | `<projectRoot>/.pan/context/project.md` | Guidance for **one project**; committed to that repo |
 | **Workspace layer** | `<workspace>/.pan/context/workspace.md` | Auto-assembled per issue workspace; never hand-edited |
@@ -50,7 +50,7 @@ Overdeck ships engineering rules inside the package under
 `sync-sources/rules/`. Each rule carries a `scope:` frontmatter key:
 
 - `scope: universal` — folded into every machine's rendered global context;
-- `scope: dev` — folded in only on a panopticon-cli source checkout, for rules
+- `scope: dev` — folded in only on a overdeck source checkout, for rules
   about developing Overdeck itself.
 
 Rules ship with `pan install` and refresh on every `pan sync`.

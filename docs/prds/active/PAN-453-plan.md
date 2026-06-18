@@ -15,7 +15,7 @@ The full VBriefViewer UI (6+ React components) is part of this issue. Single del
 The planning model is resolved from settings (`agentSettings.models.planning_agent` → fallback to `complexity.expert` → `claude-opus-4-6`). We pass the resolved `planningModel` into `buildPlanningPrompt()` so it can be injected into the template as `plan.author`. We do NOT trust models to self-report (Kimi reports as other models).
 
 ### 3. vBRIEFInfo.author from package.json
-`vBRIEFInfo.author` is the tool identifier: `"panopticon-cli/0.6.0"`. Version comes from `package.json` at runtime.
+`vBRIEFInfo.author` is the tool identifier: `"overdeck/0.6.0"`. Version comes from `package.json` at runtime.
 
 ### 4. Artifact copy: skip if exists
 `complete-planning` copies STATE.md and plan.vbrief.json to `docs/prds/active/` but does NOT overwrite existing files. Protects manually edited plans.
@@ -28,7 +28,7 @@ Use existing Vitest + React Testing Library setup for all tests. Follow existing
 ### Type changes (types.ts)
 
 Add to `VBriefDocument.vBRIEFInfo`:
-- `author?: string` — tool identifier ("panopticon-cli/0.6.0")
+- `author?: string` — tool identifier ("overdeck/0.6.0")
 - `description?: string` — "Plan for PAN-453: ..."
 - `metadata?: Record<string, unknown>` — optional, skip for now
 

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-11T12:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-645: Tests: root Vitest config does not discover ActionsSection.test.tsx"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-11T12:00:00Z",
     "updated": "2026-04-11T12:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/645", "label": "PAN-645", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/645", "label": "PAN-645", "type": "issue" }
     ],
     "tags": ["testing", "vitest", "config"],
     "narratives": {

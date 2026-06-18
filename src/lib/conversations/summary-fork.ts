@@ -505,7 +505,7 @@ async function generateFallbackSummaryPromise(jsonlPath: string): Promise<string
   if (filesModified.size > 0) {
     summary += `### Files Modified:\n`;
     for (const f of [...filesModified].sort()) {
-      summary += `- \`${f.replace(/.*\/panopticon-cli\//, '')}\`\n`;
+      summary += `- \`${f.replace(/.*\/overdeck\//, '')}\`\n`;
     }
     summary += '\n';
   }

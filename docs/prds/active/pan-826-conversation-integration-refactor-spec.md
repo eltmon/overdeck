@@ -1,6 +1,6 @@
 # PAN-826: Conversation/Terminal Integration Refactor
 
-Tracking issue: [eltmon/panopticon-cli#826](https://github.com/eltmon/panopticon-cli/issues/826)
+Tracking issue: [eltmon/overdeck#826](https://github.com/eltmon/overdeck/issues/826)
 
 Closes when complete: #691, #696, #612, #823, #739
 

@@ -20,7 +20,7 @@ new lines under `*.test.ts`, `*.spec.ts`, `*.test.tsx`, or `*.spec.tsx`.
 Issue text (body + comments) was captured with:
 
 ```bash
-gh issue view <number> --repo eltmon/panopticon-cli --json body,comments
+gh issue view <number> --repo eltmon/overdeck --json body,comments
 ```
 
 Comments are included because test plans and verification notes are often

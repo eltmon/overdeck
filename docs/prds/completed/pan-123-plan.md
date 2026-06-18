@@ -4,7 +4,7 @@
 
 Add drag-and-drop functionality to the Kanban board so users can move issue cards between columns to change their shadow status.
 
-**Issue URL:** https://github.com/eltmon/panopticon-cli/issues/123
+**Issue URL:** https://github.com/eltmon/overdeck/issues/123
 **Blocked by:** PAN-28 (Shadow mode) - **Implemented**
 
 ---

@@ -222,7 +222,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     trackerMocks.isGitHubIssueSync.mockReset();
     trackerMocks.isGitHubIssueSync.mockReturnValue(true);
     trackerMocks.resolveGitHubIssueSync.mockReset();
-    trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 9999 });
+    trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 9999 });
     fsMocks.existsSync.mockReset();
     fsMocks.existsSync.mockImplementation((path: string) => !path.endsWith('.panopticon.env'));
     fsMocks.readFileSync.mockReset();

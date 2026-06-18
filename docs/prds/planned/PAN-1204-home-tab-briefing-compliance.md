@@ -1,7 +1,7 @@
 # PAN-1204 — Home Tab + Live Session-Context Briefing + Compliance Audit Hook
 
-**Issue:** [PAN-1204](https://github.com/eltmon/panopticon-cli/issues/1204)
-**Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
+**Issue:** [PAN-1204](https://github.com/eltmon/overdeck/issues/1204)
+**Parent epic:** [PAN-1200](https://github.com/eltmon/overdeck/issues/1200)
 **Status:** Planned
 **Date:** 2026-05-18
 

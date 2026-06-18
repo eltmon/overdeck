@@ -166,7 +166,7 @@ function categorizeProcesses(processes: ClaudeProcess[]): void {
 
     // Specialist agent: parent is a specialist run-claude.sh (test/review/merge agents may run from project root)
     // Format: specialist-{project}-{ISSUE-ID}-{role}/run-claude.sh
-    // Project names can contain hyphens (e.g. "panopticon-cli"), so match issue ID pattern greedily
+    // Project names can contain hyphens (e.g. "overdeck"), so match issue ID pattern greedily
     const specialistMatch = parentCmd.match(/agents\/specialist-.*?-([A-Z]+-\d+)-([^/]+)\//);
     if (specialistMatch) {
       proc.category = 'workspace';

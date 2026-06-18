@@ -21,7 +21,7 @@ import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
 
-const DEFAULT_PROJECT_ID = 'panopticon-cli';
+const DEFAULT_PROJECT_ID = 'overdeck';
 const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
 const DAILY_SUMMARY_REGENERATION_OBSERVATIONS = 20;
 

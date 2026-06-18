@@ -136,8 +136,8 @@ vi.mock('../../../lib/lifecycle/archive-planning.js', () => ({
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
-  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
-  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck' })),
 }));
 
 vi.mock('../../../lib/persistent-logger.js', () => ({

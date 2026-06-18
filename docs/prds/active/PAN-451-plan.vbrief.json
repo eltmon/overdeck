@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-05T18:30:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-451: Conversation view — T3Code-style message rendering + tmux toggle for agent sessions"
   },
   "plan": {
@@ -15,9 +15,9 @@
     "created": "2026-04-05T18:30:00Z",
     "updated": "2026-04-05T18:30:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/451", "label": "PAN-451", "type": "issue" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-451/docs/prds/planned/pan-451-conversation-view.md", "label": "pan-451-conversation-view.md", "type": "prd" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/planned/pan-451-conversation-view.md", "label": "pan-451-conversation-view.md", "type": "prd" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/451", "label": "PAN-451", "type": "issue" },
+      { "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-451/docs/prds/planned/pan-451-conversation-view.md", "label": "pan-451-conversation-view.md", "type": "prd" },
+      { "uri": "/home/eltmon/Projects/overdeck/docs/prds/planned/pan-451-conversation-view.md", "label": "pan-451-conversation-view.md", "type": "prd" }
     ],
     "tags": ["frontend", "mission-control", "conversation-ui", "streaming", "lexical", "shiki"],
     "narratives": {

@@ -19,7 +19,7 @@ We use a subset of the vBRIEF v0.5 spec. Several standard fields are unsupported
 |-------|------|-----------|--------|
 | `version` | `"0.5"` | ✅ Used | None |
 | `created` | ISO datetime | ✅ Used | None |
-| `author` | string | ❌ Not set | Set to `"panopticon-cli/<version>"` — who created the FILE |
+| `author` | string | ❌ Not set | Set to `"overdeck/<version>"` — who created the FILE |
 | `description` | string | ❌ Not set | Set to `"Plan for <issue.identifier>: <issue.title>"` |
 | `updated` | ISO datetime | ❌ Not set | Update on every write (item status change, AC update) |
 | `metadata` | object | ❌ Not set | Optional — skip for now |
@@ -60,7 +60,7 @@ We use a subset of the vBRIEF v0.5 spec. Several standard fields are unsupported
 
 ```typescript
 interface VBriefReference {
-  uri: string;     // e.g., "docs/prds/planned/pan-451.md", "https://github.com/eltmon/panopticon-cli/issues/451"
+  uri: string;     // e.g., "docs/prds/planned/pan-451.md", "https://github.com/eltmon/overdeck/issues/451"
   label?: string;  // e.g., "PRD", "GitHub Issue", "Spec"
   type?: string;   // e.g., "prd", "issue", "spec"
 }
@@ -80,7 +80,7 @@ Add missing fields to `VBriefDocument`, `VBriefPlan`, `VBriefItem`:
 ```typescript
 export interface VBriefInfo {
   version: string;  // "0.5"
-  author?: string;  // "panopticon-cli/0.6.0"
+  author?: string;  // "overdeck/0.6.0"
   description?: string;
   created?: string;  // ISO datetime
   updated?: string;
@@ -119,7 +119,7 @@ Update the JSON template in `buildPlanningPrompt()` to include all new fields:
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "author": "panopticon-cli/0.6.0",
+    "author": "overdeck/0.6.0",
     "description": "Plan for PAN-451: Conversation view",
     "created": "<ISO timestamp>"
   },
@@ -133,7 +133,7 @@ Update the JSON template in `buildPlanningPrompt()` to include all new fields:
     "created": "<ISO timestamp>",
     "references": [
       { "uri": "docs/prds/planned/pan-451-conversation-view.md", "label": "PRD", "type": "prd" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/451", "label": "GitHub Issue", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/451", "label": "GitHub Issue", "type": "issue" }
     ],
     "narratives": { "Problem": "...", "Proposal": "..." },
     "items": [...],
@@ -377,7 +377,7 @@ tests/frontend/VBriefViewer.test.tsx
 
 - `plan.uid` is a UUID v4 generated once at creation — never changes
 - `plan.sequence` starts at 1 and increments on every write — useful for conflict detection
-- `vBRIEFInfo.author` is the tool (`"panopticon-cli/0.6.0"`), `plan.author` is the agent (`"agent:claude-opus-4-6"`)
+- `vBRIEFInfo.author` is the tool (`"overdeck/0.6.0"`), `plan.author` is the agent (`"agent:claude-opus-4-6"`)
 - `items[].completed` is set when status transitions to `completed` — not cleared if status reverts
 - `references` is populated by the planning agent, not Overdeck itself (agent has context about what it referenced)
 - Artifact copying in complete-planning is idempotent — won't overwrite if files already exist in docs/prds/active/

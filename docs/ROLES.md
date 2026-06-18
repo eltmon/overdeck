@@ -75,7 +75,7 @@ For a Role with no Claude-specific frontmatter (the review convoy sub-roles), th
 
 ### 2. Overdeck pipeline agent — `agents/pan-*-agent.md`
 
-Claude Code subagent definitions used by Overdeck's pipeline. These are committed under `agents/` in the panopticon-cli repo and synced to every devroot's `<devroot>/.claude/agents/` by `pan install` / `pan sync`. From there, `mergeSkillsIntoWorkspace()` copies them into each workspace's `.claude/agents/` so Claude Code can load them when a pipeline run uses the `--agent` flag.
+Claude Code subagent definitions used by Overdeck's pipeline. These are committed under `agents/` in the overdeck repo and synced to every devroot's `<devroot>/.claude/agents/` by `pan install` / `pan sync`. From there, `mergeSkillsIntoWorkspace()` copies them into each workspace's `.claude/agents/` so Claude Code can load them when a pipeline run uses the `--agent` flag.
 
 These agent definitions still exist for legacy spawn paths; the role primitive will eventually replace them. They are not the same thing as Role files — `agents/pan-review-agent.md` is the legacy Claude Code subagent that drove the old reviewer; `roles/review.md` is the current Role.
 

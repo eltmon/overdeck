@@ -137,5 +137,5 @@ test_install_then_up() {
 
 ## References
 
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/45
+- GitHub Issue: https://github.com/eltmon/overdeck/issues/45
 - Docker Compose external networks: https://docs.docker.com/compose/networking/#use-a-pre-existing-network

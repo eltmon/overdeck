@@ -323,7 +323,7 @@ Phase 1: Core Subagents (no deps)
 
 ## References
 
-- Issue: https://github.com/eltmon/panopticon-cli/issues/6
+- Issue: https://github.com/eltmon/overdeck/issues/6
 - PRD Section: "Parallel Agent Execution (Convoys via Skills)"
 - PRD Section: "Part 7: Stuck Detection and Health Monitoring"
 - Claude Code Subagent Docs: https://docs.anthropic.com/en/docs/claude-code/sub-agents

@@ -50,7 +50,7 @@ function makeDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocumen
     vBRIEFInfo: {
       version: '0.5',
       created: '2026-01-01T00:00:00Z',
-      author: 'panopticon-cli/0.6.0',
+      author: 'overdeck/0.6.0',
       description: 'Plan for TEST-1: Test Issue',
     },
     plan: {
@@ -157,7 +157,7 @@ describe('VBriefHeader', () => {
 
   it('renders vBRIEFInfo.author as tool', () => {
     render(<VBriefHeader doc={makeDoc()} />);
-    expect(screen.getByText('panopticon-cli/0.6.0')).toBeTruthy();
+    expect(screen.getByText('overdeck/0.6.0')).toBeTruthy();
   });
 
   it('renders created timestamp', () => {

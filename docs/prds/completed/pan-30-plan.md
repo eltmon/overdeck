@@ -321,4 +321,4 @@ None - all decisions captured above.
 - PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 3: Active Heartbeats & Hooks)
 - Claude Code Runtime: `/home/eltmon/projects/panopticon/src/lib/runtimes/claude-code.ts`
 - Agent spawning: `/home/eltmon/projects/panopticon/src/lib/agents.ts`
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/30
+- GitHub Issue: https://github.com/eltmon/overdeck/issues/30

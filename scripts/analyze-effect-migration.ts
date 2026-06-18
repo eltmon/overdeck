@@ -670,9 +670,9 @@ function main(): void {
       author: 'scripts/analyze-effect-migration.ts',
       tags: ['effect-migration', 'swarm', 'architecture'],
       references: [
-        { type: 'issue', id: 'PAN-1249', url: 'https://github.com/eltmon/panopticon-cli/issues/1249' },
+        { type: 'issue', id: 'PAN-1249', url: 'https://github.com/eltmon/overdeck/issues/1249' },
         { type: 'design-doc', id: 'swarm-migration-plan', url: '.pan/swarm-migration-plan.md' },
-        { type: 'risk', id: 'PAN-1193', url: 'https://github.com/eltmon/panopticon-cli/issues/1193' },
+        { type: 'risk', id: 'PAN-1193', url: 'https://github.com/eltmon/overdeck/issues/1193' },
       ],
       narratives: {
         Problem:

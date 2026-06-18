@@ -22,7 +22,7 @@
         "detectedAt": "2026-06-14T15:20:06.426Z"
       }
     ],
-    "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1811",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/1811",
     "lastVerifiedCommit": "4307e94f4cd9038d78624fdbb2bfd8980c1bb4de"
   },
   "closeOut": {
@@ -51,7 +51,7 @@
       }
     },
     "merges": [
-      "https://github.com/eltmon/panopticon-cli/pull/1811"
+      "https://github.com/eltmon/overdeck/pull/1811"
     ],
     "ranOn": "eltmon-z790"
   }

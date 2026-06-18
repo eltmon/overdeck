@@ -86,7 +86,7 @@ Specifically: **70+ issues need pass-3 re-audit** if we extend distrust to all p
 
 ### Screenshot capture
 
-Agents save screenshots to `/tmp/audit-pass3/screenshots/PAN-XXXX-<view>.png`. To attach to GitHub: commit to `docs/audit-2026-05-24/`, push, reference via `https://raw.githubusercontent.com/eltmon/panopticon-cli/main/docs/audit-2026-05-24/PAN-XXXX-<view>.png` in issue comments.
+Agents save screenshots to `/tmp/audit-pass3/screenshots/PAN-XXXX-<view>.png`. To attach to GitHub: commit to `docs/audit-2026-05-24/`, push, reference via `https://raw.githubusercontent.com/eltmon/overdeck/main/docs/audit-2026-05-24/PAN-XXXX-<view>.png` in issue comments.
 
 ## Operating constraint
 

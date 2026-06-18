@@ -34,8 +34,8 @@
           - generic [ref=e555]: myn-cli
         - button "pan-tts" [ref=e556] [cursor=pointer]:
           - generic [ref=e558]: pan-tts
-        - button "panopticon-cli 23" [ref=e559] [cursor=pointer]:
-          - generic [ref=e561]: panopticon-cli
+        - button "overdeck 23" [ref=e559] [cursor=pointer]:
+          - generic [ref=e561]: overdeck
           - generic [ref=e562]: "23"
         - button "papers-please" [ref=e563] [cursor=pointer]:
           - generic [ref=e565]: papers-please
@@ -150,7 +150,7 @@
             - heading "Fix-All Flywheel" [level=1] [ref=e184]
             - generic [ref=e185]: running · RUN-20
             - link "Flywheel docs" [ref=e187] [cursor=pointer]:
-              - /url: https://github.com/eltmon/panopticon-cli/blob/main/docs/FLYWHEEL.md
+              - /url: https://github.com/eltmon/overdeck/blob/main/docs/FLYWHEEL.md
               - text: docs
             - generic [ref=e188]:
               - generic [ref=e189]:
@@ -376,7 +376,7 @@
                     - generic [ref=e508]:
                       - generic [ref=e509]: feature/pan-1700
                       - link "PR ↗" [ref=e510] [cursor=pointer]:
-                        - /url: https://github.com/eltmon/panopticon-cli/pull/1727
+                        - /url: https://github.com/eltmon/overdeck/pull/1727
                   - generic [ref=e511]:
                     - generic [ref=e512]:
                       - generic [ref=e513]: "2"
@@ -385,7 +385,7 @@
                     - generic [ref=e516]:
                       - generic [ref=e517]: feature/pan-1712
                       - link "PR ↗" [ref=e518] [cursor=pointer]:
-                        - /url: https://github.com/eltmon/panopticon-cli/pull/1733
+                        - /url: https://github.com/eltmon/overdeck/pull/1733
                   - generic [ref=e519]:
                     - generic [ref=e520]:
                       - generic [ref=e521]: "3"
@@ -394,7 +394,7 @@
                     - generic [ref=e524]:
                       - generic [ref=e525]: feature/pan-1719
                       - link "PR ↗" [ref=e526] [cursor=pointer]:
-                        - /url: https://github.com/eltmon/panopticon-cli/pull/1724
+                        - /url: https://github.com/eltmon/overdeck/pull/1724
                   - generic [ref=e527]:
                     - generic [ref=e528]: "Escape hatch:"
                     - button "Merge one feature to main…" [ref=e529] [cursor=pointer]
@@ -949,10 +949,10 @@
                           - paragraph [ref=e1186]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                           - paragraph [ref=e1187]:
                             - text: "Brief path:"
-                            - link "panopticon-cli/docs/flywheel-brief.md" [ref=e1189] [cursor=pointer]:
-                              - /url: /home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md
+                            - link "overdeck/docs/flywheel-brief.md" [ref=e1189] [cursor=pointer]:
+                              - /url: /home/eltmon/Projects/overdeck/docs/flywheel-brief.md
                               - img [ref=e1190]
-                              - generic [ref=e1193]: panopticon-cli/docs/flywheel-brief.md
+                              - generic [ref=e1193]: overdeck/docs/flywheel-brief.md
                         - text: 10:19 PM
                       - generic [ref=e1195]:
                         - img [ref=e1196]
@@ -1014,14 +1014,14 @@
                             - paragraph [ref=e1280]:
                               - text: Handled. The full sequence for the
                               - link "PAN-1747" [ref=e1281] [cursor=pointer]:
-                                - /url: https://github.com/eltmon/panopticon-cli/issues/1747
+                                - /url: https://github.com/eltmon/overdeck/issues/1747
                               - text: "bootstrap paradox:"
                             - list [ref=e1282]:
                               - listitem [ref=e1283]:
                                 - strong [ref=e1284]: Diagnosis confirmed
                                 - text: ": the issue is fully through review, test, and verification — the self-aborted ship was the only thing between it and the merge gate, and it was holding an advancing slot at the 9/9 governor ceiling (which was also deferring"
                                 - link "PAN-1704" [ref=e1285] [cursor=pointer]:
-                                  - /url: https://github.com/eltmon/panopticon-cli/issues/1704
+                                  - /url: https://github.com/eltmon/overdeck/issues/1704
                                 - text: "'s re-review)."
                               - listitem [ref=e1286]:
                                 - strong [ref=e1287]: Transition decision made and recorded in the issue body
@@ -1046,10 +1046,10 @@
                           - paragraph [ref=e1304]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                           - paragraph [ref=e1305]:
                             - text: "Brief path:"
-                            - link "panopticon-cli/docs/flywheel-brief.md" [ref=e1307] [cursor=pointer]:
-                              - /url: /home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md
+                            - link "overdeck/docs/flywheel-brief.md" [ref=e1307] [cursor=pointer]:
+                              - /url: /home/eltmon/Projects/overdeck/docs/flywheel-brief.md
                               - img [ref=e1308]
-                              - generic [ref=e1311]: panopticon-cli/docs/flywheel-brief.md
+                              - generic [ref=e1311]: overdeck/docs/flywheel-brief.md
                         - text: 10:39 PM
                       - generic [ref=e1313]:
                         - img [ref=e1314]
@@ -1129,10 +1129,10 @@
                         - paragraph [ref=e1423]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                         - paragraph [ref=e1424]:
                           - text: "Brief path:"
-                          - link "panopticon-cli/docs/flywheel-brief.md" [ref=e1426] [cursor=pointer]:
-                            - /url: /home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md
+                          - link "overdeck/docs/flywheel-brief.md" [ref=e1426] [cursor=pointer]:
+                            - /url: /home/eltmon/Projects/overdeck/docs/flywheel-brief.md
                             - img [ref=e1427]
-                            - generic [ref=e1430]: panopticon-cli/docs/flywheel-brief.md
+                            - generic [ref=e1430]: overdeck/docs/flywheel-brief.md
                       - text: 11:02 PM
                     - generic [ref=e1432]:
                       - img [ref=e1433]
@@ -1167,10 +1167,10 @@
                         - paragraph [ref=e1479]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                         - paragraph [ref=e1480]:
                           - text: "Brief path:"
-                          - link "panopticon-cli/docs/flywheel-brief.md" [ref=e1482] [cursor=pointer]:
-                            - /url: /home/eltmon/Projects/panopticon-cli/docs/flywheel-brief.md
+                          - link "overdeck/docs/flywheel-brief.md" [ref=e1482] [cursor=pointer]:
+                            - /url: /home/eltmon/Projects/overdeck/docs/flywheel-brief.md
                             - img [ref=e1483]
-                            - generic [ref=e1486]: panopticon-cli/docs/flywheel-brief.md
+                            - generic [ref=e1486]: overdeck/docs/flywheel-brief.md
                       - text: 11:21 PM
                     - generic [ref=e1488]:
                       - generic [ref=e1490] [cursor=pointer]:
@@ -1682,14 +1682,14 @@
                   - paragraph [ref=e2134]: New conversation
           - generic [ref=e2135]:
             - heading "Yesterday Jun 9 · 1 AM" [level=3] [ref=e2136]
-            - button "C codex yesterday Review panopticon-cli against grill-me-codex" [ref=e2138] [cursor=pointer]:
+            - button "C codex yesterday Review overdeck against grill-me-codex" [ref=e2138] [cursor=pointer]:
               - generic [ref=e2139]:
                 - generic [ref=e2141]: C
                 - generic [ref=e2143]:
                   - generic [ref=e2144]:
                     - generic [ref=e2145]: codex
                     - time [ref=e2146]: yesterday
-                  - paragraph [ref=e2147]: Review panopticon-cli against grill-me-codex
+                  - paragraph [ref=e2147]: Review overdeck against grill-me-codex
           - generic [ref=e2148]:
             - heading "Monday Jun 8" [level=3] [ref=e2149]
             - button "Claude Code 2d ago MiMo model error persists after retry" [ref=e2151] [cursor=pointer]:
@@ -5363,14 +5363,14 @@
                       - generic [ref=e7004]: Unknown
                       - time [ref=e7005]: Apr 28
                     - paragraph [ref=e7006]: We seem to have gotten ourselves into a rough state where we…
-              - button "U Unknown Apr 28 Commit and push panopticon-cli changes" [ref=e7007] [cursor=pointer]:
+              - button "U Unknown Apr 28 Commit and push overdeck changes" [ref=e7007] [cursor=pointer]:
                 - generic [ref=e7008]:
                   - generic [ref=e7010]: U
                   - generic [ref=e7012]:
                     - generic [ref=e7013]:
                       - generic [ref=e7014]: Unknown
                       - time [ref=e7015]: Apr 28
-                    - paragraph [ref=e7016]: Commit and push panopticon-cli changes
+                    - paragraph [ref=e7016]: Commit and push overdeck changes
               - button "U Unknown Apr 28 Review vbrief and deft directive (I think we have them clone…" [ref=e7017] [cursor=pointer]:
                 - generic [ref=e7018]:
                   - generic [ref=e7020]: U

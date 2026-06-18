@@ -98,7 +98,7 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
@@ -110,20 +110,20 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     const [cmd] = mockExec.mock.calls[0]!;
     expect(cmd).toContain('gh pr list');
     expect(cmd).toContain('--head feature/pan-830');
-    expect(cmd).toContain('eltmon/panopticon-cli');
+    expect(cmd).toContain('eltmon/overdeck');
   });
 
   it('returns parsed pr metadata on the happy path', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     const prJson = {
       number: 642,
       title: 'feat: command deck',
-      url: 'https://github.com/eltmon/panopticon-cli/pull/642',
+      url: 'https://github.com/eltmon/overdeck/pull/642',
       state: 'OPEN',
       isDraft: false,
       baseRefName: 'main',
@@ -153,14 +153,14 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     expect(mockExec).toHaveBeenCalledTimes(2);
     const [, viewCmdCall] = mockExec.mock.calls;
     expect(viewCmdCall![0]).toContain('gh pr view 642');
-    expect(viewCmdCall![0]).toContain('eltmon/panopticon-cli');
+    expect(viewCmdCall![0]).toContain('eltmon/overdeck');
   });
 
   it('returns error when gh pr view fails', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     mockExec
@@ -188,7 +188,7 @@ describe('fetchIssuePullRequestDiff — GET /api/issues/:id/pr/diff', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     mockExec
@@ -202,14 +202,14 @@ describe('fetchIssuePullRequestDiff — GET /api/issues/:id/pr/diff', () => {
     expect(mockExec).toHaveBeenCalledTimes(2);
     const [, diffCmdCall] = mockExec.mock.calls;
     expect(diffCmdCall![0]).toContain('gh pr diff 642');
-    expect(diffCmdCall![0]).toContain('eltmon/panopticon-cli');
+    expect(diffCmdCall![0]).toContain('eltmon/overdeck');
   });
 
   it('returns error when gh pr diff fails', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     mockExec
@@ -239,7 +239,7 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
@@ -255,12 +255,12 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     const prJson = {
       number: 642,
-      url: 'https://github.com/eltmon/panopticon-cli/pull/642',
+      url: 'https://github.com/eltmon/overdeck/pull/642',
       headRefName: 'feature/pan-830',
       headRefOid: 'abc123def456',
       mergeable: 'MERGEABLE',
@@ -289,14 +289,14 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
     expect(result.summary).toMatchObject({ total: 5, passed: 1, failed: 1, skipped: 1, running: 1, pending: 1 });
     const [, , apiCmdCall] = mockExec.mock.calls;
     expect(apiCmdCall![0]).toContain('gh api');
-    expect(apiCmdCall![0]).toContain('repos/eltmon/panopticon-cli/commits/abc123def456/check-runs');
+    expect(apiCmdCall![0]).toContain('repos/eltmon/overdeck/commits/abc123def456/check-runs');
   });
 
   it('returns PR metadata and an error when gh api fails', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
     mockExec

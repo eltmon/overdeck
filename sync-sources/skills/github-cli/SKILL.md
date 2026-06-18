@@ -180,6 +180,6 @@ gh pr list --json number,title,headRefName --jq '.[] | select(.headRefName | sta
 
 When not in a git repo or targeting a different repo, use `-R`:
 ```bash
-gh issue list -R eltmon/panopticon-cli
-gh pr view 456 -R eltmon/panopticon-cli
+gh issue list -R eltmon/overdeck
+gh pr view 456 -R eltmon/overdeck
 ```

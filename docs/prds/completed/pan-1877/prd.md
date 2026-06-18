@@ -171,13 +171,13 @@ guard (cheap, catches obvious regressions at author time); WI-2 is the authorita
 
 ## Related issues — addresses vs. relates (softened per review)
 
-- **Resolves one concrete corruption vector behind** [#1720](https://github.com/eltmon/panopticon-cli/issues/1720) (cloister auto-resume tests fail
-  under parallel run). **But** [#1720](https://github.com/eltmon/panopticon-cli/issues/1720)'s comments also call for **tmux-socket isolation**,
+- **Resolves one concrete corruption vector behind** [#1720](https://github.com/eltmon/overdeck/issues/1720) (cloister auto-resume tests fail
+  under parallel run). **But** [#1720](https://github.com/eltmon/overdeck/issues/1720)'s comments also call for **tmux-socket isolation**,
   which is **out of scope here** — this PRD fixes real-home file writes; tmux socket isolation remains
-  a separate fix. Do not mark [#1720](https://github.com/eltmon/panopticon-cli/issues/1720) resolved on this alone.
-- **Same family, different mechanism (NOT fixed by this):** [#1880](https://github.com/eltmon/panopticon-cli/issues/1880) (cross-file mock
-  pollution), [#1824](https://github.com/eltmon/panopticon-cli/issues/1824) (real-timer flakiness), [#1783](https://github.com/eltmon/panopticon-cli/issues/1783) (Playwright fixture). WI-3 reduces
+  a separate fix. Do not mark [#1720](https://github.com/eltmon/overdeck/issues/1720) resolved on this alone.
+- **Same family, different mechanism (NOT fixed by this):** [#1880](https://github.com/eltmon/overdeck/issues/1880) (cross-file mock
+  pollution), [#1824](https://github.com/eltmon/overdeck/issues/1824) (real-timer flakiness), [#1783](https://github.com/eltmon/overdeck/issues/1783) (Playwright fixture). WI-3 reduces
   shared-state surface but does not address mock/timer pollution.
 - **Prevents** the silent **agent-state** corruption found in the audit (deacon-orphan-recovery,
   status-context writing real `~/.panopticon/agents/`).
-- **Sibling fixes** executed together: [#1883](https://github.com/eltmon/panopticon-cli/issues/1883), [#1884](https://github.com/eltmon/panopticon-cli/issues/1884).
+- **Sibling fixes** executed together: [#1883](https://github.com/eltmon/overdeck/issues/1883), [#1884](https://github.com/eltmon/overdeck/issues/1884).

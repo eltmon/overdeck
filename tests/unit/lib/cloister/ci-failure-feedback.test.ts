@@ -62,16 +62,16 @@ beforeEach(() => {
     issueId: 'PAN-1801',
     role: 'work',
     status: 'running',
-    workspace: '/tmp/panopticon-cli/workspaces/feature-pan-1801',
+    workspace: '/tmp/overdeck/workspaces/feature-pan-1801',
     model: 'claude-sonnet-4-6',
     startedAt: new Date().toISOString(),
   });
   mockResolveProjectFromIssueSync.mockReturnValue({
-    projectPath: '/tmp/panopticon-cli',
+    projectPath: '/tmp/overdeck',
   });
   mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
     success: true,
-    filePath: '/tmp/panopticon-cli/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md',
+    filePath: '/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md',
     relativePath: '.pan/feedback/001-ci-monitor-failed.md',
   }));
   mockMessageAgent.mockResolvedValue(undefined);
@@ -127,7 +127,7 @@ describe('relayCiFailureFeedback', () => {
     }));
 
     expect(result.agentMessageSent).toBe(true);
-    expect(result.feedbackPath).toBe('/tmp/panopticon-cli/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md');
+    expect(result.feedbackPath).toBe('/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md');
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1801',
       expect.stringContaining('SPECIALIST FEEDBACK: ci-monitor reported CI FAILED for PAN-1801'),

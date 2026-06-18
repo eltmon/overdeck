@@ -96,7 +96,7 @@ on the disk in front of you. Nothing syncs it to your other machines.
 
 For content you want on **every** machine — engineering rules, coding
 standards, behavioral guidelines — add a **bundled rule**:
-\`sync-sources/rules/<name>.md\` in the panopticon-cli repo with
+\`sync-sources/rules/<name>.md\` in the overdeck repo with
 \`scope: universal\` (or \`scope: dev\` for Overdeck-developer-only rules).
 It will ship with every \`pan install\` / \`pan sync\`. "Bundled rule",
 "global layer" (this file), "project layer", and "workspace layer" are the

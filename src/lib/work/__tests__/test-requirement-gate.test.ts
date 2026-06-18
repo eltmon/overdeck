@@ -190,7 +190,7 @@ describe('fetchIssueBodyForGate', () => {
     vi.mocked(resolveGitHubIssueSync).mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 1501,
     } as ReturnType<typeof resolveGitHubIssueSync>);
 
@@ -210,7 +210,7 @@ describe('fetchIssueBodyForGate', () => {
     vi.mocked(resolveGitHubIssueSync).mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 1501,
     } as ReturnType<typeof resolveGitHubIssueSync>);
 

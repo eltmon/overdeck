@@ -90,7 +90,7 @@ async function main() {
     headers: {
       'Authorization': `Bearer ${jwt}`,
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'panopticon-cli',
+      'User-Agent': 'overdeck',
     },
   });
 
@@ -111,7 +111,7 @@ async function main() {
     headers: {
       'Authorization': `Bearer ${jwt}`,
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'panopticon-cli',
+      'User-Agent': 'overdeck',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

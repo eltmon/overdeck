@@ -42,7 +42,7 @@ function listPendingAutoMerges(): PendingAutoMerge[] {
 }
 
 const START = new Date('2026-05-25T10:00:00.000Z');
-const PR_URL = 'https://github.com/eltmon/panopticon-cli/pull/1486';
+const PR_URL = 'https://github.com/eltmon/overdeck/pull/1486';
 
 function scheduleDeps(isEligible = async () => ({ eligible: true as const })) {
   return {
@@ -60,7 +60,7 @@ function scheduleDeps(isEligible = async () => ({ eligible: true as const })) {
       readyForMerge: true,
       prUrl: PR_URL,
     }),
-    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Overdeck CLI' }) as never,
+    resolveProject: () => ({ projectKey: 'overdeck', projectPath: process.cwd(), projectName: 'Overdeck CLI' }) as never,
     announce: vi.fn(),
   };
 }

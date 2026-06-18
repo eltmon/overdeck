@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
     resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
     createInterface: vi.fn(),
     existsSync: vi.fn(() => true),
-    readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/panopticon-cli:PAN\n'),
+    readFileSync: vi.fn(() => 'GITHUB_REPOS=eltmon/overdeck:PAN\n'),
   };
 });
 
@@ -90,7 +90,7 @@ describe('closeOutCommand', () => {
     expect(mocks.closeOut).toHaveBeenCalledWith({
       issueId: 'PAN-1190',
       projectPath: '/repo',
-      github: { owner: 'eltmon', repo: 'panopticon-cli', number: 1190 },
+      github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
     });
   });
 

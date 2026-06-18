@@ -279,7 +279,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "<ISO 8601 timestamp>",
-    "author": "panopticon-cli/{{VERSION}}",
+    "author": "overdeck/{{VERSION}}",
     "description": "Plan for {{ISSUE_ID}}: <issue title>"
   },
   "plan": {

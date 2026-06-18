@@ -3,7 +3,7 @@
  *
  * Covers:
  *  - Symlinks to .panopticon paths are removed
- *  - Symlinks to panopticon-cli paths are removed
+ *  - Symlinks to overdeck paths are removed
  *  - Symlinks to unrelated paths are preserved
  *  - Plain directories with a same-name devroot entry are preserved (not deleted)
  *  - Plain directories without a devroot counterpart are preserved
@@ -86,9 +86,9 @@ describe('migrateStalePersonalContent', () => {
     expect(existsSync(join(skillsDir, 'pan-help'))).toBe(false);
   });
 
-  it('removes a symlink pointing to a panopticon-cli path', () => {
+  it('removes a symlink pointing to a overdeck path', () => {
     const skillsDir = join(fakeHome, '.claude', 'skills');
-    symlinkSync('/home/user/panopticon-cli/skills/pan-help', join(skillsDir, 'pan-help'));
+    symlinkSync('/home/user/overdeck/skills/pan-help', join(skillsDir, 'pan-help'));
 
     const result = migrateStalePersonalContent();
 

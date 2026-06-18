@@ -173,15 +173,15 @@ describe('killAllReviewSessions', () => {
   it('kills canonical reviewer sessions (PAN-830 naming)', async () => {
     const { listSessionNames } = await import('../../../src/lib/tmux.js');
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
-      'specialist-panopticon-cli-PAN-999-review-correctness',
-      'specialist-panopticon-cli-PAN-999-review-security',
+      'specialist-overdeck-PAN-999-review-correctness',
+      'specialist-overdeck-PAN-999-review-security',
       'agent-pan-999',
     ]));
 
     const result = await Effect.runPromise(killAllReviewSessions());
 
-    expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-correctness');
-    expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-security');
+    expect(result.killed).toContain('specialist-overdeck-PAN-999-review-correctness');
+    expect(result.killed).toContain('specialist-overdeck-PAN-999-review-security');
     expect(result.killed).toHaveLength(2);
   });
 
@@ -243,7 +243,7 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-999-review',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewerSessions('panopticon-cli', 'PAN-1080'));
+    const result = await Effect.runPromise(killAllReviewerSessions('overdeck', 'PAN-1080'));
 
     expect(result.killed).toEqual(['agent-pan-1080-review']);
     expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-1080-review');
@@ -255,20 +255,20 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-1080-review',
       'agent-pan-1080-review-security',
       'agent-pan-1080-review-correctness',
-      'specialist-panopticon-cli-pan-1080-review-performance',
-      'specialist-panopticon-cli-pan-1080-review-requirements',
+      'specialist-overdeck-pan-1080-review-performance',
+      'specialist-overdeck-pan-1080-review-requirements',
       'review-coordinator-pan-1080-1234567890',
       'agent-pan-1080',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewerSessions('panopticon-cli', 'PAN-1080'));
+    const result = await Effect.runPromise(killAllReviewerSessions('overdeck', 'PAN-1080'));
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-1080-review',
       'agent-pan-1080-review-security',
       'agent-pan-1080-review-correctness',
-      'specialist-panopticon-cli-pan-1080-review-performance',
-      'specialist-panopticon-cli-pan-1080-review-requirements',
+      'specialist-overdeck-pan-1080-review-performance',
+      'specialist-overdeck-pan-1080-review-requirements',
       'review-coordinator-pan-1080-1234567890',
     ]));
     expect(result.killed).toHaveLength(6);
@@ -276,10 +276,10 @@ describe('killAllReviewerSessions', () => {
   });
 
   it('matches only review sessions for the requested issue', () => {
-    expect(isReviewSessionForIssue('agent-pan-1080-review', 'panopticon-cli', 'PAN-1080')).toBe(true);
-    expect(isReviewSessionForIssue('agent-pan-1080-review-security', 'panopticon-cli', 'PAN-1080')).toBe(true);
-    expect(isReviewSessionForIssue('agent-pan-1080', 'panopticon-cli', 'PAN-1080')).toBe(false);
-    expect(isReviewSessionForIssue('agent-pan-1081-review', 'panopticon-cli', 'PAN-1080')).toBe(false);
+    expect(isReviewSessionForIssue('agent-pan-1080-review', 'overdeck', 'PAN-1080')).toBe(true);
+    expect(isReviewSessionForIssue('agent-pan-1080-review-security', 'overdeck', 'PAN-1080')).toBe(true);
+    expect(isReviewSessionForIssue('agent-pan-1080', 'overdeck', 'PAN-1080')).toBe(false);
+    expect(isReviewSessionForIssue('agent-pan-1081-review', 'overdeck', 'PAN-1080')).toBe(false);
   });
 });
 

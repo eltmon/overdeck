@@ -42,21 +42,21 @@ describe('schema migrations', () => {
       );
     `);
 
-    const cwd = '/Users/edward.becker/Projects/panopticon-cli';
+    const cwd = '/Users/edward.becker/Projects/overdeck';
     const base = join(tempRoot, '.claude', 'projects');
     const stalePath = join(
       base,
-      '-Users-edward.becker-Projects-panopticon-cli',
+      '-Users-edward.becker-Projects-overdeck',
       'sessions',
       'session-1.jsonl'
     );
     const correctedPath = join(
       base,
-      '-Users-edward-becker-Projects-panopticon-cli',
+      '-Users-edward-becker-Projects-overdeck',
       'sessions',
       'session-1.jsonl'
     );
-    mkdirSync(join(base, '-Users-edward-becker-Projects-panopticon-cli', 'sessions'), {
+    mkdirSync(join(base, '-Users-edward-becker-Projects-overdeck', 'sessions'), {
       recursive: true,
     });
     writeFileSync(correctedPath, '{"type":"message"}\n');
@@ -316,12 +316,12 @@ describe('schema migrations', () => {
     initSchema(db);
     db.pragma('user_version = 15');
 
-    const cwd = '/Users/edward.becker/Projects/panopticon-cli';
+    const cwd = '/Users/edward.becker/Projects/overdeck';
     const stalePath = join(
       tempRoot,
       '.claude',
       'projects',
-      '-Users-edward.becker-Projects-panopticon-cli',
+      '-Users-edward.becker-Projects-overdeck',
       'sessions',
       'session-2.jsonl'
     );
@@ -410,7 +410,7 @@ describe('schema migrations', () => {
 
     db.prepare(`
       INSERT INTO pending_auto_merges (issueId, prUrl, prNumber, projectKey, "status", scheduledMergeAt, scheduledAt)
-      VALUES ('PAN-MIGRATE-AM', 'https://github.com/eltmon/panopticon-cli/pull/1', 1, 'panopticon-cli', 'pending', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
+      VALUES ('PAN-MIGRATE-AM', 'https://github.com/eltmon/overdeck/pull/1', 1, 'overdeck', 'pending', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')
     `).run();
 
     const before = db.pragma('table_info(pending_auto_merges)') as Array<{ name: string }>;

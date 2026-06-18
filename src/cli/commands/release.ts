@@ -174,7 +174,7 @@ ${installCommand}
 \`\`\`
 
 ## Full changelog
-${from ? `- https://github.com/eltmon/panopticon-cli/compare/${from}...${to}` : '- First tagged release in this range'}
+${from ? `- https://github.com/eltmon/overdeck/compare/${from}...${to}` : '- First tagged release in this range'}
 `;
 }
 

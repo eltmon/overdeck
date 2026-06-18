@@ -206,8 +206,8 @@ describe('operator intervention CLI emission', () => {
       workspace: '/tmp/wrong-specialist-workspace',
     });
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
-    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/panopticon-cli' });
-    workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/panopticon-cli/workspaces/feature-pan-1326');
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
+    workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-1326');
     workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
       containersFound: true,
       steps: ['docker compose down', 'docker network prune'],
@@ -217,9 +217,9 @@ describe('operator intervention CLI emission', () => {
     await killCommand('agent-pan-1326-ship', {});
 
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-1326');
-    expect(workspaceMocks.findWorkspacePath).toHaveBeenCalledWith('/tmp/panopticon-cli', 'pan-1326');
+    expect(workspaceMocks.findWorkspacePath).toHaveBeenCalledWith('/tmp/overdeck', 'pan-1326');
     expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledTimes(1);
-    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith('/tmp/panopticon-cli/workspaces/feature-pan-1326', 'pan-1326');
+    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith('/tmp/overdeck/workspaces/feature-pan-1326', 'pan-1326');
     expect(logSpy.mock.calls.some(([message]) => String(message).includes('Stopped Docker stack: docker compose down; docker network prune'))).toBe(true);
   });
 
@@ -231,8 +231,8 @@ describe('operator intervention CLI emission', () => {
       workspace: '/tmp/wrong-workspace',
     });
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
-    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/panopticon-cli' });
-    workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/panopticon-cli/workspaces/feature-pan-1326');
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
+    workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-1326');
     workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
       containersFound: true,
       steps: ['docker compose down', 'docker network prune'],
@@ -242,9 +242,9 @@ describe('operator intervention CLI emission', () => {
     await killCommand('agent-pan-1326', {});
 
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-1326');
-    expect(workspaceMocks.findWorkspacePath).toHaveBeenCalledWith('/tmp/panopticon-cli', 'pan-1326');
+    expect(workspaceMocks.findWorkspacePath).toHaveBeenCalledWith('/tmp/overdeck', 'pan-1326');
     expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledTimes(1);
-    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith('/tmp/panopticon-cli/workspaces/feature-pan-1326', 'pan-1326');
+    expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith('/tmp/overdeck/workspaces/feature-pan-1326', 'pan-1326');
     expect(logSpy.mock.calls.some(([message]) => String(message).includes('Stopped Docker stack: docker compose down; docker network prune'))).toBe(true);
   });
 

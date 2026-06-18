@@ -77,7 +77,7 @@ export function initializeAutoUpdater(channel: string = "latest"): void {
   autoUpdater.setFeedURL({
     provider: "github",
     owner: "eltmon",
-    repo: "panopticon-cli",
+    repo: "overdeck",
   });
 
   // Respect release channel so canary users don't get stable updates and vice versa

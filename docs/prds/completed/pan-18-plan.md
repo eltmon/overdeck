@@ -154,7 +154,7 @@ None - scope is clear.
 
 ## References
 
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/18
+- GitHub Issue: https://github.com/eltmon/overdeck/issues/18
 - Files:
   - `src/lib/config.ts:81-94` - loadConfig() with shallow merge
   - `src/cli/commands/sync.ts:16-22` - crashes on undefined targets

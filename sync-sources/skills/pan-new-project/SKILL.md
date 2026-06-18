@@ -173,9 +173,9 @@ For **GitHub** projects, add to `GITHUB_REPOS` in `~/.panopticon.env`:
 ```bash
 # Format: owner/repo:PREFIX (comma-separated)
 # Example: current value might be:
-#   GITHUB_REPOS=eltmon/panopticon-cli:PAN
+#   GITHUB_REPOS=eltmon/overdeck:PAN
 # Append the new project:
-#   GITHUB_REPOS=eltmon/panopticon-cli:PAN,owner/newrepo:APP
+#   GITHUB_REPOS=eltmon/overdeck:PAN,owner/newrepo:APP
 ```
 
 Read current value, append new repo, write back. The dashboard polls this
@@ -295,8 +295,8 @@ Next steps:
 
 ## REFERENCE: Working Project Configs
 
-### panopticon-cli (monorepo, GitHub)
-- `issue_prefix: PAN`, `github_repo: eltmon/panopticon-cli`
+### overdeck (monorepo, GitHub)
+- `issue_prefix: PAN`, `github_repo: eltmon/overdeck`
 - `workspace.type: monorepo`
 - Has: dns, docker, agent, services, env, tests
 

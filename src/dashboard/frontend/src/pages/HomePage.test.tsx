@@ -51,7 +51,7 @@ function makeObservation(overrides: Partial<MemoryObservation> = {}): MemoryObse
   return {
     id: 'obs-1',
     timestamp: '2026-05-25T00:10:00.000Z',
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     workspaceId: 'feature-pan-1204',
     issueId: 'PAN-1204',
     runId: 'run-1',

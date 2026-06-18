@@ -1,7 +1,7 @@
 # Skill Distribution Architecture: Analysis & Findings
 
 > **Status**: Analysis complete — Feb 2026
-> **Issue**: [PAN-266](https://github.com/eltmon/panopticon-cli/issues/266)
+> **Issue**: [PAN-266](https://github.com/eltmon/overdeck/issues/266)
 > **PRD**: `docs/prds/active/PAN-266-plan.md`
 > **Context**: Investigation into how Overdeck distributes skills, rules, agents, and commands — how Claude Code resolves conflicts, what's broken today, and the agreed end-state.
 
@@ -116,9 +116,9 @@ export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1  # Force OFF
 
 ```
 TIER 1: REPO SOURCE
-panopticon-cli/skills/                 Source of truth (git-tracked)
-panopticon-cli/dev-skills/             Dev-only skills (git-tracked)
-panopticon-cli/agents/                 Agent definitions (git-tracked)
+overdeck/skills/                 Source of truth (git-tracked)
+overdeck/dev-skills/             Dev-only skills (git-tracked)
+overdeck/agents/                 Agent definitions (git-tracked)
 
         │ pan install (one-time COPY, never updates existing)
         ▼
@@ -281,8 +281,8 @@ Readable by all users, writable only by admins. Intended for IT/DevOps to deploy
 
 ## 5. Path Portability (Completed)
 
-Skills previously contained hardcoded absolute paths like `/home/eltmon/Projects/panopticon-cli/...`. Fixed by introducing environment variables:
-- `$OVERDECK_INSTALL_PATH` — where panopticon-cli lives
+Skills previously contained hardcoded absolute paths like `/home/eltmon/Projects/overdeck/...`. Fixed by introducing environment variables:
+- `$OVERDECK_INSTALL_PATH` — where overdeck lives
 - `$OVERDECK_PROJECT_PATH` — the project the agent works on
 - `$OVERDECK_WORKSPACE_PATH` — the workspace directory
 
@@ -306,11 +306,11 @@ DEVROOT (~/Projects/)                    Not a git repo
 │   ├── skills/                          Overdeck skills — visible during manual work
 │   ├── agents/                          Overdeck agents
 │   └── rules/                           Overdeck rules
-├── panopticon-cli/                      Git repo (own project root)
+├── overdeck/                      Git repo (own project root)
 ├── myn/                                 Git repos (own project roots)
 └── ...
 
-WORKSPACE (~/Projects/panopticon-cli/    Git repo — separate project root
+WORKSPACE (~/Projects/overdeck/    Git repo — separate project root
            workspaces/feature-pan-300/)
 ├── .claude/
 │   ├── skills/                          Copied by pan workspace create
@@ -527,7 +527,7 @@ Agent starts on MIN-678 workspace
 ```
 
 Environment variables available to agents:
-- `$OVERDECK_INSTALL_PATH` — where panopticon-cli lives
+- `$OVERDECK_INSTALL_PATH` — where overdeck lives
 - `$OVERDECK_PROJECT_PATH` — the project the agent works on
 - `$OVERDECK_WORKSPACE_PATH` — the workspace directory
 - `$OVERDECK_AGENT_ID` — agent identifier
@@ -557,7 +557,7 @@ Environment variables available to agents:
 │   ├── rules/                          Overdeck rules
 │   ├── settings.local.json             (pre-existing user settings)
 │   └── .panopticon-manifest.json       Tracks what Overdeck placed here
-├── panopticon-cli/                     Git repo
+├── overdeck/                     Git repo
 ├── myn/                                Git repos
 └── ...
 
@@ -692,7 +692,7 @@ This doesn't need to happen atomically — commands and skills coexist. But the 
 
 Rules are a new content type Overdeck should distribute. Some content currently in generated workspace CLAUDE.md is better expressed as path-scoped rules.
 
-**Planned Overdeck rules** (tracked in [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263)):
+**Planned Overdeck rules** (tracked in [PAN-263](https://github.com/eltmon/overdeck/issues/263)):
 
 | Candidate Rule | Path Scope | Currently In |
 |---------------|-----------|-------------|
@@ -878,9 +878,9 @@ Items tracked as GitHub issues (follow-up work, not blocking implementation):
 
 | Issue | Title | Notes |
 |-------|-------|-------|
-| [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263) | Analyze and create initial Overdeck rules | Research candidates, community patterns, create `.claude/rules/` files |
-| [PAN-264](https://github.com/eltmon/panopticon-cli/issues/264) | Audit localias references across all code and docs | Clean up stale localias references in all repos |
-| [PAN-265](https://github.com/eltmon/panopticon-cli/issues/265) | Review skill categorization: all skills available everywhere | Confirm all 64 skills work gracefully outside workspace context |
+| [PAN-263](https://github.com/eltmon/overdeck/issues/263) | Analyze and create initial Overdeck rules | Research candidates, community patterns, create `.claude/rules/` files |
+| [PAN-264](https://github.com/eltmon/overdeck/issues/264) | Audit localias references across all code and docs | Clean up stale localias references in all repos |
+| [PAN-265](https://github.com/eltmon/overdeck/issues/265) | Review skill categorization: all skills available everywhere | Confirm all 64 skills work gracefully outside workspace context |
 
 ## 11. Implementation Scope
 
@@ -908,7 +908,7 @@ Everything below is **part of this effort** — not deferred, not follow-up:
 - [Claude Code Skills Docs](https://code.claude.com/docs/en/skills) — Skills hierarchy
 - [Claude Code Sub-agents Docs](https://code.claude.com/docs/en/sub-agents) — Agents hierarchy
 - [Symlink Bug #14836](https://github.com/anthropics/claude-code/issues/14836) — Skills not listed when symlinked
-- [PAN-3 Issue](https://github.com/eltmon/panopticon-cli/issues/3) — Original skills architecture
-- [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263) — Initial rules analysis
-- [PAN-264](https://github.com/eltmon/panopticon-cli/issues/264) — Localias reference cleanup
-- [PAN-265](https://github.com/eltmon/panopticon-cli/issues/265) — Skill categorization review
+- [PAN-3 Issue](https://github.com/eltmon/overdeck/issues/3) — Original skills architecture
+- [PAN-263](https://github.com/eltmon/overdeck/issues/263) — Initial rules analysis
+- [PAN-264](https://github.com/eltmon/overdeck/issues/264) — Localias reference cleanup
+- [PAN-265](https://github.com/eltmon/overdeck/issues/265) — Skill categorization review

@@ -260,7 +260,7 @@ Skills are:
 
 | Task | Status | Reference |
 |------|--------|-----------|
-| Fix planning prompt template to include PRD instruction | ✅ Done | [GitHub #7](https://github.com/eltmon/panopticon-cli/issues/7) |
+| Fix planning prompt template to include PRD instruction | ✅ Done | [GitHub #7](https://github.com/eltmon/overdeck/issues/7) |
 | Create Phase 1 skills (9 skills) | ✅ Done | Commit `073b520` |
 
 **Fix details:** Updated `src/dashboard/server/index.ts` to include PRD creation instruction in both the main planning prompt and continuation prompt templates.

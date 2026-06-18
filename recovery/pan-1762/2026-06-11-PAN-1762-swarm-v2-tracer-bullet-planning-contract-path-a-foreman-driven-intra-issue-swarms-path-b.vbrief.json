@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-06-11T03:16:56-04:00",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1762: Swarm v2: tracer-bullet planning contract (Path A) + foreman-driven intra-issue swarms (Path B)",
     "updated": "2026-06-11T07:21:17.629Z"
   },
@@ -17,7 +17,7 @@
     "updated": "2026-06-11T07:21:17.629Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1762",
+        "uri": "https://github.com/eltmon/overdeck/issues/1762",
         "label": "PAN-1762",
         "type": "issue"
       },
@@ -27,17 +27,17 @@
         "type": "doc"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1517",
+        "uri": "https://github.com/eltmon/overdeck/issues/1517",
         "label": "PAN-1517 (swarm removal)",
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1691",
+        "uri": "https://github.com/eltmon/overdeck/issues/1691",
         "label": "PAN-1691 (merge train)",
         "type": "issue"
       },
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1737",
+        "uri": "https://github.com/eltmon/overdeck/issues/1737",
         "label": "PAN-1737 (UAT generations)",
         "type": "issue"
       }

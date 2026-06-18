@@ -210,7 +210,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-04-04T12:00:00Z",
-    "author": "panopticon-cli/0.6.0",
+    "author": "overdeck/0.6.0",
     "description": "Plan for PAN-436: Dashboard skeleton loading states"
   },
   "plan": {
@@ -223,7 +223,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
     "created": "2026-04-04T12:00:00Z",
     "updated": "2026-04-04T18:30:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/436", "label": "PAN-436", "type": "issue" },
+      { "uri": "https://github.com/eltmon/overdeck/issues/436", "label": "PAN-436", "type": "issue" },
       { "uri": ".pan/drafts/PAN-436.md", "label": "PAN-436 PRD draft", "type": "prd" }
     ],
     "tags": ["frontend", "ux"],
@@ -277,7 +277,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 | `vBRIEFInfo.version` | YES | Emit `"0.6"`; readers accept `"0.5"` and `"0.6"` |
 | `vBRIEFInfo.created` | YES | ISO 8601 timestamp — when the document was created |
 | `vBRIEFInfo.updated` | NO | ISO 8601 timestamp — updated automatically on every write |
-| `vBRIEFInfo.author` | NO | Tool identifier, e.g. `"panopticon-cli/0.6.0"` |
+| `vBRIEFInfo.author` | NO | Tool identifier, e.g. `"overdeck/0.6.0"` |
 | `vBRIEFInfo.description` | NO | Human-readable description: `"Plan for PAN-436: ..."` |
 
 #### `plan` fields

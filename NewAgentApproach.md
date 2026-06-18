@@ -218,7 +218,7 @@ draft (.pan/drafts/*.md) → proposed → approved → active/running → comple
 
 | Prefix | Tracker | URL |
 |---|---|---|
-| `PAN-<n>` | GitHub `eltmon/panopticon-cli` | `…/issues/<n>` — **`PAN-<n>` IS GitHub `#<n>`** |
+| `PAN-<n>` | GitHub `eltmon/overdeck` | `…/issues/<n>` — **`PAN-<n>` IS GitHub `#<n>`** |
 | `KRUX-<n>` | GitHub `eltmon/krux` | `…/issues/<n>` |
 | `MIN-<n>` | Linear (Mind Your Now) | canonical `url` from tracker API |
 | `AUR-<n>` | Linear (Auricle) | canonical `url` from tracker API |
@@ -246,7 +246,7 @@ draft (.pan/drafts/*.md) → proposed → approved → active/running → comple
 | You say | Destination |
 |---|---|
 | **universal rule** | `sync-sources/rules/<name>.md`, `scope: universal` (ships to every machine/project) |
-| **dev rule** | `sync-sources/rules/<name>.md`, `scope: dev` (panopticon-cli checkout only) |
+| **dev rule** | `sync-sources/rules/<name>.md`, `scope: dev` (overdeck checkout only) |
 | **project rule** | `<root>/.pan/context/project.md` |
 | **machine rule** | `~/.panopticon/context/global.md` |
 

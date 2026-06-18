@@ -41,7 +41,7 @@ function makePr(overrides: Partial<PullRequestData> = {}): PullRequestData {
   return {
     number: 642,
     title: 'feat(dashboard): unified command deck',
-    url: 'https://github.com/eltmon/panopticon-cli/pull/642',
+    url: 'https://github.com/eltmon/overdeck/pull/642',
     state: 'OPEN',
     isDraft: false,
     baseRefName: 'main',

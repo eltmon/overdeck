@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eltmon/panopticon-cli.git",
+    "url": "https://github.com/eltmon/overdeck.git",
     "directory": "packages/contracts"
   },
   "main": "./dist/index.cjs",

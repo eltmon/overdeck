@@ -57,7 +57,7 @@ const mockSystemHealth = {
       leaked: true,
       killTarget: {
         kind: 'specialist',
-        projectKey: 'panopticon-cli',
+        projectKey: 'overdeck',
         issueId: 'PAN-455',
         specialistType: 'review-agent',
       },
@@ -149,7 +149,7 @@ test.describe('System health pill (PAN-455)', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: 'Remove' }).click();
 
     await expect.poll(() => requests.length).toBe(3);
-    expect(requests.some((url) => url.includes('/api/specialists/panopticon-cli/PAN-455/review-agent/kill'))).toBe(true);
+    expect(requests.some((url) => url.includes('/api/specialists/overdeck/PAN-455/review-agent/kill'))).toBe(true);
     expect(requests.some((url) => url.includes('/api/agents/agent-pan-455'))).toBe(true);
     expect(requests.some((url) => url.includes('/api/resources/docker/container/abcdef123456'))).toBe(true);
   });

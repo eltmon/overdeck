@@ -18,7 +18,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity: MemoryIdentity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -78,11 +78,11 @@ describe('pan memory CLI service', () => {
     }));
     await writeObservationRecord(observation({ id: 'other-tag', summary: 'Primary unrelated result', tags: ['other'] }));
 
-    expect((await searchMemory('primary', { project: 'panopticon-cli', issue: 'PAN-1052', tag: 'memory' })).map((r) => r.observation.id))
+    expect((await searchMemory('primary', { project: 'overdeck', issue: 'PAN-1052', tag: 'memory' })).map((r) => r.observation.id))
       .toEqual(['primary']);
-    expect((await searchMemory('sibling', { project: 'panopticon-cli', issue: 'PAN-1052', sibling: true })).map((r) => r.observation.id))
+    expect((await searchMemory('sibling', { project: 'overdeck', issue: 'PAN-1052', sibling: true })).map((r) => r.observation.id))
       .toEqual(['sibling']);
-    expect((await searchMemory('primary', { project: 'panopticon-cli', workspace: 'other-workspace' }))).toEqual([]);
+    expect((await searchMemory('primary', { project: 'overdeck', workspace: 'other-workspace' }))).toEqual([]);
   });
 
   it('applies project, workspace, issue, and session reset markers at read time', async () => {
@@ -92,7 +92,7 @@ describe('pan memory CLI service', () => {
     await writeObservationRecord(observation({ id: 'project-live', summary: 'project scoped memory', issueId: 'PAN-997', workspaceId: 'feature-pan-997', sessionId: 'session-997', timestamp: '2026-05-16T22:00:00.000Z' }));
 
     await createResetMarker({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       scope: 'issue',
       scopeId: 'PAN-1052',
       reason: 'issue reset',
@@ -101,7 +101,7 @@ describe('pan memory CLI service', () => {
       emitResetMarkerCreated: async () => undefined,
     });
     await createResetMarker({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       scope: 'workspace',
       scopeId: 'feature-pan-1052',
       reason: 'workspace reset',
@@ -110,7 +110,7 @@ describe('pan memory CLI service', () => {
       emitResetMarkerCreated: async () => undefined,
     });
     await createResetMarker({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       scope: 'session',
       scopeId: 'session-1',
       reason: 'session reset',
@@ -119,18 +119,18 @@ describe('pan memory CLI service', () => {
       emitResetMarkerCreated: async () => undefined,
     });
     await createResetMarker({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       scope: 'project',
-      scopeId: 'panopticon-cli',
+      scopeId: 'overdeck',
       reason: 'project reset',
       fromTimestamp: '2026-05-16T21:00:00.000Z',
       createdAt: '2026-05-16T21:00:00.000Z',
       emitResetMarkerCreated: async () => undefined,
     });
 
-    expect((await searchMemory('scoped', { project: 'panopticon-cli', includeArchived: true })).map((r) => r.observation.id).sort())
+    expect((await searchMemory('scoped', { project: 'overdeck', includeArchived: true })).map((r) => r.observation.id).sort())
       .toEqual(['issue-archived', 'project-live', 'session-archived', 'workspace-live']);
-    expect((await searchMemory('scoped', { project: 'panopticon-cli' })).map((r) => r.observation.id).sort())
+    expect((await searchMemory('scoped', { project: 'overdeck' })).map((r) => r.observation.id).sort())
       .toEqual(['project-live', 'workspace-live']);
   });
 
@@ -139,7 +139,7 @@ describe('pan memory CLI service', () => {
     const events: Array<{ marker: unknown; timestamp: string }> = [];
 
     const marker = await createResetMarker({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       scope: 'issue',
       scopeId: 'PAN-1052',
       reason: 'test reset',
@@ -149,12 +149,12 @@ describe('pan memory CLI service', () => {
       emitResetMarkerCreated: (createdMarker, timestamp) => events.push({ marker: createdMarker, timestamp }),
     });
 
-    const indexedMarkers = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare('SELECT scope, scope_id, from_timestamp, reason, created_at FROM reset_markers').all());
+    const indexedMarkers = await withMemoryFtsDatabase('overdeck', (db) => db.prepare('SELECT scope, scope_id, from_timestamp, reason, created_at FROM reset_markers').all());
 
     expect(marker.id).toBe('reset-1');
-    expect((await searchMemory('memory', { project: 'panopticon-cli', issue: 'PAN-1052' }))).toHaveLength(0);
-    expect((await searchMemory('memory', { project: 'panopticon-cli', issue: 'PAN-1052', includeArchived: true }))).toHaveLength(1);
-    expect(JSON.parse(await readFile(join(tempDir!, 'memory/panopticon-cli/reset-markers.json'), 'utf8'))).toEqual([marker]);
+    expect((await searchMemory('memory', { project: 'overdeck', issue: 'PAN-1052' }))).toHaveLength(0);
+    expect((await searchMemory('memory', { project: 'overdeck', issue: 'PAN-1052', includeArchived: true }))).toHaveLength(1);
+    expect(JSON.parse(await readFile(join(tempDir!, 'memory/overdeck/reset-markers.json'), 'utf8'))).toEqual([marker]);
     expect(indexedMarkers).toEqual([{
       scope: 'issue',
       scope_id: 'PAN-1052',
@@ -170,7 +170,7 @@ describe('pan memory CLI service', () => {
     await writeObservationRecord(observation({ id: 'summary-2', summary: 'Second observation', timestamp: '2026-05-16T20:01:00.000Z' }));
 
     const result = await generateDailySummary({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       issueId: 'PAN-1052',
       date: '2026-05-16',
     });
@@ -190,11 +190,11 @@ describe('pan memory CLI service', () => {
     }
 
     const result = await generateDailySummary({
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       issueId: 'PAN-1052',
       date: '2026-05-16',
     });
-    const indexedSummaries = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+    const indexedSummaries = await withMemoryFtsDatabase('overdeck', (db) => db.prepare(`
       SELECT content, doc_type, scope, project_id, issue_id, tags
       FROM memory_fts
       WHERE doc_type = 'summary'
@@ -208,7 +208,7 @@ describe('pan memory CLI service', () => {
       content: result.markdown,
       doc_type: 'summary',
       scope: 'issue',
-      project_id: 'panopticon-cli',
+      project_id: 'overdeck',
       issue_id: 'PAN-1052',
       tags: expect.stringContaining('summary'),
     })]);
@@ -222,7 +222,7 @@ describe('pan memory CLI service', () => {
         timestamp: `2026-05-16T20:0${index}:00.000Z`,
       }));
     }
-    const initial = await generateDailySummary({ projectId: 'panopticon-cli', issueId: 'PAN-1052', date: '2026-05-16' });
+    const initial = await generateDailySummary({ projectId: 'overdeck', issueId: 'PAN-1052', date: '2026-05-16' });
 
     for (let index = 0; index < 19; index += 1) {
       await writeObservationRecord(observation({
@@ -231,14 +231,14 @@ describe('pan memory CLI service', () => {
         timestamp: `2026-05-16T21:${index.toString().padStart(2, '0')}:00.000Z`,
       }));
     }
-    const unchanged = await generateDailySummary({ projectId: 'panopticon-cli', issueId: 'PAN-1052', date: '2026-05-16' });
+    const unchanged = await generateDailySummary({ projectId: 'overdeck', issueId: 'PAN-1052', date: '2026-05-16' });
 
     await writeObservationRecord(observation({
       id: 'regenerated-20',
       summary: 'Twentieth new observation',
       timestamp: '2026-05-16T21:19:00.000Z',
     }));
-    const regenerated = await generateDailySummary({ projectId: 'panopticon-cli', issueId: 'PAN-1052', date: '2026-05-16' });
+    const regenerated = await generateDailySummary({ projectId: 'overdeck', issueId: 'PAN-1052', date: '2026-05-16' });
 
     expect(unchanged.status).toBe('up-to-date');
     expect(unchanged.markdown).toBe(initial.markdown);
@@ -256,10 +256,10 @@ describe('pan memory CLI service', () => {
       status: 'running',
       role: 'work',
     }), 'utf8');
-    await ensureDir(resolvePendingDir('panopticon-cli', 'PAN-1052'));
-    await writeFile(join(resolvePendingDir('panopticon-cli', 'PAN-1052'), 'pending.json'), '{}\n', 'utf8');
-    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
-    await writeFile(getMemoryHealthPath({ projectId: 'panopticon-cli', issueId: 'PAN-1052' }), JSON.stringify({
+    await ensureDir(resolvePendingDir('overdeck', 'PAN-1052'));
+    await writeFile(join(resolvePendingDir('overdeck', 'PAN-1052'), 'pending.json'), '{}\n', 'utf8');
+    await ensureDir(join(tempDir!, 'memory/overdeck/PAN-1052'));
+    await writeFile(getMemoryHealthPath({ projectId: 'overdeck', issueId: 'PAN-1052' }), JSON.stringify({
       status: 'healthy',
       last_success: '2026-05-16T19:00:00.000Z',
       last_failure: null,
@@ -268,7 +268,7 @@ describe('pan memory CLI service', () => {
       failed_by_reason: {},
     }), 'utf8');
 
-    const result = await runMemoryDoctor({ project: 'panopticon-cli', now: new Date('2026-05-16T21:00:00.000Z') });
+    const result = await runMemoryDoctor({ project: 'overdeck', now: new Date('2026-05-16T21:00:00.000Z') });
 
     expect(result.exitCode).toBe(1);
     expect(result.issues[0]).toMatchObject({ issueId: 'PAN-1052', pendingCount: 1 });

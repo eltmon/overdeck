@@ -171,7 +171,7 @@ describe('restoreReviewStatusFromRecords', () => {
       reviewNotes: 'review ok',
       testNotes: 'test ok',
       mergeNotes: 'merge ok',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1922',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1922',
       prNumber: 1922,
       prHeadSha: 'abc123',
       reviewedAtCommit: 'def456',
@@ -200,7 +200,7 @@ describe('restoreReviewStatusFromRecords', () => {
     expect(status!.reviewNotes).toBe('review ok');
     expect(status!.testNotes).toBe('test ok');
     expect(status!.mergeNotes).toBe('merge ok');
-    expect(status!.prUrl).toBe('https://github.com/eltmon/panopticon-cli/pull/1922');
+    expect(status!.prUrl).toBe('https://github.com/eltmon/overdeck/pull/1922');
     expect(status!.prNumber).toBe(1922);
     expect(status!.prHeadSha).toBe('abc123');
     expect(status!.reviewedAtCommit).toBe('def456');
@@ -382,7 +382,7 @@ describe('restoreReviewStatusFromRecords', () => {
       writeRecord('PAN-1922', {
         reviewStatus: 'passed',
         testStatus: 'passed',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1922',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1922',
         prNumber: 1922,
       });
 
@@ -391,7 +391,7 @@ describe('restoreReviewStatusFromRecords', () => {
       expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledTimes(1);
       expect(mockRefreshMergeStateFromGitHub).toHaveBeenCalledWith(
         'PAN-1922',
-        'eltmon/panopticon-cli',
+        'eltmon/overdeck',
         1922,
       );
     });
@@ -412,7 +412,7 @@ describe('restoreReviewStatusFromRecords', () => {
       writeRecord('PAN-1922', {
         reviewStatus: 'passed',
         testStatus: 'passed',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1922',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1922',
       });
 
       await restoreReviewStatusFromRecords({ issueId: 'PAN-1922' });
@@ -426,7 +426,7 @@ describe('restoreReviewStatusFromRecords', () => {
       writeRecord('PAN-1922', {
         reviewStatus: 'passed',
         testStatus: 'passed',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1922',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1922',
         prNumber: 1922,
       });
 
@@ -441,7 +441,7 @@ describe('restoreReviewStatusFromRecords', () => {
       writeRecord('PAN-1922', {
         reviewStatus: 'passed',
         testStatus: 'passed',
-        prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1922',
+        prUrl: 'https://github.com/eltmon/overdeck/pull/1922',
         prNumber: 1922,
       });
 

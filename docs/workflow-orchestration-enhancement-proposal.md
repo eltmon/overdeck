@@ -113,7 +113,7 @@ You MUST NOT signal pan done until all checks pass.
 
 ```yaml
 projects:
-  panopticon-cli:
+  overdeck:
     # ...
     ralph_loop:
       enabled: true
@@ -333,7 +333,7 @@ function extractPrinciplesFromPRD(prdContent: string): Principles {
 
 ```yaml
 projects:
-  panopticon-cli:
+  overdeck:
     # ...
     planning:
       require_principles: false  # true = block planning without principles
@@ -496,7 +496,7 @@ inspect-agent (Tier 1)
 
 ```yaml
 projects:
-  panopticon-cli:
+  overdeck:
     # ...
     verification_ladder:
       enabled: true

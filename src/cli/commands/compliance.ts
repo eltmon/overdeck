@@ -18,7 +18,7 @@ export function createComplianceCommand(): Command {
   compliance
     .command('status')
     .description('Show compliance mode and recent compliance misses')
-    .option('--project <id>', 'Project ID', 'panopticon-cli')
+    .option('--project <id>', 'Project ID', 'overdeck')
     .option('--workspace <id>', 'Workspace ID')
     .option('--issue <id>', 'Issue ID')
     .option('--session <id>', 'Session ID')

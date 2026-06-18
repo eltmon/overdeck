@@ -14,7 +14,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity: MemoryIdentity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1204',
   issueId: 'PAN-1204',
   runId: 'agent-pan-1204',

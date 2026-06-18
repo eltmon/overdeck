@@ -22,18 +22,18 @@ describe("context dashboard contracts", () => {
       operation: "load",
       projects: [
         {
-          projectKey: "panopticon-cli",
+          projectKey: "overdeck",
           name: "Overdeck CLI",
-          path: "/repo/panopticon-cli",
+          path: "/repo/overdeck",
           issuePrefix: "PAN",
           tracker: "github",
-          workspaceRoot: "/repo/panopticon-cli/workspaces",
+          workspaceRoot: "/repo/overdeck/workspaces",
         },
       ],
       workspaces: [
         {
-          projectKey: "panopticon-cli",
-          path: "/repo/panopticon-cli/workspaces/feature-pan-1201",
+          projectKey: "overdeck",
+          path: "/repo/overdeck/workspaces/feature-pan-1201",
           name: "feature-pan-1201",
           issueId: "PAN-1201",
           branch: "feature/pan-1201",
@@ -49,17 +49,17 @@ describe("context dashboard contracts", () => {
         },
         {
           kind: "project",
-          projectKey: "panopticon-cli",
-          file: "/repo/panopticon-cli/.pan/context/project.md",
+          projectKey: "overdeck",
+          file: "/repo/overdeck/.pan/context/project.md",
           exists: true,
           content: "project context",
           editable: true,
         },
         {
           kind: "workspace",
-          projectKey: "panopticon-cli",
-          workspacePath: "/repo/panopticon-cli/workspaces/feature-pan-1201",
-          file: "/repo/panopticon-cli/workspaces/feature-pan-1201/.pan/context/workspace.md",
+          projectKey: "overdeck",
+          workspacePath: "/repo/overdeck/workspaces/feature-pan-1201",
+          file: "/repo/overdeck/workspaces/feature-pan-1201/.pan/context/workspace.md",
           exists: false,
           content: "",
           editable: true,
@@ -78,9 +78,9 @@ describe("context dashboard contracts", () => {
         {
           harness: "pi",
           layerKind: "project",
-          projectKey: "panopticon-cli",
-          label: "panopticon-cli · AGENTS.md",
-          path: "/repo/panopticon-cli/AGENTS.md",
+          projectKey: "overdeck",
+          label: "overdeck · AGENTS.md",
+          path: "/repo/overdeck/AGENTS.md",
           exists: false,
           hasManagedRegion: false,
           hasUserContent: false,
@@ -115,10 +115,10 @@ describe("context dashboard contracts", () => {
   it("keeps preview, save, and sync operations distinct", () => {
     const preview = decodePreviewRequest({
       operation: "preview",
-      selectedLayer: { kind: "project", projectKey: "panopticon-cli" },
+      selectedLayer: { kind: "project", projectKey: "overdeck" },
       drafts: [
         {
-          target: { kind: "project", projectKey: "panopticon-cli" },
+          target: { kind: "project", projectKey: "overdeck" },
           content: "draft only",
         },
       ],
@@ -127,7 +127,7 @@ describe("context dashboard contracts", () => {
 
     const save = decodeSaveRequest({
       operation: "save",
-      target: { kind: "project", projectKey: "panopticon-cli" },
+      target: { kind: "project", projectKey: "overdeck" },
       content: "persist this layer",
     })
     expect(save.operation).toBe("save")
@@ -157,7 +157,7 @@ describe("context dashboard contracts", () => {
 
     expect(() => decodeSaveRequest({
       operation: "save",
-      target: { kind: "workspace", projectKey: "panopticon-cli" },
+      target: { kind: "workspace", projectKey: "overdeck" },
       content: "missing workspace path",
     })).toThrow()
   })

@@ -172,7 +172,7 @@ describe('POST /api/issues/:id/reopen', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       prefix: 'PAN',
       number: 1190,
     });

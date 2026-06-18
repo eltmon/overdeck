@@ -1,6 +1,6 @@
 # PRD — Overdeck: the Overdeck data-architecture remodel + rebrand
 
-**Epic:** [PAN-1938](https://github.com/eltmon/panopticon-cli/issues/1938) · **Status:** ready for implementation · **Authored:** 2026-06-17
+**Epic:** [PAN-1938](https://github.com/eltmon/overdeck/issues/1938) · **Status:** ready for implementation · **Authored:** 2026-06-17
 
 > **This PRD is the execution plan. It deliberately does NOT repeat the design.**
 > The *what* and the *how* are fully specified in the design package below; this

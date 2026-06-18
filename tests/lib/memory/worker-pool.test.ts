@@ -7,7 +7,7 @@ import { readMemoryHealthSnapshot, updateMemoryHealth, type MemoryHealthChangedP
 import { MemoryExtractionWorkerPool, MemoryPipelineWorkerPool, type MemoryExtractionJobResult, type MemoryPipelineJobResult } from '../../../src/lib/memory/worker-pool.js';
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -297,7 +297,7 @@ describe('memory extraction worker pool', () => {
       {
         timestamp: '2026-05-16T22:00:00.000Z',
         payload: {
-          projectId: 'panopticon-cli',
+          projectId: 'overdeck',
           issueId: 'PAN-1052',
           status: 'failing',
           reason: 'extraction-failed',
@@ -306,7 +306,7 @@ describe('memory extraction worker pool', () => {
       {
         timestamp: '2026-05-16T22:02:00.000Z',
         payload: {
-          projectId: 'panopticon-cli',
+          projectId: 'overdeck',
           issueId: 'PAN-1052',
           status: 'healthy',
           reason: null,

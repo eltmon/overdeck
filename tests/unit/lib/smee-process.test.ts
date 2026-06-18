@@ -36,7 +36,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:url', () => ({
-  fileURLToPath: () => '/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-905/src/lib/smee.ts',
+  fileURLToPath: () => '/home/eltmon/Projects/overdeck/workspaces/feature-pan-905/src/lib/smee.ts',
 }));
 
 const mockLoadConfig = vi.fn(() => ({

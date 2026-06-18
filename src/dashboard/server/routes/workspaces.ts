@@ -4915,8 +4915,8 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           );
           const sha = stdout.trim();
           if (sha) {
-            await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/review', 'Review passed');
-            await reportCommitStatus('eltmon', 'panopticon-cli', sha, 'success', 'panopticon/test', 'Tests passed');
+            await reportCommitStatus('eltmon', 'overdeck', sha, 'success', 'panopticon/review', 'Review passed');
+            await reportCommitStatus('eltmon', 'overdeck', sha, 'success', 'panopticon/test', 'Tests passed');
             console.log(`[merge] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
           }
         }

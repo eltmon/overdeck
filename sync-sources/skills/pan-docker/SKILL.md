@@ -68,7 +68,7 @@ This skill guides you through selecting and configuring Docker templates for Ove
 TEMPLATE=react-vite  # or: spring-boot, nextjs, dotnet, python-fastapi, monorepo
 
 # Copy to project
-cp ~/Projects/panopticon-cli/templates/docker/$TEMPLATE/* /path/to/your/project/
+cp ~/Projects/overdeck/templates/docker/$TEMPLATE/* /path/to/your/project/
 ```
 
 ### 2. Create Environment File

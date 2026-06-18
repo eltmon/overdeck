@@ -143,8 +143,8 @@ vi.mock('../../projects.js', () => ({
 }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })),
-  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 })),
+  resolveGitHubIssue: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 1190 })),
+  resolveGitHubIssueSync: vi.fn(() => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 1190 })),
 }));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../config.js', async () => {
@@ -222,7 +222,7 @@ describe('autoCloseOut', () => {
     mockLoadCloisterConfig.mockReturnValue(Effect.succeed({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} }) as any);
     mockLoadReviewStatuses.mockReturnValue({});
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
-    mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 } as any);
+    mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 1190 } as any);
     // PAN-1249: closeOut returns Effect; mock with Effect.succeed.
     mockCloseOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }) as any);
     installIssueView(['verifying-on-main']);
@@ -250,7 +250,7 @@ describe('autoCloseOut', () => {
       issueId: 'PAN-1190',
       projectPath: '/repo',
       auto: true,
-      github: { owner: 'eltmon', repo: 'panopticon-cli', number: 1190 },
+      github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
     });
     expect(actions).toEqual(['Auto close-out completed for PAN-1190']);
     expect(mockEmitActivityEntry).toHaveBeenCalledWith({

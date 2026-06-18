@@ -1,6 +1,6 @@
 # PAN-632 Implementation Plan
 
-This document is the execution companion to [PAN-632-merge-system-refactor.md](/home/eltmon/Projects/panopticon-cli/docs/prds/planned/PAN-632-merge-system-refactor.md:1).
+This document is the execution companion to [PAN-632-merge-system-refactor.md](/home/eltmon/Projects/overdeck/docs/prds/planned/PAN-632-merge-system-refactor.md:1).
 
 It exists to keep the refactor grounded in a small number of ordered implementation slices.
 

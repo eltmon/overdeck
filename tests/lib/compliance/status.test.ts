@@ -13,7 +13,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity: MemoryIdentity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1204',
   issueId: 'PAN-1204',
   runId: 'run-1',
@@ -98,7 +98,7 @@ describe('compliance status', () => {
     expect(status).toMatchObject({
       mode: 'advisory',
       recentMissCount: 1,
-      projectId: 'panopticon-cli',
+      projectId: 'overdeck',
       workspaceId: 'feature-pan-1204',
       issueId: 'PAN-1204',
       sessionId: 'session-1',

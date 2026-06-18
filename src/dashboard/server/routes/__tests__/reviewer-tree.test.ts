@@ -18,7 +18,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 
 const PROJECT_KEY = 'panopticon';
 const ISSUE_ID = 'pan-830';
-const WORKSPACE_PATH = '/home/testuser/Projects/panopticon-cli/workspaces/feature-pan-830';
+const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
 
 let testDir: string;
 let agentsDir: string;

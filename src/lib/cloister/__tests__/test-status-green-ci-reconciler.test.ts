@@ -33,7 +33,7 @@ const candidate = {
   reviewStatus: 'passed',
   testStatus: 'pending',
   mergeStatus: 'pending',
-  prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1658',
+  prUrl: 'https://github.com/eltmon/overdeck/pull/1658',
 };
 
 describe('reconcileTestStatusFromGreenCiWithDeps', () => {
@@ -46,8 +46,8 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
 
     const actions = await reconcileTestStatusFromGreenCiWithDeps(deps);
 
-    expect(deps.getPullRequestHeadState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 1658);
-    expect(deps.getCiCheckRunsState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 'abcdef1234567890');
+    expect(deps.getPullRequestHeadState).toHaveBeenCalledWith('eltmon', 'overdeck', 1658);
+    expect(deps.getCiCheckRunsState).toHaveBeenCalledWith('eltmon', 'overdeck', 'abcdef1234567890');
     expect(deps.setReviewStatusSync).toHaveBeenCalledWith('PAN-1658', {
       testStatus: 'passed',
       testNotes: 'Reconciled from green GitHub Actions CI on abcdef12: test (https://github.com/run/1)',
@@ -118,7 +118,7 @@ describe('reconcileTestStatusFromGreenCiWithDeps', () => {
 
     await reconcileTestStatusFromGreenCiWithDeps(deps);
 
-    expect(deps.getCiCheckRunsState).toHaveBeenCalledWith('eltmon', 'panopticon-cli', 'newhead9876543210');
+    expect(deps.getCiCheckRunsState).toHaveBeenCalledWith('eltmon', 'overdeck', 'newhead9876543210');
 
     const closedDeps = makeDeps({ 'PAN-1658': candidate });
     vi.mocked(closedDeps.getPullRequestHeadState).mockReturnValueOnce(Effect.succeed({

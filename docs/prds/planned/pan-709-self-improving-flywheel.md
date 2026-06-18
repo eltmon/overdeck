@@ -23,7 +23,7 @@ Build an end-to-end self-improvement system where every completed issue feeds a 
 - **Signal threshold**: a skill change requires **3+ independent retros pointing at the same gap** before synthesis proposes it. Below that threshold, the gap goes on a watchlist in `FLYWHEEL-REPORT.md` — tracked but not acted on.
 - **Audience-aware distribution**: every skill declares its audience (`operator` | `agent` | `both`). `pan sync` respects this — operator skills to `~/.claude/skills/`, agent skills injected into workspace CLAUDE.md at creation time.
 - **Autonomous by default, interruptive only for blockers**: the daemon fires on events and on schedule, files issues for everything, and only falls back to inline edits for blocker-tier substrate fixes that are stopping issues from merging *right now*.
-- **Every improvement is public**: `docs/FLYWHEEL-REPORT.md` is an append-only, user-facing changelog of how Overdeck is teaching itself. Rendered at `panopticon-cli.com/flywheel` as a living marketing artifact.
+- **Every improvement is public**: `docs/FLYWHEEL-REPORT.md` is an append-only, user-facing changelog of how Overdeck is teaching itself. Rendered at `overdeck.ai/flywheel` as a living marketing artifact.
 
 Ship all of this in one epic. No phased rollout.
 
@@ -31,7 +31,7 @@ Ship all of this in one epic. No phased rollout.
 
 ## Dependencies — aligned with PAN-705 (Command Taxonomy Reorg)
 
-[PAN-705](https://github.com/eltmon/panopticon-cli/issues/705) is **already merged**. It reshaped three surfaces PAN-709 touches: the CLI command tree, the `~/.claude/skills/` set, and dashboard HTTP routes. PAN-709 builds on PAN-705's end-state. The following alignment rules describe **current reality**, not future dependencies:
+[PAN-705](https://github.com/eltmon/overdeck/issues/705) is **already merged**. It reshaped three surfaces PAN-709 touches: the CLI command tree, the `~/.claude/skills/` set, and dashboard HTTP routes. PAN-709 builds on PAN-705's end-state. The following alignment rules describe **current reality**, not future dependencies:
 
 ### 1. Operator skills are already renamed
 
@@ -286,7 +286,7 @@ _Living record of how Overdeck teaches itself. Each section documents one flywhe
 …
 ```
 
-The rendered public version at `panopticon-cli.com/flywheel` uses this file as its source.
+The rendered public version at `overdeck.ai/flywheel` uses this file as its source.
 
 ### 5. Skill-changes-as-PAN-issues pipeline
 
@@ -420,7 +420,7 @@ flywheel:
 
 ### 11. Public flywheel dashboard page
 
-**Location:** `panopticon-cli.com/flywheel`
+**Location:** `overdeck.ai/flywheel`
 
 **Source:** `docs/FLYWHEEL-REPORT.md` rendered by the existing Mintlify docs pipeline.
 
@@ -512,7 +512,7 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 7. **Q&A detection works.** An agent waiting on a prompt (planning Q&A OR Claude Code approval) is marked `waiting-on-human`. Dashboard shows the badge. Deacon does not intervene. Clicking the badge opens the terminal focused on the prompt.
 8. **Autonomous daemon runs.** With `flywheel.autonomous: true`, Cloister fires retro-agents on merge without user intervention. Every 30 min the daemon re-reads FLYWHEEL-STATE and runs synthesis if there are new retros. Quiet hours and active-session backoff are respected.
 9. **`docs/FLYWHEEL-REPORT.md` accumulates.** After 3 runs, the report has 3 sections with all required fields.
-10. **Public dashboard renders.** `panopticon-cli.com/flywheel` shows the timeline from FLYWHEEL-REPORT.md via the Mintlify pipeline.
+10. **Public dashboard renders.** `overdeck.ai/flywheel` shows the timeline from FLYWHEEL-REPORT.md via the Mintlify pipeline.
 11. **Skill-change pipeline never interrupts the flywheel for approval.** During `/all-up`, zero approval prompts are raised for skill edits. All skill changes flow through filed issues.
 12. **`all-up` skill updated** with Step 8 synthesis and the rule "skill changes are never inline edits during `/all-up`."
 13. **Retro cost is bounded.** Median retro cost across 10 runs is ≤ $0.10. Max retro cost is ≤ $0.30 (including surprising retros with more proposals).
@@ -610,7 +610,7 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 - **Skill frontmatter schema** defined in `packages/contracts/src/skills.ts` (new or extended).
 - **`pan admin skills audit`** command in `src/cli/commands/admin/skills/audit.ts` (new).
 - **Dashboard "Flywheel Changes" tab** in `src/dashboard/frontend/src/components/AwaitingMergePage.tsx` + new `FlywheelChangesTab.tsx`.
-- **Public flywheel page** — add `flywheel.mdx` in `panopticon-cli.com/content/` (or wherever Mintlify pulls from) that embeds the rendered FLYWHEEL-REPORT.md.
+- **Public flywheel page** — add `flywheel.mdx` in `overdeck.ai/content/` (or wherever Mintlify pulls from) that embeds the rendered FLYWHEEL-REPORT.md.
 
 ---
 

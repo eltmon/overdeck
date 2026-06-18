@@ -227,7 +227,7 @@ These issues should be merged into parent tracking issues to reduce backlog nois
 - #403 Plan button missing when derivedStatus in_progress
 - #457 Archived Conversations page
 - #654 Project Setup Wizard UI
-- #656 Docs site CSS leaks onto panopticon-cli.com
+- #656 Docs site CSS leaks onto overdeck.ai
 - #660 Slash menu catalog drift (hardcoded array)
 - #747 Conversation list lacks accessible labels
 - #783 Agents Page Redesign

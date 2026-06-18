@@ -40,7 +40,7 @@ Do NOT leave any decisions for the implementation agent. Every architectural cho
 ### Step 1: Parse Issue ID and Create Workspace
 
 ```bash
-# PAN-XXX -> ~/Projects/panopticon-cli (GitHub)
+# PAN-XXX -> ~/Projects/overdeck (GitHub)
 # MIN-XXX -> ~/Projects/myn (Linear)
 # HH-XXX  -> ~/Projects/househunt (Linear)
 # JH-XXX  -> ~/Projects/jobhunt (Linear)

@@ -73,7 +73,7 @@ function makeNotify() {
 
 /** Set up mocks so resolveProjectFromIssue returns a project */
 function setupProjectResolved() {
-  mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli' });
+  mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck' });
 }
 
 /** Set up mocks so resolveProjectFromIssue returns null (no project) */

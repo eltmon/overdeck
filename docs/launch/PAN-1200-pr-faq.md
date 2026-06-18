@@ -33,7 +33,7 @@ The Universal Context System has four parts that ship together:
 
 **Available now:** `pan install` upgrades existing installations in place. New installs get the system by default.
 
-Source: https://github.com/eltmon/panopticon-cli
+Source: https://github.com/eltmon/overdeck
 
 ---
 

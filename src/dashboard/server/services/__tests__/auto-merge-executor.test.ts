@@ -13,9 +13,9 @@ function pendingEntry(overrides: Partial<PendingAutoMerge> = {}): PendingAutoMer
   return {
     id: 1,
     issueId: 'PAN-1486',
-    prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
+    prUrl: 'https://github.com/eltmon/overdeck/pull/1486',
     prNumber: 1486,
-    projectKey: 'panopticon-cli',
+    projectKey: 'overdeck',
     status: 'pending',
     scheduledMergeAt: '2026-05-25T09:59:59.000Z',
     scheduledAt: '2026-05-25T09:54:59.000Z',

@@ -423,7 +423,7 @@ API keys live in **`~/.panopticon.env`**, NEVER `config.yaml` (config may be in 
 │ │ [✓ Enriched only] [Clear filters]                               │ │
 │ └──────────────────────────────────────────────────────────────────┘ │
 │ ┌─Facets (collapsible)─────────────────────────────────────────────┐ │
-│ │ Workspace: myn (412) · panopticon-cli (287) · auricle (143) ... │ │
+│ │ Workspace: myn (412) · overdeck (287) · auricle (143) ... │ │
 │ │ Model:     opus-4-6 (621) · sonnet-4-6 (312) · haiku-4-5 (98)   │ │
 │ │ Period:    last 7d (84) · last 30d (412) · older (1247)         │ │
 │ └──────────────────────────────────────────────────────────────────┘ │

@@ -126,7 +126,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     } else {
       // Fallback for PAN- issues
       owner = 'eltmon';
-      repo = 'panopticon-cli';
+      repo = 'overdeck';
       number = parseInt(issueId.replace(/^PAN-/i, ''), 10);
     }
   }

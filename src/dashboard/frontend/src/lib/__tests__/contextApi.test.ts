@@ -59,10 +59,10 @@ describe('contextApi', () => {
   it('posts draft content to the preview endpoint', async () => {
     const request: ContextPreviewRequest = {
       operation: 'preview',
-      selectedLayer: { kind: 'project', projectKey: 'panopticon-cli' },
+      selectedLayer: { kind: 'project', projectKey: 'overdeck' },
       drafts: [
         {
-          target: { kind: 'project', projectKey: 'panopticon-cli' },
+          target: { kind: 'project', projectKey: 'overdeck' },
           content: 'shared {{#harness:claude}}claude{{/harness:claude}}',
         },
       ],
@@ -86,14 +86,14 @@ describe('contextApi', () => {
   it('puts layer writes only through the save endpoint', async () => {
     const request: ContextLayerSaveRequest = {
       operation: 'save',
-      target: { kind: 'workspace', projectKey: 'panopticon-cli', workspacePath: '/repo/workspaces/feature-pan-1201' },
+      target: { kind: 'workspace', projectKey: 'overdeck', workspacePath: '/repo/workspaces/feature-pan-1201' },
       content: 'workspace context',
     };
     fetchMock.mockResolvedValue(jsonResponse({
       operation: 'save',
       layer: {
         kind: 'workspace',
-        projectKey: 'panopticon-cli',
+        projectKey: 'overdeck',
         workspacePath: '/repo/workspaces/feature-pan-1201',
         file: '/repo/workspaces/feature-pan-1201/.pan/context/workspace.md',
         exists: true,

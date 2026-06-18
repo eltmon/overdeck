@@ -23,7 +23,7 @@ function makeTmpDir(): string {
 function makeChunk(overrides: Partial<ChunkInsert> = {}): ChunkInsert {
   return {
     sessionId: 'session-abc',
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     role: 'assistant',
     ts: '2026-06-02T00:00:00.000Z',
     byteOffset: 0,

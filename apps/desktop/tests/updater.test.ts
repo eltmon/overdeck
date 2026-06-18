@@ -86,7 +86,7 @@ describe("initializeAutoUpdater", () => {
     expect(autoUpdater.setFeedURL).toHaveBeenCalledWith({
       provider: "github",
       owner: "eltmon",
-      repo: "panopticon-cli",
+      repo: "overdeck",
     });
   });
 

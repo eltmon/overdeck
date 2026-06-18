@@ -73,7 +73,7 @@ describe('project-repos', () => {
     const projectConfig: ProjectConfig = {
       name: 'Overdeck',
       path: '/tmp/panopticon',
-      github_repo: 'eltmon/panopticon-cli',
+      github_repo: 'eltmon/overdeck',
       workspace: {
         type: 'monorepo',
         pr_target: 'main',

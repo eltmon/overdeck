@@ -141,5 +141,5 @@ The `rally-api.ts` client will extract `QueryResult.Results` to maintain compati
 
 ## References
 
-- GitHub Issue: https://github.com/eltmon/panopticon-cli/issues/50
+- GitHub Issue: https://github.com/eltmon/overdeck/issues/50
 - Rally WSAPI Docs: https://rally1.rallydev.com/slm/doc/webservice/

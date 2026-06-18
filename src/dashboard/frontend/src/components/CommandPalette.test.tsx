@@ -129,8 +129,8 @@ describe('CommandPalette conversation results', () => {
             conversations: [{
               sessionId: 'session-a',
               conversationId: 'session-a',
-              projectId: '-home-eltmon-Projects-panopticon-cli-workspaces-feature-pan-1896',
-              projectKey: 'panopticon-cli',
+              projectId: '-home-eltmon-Projects-overdeck-workspaces-feature-pan-1896',
+              projectKey: 'overdeck',
               role: 'assistant',
               ts: '2026-06-02T01:00:00.000Z',
               byteOffset: 42,
@@ -146,7 +146,7 @@ describe('CommandPalette conversation results', () => {
             memory: [{
               kind: 'memory',
               id: 'mem-a',
-              projectId: 'panopticon-cli',
+              projectId: 'overdeck',
               workspaceId: '',
               issueId: '',
               timestamp: '2026-06-02T01:00:00.000Z',
@@ -191,7 +191,7 @@ describe('CommandPalette conversation results', () => {
     const conversationsHeading = groupHeading('Conversations');
     expect(screen.getByText('semantic transcript hit')).toBeInTheDocument();
     expect(screen.getByText('needle')).toBeInTheDocument();
-    expect(screen.getByText('panopticon-cli · feature-pan-1896')).toBeInTheDocument();
+    expect(screen.getByText('overdeck · feature-pan-1896')).toBeInTheDocument();
     expect(screen.getByText('PAN-1896')).toBeInTheDocument();
     expect(screen.getByText('Claude session session-')).toBeInTheDocument();
 
@@ -222,8 +222,8 @@ describe('CommandPalette conversation results', () => {
     expect(onOpenConversationHit).toHaveBeenCalledWith({
       sessionId: 'session-a',
       conversationId: 'session-a',
-      projectId: '-home-eltmon-Projects-panopticon-cli-workspaces-feature-pan-1896',
-      projectKey: 'panopticon-cli',
+      projectId: '-home-eltmon-Projects-overdeck-workspaces-feature-pan-1896',
+      projectKey: 'overdeck',
       byteOffset: 42,
       label: 'semantic transcript hit',
       sourceLabel: 'Claude session session-',

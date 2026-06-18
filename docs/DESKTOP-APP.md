@@ -198,7 +198,7 @@ The channel is derived automatically from `app.getVersion()` at startup:
 
 This means a user on `v1.0.0` will not be prompted to install `v1.1.0-canary.3`, and a user on `v1.1.0-canary.3` will not be offered `v1.0.0`.
 
-The `beta` channel maps to GitHub prereleases; `latest` maps to full releases. Both are served from the same `eltmon/panopticon-cli` release feed.
+The `beta` channel maps to GitHub prereleases; `latest` maps to full releases. Both are served from the same `eltmon/overdeck` release feed.
 
 ---
 

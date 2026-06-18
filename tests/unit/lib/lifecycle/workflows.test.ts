@@ -153,7 +153,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
       const result = await approve(ctx);
 
@@ -168,7 +168,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       const result = await approve(ctx);
@@ -195,7 +195,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
       const result = await close(ctx);
 
@@ -207,7 +207,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
       const result = await close(ctx);
 
@@ -279,7 +279,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
       const result = await closeOut(ctx);
 
@@ -361,7 +361,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
 
       await closeOut(ctx);
@@ -403,7 +403,7 @@ describe('workflows', () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
-        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
       };
       const result = await deepWipe(ctx);
 

@@ -4,14 +4,14 @@ import { getDirectRestartRequest } from './restartRouting';
 describe('getDirectRestartRequest', () => {
   it('routes review coordinator restarts to the review convoy endpoint', () => {
     expect(getDirectRestartRequest({
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       issueId: 'PAN-1381',
       sessionId: 'agent-pan-1381-review',
       sessionType: 'review',
       model: 'claude-opus-4-7',
       harness: 'pi',
     })).toEqual({
-      endpoint: '/api/specialists/panopticon-cli/PAN-1381/review/restart',
+      endpoint: '/api/specialists/overdeck/PAN-1381/review/restart',
       body: { model: 'claude-opus-4-7', harness: 'pi' },
       successMessage: 'Review restarted',
       errorMessage: 'Failed to restart review',
@@ -20,7 +20,7 @@ describe('getDirectRestartRequest', () => {
 
   it('routes reviewer restarts to the review convoy endpoint instead of the retired per-reviewer route', () => {
     const request = getDirectRestartRequest({
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       issueId: 'PAN-1381',
       sessionId: 'agent-pan-1381-review-correctness',
       sessionType: 'reviewer',
@@ -28,14 +28,14 @@ describe('getDirectRestartRequest', () => {
       model: 'claude-sonnet-4-6',
     });
 
-    expect(request?.endpoint).toBe('/api/specialists/panopticon-cli/PAN-1381/review/restart');
+    expect(request?.endpoint).toBe('/api/specialists/overdeck/PAN-1381/review/restart');
     expect(request?.endpoint).not.toContain('/reviewer/');
     expect(request?.body).toEqual({ model: 'claude-sonnet-4-6' });
   });
 
   it('omits the model field for default-model review restarts', () => {
     expect(getDirectRestartRequest({
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       issueId: 'PAN-1381',
       sessionId: 'agent-pan-1381-review-correctness',
       sessionType: 'reviewer',
@@ -44,7 +44,7 @@ describe('getDirectRestartRequest', () => {
 
   it.each(['test', 'ship', 'merge'])('routes %s restarts to the generic agent restart endpoint', (sessionType) => {
     expect(getDirectRestartRequest({
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       issueId: 'PAN-1381',
       sessionId: `agent-pan-1381-${sessionType}`,
       sessionType,
@@ -60,7 +60,7 @@ describe('getDirectRestartRequest', () => {
 
   it('uses no model field for default generic agent restarts', () => {
     expect(getDirectRestartRequest({
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       issueId: 'PAN-1381',
       sessionId: 'agent-pan-1381-test',
       sessionType: 'test',
@@ -69,7 +69,7 @@ describe('getDirectRestartRequest', () => {
 
   it('leaves work sessions on the existing resume/start restart path', () => {
     expect(getDirectRestartRequest({
-      projectKey: 'panopticon-cli',
+      projectKey: 'overdeck',
       issueId: 'PAN-1381',
       sessionId: 'agent-pan-1381',
       sessionType: 'work',

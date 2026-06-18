@@ -8,7 +8,7 @@ function observation(id: string, timestamp: string, actionStatus: string | null,
   return {
     id,
     timestamp,
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     workspaceId: `feature-${issueId.toLowerCase()}`,
     issueId,
     runId: 'run-1',

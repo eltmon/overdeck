@@ -17,7 +17,7 @@ export interface IssueOverviewProps {
   title: string
   /** Feature branch; defaults to feature/<issueId>. */
   branch?: string
-  /** Active project name for the cockpit breadcrumb (e.g. "panopticon-cli"). */
+  /** Active project name for the cockpit breadcrumb (e.g. "overdeck"). */
   projectName?: string
   /** Issue creation time for the age stat chip. */
   createdAt?: number | string

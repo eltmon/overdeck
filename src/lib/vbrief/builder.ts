@@ -140,7 +140,7 @@ export class PlanBuilder {
       vBRIEFInfo: {
         version: '0.6',
         created: now,
-        author: `panopticon-cli/${version}`,
+        author: `overdeck/${version}`,
         description: this._description,
       },
       plan: {

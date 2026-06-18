@@ -28,7 +28,7 @@ export interface ComplianceStatusResult {
   sessionId: string | null;
 }
 
-const DEFAULT_PROJECT_ID = 'panopticon-cli';
+const DEFAULT_PROJECT_ID = 'overdeck';
 const DEFAULT_SINCE_HOURS = 24;
 
 export async function getComplianceStatus(options: ComplianceStatusOptions = {}): Promise<ComplianceStatusResult> {

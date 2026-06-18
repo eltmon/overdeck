@@ -154,7 +154,7 @@ describe('POST /api/issues/:id/close-out', () => {
     resolveGitHubIssueMock.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 1190,
     });
     issueDataServiceMock.getIssueSource.mockReturnValue('github');
@@ -196,7 +196,7 @@ describe('POST /api/issues/:id/close-out', () => {
       issueId: 'PAN-1190',
       projectName: 'panopticon',
       projectPath: '/tmp/panopticon',
-      github: { owner: 'eltmon', repo: 'panopticon-cli', number: 1190 },
+      github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
     });
     expect(issueDataServiceMock.patchIssue).toHaveBeenCalledWith('PAN-1190', {
       status: 'Done',

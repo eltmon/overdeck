@@ -2,7 +2,7 @@
 
 ## Issue
 **Title:** fix(pan-705 followup): clean up stale `.claude/skills/` references and add unit tests for `doneCommand`/`approveCommand`
-**URL:** https://github.com/eltmon/panopticon-cli/issues/714
+**URL:** https://github.com/eltmon/overdeck/issues/714
 **Type:** Cleanup + test debt (follow-up from PAN-705 command taxonomy reorg)
 
 ## Problem
@@ -39,7 +39,7 @@ The repo tracks 26 skill directories under `.claude/skills/` (separate from the 
 
 **Chosen:**
 1. Regenerate `.claude/skills/` as an exact mirror of canonical `skills/` (delete stale tree, copy current, preserve `.gitignore`).
-2. Extend `pan sync` so it *also* populates project-level `.claude/skills/` from `./skills/` when run inside a repo that has a top-level `skills/` directory with SKILL.md files (i.e., the panopticon-cli repo itself). This makes drift self-healing: any future rename in `skills/` + a `pan sync` run will push the change into `.claude/skills/` automatically.
+2. Extend `pan sync` so it *also* populates project-level `.claude/skills/` from `./skills/` when run inside a repo that has a top-level `skills/` directory with SKILL.md files (i.e., the overdeck repo itself). This makes drift self-healing: any future rename in `skills/` + a `pan sync` run will push the change into `.claude/skills/` automatically.
 
 ### Tests — extract pure helpers AND add command-level behavior tests
 
@@ -84,6 +84,6 @@ User chose "both" over "helpers only" or "command-level only". Plan:
 
 - `rg -n "pan work list|pan cloister start|pan specialists wake" .claude/skills/` returns zero matches.
 - `diff -r skills/ .claude/skills/` returns only the `.gitignore` as an exception (or `.claude/skills/` is a strict superset with just `.gitignore` extra).
-- `pan sync` run inside panopticon-cli reports "synced N project-level skills" and produces no diff on a clean tree.
+- `pan sync` run inside overdeck reports "synced N project-level skills" and produces no diff on a clean tree.
 - `npm run test -- tests/cli/commands/work/done` and `tests/cli/commands/work/approve` both pass with >0 assertions.
 - `npm run typecheck` and `npm run lint` pass.

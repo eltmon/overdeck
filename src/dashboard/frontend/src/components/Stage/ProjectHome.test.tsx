@@ -5,7 +5,7 @@ import type { StageApi } from './types'
 
 function api(overrides: Partial<StageApi> = {}): StageApi {
   return {
-    deckKey: 'panopticon-cli',
+    deckKey: 'overdeck',
     openPane: vi.fn(),
     openTypedPane: vi.fn(),
     openIssue: vi.fn(),
@@ -22,7 +22,7 @@ describe('ProjectHome', () => {
 
     render(
       <ProjectHome
-        projectName="panopticon-cli"
+        projectName="overdeck"
         onCreateConversation={onCreateConversation}
         api={api({ openOrFocusAgentPane })}
       />,

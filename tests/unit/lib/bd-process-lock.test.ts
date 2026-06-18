@@ -89,7 +89,7 @@ describe('bd process lock', () => {
   });
 
   it('derives the same lock path from worktrees that redirect to the same shared .beads dir', async () => {
-    const projectRoot = join(testRoot, 'panopticon-cli');
+    const projectRoot = join(testRoot, 'overdeck');
     const featureWorkspace = join(projectRoot, 'workspaces', 'feature-pan-1629');
     mkdirSync(join(projectRoot, '.beads'), { recursive: true });
     mkdirSync(join(featureWorkspace, '.beads'), { recursive: true });
@@ -100,7 +100,7 @@ describe('bd process lock', () => {
   });
 
   it('keys a standard worktree without redirect to the project-root .beads dir before recovery creates it', async () => {
-    const projectRoot = join(testRoot, 'panopticon-cli');
+    const projectRoot = join(testRoot, 'overdeck');
     const featureWorkspace = join(projectRoot, 'workspaces', 'feature-pan-1629');
     mkdirSync(join(projectRoot, '.beads'), { recursive: true });
     mkdirSync(join(featureWorkspace, '.beads'), { recursive: true });

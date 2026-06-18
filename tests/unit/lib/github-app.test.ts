@@ -43,7 +43,7 @@ describe('getCiCheckRunsState', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'token', expires_at: '2026-06-10T00:00:00Z' }), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ check_runs: checkRuns }), { status: 200 }));
 
-    return Effect.runPromise(getCiCheckRunsState('eltmon', 'panopticon-cli', 'abc123'));
+    return Effect.runPromise(getCiCheckRunsState('eltmon', 'overdeck', 'abc123'));
   }
 
   it('returns green from check-runs only when at least one run succeeded and none are pending or failed', async () => {
@@ -96,7 +96,7 @@ describe('getCiCheckRunsState', () => {
         {
           status: 200,
           headers: {
-            link: '<https://api.github.com/repos/eltmon/panopticon-cli/commits/abc123/check-runs?per_page=100&page=2>; rel="next"',
+            link: '<https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100&page=2>; rel="next"',
           },
         },
       ))
@@ -105,7 +105,7 @@ describe('getCiCheckRunsState', () => {
         { status: 200 },
       ));
 
-    const state = await Effect.runPromise(getCiCheckRunsState('eltmon', 'panopticon-cli', 'abc123'));
+    const state = await Effect.runPromise(getCiCheckRunsState('eltmon', 'overdeck', 'abc123'));
 
     expect(state).toMatchObject({
       verdict: 'pending',
@@ -118,8 +118,8 @@ describe('getCiCheckRunsState', () => {
     });
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       'https://api.github.com/app/installations/67890/access_tokens',
-      'https://api.github.com/repos/eltmon/panopticon-cli/commits/abc123/check-runs?per_page=100',
-      'https://api.github.com/repos/eltmon/panopticon-cli/commits/abc123/check-runs?per_page=100&page=2',
+      'https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100',
+      'https://api.github.com/repos/eltmon/overdeck/commits/abc123/check-runs?per_page=100&page=2',
     ]);
   });
 });

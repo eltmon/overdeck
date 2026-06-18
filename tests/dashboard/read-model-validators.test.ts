@@ -218,7 +218,7 @@ describe('toReviewStatusSnapshot', () => {
       verificationCycleCount: 2,
       readyForMerge: false,
       updatedAt: '2026-04-11T17:00:00.000Z',
-      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/486',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/486',
     }
     const snapshot = toReviewStatusSnapshot(status)
 

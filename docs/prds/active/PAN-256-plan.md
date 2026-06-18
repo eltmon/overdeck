@@ -1,7 +1,7 @@
 # PAN-256: Add reopen-issue command to properly reset workspace state
 
 **STATUS: Planning**
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/256
+**Issue:** https://github.com/eltmon/overdeck/issues/256
 **Branch:** feature/pan-256
 
 ---

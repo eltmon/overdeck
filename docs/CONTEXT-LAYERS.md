@@ -151,7 +151,7 @@ Overdeck ships engineering rules under `sync-sources/rules/`. Each rule
 carries a `scope:` frontmatter key:
 
 - `scope: universal` — folded into the rendered CLAUDE.md everywhere;
-- `scope: dev` — folded in only on a panopticon-cli checkout (`isDevMode()`),
+- `scope: dev` — folded in only on a overdeck checkout (`isDevMode()`),
   for rules about developing Overdeck itself.
 
 ## `pan context` CLI

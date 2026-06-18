@@ -16,8 +16,8 @@
   "readme": "README.md",
   "name": "Overdeck API Documentation",
   "navigationLinks": {
-    "GitHub": "https://github.com/eltmon/panopticon-cli",
-    "npm": "https://www.npmjs.com/package/panopticon-cli"
+    "GitHub": "https://github.com/eltmon/overdeck",
+    "npm": "https://www.npmjs.com/package/overdeck"
   },
   "plugin": [],
   "theme": "default",

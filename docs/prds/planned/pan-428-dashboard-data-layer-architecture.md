@@ -147,7 +147,7 @@ import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 
 ### Current Layout
 ```
-panopticon-cli/
+overdeck/
 ├── src/
 │   ├── cli/                    # CLI (tsup → npm published)
 │   ├── dashboard/
@@ -160,7 +160,7 @@ panopticon-cli/
 
 ### Target Layout
 ```
-panopticon-cli/
+overdeck/
 ├── packages/
 │   └── contracts/              # @panopticon/contracts (NEW)
 │       ├── package.json

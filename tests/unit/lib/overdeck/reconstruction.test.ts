@@ -118,10 +118,10 @@ function makeTmuxLayer(sessionNames: string[]): Layer.Layer<Tmux> {
 
 const FAKE_PROJECT: ProjectConfig = {
   id: 'panopticon',
-  name: 'panopticon-cli',
-  path: '/home/eltmon/Projects/panopticon-cli',
+  name: 'overdeck',
+  path: '/home/eltmon/Projects/overdeck',
   tracker: 'github',
-  github_repo: 'eltmon/panopticon-cli',
+  github_repo: 'eltmon/overdeck',
 } as unknown as ProjectConfig;
 
 function makeRecord(overrides?: Partial<PanIssueRecord['pipeline']>): PanIssueRecord {
@@ -282,7 +282,7 @@ describe('Reconstruction.rebuild', () => {
         { openIssueIds: new Set(['PAN-1234']) },
         {
           records: new Map([['PAN-1234', makeRecord({
-            prUrl: 'https://github.com/eltmon/panopticon-cli/pull/42',
+            prUrl: 'https://github.com/eltmon/overdeck/pull/42',
             reviewStatus: 'reviewing',
             readyForMerge: false,
           })]]),
@@ -297,7 +297,7 @@ describe('Reconstruction.rebuild', () => {
         { openIssueIds: new Set(['PAN-1234']) },
         {
           records: new Map([['PAN-1234', makeRecord({
-            prUrl: 'https://github.com/eltmon/panopticon-cli/pull/42',
+            prUrl: 'https://github.com/eltmon/overdeck/pull/42',
             reviewStatus: 'passed',
             readyForMerge: true,
           })]]),
@@ -312,7 +312,7 @@ describe('Reconstruction.rebuild', () => {
         { openIssueIds: new Set(['PAN-1234']) },
         {
           records: new Map([['PAN-1234', makeRecord({
-            prUrl: 'https://github.com/eltmon/panopticon-cli/pull/42',
+            prUrl: 'https://github.com/eltmon/overdeck/pull/42',
             mergeStatus: 'merged',
           })]]),
         },
@@ -335,7 +335,7 @@ describe('Reconstruction.rebuild', () => {
         { openIssueIds: new Set(['PAN-1234']) },
         {
           records: new Map([['PAN-1234', makeRecord({
-            prUrl:    'https://github.com/eltmon/panopticon-cli/pull/99',
+            prUrl:    'https://github.com/eltmon/overdeck/pull/99',
             prNumber: 99,
             prHeadSha: 'abc123',
           })]]),
@@ -343,7 +343,7 @@ describe('Reconstruction.rebuild', () => {
       );
       await run();
       expect(fdb.issues[0]).toMatchObject({
-        prUrl:    'https://github.com/eltmon/panopticon-cli/pull/99',
+        prUrl:    'https://github.com/eltmon/overdeck/pull/99',
         prNumber: 99,
         prHeadSha: 'abc123',
       });

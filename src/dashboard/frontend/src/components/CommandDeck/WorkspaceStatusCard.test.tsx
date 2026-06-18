@@ -28,7 +28,7 @@ function observation(id: string, timestamp: string, actionStatus: string | null)
   return {
     id,
     timestamp,
-    projectId: 'panopticon-cli',
+    projectId: 'overdeck',
     workspaceId: 'feature-pan-1052',
     issueId: 'PAN-1052',
     runId: 'run-1',

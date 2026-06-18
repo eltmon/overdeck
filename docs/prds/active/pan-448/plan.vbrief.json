@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-06T12:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-448: Start Agent confirmation timeout too short — button reverts before user can click"
   },
   "plan": {
@@ -15,10 +15,10 @@
     "created": "2026-04-06T12:00:00Z",
     "updated": "2026-04-06T12:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/448", "label": "PAN-448", "type": "issue" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-448/docs/prds/active/PAN-448-plan.md", "label": "PAN-448-plan.md", "type": "prd" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/active/PAN-448-plan.md", "label": "PAN-448-plan.md", "type": "prd" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/active/PAN-448-plan.vbrief.json", "label": "PAN-448-plan.vbrief.json", "type": "prd" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/448", "label": "PAN-448", "type": "issue" },
+      { "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-448/docs/prds/active/PAN-448-plan.md", "label": "PAN-448-plan.md", "type": "prd" },
+      { "uri": "/home/eltmon/Projects/overdeck/docs/prds/active/PAN-448-plan.md", "label": "PAN-448-plan.md", "type": "prd" },
+      { "uri": "/home/eltmon/Projects/overdeck/docs/prds/active/PAN-448-plan.vbrief.json", "label": "PAN-448-plan.vbrief.json", "type": "prd" }
     ],
     "tags": ["frontend", "ux", "kanban"],
     "narratives": {

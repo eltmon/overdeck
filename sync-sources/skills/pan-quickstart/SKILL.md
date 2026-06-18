@@ -47,8 +47,8 @@ If `pan` command not found, Overdeck isn't installed yet.
 #### Install Overdeck
 ```bash
 # Clone the repository
-git clone https://github.com/eltmon/panopticon-cli.git
-cd panopticon-cli
+git clone https://github.com/eltmon/overdeck.git
+cd overdeck
 
 # Install dependencies
 npm install
@@ -237,8 +237,8 @@ echo "=== Overdeck Quick Start ==="
 
 # 1. Install Overdeck (skip if already done)
 if ! command -v pan &> /dev/null; then
-    git clone https://github.com/eltmon/panopticon-cli.git
-    cd panopticon-cli
+    git clone https://github.com/eltmon/overdeck.git
+    cd overdeck
     npm install
     npm run build
     npm install -g .
@@ -396,7 +396,7 @@ pan doctor
 cat ~/.panopticon/logs/panopticon.log
 
 # Check dashboard logs
-cd panopticon-cli/src/dashboard
+cd overdeck/src/dashboard
 npm run dev  # Run in foreground to see errors
 
 # Get help
@@ -415,7 +415,7 @@ Use these skills for specific issues:
 If you encounter issues:
 1. Check the troubleshooting section above
 2. Run `pan doctor` for diagnostic info
-3. Visit https://github.com/eltmon/panopticon-cli/issues
+3. Visit https://github.com/eltmon/overdeck/issues
 4. Join the community (link in README)
 
 ## Related Skills

@@ -52,7 +52,7 @@ interface AgentOutputPanelProps {
 //   e.g. agent-pan-1069-review, agent-pan-1069-review-correctness, agent-pan-1069-test
 //
 // Legacy pattern: specialist-{projectKey}-{issueId}-review-{role}
-//   e.g. specialist-panopticon-cli-PAN-1069-review-correctness
+//   e.g. specialist-overdeck-PAN-1069-review-correctness
 function parseSpecialistSession(agentId: string): { projectKey: string; issueId: string; type: string } | null {
   // Try new agent- pattern first
   const newMatch = agentId.match(/^agent-(.+)-([A-Z]+-\d+)(?:-(review|correctness|security|performance|requirements|test|ship|merge))?$/);

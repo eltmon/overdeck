@@ -67,4 +67,4 @@ The PreToolUse interceptor already bypasses these cases automatically — it log
 ## See also
 
 - `pan admin tldr status` — operator view of running daemons. Use the `pan-admin-tldr` skill for daemon lifecycle.
-- `docs/TLDR.md` in panopticon-cli — full TLDR design.
+- `docs/TLDR.md` in overdeck — full TLDR design.

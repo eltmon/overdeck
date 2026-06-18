@@ -52,7 +52,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
   {
     issueId: 'PAN-862',
     title: 'Resource strip visual test',
-    projectName: 'panopticon-cli',
+    projectName: 'overdeck',
     branch: 'feature/pan-862',
     status: 'running',
     stateLabel: 'In Progress',
@@ -90,7 +90,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
   {
     issueId: 'PAN-777',
     title: 'Closed but still allocated',
-    projectName: 'panopticon-cli',
+    projectName: 'overdeck',
     branch: 'feature/pan-777',
     status: 'idle',
     stateLabel: 'Closed',
@@ -160,7 +160,7 @@ test.describe('Command Deck resource strip', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([{ key: 'panopticon-cli', name: 'panopticon-cli', path: '/tmp/panopticon-cli' }]),
+        body: JSON.stringify([{ key: 'overdeck', name: 'overdeck', path: '/tmp/overdeck' }]),
       });
     });
     await page.route('**/api/issues/*/resource-details', async (route) => {
@@ -217,7 +217,7 @@ test.describe('Command Deck resource strip', () => {
     // load the initial app boot (WS connect + first snapshot) can take several
     // seconds, and a click that races the mount silently no-ops, leaving the
     // rows un-rendered and flaking the first toBeVisible below.
-    const sidebarProject = page.getByTestId('sidebar-project-panopticon-cli');
+    const sidebarProject = page.getByTestId('sidebar-project-overdeck');
     await expect(sidebarProject).toBeVisible({ timeout: 20_000 });
     await sidebarProject.click();
 

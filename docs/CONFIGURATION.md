@@ -222,7 +222,7 @@ Highest wins:
 
 ### Caveats
 
-- **`claudish`-routed providers** (Kimi, MiniMax, GLM, OpenRouter, Mimo, OpenAI non-subscription, Google CodeAssist) are **always pinned to `bypass`**, regardless of config. `auto` is a Claude Code research-preview feature that doesn't translate through claudish to the upstream provider. Tracked in [#1015](https://github.com/eltmon/panopticon-cli/issues/1015) — once claudish is fully replaced by CLIProxy, every provider will honor the config.
+- **`claudish`-routed providers** (Kimi, MiniMax, GLM, OpenRouter, Mimo, OpenAI non-subscription, Google CodeAssist) are **always pinned to `bypass`**, regardless of config. `auto` is a Claude Code research-preview feature that doesn't translate through claudish to the upstream provider. Tracked in [#1015](https://github.com/eltmon/overdeck/issues/1015) — once claudish is fully replaced by CLIProxy, every provider will honor the config.
 - **CLIProxy-routed OpenAI subscription** does honor the config — `claude` is still the binary, only `ANTHROPIC_BASE_URL` points at the local sidecar.
 - Settings on **`~/.claude/settings.json`** are per-user, not per-project. Each developer needs `skipAutoPermissionPrompt: true` on their own machine. Overdeck doesn't write this for you.
 
@@ -934,7 +934,7 @@ quality_gates:
     required: true
 ```
 
-A project with extra test roots (e.g. panopticon-cli's `src/dashboard/frontend`) appends them in its own explicit `quality_gates.test` (`… && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}`). The generic default stays single-root so it works for any project.
+A project with extra test roots (e.g. overdeck's `src/dashboard/frontend`) appends them in its own explicit `quality_gates.test` (`… && cd src/dashboard/frontend && npx vitest run --changed {{CHANGED_BASE}}`). The generic default stays single-root so it works for any project.
 
 `{{CHANGED_BASE}}` is injected as `origin/<target-branch>` after the verification runner syncs the target branch. This keeps unrelated pre-existing failures from failing every work agent gate. Vitest's `--changed` graph follows static imports; dynamic imports, fixtures, generated files, and environment-driven branches may need explicit tests because they can be invisible to the changed-file graph.
 
@@ -1015,5 +1015,5 @@ External service integrations follow a common pattern (see `tunnel.ts` and `hume
 
 - **Configuration issues**: `pan config validate`
 - **Full documentation**: [WORK-TYPES.md](./WORK-TYPES.md)
-- **GitHub issues**: [panopticon-cli/issues](https://github.com/eltmon/panopticon-cli/issues)
-- **Tracking issue**: [PAN-118](https://github.com/eltmon/panopticon-cli/issues/118)
+- **GitHub issues**: [overdeck/issues](https://github.com/eltmon/overdeck/issues)
+- **Tracking issue**: [PAN-118](https://github.com/eltmon/overdeck/issues/118)

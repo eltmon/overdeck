@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-14T21:33:26Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-697: Reorganize root-level artifacts into professional top-level structure"
   },
   "plan": {
@@ -15,9 +15,9 @@
     "created": "2026-04-14T21:33:26Z",
     "updated": "2026-04-14T21:33:26Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/697", "label": "PAN-697", "type": "issue" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-697/docs/prds/active/pan-697-root-artifact-cleanup-spec.md", "label": "pan-697-root-artifact-cleanup-spec.md", "type": "prd" },
-      { "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/active/pan-697-root-artifact-cleanup-spec.md", "label": "pan-697-root-artifact-cleanup-spec.md", "type": "prd" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/697", "label": "PAN-697", "type": "issue" },
+      { "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-697/docs/prds/active/pan-697-root-artifact-cleanup-spec.md", "label": "pan-697-root-artifact-cleanup-spec.md", "type": "prd" },
+      { "uri": "/home/eltmon/Projects/overdeck/docs/prds/active/pan-697-root-artifact-cleanup-spec.md", "label": "pan-697-root-artifact-cleanup-spec.md", "type": "prd" }
     ],
     "tags": ["cleanup", "docs", "repo-hygiene"],
     "narratives": {

@@ -14,7 +14,7 @@ Planned. Extends PAN-821 (session tree) and PAN-862 (resource icon strip). Does 
 
 ## Problem
 
-When working across multiple projects (e.g., `panopticon-cli` and `mind-your-now`), the Command Deck shows agents under each project's issues but gives no visibility into the infrastructure supporting them. A MYN issue like MIN-846 has 4 Docker containers running (API, frontend, PostgreSQL, Redis), but the only way to see them is:
+When working across multiple projects (e.g., `overdeck` and `mind-your-now`), the Command Deck shows agents under each project's issues but gives no visibility into the infrastructure supporting them. A MYN issue like MIN-846 has 4 Docker containers running (API, frontend, PostgreSQL, Redis), but the only way to see them is:
 
 1. **Resource icon strip** (PAN-862) — a tiny docker icon on the issue row, hover to see a count ("4 containers"). No status, no names, no actions.
 2. **Inspector panel** (`ContainerSection.tsx`) — a separate panel you have to open, which shows container chips with status dots. Accessible but disconnected from the session tree.

@@ -19,7 +19,7 @@ import {
 
 const issue = (identifier: string, extra: Record<string, unknown> = {}) => ({
   identifier,
-  id: `github-eltmon-panopticon-cli-${identifier.replace(/^PAN-/, '')}`,
+  id: `github-eltmon-overdeck-${identifier.replace(/^PAN-/, '')}`,
   title: `${identifier} title`,
   ...extra,
 });

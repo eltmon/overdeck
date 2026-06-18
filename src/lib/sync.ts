@@ -91,7 +91,7 @@ export interface MigrationResult {
  * This is safe to run multiple times — it's a no-op if nothing remains to clean up.
  *
  * Removes stale Overdeck content from ~/.claude/:
- * - Symlinks pointing to .panopticon or panopticon-cli (legacy sync method)
+ * - Symlinks pointing to .panopticon or overdeck (legacy sync method)
  *
  * Plain directories are always preserved as user content — there is no reliable
  * way to prove a plain directory was created by Overdeck vs the user.
@@ -116,7 +116,7 @@ export function migrateStalePersonalContentSync(): MigrationResult {
           const stats = lstatSync(entryPath);
           if (stats.isSymbolicLink()) {
             const linkTarget = readlinkSync(entryPath);
-            if (linkTarget.includes('.panopticon') || linkTarget.includes('panopticon-cli')) {
+            if (linkTarget.includes('.panopticon') || linkTarget.includes('overdeck')) {
               unlinkSync(entryPath);
               result.removedSymlinks.push(`${subdir}/${entry}`);
             } else {
@@ -871,7 +871,7 @@ function resolveSkillsRoot(startDir: string): string | null {
 
 /**
  * Mirror the top-level skills/ directory into .claude/skills/ when run inside a
- * panopticon-cli-style project that has a skills/ tree with SKILL.md files.
+ * overdeck-style project that has a skills/ tree with SKILL.md files.
  *
  * - Creates missing skill directories and recursively copies all their contents
  * - Updates out-of-date files when source content has changed

@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-20T22:21:27Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-699: Conversation view renders tool calls out of terminal order"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-20T22:21:27Z",
     "updated": "2026-04-20T22:21:27Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/699", "label": "PAN-699", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/699", "label": "PAN-699", "type": "issue" }
     ],
     "tags": ["dashboard", "conversation", "ordering", "bug"],
     "narratives": {

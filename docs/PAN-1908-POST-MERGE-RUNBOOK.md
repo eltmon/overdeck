@@ -15,7 +15,7 @@ For each issue below, close the GitHub issue with a comment referencing this PRD
 ### PAN-1436 — stale stopped-agent zombies pollute the dashboard list
 
 ```bash
-gh issue close 1436 --repo eltmon/panopticon-cli \
+gh issue close 1436 --repo eltmon/overdeck \
   --comment "Resolved by PAN-1908 (#<PR>). Dead agents are no longer enumerated from the directory; the SQLite agents table is now the authoritative runtime registry."
 pan admin db clear-review-status PAN-1436 || true
 pan admin db clear-merge-rows PAN-1436 || true
@@ -25,7 +25,7 @@ pan close PAN-1436 --force || true
 ### PAN-1689 — Paused/troubled card inflated by stale stopped sub-agent tombstones
 
 ```bash
-gh issue close 1689 --repo eltmon/panopticon-cli \
+gh issue close 1689 --repo eltmon/overdeck \
   --comment "Resolved by PAN-1908 (#<PR>). Stale stopped-agent tombstones are no longer enumerated from the filesystem; runtime status comes from the agents table."
 pan admin db clear-review-status PAN-1689 || true
 pan admin db clear-merge-rows PAN-1689 || true
@@ -35,7 +35,7 @@ pan close PAN-1689 --force || true
 ### PAN-832 — state.json staleness (lastActivity/costSoFar frozen; /api/agents drops phase/cost)
 
 ```bash
-gh issue close 832 --repo eltmon/panopticon-cli \
+gh issue close 832 --repo eltmon/overdeck \
   --comment "Resolved by PAN-1908 (#<PR>). Agent state is now written transactionally to the SQLite agents table per lifecycle event; state.json is kept only as a rollback/rebuild source."
 pan admin db clear-review-status PAN-832 || true
 pan admin db clear-merge-rows PAN-832 || true
@@ -45,7 +45,7 @@ pan close PAN-832 --force || true
 ### PAN-1846 — unbounded deacon.log growth from per-agent patrol skip lines
 
 ```bash
-gh issue close 1846 --repo eltmon/panopticon-cli \
+gh issue close 1846 --repo eltmon/overdeck \
   --comment "Resolved by PAN-1908 (#<PR>). The per-agent directory-scan patrol is removed; deacon recovery reacts to lifecycle events and thin SQLite safety nets instead of O(all-agents) scans."
 pan admin db clear-review-status PAN-1846 || true
 pan admin db clear-merge-rows PAN-1846 || true
@@ -55,7 +55,7 @@ pan close PAN-1846 --force || true
 ### PAN-1711 — dashboard event-loop stalls under load
 
 ```bash
-gh issue close 1711 --repo eltmon/panopticon-cli \
+gh issue close 1711 --repo eltmon/overdeck \
   --comment "Resolved by PAN-1908 (#<PR>). All O(all-agents) filesystem scans are removed from runtime status paths; the dashboard reads from the SQLite agents table and event-driven read model."
 pan admin db clear-review-status PAN-1711 || true
 pan admin db clear-merge-rows PAN-1711 || true
@@ -86,27 +86,27 @@ For each issue below, **do NOT close**. Instead, update the title or labels to d
 
 ```bash
 # Template command — substitute issue number and remaining-scope text
-gh issue edit <NUMBER> --repo eltmon/panopticon-cli \
+gh issue edit <NUMBER> --repo eltmon/overdeck \
   --title "<remaining scope>" \
   --add-label " narrowed-by-pan-1908"
-gh issue comment <NUMBER> --repo eltmon/panopticon-cli \
+gh issue comment <NUMBER> --repo eltmon/overdeck \
   --body "Partially addressed by PAN-1908 (#<PR>). The agent-state / per-issue record work in PAN-1908 covers: <what it delivered>. Remaining scope: <what is still open>."
 ```
 
 | Issue | Remaining scope after PAN-1908 |
 |-------|-------------------------------|
-| [PAN-541](https://github.com/eltmon/panopticon-cli/issues/541) | Specialist `.session` files and compact-offset migration to SQLite/db. |
-| [PAN-1888](https://github.com/eltmon/panopticon-cli/issues/1888) | Remove the legacy stop-hook `review-status.json` writer entirely. |
-| [PAN-1325](https://github.com/eltmon/panopticon-cli/issues/1325) | Canonical infra-repo setup for `docs/prds` and per-project configuration. |
-| [PAN-944](https://github.com/eltmon/panopticon-cli/issues/944) | Collapse beads and vBRIEF into a single durable per-issue record. |
-| [PAN-456](https://github.com/eltmon/panopticon-cli/issues/456) | Resume-on-restart logic using persisted harness session ids. |
-| [PAN-793](https://github.com/eltmon/panopticon-cli/issues/793) | Formal agent state-machine model and documentation. |
-| [PAN-1037](https://github.com/eltmon/panopticon-cli/issues/1037) | Retire the `planning-` prefix in remaining call sites. |
-| [PAN-111](https://github.com/eltmon/panopticon-cli/issues/111) | Planning-specific cross-machine sync UX. |
-| [PAN-1650](https://github.com/eltmon/panopticon-cli/issues/1650) | `readyForMerge` field rename and `gatesPassed` trigger. |
-| [PAN-1219](https://github.com/eltmon/panopticon-cli/issues/1219) | Review `cycle.json` findings model. |
-| [PAN-77](https://github.com/eltmon/panopticon-cli/issues/77) | Dashboard cost-breakdown modal UI. |
-| [PAN-1482](https://github.com/eltmon/panopticon-cli/issues/1482) | Report generator wiring and UI. |
+| [PAN-541](https://github.com/eltmon/overdeck/issues/541) | Specialist `.session` files and compact-offset migration to SQLite/db. |
+| [PAN-1888](https://github.com/eltmon/overdeck/issues/1888) | Remove the legacy stop-hook `review-status.json` writer entirely. |
+| [PAN-1325](https://github.com/eltmon/overdeck/issues/1325) | Canonical infra-repo setup for `docs/prds` and per-project configuration. |
+| [PAN-944](https://github.com/eltmon/overdeck/issues/944) | Collapse beads and vBRIEF into a single durable per-issue record. |
+| [PAN-456](https://github.com/eltmon/overdeck/issues/456) | Resume-on-restart logic using persisted harness session ids. |
+| [PAN-793](https://github.com/eltmon/overdeck/issues/793) | Formal agent state-machine model and documentation. |
+| [PAN-1037](https://github.com/eltmon/overdeck/issues/1037) | Retire the `planning-` prefix in remaining call sites. |
+| [PAN-111](https://github.com/eltmon/overdeck/issues/111) | Planning-specific cross-machine sync UX. |
+| [PAN-1650](https://github.com/eltmon/overdeck/issues/1650) | `readyForMerge` field rename and `gatesPassed` trigger. |
+| [PAN-1219](https://github.com/eltmon/overdeck/issues/1219) | Review `cycle.json` findings model. |
+| [PAN-77](https://github.com/eltmon/overdeck/issues/77) | Dashboard cost-breakdown modal UI. |
+| [PAN-1482](https://github.com/eltmon/overdeck/issues/1482) | Report generator wiring and UI. |
 
 ## 4. Verification
 

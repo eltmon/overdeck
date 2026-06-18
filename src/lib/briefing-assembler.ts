@@ -26,7 +26,7 @@ interface BriefingStatus {
   open?: string[];
 }
 
-const DEFAULT_PROJECT_ID = 'panopticon-cli';
+const DEFAULT_PROJECT_ID = 'overdeck';
 
 export async function assembleLiveBriefingMarkdown(input: AssembleLiveBriefingInput = {}): Promise<string> {
   const projectId = input.projectId ?? DEFAULT_PROJECT_ID;

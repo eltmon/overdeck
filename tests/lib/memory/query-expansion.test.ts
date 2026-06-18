@@ -23,7 +23,7 @@ let tempDir: string | null = null;
 let originalHome: string | undefined;
 
 const identity = {
-  projectId: 'panopticon-cli',
+  projectId: 'overdeck',
   workspaceId: 'feature-pan-1052',
   issueId: 'PAN-1052',
   runId: 'run-1',
@@ -133,7 +133,7 @@ describe('memory query expansion', () => {
       previousObservations: [previousObservation],
     }));
 
-    const ragRuns = await readFile(join(tempDir!, 'memory/panopticon-cli/PAN-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
+    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
     const entries = ragRuns.trim().split('\n').map((line) => JSON.parse(line));
     expect(entries).toMatchObject([
       { id: 'run-1', type: 'query-expansion', outcome: 'expanded', query: first.query, expandedTerms: first.expandedTerms, reason: null },
@@ -190,7 +190,7 @@ describe('memory query expansion', () => {
       reason: 'extraction-failed',
     });
 
-    const ragRuns = await readFile(join(tempDir!, 'memory/panopticon-cli/PAN-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
+    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
     expect(JSON.parse(ragRuns.trim())).toMatchObject({
       id: 'failed-run',
       outcome: 'expansion-failed',

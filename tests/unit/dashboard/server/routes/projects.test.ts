@@ -6,8 +6,8 @@ import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
   listProjectsSync: vi.fn(),
-  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
-  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
+  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck' })),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
@@ -28,7 +28,7 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
       return {
         id: 'agent-pan-539',
         issueId: 'PAN-539',
-        workspace: '/tmp/panopticon-cli/workspaces/feature-pan-539',
+        workspace: '/tmp/overdeck/workspaces/feature-pan-539',
         role: 'work',
         model: 'gpt-4',
         status: 'running',
@@ -40,7 +40,7 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
-  getTmuxSessionName: vi.fn(() => 'review-agent-panopticon-cli'),
+  getTmuxSessionName: vi.fn(() => 'review-agent-overdeck'),
 }));
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
@@ -107,7 +107,7 @@ describe('fetchProjectSessionTree', () => {
 
   it('returns null for unknown project key', async () => {
     (listProjectsSync as any).mockReturnValue([
-      { key: 'panopticon-cli', config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli' } },
+      { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck' } },
     ]);
 
     const result = await fetchProjectSessionTree('unknown-project');
@@ -116,29 +116,29 @@ describe('fetchProjectSessionTree', () => {
 
   it('returns empty features array when workspaces directory does not exist', async () => {
     (listProjectsSync as any).mockReturnValue([
-      { key: 'panopticon-cli', config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli' } },
+      { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck' } },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set());
     (readdir as any).mockResolvedValue([]);
 
-    const result = await fetchProjectSessionTree('panopticon-cli');
-    expect(result).toEqual({ projectKey: 'panopticon-cli', features: [] });
+    const result = await fetchProjectSessionTree('overdeck');
+    expect(result).toEqual({ projectKey: 'overdeck', features: [] });
   });
 
   it('aggregates sessions for active feature workspaces', async () => {
     (listProjectsSync as any).mockReturnValue([
       {
-        key: 'panopticon-cli',
-        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
     (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
     mockAccess(new Set([
-      '/tmp/panopticon-cli/workspaces',
-      '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
-      '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/continue.json',
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-821/.pan',
+      '/tmp/overdeck/workspaces/feature-pan-821/.pan/continue.json',
       join(getOverdeckHome(), 'agents', 'agent-pan-539'),
       join(getOverdeckHome(), 'agents', 'agent-pan-539', 'state.json'),
     ]));
@@ -159,10 +159,10 @@ describe('fetchProjectSessionTree', () => {
       return Promise.reject(err);
     });
 
-    const result = await fetchProjectSessionTree('panopticon-cli');
+    const result = await fetchProjectSessionTree('overdeck');
     expect(result).not.toBeNull();
     const tree = result as { projectKey: string; features: Array<{ issueId: string; sessions: unknown[] }> };
-    expect(tree.projectKey).toBe('panopticon-cli');
+    expect(tree.projectKey).toBe('overdeck');
     expect(tree.features).toHaveLength(2);
     expect(tree.features[0]?.issueId).toBe('PAN-539');
     expect(tree.features[1]?.issueId).toBe('PAN-821');
@@ -175,17 +175,17 @@ describe('fetchProjectSessionTree', () => {
   it('skips features with no agent dir and no planning dir', async () => {
     (listProjectsSync as any).mockReturnValue([
       {
-        key: 'panopticon-cli',
-        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    mockAccess(new Set(['/tmp/panopticon-cli/workspaces']));
+    mockAccess(new Set(['/tmp/overdeck/workspaces']));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-999', isDirectory: () => true },
     ]);
 
-    const result = await fetchProjectSessionTree('panopticon-cli');
+    const result = await fetchProjectSessionTree('overdeck');
     const tree = result as { projectKey: string; features: Array<{ issueId: string }> };
     expect(tree.features).toHaveLength(0);
   });
@@ -193,8 +193,8 @@ describe('fetchProjectSessionTree', () => {
   it('matches project by config name when key differs from name', async () => {
     (listProjectsSync as any).mockReturnValue([
       {
-        key: 'panopticon-cli',
-        config: { name: 'Overdeck CLI', path: '/tmp/panopticon-cli' },
+        key: 'overdeck',
+        config: { name: 'Overdeck CLI', path: '/tmp/overdeck' },
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
@@ -208,22 +208,22 @@ describe('fetchProjectSessionTree', () => {
   it('resolves feature title from main-side .pan/specs/ via findSpecByIssue', async () => {
     (listProjectsSync as any).mockReturnValue([
       {
-        key: 'panopticon-cli',
-        config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set([
-      '/tmp/panopticon-cli/workspaces',
-      '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan',
-      '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan/continue.json',
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-123/.pan',
+      '/tmp/overdeck/workspaces/feature-pan-123/.pan/continue.json',
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-123', isDirectory: () => true },
     ]);
 
     // Mock findSpecByIssue to return a spec entry — Effect-returning post-PAN-1249.
-    const specPath = '/tmp/panopticon-cli/.pan/specs/2026-01-01-PAN-123-implement-command-deck.vbrief.json';
+    const specPath = '/tmp/overdeck/.pan/specs/2026-01-01-PAN-123-implement-command-deck.vbrief.json';
     mockFindSpecByIssue.mockReturnValue(Effect.succeed({ path: specPath }));
 
     // Mock readFile to return spec content when the spec path is read (by readOptional)
@@ -238,7 +238,7 @@ describe('fetchProjectSessionTree', () => {
       return Promise.reject(err);
     });
 
-    const result = await fetchProjectSessionTree('panopticon-cli');
+    const result = await fetchProjectSessionTree('overdeck');
     const tree = result as { features: Array<{ issueId: string; title: string }> };
     expect(tree.features).toHaveLength(1);
     expect(tree.features[0]?.issueId).toBe('PAN-123');

@@ -119,7 +119,7 @@ describe('orphan proposed spec reconciler', () => {
     ['mergeStatus beyond pending', { reviewStatus: 'pending', testStatus: 'pending', mergeStatus: 'queued', readyForMerge: false }],
     ['readyForMerge true', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: true }],
     ['prNumber set', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, prNumber: 1707 }],
-    ['prUrl set', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1707' }],
+    ['prUrl set', { reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, prUrl: 'https://github.com/eltmon/overdeck/pull/1707' }],
   ] as const)('returns true for %s', (_label, status) => {
     expect(hasReviewPipelinePresence(status)).toBe(true);
   });

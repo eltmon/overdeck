@@ -10,7 +10,7 @@ import { PanRpcError } from '@overdeck/contracts';
 const projectPath = vi.hoisted(() => ({ value: '' }));
 
 vi.mock('../../../../lib/projects.js', () => ({
-  resolveProjectFromIssue: () => Effect.succeed({ projectPath: projectPath.value, projectKey: 'panopticon-cli' }),
+  resolveProjectFromIssue: () => Effect.succeed({ projectPath: projectPath.value, projectKey: 'overdeck' }),
 }));
 
 async function expectPanRpcError(promise: Promise<unknown>, code: string) {

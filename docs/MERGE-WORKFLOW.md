@@ -158,13 +158,13 @@ contributor can read in one diagram.
 
 ## References
 
-- [PAN-1531](https://github.com/eltmon/panopticon-cli/issues/1531) — this
+- [PAN-1531](https://github.com/eltmon/overdeck/issues/1531) — this
   workflow simplification
-- [PAN-632](https://github.com/eltmon/panopticon-cli/issues/632) — in-process
+- [PAN-632](https://github.com/eltmon/overdeck/issues/632) — in-process
   rebase that replaced the ship-role git operations
-- [PAN-1024](https://github.com/eltmon/panopticon-cli/issues/1024) — the
+- [PAN-1024](https://github.com/eltmon/overdeck/issues/1024) — the
   three-oracle disagreement bug that motivated single-oracle verification
-- [PAN-879](https://github.com/eltmon/panopticon-cli/issues/879) — the
+- [PAN-879](https://github.com/eltmon/overdeck/issues/879) — the
   original stash taxonomy this workflow shrinks
 - [`src/lib/cloister/merge-rebase.ts`](../src/lib/cloister/merge-rebase.ts)
   — server-side rebase implementation

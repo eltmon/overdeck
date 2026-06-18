@@ -1,7 +1,7 @@
 # PAN-1203 — Overdeck-docs RAG
 
-**Issue:** [PAN-1203](https://github.com/eltmon/panopticon-cli/issues/1203)
-**Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
+**Issue:** [PAN-1203](https://github.com/eltmon/overdeck/issues/1203)
+**Parent epic:** [PAN-1200](https://github.com/eltmon/overdeck/issues/1200)
 **Status:** Planned
 **Date:** 2026-05-18
 
@@ -35,11 +35,11 @@ Make every harness able to surface Overdeck's own documentation just-in-time, vi
 
 | Source | Path | Notes |
 |---|---|---|
-| Project docs | `panopticon-cli/docs/**/*.md` | All markdown docs |
-| Skills | `panopticon-cli/skills/*/SKILL.md` | All ~60 skills |
-| PRDs (active + planned) | `panopticon-cli/docs/prds/{active,planned}/*.md` | Optional; toggleable in build |
-| CLAUDE.md | `panopticon-cli/CLAUDE.md` | Project-level rules |
-| Rules | `panopticon-cli/.claude/rules/*.md` | Project-level rule files |
+| Project docs | `overdeck/docs/**/*.md` | All markdown docs |
+| Skills | `overdeck/skills/*/SKILL.md` | All ~60 skills |
+| PRDs (active + planned) | `overdeck/docs/prds/{active,planned}/*.md` | Optional; toggleable in build |
+| CLAUDE.md | `overdeck/CLAUDE.md` | Project-level rules |
+| Rules | `overdeck/.claude/rules/*.md` | Project-level rule files |
 
 Each source file is chunked by markdown heading into sections of ≤ 500 tokens.
 
@@ -144,7 +144,7 @@ Registered once during `pan install` for each detected harness:
 ```json
 {
   "hooks": {
-    "UserPromptSubmit": "panopticon-cli/dist/hooks/docs-rag.sh"
+    "UserPromptSubmit": "overdeck/dist/hooks/docs-rag.sh"
   }
 }
 ```
@@ -155,7 +155,7 @@ The hook script:
 
 ```bash
 #!/usr/bin/env bash
-# panopticon-cli/dist/hooks/docs-rag.sh
+# overdeck/dist/hooks/docs-rag.sh
 # Receives prompt via stdin; outputs augmented prompt or original.
 
 prompt=$(cat)

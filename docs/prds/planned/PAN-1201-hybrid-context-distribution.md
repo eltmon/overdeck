@@ -1,7 +1,7 @@
 # PAN-1201 — Hybrid Context Distribution
 
-**Issue:** [PAN-1201](https://github.com/eltmon/panopticon-cli/issues/1201)
-**Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
+**Issue:** [PAN-1201](https://github.com/eltmon/overdeck/issues/1201)
+**Parent epic:** [PAN-1200](https://github.com/eltmon/overdeck/issues/1200)
 **Status:** Planned
 **Date:** 2026-05-18
 
@@ -323,7 +323,7 @@ The reorg must **lose zero content**:
 ### Decide during planning
 
 `.claude/rules/` mixes universally-distributable rules (`work-agents-via-pan`,
-`no-destructive-requests`) with panopticon-cli-development-only ones
+`no-destructive-requests`) with overdeck-development-only ones
 (`fake-timers-for-retry-tests` is a test-writing rule; `dashboard-node22-only` /
 `single-deacon-invariant` concern developing Overdeck itself). Planning must decide
 whether `pan sync` distributes dev-only rules everywhere, or whether the two sets need

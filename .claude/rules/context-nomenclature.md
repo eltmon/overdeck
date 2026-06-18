@@ -5,13 +5,13 @@ scope: universal
 
 Overdeck distributes context through the **context layers** system
 (`docs/CONTEXT-LAYERS.md`; user docs:
-https://panopticon-cli.com/configuration/context-layers). All placement
+https://overdeck.ai/configuration/context-layers). All placement
 requests use one shorthand — **"add a `<scope>` rule: `<content>`"** — where the
 scope word alone determines the destination:
 
 | You say | Applies to | Where it goes |
 | --- | --- | --- |
-| **universal rule** | every machine, every project | bundled rule: `sync-sources/rules/<name>.md` in panopticon-cli, `scope: universal` |
+| **universal rule** | every machine, every project | bundled rule: `sync-sources/rules/<name>.md` in overdeck, `scope: universal` |
 | **dev rule** | Overdeck development only | bundled rule: `sync-sources/rules/<name>.md`, `scope: dev` |
 | **project rule** | one project | `<projectRoot>/.pan/context/project.md` (project layer) |
 | **machine rule** | this machine only | `~/.panopticon/context/global.md` (global layer) |

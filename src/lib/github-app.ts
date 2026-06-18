@@ -155,7 +155,7 @@ function generateJWT(appId: string, privateKey: string): string {
       headers: {
         'Authorization': `Bearer ${jwt}`,
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'panopticon-cli',
+        'User-Agent': 'overdeck',
       },
     }
   );
@@ -192,7 +192,7 @@ async function githubApiWithToken<T>(
     headers: {
       'Authorization': `token ${token}`,
       'Accept': 'application/vnd.github+json',
-      'User-Agent': 'panopticon-cli',
+      'User-Agent': 'overdeck',
       ...extraHeaders,
       ...(init.headers || {}),
     },
@@ -422,7 +422,7 @@ async function getPullRequestHeadStatePromise(
       headers: {
         'Authorization': `token ${token}`,
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'panopticon-cli',
+        'User-Agent': 'overdeck',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -523,7 +523,7 @@ export async function reportCommitStatus(
       headers: {
         'Authorization': `token ${token}`,
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'panopticon-cli',
+        'User-Agent': 'overdeck',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ state: status, context, description }),

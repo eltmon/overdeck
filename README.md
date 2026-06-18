@@ -7,7 +7,7 @@
 [![npm version](https://img.shields.io/npm/v/%40panctl%2Fcli.svg)](https://www.npmjs.com/package/@overdeck/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/panopticon-cli/pulls)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/overdeck/pulls)
 
 > *"The Overdeck had six sides, one for each of the Founders of Gallifrey..."*
 >
@@ -33,7 +33,7 @@ No install step required. `npx @overdeck/cli` starts Command Deck and opens the 
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 
-See the [full documentation](https://panopticon-cli.com) for detailed setup, configuration, and usage guides.
+See the [full documentation](https://overdeck.ai) for detailed setup, configuration, and usage guides.
 
 ---
 
@@ -197,15 +197,15 @@ Overdeck is actively used in production to develop itself and multiple other pro
 
 ## Documentation
 
-Full documentation at **[panopticon-cli.com](https://panopticon-cli.com)**
+Full documentation at **[overdeck.ai](https://overdeck.ai)**
 
 | Document | Description |
 |----------|-------------|
-| [Quick Start](https://panopticon-cli.com/quickstart) | Installation and setup |
-| [Core Concepts](https://panopticon-cli.com/concepts) | Architecture and key concepts |
-| [CLI Reference](https://panopticon-cli.com/cli/overview) | All available commands |
-| [Features](https://panopticon-cli.com/features/mission-control) | Deep dive into key features |
-| [Guides](https://panopticon-cli.com/guides/legacy-codebases) | Step-by-step guides |
+| [Quick Start](https://overdeck.ai/quickstart) | Installation and setup |
+| [Core Concepts](https://overdeck.ai/concepts) | Architecture and key concepts |
+| [CLI Reference](https://overdeck.ai/cli/overview) | All available commands |
+| [Features](https://overdeck.ai/features/mission-control) | Deep dive into key features |
+| [Guides](https://overdeck.ai/guides/legacy-codebases) | Step-by-step guides |
 
 ---
 
@@ -222,5 +222,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-<p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="https://panopticon-cli.com">Documentation</a></p>
+<p><a href="https://github.com/eltmon/overdeck">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="https://overdeck.ai">Documentation</a></p>
 </div>

@@ -134,7 +134,7 @@ DeepEval was rejected for the same Python-toolchain reason. Braintrust / Langfus
 ### 3.2 Repo layout
 
 ```
-panopticon-cli/
+overdeck/
   evals/
     datasets/
       compaction/

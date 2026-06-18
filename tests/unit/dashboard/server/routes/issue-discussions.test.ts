@@ -131,7 +131,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
 
@@ -186,7 +186,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
 
@@ -207,7 +207,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
-      repo: 'panopticon-cli',
+      repo: 'overdeck',
       number: 830,
     });
 
@@ -232,7 +232,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     mockResolveTrackerType.mockReturnValue('linear');
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: false });
     mockGetGitHubConfig.mockReturnValue({
-      repos: [{ owner: 'eltmon', repo: 'panopticon-cli', prefix: 'PAN' }],
+      repos: [{ owner: 'eltmon', repo: 'overdeck', prefix: 'PAN' }],
     });
 
     const linearGetIssueId = vi.fn().mockResolvedValue('uuid-1');
@@ -257,7 +257,7 @@ describe('fetchIssueDiscussions — GET /api/issues/:id/discussions', () => {
     expect(mockExec).toHaveBeenCalledTimes(4);
     const [listCmd] = mockExec.mock.calls[0]!;
     expect(listCmd).toContain('gh pr list');
-    expect(listCmd).toContain('eltmon/panopticon-cli');
+    expect(listCmd).toContain('eltmon/overdeck');
   });
 
   it('skips Linear fetch when deps are not provided (no Linear client wired)', async () => {

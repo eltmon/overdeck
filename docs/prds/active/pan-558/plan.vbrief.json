@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-08T07:05:00.000Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-558: Auto-update mechanism for Electron app"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-08T07:05:00.000Z",
     "updated": "2026-04-08T07:05:00.000Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/558", "label": "PAN-558", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/558", "label": "PAN-558", "type": "issue" }
     ],
     "tags": ["electron", "auto-update", "desktop", "electron-updater"],
     "narratives": {
@@ -64,7 +64,7 @@
           "issueLabel": "pan-558"
         },
         "narrative": {
-          "Action": "Create `apps/desktop/src/updater.ts` module. Initialize auto-updater with `setFeedURL({ provider: 'github', owner: 'eltmon', repo: 'panopticon-cli' })`. Call `checkForUpdates()` on app startup and every 4 hours via `setInterval`. Handle `update-available`, `download-progress`, `update-downloaded`, and error events. Export functions for manual check and quit-and-install."
+          "Action": "Create `apps/desktop/src/updater.ts` module. Initialize auto-updater with `setFeedURL({ provider: 'github', owner: 'eltmon', repo: 'overdeck' })`. Call `checkForUpdates()` on app startup and every 4 hours via `setInterval`. Handle `update-available`, `download-progress`, `update-downloaded`, and error events. Export functions for manual check and quit-and-install."
         },
         "subItems": [
           {

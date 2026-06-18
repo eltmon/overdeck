@@ -17,11 +17,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eltmon/panopticon-cli.git"
+    "url": "https://github.com/eltmon/overdeck.git"
   },
-  "homepage": "https://github.com/eltmon/panopticon-cli#readme",
+  "homepage": "https://github.com/eltmon/overdeck#readme",
   "bugs": {
-    "url": "https://github.com/eltmon/panopticon-cli/issues"
+    "url": "https://github.com/eltmon/overdeck/issues"
   },
   "type": "module",
   "workspaces": {

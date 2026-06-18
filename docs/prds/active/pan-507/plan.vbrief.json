@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-04-06T18:00:00Z",
-    "author": "panopticon-cli/0.0.0",
+    "author": "overdeck/0.0.0",
     "description": "Plan for PAN-507: beads db not initialized on fresh install — bd init must be run once per project"
   },
   "plan": {
@@ -15,7 +15,7 @@
     "created": "2026-04-06T18:00:00Z",
     "updated": "2026-04-06T18:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/507", "label": "PAN-507", "type": "issue" }
+      { "uri": "https://github.com/eltmon/overdeck/issues/507", "label": "PAN-507", "type": "issue" }
     ],
     "tags": ["testing", "beads", "auto-init"],
     "narratives": {

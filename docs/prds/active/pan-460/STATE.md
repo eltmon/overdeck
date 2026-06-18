@@ -1,6 +1,6 @@
 # PAN-460: Dashboard Rebrand — Planning State
 
-**Issue:** https://github.com/eltmon/panopticon-cli/issues/460
+**Issue:** https://github.com/eltmon/overdeck/issues/460
 **Status:** Planning complete
 **Date:** 2026-04-06
 

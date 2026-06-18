@@ -51,12 +51,12 @@ describe('conversation JSONL chunker', () => {
     const second = line(message('assistant', 'assistant reply', '2026-06-02T01:00:01.000Z'));
     writeFileSync(filePath, first + second);
 
-    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-1', projectId: 'panopticon-cli' });
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-1', projectId: 'overdeck' });
 
     expect(chunks).toEqual([
       expect.objectContaining({
         sessionId: 'sess-1',
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         role: 'user',
         ts: '2026-06-02T01:00:00.000Z',
         charLength: Buffer.byteLength('hello from user', 'utf8'),
@@ -64,7 +64,7 @@ describe('conversation JSONL chunker', () => {
       }),
       expect.objectContaining({
         sessionId: 'sess-1',
-        projectId: 'panopticon-cli',
+        projectId: 'overdeck',
         role: 'assistant',
         ts: '2026-06-02T01:00:01.000Z',
         charLength: Buffer.byteLength('assistant reply', 'utf8'),
@@ -82,7 +82,7 @@ describe('conversation JSONL chunker', () => {
     const text = 'line one\nquoted "value" and backslash \\ done';
     writeFileSync(filePath, line(message('assistant', text, '2026-06-02T01:00:00.000Z')));
 
-    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-escaped', projectId: 'panopticon-cli' });
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-escaped', projectId: 'overdeck' });
 
     expect(chunks).toHaveLength(1);
     expect(chunks[0]?.text).toBe(text);
@@ -103,7 +103,7 @@ describe('conversation JSONL chunker', () => {
     };
     writeFileSync(filePath, line(entry));
 
-    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-collision', projectId: 'panopticon-cli' });
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-collision', projectId: 'overdeck' });
 
     expect(chunks).toHaveLength(1);
     expect(sourceSlice(filePath, chunks[0]!.byteOffset, chunks[0]!.charLength)).toBe(jsonStringPayload('text'));
@@ -131,7 +131,7 @@ describe('conversation JSONL chunker', () => {
     };
     writeFileSync(filePath, line(entry) + line(topLevelToolResult));
 
-    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-tool-result', projectId: 'panopticon-cli' });
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-tool-result', projectId: 'overdeck' });
 
     expect(chunks.map((chunk) => chunk.text)).toEqual(['assistant text']);
   });
@@ -153,7 +153,7 @@ describe('conversation JSONL chunker', () => {
     };
     writeFileSync(filePath, line(entry));
 
-    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-multipart', projectId: 'panopticon-cli' });
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-multipart', projectId: 'overdeck' });
 
     expect(chunks.map((chunk) => chunk.text)).toEqual(['first part', 'second part']);
     for (const chunk of chunks) {
@@ -183,13 +183,13 @@ describe('conversation JSONL chunker', () => {
     writeFileSync(filePath, first + second);
     const cursor = Buffer.byteLength(first + second, 'utf8');
 
-    const beforeAppend = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-append', projectId: 'panopticon-cli' });
+    const beforeAppend = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-append', projectId: 'overdeck' });
 
     const third = line(message('user', 'third message', '2026-06-02T02:00:02.000Z'));
     appendFileSync(filePath, third);
 
-    const afterAppend = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-append', projectId: 'panopticon-cli' });
-    const appendedOnly = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-append', projectId: 'panopticon-cli', fromOffset: cursor });
+    const afterAppend = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-append', projectId: 'overdeck' });
+    const appendedOnly = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-append', projectId: 'overdeck', fromOffset: cursor });
 
     expect(afterAppend.slice(0, 2).map((chunk) => chunk.byteOffset)).toEqual(beforeAppend.map((chunk) => chunk.byteOffset));
     expect(appendedOnly).toEqual([
@@ -207,7 +207,7 @@ describe('conversation JSONL chunker', () => {
     const complete = line(message('user', 'complete message', '2026-06-02T03:00:00.000Z'));
     writeFileSync(filePath, `${complete}{"type":"assistant"`);
 
-    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-partial', projectId: 'panopticon-cli' });
+    const chunks = await chunkConversationJsonlFile({ filePath, sessionId: 'sess-partial', projectId: 'overdeck' });
 
     expect(chunks).toHaveLength(1);
     expect(chunks[0]?.text).toBe('complete message');

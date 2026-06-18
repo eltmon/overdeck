@@ -81,7 +81,7 @@ Workflow / reference / topical skills are not subject to the strict invocation-p
 
 ## How skills are distributed
 
-Source of truth lives in `skills/` in the panopticon-cli repo. The flow:
+Source of truth lives in `skills/` in the overdeck repo. The flow:
 
 ```
 skills/pan-<verb>/SKILL.md            (canonical, committed)

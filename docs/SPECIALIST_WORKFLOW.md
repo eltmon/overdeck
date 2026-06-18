@@ -197,7 +197,7 @@ All agents spawned by Overdeck receive these environment variables via tmux `-e`
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
-| `OVERDECK_AGENT_ID` | `specialist-panopticon-cli-review-agent` | Specialist tmux session name |
+| `OVERDECK_AGENT_ID` | `specialist-overdeck-review-agent` | Specialist tmux session name |
 | `OVERDECK_ISSUE_ID` | `PAN-379` | Issue being reviewed/tested/merged |
 | `OVERDECK_SESSION_TYPE` | `review` / `test` / `merge` | Specialist type — used for cost attribution by stage |
 

@@ -12,7 +12,7 @@ import {
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 
 const AGENT_ID = 'agent-pan-830';
-const WORKSPACE_PATH = '/home/testuser/Projects/panopticon-cli/workspaces/feature-pan-830';
+const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
 const CLAUDE_SESSION_ID = '9d08794c-3973-4f83-92cf-234ae618258a';
 
 let testDir: string;
@@ -187,7 +187,7 @@ describe('resolveJsonlPath (PAN-830)', () => {
   it('uses the encoded workspace path under claudeProjects root', async () => {
     const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
     expect(encoded).toBe(
-      '-home-testuser-Projects-panopticon-cli-workspaces-feature-pan-830',
+      '-home-testuser-Projects-overdeck-workspaces-feature-pan-830',
     );
     const projectDir = join(claudeProjectsDir, encoded);
     await mkdir(projectDir, { recursive: true });

@@ -22,12 +22,12 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/eltmon/panopticon-cli"
+      "url": "https://github.com/eltmon/overdeck"
     }
   ],
   "topbarCtaButton": {
     "name": "Install",
-    "url": "https://www.npmjs.com/package/panopticon-cli"
+    "url": "https://www.npmjs.com/package/overdeck"
   },
   "navigation": {
     "tabs": [
@@ -142,7 +142,7 @@
     "og:type": "website"
   },
   "footerSocials": {
-    "github": "https://github.com/eltmon/panopticon-cli"
+    "github": "https://github.com/eltmon/overdeck"
   },
   "feedback": {
     "thumbsRating": true,

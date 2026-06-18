@@ -30,7 +30,7 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
     vBRIEFInfo: {
       version: '0.5',
       created: '2026-01-01T00:00:00Z',
-      author: 'panopticon-cli/0.6.0',
+      author: 'overdeck/0.6.0',
       description: 'Plan for PAN-453: Full vBRIEF v0.5 Spec Support',
     },
     plan: {
@@ -43,7 +43,7 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
       updated: '2026-01-01T00:00:00Z',
       author: 'agent:claude-opus-4-6',
       references: [
-        { uri: 'https://github.com/eltmon/panopticon-cli/issues/453', label: 'PAN-453', type: 'issue' },
+        { uri: 'https://github.com/eltmon/overdeck/issues/453', label: 'PAN-453', type: 'issue' },
         { uri: 'docs/prds/active/PAN-453-plan.md', label: 'Plan', type: 'prd' },
       ],
       items: [
@@ -114,7 +114,7 @@ describe('vBRIEFInfo v0.5 fields', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
     const result = readPlanSync(planPath);
-    expect(result.vBRIEFInfo.author).toBe('panopticon-cli/0.6.0');
+    expect(result.vBRIEFInfo.author).toBe('overdeck/0.6.0');
   });
 
   it('readPlan preserves vBRIEFInfo.description', () => {
@@ -155,7 +155,7 @@ describe('VBriefPlan v0.5 fields', () => {
     const result = readPlanSync(planPath);
     expect(result.plan.references).toHaveLength(2);
     expect(result.plan.references![0]).toEqual({
-      uri: 'https://github.com/eltmon/panopticon-cli/issues/453',
+      uri: 'https://github.com/eltmon/overdeck/issues/453',
       label: 'PAN-453',
       type: 'issue',
     });
