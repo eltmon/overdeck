@@ -1,4 +1,4 @@
-# PRD: Panopticon Dashboard Rebrand
+# PRD: Overdeck Dashboard Rebrand
 
 **Issue:** PAN-460
 **Author:** Ed Becker
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Full visual rebrand of the Panopticon dashboard: rename "Mission Control" to "Command Deck", unify the design system around a T3Code-inspired aesthetic, fix the completely broken light/dark mode, replace the overcrowded horizontal nav with a grouped sidebar, update typography, and establish an official style guide for all current and future UI work.
+Full visual rebrand of the Overdeck dashboard: rename "Mission Control" to "Command Deck", unify the design system around a T3Code-inspired aesthetic, fix the completely broken light/dark mode, replace the overcrowded horizontal nav with a grouped sidebar, update typography, and establish an official style guide for all current and future UI work.
 
 ## Motivation
 
@@ -54,7 +54,7 @@ T3Code (`/home/eltmon/Projects/t3code`) is our primary design reference. Its des
 - All references in docs, server routes, API endpoints
 
 **Why "Command Deck":**
-- Fits the surveillance/oversight metaphor of "Panopticon"
+- Fits the surveillance/oversight metaphor of "Overdeck"
 - Not used by any competing AI orchestration tool
 - Short, punchy, immediately understood
 - Works as noun ("the Command Deck") and destination ("go to Command Deck")
@@ -72,7 +72,7 @@ T3Code (`/home/eltmon/Projects/t3code`) is our primary design reference. Its des
 **New:** Collapsible left sidebar with grouped sections.
 
 ```
-[Eye icon] Panopticon           [<< collapse]
+[Eye icon] Overdeck           [<< collapse]
 
 OPERATIONS
   Command Deck     (Compass)
@@ -163,7 +163,7 @@ SYSTEM
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-700);
 
-  /* Panopticon-specific signal colors */
+  /* Overdeck-specific signal colors */
   --signal-review: var(--color-purple-500);
   --signal-review-foreground: var(--color-purple-700);
   --signal-cost: var(--color-cyan-500);
@@ -271,7 +271,7 @@ These rules are absolute. There are no exceptions outside God View.
 
 2. **SF Mono is ONLY for code and technical identifiers.** Code blocks, terminal output, command snippets, session IDs, run IDs, file paths, env vars, hashes, model IDs, branch names, tool names, vBRIEF IDs.
 
-3. **Space Grotesk (`font-display`) is ONLY for the sidebar "Panopticon" wordmark.** No other non–God-View surface uses `font-display`. Page titles, section headings, nav labels, stat values, card titles — all DM Sans.
+3. **Space Grotesk (`font-display`) is ONLY for the sidebar "Overdeck" wordmark.** No other non–God-View surface uses `font-display`. Page titles, section headings, nav labels, stat values, card titles — all DM Sans.
 
 4. **God View uses its own scoped typography system.** God View (`src/dashboard/frontend/src/components/GodView/*`) is the only deliberate exception to Rules 1–3.
 
@@ -409,10 +409,10 @@ Adopt T3Code's radius scale based on a 10px base:
 
 ### Stitch (Google AI Design Tool)
 
-**Stitch project:** `projects/4014658539033902919` ("Panopticon Dashboard Rebrand")
+**Stitch project:** `projects/4014658539033902919` ("Overdeck Dashboard Rebrand")
 **Design systems created:**
 - "Obsidian & Signal" (`assets/14564320821242961935`) — original proposal
-- "Panopticon — T3Code-Inspired" (`assets/1053371932029435838`) — refined version
+- "Overdeck — T3Code-Inspired" (`assets/1053371932029435838`) — refined version
 
 **Screens generated (all in `design/stitch-exports/`):**
 - `board-view-dark.png/.html` — Original dark board
@@ -529,4 +529,4 @@ The dashboard is an internal tool with one user. There are no third-party consum
 
 ## Style Guide
 
-The official Panopticon style guide lives at `design/style-guide/STYLE-GUIDE.md` and is the canonical reference for all UI decisions. Every new feature and every existing component must conform to it after this rebrand.
+The official Overdeck style guide lives at `design/style-guide/STYLE-GUIDE.md` and is the canonical reference for all UI decisions. Every new feature and every existing component must conform to it after this rebrand.

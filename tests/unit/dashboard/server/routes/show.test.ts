@@ -18,7 +18,7 @@ import {
   getShadowState,
   createShadowState,
 } from '../../../../../src/lib/shadow-state.js';
-import { getPanopticonHome } from '../../../../../src/lib/paths.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 
 // ─── Health mocks (getRuntimeForAgent + getAgentHealth from cloister) ─────────
 
@@ -37,7 +37,7 @@ vi.mock('../../../../../src/lib/cloister/health.js', () => ({
 
 // ─── Test-file isolation ──────────────────────────────────────────────────────
 
-const SHADOW_STATE_DIR = join(getPanopticonHome(), 'shadow-state');
+const SHADOW_STATE_DIR = join(getOverdeckHome(), 'shadow-state');
 const TEST_PREFIX = 'TEST-ROUTE-SHOW';
 
 function cleanupShadowTestFiles() {

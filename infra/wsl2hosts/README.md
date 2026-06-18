@@ -4,7 +4,7 @@ Automatically syncs local development domains from WSL to Windows hosts file.
 
 ## How It Works
 
-1. Panopticon writes workspace DNS entries to `~/.wsl2hosts` in WSL when creating workspaces
+1. Overdeck writes workspace DNS entries to `~/.wsl2hosts` in WSL when creating workspaces
 2. A Windows scheduled task reads this file every 5 minutes
 3. Entries are added to `C:\Windows\System32\drivers\etc\hosts` with the current WSL IP
 4. Your browser can now access `https://feature-pan-123.pan.localhost`
@@ -37,14 +37,14 @@ Copy-Item "\\wsl$\Ubuntu-20.04\home\eltmon\projects\panopticon\infra\wsl2hosts\s
 # Create scheduled task (run as admin)
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$env:USERPROFILE\.panopticon\sync-wsl2hosts.ps1`""
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
-Register-ScheduledTask -TaskName "PanopticonWsl2HostsSync" -Trigger $trigger -Action $action -RunLevel Highest
+Register-ScheduledTask -TaskName "OverdeckWsl2HostsSync" -Trigger $trigger -Action $action -RunLevel Highest
 ```
 
 ## Usage
 
 ### Adding DNS Entries
 
-Panopticon automatically manages `~/.wsl2hosts` when you:
+Overdeck automatically manages `~/.wsl2hosts` when you:
 
 - Create a workspace: `pan workspace create PAN-123`
 - Destroy a workspace: `pan workspace destroy PAN-123`
@@ -58,7 +58,7 @@ echo "myapp.localhost" >> ~/.wsl2hosts
 ### Triggering Sync Manually
 
 ```powershell
-Start-ScheduledTask -TaskName "PanopticonWsl2HostsSync"
+Start-ScheduledTask -TaskName "OverdeckWsl2HostsSync"
 ```
 
 Or run the script directly:
@@ -71,7 +71,7 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.panopticon\sync-wsl2
 
 ```powershell
 # View task status
-Get-ScheduledTask -TaskName "PanopticonWsl2HostsSync" | Get-ScheduledTaskInfo
+Get-ScheduledTask -TaskName "OverdeckWsl2HostsSync" | Get-ScheduledTaskInfo
 
 # View synced entries
 Get-Content C:\Windows\System32\drivers\etc\hosts | Select-String "panopticon-auto"
@@ -83,12 +83,12 @@ Get-Content C:\Windows\System32\drivers\etc\hosts | Select-String "panopticon-au
 
 1. Check if the scheduled task exists:
    ```powershell
-   Get-ScheduledTask -TaskName "PanopticonWsl2HostsSync"
+   Get-ScheduledTask -TaskName "OverdeckWsl2HostsSync"
    ```
 
 2. Check task last run result:
    ```powershell
-   Get-ScheduledTask -TaskName "PanopticonWsl2HostsSync" | Get-ScheduledTaskInfo
+   Get-ScheduledTask -TaskName "OverdeckWsl2HostsSync" | Get-ScheduledTaskInfo
    ```
 
 3. Run the sync manually to see errors:
@@ -106,6 +106,6 @@ The sync script automatically detects the current WSL IP on each run. If your IP
 
 ## Migration from SyncMynHosts
 
-If you have the old `SyncMynHosts` task, the installation script will automatically remove it and create the new `PanopticonWsl2HostsSync` task.
+If you have the old `SyncMynHosts` task, the installation script will automatically remove it and create the new `OverdeckWsl2HostsSync` task.
 
 The new task uses a different marker (`# panopticon-auto` instead of `# myn-auto`) but will continue to sync all entries from `~/.wsl2hosts`.

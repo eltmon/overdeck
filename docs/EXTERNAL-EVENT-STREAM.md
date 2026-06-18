@@ -1,6 +1,6 @@
 # External Event Stream
 
-**Panopticon's public event feed for third-party integrations.**
+**Overdeck's public event feed for third-party integrations.**
 
 > **Status: implemented.** The `/events/stream` SSE endpoint is live at `GET /events/stream`. See `src/dashboard/server/routes/events.ts` for the implementation.
 
@@ -8,7 +8,7 @@
 
 ## Why This Exists
 
-Panopticon's dashboard consumes a rich internal event stream: agent lifecycle, workspace transitions, activity log entries, specialist pipeline state, dashboard restarts, and more. The internal transport is **Effect RPC over WebSocket** at `/ws/rpc` — beautifully typed for the dashboard, but a hard dependency for any external process that wants to react to what pan is doing (a TTS daemon, a desk lamp, a phone notification bridge, a Prometheus exporter, a Slack forwarder).
+Overdeck's dashboard consumes a rich internal event stream: agent lifecycle, workspace transitions, activity log entries, specialist pipeline state, dashboard restarts, and more. The internal transport is **Effect RPC over WebSocket** at `/ws/rpc` — beautifully typed for the dashboard, but a hard dependency for any external process that wants to react to what pan is doing (a TTS daemon, a desk lamp, a phone notification bridge, a Prometheus exporter, a Slack forwarder).
 
 External integrations need something simpler: a plain stream of JSON events that any language can consume with two lines of code. This doc defines that surface.
 
@@ -72,7 +72,7 @@ data: {"type":"activity.entry","sequence":18423,"timestamp":"2026-04-12T14:22:08
 
 ```
 
-- `event:` — the Panopticon event type (e.g. `activity.entry`). Consumers that only care about one type can use `eventSource.addEventListener('activity.entry', ...)`.
+- `event:` — the Overdeck event type (e.g. `activity.entry`). Consumers that only care about one type can use `eventSource.addEventListener('activity.entry', ...)`.
 - `id:` — the SQLite sequence number. `EventSource` stores the latest and replays it as `Last-Event-ID` on reconnect automatically.
 - `data:` — a single-line JSON object matching the `DomainEvent` schema in `@panopticon/contracts` (see `packages/contracts/src/events.ts`).
 

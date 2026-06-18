@@ -52,7 +52,7 @@ export async function skillsCommand(options: { json?: boolean }): Promise<void> 
     return;
   }
 
-  console.log(chalk.bold(`\nPanopticon Skills (${skills.length})\n`));
+  console.log(chalk.bold(`\nOverdeck Skills (${skills.length})\n`));
 
   if (skills.length === 0) {
     console.log(chalk.yellow('No skills found.'));

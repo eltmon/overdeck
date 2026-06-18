@@ -71,7 +71,7 @@ describe('project-repos', () => {
 
   it('resolves a monorepo project as a single repo target', () => {
     const projectConfig: ProjectConfig = {
-      name: 'Panopticon',
+      name: 'Overdeck',
       path: '/tmp/panopticon',
       github_repo: 'eltmon/panopticon-cli',
       workspace: {

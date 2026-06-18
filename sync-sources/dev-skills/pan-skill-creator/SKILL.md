@@ -1,6 +1,6 @@
 ---
 name: pan-skill-creator
-description: Guide for Panopticon developers on creating and distributing skills
+description: Guide for Overdeck developers on creating and distributing skills
 triggers:
   - create a skill
   - add a skill
@@ -8,13 +8,13 @@ triggers:
   - make skill available to all users
 ---
 
-# Panopticon Skill Development Guide
+# Overdeck Skill Development Guide
 
-**This skill is for Panopticon developers only.** It teaches how to create skills that are distributed with Panopticon to all users.
+**This skill is for Overdeck developers only.** It teaches how to create skills that are distributed with Overdeck to all users.
 
 ## How Skills Are Distributed
 
-Panopticon has a two-stage skill distribution system:
+Overdeck has a two-stage skill distribution system:
 
 ### 1. Source Locations
 
@@ -74,7 +74,7 @@ Content and instructions for the skill...
 ### Step 4: Test Locally
 
 ```bash
-# Rebuild Panopticon
+# Rebuild Overdeck
 cd /path/to/panopticon && npm run build
 
 # Sync skills (dev mode auto-detected)
@@ -94,7 +94,7 @@ git push
 
 ## Key Points
 
-1. **Always add skills to the Panopticon repo** unless the user explicitly says to create a personal/local skill
+1. **Always add skills to the Overdeck repo** unless the user explicitly says to create a personal/local skill
 2. **`pan install` copies skills** from package to ~/.panopticon/skills/ (doesn't overwrite existing)
 3. **`pan sync` creates symlinks** from ~/.panopticon/skills/ to ~/.claude/skills/
 4. **Dev mode** (detected by dev-skills/ existing) also syncs dev-skills/

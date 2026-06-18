@@ -54,7 +54,7 @@ describe('resolveWalDir', () => {
 
   it('returns the events dir for a matching project key', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', name: 'Panopticon' } },
+      { key: 'PAN', config: { path: '/repos/panopticon', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
@@ -63,7 +63,7 @@ describe('resolveWalDir', () => {
 
   it('uses events_repo when configured', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', events_repo: '/shared/pan-events', name: 'Panopticon' } },
+      { key: 'PAN', config: { path: '/repos/panopticon', events_repo: '/shared/pan-events', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
@@ -72,7 +72,7 @@ describe('resolveWalDir', () => {
 
   it('uses events_path when configured', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', events_path: 'custom/events', name: 'Panopticon' } },
+      { key: 'PAN', config: { path: '/repos/panopticon', events_path: 'custom/events', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
@@ -90,7 +90,7 @@ describe('resolveWalDir', () => {
 
   it('returns null for malformed issueId with no prefix', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', name: 'Panopticon' } },
+      { key: 'PAN', config: { path: '/repos/panopticon', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     expect(resolveWalDir('')).toBeNull();
@@ -119,7 +119,7 @@ describe('appendToWal', () => {
 
   it('writes a JSONL line to the correct WAL file', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: tmpDir, name: 'Panopticon' } },
+      { key: 'PAN', config: { path: tmpDir, name: 'Overdeck' } },
     ]);
     const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
     const event = makeCostEvent();
@@ -144,7 +144,7 @@ describe('appendToWal', () => {
 
   it('appends multiple events as separate lines', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: tmpDir, name: 'Panopticon' } },
+      { key: 'PAN', config: { path: tmpDir, name: 'Overdeck' } },
     ]);
     const { appendToWalSync } = await import('../../../src/lib/costs/wal.js');
     appendToWalSync(makeCostEvent({ requestId: 'req-1' }));

@@ -352,7 +352,7 @@ async function releaseCheckCommand(): Promise<void> {
   const currentVersion = getCurrentVersion();
   const latestTag = getLatestTag(repoRoot);
 
-  console.log(chalk.bold('Panopticon Release Check\n'));
+  console.log(chalk.bold('Overdeck Release Check\n'));
   console.log(`Current version: ${chalk.cyan(currentVersion)}`);
   console.log(`Current branch:  ${chalk.cyan(getCurrentBranch(repoRoot))}`);
   console.log(`Latest tag:      ${chalk.cyan(latestTag ?? 'none')}`);
@@ -388,7 +388,7 @@ async function releaseCreateCommand(
   ensureCleanTree(repoRoot);
   ensureTagDoesNotExist(repoRoot, tagName);
 
-  console.log(chalk.bold(`Panopticon ${channel === 'stable' ? 'Stable' : 'Canary'} Release\n`));
+  console.log(chalk.bold(`Overdeck ${channel === 'stable' ? 'Stable' : 'Canary'} Release\n`));
   console.log(`Current version: ${chalk.cyan(currentVersion)}`);
   console.log(`Target version:  ${chalk.cyan(resolvedVersion)}`);
   if (!version) {

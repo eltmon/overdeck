@@ -24,7 +24,7 @@
   `pan sync` renders bundled rules into `~/.claude/CLAUDE.md` (managed region), `pi-global.md`,
   `codex-global.md`.
 - **scope:dev** — folds into the managed region only on a panopticon-cli checkout; never ships to
-  projects that merely use Panopticon. **All new bundled rules here are `scope: dev`.**
+  projects that merely use Overdeck. **All new bundled rules here are `scope: dev`.**
 
 ---
 

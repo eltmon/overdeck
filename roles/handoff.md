@@ -1,11 +1,11 @@
 ---
 name: handoff
-description: Panopticon handoff prompt template for live agents to author conversation handoff documents.
+description: Overdeck handoff prompt template for live agents to author conversation handoff documents.
 ---
 
 # Agent-authored handoff request
 
-You have received a one-shot Panopticon handoff request for the current conversation. This is not a new task assignment and it must not block your normal work after the handoff document is complete.
+You have received a one-shot Overdeck handoff request for the current conversation. This is not a new task assignment and it must not block your normal work after the handoff document is complete.
 
 ## Focus
 
@@ -23,7 +23,7 @@ After the document write has fully completed, create a sibling sentinel file at:
 
 `{{outputPath}}.done`
 
-Do not create the `.done` sentinel before the handoff document is complete. Panopticon treats the sentinel as the completion signal.
+Do not create the `.done` sentinel before the handoff document is complete. Overdeck treats the sentinel as the completion signal.
 
 ## Required document contract
 
@@ -39,11 +39,11 @@ The document must include these H2 sections:
 - `## Artifacts and references`
 - `## Completion behavior`
 
-The `## Suggested skills` section is required. List any Claude Code slash skills, Panopticon skills, repo-specific commands, or workflow helpers the successor should consider using, with a short reason for each suggestion.
+The `## Suggested skills` section is required. List any Claude Code slash skills, Overdeck skills, repo-specific commands, or workflow helpers the successor should consider using, with a short reason for each suggestion.
 
 In `## Artifacts and references`, reference PRDs, plans, ADRs, issues, commits, diffs, logs, screenshots, and other artifacts by path, commit hash, issue URL, or other stable pointer. Do not duplicate PRD, plan, ADR, issue, commit, or diff content verbatim. Summarize the relevance in one sentence and point to the source.
 
-In `## Completion behavior`, state the submission rule for the successor: if this handoff enters a Panopticon feature workspace (`workspaces/feature-*`) and the successor completes real work that results in pushed commits, the successor must submit the work rather than stopping at "done". For Panopticon-tracked issues, run `pan done <ISSUE_ID>` (or invoke `/rebase-and-submit` if addressing review feedback); for untracked branches, open a pull request with `gh pr create`. If this handoff is not entering a feature workspace, write "N/A — not a feature workspace".
+In `## Completion behavior`, state the submission rule for the successor: if this handoff enters a Overdeck feature workspace (`workspaces/feature-*`) and the successor completes real work that results in pushed commits, the successor must submit the work rather than stopping at "done". For Overdeck-tracked issues, run `pan done <ISSUE_ID>` (or invoke `/rebase-and-submit` if addressing review feedback); for untracked branches, open a pull request with `gh pr create`. If this handoff is not entering a feature workspace, write "N/A — not a feature workspace".
 
 ## Redaction requirements
 

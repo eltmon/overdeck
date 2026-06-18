@@ -1,7 +1,7 @@
 /**
  * Provider Configuration
  *
- * Defines LLM providers that Panopticon launches through Claude Code directly
+ * Defines LLM providers that Overdeck launches through Claude Code directly
  * or through local Anthropic-compatible sidecars such as CLIProxyAPI.
  */
 
@@ -168,7 +168,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     haikuModel: 'qwen/qwen3.6-plus',
     tierModels: { opus: 'qwen/qwen3.6-plus', sonnet: 'qwen/qwen3.6-plus', haiku: 'qwen/qwen3.6-plus' },
     tested: true,
-    description: "Route Nous Portal OpenAI-compatible models through Panopticon's local Anthropic-compatible adapter using NOUS_API_KEY.",
+    description: "Route Nous Portal OpenAI-compatible models through Overdeck's local Anthropic-compatible adapter using NOUS_API_KEY.",
   },
 
   dashscope: {
@@ -182,7 +182,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     haikuModel: 'qwen3-plus',
     tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
     tested: false,
-    description: "Route Alibaba DashScope Qwen models through Panopticon's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).",
+    description: "Route Alibaba DashScope Qwen models through Overdeck's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).",
   },
 
   xai: {
@@ -474,7 +474,7 @@ export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<vo
   });
 
 /**
- * Map a Panopticon provider to the Pi harness's provider name for that
+ * Map a Overdeck provider to the Pi harness's provider name for that
  * vendor. Pi resolves bare model ids against its own registry order, which
  * can pick the wrong provider entirely — e.g. bare `kimi-k2.6` resolves to
  * `moonshotai` (no API key configured) instead of `kimi-coding`, leaving the

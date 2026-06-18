@@ -17,7 +17,7 @@ import {
 import type { CostBudget } from '../cost.js';
 import { parsePiSessionSync } from '../cost-parsers/pi-parser.js';
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 // ── Filesystem helpers ────────────────────────────────────────────────────────
 
@@ -515,7 +515,7 @@ export const CostWriterLive = Layer.effect(
         const source = opts?.source ?? 'claude';
         if (source !== 'pi' && source !== 'codex') return { imported: 0 };
 
-        const agentsDir = join(getPanopticonHome(), 'agents');
+        const agentsDir = join(getOverdeckHome(), 'agents');
         const agentNames = yield* Effect.sync(() => {
           if (!existsSync(agentsDir)) return [] as string[];
           return readdirSync(agentsDir, { withFileTypes: true })

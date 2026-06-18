@@ -11,7 +11,7 @@ tools:
   - Write
 ---
 
-# Panopticon Review Agent
+# Overdeck Review Agent
 
 Code review specialist. Spawned per feature branch via the canonical PAN-830 long-lived session pattern (one process per role, kept alive across rounds via `tmux send-keys`).
 

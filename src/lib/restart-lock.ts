@@ -1,7 +1,7 @@
 import { mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export type RestartLockHolder = {
   pid: number;
@@ -16,7 +16,7 @@ export type RestartLockHandle = {
 const STALE_LOCK_MS = 5 * 60 * 1000;
 
 function restartLockPath(): string {
-  return join(getPanopticonHome(), 'restart.lock');
+  return join(getOverdeckHome(), 'restart.lock');
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

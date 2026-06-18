@@ -418,7 +418,7 @@ describe('getRuntimeForAgent — codex dispatch', () => {
 })
 
 describe('toCodexSandboxValue (PAN-1799)', () => {
-  it("translates Panopticon's abstract 'workspace' to workspace-write", () => {
+  it("translates Overdeck's abstract 'workspace' to workspace-write", () => {
     expect(toCodexSandboxValue('workspace')).toBe('workspace-write');
   });
   it('passes through valid codex values unchanged', () => {

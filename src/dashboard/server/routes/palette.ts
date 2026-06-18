@@ -41,8 +41,8 @@ interface PanCommandEntry {
 
 const PAN_COMMANDS: PanCommandEntry[] = [
   // Orchestration / lifecycle
-  { name: 'pan up', description: 'Start the Panopticon dashboard on port 3010', group: 'Orchestration', keywords: ['start', 'serve', 'dashboard'] },
-  { name: 'pan down', description: 'Stop the Panopticon dashboard', group: 'Orchestration', keywords: ['stop', 'shutdown'] },
+  { name: 'pan up', description: 'Start the Overdeck dashboard on port 3010', group: 'Orchestration', keywords: ['start', 'serve', 'dashboard'] },
+  { name: 'pan down', description: 'Stop the Overdeck dashboard', group: 'Orchestration', keywords: ['stop', 'shutdown'] },
   { name: 'pan dev', description: 'Run dashboard in development mode (Vite HMR + tsx watch)', group: 'Orchestration', keywords: ['vite', 'hot', 'reload'] },
   { name: 'pan reload', description: 'Build then restart the dashboard only on success', group: 'Orchestration', keywords: ['rebuild', 'restart'] },
   { name: 'pan restart', description: 'Restart the dashboard (preserves sidecars)', group: 'Orchestration', keywords: ['bounce'] },
@@ -77,7 +77,7 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan review restart <id>', description: 'Restart review with optional model override', group: 'Review' },
 
   // Memory
-  { name: 'pan memory search <q>', description: 'Search Panopticon memory observations across an issue/project', group: 'Memory', keywords: ['observations', 'fts', 'find'] },
+  { name: 'pan memory search <q>', description: 'Search Overdeck memory observations across an issue/project', group: 'Memory', keywords: ['observations', 'fts', 'find'] },
   { name: 'pan memory status', description: 'Show memory pipeline status (rollup, extraction, health)', group: 'Memory' },
   { name: 'pan memory health', description: 'Memory pipeline health snapshot', group: 'Memory' },
   { name: 'pan memory reset', description: 'Insert a memory reset marker for a scope', group: 'Memory' },
@@ -90,15 +90,15 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan workspace reap', description: 'Reap orphaned workspaces no longer tied to an issue', group: 'Workspace' },
 
   // Skills / install / sync
-  { name: 'pan install', description: 'Install Panopticon prerequisites', group: 'Setup' },
-  { name: 'pan init', description: 'Initialize Panopticon in the current project', group: 'Setup' },
+  { name: 'pan install', description: 'Install Overdeck prerequisites', group: 'Setup' },
+  { name: 'pan init', description: 'Initialize Overdeck in the current project', group: 'Setup' },
   { name: 'pan sync', description: 'Sync skills + agents from devroot into ~/.claude/', group: 'Setup', keywords: ['skills', 'agents'] },
   { name: 'pan skills', description: 'List, install, and manage skills', group: 'Setup' },
 
   // Backup
-  { name: 'pan backup list', description: 'List Panopticon backups', group: 'Backup' },
+  { name: 'pan backup list', description: 'List Overdeck backups', group: 'Backup' },
   { name: 'pan backup clean', description: 'Remove old backups beyond retention', group: 'Backup' },
-  { name: 'pan restore [timestamp]', description: 'Restore Panopticon state from a backup', group: 'Backup' },
+  { name: 'pan restore [timestamp]', description: 'Restore Overdeck state from a backup', group: 'Backup' },
 
   // Release
   { name: 'pan release stable --version X.Y.Z', description: 'Cut a stable @overdeck/* release (bump + tag + notes)', group: 'Release', keywords: ['publish', 'tag', 'version'] },
@@ -111,8 +111,8 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan reopen <id>', description: 'Re-enter the pipeline for a closed/cancelled issue', group: 'Flywheel' },
 
   // Misc
-  { name: 'pan fork <conv>', description: 'Fork a Panopticon conversation into a new branch session', group: 'Conversations' },
-  { name: 'pan unarchive-conversation <query>', description: 'Restore an archived Panopticon conversation', group: 'Conversations' },
+  { name: 'pan fork <conv>', description: 'Fork a Overdeck conversation into a new branch session', group: 'Conversations' },
+  { name: 'pan unarchive-conversation <query>', description: 'Restore an archived Overdeck conversation', group: 'Conversations' },
   { name: 'pan cost', description: 'Token + dollar cost report for recent runs', group: 'Reporting', keywords: ['spend', 'tokens'] },
   { name: 'pan resources', description: 'RAM usage by agents, conversations, and system processes', group: 'Reporting', keywords: ['ram', 'memory', 'cpu'] },
 ];

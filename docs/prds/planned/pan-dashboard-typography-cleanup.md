@@ -1,8 +1,8 @@
-# Panopticon dashboard typography cleanup
+# Overdeck dashboard typography cleanup
 
 ## Context
 
-Panopticon's dashboard typography has drifted into multiple competing systems. The global app shell already points toward the intended direction (`DM Sans` for body/UI, `Space Grotesk` for display, `SF Mono` for technical strings), but Mission Control/Command Deck still carries a separate typography island and several dashboard surfaces use `font-display` or hardcoded font stacks outside the intended boundary. This creates visible inconsistency across left navigation, list views, metrics, and especially conversations.
+Overdeck's dashboard typography has drifted into multiple competing systems. The global app shell already points toward the intended direction (`DM Sans` for body/UI, `Space Grotesk` for display, `SF Mono` for technical strings), but Mission Control/Command Deck still carries a separate typography island and several dashboard surfaces use `font-display` or hardcoded font stacks outside the intended boundary. This creates visible inconsistency across left navigation, list views, metrics, and especially conversations.
 
 The goal of this work is a complete typography cleanup across the non–God View dashboard so there is one canonical rule set:
 
@@ -12,7 +12,7 @@ The goal of this work is a complete typography cleanup across the non–God View
 - **Conversations** = entirely DM Sans except inline code / fenced code blocks / clearly technical strings
 - **God View** = explicit typography exception; do not normalize it in this issue
 
-This cleanup must also update Panopticon's documentation/style guide so future work does not drift again.
+This cleanup must also update Overdeck's documentation/style guide so future work does not drift again.
 
 ## Recommended approach
 
@@ -87,7 +87,7 @@ Conversations need to become visibly uniform and match the policy exactly.
 The implementation should be stricter than the current style guide so future work is unambiguous.
 
 #### Allowed non–God View use
-- the upper-left `Panopticon` wordmark in `src/dashboard/frontend/src/components/Sidebar.tsx`
+- the upper-left `Overdeck` wordmark in `src/dashboard/frontend/src/components/Sidebar.tsx`
 
 #### Default rule
 - Ordinary page headings, section headings, metric values, card titles, labels, nav items, dialogs, buttons, tables, forms, and all other non–God View UI should use DM Sans
@@ -97,7 +97,7 @@ The implementation should be stricter than the current style guide so future wor
 
 #### Known non-God-View places to audit/change
 - `src/dashboard/frontend/src/components/Sidebar.tsx`
-  - keep only the `Panopticon` wordmark as the deliberate non–God View exception; nav labels remain sans
+  - keep only the `Overdeck` wordmark as the deliberate non–God View exception; nav labels remain sans
 - `src/dashboard/frontend/src/components/AwaitingMergePage.tsx`
   - convert `font-display` page title to DM Sans
 - `src/dashboard/frontend/src/components/MetricsSummaryRow.tsx`
@@ -105,7 +105,7 @@ The implementation should be stricter than the current style guide so future wor
 
 #### Sweep requirement
 Search for all non–God View `font-display` usage and enforce this rule:
-- keep only the sidebar `Panopticon` wordmark
+- keep only the sidebar `Overdeck` wordmark
 - convert every other non–God View use to DM Sans
 
 ### 5. Preserve SF Mono only for semantically technical surfaces
@@ -173,7 +173,7 @@ Do a repo-wide audit for explicit font declarations and semantic-font misuse acr
 #### Documentation rule to encode
 - default non–God View dashboard UI = DM Sans
 - technical strings/code = SF Mono
-- sidebar `Panopticon` wordmark = the only approved non–God View display-font exception
+- sidebar `Overdeck` wordmark = the only approved non–God View display-font exception
 - conversations = DM Sans prose, SF Mono only for code/technical strings
 - God View uses its own scoped typography system and is not governed by the general dashboard cleanup
 

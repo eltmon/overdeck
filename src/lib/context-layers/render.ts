@@ -12,15 +12,15 @@ import { renderForHarness } from './harness.js';
 import { renderBundledRules } from './rules.js';
 import { globalContextFile, projectContextFile, readLayerContent } from './layers.js';
 
-/** Opening marker of the Panopticon-managed region in a target CLAUDE.md. */
+/** Opening marker of the Overdeck-managed region in a target CLAUDE.md. */
 export const REGION_BEGIN =
   '<!-- BEGIN PANOPTICON CONTEXT — managed by `pan sync`; edit the layer source, not this region -->';
 
-/** Closing marker of the Panopticon-managed region. */
+/** Closing marker of the Overdeck-managed region. */
 export const REGION_END = '<!-- END PANOPTICON CONTEXT -->';
 
 /**
- * Insert or replace the Panopticon-managed region inside an existing file.
+ * Insert or replace the Overdeck-managed region inside an existing file.
  *
  * Content outside the markers is preserved untouched. When the file has no
  * region yet, one is appended (after existing content, if any). This keeps a
@@ -51,7 +51,7 @@ export function applyManagedRegion(existing: string, managed: string): string {
   return (trimmed ? `${trimmed}\n\n${region}` : region) + '\n';
 }
 
-/** True when `existing` already contains a Panopticon-managed region. */
+/** True when `existing` already contains a Overdeck-managed region. */
 export function hasManagedRegion(existing: string): boolean {
   const beginIdx = existing.indexOf(REGION_BEGIN);
   const endIdx = existing.indexOf(REGION_END);
@@ -59,7 +59,7 @@ export function hasManagedRegion(existing: string): boolean {
 }
 
 /**
- * Return `existing` with the Panopticon-managed region removed — i.e. only the
+ * Return `existing` with the Overdeck-managed region removed — i.e. only the
  * hand-authored content the user owns, trimmed. When there is no region, the
  * whole (trimmed) file is the user's. Used to decide whether a target file has
  * pre-existing content worth preserving and backing up before first injection.

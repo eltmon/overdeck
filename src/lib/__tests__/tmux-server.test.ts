@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { execFileSync, execSync, execFile } from 'child_process';
 import { readFileSync } from 'fs';
 import {
-  ensurePanopticonTmuxServerSync,
-  ensurePanopticonTmuxServerAsync,
+  ensureOverdeckTmuxServerSync,
+  ensureOverdeckTmuxServerAsync,
   findManagedServerPidSync,
 } from '../tmux.js';
 
@@ -47,7 +47,7 @@ function isSystemctlShowCall(cmd: unknown): boolean {
   return cmd === 'systemctl';
 }
 
-describe('ensurePanopticonTmuxServerSync', () => {
+describe('ensureOverdeckTmuxServerSync', () => {
   let serverAlive = false;
   let systemdAvailable = true;
   let setsidAvailable = true;
@@ -141,7 +141,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
   });
 
   it('founds the shared server in a dedicated systemd unit', () => {
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     const systemdCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'systemd-run');
     expect(systemdCalls).toHaveLength(1);
@@ -155,7 +155,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
 
   it('skips founding when the server is already alive', () => {
     serverAlive = true;
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     const systemdCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'systemd-run');
     expect(systemdCalls).toHaveLength(0);
@@ -163,7 +163,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
 
   it('falls back to setsid when systemd-run is unavailable', () => {
     systemdAvailable = false;
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     const setsidCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'setsid');
     expect(setsidCalls).toHaveLength(1);
@@ -173,7 +173,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
   it('falls back to plain tmux when neither systemd-run nor setsid is available', () => {
     systemdAvailable = false;
     setsidAvailable = false;
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     const tmuxCalls = mockedExecFileSync.mock.calls.filter(
       (c) => c[0] === 'tmux' && isStartServerCall(c[0], c[1]),
@@ -187,7 +187,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
     systemctlMainPid = '12345';
     cgroupOutput = '0::/user.slice/user-1000.slice/user@1000.service/tmux-spawn-abc.scope\n';
 
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('tmux-spawn'));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID 12345'));
@@ -199,7 +199,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
     cgroupOutput = '0::/user.slice/user-1000.slice/user@1000.service/panopticon-tmux-server.service\n';
     cmdlineOutput = 'tmux\0-L\0panopticon\0-f\0/home/user/.panopticon/tmux/panopticon.tmux.conf\0start-server\0';
 
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('tmux-spawn'));
     expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('dirty cmdline'));
@@ -210,14 +210,14 @@ describe('ensurePanopticonTmuxServerSync', () => {
     systemctlMainPid = '12345';
     cmdlineOutput = 'tmux\0-L\0panopticon\0new-session\0-d\0-s\0conv-20260612-3871\0bash\0launcher.sh\0';
 
-    ensurePanopticonTmuxServerSync({});
+    ensureOverdeckTmuxServerSync({});
 
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('dirty cmdline'));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID 12345'));
   });
 });
 
-describe('ensurePanopticonTmuxServerAsync', () => {
+describe('ensureOverdeckTmuxServerAsync', () => {
   let serverAlive = false;
   let systemdAvailable = true;
   let setsidAvailable = true;
@@ -271,7 +271,7 @@ describe('ensurePanopticonTmuxServerAsync', () => {
   });
 
   it('delegates to the sync helper and founds a dedicated systemd unit', async () => {
-    await ensurePanopticonTmuxServerAsync({});
+    await ensureOverdeckTmuxServerAsync({});
 
     const systemdCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'systemd-run');
     expect(systemdCalls).toHaveLength(1);
@@ -284,7 +284,7 @@ describe('ensurePanopticonTmuxServerAsync', () => {
 
   it('falls back to setsid when systemd-run is unavailable', async () => {
     systemdAvailable = false;
-    await ensurePanopticonTmuxServerAsync({});
+    await ensureOverdeckTmuxServerAsync({});
 
     const setsidCalls = mockedExecFileSync.mock.calls.filter((c) => c[0] === 'setsid');
     expect(setsidCalls).toHaveLength(1);

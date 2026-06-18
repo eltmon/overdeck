@@ -1,4 +1,4 @@
-# Test configuration fixture for Panopticon tests
+# Test configuration fixture for Overdeck tests
 
 [panopticon]
 version = "1.0.0"

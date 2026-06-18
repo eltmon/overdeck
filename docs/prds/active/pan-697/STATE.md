@@ -2,7 +2,7 @@
 
 ## Problem
 
-The Panopticon repo root mixes canonical entrypoint files with stray audit reports,
+The Overdeck repo root mixes canonical entrypoint files with stray audit reports,
 historical writeups, and unused screenshots. The top level looks improvised rather
 than intentional, which is a bad first impression for anyone opening the repo.
 

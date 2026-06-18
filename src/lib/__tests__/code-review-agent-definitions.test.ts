@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 
-// Convoy reviewer prompts are harness-agnostic templates owned by Panopticon
+// Convoy reviewer prompts are harness-agnostic templates owned by Overdeck
 // and inlined by the orchestrator at spawn time. They live under `roles/`,
 // not `.claude/agents/`, so they cannot be auto-discovered as ambient Claude
 // Code subagents and the same body drives Claude Code, Pi, and any future

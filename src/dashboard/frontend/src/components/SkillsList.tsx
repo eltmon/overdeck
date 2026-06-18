@@ -70,12 +70,12 @@ export function SkillsList() {
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Panopticon Skills */}
+          {/* Overdeck Skills */}
           <div className="bg-card rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-primary" />
               <h3 className="font-medium text-foreground">
-                Panopticon ({panopticonSkills.length})
+                Overdeck ({panopticonSkills.length})
               </h3>
             </div>
             <div className="space-y-2">
@@ -83,7 +83,7 @@ export function SkillsList() {
                 <SkillCard key={skill.path} skill={skill} />
               ))}
               {panopticonSkills.length === 0 && (
-                <p className="text-muted-foreground text-sm">No Panopticon skills</p>
+                <p className="text-muted-foreground text-sm">No Overdeck skills</p>
               )}
             </div>
           </div>
@@ -112,7 +112,7 @@ export function SkillsList() {
         <h3 className="font-medium text-foreground mb-2">Skill Locations</h3>
         <div className="text-sm text-muted-foreground space-y-1">
           <p>
-            <span className="text-primary">Panopticon:</span>{' '}
+            <span className="text-primary">Overdeck:</span>{' '}
             ~/.panopticon/skills/
           </p>
           <p>

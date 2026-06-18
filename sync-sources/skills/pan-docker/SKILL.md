@@ -17,7 +17,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through selecting and configuring Docker templates for Panopticon workspaces. Templates provide containerized development environments with hot reload, databases, and Traefik integration.
+This skill guides you through selecting and configuring Docker templates for Overdeck workspaces. Templates provide containerized development environments with hot reload, databases, and Traefik integration.
 
 ## When to Use
 

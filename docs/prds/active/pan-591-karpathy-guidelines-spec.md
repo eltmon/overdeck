@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Panopticon agents exhibit the same failure modes Andrej Karpathy described in his public post on LLM coding pitfalls: silent assumptions, over-engineered abstractions, drive-by refactoring, and vague success criteria. These aren't model failures — they're missing behavioral constraints. Adding targeted guidelines to the right prompts, for the right agents, reduces first-try review failures, decreases rework cycles, and produces cleaner diffs.
+Overdeck agents exhibit the same failure modes Andrej Karpathy described in his public post on LLM coding pitfalls: silent assumptions, over-engineered abstractions, drive-by refactoring, and vague success criteria. These aren't model failures — they're missing behavioral constraints. Adding targeted guidelines to the right prompts, for the right agents, reduces first-try review failures, decreases rework cycles, and produces cleaner diffs.
 
 Source: `github.com/forrestchang/andrej-karpathy-skills` — codified from Karpathy's X post `2015883857489522876`.
 
@@ -184,7 +184,7 @@ Evidence required: `src/upload.ts:L12 — changed 'rb' to "rb", rest of file use
 
 ### Karpathy Skill File
 
-Add `~/.claude/skills/karpathy-guidelines/SKILL.md` (verbatim from source repo with Panopticon-specific note prepended). Synced via `pan sync`. Review and planning agents can load it on demand for the full examples from EXAMPLES.md.
+Add `~/.claude/skills/karpathy-guidelines/SKILL.md` (verbatim from source repo with Overdeck-specific note prepended). Synced via `pan sync`. Review and planning agents can load it on demand for the full examples from EXAMPLES.md.
 
 ### Config Schema
 

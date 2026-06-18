@@ -5,7 +5,7 @@
  * exposes an Anthropic-compatible `/v1/messages` endpoint backed by the
  * OpenAI Responses WebSocket transport using ChatGPT subscription OAuth tokens.
  *
- * Panopticon runs cliproxy as a background sidecar so Claude Code can drive
+ * Overdeck runs cliproxy as a background sidecar so Claude Code can drive
  * GPT models (via ANTHROPIC_BASE_URL) without needing an OpenAI API key.
  *
  * Responsibilities:
@@ -310,7 +310,7 @@ function serializeYamlString(value: string): string {
  *
  * CLIProxyAPI v6.10.x accepts Gemini API keys through the `gemini-api-key`
  * config section. We also keep a small credential marker in auth-dir so future
- * config rewrites can preserve the bridged key without re-reading Panopticon
+ * config rewrites can preserve the bridged key without re-reading Overdeck
  * settings. This path is used by getProviderEnvForModel(), which is reachable
  * from dashboard HTTP routes, so all credential/config persistence is async.
  */

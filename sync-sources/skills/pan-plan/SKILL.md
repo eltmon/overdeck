@@ -16,7 +16,7 @@ allowed-tools:
   - Grep
 ---
 
-# Panopticon Planning Lifecycle
+# Overdeck Planning Lifecycle
 
 `pan plan <id>` starts a planning session for an issue. Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically. Use `--auto-start` only when an autonomous orchestrator should start the work agent after planning finalizes.
 

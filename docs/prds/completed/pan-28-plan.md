@@ -4,7 +4,7 @@
 
 ### Problem Statement
 
-Panopticon currently assumes it should update the issue tracker (Linear, GitHub Issues) when moving issues through the workflow. This doesn't work for:
+Overdeck currently assumes it should update the issue tracker (Linear, GitHub Issues) when moving issues through the workflow. This doesn't work for:
 - Shadowing teams at work (observing without modifying their issue states)
 - Read-only access scenarios
 - Demo/training modes
@@ -75,7 +75,7 @@ New module for managing shadow state files.
 ```typescript
 interface ShadowState {
   issueId: string;                    // e.g., "MIN-123"
-  shadowStatus: CanonicalState;       // Panopticon's view
+  shadowStatus: CanonicalState;       // Overdeck's view
   trackerStatus: CanonicalState;      // Last known tracker status (cached)
   trackerStatusUpdatedAt: string;     // When tracker status was last fetched
   shadowedAt: string;                 // When shadow mode was enabled
@@ -216,7 +216,7 @@ function resolveShadowMode(options: ShadowModeOptions): boolean
 #### 4.1 Install Wizard Changes (`pan install`)
 
 **New Questions:**
-1. Global: "How should Panopticon interact with issue trackers?"
+1. Global: "How should Overdeck interact with issue trackers?"
    - Normal - Update issue status in tracker (default)
    - Shadow - Track status locally, don't modify tracker
    - Ask per-project - Configure each project separately

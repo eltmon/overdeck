@@ -19,7 +19,7 @@
     ],
     "tags": ["migration", "sync", "multi-tool", "project-structure"],
     "narratives": {
-      "Problem": "Project-level Panopticon artifacts use inconsistent, verbose paths (.panopticon/) and config names (.panopticon.yaml). Skills only sync to Claude Code. Planning archives use a flat structure that doesn't scale. No project-level skill source directory exists.",
+      "Problem": "Project-level Overdeck artifacts use inconsistent, verbose paths (.panopticon/) and config names (.panopticon.yaml). Skills only sync to Claude Code. Planning archives use a flat structure that doesn't scale. No project-level skill source directory exists.",
       "Proposal": "Rename .panopticon/ to .pan/ (project-level only), rename .panopticon.yaml to .pan.yaml with backwards compat, add .pan/skills/ as a sync source, implement multi-tool sync for 6 AI tools, change archive structure to per-issue subdirectories, and add safe workspace migration."
     },
     "items": [

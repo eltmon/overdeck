@@ -887,7 +887,7 @@ export const contextProactiveCompactState: Map<string, { lastAttempt: number }> 
 /**
  * PAN-1675 (A2): bounded native-compaction recovery for agents already flagged
  * `stuck` with reason `context_overflow`. These got stuck under the OLD
- * /compact+/clear ladder (which predates Panopticon-side compaction), so they
+ * /compact+/clear ladder (which predates Overdeck-side compaction), so they
  * never received a native-compaction attempt — and the `overflowBlocked` gate
  * would otherwise skip their recovery forever. We give them a small, bounded
  * number of out-of-band compaction attempts; if the agent keeps overflowing
@@ -1029,7 +1029,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
       // PAN-1675 (A2): rescue agents already flagged stuck=context_overflow.
       // The old /compact+/clear ladder set `stuck` and the `overflowBlocked`
       // gate below then skips their recovery permanently — but those agents
-      // never got a Panopticon-side (out-of-band) compaction, which can recover
+      // never got a Overdeck-side (out-of-band) compaction, which can recover
       // an overflow the harness /compact could not. Give them a bounded number
       // of native-compaction attempts BEFORE the overflowBlocked gate. A
       // successful resumeAgent({compact:true}) clears the stuck flag (in
@@ -1089,7 +1089,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
             emitActivityEntrySync({
               source: 'cloister',
               level: 'warn',
-              message: `${sessionName} recovered from a stuck context-overflow via Panopticon-side compaction (attempt ${rec.attempts})`,
+              message: `${sessionName} recovered from a stuck context-overflow via Overdeck-side compaction (attempt ${rec.attempts})`,
               issueId: issueId ?? undefined,
             });
             console.log(`[deacon] Agent ${sessionName} recovered from stuck context-overflow via native compaction (attempt ${rec.attempts})`);
@@ -3665,7 +3665,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
               specialist: 'merge-agent',
               outcome: 'ci-failure',
               summary: 'CI checks still failing after 5 transient retries — merge blocked',
-              markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
+              markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Overdeck will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
             }).pipe(Effect.catch((err) => {
               console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message);
               return Effect.succeed({ success: false, error: err.message });
@@ -5344,7 +5344,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // PAN-1441: sweep host-main beads drift into git. `.beads/{issues.jsonl,
   // export-state.json}` re-export on `main` whenever the `bd` binary syncs the
-  // shared dolt remote, and there is no single Panopticon write site to hook —
+  // shared dolt remote, and there is no single Overdeck write site to hook —
   // so commit any resulting drift here. queueBeadsAutoCommit is main-only,
   // debounced, skips missing files, and no-ops when nothing changed.
   for (const { config: projectConfig } of listProjectsSync()) {
@@ -5449,7 +5449,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
         try {
           await Effect.runPromise(killSession(projSpec.tmuxSession));
-          // Preserve Claude JSONL/session artifacts; only reset Panopticon runtime state.
+          // Preserve Claude JSONL/session artifacts; only reset Overdeck runtime state.
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
           actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
         } catch {

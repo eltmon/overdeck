@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The Panopticon dashboard currently shows a flat list of agents with basic health indicators (Phase 1). Users need:
+The Overdeck dashboard currently shows a flat list of agents with basic health indicators (Phase 1). Users need:
 1. **Visibility into specialist vs ephemeral agents** - Different agent types have different lifecycles and actions
 2. **Health history visualization** - See agent health over time, not just current state
 3. **Better control actions** - Poke stuck agents, wake sleeping specialists, reset broken sessions

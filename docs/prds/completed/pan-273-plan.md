@@ -2,7 +2,7 @@
 
 ## Summary
 
-Redesign the Panopticon kanban board from 6 visible columns (Backlog, Todo, Planning, In Progress, In Review, Done) to 4 visible columns (Todo, In Progress, In Review, Done). Remove "Planning" as a canonical state. Hide Backlog from the board (separate view). Introduce pre-workspace PRDs decoupled from feature branches.
+Redesign the Overdeck kanban board from 6 visible columns (Backlog, Todo, Planning, In Progress, In Review, Done) to 4 visible columns (Todo, In Progress, In Review, Done). Remove "Planning" as a canonical state. Hide Backlog from the board (separate view). Introduce pre-workspace PRDs decoupled from feature branches.
 
 See `docs/KANBAN-MODEL.md` for the design rationale and mental model.
 
@@ -169,7 +169,7 @@ Labels are used extensively and inconsistently across the codebase. This audit c
 
 ### A. Labels as Pseudo-States (GitHub/GitLab)
 
-GitHub and GitLab only have binary state (open/closed), so Panopticon uses labels to encode workflow states.
+GitHub and GitLab only have binary state (open/closed), so Overdeck uses labels to encode workflow states.
 
 **State labels currently in use:**
 
@@ -299,7 +299,7 @@ After cleanup:
 
 Remove these custom states from the MIN Linear team:
 - "In Planning" (type: started) — no longer used
-- "In Review" (type: started) — optional; can keep if stakeholders look at Linear directly, otherwise remove and let Panopticon handle the distinction internally
+- "In Review" (type: started) — optional; can keep if stakeholders look at Linear directly, otherwise remove and let Overdeck handle the distinction internally
 
 Any issues currently in "In Planning" state should be moved to "Todo".
 Any issues currently in "In Review" state should be moved to "In Progress" (or "Done" if already merged).

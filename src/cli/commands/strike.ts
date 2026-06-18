@@ -35,7 +35,7 @@ function planStrike(issueId: string): StrikePlan {
   const normalized = issueId.toLowerCase();
   const project = resolveProjectFromIssueSync(issueId);
   if (!project) {
-    throw new Error(`No Panopticon project is configured for issue prefix in "${issueId}". Add the project to projects.yaml first.`);
+    throw new Error(`No Overdeck project is configured for issue prefix in "${issueId}". Add the project to projects.yaml first.`);
   }
   const workspace = join(project.projectPath, 'workspaces', `feature-${normalized}-strike`);
   return {

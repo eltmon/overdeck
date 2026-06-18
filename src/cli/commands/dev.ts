@@ -228,7 +228,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // tab instead of leaving it stuck on "Reconnecting…").
   const reloadSignalPath = join(tmpdir(), `pan-dev-fullreload-${config.dashboardPort}.signal`);
 
-  console.log(chalk.bold('Starting Panopticon in development mode...\n'));
+  console.log(chalk.bold('Starting Overdeck in development mode...\n'));
 
   // Refuse to start a second dev session — two supervisors would fight over the
   // ports, each respawning children the other just killed. readDevSupervisorMarker
@@ -270,11 +270,11 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   // ── Traefik ────────────────────────────────────────────────────────────────
   if (config.traefikEnabled && !options.skipTraefik) {
     try {
-      const { generatePanopticonTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } =
+      const { generateOverdeckTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } =
         await import('../../lib/traefik.js');
 
       cleanupStaleTlsSectionsSync();
-      if (generatePanopticonTraefikConfigSync('dev')) {
+      if (generateOverdeckTraefikConfigSync('dev')) {
         console.log(chalk.dim('  Regenerated Traefik config for dev mode'));
       }
       const generatedDomains = ensureProjectCertsSync();

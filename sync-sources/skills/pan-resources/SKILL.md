@@ -16,7 +16,7 @@ allowed-tools:
 
 # System Resource Inventory
 
-Run `pan resources` to get a full breakdown of RAM usage across all Panopticon-managed processes.
+Run `pan resources` to get a full breakdown of RAM usage across all Overdeck-managed processes.
 
 ```bash
 pan resources
@@ -27,7 +27,7 @@ This shows:
 - **Model breakdown** — count and total RAM per AI model (claude-opus, sonnet, kimi, mimo, etc.)
 - **Workspace agents** — each running agent with issue ID, role (work/planning/review/test/merge), model, RAM, and start time
 - **Conversations** — count, total RAM, oldest, and archival recommendation for old conversations
-- **Orphaned processes** — Claude processes NOT tracked by Panopticon (the real bug signal)
+- **Orphaned processes** — Claude processes NOT tracked by Overdeck (the real bug signal)
 - **Other heavy processes** — Chrome, Vite, Java, TTS, Playwright, etc. over 100 MB
 
 ## JSON output

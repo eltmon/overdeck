@@ -69,7 +69,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
     projectPath = await mkdtemp(join(tmpdir(), 'pan-inspect-route-'));
     resolveProjectFromIssueMock.mockReturnValue({
       projectKey: 'panopticon',
-      projectName: 'Panopticon',
+      projectName: 'Overdeck',
       projectPath,
       linearTeam: 'PAN',
     });

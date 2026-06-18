@@ -164,7 +164,7 @@ export interface Skill {
   description?: string;
 }
 
-// Panopticon's canonical states (richer than most trackers)
+// Overdeck's canonical states (richer than most trackers)
 export type CanonicalState =
   | 'backlog'
   | 'todo'
@@ -253,8 +253,8 @@ export const STATE_TYPE_TO_CANONICAL: Record<string, CanonicalState> = {
   cancelled: 'canceled',
 };
 
-// Panopticon's virtual state tracking
-export interface PanopticonIssueState {
+// Overdeck's virtual state tracking
+export interface OverdeckIssueState {
   issueId: string;
   panopticonState: CanonicalState;  // Our canonical state
   trackerState: string;              // What's in the tracker

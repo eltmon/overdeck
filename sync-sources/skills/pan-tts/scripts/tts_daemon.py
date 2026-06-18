@@ -459,7 +459,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return not origin or origin in ALLOWED_ORIGINS
 
     def _authorized(self) -> bool:
-        header_token = self.headers.get("X-Panopticon-TTS-Token", "").strip()
+        header_token = self.headers.get("X-Overdeck-TTS-Token", "").strip()
         auth_header = self.headers.get("Authorization", "").strip()
         bearer_token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
         return bool(AUTH_TOKEN) and (header_token == AUTH_TOKEN or bearer_token == AUTH_TOKEN)
@@ -470,7 +470,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Panopticon-TTS-Token, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Overdeck-TTS-Token, Authorization")
 
     def _json(self, status: int, body: dict[str, Any]) -> None:
         payload = json.dumps(body).encode("utf-8")

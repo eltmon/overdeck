@@ -355,7 +355,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   // PAN-1513: fire postMergeLifecycle when GitHub reports the PR closed+merged.
   // Without this, admin-merges (gh pr merge --admin) and any merge that doesn't
-  // route through Panopticon's own merge flow leave work agents, strikes, tmux
+  // route through Overdeck's own merge flow leave work agents, strikes, tmux
   // sessions, and worktrees orphaned. postMergeLifecycle has its own
   // single-flight guard (specialists.ts L116) and _completedPostMerge marker,
   // so duplicate webhook deliveries are idempotent.

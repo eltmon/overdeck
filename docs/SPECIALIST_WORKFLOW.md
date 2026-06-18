@@ -1,8 +1,8 @@
 # Specialist Workflow Guide
 
-This document explains how the work agent and specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) interact through Panopticon's validation pipeline.
+This document explains how the work agent and specialist agents (`inspect-agent`, `review-agent`, `test-agent`, `uat-agent`, `merge-agent`) interact through Overdeck's validation pipeline.
 
-If you are new to Panopticon, start with [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) for the high-level map of what each agent type is for. This document is the deeper workflow guide.
+If you are new to Overdeck, start with [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) for the high-level map of what each agent type is for. This document is the deeper workflow guide.
 
 ## Overview
 
@@ -18,7 +18,7 @@ Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 
 ### Full Pipeline
 
-![Panopticon Specialist Pipeline](./diagrams/panopticon-specialist-pipeline.png)
+![Overdeck Specialist Pipeline](./diagrams/panopticon-specialist-pipeline.png)
 
 Source: [`docs/diagrams/panopticon-specialist-pipeline.excalidraw`](./diagrams/panopticon-specialist-pipeline.excalidraw)
 
@@ -182,7 +182,7 @@ The archive step (`renameSync → .archived`) prevents this while preserving the
 
 ### Agent Environment Variables
 
-All agents spawned by Panopticon receive these environment variables via tmux `-e` flags:
+All agents spawned by Overdeck receive these environment variables via tmux `-e` flags:
 
 **Work and Planning Agents:**
 
@@ -207,7 +207,7 @@ Provider-specific variables (`BASE_URL`, `AUTH_TOKEN`) are also injected based o
 
 ### Session-to-Agent Mapping
 
-The heartbeat hook (PostToolUse) maintains a mapping between Claude Code session UUIDs and Panopticon agents:
+The heartbeat hook (PostToolUse) maintains a mapping between Claude Code session UUIDs and Overdeck agents:
 
 - **`runtime.json`** — `claudeSessionId` field tracks the currently active Claude session
 - **`sessions.json`** — Append-only array of all Claude session UUIDs this agent has ever used
@@ -795,7 +795,7 @@ Reopen clears `reviewStatus`, `testStatus`, and `mergeStatus` to `pending`. Beca
 
 ## Future Enhancements
 
-- External PR selection (select PRs from repo, not just Panopticon-created)
+- External PR selection (select PRs from repo, not just Overdeck-created)
 - Multiple merge agents per repository
 - Webhook integration (GitHub webhooks trigger specialists)
 - Deacon backoff/escalation for repeated failures (PAN-247)

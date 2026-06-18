@@ -175,7 +175,7 @@ export type PiCodexAuthStatus =
   | { status: 'missing' }
   /** Token expired; refresh either not attempted or attempted and failed. */
   | { status: 'expired'; expiresAt: number; refreshFailed: boolean }
-  /** Pi's OAuth module could not be loaded — can't refresh/relogin via Panopticon. */
+  /** Pi's OAuth module could not be loaded — can't refresh/relogin via Overdeck. */
   | { status: 'unavailable' };
 
 /** Treat a token expiring within this window as already expired. */

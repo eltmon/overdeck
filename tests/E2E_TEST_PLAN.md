@@ -65,11 +65,11 @@ nslookup pan.localhost
 ### 3. Startup Test (pan up)
 
 ```bash
-# Start Panopticon
+# Start Overdeck
 pan up --detach
 
 # Expected output:
-# Starting Panopticon...
+# Starting Overdeck...
 #
 # Starting Traefik...
 # ✓ Traefik started
@@ -136,11 +136,11 @@ curl -v https://pan.localhost/api/health 2>&1 | grep -E "(< HTTP|< location)"
 ### 6. Shutdown Test (pan down)
 
 ```bash
-# Stop Panopticon
+# Stop Overdeck
 pan down
 
 # Expected output:
-# Stopping Panopticon...
+# Stopping Overdeck...
 #
 # Stopping dashboard...
 # ✓ Dashboard stopped
@@ -148,7 +148,7 @@ pan down
 # Stopping Traefik...
 # ✓ Traefik stopped
 #
-# Panopticon stopped
+# Overdeck stopped
 
 # Verify Traefik container stopped
 docker ps | grep panopticon-traefik

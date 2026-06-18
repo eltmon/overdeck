@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Postinstall script for Panopticon
+ * Postinstall script for Overdeck
  *
- * Automatically syncs hooks after npm install/upgrade if Panopticon
+ * Automatically syncs hooks after npm install/upgrade if Overdeck
  * has been initialized (bin dir exists).
  */
 
@@ -19,7 +19,7 @@ const HOOKS_SOURCE_DIR = join(PACKAGE_ROOT, 'sync-sources', 'hooks');
 
 function syncHooksIfInitialized() {
   if (!existsSync(join(homedir(), '.panopticon'))) {
-    console.log('Panopticon not initialized yet. Run `pan init` to set up.');
+    console.log('Overdeck not initialized yet. Run `pan init` to set up.');
     return;
   }
 

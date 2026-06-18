@@ -1,5 +1,5 @@
 /**
- * Panopticon platform stack lifecycle — dashboard + CLIProxy + Traefik + TLDR.
+ * Overdeck platform stack lifecycle — dashboard + CLIProxy + Traefik + TLDR.
  *
  * Used by `pan up`, `pan down`, and `pan restart`. Provides scoped primitives so
  * a dashboard restart does not strand the system or tear down unrelated shared

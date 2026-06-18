@@ -43,7 +43,7 @@ Principles:
 +-------------------------------------------------------------+
 | Sidebar (existing, 220px)    | Main Content Area             |
 |                              |                               |
-|  [Panopticon Logo]           |  +-------------------------+  |
+|  [Overdeck Logo]           |  +-------------------------+  |
 |                              |  | Top Bar                 |  |
 |  Operations                  |  | Breadcrumb | Actions     |  |
 |  - Command Deck              |  +-------------------------+  |

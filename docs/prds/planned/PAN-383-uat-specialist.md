@@ -2,7 +2,7 @@
 
 ## Summary
 
-Introduce a **UAT (User Acceptance Testing) Specialist** into the Panopticon specialist pipeline. It runs after the test specialist passes, using Playwright in a real browser to manually verify every requirement against the actual running application. It takes screenshots at each step to provide visual evidence of quality.
+Introduce a **UAT (User Acceptance Testing) Specialist** into the Overdeck specialist pipeline. It runs after the test specialist passes, using Playwright in a real browser to manually verify every requirement against the actual running application. It takes screenshots at each step to provide visual evidence of quality.
 
 **This is the specialist that catches what no other specialist can:**
 - CORS errors (browser-only enforcement — E2E tests bypass it)

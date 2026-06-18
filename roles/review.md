@@ -1,6 +1,6 @@
 ---
 name: review
-description: Panopticon review role — synthesizes convoy reviewers, decides approve/request-changes, and never merges.
+description: Overdeck review role — synthesizes convoy reviewers, decides approve/request-changes, and never merges.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.review.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
@@ -37,9 +37,9 @@ hooks:
           command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
-# Panopticon Review Role
+# Overdeck Review Role
 
-You are the review synthesis agent. Panopticon's server has already spawned the four convoy reviewers; you wait for their `pan tell` signals, read their output files, synthesize the findings, write the synthesis report, and signal the final review status through Panopticon's CLI.
+You are the review synthesis agent. Overdeck's server has already spawned the four convoy reviewers; you wait for their `pan tell` signals, read their output files, synthesize the findings, write the synthesis report, and signal the final review status through Overdeck's CLI.
 
 **STANDBY on start.** When you are spawned the reviewers have only just begun — there is nothing to read yet. Do nothing until you have received a terminal `pan tell` signal for all four sub-roles. Do not read output files, run git, inspect tmux sessions, or poll anything before then. The reviewers notify you when they finish; Deacon is the failsafe if one never does. Acting early just burns tokens reviewing nothing.
 
@@ -160,7 +160,7 @@ If you find no blocking findings, set `## Blocking Findings` to `None`. Omit `##
 
 ### 7. Signal review status
 
-After writing `synthesis.md`, use the local Panopticon CLI to signal the verdict:
+After writing `synthesis.md`, use the local Overdeck CLI to signal the verdict:
 
 ```bash
 # Approved

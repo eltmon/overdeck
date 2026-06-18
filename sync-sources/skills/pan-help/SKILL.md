@@ -1,6 +1,6 @@
 ---
 name: pan-help
-description: Overview of all Panopticon commands and capabilities
+description: Overview of all Overdeck commands and capabilities
 triggers:
   - pan help
   - panopticon help
@@ -11,15 +11,15 @@ allowed-tools:
   - Read
 ---
 
-# Panopticon Help
+# Overdeck Help
 
 ## Overview
 
-Panopticon is a multi-agent orchestration framework for AI coding assistants. This skill provides a comprehensive overview of all available commands and capabilities.
+Overdeck is a multi-agent orchestration framework for AI coding assistants. This skill provides a comprehensive overview of all available commands and capabilities.
 
 ## When to Use
 
-- User asks about Panopticon capabilities
+- User asks about Overdeck capabilities
 - User is confused about which command to use
 - First-time users exploring the system
 - User needs to discover available skills
@@ -37,7 +37,7 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan init` | Initialize Panopticon configuration (~/.panopticon/) | `pan init` |
+| `pan init` | Initialize Overdeck configuration (~/.panopticon/) | `pan init` |
 | `pan install` | Install prerequisites (Node.js, Docker, etc.) | `pan install` |
 | `pan up` | Start dashboard and services | `pan up` |
 | `pan down` | Stop dashboard and services | `pan down` |
@@ -73,7 +73,7 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan project add <path>` | Add project to Panopticon | `pan project add /home/user/myapp` |
+| `pan project add <path>` | Add project to Overdeck | `pan project add /home/user/myapp` |
 | `pan project list` | List managed projects | `pan project list` |
 | `pan project remove <name>` | Remove project | `pan project remove myapp` |
 
@@ -100,13 +100,13 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan update` | Update Panopticon to latest version | `pan update` |
+| `pan update` | Update Overdeck to latest version | `pan update` |
 | `pan backup` | Manage backups | `pan backup` |
 | `pan restore <timestamp>` | Restore from backup | `pan restore 2024-01-15-1200` |
 
 ## Available Skills
 
-Panopticon comes with a suite of skills to guide AI assistants:
+Overdeck comes with a suite of skills to guide AI assistants:
 
 ### Development Workflows
 - `/bug-fix` - Systematic bug investigation and fixing
@@ -130,7 +130,7 @@ Panopticon comes with a suite of skills to guide AI assistants:
 - `/web-design-guidelines` - UI/UX best practices
 - `/work-complete` - Checklist for completing work
 
-### Panopticon-Specific
+### Overdeck-Specific
 - `/pan-help` - This skill (overview of commands)
 - `/pan-install` - Installation guidance
 - `/pan-setup` - Configuration wizard
@@ -146,7 +146,7 @@ Panopticon comes with a suite of skills to guide AI assistants:
 
 ### First-Time Setup
 ```bash
-# 1. Initialize Panopticon
+# 1. Initialize Overdeck
 pan init
 
 # 2. Install prerequisites
@@ -195,14 +195,14 @@ pan workspace destroy PAN-5
 | File | Purpose |
 |------|---------|
 | `~/.panopticon.env` | Main configuration (API keys, tracker settings) |
-| `~/.panopticon/skills/` | Skills distributed with Panopticon |
+| `~/.panopticon/skills/` | Skills distributed with Overdeck |
 | `~/.panopticon/agents/` | Per-agent state and health |
 | `~/.panopticon/workspaces/` | Workspace metadata |
 | `~/.panopticon/backups/` | Configuration backups |
 
 ## Dashboard
 
-The Panopticon dashboard provides a visual interface for:
+The Overdeck dashboard provides a visual interface for:
 - Kanban board with all issues from configured trackers
 - Real-time agent monitoring (tmux session output)
 - Agent control (send messages, stop agents)
@@ -214,7 +214,7 @@ Access the dashboard at: **http://localhost:3001** (after running `pan up`)
 ## Troubleshooting
 
 **Problem:** `pan` command not found
-**Solution:** Run `npm install -g` in the Panopticon directory, or add `./node_modules/.bin` to PATH
+**Solution:** Run `npm install -g` in the Overdeck directory, or add `./node_modules/.bin` to PATH
 
 **Problem:** Dashboard won't start
 **Solution:** Check ports 3001/3002 aren't in use, run `pan doctor` to verify dependencies

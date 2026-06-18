@@ -1,12 +1,12 @@
 # Hierarchical Planning Strategy
 
-**How Panopticon structures planning across tracker hierarchies, using vBRIEF as the planning format and PRDs as human-authored input.**
+**How Overdeck structures planning across tracker hierarchies, using vBRIEF as the planning format and PRDs as human-authored input.**
 
 ---
 
 ## Overview
 
-Panopticon separates **requirements** (human intent) from **plans** (structured agent output) using two distinct artifact types:
+Overdeck separates **requirements** (human intent) from **plans** (structured agent output) using two distinct artifact types:
 
 - **PRD** — A human-authored markdown document describing requirements, context, and intent. Written before or alongside issue creation. Lives in `docs/prds/`.
 - **vBRIEF Plan** — A structured JSON document produced by Opus during the planning phase. Contains acceptance criteria, dependency DAGs, story decomposition, and architectural decisions. Created in `.planning/` during planning, then promoted to `vbrief/` lifecycle directories.
@@ -74,7 +74,7 @@ workspaces/feature-US101/
 
 ## vBRIEF Plan Format
 
-Panopticon adopts [vBRIEF](https://github.com/deftai/vBRIEF) (Basic Relational Intent Exchange Format) as its structured planning format. vBRIEF provides:
+Overdeck adopts [vBRIEF](https://github.com/deftai/vBRIEF) (Basic Relational Intent Exchange Format) as its structured planning format. vBRIEF provides:
 
 - **Graduated complexity** — A bug fix plan needs 4 fields. A multi-story feature gets a full DAG.
 - **Forced acceptance criteria** — Each requirement is a typed PlanItem with status, not a freeform checkbox.
@@ -305,7 +305,7 @@ No. The PRD is recommended but optional. If no PRD exists, Opus builds the vBRIE
 
 ### Why not plan at the feature level for all trackers?
 
-Linear and GitHub issues are already at the feature level. Adding story decomposition would mean inventing sub-issues that don't exist in the tracker. The hierarchy should come from the tracker, not be imposed by Panopticon.
+Linear and GitHub issues are already at the feature level. Adding story decomposition would mean inventing sub-issues that don't exist in the tracker. The hierarchy should come from the tracker, not be imposed by Overdeck.
 
 ### Why don't features get their own workspace?
 

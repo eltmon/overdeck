@@ -2,7 +2,7 @@ import { join } from 'path';
 import { readFile } from 'fs/promises';
 import yaml from 'js-yaml';
 import type { MemoryObservation } from '@overdeck/contracts';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import { searchMemory, type MemorySearchResult } from '../memory/cli.js';
 
 export const COMPLIANCE_MODES = ['off', 'advisory', 'enforcing'] as const;
@@ -68,7 +68,7 @@ async function readComplianceMisses(options: ComplianceStatusOptions & { project
     .filter((observation) => !options.session || observation.sessionId === options.session);
 }
 
-async function readComplianceMode(configPath = join(getPanopticonHome(), 'config.yaml')): Promise<ComplianceMode> {
+async function readComplianceMode(configPath = join(getOverdeckHome(), 'config.yaml')): Promise<ComplianceMode> {
   let parsed: unknown;
   try {
     parsed = yaml.load(await readFile(configPath, 'utf8'));

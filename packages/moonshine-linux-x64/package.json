@@ -1,7 +1,7 @@
 {
   "name": "moonshine-linux-x64",
   "version": "0.1.0",
-  "description": "Linux x64 Moonshine speech-to-text sidecar for Panopticon",
+  "description": "Linux x64 Moonshine speech-to-text sidecar for Overdeck",
   "license": "MIT",
   "type": "module",
   "os": [

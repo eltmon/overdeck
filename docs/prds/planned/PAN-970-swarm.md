@@ -6,9 +6,9 @@ Enable multiple work agents to execute vBRIEF items in parallel on the same issu
 
 ## Motivation
 
-Panopticon runs one work agent per issue. Items execute serially even when the vBRIEF DAG shows independent parallel lanes. PAN-969's Directive Flow visualizes these parallelization opportunities — swarm realizes them.
+Overdeck runs one work agent per issue. Items execute serially even when the vBRIEF DAG shows independent parallel lanes. PAN-969's Directive Flow visualizes these parallelization opportunities — swarm realizes them.
 
-Deft's swarm implementation relies on Warp terminal's undocumented `start_agent` + `send_message_to_agent` runtime tools, falling back to manual terminal tabs without Warp. Panopticon already owns:
+Deft's swarm implementation relies on Warp terminal's undocumented `start_agent` + `send_message_to_agent` runtime tools, falling back to manual terminal tabs without Warp. Overdeck already owns:
 
 - **tmux session management** — spawning, monitoring, and messaging agent sessions
 - **Cloister lifecycle orchestration** — stuck detection, specialist handoffs, completion signals

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Successfully implemented Traefik reverse proxy with HTTPS for local Panopticon development using `*.localhost` domains.
+Successfully implemented Traefik reverse proxy with HTTPS for local Overdeck development using `*.localhost` domains.
 
 ## Tasks Completed
 
@@ -25,7 +25,7 @@ All 7 planned tasks completed:
 - Updated `INIT_DIRS` to include Traefik directories
 
 **src/lib/config.ts**
-- Added `traefik?: { enabled, dashboard_port?, domain? }` to `PanopticonConfig` interface
+- Added `traefik?: { enabled, dashboard_port?, domain? }` to `OverdeckConfig` interface
 
 **src/cli/commands/install.ts**
 - Enhanced to create Traefik configuration files inline:

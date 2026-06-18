@@ -16,7 +16,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through syncing Panopticon skills to AI coding assistants. The sync process creates symlinks from `~/.panopticon/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
+This skill guides you through syncing Overdeck skills to AI coding assistants. The sync process creates symlinks from `~/.panopticon/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
 
 ## Auto-Sync
 
@@ -29,7 +29,7 @@ This skill guides you through syncing Panopticon skills to AI coding assistants.
 ## How Sync Works
 
 ```
-~/.panopticon/skills/          (Panopticon skills - source)
+~/.panopticon/skills/          (Overdeck skills - source)
         ↓ pan sync (creates symlinks)
 ~/.claude/skills/              (Claude Code)
 ~/.codex/skills/               (Codex)
@@ -123,7 +123,7 @@ backup_before_sync = true
 
 ## Conflict Handling
 
-A conflict occurs when a skill with the same name exists in the target directory but isn't a Panopticon symlink.
+A conflict occurs when a skill with the same name exists in the target directory but isn't a Overdeck symlink.
 
 ### Detecting Conflicts
 
@@ -145,7 +145,7 @@ pan sync
 pan sync --force
 ```
 
-**Option 3:** Keep both (rename Panopticon skill)
+**Option 3:** Keep both (rename Overdeck skill)
 ```bash
 # Not recommended - better to use unique names
 ```
@@ -155,7 +155,7 @@ pan sync --force
 ### Initial Setup
 
 ```bash
-# 1. Initialize Panopticon (copies bundled skills)
+# 1. Initialize Overdeck (copies bundled skills)
 pan init
 
 # 2. Preview what will be synced
@@ -171,7 +171,7 @@ pan sync
 ### After Adding Custom Skills
 
 ```bash
-# 1. Add skill to Panopticon directory
+# 1. Add skill to Overdeck directory
 mkdir -p ~/.panopticon/skills/my-skill
 # Create SKILL.md with proper frontmatter
 
@@ -182,7 +182,7 @@ pan sync
 pan skills
 ```
 
-### After Updating Panopticon
+### After Updating Overdeck
 
 ```bash
 # 1. Update package
@@ -197,7 +197,7 @@ pan sync
 
 ## Backups
 
-By default, Panopticon creates backups before syncing.
+By default, Overdeck creates backups before syncing.
 
 ### Backup Location
 
@@ -259,7 +259,7 @@ backup_before_sync = false
 
 ## Reserved Skill Names
 
-These names are reserved by Panopticon. Don't use them for custom skills:
+These names are reserved by Overdeck. Don't use them for custom skills:
 
 **Pan operations:** `pan-down`, `pan-help`, `pan-install`, `pan-issue`, `pan-plan`, `pan-quickstart`, `pan-setup`, `pan-status`, `pan-up`, `pan-config`, `pan-tracker`, `pan-projects`, `pan-sync`, `pan-docker`, `pan-network`, `pan-approve`, `pan-tell`, `pan-kill`, `pan-doctor`, `pan-diagnose`, `pan-logs`, `pan-rescue`
 

@@ -1,6 +1,6 @@
 ---
 name: pan-commit
-description: Create Panopticon repo commits that satisfy commitlint and husky on the first try
+description: Create Overdeck repo commits that satisfy commitlint and husky on the first try
 triggers:
   - commit these changes
   - create a commit
@@ -12,9 +12,9 @@ allowed-tools:
   - Read
 ---
 
-# Panopticon Commit Helper
+# Overdeck Commit Helper
 
-Use this skill when committing inside the Panopticon repo so the commit passes this repo's husky and commitlint checks on the first attempt.
+Use this skill when committing inside the Overdeck repo so the commit passes this repo's husky and commitlint checks on the first attempt.
 
 ## Repo Rules
 

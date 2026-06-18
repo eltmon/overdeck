@@ -21,7 +21,7 @@ pan admin hooks install
 ## What It Does
 
 Installs Claude Code hooks into your `.claude/` configuration that emit heartbeat events
-while agents are running. The Panopticon dashboard uses these heartbeats to track agent
+while agents are running. The Overdeck dashboard uses these heartbeats to track agent
 health and detect stuck or crashed agents.
 
 ## When to Use

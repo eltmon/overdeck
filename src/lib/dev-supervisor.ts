@@ -24,7 +24,7 @@
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export interface DevSupervisorMarker {
   /** PID of the `pan dev` process (the supervisor itself, not its children). */
@@ -35,7 +35,7 @@ export interface DevSupervisorMarker {
 }
 
 function markerPath(): string {
-  return join(getPanopticonHome(), 'dev-supervisor.json');
+  return join(getOverdeckHome(), 'dev-supervisor.json');
 }
 
 export function isProcessAlive(pid: number): boolean {

@@ -25,12 +25,12 @@
 
 ### Skills-merge (6 failures)
 
-**Cause:** Commit `093f184` (PAN-266) refactored `cleanupGitignore()` from deduplicating entries within Panopticon sections to **removing the entire Panopticon section** (skills are now file copies, not symlinks). Tests still expect the old deduplication behavior.
+**Cause:** Commit `093f184` (PAN-266) refactored `cleanupGitignore()` from deduplicating entries within Overdeck sections to **removing the entire Overdeck section** (skills are now file copies, not symlinks). Tests still expect the old deduplication behavior.
 
 **Failing tests:**
 1. `should not modify file without duplicates` — expects `cleaned: false`, gets `true`
 2. `should remove duplicate entries` — expects `duplicatesRemoved: 3`, gets `0`
-3. `should preserve user content before Panopticon section` — expects `duplicatesRemoved: 1`, gets `0`
+3. `should preserve user content before Overdeck section` — expects `duplicatesRemoved: 1`, gets `0`
 4. `should sort entries alphabetically` — expects first call `cleaned: false`, gets `true`
 5. `should handle severely duplicated content` — expects `duplicatesRemoved: 24`, gets `0`
 6. `cleanupWorkspaceGitignore > should target correct path` — expects `duplicatesRemoved: 1`, gets `0`
@@ -56,20 +56,20 @@ This fixes all 3 session-rotation failures.
 
 **File:** `tests/unit/lib/skills-merge.test.ts`
 
-The function now removes the entire Panopticon section instead of deduplicating. Update each failing test:
+The function now removes the entire Overdeck section instead of deduplicating. Update each failing test:
 
 1. **"should not modify file without duplicates"** (line 41-57):
    - Now DOES clean (removes the section): `cleaned: true`, `entriesAfter: 0`
-   - Rename test to reflect new behavior: "should remove Panopticon section even without duplicates"
-   - Verify user content is preserved and Panopticon section is gone
+   - Rename test to reflect new behavior: "should remove Overdeck section even without duplicates"
+   - Verify user content is preserved and Overdeck section is gone
 
 2. **"should remove duplicate entries"** (line 59-91):
    - Rewrite: `duplicatesRemoved: 0` (not deduplicating anymore), `entriesAfter: 0`
-   - Rename to "should remove entire Panopticon section including duplicates"
-   - Verify single Panopticon section AND entries are all removed
+   - Rename to "should remove entire Overdeck section including duplicates"
+   - Verify single Overdeck section AND entries are all removed
    - User content preserved
 
-3. **"should preserve user content before Panopticon section"** (line 93-123):
+3. **"should preserve user content before Overdeck section"** (line 93-123):
    - Just update `duplicatesRemoved` expectation from `1` to `0`
    - User content preservation checks stay the same
 
@@ -79,8 +79,8 @@ The function now removes the entire Panopticon section instead of deduplicating.
 
 5. **"should handle severely duplicated content"** (line 154-183):
    - Update: `duplicatesRemoved: 0`, `entriesAfter: 0`
-   - Still verify only one (zero) Panopticon sections remain and user content preserved
-   - Rename to "should remove all Panopticon sections from severely duplicated content"
+   - Still verify only one (zero) Overdeck sections remain and user content preserved
+   - Rename to "should remove all Overdeck sections from severely duplicated content"
 
 6. **"cleanupWorkspaceGitignore > should target correct path"** (line 187-203):
    - Update: `duplicatesRemoved: 0`, `entriesAfter: 0`

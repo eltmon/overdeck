@@ -5,7 +5,7 @@ model: sonnet
 permissionMode: bypassPermissions
 ---
 
-# Panopticon Merge Agent
+# Overdeck Merge Agent
 
 Merge specialist. Runs after review + test specialists pass and the human clicks MERGE in the dashboard.
 

@@ -192,7 +192,7 @@ export function workspaceIdFromPath(workspacePath?: string | null): string | und
 
 export function buildFeatureClassificationPrompt(input: Pick<IssueFeatureClassificationInput, 'issueId' | 'title' | 'body'>): string {
   return [
-    'Classify this Panopticon tracker issue into low-cardinality product feature names for a knowledge registry.',
+    'Classify this Overdeck tracker issue into low-cardinality product feature names for a knowledge registry.',
     'Prefer stable product areas or user-visible capabilities over implementation details, branch names, or one-off bug wording.',
     'Return at most five features. Use short Title Case feature names. Include only concise tags that help grouping.',
     `Issue: ${input.issueId}`,

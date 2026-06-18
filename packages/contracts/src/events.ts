@@ -972,7 +972,7 @@ export type CostEventRecordedEvent = typeof CostEventRecordedEvent.Type
 
 // ─── Conversation Events ──────────────────────────────────────────────────────
 
-/** Emitted (in-memory only, not persisted) when a Panopticon-native compaction starts or completes. */
+/** Emitted (in-memory only, not persisted) when a Overdeck-native compaction starts or completes. */
 export const ConversationCompactingChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.compacting_changed"),
   sequence: SequenceNumber,

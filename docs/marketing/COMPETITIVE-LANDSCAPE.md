@@ -1,7 +1,7 @@
 # Competitive Landscape — AI Coding Agent Orchestration
 
 > **What this is:** profiles, funding history, and positioning analysis for the
-> "mission control for coding agents" category Panopticon competes in.
+> "mission control for coding agents" category Overdeck competes in.
 > Research date: **June 10, 2026**. Funding figures are verified against the cited
 > sources; anything we could not verify is marked UNVERIFIED.
 >
@@ -21,7 +21,7 @@ Managed Agents), and (c) produced its first dead pool — **Terragon shut down F
 **Bloop (Vibe Kanban) shut down April 2026** — squeezed between free OSS below and
 incumbent bundling above. Worktree isolation + parallel agents + diff review is fully
 commoditized. The open whitespace is the **autonomous pipeline** — review→test→merge
-gates, backlog-draining loops, cost governance — which is exactly where Panopticon sits.
+gates, backlog-draining loops, cost governance — which is exactly where Overdeck sits.
 
 ---
 
@@ -39,7 +39,7 @@ gates, backlog-draining loops, cost governance — which is exactly where Panopt
 - **Traction claims:** 10x user growth since Jan 2026; users at Google, Meta, Amazon,
   Spotify, Ramp, Datadog, Block, Rippling.
 - **Pricing:** free app, BYO Claude/Codex subscription. Closed source. Mac-only.
-- **Gaps vs Panopticon:** no automated review→test→merge pipeline (human reviews every
+- **Gaps vs Overdeck:** no automated review→test→merge pipeline (human reviews every
   diff), no planning artifacts, no autonomy loop, no model routing, no cost governance.
 
 ### Subspace (subspace.build · "Codename")
@@ -50,7 +50,7 @@ gates, backlog-draining loops, cost governance — which is exactly where Panopt
 - **Funding:** undisclosed / UNVERIFIED — likely self/angel-funded.
 - **Pricing:** Free / Pro $12 mo / Teams coming. Closed source, Apple Silicon only.
 - **Read:** not a pipeline orchestrator — a workspace + memory layer. Its memory story
-  is the one category feature Panopticon doesn't lead on (pan memory/beads is adjacent).
+  is the one category feature Overdeck doesn't lead on (pan memory/beads is adjacent).
 
 ### Local-first orchestrators (nearest neighbors)
 
@@ -89,7 +89,7 @@ gates, backlog-draining loops, cost governance — which is exactly where Panopt
   reportedly raising at $50B+.
 - **Anthropic first-party:** Claude Code agent teams, parallel desktop/web sessions,
   Managed Agents (hosted session/sandbox primitives, May 2026). Steadily absorbing the
-  spawning layer Panopticon wraps.
+  spawning layer Overdeck wraps.
 - **Amp (Sourcegraph):** multi-agent, ad-supported free tier.
 
 ### Dead pool (12 months of category Darwinism)
@@ -112,11 +112,11 @@ Blitzy), or are incumbent features.
 isolation · diff review + merge button · multi-harness support · live terminals ·
 kanban framing · free-app-BYO-subscription pricing.
 
-**Rare or unique — Panopticon's ammunition:**
+**Rare or unique — Overdeck's ammunition:**
 
 | Capability | Who else has it | Angle |
 |:---|:---|:---|
-| Automated review→test→merge pipeline with quality gates | Almost nobody as a product; cockpits stop at "human reviews the diff" | **The** differentiator: everyone else ships a cockpit; Panopticon ships an assembly line |
+| Automated review→test→merge pipeline with quality gates | Almost nobody as a product; cockpits stop at "human reviews the diff" | **The** differentiator: everyone else ships a cockpit; Overdeck ships an assembly line |
 | Autonomous backlog-draining loop (Flywheel) | Charlie Labs (closed, cloud, TS-only); Ralph-loop OSS hacks (no gates) | "Your tracker drains itself, locally, with gates" |
 | Browser UAT as an automated pipeline stage | Nobody found | Genuinely unique |
 | Model-agnostic routing per pipeline role + harness policy | GitHub Agent HQ picks agents manually | "Right model per stage, automatically" |
@@ -125,7 +125,7 @@ kanban framing · free-app-BYO-subscription pricing.
 | Immutable plan artifacts feeding agents (vBRIEF/beads) | Gas Town beads; Entire Checkpoints (post-hoc provenance) | Governance/traceability story — Entire's $60M seed shows the market pays for it |
 | Merge train for agent fleets | Gas Town merge queue (no gates) | Solves the failure mode every parallel-agent tool creates |
 
-**Where Panopticon is behind:** cross-agent persistent memory (Subspace's whole
+**Where Overdeck is behind:** cross-agent persistent memory (Subspace's whole
 product), mobile/remote supervision (Omnara), laptop-closed cloud continuity (Conductor
 Cloud, Codex — our Fly.io remote workspaces are early), Mac-app onboarding polish
 (Conductor, Sculptor), and distribution against bundled incumbents.

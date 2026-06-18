@@ -42,7 +42,7 @@ function getModelProvider(modelId: ModelId): 'anthropic' | 'openai' | 'google' {
 }
 
 /**
- * Generate claude-code-router config from Panopticon settings (LEGACY)
+ * Generate claude-code-router config from Overdeck settings (LEGACY)
  *
  * @deprecated Use generateRouterConfigFromWorkTypes instead
  */

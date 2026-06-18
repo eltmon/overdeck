@@ -5,19 +5,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getPtyTokenPath, PTY_TOKEN_HEADER, readPtyToken, readPtyTokenSync, writePtyToken, writePtyTokenSync } from '../pty-token.js';
 
 let tmpHome: string;
-let previousPanopticonHome: string | undefined;
+let previousOverdeckHome: string | undefined;
 
 beforeEach(() => {
-  previousPanopticonHome = process.env.OVERDECK_HOME;
+  previousOverdeckHome = process.env.OVERDECK_HOME;
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-pty-token-'));
   process.env.OVERDECK_HOME = tmpHome;
 });
 
 afterEach(() => {
-  if (previousPanopticonHome === undefined) {
+  if (previousOverdeckHome === undefined) {
     delete process.env.OVERDECK_HOME;
   } else {
-    process.env.OVERDECK_HOME = previousPanopticonHome;
+    process.env.OVERDECK_HOME = previousOverdeckHome;
   }
   rmSync(tmpHome, { recursive: true, force: true });
 });

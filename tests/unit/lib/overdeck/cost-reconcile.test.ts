@@ -27,7 +27,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/paths.js')>();
   return {
     ...actual,
-    getPanopticonHome: vi.fn(() => '/fake/pan'),
+    getOverdeckHome: vi.fn(() => '/fake/pan'),
     OVERDECK_HOME:   '/fake/pan',
     AGENTS_DIR:        '/fake/pan/agents',
   };

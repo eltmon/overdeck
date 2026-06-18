@@ -36,7 +36,7 @@
     ],
     "narratives": {
       "Problem": "Dashboard typography has drifted into three competing systems: the intended canonical Tailwind tokens (DM Sans body, SF Mono, Space Grotesk display), a Mission Control island (Inter/SF Pro/Segoe UI hardcoded stacks, mono conversation titles), and ad hoc display-font and mono usage across non–God-View components. The style guide is ambiguous, so drift keeps returning.",
-      "Proposal": "Establish one enforceable policy: DM Sans for all non–God-View UI; SF Mono only for code and technical identifiers; Space Grotesk only for the sidebar Panopticon wordmark; God View untouched. Normalize canonical stacks in the typography foundation, eliminate the Mission Control island, convert non-wordmark display-font usage to DM Sans, replace ad hoc mono stacks, normalize conversation prose vs code, sweep the rest of the non–God-View dashboard, rewrite STYLE-GUIDE.md with crisp boundaries, align related PRDs/docs, and verify with static grep + isolated Playwright + quality gates."
+      "Proposal": "Establish one enforceable policy: DM Sans for all non–God-View UI; SF Mono only for code and technical identifiers; Space Grotesk only for the sidebar Overdeck wordmark; God View untouched. Normalize canonical stacks in the typography foundation, eliminate the Mission Control island, convert non-wordmark display-font usage to DM Sans, replace ad hoc mono stacks, normalize conversation prose vs code, sweep the rest of the non–God-View dashboard, rewrite STYLE-GUIDE.md with crisp boundaries, align related PRDs/docs, and verify with static grep + isolated Playwright + quality gates."
     },
     "items": [
       {
@@ -253,7 +253,7 @@
       },
       {
         "id": "sidebar-wordmark",
-        "title": "Restrict Sidebar font-display to Panopticon wordmark only",
+        "title": "Restrict Sidebar font-display to Overdeck wordmark only",
         "status": "completed",
         "priority": "medium",
         "created": "2026-04-20T22:50:32Z",
@@ -262,12 +262,12 @@
           "issueLabel": "pan-698"
         },
         "narrative": {
-          "Action": "Sidebar.tsx: keep font-display on the upper-left Panopticon wordmark only. All nav labels, section headings, badges, counts, and any other sidebar text use DM Sans. Document the wordmark carve-out with an inline comment referencing this issue."
+          "Action": "Sidebar.tsx: keep font-display on the upper-left Overdeck wordmark only. All nav labels, section headings, badges, counts, and any other sidebar text use DM Sans. Document the wordmark carve-out with an inline comment referencing this issue."
         },
         "subItems": [
           {
             "id": "sidebar-wordmark.ac1",
-            "title": "Only the Panopticon wordmark element uses font-display in Sidebar.tsx",
+            "title": "Only the Overdeck wordmark element uses font-display in Sidebar.tsx",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -398,7 +398,7 @@
         "subItems": [
           {
             "id": "sweep-audit.ac1",
-            "title": "grep -r 'font-display' src/dashboard/frontend --exclude-dir=GodView returns exactly one hit: the Sidebar.tsx Panopticon wordmark",
+            "title": "grep -r 'font-display' src/dashboard/frontend --exclude-dir=GodView returns exactly one hit: the Sidebar.tsx Overdeck wordmark",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -446,7 +446,7 @@
           "issueLabel": "pan-698"
         },
         "narrative": {
-          "Action": "design/style-guide/STYLE-GUIDE.md: rewrite the typography section to encode the final policy exactly. Default non–God-View UI = DM Sans. Technical strings/code = SF Mono (enumerate the categories). Sidebar Panopticon wordmark = only approved non–God-View display-font exception. Conversations = DM Sans prose, SF Mono for code and technical strings only. God View uses its own scoped system. Remove all ambiguous heuristics (e.g. 'use judgment if the heading has a g')."
+          "Action": "design/style-guide/STYLE-GUIDE.md: rewrite the typography section to encode the final policy exactly. Default non–God-View UI = DM Sans. Technical strings/code = SF Mono (enumerate the categories). Sidebar Overdeck wordmark = only approved non–God-View display-font exception. Conversations = DM Sans prose, SF Mono for code and technical strings only. God View uses its own scoped system. Remove all ambiguous heuristics (e.g. 'use judgment if the heading has a g')."
         },
         "subItems": [
           {

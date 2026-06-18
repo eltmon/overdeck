@@ -1,6 +1,6 @@
 ---
 name: unarchive-conversation
-description: Restore an archived Panopticon conversation by exact conversation name or by matching archived title. Use when the user asks to unarchive, restore, bring back, or reopen a Claude/Panopticon conversation such as "unarchive Models, Models, Models".
+description: Restore an archived Overdeck conversation by exact conversation name or by matching archived title. Use when the user asks to unarchive, restore, bring back, or reopen a Claude/Overdeck conversation such as "unarchive Models, Models, Models".
 triggers:
   - unarchive conversation
   - restore conversation
@@ -30,7 +30,7 @@ pan unarchive-conversation conv-153
 
 ## What It Does
 
-Restores an archived conversation to the active Panopticon conversation list.
+Restores an archived conversation to the active Overdeck conversation list.
 
 The command first checks for an exact archived conversation name match, then looks for archived title matches. If more than one archived conversation matches the title, it refuses and prints the matching conversation names so you can disambiguate safely.
 
@@ -49,6 +49,6 @@ The command first checks for an exact archived conversation name match, then loo
 ## See Also
 
 - `pan unarchive-conversation <query>` — restore the archived conversation
-- `conv-lookup` — find, read, or review a Panopticon conversation (works on archived ones too — the session file is always readable; only unarchive when you need it live in Mission Control)
+- `conv-lookup` — find, read, or review a Overdeck conversation (works on archived ones too — the session file is always readable; only unarchive when you need it live in Mission Control)
 - `pan show <id>` — inspect agent state for issue work
 - `pan status` — check running agent sessions

@@ -10,7 +10,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 import { Db, EventBus, Records, Tmux } from './infra.js';
 import { IssueId } from './issues.js';
 import { getOverdeckDatabaseSync } from './infra.js';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import type { AgentState } from '../agents.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
@@ -781,7 +781,7 @@ export interface BackfillAgentsSyncResult {
  */
 export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
   const db = getOverdeckDatabaseSync();
-  const agentsDir = join(getPanopticonHome(), 'agents');
+  const agentsDir = join(getOverdeckHome(), 'agents');
   const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNamesSync();
 
   let processed = 0;

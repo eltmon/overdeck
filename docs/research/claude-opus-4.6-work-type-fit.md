@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Anthropic's Claude Opus 4.6 against Panopticon's 23 work types. Opus 4.6 is Panopticon's current default for quality-critical work types (planning, review, security). Now superseded by Opus 4.7 (April 16, 2026) but remains the incumbent baseline.
+Evaluates Anthropic's Claude Opus 4.6 against Overdeck's 23 work types. Opus 4.6 is Overdeck's current default for quality-critical work types (planning, review, security). Now superseded by Opus 4.7 (April 16, 2026) but remains the incumbent baseline.
 
 ## Model Profile
 
@@ -81,7 +81,7 @@ Evaluates Anthropic's Claude Opus 4.6 against Panopticon's 23 work types. Opus 4
 
 ### The Incumbent
 
-Opus 4.6 is Panopticon's current quality anchor. It defaults on the work types where wrong answers have the highest blast radius: planning, pre-merge review, security review, requirements review. The question is no longer "is Opus 4.6 good enough" but "should it be replaced by Opus 4.7 or something cheaper."
+Opus 4.6 is Overdeck's current quality anchor. It defaults on the work types where wrong answers have the highest blast radius: planning, pre-merge review, security review, requirements review. The question is no longer "is Opus 4.6 good enough" but "should it be replaced by Opus 4.7 or something cheaper."
 
 ### Excellent Fit (Current Defaults)
 
@@ -167,7 +167,7 @@ Opus 4.7 improves across the board:
 
 **But:** New tokenizer inflates token count 1-1.35x, partially offsetting the same $5/$25 pricing. Breaking API changes (no budget_tokens, no sampling params) require code updates.
 
-**Verdict:** Yes, upgrade. The improvements are substantial across every dimension that matters for Panopticon's quality-critical work types.
+**Verdict:** Yes, upgrade. The improvements are substantial across every dimension that matters for Overdeck's quality-critical work types.
 
 ---
 
@@ -182,7 +182,7 @@ Opus 4.7 improves across the board:
 
 ## Integration Notes
 
-- Anthropic is the primary provider in Panopticon
+- Anthropic is the primary provider in Overdeck
 - Model ID: `claude-opus-4-6`
 - Superseded by `claude-opus-4-7` as of April 16, 2026
 - Suggested capability scores: code-generation 86, code-review 92, debugging 88, planning 96, documentation 88, testing 84, security 94, performance 86, synthesis 90, speed 42, context-length 98

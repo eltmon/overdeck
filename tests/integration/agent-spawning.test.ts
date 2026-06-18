@@ -229,10 +229,10 @@ vi.mock('../../src/lib/beads-query.js', async (importOriginal) => {
 });
 
 describe('PAN-1048 role primitive — agent spawning', () => {
-  let testPanopticonHome: string;
+  let testOverdeckHome: string;
   let testAgentsDir: string;
   let testWorkspace: string;
-  const originalPanopticonHome = process.env.OVERDECK_HOME;
+  const originalOverdeckHome = process.env.OVERDECK_HOME;
   const originalPromptReadyTimeout = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
   const originalPath = process.env.PATH;
   const originalTmuxSocketName = process.env.OVERDECK_TMUX_SOCKET_NAME;
@@ -277,16 +277,16 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   });
 
   beforeEach(async () => {
-    testPanopticonHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    testAgentsDir = join(testPanopticonHome, 'agents');
+    testOverdeckHome = join(tmpdir(), `pan-home-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testAgentsDir = join(testOverdeckHome, 'agents');
     // PAN-1752: spawn paths hard-fail on a missing workspace dir (PAN-1746
     // gate in assertWorkspaceStackHealthyForSpawn), so the fixture workspace
     // must actually exist — a bare '/tmp/test-workspace' literal only passed
     // when leftover state happened to be on the machine.
-    testWorkspace = join(testPanopticonHome, 'test-workspace');
+    testWorkspace = join(testOverdeckHome, 'test-workspace');
     mkdirSync(testAgentsDir, { recursive: true });
     mkdirSync(testWorkspace, { recursive: true });
-    process.env.OVERDECK_HOME = testPanopticonHome;
+    process.env.OVERDECK_HOME = testOverdeckHome;
     process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS = '1';
     // This suite verifies the role primitive and prompt-delivery paths with a
     // mocked tmux runtime. Keep PTY-supervisor wiring out of scope so the tests
@@ -297,7 +297,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     // on PATH for the duration of this test. This keeps harness resolution
     // deterministic regardless of whether the real `pi` CLI is installed on
     // the runner (PAN-1859).
-    const piBinDir = join(testPanopticonHome, 'bin');
+    const piBinDir = join(testOverdeckHome, 'bin');
     mkdirSync(piBinDir, { recursive: true });
     const piStub = join(piBinDir, 'pi');
     writeFileSync(piStub, '#!/bin/sh\nexit 0\n');
@@ -337,8 +337,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   afterEach(async () => {
     vi.useRealTimers();
     await closeFeatureRegistryStorage();
-    if (originalPanopticonHome) {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+    if (originalOverdeckHome) {
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     } else {
       delete process.env.OVERDECK_HOME;
     }
@@ -357,13 +357,13 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     } else {
       delete process.env.OVERDECK_DOCKER_WORKSPACE;
     }
-    if (existsSync(testPanopticonHome)) {
-      rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
+    if (existsSync(testOverdeckHome)) {
+      rmSync(testOverdeckHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
     }
   });
 
   function writeResumableWorkAgent(agentId: string, kickoffDelivered: boolean | undefined, withPrompt = true): string {
-    const workspace = join(testPanopticonHome, `${agentId}-workspace`);
+    const workspace = join(testOverdeckHome, `${agentId}-workspace`);
     mkdirSync(workspace, { recursive: true });
     const agentDir = getAgentDir(agentId);
     mkdirSync(agentDir, { recursive: true });
@@ -509,7 +509,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       vi.setSystemTime(new Date('2026-06-05T21:00:00.000Z'));
       const tmux = await import('../../src/lib/tmux.js');
-      const workspace = join(testPanopticonHome, 'ghost-workspace');
+      const workspace = join(testOverdeckHome, 'ghost-workspace');
       mkdirSync(workspace, { recursive: true });
       let createCount = 0;
       let sessionAlive = false;
@@ -1043,7 +1043,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
     it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
       const tmux = await import('../../src/lib/tmux.js');
-      const binDir = join(testPanopticonHome, 'bin');
+      const binDir = join(testOverdeckHome, 'bin');
       mkdirSync(binDir, { recursive: true });
       const fakePi = join(binDir, 'pi');
       writeFileSync(fakePi, '#!/bin/sh\nexit 0\n');

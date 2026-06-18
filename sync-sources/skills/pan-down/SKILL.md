@@ -1,6 +1,6 @@
 ---
 name: pan-down
-description: "pan down — stop the Panopticon dashboard and services"
+description: "pan down — stop the Overdeck dashboard and services"
 triggers:
   - stop panopticon
   - shutdown dashboard
@@ -11,15 +11,15 @@ allowed-tools:
   - Read
 ---
 
-# Stop Panopticon Services
+# Stop Overdeck Services
 
 ## Overview
 
-This skill guides you through gracefully stopping all Panopticon services, including the dashboard, API server, Traefik, and optionally workspace containers.
+This skill guides you through gracefully stopping all Overdeck services, including the dashboard, API server, Traefik, and optionally workspace containers.
 
 ## When to Use
 
-- User wants to stop Panopticon services
+- User wants to stop Overdeck services
 - User needs to free up ports 3001/3002
 - User wants to restart services (stop then start)
 - System is shutting down or rebooting
@@ -37,7 +37,7 @@ When you run `pan down`, the following services stop:
 ## Basic Usage
 
 ```bash
-# Stop all Panopticon services
+# Stop all Overdeck services
 pan down
 
 # Stop dashboard and Traefik
@@ -54,7 +54,7 @@ pan down --skip-traefik
 Before stopping, see what's currently running:
 
 ```bash
-# Check Panopticon status
+# Check Overdeck status
 pan status
 
 # Check running agents
@@ -403,7 +403,7 @@ After stopping services:
 
 - **Restart**: Use `pan up` to start again
 - **Configuration**: Edit `~/.panopticon.env` while services are down
-- **Updates**: Run `pan update` to update Panopticon
+- **Updates**: Run `pan update` to update Overdeck
 - **Cleanup**: Clean up logs and old workspaces
 
 ## Related Skills

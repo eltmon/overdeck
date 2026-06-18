@@ -1,4 +1,4 @@
-# Panopticon Style Guide
+# Overdeck Style Guide
 
 **Version:** 1.2
 **Issue:** PAN-460 (v1.1) · PAN-1148 (v1.2 signal-semantics tightening)
@@ -7,7 +7,7 @@
 
 ---
 
-This is the canonical reference for all Panopticon dashboard UI decisions. Every new feature and every existing component must conform to this guide. If something isn't covered here, look at T3Code's implementation first, then ask.
+This is the canonical reference for all Overdeck dashboard UI decisions. Every new feature and every existing component must conform to this guide. If something isn't covered here, look at T3Code's implementation first, then ask.
 
 **Visual reference:** [`docs/design/mockups/system-map-opus.html`](../../docs/design/mockups/system-map-opus.html) — the PAN-1148 unified-redesign system map. Section **05 · Color discipline** renders the signal-color table below as live swatches with where-used examples; sections 03 (shared primitives) and 02 (the five surfaces) show the components of this guide composed in context. The written counterpart of section 05 is [`docs/prds/planned/pan-dashboard-unified-redesign.md`](../../docs/prds/planned/pan-dashboard-unified-redesign.md) §4.5 "Color & Style Discipline". Conformance is exercised by `tests/e2e/styleguide-conformance.spec.ts`.
 
@@ -38,7 +38,7 @@ This is the canonical reference for all Panopticon dashboard UI decisions. Every
 
 ### Why These Fonts
 
-- **Space Grotesk** — geometric, technical, tight apertures. Conveys precision and monitoring. Reserved exclusively for the "Panopticon" sidebar wordmark (the single approved non–God-View display-font exception).
+- **Space Grotesk** — geometric, technical, tight apertures. Conveys precision and monitoring. Reserved exclusively for the "Overdeck" sidebar wordmark (the single approved non–God-View display-font exception).
 - **DM Sans** — clean geometric sans with a distinctive single-story "g" (open tail). Variable weight (300–800) gives fine typographic control. Excellent legibility at small sizes in data-dense layouts. The universal default for all non–God-View UI text.
 - **SF Mono** — the standard for terminal and code rendering. Falls back gracefully across platforms. Used only for code, terminal output, and technical identifiers.
 
@@ -121,7 +121,7 @@ Use `font-mono` (canonical SF Mono stack) exclusively for:
 - vBRIEF IDs, issue IDs when shown as identifiers
 - Any string presented as a technical token rather than human-readable prose
 
-**Rule 3: Space Grotesk (`font-display`) is ONLY for the sidebar "Panopticon" wordmark.**
+**Rule 3: Space Grotesk (`font-display`) is ONLY for the sidebar "Overdeck" wordmark.**
 No other non–God-View surface uses `font-display`. Page titles, section headings, nav labels, stat values, card titles — all DM Sans.
 
 **Rule 4: God View (`src/dashboard/frontend/src/components/GodView/*`) uses its own scoped typography system.**
@@ -141,7 +141,7 @@ These patterns have been eliminated from the codebase. Do not reintroduce them:
 - `-apple-system`, `BlinkMacSystemFont`, `"Segoe UI"` in font stacks
 - `"Inter"`, `"SF Pro"` as primary fonts
 - `Menlo`, `Monaco`, `"Courier New"` in mono stacks
-- `font-display` on any element other than the sidebar Panopticon wordmark
+- `font-display` on any element other than the sidebar Overdeck wordmark
 - `font-mono` on conversation titles, badge labels, button text, or any other UI prose
 
 ---
@@ -193,7 +193,7 @@ Colors are defined as CSS custom properties on `:root` (light) and via `@variant
   --warning: var(--color-amber-500);
   --warning-foreground: var(--color-amber-700);
 
-  /* Panopticon-specific */
+  /* Overdeck-specific */
   --signal-review: var(--color-purple-500);
   --signal-review-foreground: var(--color-purple-700);
   --signal-cost: var(--color-cyan-500);
@@ -677,7 +677,7 @@ Animation:
 
 ```
 Sidebar
-├── Logo section (Panopticon eye + text)
+├── Logo section (Overdeck eye + text)
 ├── Group: OPERATIONS
 │   ├── Command Deck (Compass icon)
 │   ├── Board (LayoutGrid icon)

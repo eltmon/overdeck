@@ -73,11 +73,11 @@ function resolveAgentIdOrExit(): string {
 }
 
 const INSTRUCTIONS = [
-  'Panopticon orchestrator bridge.',
+  'Overdeck orchestrator bridge.',
   '',
   'When you receive a `notifications/channel` message with `params.source` set',
   'to `panopticon-bridge`, the body is operator-supplied text from the',
-  'Panopticon dashboard or CLI that is being delivered out-of-band of the',
+  'Overdeck dashboard or CLI that is being delivered out-of-band of the',
   'normal user-prompt input stream. Treat the body as if the user had typed',
   'it into the prompt and continue the conversation accordingly.',
   '',
@@ -221,16 +221,16 @@ installPermissionRequestHandler(server);
  * Resolve OVERDECK_HOME with the same fallback semantics as the rest of the
  * codebase: env var first, then ~/.panopticon.
  */
-export function getPanopticonHome(): string {
+export function getOverdeckHome(): string {
   return process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
 }
 
 export function getSocketPath(agentId: string): string {
-  return join(getPanopticonHome(), 'sockets', `agent-${agentId}.sock`);
+  return join(getOverdeckHome(), 'sockets', `agent-${agentId}.sock`);
 }
 
 export function getBridgeLogPath(agentId: string): string {
-  return join(getPanopticonHome(), 'logs', `bridge-${agentId}.log`);
+  return join(getOverdeckHome(), 'logs', `bridge-${agentId}.log`);
 }
 
 function getDashboardBaseUrl(): string {

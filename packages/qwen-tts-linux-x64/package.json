@@ -1,7 +1,7 @@
 {
   "name": "qwen-tts-linux-x64",
   "version": "0.1.0",
-  "description": "Linux x64 Qwen TTS daemon Python environment for Panopticon",
+  "description": "Linux x64 Qwen TTS daemon Python environment for Overdeck",
   "license": "MIT",
   "type": "module",
   "os": [

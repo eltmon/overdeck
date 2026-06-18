@@ -100,13 +100,13 @@ describe('pan project(s) add — option parsing', () => {
     const { stdout, status } = runCli(['projects', 'add', '--help']);
     expect(status).toBe(0);
     expect(stdout).toMatch(/Usage: pan projects add \[options\] <path>/);
-    expect(stdout).toMatch(/Register a project with Panopticon/);
+    expect(stdout).toMatch(/Register a project with Overdeck/);
   });
 
   it('keeps the singular project command working', () => {
     const { stdout, status } = runCli(['project', 'add', '--help']);
     expect(status).toBe(0);
     expect(stdout).toMatch(/Usage: pan project add \[options\] <path>/);
-    expect(stdout).toMatch(/Register a project with Panopticon/);
+    expect(stdout).toMatch(/Register a project with Overdeck/);
   });
 });

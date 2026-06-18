@@ -13,7 +13,7 @@ import {
   pushPermissionDecisionNotification,
   getSocketPath,
   getBridgeLogPath,
-  getPanopticonHome,
+  getOverdeckHome,
 } from '../panopticon-bridge.js';
 
 const REPO_ROOT = process.cwd();
@@ -209,7 +209,7 @@ describe('pushChannelNotification (in-process protocol)', () => {
   });
 
   it('exposes a deterministic socket path under OVERDECK_HOME', () => {
-    expect(getPanopticonHome()).toBe(tmpHome);
+    expect(getOverdeckHome()).toBe(tmpHome);
     expect(getSocketPath('xyz')).toBe(join(tmpHome, 'sockets', 'agent-xyz.sock'));
   });
 });

@@ -95,7 +95,7 @@ vi.mock('../paths.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../paths.js')>()),
   AGENTS_DIR: '/tmp/test/agents',
   COSTS_DIR: '/tmp/test-costs',
-  getPanopticonHome: () => '/tmp/test',
+  getOverdeckHome: () => '/tmp/test',
 }));
 
 import { getAgentStateSync, listRunningAgentsSync, resolveAgentTargetSync } from '../agents.js';

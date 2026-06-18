@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Lock the intended merge-system design for Panopticon.
+Lock the intended merge-system design for Overdeck.
 
 This document defines the target architecture we want to build toward. It is not a description of current behavior.
 
@@ -77,9 +77,9 @@ That means the merge system must understand:
 
 ### 7. Repo identity, target branches, and gate applicability come from project configuration
 
-Panopticon must not infer repo identity or merge behavior from guessed directory names.
+Overdeck must not infer repo identity or merge behavior from guessed directory names.
 
-The source of truth is the configured repo model for the project. For each repo in a merge set, Panopticon must resolve from configuration:
+The source of truth is the configured repo model for the project. For each repo in a merge set, Overdeck must resolve from configuration:
 
 - repo key
 - repo path
@@ -110,7 +110,7 @@ For polyrepo:
 
 - one PR/MR per affected repo
 
-5. Panopticon records merge-set metadata for the issue:
+5. Overdeck records merge-set metadata for the issue:
 
 - affected repos
 - repo key and repo path for each repo
@@ -129,7 +129,7 @@ For polyrepo:
 ### Phase 3: Merge Orchestration
 
 10. A human clicks `MERGE`.
-11. Panopticon places the issue into a project-scoped SQLite merge queue.
+11. Overdeck places the issue into a project-scoped SQLite merge queue.
 12. When the issue reaches the front of the queue, the merge agent resolves the full merge plan for the issue.
 13. The merge agent instructs the work agent to rebase every affected branch onto the latest target branch.
 14. The work agent performs the rebases, resolves conflicts, and pushes the rebased branches.
@@ -151,7 +151,7 @@ Merge execution then diverges by workspace type:
 
 ### Phase 4: Handoff and Cleanup
 
-21. After merge success, Panopticon emits a merged change-set manifest.
+21. After merge success, Overdeck emits a merged change-set manifest.
 22. If the project has release configuration, that manifest is handed to the release specialist defined by PAN-399.
 23. Post-merge lifecycle cleanup runs.
 
@@ -223,7 +223,7 @@ Needed outcomes:
 
 ### 2. Merge-Set Data Model
 
-Panopticon needs a first-class merge-set model for an issue.
+Overdeck needs a first-class merge-set model for an issue.
 
 Minimum required fields:
 
@@ -256,7 +256,7 @@ The post-rebase verification path must validate the rebased heads without perfor
 
 ### 5. Forge Abstraction for Merge Artifacts
 
-Panopticon must support forge-specific create/view/merge behavior behind one repo-level abstraction.
+Overdeck must support forge-specific create/view/merge behavior behind one repo-level abstraction.
 
 Required targets:
 

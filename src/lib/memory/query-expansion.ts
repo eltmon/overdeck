@@ -150,7 +150,7 @@ export function buildQueryExpansionPrompt(input: QueryExpansionInput): string {
     .join('\n\n');
 
   return [
-    'Expand this Panopticon memory retrieval prompt into 3-5 concise BM25 search terms.',
+    'Expand this Overdeck memory retrieval prompt into 3-5 concise BM25 search terms.',
     'Prefer concrete file names, symbols, feature names, errors, decisions, and domain tags.',
     'Return terms that should retrieve durable observations; do not explain them.',
     `User prompt:\n${input.prompt}`,

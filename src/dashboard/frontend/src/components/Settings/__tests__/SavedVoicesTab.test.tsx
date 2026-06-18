@@ -86,7 +86,7 @@ describe('SavedVoicesTab', () => {
       expect(global.fetch).toHaveBeenCalledWith('/api/tts/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voiceId: 'voice-preset', text: 'This is a Panopticon TTS voice test.', preview: true }),
+        body: JSON.stringify({ voiceId: 'voice-preset', text: 'This is a Overdeck TTS voice test.', preview: true }),
       });
     });
   });

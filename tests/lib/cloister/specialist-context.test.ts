@@ -63,7 +63,7 @@ vi.mock('../../../src/lib/config-yaml.js', async () => {
 
 describe('specialist-context', () => {
   let testDir: string;
-  const originalPanopticonHome = process.env.OVERDECK_HOME;
+  const originalOverdeckHome = process.env.OVERDECK_HOME;
 
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), 'panopticon-test-context-'));
@@ -75,7 +75,7 @@ describe('specialist-context', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    process.env.OVERDECK_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalOverdeckHome;
   });
 
   describe('getContextDirectory', () => {

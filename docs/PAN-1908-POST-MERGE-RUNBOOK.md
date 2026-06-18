@@ -1,6 +1,6 @@
 # PAN-1908 Post-Merge Close-Out Runbook
 
-**Execute only after the PAN-1908 PR has been merged to `main`.** This runbook performs the external tracker hygiene and Panopticon pipeline cleanup mandated by PRD §12. It is intentionally manual — implementation agents MUST NOT run these commands before merge (D5).
+**Execute only after the PAN-1908 PR has been merged to `main`.** This runbook performs the external tracker hygiene and Overdeck pipeline cleanup mandated by PRD §12. It is intentionally manual — implementation agents MUST NOT run these commands before merge (D5).
 
 ## 1. Prerequisites
 
@@ -10,7 +10,7 @@
 
 ## 2. §12a — Close fully resolved issues (5)
 
-For each issue below, close the GitHub issue with a comment referencing this PRD/PR, then clear its Panopticon pipeline state.
+For each issue below, close the GitHub issue with a comment referencing this PRD/PR, then clear its Overdeck pipeline state.
 
 ### PAN-1436 — stale stopped-agent zombies pollute the dashboard list
 
@@ -113,7 +113,7 @@ gh issue comment <NUMBER> --repo eltmon/panopticon-cli \
 After running the §12a closes and §12b narrows:
 
 1. Confirm each §12a issue shows `closed` on GitHub.
-2. Confirm the issues no longer appear in the Panopticon Command Deck or `pan status` output.
+2. Confirm the issues no longer appear in the Overdeck Command Deck or `pan status` output.
 3. Confirm each §12b issue has a comment referencing PAN-1908 and a narrowed title or `narrowed-by-pan-1908` label.
 4. Run `pan doctor` to verify no orphaned review-status/merge rows reference the closed issues.
 

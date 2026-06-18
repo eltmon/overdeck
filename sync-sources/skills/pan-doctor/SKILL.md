@@ -1,6 +1,6 @@
 ---
 name: pan-doctor
-description: "pan doctor [options] — check Panopticon system health, dependencies, and configuration"
+description: "pan doctor [options] — check Overdeck system health, dependencies, and configuration"
 triggers:
   - pan doctor
   - system health
@@ -16,7 +16,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through checking the health of your Panopticon installation, including configuration, dependencies, and running services.
+This skill guides you through checking the health of your Overdeck installation, including configuration, dependencies, and running services.
 
 ## When to Use
 
@@ -208,7 +208,7 @@ tmux kill-session -t test
 
 ## Maintenance Tasks
 
-### Update Panopticon
+### Update Overdeck
 
 ```bash
 npm update -g panopticon

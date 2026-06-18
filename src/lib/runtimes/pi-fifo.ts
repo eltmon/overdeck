@@ -34,7 +34,7 @@ import { join } from 'node:path'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 import { Data, Effect } from 'effect'
-import { getPanopticonHome } from '../paths.js'
+import { getOverdeckHome } from '../paths.js'
 
 const execAsync = promisify(exec)
 
@@ -53,7 +53,7 @@ export class PiNotReady extends Error {
 }
 
 export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
-  const panopticonHome = home === undefined ? getPanopticonHome() : join(home, '.panopticon')
+  const panopticonHome = home === undefined ? getOverdeckHome() : join(home, '.panopticon')
   const agentDir = join(panopticonHome, 'agents', agentId)
   return {
     agentDir,

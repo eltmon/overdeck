@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates OpenAI's GPT-5.4 Mini against Panopticon's 23 work types. Mini is the mid-tier variant — faster and cheaper than standard GPT-5.4, positioned as a Sonnet/Haiku competitor.
+Evaluates OpenAI's GPT-5.4 Mini against Overdeck's 23 work types. Mini is the mid-tier variant — faster and cheaper than standard GPT-5.4, positioned as a Sonnet/Haiku competitor.
 
 ## Model Profile
 
@@ -198,7 +198,7 @@ Synthesis needs concise output. GPT-5.4 family's verbosity works against this.
 
 ## Integration Notes
 
-- OpenAI already configured in Panopticon
+- OpenAI already configured in Overdeck
 - Model ID: `gpt-5.4-mini`
 - Available via OpenAI API and CLIProxyAPI sidecar
 - Reasoning effort should be configurable per work type

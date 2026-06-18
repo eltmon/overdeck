@@ -1,6 +1,6 @@
 ---
 name: pan-admin-config
-description: "pan admin config <cmd> — view and edit Panopticon project configuration"
+description: "pan admin config <cmd> — view and edit Overdeck project configuration"
 triggers:
   - pan admin config
   - panopticon config

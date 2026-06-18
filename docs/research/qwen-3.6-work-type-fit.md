@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Alibaba's Qwen 3.6 family against Panopticon's 23 work types. Two variants exist:
+Evaluates Alibaba's Qwen 3.6 family against Overdeck's 23 work types. Two variants exist:
 
 - **Qwen 3.6 Plus** — proprietary API-only flagship, undisclosed parameter count, 1M context window
 - **Qwen 3.6-35B-A3B** — open-weight (Apache 2.0), 35B total / 3B active MoE, 262K context
@@ -69,7 +69,7 @@ The "Plus" designation in Qwen's naming is their proprietary API tier (same patt
 | NL2Repo | 37.9% | -- | -- | -- | -- | 39.8% (self) | 43.2% |
 | Claw-Eval | 58.7% | 59.6% | -- | -- | 52.9% | -- | -- |
 
-**Standout:** Terminal-Bench 2.0 at 61.6% — beats Claude Opus 4.6 (59.3%). This benchmark measures real terminal/CLI agent work, directly relevant to Panopticon's implementation agents.
+**Standout:** Terminal-Bench 2.0 at 61.6% — beats Claude Opus 4.6 (59.3%). This benchmark measures real terminal/CLI agent work, directly relevant to Overdeck's implementation agents.
 
 #### Reasoning & Knowledge
 
@@ -114,7 +114,7 @@ Note: Qwen has not published GPQA/AIME scores for 3.6 Plus specifically. BenchLM
 
 ## Standout Capabilities
 
-1. **Terminal-Bench 2.0 leader (Plus)** — 61.6% beats Claude Opus 4.6 (59.3%). Best benchmark result for real terminal/CLI agent work. Directly maps to Panopticon's implementation workflow.
+1. **Terminal-Bench 2.0 leader (Plus)** — 61.6% beats Claude Opus 4.6 (59.3%). Best benchmark result for real terminal/CLI agent work. Directly maps to Overdeck's implementation workflow.
 2. **1M context window (Plus)** — largest among competitors at this quality tier. Enables full-codebase reasoning without chunking. Critical for exploration and large refactors.
 3. **Best document/vision understanding** — OmniDocBench 91.2%, RealWorldQA 85.4%. Leads the field by significant margins. Has native vision — unlike GLM-5.1 and M2.7 which are text-only.
 4. **Native MCP + Computer Use** — built-in MCP tool integration and GUI interaction. Purpose-built for agentic workflows.
@@ -132,7 +132,7 @@ Note: Qwen has not published GPQA/AIME scores for 3.6 Plus specifically. BenchLM
 3. **NL2Repo gap** — 37.9% vs Gemini 3 Pro at 43.2%. Weaker at generating entire repositories from scratch.
 4. **Security coding** — only 43.3% hidden test success rate on security tasks. Concerning for security-adjacent work.
 5. **Closed-weight flagship** — Plus model is API-only, disappointing given Alibaba's open-source reputation. HN developers frustrated.
-6. **Data privacy concerns** — Alibaba's data terms are a red flag for production use with sensitive code. Panopticon agents process proprietary codebases.
+6. **Data privacy concerns** — Alibaba's data terms are a red flag for production use with sensitive code. Overdeck agents process proprietary codebases.
 7. **No long-term track record** — brand new (late March/early April 2026). Production reliability unproven.
 8. **Benchmark comparison controversy** — Alibaba compared against Claude 4.5 Opus (not current 4.6), which developers called deceptive.
 9. **TTFT on free tier** — 11.5s average time-to-first-token. May not apply to paid API but worth monitoring.
@@ -197,7 +197,7 @@ Logic review. The reasoning concern (BenchLM 44.2/100) is relevant here — corr
 
 **Key differentiator:** Plus has vision AND native computer use. OmniDocBench 91.2% and RealWorldQA 85.4% show best-in-class visual understanding. Unlike GLM-5.1 (disqualified, no vision) and M2.7 (disqualified, no vision), Plus can analyze Playwright screenshots effectively. Native computer use capability aligns with browser-based UAT.
 
-**Concern:** Playwright MCP integration with Qwen models hasn't been tested in Panopticon. Need validation.
+**Concern:** Playwright MCP integration with Qwen models hasn't been tested in Overdeck. Need validation.
 
 #### `specialist-merge-agent`
 **Current default:** Claude Sonnet 4.6 | **Qwen 3.6 Plus fit:** Good
@@ -268,7 +268,7 @@ TTFT concerns and hallucination reports make this unsuitable for user-facing int
 
 **Assessment:** Qwen 3.6 Plus has the best Terminal-Bench score, fastest speed, largest context window, native MCP, and vision — on paper the most well-rounded implementation candidate. The concerns are hallucination reports and the unproven reasoning score. GLM-5.1 leads on SWE-Bench Pro and autonomous endurance. M2.7 wins on raw cost.
 
-**Recommendation:** Benchmark Qwen 3.6 Plus alongside GLM-5.1 and K2.5 on 5-10 real implementation issues. If hallucination concerns don't manifest in Panopticon's structured bead workflow (which constrains scope per step), Plus could become the default implementation model.
+**Recommendation:** Benchmark Qwen 3.6 Plus alongside GLM-5.1 and K2.5 on 5-10 real implementation issues. If hallucination concerns don't manifest in Overdeck's structured bead workflow (which constrains scope per step), Plus could become the default implementation model.
 
 ---
 
@@ -282,7 +282,7 @@ The open-weight Qwen 3.6-35B-A3B deserves separate mention for potential self-ho
 - **Apache 2.0** — no licensing concerns
 - **Potential use:** Local subagent for `subagent:explore` and `subagent:bash` where you want zero API cost and can tolerate slightly lower quality
 
-This model could be interesting for Panopticon's self-hosted deployment story if/when that becomes a goal.
+This model could be interesting for Overdeck's self-hosted deployment story if/when that becomes a goal.
 
 ---
 
@@ -306,7 +306,7 @@ Alibaba Cloud's data terms should be reviewed before routing proprietary codebas
 ## Integration Notes
 
 - Qwen is available via Alibaba Bailian API and OpenRouter
-- Would need a new provider in Panopticon (or route through OpenRouter)
+- Would need a new provider in Overdeck (or route through OpenRouter)
 - Model IDs: `qwen3.6-plus` (API), `qwen/qwen3.6-plus` (OpenRouter)
 - Suggested capability scores (Plus):
   - code-generation: 90, code-review: 86, debugging: 82, planning: 72, documentation: 82, testing: 88, security: 70, performance: 82, synthesis: 80, speed: 80, context-length: 98

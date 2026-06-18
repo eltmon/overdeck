@@ -1,4 +1,4 @@
-# Workflow Orchestration Landscape & Panopticon Enhancement Proposal
+# Workflow Orchestration Landscape & Overdeck Enhancement Proposal
 
 > Research conducted 2026-04-28. Tools analyzed: vBRIEF (adopted), Deft Directive (local),
 > Superpowers (local), Spec Kit (GitHub), OpenSpec (Fission-AI), Taskmaster (claude-task-master),
@@ -10,7 +10,7 @@
 
 ### 1.1 What We Have Today
 
-Panopticon's current pipeline:
+Overdeck's current pipeline:
 
 ```
 Issue (GitHub/Linear)
@@ -36,7 +36,7 @@ Issue (GitHub/Linear)
 3. No per-bead AC linkage — beads don't know which specific ACs they implement
 4. No convention/standards injection — agents start cold every time
 5. No complexity scoring — all beads treated equally regardless of difficulty
-6. No delta-spec capability for brownfield work (most Panopticon work is brownfield)
+6. No delta-spec capability for brownfield work (most Overdeck work is brownfield)
 7. No contract verification between dependent beads
 8. No systematic spec drift detection after implementation
 9. No structured retrospective capture from completed work
@@ -64,10 +64,10 @@ The universal plan format we already use. Key features beyond what we leverage t
 
 #### Deft Directive (`/home/eltmon/Projects/deft/`)
 
-A layered framework for structuring AI development work. Most relevant concepts for Panopticon:
+A layered framework for structuring AI development work. Most relevant concepts for Overdeck:
 
 **Strategies (development approach selection):**
-Deft defines 6+ strategies based on project context: interview (standard), yolo (quick), speckit (large/complex), map (brownfield), discuss (alignment), research (pre-implementation). Panopticon currently has one approach for all work — the planning agent always does the same thing regardless of issue size or type.
+Deft defines 6+ strategies based on project context: interview (standard), yolo (quick), speckit (large/complex), map (brownfield), discuss (alignment), research (pre-implementation). Overdeck currently has one approach for all work — the planning agent always does the same thing regardless of issue size or type.
 
 **Contracts (boundary maps between work units):**
 Before parallel work begins, each feature declares what it produces and consumes:
@@ -144,7 +144,7 @@ Multi-step, resumable automation pipelines with control flow and human review ga
 A lightweight, brownfield-first spec framework. Most relevant concepts:
 
 **Delta specs:**
-Instead of restating entire requirements, delta specs describe only what's being added, modified, or removed. For brownfield work (which is 90%+ of Panopticon development), this is far more natural than writing complete specs. Our planning agents currently write full plans even for small changes.
+Instead of restating entire requirements, delta specs describe only what's being added, modified, or removed. For brownfield work (which is 90%+ of Overdeck development), this is far more natural than writing complete specs. Our planning agents currently write full plans even for small changes.
 
 **Fluid workflow (no rigid gates):**
 Artifacts can be created in any order and refined iteratively. This contrasts with Spec Kit's rigid phases. For smaller issues, our current pipeline adds unnecessary ceremony.
@@ -616,11 +616,11 @@ These enhancements close the feedback loop — learning from completed work to i
 
 | Concept | Source | Why Not |
 |---------|--------|---------|
-| Fresh agent per task (SDD) | Superpowers | Token-expensive. Our agent reuse within a workspace is more economical. Panopticon's strength is agent lifecycle management — starting fresh agents per bead would multiply costs. |
+| Fresh agent per task (SDD) | Superpowers | Token-expensive. Our agent reuse within a workspace is more economical. Overdeck's strength is agent lifecycle management — starting fresh agents per bead would multiply costs. |
 | 21+ specialized personas | BMAD | Over-engineering. Our 4 specialist types (work, review, test, merge) cover the pipeline. Adding PM, Architect, UX Designer, QA, Scrum Master personas adds ceremony without value for our scale. |
 | Rigid 4-phase gates | Spec Kit | Conflicts with graduated complexity. Forcing Specify→Plan→Tasks→Implement on a bug fix is waste. Strategy selection (Enhancement 5) achieves the same quality without the rigidity. |
 | YAML workflow pipelines | Spec Kit | Our lifecycle is code, not config. YAML pipelines add indirection. If we need configurability, we'll add it to Cloister's TypeScript lifecycle, not a new YAML DSL. |
-| Full Agile ceremonies | BMAD | Panopticon is a tool for developers, not a project management methodology. Sprint planning, story points, and standup ceremonies don't map to AI agent orchestration. |
+| Full Agile ceremonies | BMAD | Overdeck is a tool for developers, not a project management methodology. Sprint planning, story points, and standup ceremonies don't map to AI agent orchestration. |
 | TDD enforcement | Superpowers | We already have test specialists. Forcing RED-GREEN-REFACTOR on work agents would slow implementation. Our review+test specialists catch quality issues post-implementation. |
 | Standards discovery | Agent OS | Interesting but premature. Our CLAUDE.md is manually maintained and that's fine for now. Automated convention extraction is a future enhancement once we have more projects. |
 
@@ -644,7 +644,7 @@ How we'll know these enhancements are working:
 
 ### 2.6 Architecture Impact
 
-These enhancements touch the following Panopticon subsystems:
+These enhancements touch the following Overdeck subsystems:
 
 ```
 src/lib/vbrief/
@@ -696,8 +696,8 @@ No database schema changes. No new CLI commands (enhancements integrate into exi
 - vBRIEF spec v0.5: `/home/eltmon/Projects/vbrief/vbrief-spec-0.5.md`
 - Deft specification: `/home/eltmon/Projects/deft/SPECIFICATION.md`
 - Superpowers skills: `/home/eltmon/Projects/superpowers/skills/`
-- Panopticon vBRIEF integration: `src/lib/vbrief/beads.ts`, `src/lib/vbrief/io.ts`
-- Panopticon current pipeline: `docs/VBRIEF.md`, `docs/HIERARCHICAL-PLANNING.md`
+- Overdeck vBRIEF integration: `src/lib/vbrief/beads.ts`, `src/lib/vbrief/io.ts`
+- Overdeck current pipeline: `docs/VBRIEF.md`, `docs/HIERARCHICAL-PLANNING.md`
 - Martin Fowler on SDD tools: martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html
 - Spec Kit docs: github.github.com/spec-kit/
 - OpenSpec docs: openspec.dev

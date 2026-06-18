@@ -30,7 +30,7 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
-import { getPanopticonHome } from '../../../lib/paths.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -167,7 +167,7 @@ async function collectSessionTreeNodes(
 ): Promise<SessionNode[]> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-  const agentsDir = join(getPanopticonHome(), 'agents');
+  const agentsDir = join(getOverdeckHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
   const strikeAgentId = `strike-${issueLower}`;
@@ -486,7 +486,7 @@ export async function fetchProjectSessionTree(
 
     const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => Effect.promise(async () => {
-        const agentDir = join(getPanopticonHome(), 'agents', `agent-${c.issueLower}`);
+        const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const [hasAgent, hasPlanning] = await Promise.all([
           pathExists(agentDir),

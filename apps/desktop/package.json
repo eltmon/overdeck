@@ -1,9 +1,9 @@
 {
   "name": "@overdeck/desktop",
   "version": "0.21.0",
-  "description": "Panopticon Command Deck — AI agent monitoring desktop app",
+  "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
-  "productName": "Panopticon",
+  "productName": "Overdeck",
   "repository": {
     "type": "git",
     "url": "https://github.com/eltmon/panopticon-cli.git"
@@ -51,7 +51,7 @@
   },
   "build": {
     "appId": "com.panopticon.app",
-    "productName": "Panopticon",
+    "productName": "Overdeck",
     "publish": {
       "provider": "github",
       "owner": "eltmon",
@@ -101,7 +101,7 @@
       "category": "public.app-category.developer-tools"
     },
     "dmg": {
-      "title": "Panopticon",
+      "title": "Overdeck",
       "icon": "resources/icon.png"
     },
     "win": {

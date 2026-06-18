@@ -43,7 +43,7 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
 import { runModelSummary as mockedRunModelSummary } from '../smart-compaction.js';
 import { Effect as EffectMod } from 'effect';
 
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 const originalHome = process.env.HOME;
 const fixedNow = new Date('2026-05-23T04:35:00.000Z');
 
@@ -88,7 +88,7 @@ function validDoc(): string {
     '## What has been done',
     'The prompt and handoff path helpers are already in place, and this document exists to satisfy the request handshake.',
     '## Suggested skills',
-    '- /pan-workflow: use when checking Panopticon bead sequencing and completion flow.',
+    '- /pan-workflow: use when checking Overdeck bead sequencing and completion flow.',
   ].join('\n\n');
 }
 
@@ -108,7 +108,7 @@ function docWithSuggestedSkillsHeading(heading: string): string {
     '## Current state',
     'The source agent has written a curated transfer document that references project artifacts without duplicating full PRD or plan content.',
     heading,
-    '- /pan-workflow: use when checking Panopticon bead sequencing and completion flow.',
+    '- /pan-workflow: use when checking Overdeck bead sequencing and completion flow.',
   ].join('\n\n');
 }
 
@@ -153,10 +153,10 @@ afterEach(() => {
   closeOverdeckDatabaseSync();
   resetDiscoveredSessionsSchemaBootstrap();
   _testDbPaths.length = 0;
-  if (originalPanopticonHome === undefined) {
+  if (originalOverdeckHome === undefined) {
     delete process.env.OVERDECK_HOME;
   } else {
-    process.env.OVERDECK_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalOverdeckHome;
   }
   if (originalHome === undefined) {
     delete process.env.HOME;

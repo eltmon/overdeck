@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates MiniMax M2.7 (and M2.7 Highspeed) against Panopticon's 23 work types. MiniMax is already a configured provider in Panopticon with both model variants available.
+Evaluates MiniMax M2.7 (and M2.7 Highspeed) against Overdeck's 23 work types. MiniMax is already a configured provider in Overdeck with both model variants available.
 
 ## Model Profile
 
@@ -75,7 +75,7 @@ Evaluates MiniMax M2.7 (and M2.7 Highspeed) against Panopticon's 23 work types. 
 1. **Best price/performance in the top tier** — delivers ~75-90% of Opus quality at ~5% of the cost. The headline value proposition. At $0.30/$1.20, you can run 17x more agent-hours than Opus for the same budget.
 2. **Self-evolution during training** — first model that autonomously participated in its own training loop (100+ iterations of analyze/modify/evaluate/keep-revert), achieving 30% performance improvement. Handles 30-50% of RL research workflow autonomously.
 3. **97% skill adherence** — across 40+ complex skills exceeding 2,000 tokens each. Strong at following detailed multi-step instructions.
-4. **Extremely cheap cache reads** — $0.06/M tokens makes repeated agentic context nearly free. Critical for Panopticon's long-running agents that re-read workspace state.
+4. **Extremely cheap cache reads** — $0.06/M tokens makes repeated agentic context nearly free. Critical for Overdeck's long-running agents that re-read workspace state.
 5. **Highspeed variant** — ~100 tok/s at 2x the price is still dramatically cheaper than competitors. Enables fast iteration where needed without switching models.
 6. **SWE-Bench Pro 56.22%** — self-reported but, if accurate, competitive with GPT-5.3 Codex (56.8%) and close to GLM-5.1 (58.4%).
 
@@ -196,7 +196,7 @@ User-facing latency. Standard tier too slow. Highspeed is fast but CLI modes nee
 
 ---
 
-## The M2.7 Value Proposition for Panopticon
+## The M2.7 Value Proposition for Overdeck
 
 M2.7's unique angle isn't that it's the best at anything — it's that it's **good enough at many things while being absurdly cheap.** The strategic play:
 
@@ -237,7 +237,7 @@ The third row is the sweet spot: **use M2.7 for high-volume procedural work (tes
 
 ## Integration Notes
 
-- MiniMax is already a configured provider in Panopticon (`minimax`)
+- MiniMax is already a configured provider in Overdeck (`minimax`)
 - Model IDs: `minimax-m2.7`, `minimax-m2.7-highspeed`
 - Capability scores already in `model-capabilities.ts` — verify they reflect independent (not self-reported) benchmarks
 - Suggested capability score adjustments based on independent data:

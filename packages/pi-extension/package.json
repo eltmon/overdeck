@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Vendored Pi Coding Agent extension that emits Panopticon lifecycle signals to ~/.panopticon/agents and ~/.panopticon/heartbeats.",
+  "description": "Vendored Pi Coding Agent extension that emits Overdeck lifecycle signals to ~/.panopticon/agents and ~/.panopticon/heartbeats.",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "exports": {

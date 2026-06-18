@@ -1,5 +1,5 @@
 /**
- * ResourcesPanel — unified grid view of all Panopticon-managed infrastructure.
+ * ResourcesPanel — unified grid view of all Overdeck-managed infrastructure.
  * Groups containers and agents by issue, type, or status.
  * Real-time data via Socket.io (resources:updated) with 5s polling fallback.
  */

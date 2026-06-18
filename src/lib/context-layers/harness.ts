@@ -18,7 +18,7 @@
  * marker (always-on) or by a marker naming H; every marker is stripped from
  * the output. Markers for an unrecognised harness name are still parsed —
  * `pan context validate` only warns about them — so a layer can be authored
- * for a harness Panopticon does not ship an adapter for yet.
+ * for a harness Overdeck does not ship an adapter for yet.
  */
 
 import type { Harness } from '@overdeck/contracts';
@@ -26,14 +26,14 @@ import type { Harness } from '@overdeck/contracts';
 /** Short marker name used in `{{#harness:<name>}}` blocks. */
 export type HarnessMarker = 'claude' | 'pi' | 'codex';
 
-/** Maps a Panopticon {@link Harness} to its templating marker name. */
+/** Maps a Overdeck {@link Harness} to its templating marker name. */
 export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
   'claude-code': 'claude',
   pi: 'pi',
   codex: 'codex',
 };
 
-/** Marker names Panopticon ships an adapter for in v1. */
+/** Marker names Overdeck ships an adapter for in v1. */
 export const KNOWN_HARNESS_MARKERS: ReadonlySet<string> = new Set<HarnessMarker>(['claude', 'pi', 'codex']);
 
 /** Matches an open `{{#harness:x}}` or close `{{/harness:x}}` marker. */
@@ -97,7 +97,7 @@ export interface TemplateValidation {
  * Lint a context-layer template for malformed harness blocks.
  *
  * Errors: an unclosed `{{#harness:x}}` or a stray `{{/harness:x}}` with no
- * matching open. Warnings: a marker naming a harness Panopticon has no
+ * matching open. Warnings: a marker naming a harness Overdeck has no
  * adapter for (allowed for forward compatibility, surfaced so typos —
  * `{{#harness:clade}}` — do not pass silently).
  */
@@ -138,7 +138,7 @@ export function validateTemplate(content: string): TemplateValidation {
     if (!KNOWN_HARNESS_MARKERS.has(name)) {
       issues.push({
         severity: 'warning',
-        message: `unknown harness "${name}" — Panopticon ships adapters for: ${[...KNOWN_HARNESS_MARKERS].join(', ')}`,
+        message: `unknown harness "${name}" — Overdeck ships adapters for: ${[...KNOWN_HARNESS_MARKERS].join(', ')}`,
       });
     }
   }

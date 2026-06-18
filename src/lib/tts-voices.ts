@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 import { FsError } from './errors.js';
 
 export type TtsVoiceKind = 'preset' | 'design' | 'clone';
@@ -19,7 +19,7 @@ export interface TtsVoice {
 }
 
 export function getTtsVoicesPath(): string {
-  return join(getPanopticonHome(), 'tts-voices.json');
+  return join(getOverdeckHome(), 'tts-voices.json');
 }async function loadVoicesPromise(): Promise<TtsVoice[]> {
   try {
     const content = await readFile(getTtsVoicesPath(), 'utf-8');

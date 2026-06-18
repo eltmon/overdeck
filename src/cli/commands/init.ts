@@ -76,11 +76,11 @@ function copyBundledAgents(): number {
 }
 
 export async function initCommand(): Promise<void> {
-  const spinner = ora('Initializing Panopticon...').start();
+  const spinner = ora('Initializing Overdeck...').start();
 
   // Check if already initialized
   if (existsSync(CONFIG_FILE)) {
-    spinner.info('Panopticon already initialized');
+    spinner.info('Overdeck already initialized');
     console.log(chalk.dim(`  Config: ${CONFIG_FILE}`));
     console.log(chalk.dim(`  Home: ${OVERDECK_HOME}`));
     console.log(chalk.dim('  Run `pan sync` to update skills'));
@@ -115,7 +115,7 @@ export async function initCommand(): Promise<void> {
 
     if (rcFile && existsSync(rcFile)) {
       addAliasSync(rcFile);
-      spinner.succeed('Panopticon initialized!');
+      spinner.succeed('Overdeck initialized!');
       console.log('');
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(OVERDECK_HOME));
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(CONFIG_FILE));
@@ -127,7 +127,7 @@ export async function initCommand(): Promise<void> {
       }
       console.log(chalk.green('✓') + ' ' + getAliasInstructionsSync(shell));
     } else {
-      spinner.succeed('Panopticon initialized!');
+      spinner.succeed('Overdeck initialized!');
       console.log('');
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(OVERDECK_HOME));
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(CONFIG_FILE));

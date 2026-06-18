@@ -1,5 +1,5 @@
 /**
- * System tray for the Panopticon desktop app.
+ * System tray for the Overdeck desktop app.
  *
  * Creates a Tray with:
  * - Color-coded icon: green (idle), yellow (working), red (attention needed)
@@ -50,10 +50,10 @@ function createTrayIcon(status: AgentStatus): Electron.NativeImage {
 function buildTooltip(agentCount: number, attentionCount: number, lastActivity: string | null): string {
   const settings = getDesktopSettings();
   if (settings.tray.tooltipDetail === "minimal") {
-    return `Panopticon — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
+    return `Overdeck — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
   }
 
-  const lines = ["Panopticon"];
+  const lines = ["Overdeck"];
   lines.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""} running`);
   if (attentionCount > 0) {
     lines.push(`⚠ ${attentionCount} need${attentionCount !== 1 ? "" : "s"} attention`);
@@ -152,7 +152,7 @@ export function createTray(): void {
 
   const icon = createTrayIcon("idle");
   tray = new Tray(icon);
-  tray.setToolTip("Panopticon");
+  tray.setToolTip("Overdeck");
   tray.setContextMenu(buildContextMenu());
 
   // Single-click opens dashboard on all platforms

@@ -1,6 +1,6 @@
 ---
 title: Flywheel Vision
-description: "Why the Flywheel exists today (dev-loop for building Panopticon itself) and what v1.0 looks like (a user-facing pipeline that delivers work with only human UAT and merge in the loop). Seven readiness criteria anchored to industry benchmarks, the substrate-bug-discovery-rate metric, and the live tracker of v1.0-required issues."
+description: "Why the Flywheel exists today (dev-loop for building Overdeck itself) and what v1.0 looks like (a user-facing pipeline that delivers work with only human UAT and merge in the loop). Seven readiness criteria anchored to industry benchmarks, the substrate-bug-discovery-rate metric, and the live tracker of v1.0-required issues."
 ---
 
 # Flywheel Vision — Dev-Loop Today, User Pipeline at v1.0
@@ -9,7 +9,7 @@ description: "Why the Flywheel exists today (dev-loop for building Panopticon it
 
 ## TL;DR
 
-The Flywheel is a dev-loop for building Panopticon itself, not a feature for end users. Today it runs real Panopticon work through Panopticon's own pipeline so that substrate defects surface as the work flows, and we fix the substrate as the bugs appear. At v1.0, the substrate becomes reliable enough that end users get features and fixes into the pipeline and the system delivers them with only human UAT and merge in the loop.
+The Flywheel is a dev-loop for building Overdeck itself, not a feature for end users. Today it runs real Overdeck work through Overdeck's own pipeline so that substrate defects surface as the work flows, and we fix the substrate as the bugs appear. At v1.0, the substrate becomes reliable enough that end users get features and fixes into the pipeline and the system delivers them with only human UAT and merge in the loop.
 
 This document names what "v1.0-ready" means with measurable criteria, captures the immediate behavioral changes we need on the Flywheel to start measuring honestly, and lists the tracking issues that get us there.
 
@@ -19,19 +19,19 @@ This document names what "v1.0-ready" means with measurable criteria, captures t
 
 ### Today: Flywheel as substrate dev-loop
 
-The Flywheel takes whatever work is moving through Panopticon and watches it flow. When a stage misbehaves — a review specialist fails to block obvious issues, a test agent loops, a merge gate confuses itself, a planning artifact gets written to the wrong path — the failure is a defect in Panopticon, not in the work. We call those **substrate bugs**.
+The Flywheel takes whatever work is moving through Overdeck and watches it flow. When a stage misbehaves — a review specialist fails to block obvious issues, a test agent loops, a merge gate confuses itself, a planning artifact gets written to the wrong path — the failure is a defect in Overdeck, not in the work. We call those **substrate bugs**.
 
 The work issue is almost a vehicle. The real product of a Flywheel pass is:
 
 1. A merged PR for the work itself (the issue gets done).
-2. Zero or more substrate bug issues filed against Panopticon.
+2. Zero or more substrate bug issues filed against Overdeck.
 3. Zero or more substrate bug fixes merged (often before the original work merges).
 
 Every substrate bug is a step toward v1.0. The Flywheel exists to expose them faster than we'd find them with manual usage.
 
 ### v1.0: Flywheel as user-facing pipeline
 
-When the substrate is solid, the Flywheel becomes a user-facing capability. Users (developers using Panopticon for their own projects) get features and bug fixes into the pipeline and the system delivers them end-to-end. The pipeline reliably:
+When the substrate is solid, the Flywheel becomes a user-facing capability. Users (developers using Overdeck for their own projects) get features and bug fixes into the pipeline and the system delivers them end-to-end. The pipeline reliably:
 
 - Picks up backlog work.
 - Plans, implements, reviews, and tests it.
@@ -44,7 +44,7 @@ At v1.0, **the only required human input is UAT (optional, per-issue) and merge 
 
 | Aspect | Today (dev-loop) | v1.0 (user pipeline) |
 |---|---|---|
-| Who files issues | Mostly us, often Panopticon agents | Mostly users |
+| Who files issues | Mostly us, often Overdeck agents | Mostly users |
 | Who picks up from backlog | Operator (human click) | Pipeline, when configured to |
 | Substrate-bug discovery rate | High — expected, that's the point | Low — bounded by error budget |
 | Required human input | UAT + merge + frequent intervention | UAT (optional) + merge |
@@ -56,7 +56,7 @@ The Flywheel doesn't disappear at v1.0. It changes role: from "exposes our own d
 
 ## Definitions
 
-- **Substrate bug** — a defect in Panopticon itself: a broken route, a misbehaving role prompt, a wrong gate condition, a flaky lifecycle transition, a UI that lies about state. Substrate bugs get filed against `eltmon/panopticon-cli` and fixed through the normal Panopticon pipeline.
+- **Substrate bug** — a defect in Overdeck itself: a broken route, a misbehaving role prompt, a wrong gate condition, a flaky lifecycle transition, a UI that lies about state. Substrate bugs get filed against `eltmon/panopticon-cli` and fixed through the normal Overdeck pipeline.
 - **Work-code bug** — a defect in the application code that an issue agent is producing. Work-code bugs are part of normal pipeline operation and are not a v1.0 signal — review and test agents catch them.
 - **Pipeline run** — one issue's journey from `start` to `merged` (or to `parked`/`cancelled`). The Flywheel may have many issues in flight; each is its own run for measurement purposes.
 - **Pipeline pass** — a single end-to-end completion: plan → work → review → test → ship → merge. A run may go through multiple passes if review or test rejects work and the agent re-submits.
@@ -69,7 +69,7 @@ A note on bug-filing provenance: today we cannot distinguish, from the issue alo
 
 ## v1.0 readiness criteria (DRAFT)
 
-These are the proposed thresholds for declaring Panopticon's substrate "v1.0-ready." Targets are anchored to industry benchmarks (see [Methodology & Research](#methodology--research)); they are **draft** and should be refined after ~1 month of real Flywheel telemetry.
+These are the proposed thresholds for declaring Overdeck's substrate "v1.0-ready." Targets are anchored to industry benchmarks (see [Methodology & Research](#methodology--research)); they are **draft** and should be refined after ~1 month of real Flywheel telemetry.
 
 We are v1.0-ready when **all** of the following hold for **30 consecutive days**:
 
@@ -107,7 +107,7 @@ The Flywheel currently restricts inventory and suggestions to issues authored by
 
 > Include an issue in inventory and suggestions **only if at least one of**:
 > - `author.login` is `eltmon` (project owner), **OR**
-> - `author.login` is `panopticon-agent[bot]` (Panopticon GitHub App), **OR**
+> - `author.login` is `panopticon-agent[bot]` (Overdeck GitHub App), **OR**
 > - `assignees[].login` contains `eltmon` (operator has personally assigned the issue).
 >
 > Verify with `gh issue view <num> --json author,assignees`. Any other state — third-party author and `eltmon` not among assignees — is out of scope.
@@ -163,7 +163,7 @@ The v1.0 targets are triangulated from three industry analogues, because "substr
 
 2. **Pipeline pass success rate ↔ CI/CD substrate SLO.** Google's SRE Workbook and Shopify's CI engineering posts both treat their CI/CD as a service with an SLO. The standard frame is 99% availability for substrate (with the remaining 1% being the error budget for known-acceptable failure modes). We adopt the 99% target, scoped to substrate-attributable failures specifically — legitimate test failures don't count.
 
-3. **Operator intervention rate ↔ agent autonomy benchmarks.** SWE-bench Verified is the cleanest public number for autonomous coding agent success. Top systems in 2026 sit at 80-94% on solvable, well-defined tasks. Our intervention rate target (<5%) is **stricter than the agent layer** because the substrate is supposed to be the reliable part — agents may fail at their tasks, but Panopticon shouldn't be the reason they fail.
+3. **Operator intervention rate ↔ agent autonomy benchmarks.** SWE-bench Verified is the cleanest public number for autonomous coding agent success. Top systems in 2026 sit at 80-94% on solvable, well-defined tasks. Our intervention rate target (<5%) is **stricter than the agent layer** because the substrate is supposed to be the reliable part — agents may fail at their tasks, but Overdeck shouldn't be the reason they fail.
 
 ### Sources
 

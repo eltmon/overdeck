@@ -33,7 +33,7 @@ beforeEach(async () => {
     {
       key: 'panopticon-cli',
       config: {
-        name: 'Panopticon CLI',
+        name: 'Overdeck CLI',
         path: projectRoot,
         issue_prefix: 'PAN',
         tracker: 'github',

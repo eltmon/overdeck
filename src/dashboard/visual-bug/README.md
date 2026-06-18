@@ -1,7 +1,7 @@
 # Remote Terminal Visual Bug
 
 ## Summary
-When viewing remote exe.dev VM terminals in the Panopticon dashboard, status lines (tmux status bar and Claude Code spinner) duplicate and scroll instead of updating in place.
+When viewing remote exe.dev VM terminals in the Overdeck dashboard, status lines (tmux status bar and Claude Code spinner) duplicate and scroll instead of updating in place.
 
 ## Affected Scenarios
 - **ONLY affects remote SSH connections** (exe.dev VMs)
@@ -371,7 +371,7 @@ window.showTerminalDebug()  // Print all to console
 
 ### Prerequisites
 - Access to exe.dev VM credentials
-- Panopticon dashboard running locally (port 3010)
+- Overdeck dashboard running locally (port 3010)
 
 ### Test Procedure
 

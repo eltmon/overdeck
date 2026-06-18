@@ -249,7 +249,7 @@ export class LinearTracker implements IssueTracker {
         id: comment.id,
         issueId,
         body: comment.body,
-        author: 'Panopticon', // Simplified
+        author: 'Overdeck', // Simplified
         createdAt: comment.createdAt.toISOString(),
         updatedAt: comment.updatedAt.toISOString(),
       };

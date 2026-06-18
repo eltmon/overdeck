@@ -25,17 +25,17 @@ This PRD was originally written as a "Phase 4 / dashboard front-end" companion t
 
 ## Problem
 
-`pan setup` works on the CLI, but the dashboard is the primary surface for everything else in Panopticon (kanban, agent terminals, planning, costs, health). New users who land on the dashboard hit a dead end: there's no way to add a project, no way to see what projects exist, no way to edit a project's config without dropping to YAML, and no visibility into the Setup Agent while it runs.
+`pan setup` works on the CLI, but the dashboard is the primary surface for everything else in Overdeck (kanban, agent terminals, planning, costs, health). New users who land on the dashboard hit a dead end: there's no way to add a project, no way to see what projects exist, no way to edit a project's config without dropping to YAML, and no visibility into the Setup Agent while it runs.
 
 This is a serious adoption blocker:
 
-1. **First-run cliff.** A user installs Panopticon, runs `pan up`, opens the dashboard, and... sees nothing. There's no project, no kanban, no agents. The "create your first project" moment lives in a CLI command they didn't know to run.
+1. **First-run cliff.** A user installs Overdeck, runs `pan up`, opens the dashboard, and... sees nothing. There's no project, no kanban, no agents. The "create your first project" moment lives in a CLI command they didn't know to run.
 2. **No dogfooding loop.** We have a CLAUDE.md rule that says "always dogfood the dashboard, never curl APIs manually." But for project creation we ourselves drop to the CLI because the dashboard can't do it.
 3. **Setup Agent is invisible.** The Setup Agent spawns in tmux like a planning agent, but unlike planning agents it has no row in the agent list, no terminal panel, no progress events. Users running `pan setup` from the CLI literally cannot see the agent's reasoning except by tmux-attaching.
-4. **Editing is YAML-only.** Once a project exists, changing branch names, adding repos, toggling specialists, configuring quality gates, or rotating tracker config means opening `~/.panopticon/projects.yaml` in a text editor. Every Panopticon power-user has corrupted this file at least once.
-5. **Multi-project teams have no overview.** A user with 5 projects (Panopticon, MYN, Auricle, Krux, etc.) has no place in the dashboard to see them side-by-side, see which is healthy, jump between them, or trigger setup re-runs.
+4. **Editing is YAML-only.** Once a project exists, changing branch names, adding repos, toggling specialists, configuring quality gates, or rotating tracker config means opening `~/.panopticon/projects.yaml` in a text editor. Every Overdeck power-user has corrupted this file at least once.
+5. **Multi-project teams have no overview.** A user with 5 projects (Overdeck, MYN, Auricle, Krux, etc.) has no place in the dashboard to see them side-by-side, see which is healthy, jump between them, or trigger setup re-runs.
 
-The CLI wizard is a faithful onboarding tool for terminal-native users, but Panopticon's identity is the dashboard. This feature has to live there too.
+The CLI wizard is a faithful onboarding tool for terminal-native users, but Overdeck's identity is the dashboard. This feature has to live there too.
 
 ## Goals
 
@@ -61,12 +61,12 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Pano
 ## User Stories
 
 ### US-1 — First project (zero state)
-*As a new user who just installed Panopticon and opened the dashboard, I want to be guided to create my first project without leaving the browser.*
+*As a new user who just installed Overdeck and opened the dashboard, I want to be guided to create my first project without leaving the browser.*
 
 **Acceptance:** Dashboard with no projects configured shows a welcome screen with a single primary action ("Set up your first project") that opens the wizard. The wizard walks me through detection, template selection, tracker, meta repo, and review. On save, the dashboard transitions to the normal kanban view scoped to my new project.
 
 ### US-2 — Second project (existing user) via the sidebar `+`
-*As a user who already has Panopticon running for one project, I want to add another straight from the sidebar without hunting through menus.*
+*As a user who already has Overdeck running for one project, I want to add another straight from the sidebar without hunting through menus.*
 
 **Acceptance:** The left-sidebar **PROJECTS section header shows a `+` button**. Clicking it opens the wizard (`/projects/new`). The same wizard is also reachable from a "+ New project" tile on the `/projects` list page. On save, the project appears in the sidebar tree and the project switcher.
 
@@ -81,7 +81,7 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Pano
 **Acceptance:** The Source step offers "Clone from a remote". I paste a GitHub/GitLab URL (or `owner/repo` shorthand) or pick from my `gh`-authenticated repos, choose a destination directory, and the wizard clones it (streaming progress), then runs detection on the clone. Auth uses the existing `gh`/git credentials on the host; no new credential store.
 
 ### US-2d — Brand-new project (create folder + repo)
-*As a user starting something from scratch, I want Panopticon to create the project folder and set up git for me.*
+*As a user starting something from scratch, I want Overdeck to create the project folder and set up git for me.*
 
 **Acceptance:** The Source step offers "Start a brand-new project". I name it and pick a parent directory; the wizard creates the folder, **strongly recommends and defaults to `git init` + an initial commit**, and optionally creates a remote (GitHub via `gh repo create`, or a URL I provide) and pushes. Declining the repo is allowed but the UI nudges toward creating one.
 
@@ -111,7 +111,7 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Pano
 **Acceptance:** Project detail page has a "Remove project" action behind a destructive confirmation. Removing the project deletes its `projects.yaml` entry but leaves the repos and meta repo on disk untouched.
 
 ### US-8 — Dogfood through the dashboard
-*As a Panopticon developer, I want every wizard interaction to go through the dashboard so I can catch UI bugs as I work.*
+*As a Overdeck developer, I want every wizard interaction to go through the dashboard so I can catch UI bugs as I work.*
 
 **Acceptance:** I can onboard a brand-new project end-to-end without running `pan setup`. The dashboard wizard hits the same backend code paths and produces a byte-identical `projects.yaml` entry to the CLI version.
 
@@ -349,9 +349,9 @@ When `useProjectStore().projects.length === 0`, the root route renders a full-sc
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                                                          │
-│              Welcome to Panopticon                        │
+│              Welcome to Overdeck                        │
 │                                                          │
-│   Panopticon orchestrates AI agents across your          │
+│   Overdeck orchestrates AI agents across your          │
 │   projects. To get started, set up your first project.   │
 │                                                          │
 │              [ Set up a project → ]                      │
@@ -619,7 +619,7 @@ Per CLAUDE.md, every UI change is verified with Playwright. Every flow above MUS
 
 ## Success Criteria
 
-- A new user can install Panopticon, open the dashboard, and have a fully configured project without ever opening a terminal.
+- A new user can install Overdeck, open the dashboard, and have a fully configured project without ever opening a terminal.
 - A project can be created via all four entry points: first-run welcome, sidebar `+`, `/projects` "+ New project" tile, and `pan setup`.
 - A project can be created from all four sources: an existing repo on disk, a plain folder on disk, a cloned remote (GitHub/GitLab/URL), and a brand-new project where the wizard creates the folder and initializes git (and optionally a remote).
 - A brand-new project ends up with a git repo by default (the recommended path), and a folder-without-git surfaces a clear warning rather than silently producing a project agents can't branch in.

@@ -23,7 +23,7 @@ import { initializeAutoUpdater, checkForUpdates, downloadUpdate, quitAndInstall,
 
 const ROOT_DIR = Path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const APP_DISPLAY_NAME = isDevelopment ? "Panopticon (Dev)" : "Panopticon";
+const APP_DISPLAY_NAME = isDevelopment ? "Overdeck (Dev)" : "Overdeck";
 const APP_ID = "com.panopticon.app";
 const LINUX_WM_CLASS = isDevelopment ? "panopticon-dev" : "panopticon";
 export const DESKTOP_SCHEME = "panopticon";

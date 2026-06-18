@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * capture-doc-shot.mjs — capture a Panopticon dashboard view for the docs site
+ * capture-doc-shot.mjs — capture a Overdeck dashboard view for the docs site
  * in BOTH light and dark mode.
  *
  * Every screenshot shown in the Mintlify docs has a light and a dark variant so

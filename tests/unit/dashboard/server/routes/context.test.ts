@@ -18,19 +18,19 @@ async function exists(path: string): Promise<boolean> {
 
 describe('dashboard context routes helpers', () => {
   let tempRoot: string;
-  let oldPanopticonHome: string | undefined;
+  let oldOverdeckHome: string | undefined;
 
   beforeEach(async () => {
-    oldPanopticonHome = process.env.OVERDECK_HOME;
+    oldOverdeckHome = process.env.OVERDECK_HOME;
     tempRoot = await mkdtemp(join(tmpdir(), 'pan-context-route-'));
     process.env.OVERDECK_HOME = join(tempRoot, 'home');
   });
 
   afterEach(async () => {
-    if (oldPanopticonHome === undefined) {
+    if (oldOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
-      process.env.OVERDECK_HOME = oldPanopticonHome;
+      process.env.OVERDECK_HOME = oldOverdeckHome;
     }
     await rm(tempRoot, { recursive: true, force: true });
   });
@@ -42,7 +42,7 @@ describe('dashboard context routes helpers', () => {
     return [{
       key: 'pan',
       config: {
-        name: 'Panopticon',
+        name: 'Overdeck',
         path: projectPath,
         issue_prefix: 'PAN',
         workspace: { workspaces_dir: 'workspaces' },
@@ -85,7 +85,7 @@ describe('dashboard context routes helpers', () => {
     const response = await buildContextLayersResponse(projects);
 
     expect(response.operation).toBe('load');
-    expect(response.projects).toMatchObject([{ projectKey: 'pan', name: 'Panopticon', issuePrefix: 'PAN' }]);
+    expect(response.projects).toMatchObject([{ projectKey: 'pan', name: 'Overdeck', issuePrefix: 'PAN' }]);
     expect(response.workspaces).toMatchObject([{ projectKey: 'pan', name: 'feature-pan-1201', issueId: 'PAN-1201' }]);
     expect(response.layers).toContainEqual(expect.objectContaining({
       kind: 'project',

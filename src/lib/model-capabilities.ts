@@ -144,7 +144,7 @@ export interface ModelCapability {
    */
   effortLevels?: readonly EffortLevel[];
   /**
-   * Whether this model accepts image input (vision) on the endpoint Panopticon
+   * Whether this model accepts image input (vision) on the endpoint Overdeck
    * routes it through. Tri-state by design:
    *   - `false` — proven text-only; image attachments must be blocked.
    *   - `true`  — proven to accept images.
@@ -553,7 +553,7 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     displayName: 'GPT-5.3 Codex Spark',
     // Headline rate card matches the Codex family ($1.75 in / $14 out) when
     // the model is reachable, but Spark is a ChatGPT-Pro-only research
-    // preview as of 2026-05-23 — no raw API access. Panopticon routes via
+    // preview as of 2026-05-23 — no raw API access. Overdeck routes via
     // Codex CLI subscription auth through CLIProxy, so it is reachable
     // when the operator has a Pro account.
     costPer1MTokens: 7.875,

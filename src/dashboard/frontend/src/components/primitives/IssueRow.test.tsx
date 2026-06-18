@@ -19,7 +19,7 @@ function renderIssueRow(priority: IssueRowPriority = 'high') {
       phase="ship"
       priority={priority}
       title="Ship dashboard redesign"
-      project={{ name: 'Panopticon', markClassName: 'bg-primary' }}
+      project={{ name: 'Overdeck', markClassName: 'bg-primary' }}
       labels={['frontend', 'design']}
       verbBadge={<VerbBadge variant="WORK RUNNING" />}
       agent={{ name: 'agent-pan-123', sub: 'opus · 18m' }}

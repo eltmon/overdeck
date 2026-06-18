@@ -26,7 +26,7 @@ const getWorkspaceStackHealth: typeof getWorkspaceStackHealthProgram extends (..
     Effect.runPromise(getWorkspaceStackHealthProgram(...args))) as any;
 
 const dockerProject: ProjectConfig = {
-  name: 'Panopticon',
+  name: 'Overdeck',
   path: '/repo',
   workspace: {
     docker: { compose_template: 'infra/.devcontainer-template' },

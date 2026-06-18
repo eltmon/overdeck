@@ -1,6 +1,6 @@
 #!/bin/bash
 # notify-complete: Send desktop notification when agent completes work
-# Part of Panopticon - works on WSL2/Windows, Linux, and macOS
+# Part of Overdeck - works on WSL2/Windows, Linux, and macOS
 #
 # Usage: notify-complete <issue-id> <title> [mr-url]
 #
@@ -43,7 +43,7 @@ send_notification() {
 \$template = New-Object Windows.Data.Xml.Dom.XmlDocument
 \$template.LoadXml(\$xml)
 \$toast = New-Object Windows.UI.Notifications.ToastNotification \$template
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Panopticon').Show(\$toast)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Overdeck').Show(\$toast)
 " 2>/dev/null && return 0
 
     # Fallback: MessageBox
@@ -74,6 +74,6 @@ else
   MESSAGE="${TITLE} - Work complete"
 fi
 
-send_notification "Panopticon: ${ISSUE_ID}" "$MESSAGE"
+send_notification "Overdeck: ${ISSUE_ID}" "$MESSAGE"
 
 echo "Notification sent for ${ISSUE_ID}"

@@ -545,7 +545,7 @@ describe('passed-state rerun regression', () => {
 });
 
 // ── template/output contract ──────────────────────────────────────────────────
-// Convoy sub-role prompts are harness-agnostic templates owned by Panopticon.
+// Convoy sub-role prompts are harness-agnostic templates owned by Overdeck.
 // They live in roles/review-<sub-role>.md and are inlined into each convoy
 // spawn message by the orchestrator. Each template tells one reviewer to read
 // the shared context manifest and write one report to its assigned output

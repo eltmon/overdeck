@@ -2,7 +2,7 @@
 
 ## Problem
 
-Panopticon's polyrepo workspace system creates git worktrees for **every repo listed in the config** on workspace creation. This works for projects with 4-6 repos (like a typical frontend/backend/infra split), but breaks down for large-scale integration projects with 30+ repositories.
+Overdeck's polyrepo workspace system creates git worktrees for **every repo listed in the config** on workspace creation. This works for projects with 4-6 repos (like a typical frontend/backend/infra split), but breaks down for large-scale integration projects with 30+ repositories.
 
 Issues with the current all-or-nothing approach:
 - **Most issues touch 1-3 repos.** Creating 30+ worktrees wastes time and disk for the 90% case.
@@ -12,7 +12,7 @@ Issues with the current all-or-nothing approach:
 
 ## Decision
 
-Add **progressive worktree creation** to Panopticon's polyrepo system. Workspaces start with only essential repos (meta/docs), and agents pull in additional repos on demand during work.
+Add **progressive worktree creation** to Overdeck's polyrepo system. Workspaces start with only essential repos (meta/docs), and agents pull in additional repos on demand during work.
 
 This is opt-in via a `progressive: true` flag. Existing polyrepo projects (which have 4-6 repos) continue to work exactly as before — all repos checked out on workspace creation.
 
@@ -205,7 +205,7 @@ async function addRepoCommand(workspaceId: string, repoNames: string[], options:
 
 ### Agent Skill: `/workspace-add-repo`
 
-A Claude Code skill that agents invoke during work. Lives in the Panopticon global skills cache (synced via `pan sync`), not in individual meta repos.
+A Claude Code skill that agents invoke during work. Lives in the Overdeck global skills cache (synced via `pan sync`), not in individual meta repos.
 
 **Skill structure:**
 ```

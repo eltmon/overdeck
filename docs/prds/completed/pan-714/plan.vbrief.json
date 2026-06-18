@@ -52,7 +52,7 @@
           },
           {
             "id": "regen-claude-skills.ac3",
-            "title": ".claude/skills/.gitignore is preserved unchanged (protects future Panopticon-managed symlinks)",
+            "title": ".claude/skills/.gitignore is preserved unchanged (protects future Overdeck-managed symlinks)",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },

@@ -1,14 +1,14 @@
-# Panopticon Hook System
+# Overdeck Hook System
 
-Panopticon uses Claude Code's lifecycle hooks to emit domain events that drive the dashboard, deacon, and activity tracking. This document explains how the system works, what events exist, and the known gaps for the Pi harness.
+Overdeck uses Claude Code's lifecycle hooks to emit domain events that drive the dashboard, deacon, and activity tracking. This document explains how the system works, what events exist, and the known gaps for the Pi harness.
 
 ## What Hooks Are
 
-Claude Code exposes nine lifecycle hook events. Panopticon registers shell scripts against these events. When an event fires, the script POSTs a JSON body to the dashboard's `/api/agents/:id/heartbeat` endpoint, which translates it into a typed `DomainEvent` and appends it to the event store. The `AgentStateService` folds these events into an in-memory `AgentRuntimeSnapshot` that the dashboard UI and deacon consume.
+Claude Code exposes nine lifecycle hook events. Overdeck registers shell scripts against these events. When an event fires, the script POSTs a JSON body to the dashboard's `/api/agents/:id/heartbeat` endpoint, which translates it into a typed `DomainEvent` and appends it to the event store. The `AgentStateService` folds these events into an in-memory `AgentRuntimeSnapshot` that the dashboard UI and deacon consume.
 
 ## The Nine Hook Events
 
-| Event | When It Fires | Panopticon Script | Domain Event(s) Emitted |
+| Event | When It Fires | Overdeck Script | Domain Event(s) Emitted |
 |---|---|---|---|
 | `PreToolUse` | Before Claude executes a tool | `pre-tool-hook` | `agent.activity_changed` (working) |
 | `PostToolUse` | After Claude executes a tool | `heartbeat-hook` | `agent.activity_changed` (working) |
@@ -30,11 +30,11 @@ Users upgrading across PAN-1402 should re-run `pan install` (or `pan admin hooks
 
 ### History
 
-PAN-982 attempted to move `PreToolUse`, `PostToolUse`, and `Stop` into per-agent frontmatter to avoid double-firing. PAN-1402 reverted that migration because Claude Code did not honor those frontmatter hooks when Panopticon launched agents with path-form `--agent roles/<role>.md`; the observable result was missing heartbeats, missing `sessions.json`, and `claudeSessionId: null`.
+PAN-982 attempted to move `PreToolUse`, `PostToolUse`, and `Stop` into per-agent frontmatter to avoid double-firing. PAN-1402 reverted that migration because Claude Code did not honor those frontmatter hooks when Overdeck launched agents with path-form `--agent roles/<role>.md`; the observable result was missing heartbeats, missing `sessions.json`, and `claudeSessionId: null`.
 
 ### Migration Pruning
 
-No PAN-1402 pruning is needed. The old PAN-982 `removeIfPresent(...)` block was removed, so setup now only adds missing Panopticon hook registrations and leaves existing matching entries intact.
+No PAN-1402 pruning is needed. The old PAN-982 `removeIfPresent(...)` block was removed, so setup now only adds missing Overdeck hook registrations and leaves existing matching entries intact.
 
 ## Hook Execution Flow
 
@@ -83,7 +83,7 @@ Dashboard UI + Deacon read snapshot
 
 ## Pi Parity Matrix
 
-Pi's extension API (`pi --extension`) exposes three lifecycle events: `session_start`, `tool_execution_end`, and `turn_end`. Panopticon maps everything Pi can provide onto the same dashboard ingestion path used by Claude Code hooks.
+Pi's extension API (`pi --extension`) exposes three lifecycle events: `session_start`, `tool_execution_end`, and `turn_end`. Overdeck maps everything Pi can provide onto the same dashboard ingestion path used by Claude Code hooks.
 
 | Claude Code Hook | Pi Surface | Pi Coverage |
 |---|---|---|
@@ -97,7 +97,7 @@ Pi's extension API (`pi --extension`) exposes three lifecycle events: `session_s
 | `PostCompact` | none | Not available; Pi does not expose compaction lifecycle events. |
 | `PermissionRequest` | not applicable | Pi has no Claude Code-style permission prompt system. |
 
-The unavailable rows are API gaps rather than missing Panopticon code. Pi agents cannot participate in hook-driven workflows that depend on those missing lifecycle events until Pi exposes equivalent extension events.
+The unavailable rows are API gaps rather than missing Overdeck code. Pi agents cannot participate in hook-driven workflows that depend on those missing lifecycle events until Pi exposes equivalent extension events.
 
 ## Pi Event Channel (PAN-1134)
 

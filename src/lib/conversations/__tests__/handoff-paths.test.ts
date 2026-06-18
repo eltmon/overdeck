@@ -4,13 +4,13 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { createHandoffPaths, ensureHandoffsDir } from '../handoff-paths.js';
 
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 afterEach(() => {
-  if (originalPanopticonHome === undefined) {
+  if (originalOverdeckHome === undefined) {
     delete process.env.OVERDECK_HOME;
   } else {
-    process.env.OVERDECK_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalOverdeckHome;
   }
 });
 

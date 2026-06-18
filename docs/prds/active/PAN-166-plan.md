@@ -519,7 +519,7 @@ Rally workspace and project IDs are numeric strings prefixed with `/workspace/` 
 ## Dependencies
 
 - No external dependencies
-- All changes are internal to Panopticon
+- All changes are internal to Overdeck
 - Rally API key and access required for manual testing
 
 ## Follow-up Work

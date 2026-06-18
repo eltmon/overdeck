@@ -1,7 +1,7 @@
 let electron = require("electron");
 //#region src/preload.ts
 /**
-* Preload script for the Panopticon Electron renderer.
+* Preload script for the Overdeck Electron renderer.
 *
 * Exposes `window.panopticonBridge` via contextBridge.exposeInMainWorld.
 * The renderer uses this bridge to communicate with the main process over IPC.

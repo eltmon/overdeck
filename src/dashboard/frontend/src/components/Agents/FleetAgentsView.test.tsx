@@ -274,9 +274,9 @@ describe('FleetAgentsView', () => {
   it('filters additively by project and model dropdowns and syncs the URL', () => {
     useDashboardStore.setState({
       issuesRaw: [
-        issue({ identifier: 'PAN-1', title: 'Fleet drawer issue', project: { id: 'pan', name: 'Panopticon', color: '#333' } }),
+        issue({ identifier: 'PAN-1', title: 'Fleet drawer issue', project: { id: 'pan', name: 'Overdeck', color: '#333' } }),
         issue({ identifier: 'PAN-2', title: 'Stuck issue', project: { id: 'ops', name: 'Ops', color: '#444' } }),
-        issue({ identifier: 'PAN-3', title: 'Ship issue', project: { id: 'pan', name: 'Panopticon', color: '#333' } }),
+        issue({ identifier: 'PAN-3', title: 'Ship issue', project: { id: 'pan', name: 'Overdeck', color: '#333' } }),
       ],
       agentsById: {
         'agent-running': agent({ id: 'agent-running', issueId: 'PAN-1', status: 'running', role: 'work', model: 'claude-opus-4-7' }),
@@ -287,7 +287,7 @@ describe('FleetAgentsView', () => {
 
     renderFleetView();
 
-    fireEvent.click(screen.getByLabelText('Panopticon'));
+    fireEvent.click(screen.getByLabelText('Overdeck'));
     expect(window.location.search).toBe('?projects=pan');
     expect(screen.getByText('agent-running')).toBeInTheDocument();
     expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();

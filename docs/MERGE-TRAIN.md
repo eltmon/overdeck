@@ -19,7 +19,7 @@
 ## 1. The problem (why this exists)
 
 When one feature merges to `main`, **every other ready feature is now behind main**.
-In Panopticon today they go stale / `CONFLICTING` and strand — nobody re-rebases
+In Overdeck today they go stale / `CONFLICTING` and strand — nobody re-rebases
 them. That stranding is the root cause of the cascade bugs **PAN-1240, PAN-1215,
 PAN-1213, PAN-1658**. The expensive part isn't the rebase, it's the forced
 **re-verification** after each rebase. The fix is a conflict-aware **merge train**
@@ -108,7 +108,7 @@ Turn `merge_train_enabled` ON, observe ONE real cascade (a merge → siblings re
 
 ## 7. Future: decouple merge-train from the Flywheel?
 
-The Flywheel began as a Panopticon-dev tool (keep agents working, surface holes the
+The Flywheel began as a Overdeck-dev tool (keep agents working, surface holes the
 deacon alone can't). The merge-train is broadly useful — and it's **already mostly
 structurally decoupled**: the engine lives in `src/lib/` + `src/lib/cloister/`, the
 reconciler fires from the **post-merge path** (`specialists.ts`), not the flywheel

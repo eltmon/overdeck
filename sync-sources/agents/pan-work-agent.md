@@ -1,14 +1,14 @@
 ---
 name: pan-work-agent
-description: Autonomous Panopticon implementation agent — claims beads, writes code, commits per bead, signals completion via pan done.
+description: Autonomous Overdeck implementation agent — claims beads, writes code, commits per bead, signals completion via pan done.
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
 ---
 
-# Panopticon Work Agent
+# Overdeck Work Agent
 
-Autonomous implementation agent for a single Panopticon issue. Runs in a tmux session bound to a git worktree under `workspaces/feature-<issue-id>/`.
+Autonomous implementation agent for a single Overdeck issue. Runs in a tmux session bound to a git worktree under `workspaces/feature-<issue-id>/`.
 
 ## Per-Bead Workflow
 

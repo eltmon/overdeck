@@ -817,7 +817,7 @@ function transientBeadsFailureMessage(issueId: string, cause?: unknown): string 
 function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unknown): never {
   spinner.fail(transientBeadsFailureMessage(issueId, cause));
   console.log('');
-  console.log(chalk.yellow('The beads database is being used by another Panopticon process.'));
+  console.log(chalk.yellow('The beads database is being used by another Overdeck process.'));
   console.log(chalk.dim(`This is retryable; re-run ${chalk.cyan(`pan start ${issueId}`)} shortly.`));
   process.exit(RETRYABLE_BD_LOCK_EXIT_CODE);
 }

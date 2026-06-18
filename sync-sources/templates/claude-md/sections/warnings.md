@@ -13,7 +13,7 @@ This prevents scope creep, keeps changes traceable, and ensures every fix goes t
 
 ## tmux Socket — CRITICAL
 
-**Panopticon agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon`:
+**Overdeck agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon`:
 
 ```bash
 tmux -L panopticon list-sessions

@@ -97,7 +97,7 @@ describe('restoreReviewStatusFromRecords', () => {
     mockLoadProjectsConfigSync.mockReturnValue({
       projects: {
         pan: {
-          name: 'Panopticon',
+          name: 'Overdeck',
           path: projectRoot,
           issue_prefix: 'PAN',
           pan_records: { repo: '.', path: '.pan' },
@@ -109,7 +109,7 @@ describe('restoreReviewStatusFromRecords', () => {
       if (!issueId.toUpperCase().startsWith('PAN-')) return null;
       return {
         projectKey: 'pan',
-        projectName: 'Panopticon',
+        projectName: 'Overdeck',
         projectPath: projectRoot,
         linearTeam: 'PAN',
       };
@@ -118,7 +118,7 @@ describe('restoreReviewStatusFromRecords', () => {
     mockGetProjectSync.mockImplementation((key: string) => {
       if (key !== 'pan') return null;
       return {
-        name: 'Panopticon',
+        name: 'Overdeck',
         path: projectRoot,
         issue_prefix: 'PAN',
         pan_records: { repo: '.', path: '.pan' },

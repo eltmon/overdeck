@@ -2,13 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import type { AgentState } from '../agents.js';
 
 const AGENT_STATE_ROLLBACK_FILE = 'state' + '.json';
 
 export function getRollbackAgentStatePath(agentId: string): string {
-  return join(getPanopticonHome(), 'agents', agentId, AGENT_STATE_ROLLBACK_FILE);
+  return join(getOverdeckHome(), 'agents', agentId, AGENT_STATE_ROLLBACK_FILE);
 }
 
 export function readRollbackAgentStateSync<T>(
@@ -25,7 +25,7 @@ export function writeRollbackAgentStateSync(
   serialize: (state: AgentState) => string,
 ): void {
   const stateFile = getRollbackAgentStatePath(state.id);
-  mkdirSync(join(getPanopticonHome(), 'agents', state.id), { recursive: true });
+  mkdirSync(join(getOverdeckHome(), 'agents', state.id), { recursive: true });
   writeFileSync(stateFile, serialize(state));
 }
 

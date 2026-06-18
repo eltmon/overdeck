@@ -312,7 +312,7 @@ Work agents request inspection **only for beads where the planning agent set `me
 
 1. **Work prompt** (`src/lib/cloister/prompts/work.md`) — encodes the per-bead branching: read `metadata.requiresInspection` from the closed bead's plan item; if `true`, run `pan inspect <issueId> --bead <beadId>` and wait; if `false`, skip and move to the next bead.
 2. **Planning prompt** (`src/lib/cloister/prompts/planning.md` § "Inspection Requirement") — gives the planning agent the criteria for setting the flag, and requires the field to be set explicitly on every plan item.
-3. **vBRIEF schema** — `metadata.requiresInspection: boolean` is a Panopticon extension on every plan item, alongside `metadata.difficulty` and `metadata.issueLabel`.
+3. **vBRIEF schema** — `metadata.requiresInspection: boolean` is a Overdeck extension on every plan item, alongside `metadata.difficulty` and `metadata.issueLabel`.
 
 The flag is set once at planning time and read by the work agent at run time. There is no global override; each bead's flag is the source of truth.
 

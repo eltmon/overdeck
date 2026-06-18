@@ -1,4 +1,4 @@
-# Research: Mission Control Feature Adoption for Panopticon
+# Research: Mission Control Feature Adoption for Overdeck
 
 **Date**: 2026-03-02
 **Status**: Research Complete
@@ -9,16 +9,16 @@
 
 ## Executive Summary
 
-Mission Control (MC) is an open-source Next.js agent orchestration dashboard built by Builderz Labs. It's a monitoring/management UI layer designed to sit atop OpenClaw (their agent gateway). While Panopticon is a deeper orchestration engine (workspace lifecycle, specialist pipeline, Cloister health, skills, git workflow), MC has several production-hardened features that Panopticon lacks entirely. This document proposes adopting the strongest MC features into Panopticon, prioritized by impact.
+Mission Control (MC) is an open-source Next.js agent orchestration dashboard built by Builderz Labs. It's a monitoring/management UI layer designed to sit atop OpenClaw (their agent gateway). While Overdeck is a deeper orchestration engine (workspace lifecycle, specialist pipeline, Cloister health, skills, git workflow), MC has several production-hardened features that Overdeck lacks entirely. This document proposes adopting the strongest MC features into Overdeck, prioritized by impact.
 
 ### Relationship Between the Two
 
 ```
 MC is a wide, shallow dashboard (26 panels, passive monitoring)
-Panopticon is a deep orchestration engine (workspace lifecycle, active monitoring, automation)
+Overdeck is a deep orchestration engine (workspace lifecycle, active monitoring, automation)
 ```
 
-They occupy different layers. MC watches; Panopticon acts. The features proposed below fill gaps in Panopticon's watch/notify/report capabilities without duplicating its orchestration strengths.
+They occupy different layers. MC watches; Overdeck acts. The features proposed below fill gaps in Overdeck's watch/notify/report capabilities without duplicating its orchestration strengths.
 
 ---
 
@@ -28,7 +28,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: Critical
 **MC Implementation**: `src/lib/event-bus.ts` (64 lines) + `src/app/api/events/route.ts` (71 lines)
-**Panopticon Gap**: Socket.io is configured but has **zero event handlers registered**. All dashboard updates are poll-based (React Query refetchInterval). The `pipeline-notifier.ts` bridge exists but isn't wired to Socket.io.
+**Overdeck Gap**: Socket.io is configured but has **zero event handlers registered**. All dashboard updates are poll-based (React Query refetchInterval). The `pipeline-notifier.ts` bridge exists but isn't wired to Socket.io.
 
 **What MC Does**:
 - Singleton EventEmitter broadcasts all state mutations
@@ -36,7 +36,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 - SSE endpoint streams events to clients with 30s heartbeat keepalive
 - Every API mutation calls `eventBus.broadcast(type, data)` at the end
 
-**What Panopticon Should Do**:
+**What Overdeck Should Do**:
 - Wire `pipeline-notifier.ts` to Socket.io (the bridge already exists, just not connected)
 - Add event types for: agent health changes, specialist transitions, cost events, workspace state changes, handoff triggers
 - Emit events from: Cloister health checks, specialist queue changes, cost recording, workspace lifecycle, agent spawn/stop
@@ -58,7 +58,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: High
 **MC Implementation**: `src/lib/webhooks.ts` (365 lines) + `src/app/api/webhooks/route.ts` (183 lines)
-**Panopticon Gap**: Zero webhook infrastructure. No way to notify external systems.
+**Overdeck Gap**: Zero webhook infrastructure. No way to notify external systems.
 
 **What MC Does**:
 - HMAC-SHA256 signed payloads (constant-time comparison, prevents timing attacks)
@@ -68,7 +68,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 - Delivery logging: last 200 deliveries per webhook (status, duration, response)
 - 10-second timeout per delivery
 
-**What Panopticon Should Do**:
+**What Overdeck Should Do**:
 - Implement webhook delivery engine (subscribe to event bus from Feature #1)
 - Store webhooks in cloister.db or a new webhooks.db
 - CLI: `pan webhook add <url> --events "agent.*,specialist.*" --secret <key>`
@@ -90,7 +90,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: High
 **MC Implementation**: `src/lib/claude-sessions.ts` (299 lines)
-**Panopticon Gap**: Panopticon spawns Claude Code agents but doesn't read their session transcripts. Cost tracking relies on hook-based event capture, not transcript parsing.
+**Overdeck Gap**: Overdeck spawns Claude Code agents but doesn't read their session transcripts. Cost tracking relies on hook-based event capture, not transcript parsing.
 
 **What MC Does**:
 - Scans `~/.claude/projects/*/` every 60 seconds
@@ -105,7 +105,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 - Detects active sessions (last message < 5 minutes ago)
 - Stores in SQLite with upsert semantics
 
-**What Panopticon Should Do**:
+**What Overdeck Should Do**:
 - Add session transcript scanner to Deacon (background patrol)
 - Use as **secondary cost verification** — cross-check hook-based cost events against transcript totals
 - Feed into **PAN-293 memory extraction** — transcripts are the richest source for learning extraction
@@ -123,7 +123,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: Medium-High
 **MC Implementation**: `src/components/panels/alert-rules-panel.tsx` + `src/app/api/alerts/route.ts`
-**Panopticon Gap**: No alerting. Budget overruns show a red widget but don't notify anyone. Stuck agents are detected by Cloister but only logged internally.
+**Overdeck Gap**: No alerting. Budget overruns show a red widget but don't notify anyone. Stuck agents are detected by Cloister but only logged internally.
 
 **What MC Does**:
 - Condition-based alert rules: `if agent.status == 'error' then notify`
@@ -131,7 +131,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 - Cooldown period to prevent alert storms
 - Notification channel routing (in-app, webhook)
 
-**What Panopticon Should Do**:
+**What Overdeck Should Do**:
 - Alert rules stored in config or cloister.db
 - Conditions: budget exceeded, agent stuck > N minutes, specialist queue depth > N, health state degraded, mass death detected
 - Actions: webhook (from Feature #2), dashboard notification, terminal bell
@@ -148,14 +148,14 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: Medium
 **MC Implementation**: `src/components/panels/standup-panel.tsx`
-**Panopticon Gap**: No reporting. Mission Control panel shows features/agents but no summarized daily view.
+**Overdeck Gap**: No reporting. Mission Control panel shows features/agents but no summarized daily view.
 
 **What MC Does**:
 - Daily standup view: what agents worked on, what completed, what's blocked
 - Per-agent activity summary
 - Timeline of status changes
 
-**What Panopticon Should Do**:
+**What Overdeck Should Do**:
 - `pan standup` CLI command — generates daily summary from:
   - Issues progressed (status changes)
   - Issues completed (merged)
@@ -175,7 +175,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: Medium
 **MC Implementation**: `src/app/api/workflows/route.ts` (160 lines) + `src/app/api/pipelines/route.ts` (183 lines)
-**Panopticon Gap**: Skills define knowledge but not execution sequences. No reusable task templates.
+**Overdeck Gap**: Skills define knowledge but not execution sequences. No reusable task templates.
 
 **What MC Does**:
 - Workflow templates: reusable task specs (model, prompt, timeout, agent role, tags)
@@ -183,8 +183,8 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 - Usage tracking: `use_count`, `last_used_at`
 - Run history with completion stats
 
-**What Panopticon Should Do**:
-- This partially overlaps with **skills** (knowledge) and **PRDs** (planning). Consider whether Panopticon needs a separate concept or can extend skills.
+**What Overdeck Should Do**:
+- This partially overlaps with **skills** (knowledge) and **PRDs** (planning). Consider whether Overdeck needs a separate concept or can extend skills.
 - Possible approach: "Runbooks" — ordered sequences of skill invocations with failure handling
   - `pan runbook create "deploy-and-verify" --steps "build,test,deploy,smoke-test"`
   - Each step references a skill or shell command
@@ -195,7 +195,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 **Effort**: Medium — new concept, needs design work
 **Impact**: Medium — extends automation beyond the fixed specialist pipeline
 
-**Note**: Lower priority because Panopticon's specialist pipeline already handles the most common workflow (review → test → merge). This would be for custom automation.
+**Note**: Lower priority because Overdeck's specialist pipeline already handles the most common workflow (review → test → merge). This would be for custom automation.
 
 ---
 
@@ -203,14 +203,14 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: Low-Medium
 **MC Implementation**: `src/app/api/quality-review/route.ts` (107 lines)
-**Panopticon Gap**: Panopticon's merge step already requires user approval (`pan approve`), but the UX is CLI-only. The dashboard has an APPROVE button but no structured review form.
+**Overdeck Gap**: Overdeck's merge step already requires user approval (`pan approve`), but the UX is CLI-only. The dashboard has an APPROVE button but no structured review form.
 
 **What MC Does**:
 - Dedicated quality review API: review records with status (approved/rejected/needs_revision), reviewer, notes
 - Task progression blocked until quality review passes
 - Audit trail of all review decisions
 
-**What Panopticon Should Do**:
+**What Overdeck Should Do**:
 - Add structured review notes to the approval flow (not just approve/reject)
 - Store review decisions in archive (currently only specialist feedback is archived)
 - Dashboard: review panel with checklist, notes field, history
@@ -225,7 +225,7 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 
 **Priority**: Low (for now)
 **MC Implementation**: `src/lib/auth.ts` (3 roles: viewer/operator/admin, session + API key + Google OAuth)
-**Panopticon Gap**: Zero auth. Dashboard is open to anyone on localhost.
+**Overdeck Gap**: Zero auth. Dashboard is open to anyone on localhost.
 
 **What MC Does**:
 - 3-tier RBAC: viewer (read-only), operator (read-write), admin (full)
@@ -234,14 +234,14 @@ They occupy different layers. MC watches; Panopticon acts. The features proposed
 - Scrypt password hashing
 - Audit logging of all auth events
 
-**What Panopticon Should Do**:
-- **Not now** — Panopticon is single-operator by design. Auth adds complexity without value for the current use case.
-- **Future trigger**: When Panopticon dashboard is exposed beyond localhost (e.g., team access, remote agents reporting back)
+**What Overdeck Should Do**:
+- **Not now** — Overdeck is single-operator by design. Auth adds complexity without value for the current use case.
+- **Future trigger**: When Overdeck dashboard is exposed beyond localhost (e.g., team access, remote agents reporting back)
 - **Minimum viable auth**: API key validation on dashboard endpoints + optional basic auth
 - Store in `~/.panopticon/auth.yaml` (not a database — single operator doesn't need user management)
 
 **Effort**: Medium — auth is always more work than it looks
-**Impact**: Low (currently) — would increase if Panopticon goes multi-user
+**Impact**: Low (currently) — would increase if Overdeck goes multi-user
 
 ---
 
@@ -277,14 +277,14 @@ Phase A (event bus)     → no dependencies, start here
 
 | MC Feature | Why Skip |
 |-----------|----------|
-| **Multi-tenant provisioning** | Panopticon is single-operator. SaaS deployment is not on the roadmap. |
-| **SSE over Socket.io** | Panopticon already uses Socket.io (bidirectional, needed for terminal). Switching to SSE would be a downgrade for our use case. |
-| **Agent templates (archetypes)** | Panopticon's skills + CLAUDE.md + project templates serve the same purpose with more depth. |
-| **Kanban board** | Panopticon already has a kanban board. MC's is simpler (no specialist pipeline integration). |
-| **OpenClaw gateway protocol** | Panopticon manages agents directly via tmux. Adding a gateway layer adds complexity without value for local orchestration. |
+| **Multi-tenant provisioning** | Overdeck is single-operator. SaaS deployment is not on the roadmap. |
+| **SSE over Socket.io** | Overdeck already uses Socket.io (bidirectional, needed for terminal). Switching to SSE would be a downgrade for our use case. |
+| **Agent templates (archetypes)** | Overdeck's skills + CLAUDE.md + project templates serve the same purpose with more depth. |
+| **Kanban board** | Overdeck already has a kanban board. MC's is simpler (no specialist pipeline integration). |
+| **OpenClaw gateway protocol** | Overdeck manages agents directly via tmux. Adding a gateway layer adds complexity without value for local orchestration. |
 | **Memory browser panel** | Superseded by PAN-293 (Project Living Memory) which is much more ambitious than MC's file browser. |
-| **Direct CLI registration** | Interesting pattern but Panopticon's tmux-based agent management is more capable (bi-directional, message delivery, session resume). |
-| **Next.js migration** | MC uses Next.js App Router. Panopticon's Express + Vite React stack works fine. Migration cost >> benefit. |
+| **Direct CLI registration** | Interesting pattern but Overdeck's tmux-based agent management is more capable (bi-directional, message delivery, session resume). |
+| **Next.js migration** | MC uses Next.js App Router. Overdeck's Express + Vite React stack works fine. Migration cost >> benefit. |
 
 ---
 
@@ -300,7 +300,7 @@ Phase A (event bus)     → no dependencies, start here
   - `src/app/api/quality-review/route.ts` — quality gates (107 lines)
   - `src/app/api/workflows/route.ts` — workflow templates (160 lines)
   - `src/app/api/pipelines/route.ts` — pipeline definitions (183 lines)
-- **Panopticon integration points**:
+- **Overdeck integration points**:
   - `src/lib/pipeline-notifier.ts` — event bridge (ready for wiring)
   - `src/dashboard/server/index.ts` — Socket.io configured but unused
   - `src/lib/cloister/deacon.ts` — background patrol (add session scanner here)

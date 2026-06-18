@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Claude Code v2.1.117+ introduced a built-in agent definition system: `.claude/agents/<name>.md` files with YAML frontmatter specifying model, tools, permissions, hooks, and MCP servers. The `--agent <name>` CLI flag starts Claude with that agent's full config. This PRD evaluates how Panopticon can leverage this system to simplify agent lifecycle management, and proposes a phased migration that replaces parts of `launcher-generator.ts` while preserving what Claude Code's agent system cannot handle.
+Claude Code v2.1.117+ introduced a built-in agent definition system: `.claude/agents/<name>.md` files with YAML frontmatter specifying model, tools, permissions, hooks, and MCP servers. The `--agent <name>` CLI flag starts Claude with that agent's full config. This PRD evaluates how Overdeck can leverage this system to simplify agent lifecycle management, and proposes a phased migration that replaces parts of `launcher-generator.ts` while preserving what Claude Code's agent system cannot handle.
 
 ## Research Findings
 
@@ -61,7 +61,7 @@ color: blue                         # display color
 Agent system prompt (markdown body)...
 ```
 
-### What `--agent` Can Replace in Panopticon
+### What `--agent` Can Replace in Overdeck
 
 | Current Mechanism | Replacement | Notes |
 |---|---|---|
@@ -94,7 +94,7 @@ Claude Code's per-agent `hooks:` frontmatter supports **only 3 events**:
 - `PostToolUse`
 - `Stop`
 
-Panopticon's global `~/.claude/settings.json` registers hooks for **8 events**:
+Overdeck's global `~/.claude/settings.json` registers hooks for **8 events**:
 - `PreToolUse` ← can move to per-agent
 - `PostToolUse` ← can move to per-agent
 - `Stop` ← can move to per-agent
@@ -117,7 +117,7 @@ Claude Code Agent Teams (shared task lists, teammate coordination) is **explicit
 - File-locked task list reinvents what beads + tmux message delivery already do reliably
 - Shutdown can be slow and task status can lag
 
-Panopticon's tmux-based lifecycle + beads task tracking + sendKeysAsync message delivery is strictly more capable and battle-tested.
+Overdeck's tmux-based lifecycle + beads task tracking + sendKeysAsync message delivery is strictly more capable and battle-tested.
 
 ### `claude agents` Has No JSON Output
 
@@ -148,7 +148,7 @@ Claude Code supports three ways to provide agent definitions:
 - Checked into repo → all workspace worktrees inherit
 - Discoverable by `claude agents` listing
 - Subagents (via `Agent` tool) auto-discover these
-- **Best for**: Panopticon pipeline roles that are stable across issues
+- **Best for**: Overdeck pipeline roles that are stable across issues
 
 ### 2. CLI JSON: `--agents '{"name":{...}}'`
 - Injected at spawn time, no filesystem footprint
@@ -165,9 +165,9 @@ Claude Code supports three ways to provide agent definitions:
 
 ## Proposed Agent Definitions
 
-### Panopticon Pipeline Agents (NEW files)
+### Overdeck Pipeline Agents (NEW files)
 
-These are distinct from the existing `.claude/agents/` subagent definitions (codebase-explorer, planning-agent, triage-agent, health-monitor) which are for Claude Code's `Agent` tool. Pipeline agents drive Panopticon's lifecycle.
+These are distinct from the existing `.claude/agents/` subagent definitions (codebase-explorer, planning-agent, triage-agent, health-monitor) which are for Claude Code's `Agent` tool. Pipeline agents drive Overdeck's lifecycle.
 
 | File | Role | Model | Permission Mode | Key Tools |
 |------|------|-------|-----------------|-----------|
@@ -179,14 +179,14 @@ These are distinct from the existing `.claude/agents/` subagent definitions (cod
 | `pan-uat-agent.md` | Browser verification | `sonnet` | `bypassPermissions` | All + Playwright MCP |
 | `pan-merge-agent.md` | PR merge & cleanup | `sonnet` | `bypassPermissions` | All |
 
-**Naming convention:** `pan-` prefix to distinguish Panopticon pipeline agents from Claude Code subagent definitions. Prevents confusion in `claude agents` listing.
+**Naming convention:** `pan-` prefix to distinguish Overdeck pipeline agents from Claude Code subagent definitions. Prevents confusion in `claude agents` listing.
 
 ### Example: `pan-work-agent.md`
 
 ```yaml
 ---
 name: pan-work-agent
-description: Panopticon implementation agent — autonomous coding with full tool access
+description: Overdeck implementation agent — autonomous coding with full tool access
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
@@ -219,7 +219,7 @@ hooks:
           command: "/home/eltmon/.panopticon/bin/stop-hook"
 ---
 
-You are a Panopticon work agent...
+You are a Overdeck work agent...
 ```
 
 ### Hook Migration Matrix
@@ -265,7 +265,7 @@ command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROO
 unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN OPENAI_API_KEY ...
 export ANTHROPIC_BASE_URL=...  # if non-Anthropic
 export ANTHROPIC_AUTH_TOKEN=... # if non-Anthropic
-# Panopticon identity
+# Overdeck identity
 export OVERDECK_AGENT_ID='agent-pan-982'
 export OVERDECK_ISSUE_ID='PAN-982'
 export OVERDECK_SESSION_TYPE='implementation'
@@ -337,9 +337,9 @@ pan plan draft PAN-999
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Per-agent hooks fire for user sessions too | User's ad-hoc `claude` sessions in workspace would trigger Panopticon hooks defined in agent .md files | `pan-*` prefix means user won't accidentally use `--agent pan-work-agent`. Hooks only fire when that specific agent is active. |
+| Per-agent hooks fire for user sessions too | User's ad-hoc `claude` sessions in workspace would trigger Overdeck hooks defined in agent .md files | `pan-*` prefix means user won't accidentally use `--agent pan-work-agent`. Hooks only fire when that specific agent is active. |
 | `--agent` + `--resume` behavior changes in future Claude Code versions | Migration depends on agent config applying to resumed sessions | Pin minimum Claude Code version in `pan doctor` checks. Test in CI. |
-| Agent definition files pollute `claude agents` listing | Users see 7+ Panopticon agents alongside their own | `pan-` prefix makes them visually distinct. Consider `~/.panopticon/agents/` as alternate location if Claude Code adds user-dir agent discovery. |
+| Agent definition files pollute `claude agents` listing | Users see 7+ Overdeck agents alongside their own | `pan-` prefix makes them visually distinct. Consider `~/.panopticon/agents/` as alternate location if Claude Code adds user-dir agent discovery. |
 | Non-Anthropic models need both `--agent` AND `--model` | Dual-flag complexity | Only applies to ~20% of spawns (Kimi, CLIProxy). Document clearly. |
 | Hook deduplication between global and per-agent | If global hooks aren't cleaned up, PreToolUse/PostToolUse fire twice | Phase 3 must remove migrated hooks from global `settings.json` atomically with agent definition deployment. |
 

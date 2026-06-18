@@ -152,7 +152,7 @@ export interface ConversationsConfig {
   enrichment: ConversationsEnrichmentConfig;
 }
 
-export interface PanopticonConfig {
+export interface OverdeckConfig {
   panopticon: {
     version: string;
   };
@@ -189,7 +189,7 @@ export interface PanopticonConfig {
   conversations?: ConversationsConfig;
 }
 
-const DEFAULT_CONFIG: PanopticonConfig = {
+const DEFAULT_CONFIG: OverdeckConfig = {
   panopticon: {
     version: '1.0.0',
   },
@@ -284,7 +284,7 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
 const VALID_RESILIENCY_TIERS = ['ephemeral', 'durable'] as const;
 
 /** Normalize and validate the remote config section. Mutates `config.remote`. */
-export function normalizeRemoteConfig(config: PanopticonConfig): void {
+export function normalizeRemoteConfig(config: OverdeckConfig): void {
   if (!config.remote) return;
 
   if (config.remote.resiliency_tier === undefined) {
@@ -309,19 +309,19 @@ export function normalizeRemoteConfig(config: PanopticonConfig): void {
   }
 }
 
-export function loadConfigSync(): PanopticonConfig {
-  let config: PanopticonConfig;
+export function loadConfigSync(): OverdeckConfig {
+  let config: OverdeckConfig;
 
   if (!existsSync(CONFIG_FILE)) {
-    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as OverdeckConfig;
   } else {
     try {
       const content = readFileSync(CONFIG_FILE, 'utf8');
-      const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+      const parsed = parse(content) as unknown as Partial<OverdeckConfig>;
       config = deepMerge(DEFAULT_CONFIG, parsed);
     } catch (error) {
       console.error('Warning: Failed to parse config, using defaults');
-      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as OverdeckConfig;
     }
   }
 
@@ -346,24 +346,24 @@ export function loadConfigSync(): PanopticonConfig {
   return config;
 }
 
-export function saveConfigSync(config: PanopticonConfig): void {
+export function saveConfigSync(config: OverdeckConfig): void {
   const content = stringify(config as any);
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
-async function loadConfigFromFile(): Promise<PanopticonConfig> {
-  let config: PanopticonConfig;
+async function loadConfigFromFile(): Promise<OverdeckConfig> {
+  let config: OverdeckConfig;
 
   try {
     const content = await fs.readFile(CONFIG_FILE, 'utf8');
-    const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+    const parsed = parse(content) as unknown as Partial<OverdeckConfig>;
     config = deepMerge(DEFAULT_CONFIG, parsed);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as OverdeckConfig;
     } else {
       console.error('Warning: Failed to parse config, using defaults');
-      return JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as PanopticonConfig;
+      return JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as OverdeckConfig;
     }
   }
 
@@ -385,12 +385,12 @@ async function loadConfigFromFile(): Promise<PanopticonConfig> {
   return config;
 }
 
-async function saveConfigToFile(config: PanopticonConfig): Promise<void> {
+async function saveConfigToFile(config: OverdeckConfig): Promise<void> {
   const content = stringify(config as any);
   await fs.writeFile(CONFIG_FILE, content, 'utf8');
 }
 
-export function getDefaultConfigSync(): PanopticonConfig {
+export function getDefaultConfigSync(): OverdeckConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
 
@@ -474,7 +474,7 @@ export function findDevrootForProjectSync(projectPath: string): string {
  * Get the conversations config block, with defaults merged in.
  * Resolves watchDirs ~ to home directory.
  */
-function resolveConversationsConfig(config: PanopticonConfig): ConversationsConfig {
+function resolveConversationsConfig(config: OverdeckConfig): ConversationsConfig {
   const conv = config.conversations ?? (DEFAULT_CONFIG.conversations as ConversationsConfig);
   return {
     ...conv,
@@ -498,7 +498,7 @@ async function readConversationsConfig(): Promise<ConversationsConfig> {
 // via Effect.tryPromise; the sync paths route through Effect.try.
 
 /** Load config.toml (async; dashboard-safe). */
-export const loadConfig = (): Effect.Effect<PanopticonConfig, FsError> =>
+export const loadConfig = (): Effect.Effect<OverdeckConfig, FsError> =>
   Effect.tryPromise({
     try: () => loadConfigFromFile(),
     catch: (cause) =>
@@ -507,7 +507,7 @@ export const loadConfig = (): Effect.Effect<PanopticonConfig, FsError> =>
 
 /** Persist config.toml (async; dashboard-safe). */
 export const saveConfig = (
-  config: PanopticonConfig,
+  config: OverdeckConfig,
 ): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: () => saveConfigToFile(config),
@@ -516,7 +516,7 @@ export const saveConfig = (
   });
 
 /** Default config template. Pure. */
-export const getDefaultConfig = (): Effect.Effect<PanopticonConfig> =>
+export const getDefaultConfig = (): Effect.Effect<OverdeckConfig> =>
   Effect.sync(() => getDefaultConfigSync());
 
 /** Compute the dashboard's external API URL. Pure (reads env). */

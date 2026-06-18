@@ -1,4 +1,4 @@
-# Panopticon WSL2 Hosts Sync
+# Overdeck WSL2 Hosts Sync
 # Syncs entries from ~/.wsl2hosts in WSL to Windows hosts file
 # This enables local development domains (*.localhost, *.test) to resolve correctly
 #

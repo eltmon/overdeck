@@ -2,7 +2,7 @@
 
 ## Vision
 
-Replace the legacy `.planning/` directory and separate `vbrief/` directory with a single `.pan/` dot-directory that holds ALL Panopticon orchestration metadata. The dot-prefix signals "tooling, not code" (same convention as `.git/`, `.github/`, `.beads/`). State lives in git on the feature branch for remote distribution, with a clear lifecycle from draft → proposed → active → completed.
+Replace the legacy `.planning/` directory and separate `vbrief/` directory with a single `.pan/` dot-directory that holds ALL Overdeck orchestration metadata. The dot-prefix signals "tooling, not code" (same convention as `.git/`, `.github/`, `.beads/`). State lives in git on the feature branch for remote distribution, with a clear lifecycle from draft → proposed → active → completed.
 
 ## Motivation
 
@@ -26,7 +26,7 @@ The current system has three problems:
 
 ## Architecture (3 sentences)
 
-Everything Panopticon owns lives in `.pan/` — drafts, specs, continue state, session history. Lifecycle status is a field in the JSON (`status: "proposed" | "active" | "completed" | "cancelled"`), not a directory location — files never move. Agents report progress exclusively through Beads (`bd update`); they never write to shared orchestration files.
+Everything Overdeck owns lives in `.pan/` — drafts, specs, continue state, session history. Lifecycle status is a field in the JSON (`status: "proposed" | "active" | "completed" | "cancelled"`), not a directory location — files never move. Agents report progress exclusively through Beads (`bd update`); they never write to shared orchestration files.
 
 ## Directory Structure
 

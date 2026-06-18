@@ -18,13 +18,13 @@ tables + 5 search/checkpoint tables). **Conversations: 30 cols → 14 export
 (SOURCE-OF-TRUTH) + favorites table, 12 CACHE, 4 DEAD.** **Transcript subsystem:
 100% CACHE — every column rebuildable from JSONL.** **9 of the 10 in-scope tables
 are pure disposable cache; only `conversations` (a subset) + `favorites` carry
-irreplaceable Panopticon-authored state.** The collapse target: **one Transcript
+irreplaceable Overdeck-authored state.** The collapse target: **one Transcript
 index** (today `discovered_sessions`) computes the JSONL-derived facts ONCE;
 Conversation references it by `claude_session_id`, Agent by `agents.session_id`.
 
 ## Glossary
 
-- **SOURCE-OF-TRUTH (export target)** — Panopticon-authored intent or lineage
+- **SOURCE-OF-TRUTH (export target)** — Overdeck-authored intent or lineage
   that exists nowhere but the DB row. Must survive a wipe → exported to a durable
   home (per-issue git record or a conversations export file, PAN-1937).
 - **CACHE** — recomputable from a source of truth (JSONL transcript, git

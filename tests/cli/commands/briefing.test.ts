@@ -30,8 +30,8 @@ describe('pan briefing command', () => {
 
     const output = logSpy.mock.calls[0][0] as string;
     logSpy.mockRestore();
-    expect(output).toContain('# Working Inside Panopticon');
-    expect(output).toContain('## What Panopticon Gives You');
+    expect(output).toContain('# Working Inside Overdeck');
+    expect(output).toContain('## What Overdeck Gives You');
     expect(output).toContain('## How to Read What Follows');
     expect(output).toContain('## Current Workspace');
     expect(output).toContain('## Knowledge Registry');

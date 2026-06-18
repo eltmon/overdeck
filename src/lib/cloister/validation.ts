@@ -345,7 +345,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   }
   if (opts.isRemote && opts.vmName) {
     // Validate vmName and projectPath to prevent shell injection.
-    // Both are controlled by Panopticon config, but explicit validation
+    // Both are controlled by Overdeck config, but explicit validation
     // catches any accidental or malicious values before they reach the shell.
     if (!/^[a-z0-9][a-z0-9-]*$/.test(opts.vmName)) {
       throw new Error(`Invalid vmName for SSH: ${opts.vmName}`);

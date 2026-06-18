@@ -1,6 +1,6 @@
-# DNS Setup for Panopticon
+# DNS Setup for Overdeck
 
-Panopticon uses local domain names for HTTPS development. This guide explains how to configure DNS resolution for `pan.localhost` and wildcard domains.
+Overdeck uses local domain names for HTTPS development. This guide explains how to configure DNS resolution for `pan.localhost` and wildcard domains.
 
 ## Automatic Setup (Recommended)
 
@@ -53,7 +53,7 @@ WSL2 requires special handling because `/etc/hosts` changes don't sync to Window
 
 #### Option 1: wsl2hosts (Default for WSL2)
 
-Panopticon uses `~/.wsl2hosts` to sync DNS entries to Windows via a scheduled task:
+Overdeck uses `~/.wsl2hosts` to sync DNS entries to Windows via a scheduled task:
 
 ```bash
 # pan install sets this up automatically
@@ -68,7 +68,7 @@ Install and configure dnsmasq for wildcard DNS:
 # Install dnsmasq
 sudo apt update && sudo apt install -y dnsmasq
 
-# Create Panopticon DNS config
+# Create Overdeck DNS config
 sudo tee /etc/dnsmasq.d/panopticon.conf > /dev/null <<EOF
 # Resolve all *.localhost domains to 127.0.0.1
 address=/localhost/127.0.0.1

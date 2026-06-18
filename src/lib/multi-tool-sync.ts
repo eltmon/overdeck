@@ -1,7 +1,7 @@
 /**
  * Multi-Tool Skill Sync
  *
- * Writes Panopticon skills to other AI tool formats so skills authored once
+ * Writes Overdeck skills to other AI tool formats so skills authored once
  * in .pan/skills/ are available across all configured tools.
  *
  * Configured via `tools.also_sync` in ~/.panopticon/config.yaml and .pan.yaml.

@@ -3,7 +3,7 @@
  *
  * CRUD, FTS5 sync, embedding helpers, and filter-based search for
  * the discovered_sessions table — the index of all Claude Code JSONL
- * sessions found on disk, inside and outside Panopticon.
+ * sessions found on disk, inside and outside Overdeck.
  *
  * PAN-1249: Effect migration pass — public API stays synchronous to keep
  * the existing call sites unchanged. FTS5 try/catch blocks are preserved

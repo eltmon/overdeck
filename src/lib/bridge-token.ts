@@ -4,12 +4,12 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { FsError } from './errors.js';
 
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export const BRIDGE_TOKEN_HEADER = 'x-panopticon-bridge-token';
 
 function bridgeTokensDir(): string {
-  return join(getPanopticonHome(), 'bridge-tokens');
+  return join(getOverdeckHome(), 'bridge-tokens');
 }
 
 export function getBridgeTokenPath(agentId: string): string {

@@ -2,7 +2,7 @@
 
 ## Problem
 
-The Panopticon dashboard takes 5-20+ seconds to open a workspace detail panel. Root cause: **80+ HTTP requests/minute** from aggressive, duplicated polling saturates the browser's 6-connection HTTP/1.1 limit through Traefik.
+The Overdeck dashboard takes 5-20+ seconds to open a workspace detail panel. Root cause: **80+ HTTP requests/minute** from aggressive, duplicated polling saturates the browser's 6-connection HTTP/1.1 limit through Traefik.
 
 The server has a partial data layer already — `IssueDataService` handles background tracker polling, GitHub ETag caching, and socket.io snapshot/update push. The core problem is **inconsistency**: issues are partially centralized through `IssueDataService`, but agents, specialists, workspaces, costs, and resources each have their own independent React Query polling loops. The frontend has 3 independent `/api/issues` queries with different cache keys, plus 42+ other polls at 2-5 second intervals. Live updates are split across socket.io, raw WebSocket (terminal), and HTTP polling — three transport paradigms that don't coordinate.
 
@@ -14,7 +14,7 @@ The server is a single 15,777-line Express file (`src/dashboard/server/index.ts`
 
 **Switch to Bun** as package manager and dev runtime (Node remains the production runtime for npm distribution). Add shared contracts as a proper workspace package.
 
-This work will be parallelized across multiple Panopticon agents.
+This work will be parallelized across multiple Overdeck agents.
 
 ---
 

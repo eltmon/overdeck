@@ -23,7 +23,7 @@ import {
  * TerminalDrawer — a resizable terminal drawer stacked below the deck content
  * (PAN-1561). UI/state vendored from t3code's ThreadTerminalDrawer +
  * terminalStateStore so upstream fixes merge cleanly; the one adapted seam is
- * the viewport: each terminal is a Panopticon tmux session rendered by
+ * the viewport: each terminal is a Overdeck tmux session rendered by
  * <XTerminal>, created/killed via /api/terminals. The RPC-backed viewport
  * (t3code's TerminalViewport) lands later under PAN-1536.
  */

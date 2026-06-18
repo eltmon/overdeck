@@ -2,9 +2,9 @@
 scope: dev
 ---
 
-### Commit often when working directly on main (Panopticon dev only)
+### Commit often when working directly on main (Overdeck dev only)
 
-When developing Panopticon itself, agents frequently work **directly on the
+When developing Overdeck itself, agents frequently work **directly on the
 primary `main` worktree** rather than in an isolated feature workspace. On
 `main` there is no review/merge pipeline to checkpoint your work, and other
 agents (or the deacon's janitors) may be operating in the same repo at the
@@ -24,7 +24,7 @@ uncommitted change accumulate across many edits.
 - This complements — does not replace — the stash-discipline rule: agents
   still never `git stash`. Commit, discard, or surface; never stash.
 
-This rule is **Panopticon-development-specific** (`scope: dev`). It folds into
+This rule is **Overdeck-development-specific** (`scope: dev`). It folds into
 the global managed region only on a panopticon-cli source checkout, so it
-never ships to projects that merely *use* Panopticon — their agents work in
+never ships to projects that merely *use* Overdeck — their agents work in
 feature workspaces behind the review pipeline and don't need it.

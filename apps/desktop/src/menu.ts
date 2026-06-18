@@ -1,8 +1,8 @@
 /**
- * Application menu bar for the Panopticon desktop app.
+ * Application menu bar for the Overdeck desktop app.
  *
  * Standard Electron menus: File, Edit, View, Window, Help
- * Plus a Panopticon menu with all orchestration actions.
+ * Plus a Overdeck menu with all orchestration actions.
  *
  * macOS: app name menu with About, Settings, Services etc.
  * Linux/Windows: Settings in File menu.
@@ -42,7 +42,7 @@ function rebuildMenu(): void {
   Menu.setApplicationMenu(menu);
 
   // Re-attach workspace submenu refresh listener
-  const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+  const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
   if (panopticonMenu?.submenu) {
     panopticonMenu.submenu.on("menu-will-show", () => {
       void fetchActiveWorkspaces().then((workspaces) => {
@@ -147,9 +147,9 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
   // Window
   template.push({ role: "windowMenu" as const });
 
-  // Panopticon
+  // Overdeck
   template.push({
-    label: "Panopticon",
+    label: "Overdeck",
     submenu: [
       {
         label: "Start Cloister",
@@ -200,7 +200,7 @@ function buildMenuTemplate(): MenuItemConstructorOptions[] {
           ),
       },
       {
-        label: "Panopticon on GitHub",
+        label: "Overdeck on GitHub",
         click: () =>
           void shell.openExternal("https://github.com/eltmon/panopticon-cli"),
       },
@@ -237,8 +237,8 @@ export function configureApplicationMenu(): void {
   const menu = Menu.buildFromTemplate(buildMenuTemplate());
   Menu.setApplicationMenu(menu);
 
-  // Refresh workspace submenu when the Panopticon menu is about to open
-  const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+  // Refresh workspace submenu when the Overdeck menu is about to open
+  const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
   if (panopticonMenu?.submenu) {
     panopticonMenu.submenu.on("menu-will-show", () => {
       void fetchActiveWorkspaces().then((workspaces) => {

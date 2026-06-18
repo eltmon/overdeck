@@ -1,4 +1,4 @@
-# Panopticon Traefik Configuration
+# Overdeck Traefik Configuration
 
 Traefik reverse proxy for local development with HTTPS.
 
@@ -20,8 +20,8 @@ Traefik reverse proxy for local development with HTTPS.
 
 | URL | Service |
 |-----|---------|
-| `https://pan.localhost` | Panopticon Dashboard (Frontend) |
-| `https://pan.localhost/api/*` | Panopticon Dashboard (API) |
+| `https://pan.localhost` | Overdeck Dashboard (Frontend) |
+| `https://pan.localhost/api/*` | Overdeck Dashboard (API) |
 | `http://localhost:8080` | Traefik Dashboard |
 
 ## How It Works

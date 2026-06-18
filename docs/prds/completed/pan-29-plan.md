@@ -2,7 +2,7 @@
 
 ## Issue Summary
 
-When clicking "Approve & Merge" on an issue with merge conflicts, Panopticon currently shows a manual resolution message. This issue implements the `merge-agent` specialist to automatically resolve conflicts using Claude Code.
+When clicking "Approve & Merge" on an issue with merge conflicts, Overdeck currently shows a manual resolution message. This issue implements the `merge-agent` specialist to automatically resolve conflicts using Claude Code.
 
 ## Key Decisions
 

@@ -6,7 +6,7 @@ import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
-import { AGENTS_DIR, getPanopticonHome, packageRoot, sessionFilePath } from './paths.js';
+import { AGENTS_DIR, getOverdeckHome, packageRoot, sessionFilePath } from './paths.js';
 import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
@@ -709,7 +709,7 @@ const PROVIDER_ENV_KEYS = [
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
-  // Pi-native provider env vars (bridged from Panopticon settings so Pi can auth)
+  // Pi-native provider env vars (bridged from Overdeck settings so Pi can auth)
   'KIMI_API_KEY',
   'MINIMAX_API_KEY',
   'ZAI_API_KEY',
@@ -957,7 +957,7 @@ export interface AgentState {
 }
 
 export function getAgentDir(agentId: string): string {
-  return join(getPanopticonHome(), 'agents', agentId);
+  return join(getOverdeckHome(), 'agents', agentId);
 }
 
 export function getAgentStateFilePath(agentId: string): string {
@@ -2838,16 +2838,16 @@ export async function buildAgentLaunchConfig(opts: {
 }): Promise<AgentLaunchConfig> {
   const model = requireModelOverrideSync(opts.model);
 
-  // Substrate guard: inject permission deny rules for Panopticon infrastructure
+  // Substrate guard: inject permission deny rules for Overdeck infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
   // into the workspace's .claude/settings.local.json. Idempotent. Without this
   // a vBRIEF action like "delete the legacy pan-*-agent.md files" can convince
   // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
   try {
-    const { injectPanopticonInfraDeny } = await import('./claude-settings-overlay.js');
-    await Effect.runPromise(injectPanopticonInfraDeny(opts.workspace));
+    const { injectOverdeckInfraDeny } = await import('./claude-settings-overlay.js');
+    await Effect.runPromise(injectOverdeckInfraDeny(opts.workspace));
   } catch (err) {
-    console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
+    console.warn(`[agents] injectOverdeckInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
   }
 
   const providerEnv = await getProviderEnvForModel(model);
@@ -3047,7 +3047,7 @@ const SPAWN_STACK_REBUILD_COOLDOWN_MS = 15 * 60 * 1000;
 const SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3;
 
 /**
- * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
+ * Spawn a role-based Overdeck run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
 export async function assertWorkspaceStackHealthyForSpawn(
@@ -5336,7 +5336,7 @@ export async function autoRecoverAgents(): Promise<{ recovered: string[]; failed
 }
 
 /**
- * Check if Panopticon hooks are configured, and auto-setup if not
+ * Check if Overdeck hooks are configured, and auto-setup if not
  */
 function checkAndSetupHooks(): void {
   const settingsPath = join(homedir(), '.claude', 'settings.json');
@@ -5367,7 +5367,7 @@ function checkAndSetupHooks(): void {
 
   // Hooks not configured - run setup silently
   try {
-    console.log('Configuring Panopticon heartbeat hooks...');
+    console.log('Configuring Overdeck heartbeat hooks...');
     // Note: This runs during spawn which is now async, so we can use execAsync
     // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
     exec('pan admin hooks install', (error: Error | null) => {

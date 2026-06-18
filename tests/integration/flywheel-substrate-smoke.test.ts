@@ -9,7 +9,7 @@ import { runGhIssueTrailerHook } from '../../sync-sources/hooks/gh-issue-trailer
 const projectRoot = resolve(__dirname, '../..');
 
 let tempDirs: string[] = [];
-let previousPanopticonHome: string | undefined;
+let previousOverdeckHome: string | undefined;
 let browser: Browser | undefined;
 let context: BrowserContext | undefined;
 let page: Page | undefined;
@@ -33,7 +33,7 @@ function response(body: unknown): Response {
   return new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 }
 
-async function makePanopticonHome(): Promise<string> {
+async function makeOverdeckHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), 'pan-flywheel-substrate-smoke-'));
   tempDirs.push(home);
   await mkdir(join(home, 'agents', 'agent-flywheel'), { recursive: true });
@@ -237,16 +237,16 @@ afterEach(async () => {
 
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
-  if (previousPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-  else process.env.OVERDECK_HOME = previousPanopticonHome;
+  if (previousOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = previousOverdeckHome;
 
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe('flywheel substrate bug smoke', () => {
   it('flows hook provenance through poller projection, stats route, and Stats tab', async () => {
-    previousPanopticonHome = process.env.OVERDECK_HOME;
-    process.env.OVERDECK_HOME = await makePanopticonHome();
+    previousOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = await makeOverdeckHome();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-25T12:15:00.000Z'));
 

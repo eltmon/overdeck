@@ -28,7 +28,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
-import { encodeClaudeProjectDir, getPanopticonHome } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, getOverdeckHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 import { readRollbackAgentHarnessFromDir } from '../../../lib/overdeck/agent-rollback-state.js';
 
@@ -118,7 +118,7 @@ export async function resolveClaudeSessionId(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
 
   // 1. session.id — single UUID written by auto-suspend. Authoritative when
@@ -175,7 +175,7 @@ export async function resolveCodexRolloutPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
   const codexHome = join(agentDir, 'codex-home');
   if (!(await pathExists(codexHome))) return null;
@@ -201,7 +201,7 @@ export async function resolvePiSessionPath(
   agentId: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  const agentsRoot = opts.agentsDirOverride ?? join(getPanopticonHome(), 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
   const NON_TRANSCRIPT = new Set(['cost-events.jsonl', 'activity.jsonl']);
   let best: { path: string; mtime: number } | null = null;

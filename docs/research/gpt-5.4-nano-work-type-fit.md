@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates OpenAI's GPT-5.4 Nano against Panopticon's 23 work types. Nano is the smallest, cheapest, and fastest GPT-5.4 variant — positioned for classification, routing, and lightweight subagent work.
+Evaluates OpenAI's GPT-5.4 Nano against Overdeck's 23 work types. Nano is the smallest, cheapest, and fastest GPT-5.4 variant — positioned for classification, routing, and lightweight subagent work.
 
 ## Model Profile
 
@@ -146,9 +146,9 @@ Exploration needs synthesis capability to map unfamiliar codebases. Nano's long-
 
 ---
 
-## Nano's Niche: The Panopticon Routing Layer
+## Nano's Niche: The Overdeck Routing Layer
 
-Beyond work types, Nano has a potential role in Panopticon's infrastructure:
+Beyond work types, Nano has a potential role in Overdeck's infrastructure:
 
 1. **Smart model selection routing** — Nano could classify incoming tasks by complexity and route to appropriate models, replacing hard-coded rules in `smart-model-selector.ts`.
 2. **Bead complexity scoring** — evaluate bead descriptions and estimate which model tier they need.
@@ -170,7 +170,7 @@ At $0.02/M cached input, these routing/classification calls would add negligible
 
 ## Integration Notes
 
-- OpenAI already configured in Panopticon
+- OpenAI already configured in Overdeck
 - Model ID: `gpt-5.4-nano`
 - Available via OpenAI API and CLIProxyAPI sidecar
 - Suggested capability scores: code-generation 76, code-review 68, debugging 72, planning 60, documentation 58, testing 74, security 62, performance 66, synthesis 64, speed 96, context-length 85

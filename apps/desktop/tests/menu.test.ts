@@ -12,10 +12,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ─── Mock electron first ───────────────────────────────────────────────────────
 
 vi.mock("electron", () => ({
-  app: { name: "Panopticon" },
+  app: { name: "Overdeck" },
   Menu: {
     buildFromTemplate: vi.fn(() => ({
-      items: [{ label: "Panopticon", submenu: { on: vi.fn() } }],
+      items: [{ label: "Overdeck", submenu: { on: vi.fn() } }],
     })),
     setApplicationMenu: vi.fn(),
   },

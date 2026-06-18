@@ -1,6 +1,6 @@
 # Flywheel
 
-The Flywheel is Panopticon's singleton orchestrator for long-running, fix-all runs. It keeps PAN issues moving through the existing `plan`, `work`, `review`, `test`, and `ship` roles until each branch reaches the human merge gate.
+The Flywheel is Overdeck's singleton orchestrator for long-running, fix-all runs. It keeps PAN issues moving through the existing `plan`, `work`, `review`, `test`, and `ship` roles until each branch reaches the human merge gate.
 
 The canonical skill entrypoint is `/pan-flywheel`, which wraps the `pan flywheel` CLI. Legacy invocations redirect there for one release only.
 
@@ -36,7 +36,7 @@ The top-level fields are:
 | `orchestrator` | Harness, model, effort, and context usage for the singleton orchestrator. |
 | `headline` | Counts for bugs fixed, swarm items merged, PRs merged, and items awaiting UAT. |
 | `activePipeline` | Issues currently moving through planning, work, review, test, ship, merge, blocked, or parked states. |
-| `substrateBugs` | Panopticon infrastructure bugs found during orchestration. |
+| `substrateBugs` | Overdeck infrastructure bugs found during orchestration. |
 | `agents` | Role agents participating in the run, with issue, role, model, context, and current action when known. |
 | `parked` | Issues the Flywheel cannot move without a concrete reason. |
 | `system` | Main HEAD, RAM, swap, active-agent count, and agent cap. |
@@ -87,7 +87,7 @@ Flywheel-Discovered-In: PAN-1487
 
 `Flywheel-Filed-By` is `agent` only when the singleton `flywheel-orchestrator` files the issue itself. Work, plan, review, test, ship, and operator-requested issue creation are recorded as `operator` because a human or non-Flywheel role decided to file the record.
 
-`Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Panopticon state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
+`Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Overdeck state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
 
 The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
 
@@ -106,7 +106,7 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 | `pan flywheel emit-status --file <json>` | Validates and writes a status snapshot from the orchestrator. |
 | `pan flywheel report` | Writes the per-run report under the run directory and commits any pending changes to `docs/FLYWHEEL-STATE.md`. |
 
-Cloister owns the singleton gate. Only one Flywheel run may be active for a Panopticon home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
+Cloister owns the singleton gate. Only one Flywheel run may be active for a Overdeck home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
 
 For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`OVERDECK_DEV_SOP.md`](./OVERDECK_DEV_SOP.md#deacon-and-flywheel-startup-order).
 
@@ -157,14 +157,14 @@ Changing the Flywheel row affects future starts. It must not mutate already-save
 
 ## Brief authoring
 
-A brief is a markdown operating contract for a Flywheel run. It should be specific enough that the orchestrator can act without asking for routine direction, but narrow enough that it does not bypass Panopticon's pipeline.
+A brief is a markdown operating contract for a Flywheel run. It should be specific enough that the orchestrator can act without asking for routine direction, but narrow enough that it does not bypass Overdeck's pipeline.
 
 A useful brief includes:
 
 1. Source material to read before the first tick.
 2. Scope: projects, issue prefixes, priorities, and exclusions.
 3. Priority rules for choosing the next issue.
-4. The substrate-fix rule: broken Panopticon behavior must be fixed at the root cause.
+4. The substrate-fix rule: broken Overdeck behavior must be fixed at the root cause.
 5. Human-input policy: the expected human gate is merge approval after UAT.
 6. Status requirements: which facts must appear in each `FlywheelStatus` snapshot.
 7. End-of-run report requirements.
@@ -199,7 +199,7 @@ Do not put secrets, machine-local paths, or one-time session state in a brief. P
 | UI | Sidebar Flywheel item | Opens `/flywheel` and shows a live badge when a run summary reports `status: running`. |
 | UI | Settings → Roles → Flywheel | Edits the orchestrator model, harness, effort, max-agent budget, and scope for future starts. |
 
-The legacy skill described a manual operating loop for pushing many Panopticon issues forward. The Flywheel turns that loop into a product surface:
+The legacy skill described a manual operating loop for pushing many Overdeck issues forward. The Flywheel turns that loop into a product surface:
 
 - The brief replaces ad hoc prompt text.
 - `FlywheelStatus` replaces prose-only progress updates.
@@ -207,4 +207,4 @@ The legacy skill described a manual operating loop for pushing many Panopticon i
 - Run artifacts make pause, resume, report, and debugging repeatable.
 - Dashboard panes expose active pipeline, substrate bugs, agents, system health, parked items, open questions, transcript, and run configuration.
 
-The operating principle stays the same: use Panopticon to fix Panopticon. When the Flywheel finds a broken route, gate, prompt, workspace setup, status update, or recovery path, it fixes the substrate instead of working around it.
+The operating principle stays the same: use Overdeck to fix Overdeck. When the Flywheel finds a broken route, gate, prompt, workspace setup, status update, or recovery path, it fixes the substrate instead of working around it.

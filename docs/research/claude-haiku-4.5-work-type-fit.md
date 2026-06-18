@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Anthropic's Claude Haiku 4.5 against Panopticon's 23 work types. Haiku 4.5 is Panopticon's current default for lightweight subagent and CLI work — the fastest and cheapest Claude model.
+Evaluates Anthropic's Claude Haiku 4.5 against Overdeck's 23 work types. Haiku 4.5 is Overdeck's current default for lightweight subagent and CLI work — the fastest and cheapest Claude model.
 
 ## Model Profile
 
@@ -67,7 +67,7 @@ Evaluates Anthropic's Claude Haiku 4.5 against Panopticon's 23 work types. Haiku
 5. **SWE-Bench Pro 39.5%** — Significant gap to Nano (52.4%) on the hardest coding benchmark. Haiku struggles with complex multi-step coding.
 6. **Price increase** — 25% more expensive than Haiku 3.5 ($0.80/$4.00), narrowing the cost advantage.
 7. **Verbosity** — 8.3M output tokens in evals vs 7.2M median. Tends to over-generate.
-8. **Knowledge cutoff** — July 2025 is the oldest of any model in Panopticon's roster.
+8. **Knowledge cutoff** — July 2025 is the oldest of any model in Overdeck's roster.
 
 ---
 
@@ -75,7 +75,7 @@ Evaluates Anthropic's Claude Haiku 4.5 against Panopticon's 23 work types. Haiku
 
 ### The Fading Default
 
-Haiku 4.5 has been Panopticon's lightweight workhorse since launch. But the budget tier has evolved dramatically — GPT-5.4 Nano, Gemini Flash-Lite, and Gemini 3 Flash all offer better value propositions. Haiku 4.5 remains a safe, proven choice within the Anthropic ecosystem, but it's no longer the obvious default for any work type.
+Haiku 4.5 has been Overdeck's lightweight workhorse since launch. But the budget tier has evolved dramatically — GPT-5.4 Nano, Gemini Flash-Lite, and Gemini 3 Flash all offer better value propositions. Haiku 4.5 remains a safe, proven choice within the Anthropic ecosystem, but it's no longer the obvious default for any work type.
 
 ### Good Fit (Current Defaults)
 
@@ -160,11 +160,11 @@ All other work types. Haiku 4.5's Intelligence Index of 31, GPQA ~73%, and SWE-B
 
 ## Integration Notes
 
-- Anthropic is the primary provider in Panopticon
+- Anthropic is the primary provider in Overdeck
 - Model ID: `claude-haiku-4-5-20251001`
 - Suggested capability scores: code-generation 72, code-review 64, debugging 68, planning 56, documentation 62, testing 68, security 58, performance 62, synthesis 60, speed 82, context-length 72
 - **Status:** Still the Anthropic budget option, but strongly consider GPT-5.4 Nano as the new default for subagent and CLI work
-- **Knowledge cutoff warning:** July 2025 is the oldest cutoff in Panopticon's roster. May miss awareness of recent frameworks, APIs, or language features.
+- **Knowledge cutoff warning:** July 2025 is the oldest cutoff in Overdeck's roster. May miss awareness of recent frameworks, APIs, or language features.
 
 ## Sources
 

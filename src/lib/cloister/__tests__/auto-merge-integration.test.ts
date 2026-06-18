@@ -60,7 +60,7 @@ function scheduleDeps(isEligible = async () => ({ eligible: true as const })) {
       readyForMerge: true,
       prUrl: PR_URL,
     }),
-    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Panopticon CLI' }) as never,
+    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Overdeck CLI' }) as never,
     announce: vi.fn(),
   };
 }

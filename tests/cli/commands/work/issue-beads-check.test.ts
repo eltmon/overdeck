@@ -16,7 +16,7 @@ const childProcessMocks = vi.hoisted(() => ({
 vi.mock('child_process', () => childProcessMocks);
 
 let tmpDir: string;
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'pan-issue-test-'));
@@ -28,10 +28,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  if (originalPanopticonHome === undefined) {
+  if (originalOverdeckHome === undefined) {
     delete process.env.OVERDECK_HOME;
   } else {
-    process.env.OVERDECK_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalOverdeckHome;
   }
   rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();

@@ -70,7 +70,7 @@ async function main() {
 <!DOCTYPE html>
 <html>
 <body>
-<h2>Create Panopticon GitHub App</h2>
+<h2>Create Overdeck GitHub App</h2>
 <p>Click the button to create the <code>panopticon-agent</code> GitHub App on your account.</p>
 <form action="https://github.com/settings/apps/new" method="post">
   <input type="hidden" name="manifest" value='${JSON.stringify(manifest)}'>

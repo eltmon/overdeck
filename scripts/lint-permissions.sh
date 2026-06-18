@@ -2,7 +2,7 @@
 #
 # lint-permissions.sh — repo-wide guard against permission-flag leaks.
 #
-# Background: when the user has set Panopticon's permission mode to Auto
+# Background: when the user has set Overdeck's permission mode to Auto
 # (the default), no spawned `claude` process may receive
 # `--dangerously-skip-permissions`, `--permission-mode bypassPermissions`,
 # or a settings.json with `defaultMode: "bypassPermissions"`. A regression

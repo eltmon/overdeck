@@ -10,7 +10,7 @@ All planned work has been implemented:
 4. **Runtime adapters** - Deleted codex.ts, cursor.ts, gemini.ts; simplified runtime/interface.ts and runtime/index.ts to claude-only
 5. **Cloister RuntimeName** - Consolidated to 'claude-code' only in runtimes/types.ts and runtimes/index.ts
 6. **CLI flags** - Removed --runtime from work/index.ts, cleaned up issue.ts
-7. **Config** - Removed targets from PanopticonConfig sync interface, added cleanupLegacyRuntimeSymlinks() and migrateSyncTargets() to config-migration.ts
+7. **Config** - Removed targets from OverdeckConfig sync interface, added cleanupLegacyRuntimeSymlinks() and migrateSyncTargets() to config-migration.ts
 8. **restore.ts** - Updated to use SYNC_TARGET instead of SYNC_TARGETS
 9. **Tests** - Updated paths, config, sync tests and fixtures; removed targets references
 10. **Documentation** - Updated PRD.md and PRD-CLOISTER.md to remove multi-runtime references
@@ -19,7 +19,7 @@ TypeScript compilation passes cleanly. Test suite: 1126 passing, 2 pre-existing 
 
 ## Context
 
-Panopticon was originally designed to support multiple AI coding tools (Claude Code, Codex, Cursor, Gemini, OpenCode) with a unified sync system. This added significant complexity:
+Overdeck was originally designed to support multiple AI coding tools (Claude Code, Codex, Cursor, Gemini, OpenCode) with a unified sync system. This added significant complexity:
 
 - Multiple sync targets in `paths.ts`
 - Runtime adapters for each tool (`src/lib/runtime/`)
@@ -98,12 +98,12 @@ The Cloister system (specialist agent management) has a separate runtime abstrac
 
 #### New Functionality:
 - **Symlink Cleanup Migration**
-  - On first run after upgrade, detect and remove Panopticon-managed symlinks from:
+  - On first run after upgrade, detect and remove Overdeck-managed symlinks from:
     - `~/.opencode/skills/`, `~/.opencode/commands/`, `~/.opencode/agents/`
     - `~/.codex/skills/`, `~/.codex/commands/`, `~/.codex/agents/`
     - `~/.cursor/skills/`, `~/.cursor/commands/`, `~/.cursor/agents/`
     - `~/.gemini/skills/`, `~/.gemini/commands/`, `~/.gemini/agents/`
-  - Use existing `isPanopticonSymlink()` helper from `sync.ts`
+  - Use existing `isOverdeckSymlink()` helper from `sync.ts`
   - Log cleanup actions to user
   - **Where to implement**:
     - Option A: Add to config migration (`config-migration.ts`)
@@ -206,7 +206,7 @@ targets = ["claude", "codex"]
 - [x] `RuntimeName` type in Cloister only includes 'claude-code'
 - [x] `--runtime` flag removed from CLI commands
 - [x] Config migration strips `[sync].targets` field
-- [x] Symlink cleanup removes Panopticon-managed links in legacy runtime dirs
+- [x] Symlink cleanup removes Overdeck-managed links in legacy runtime dirs
 - [x] All tests pass with updated fixtures (2 pre-existing failures unrelated to PAN-142)
 - [x] Documentation updated to reflect claude-only approach
 - [x] No references to codex/cursor/gemini/opencode as runtimes (model references intentionally preserved)

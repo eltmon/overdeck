@@ -113,7 +113,7 @@ grep "/api/agents" ~/.panopticon/logs/server.log
 
 ## System Logs
 
-### Panopticon Commands
+### Overdeck Commands
 
 ```bash
 # Command history (if configured)

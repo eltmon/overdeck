@@ -1,4 +1,4 @@
-# PAN-1203 — Panopticon-docs RAG
+# PAN-1203 — Overdeck-docs RAG
 
 **Issue:** [PAN-1203](https://github.com/eltmon/panopticon-cli/issues/1203)
 **Parent epic:** [PAN-1200](https://github.com/eltmon/panopticon-cli/issues/1200)
@@ -9,17 +9,17 @@
 
 ## Problem
 
-Panopticon has substantial documentation in `docs/` and ~60 skills with detailed `SKILL.md` files. Today, when a user asks any agent (Claude Code, Pi, future) "how do I do X in Panopticon?", the agent has to:
+Overdeck has substantial documentation in `docs/` and ~60 skills with detailed `SKILL.md` files. Today, when a user asks any agent (Claude Code, Pi, future) "how do I do X in Overdeck?", the agent has to:
 
-1. Guess based on training data (rarely correct for Panopticon-specific verbs)
+1. Guess based on training data (rarely correct for Overdeck-specific verbs)
 2. Browse the docs from scratch using Read/grep
 3. Ask the user to paste relevant docs
 
-This causes users to repeatedly re-explain Panopticon mechanics to agents. Workflow knowledge that *exists* in our repo never reaches the agent at the right moment.
+This causes users to repeatedly re-explain Overdeck mechanics to agents. Workflow knowledge that *exists* in our repo never reaches the agent at the right moment.
 
 ## Goal
 
-Make every harness able to surface Panopticon's own documentation just-in-time, via a `UserPromptSubmit` hook that retrieves and injects relevant doc snippets when the user's prompt mentions Panopticon concepts.
+Make every harness able to surface Overdeck's own documentation just-in-time, via a `UserPromptSubmit` hook that retrieves and injects relevant doc snippets when the user's prompt mentions Overdeck concepts.
 
 ## Design Goals
 
@@ -184,7 +184,7 @@ echo "$prompt"
 Detection has two layers:
 
 1. **Regex trigger** — fast, configurable in `~/.panopticon/config.yaml` under `docs.triggers`
-2. **Optional classifier fallback** — if regex doesn't match but prompt looks Panopticon-adjacent (e.g., asks about agents, workflows), a cheap Haiku call rates relevance. Off by default; enable via `docs.classifier.enabled = true`.
+2. **Optional classifier fallback** — if regex doesn't match but prompt looks Overdeck-adjacent (e.g., asks about agents, workflows), a cheap Haiku call rates relevance. Off by default; enable via `docs.classifier.enabled = true`.
 
 ### Budget Controls
 

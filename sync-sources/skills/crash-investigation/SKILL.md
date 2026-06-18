@@ -270,8 +270,8 @@ poolOptions: {
 
 ### Multiple Claude Code Agents
 **Symptom**: 10+ `claude` processes, each 200-800 MB RSS plus swap.
-**Cause**: Panopticon agents + specialist agents + sub-agents all running simultaneously.
-**Fix**: Limit concurrent agents in Panopticon config; ensure agents exit cleanly.
+**Cause**: Overdeck agents + specialist agents + sub-agents all running simultaneously.
+**Fix**: Limit concurrent agents in Overdeck config; ensure agents exit cleanly.
 
 ### K8s Pod Memory Limits Not Set
 **Symptom**: Java/Go processes in k8s pods growing unbounded.

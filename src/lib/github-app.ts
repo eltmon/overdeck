@@ -540,7 +540,7 @@ export async function reportCommitStatus(
  * Post the `panopticon/tests` commit status for the HEAD of a workspace.
  *
  * Used by verification-runner (pre-review gate) and the test specialist
- * (post-review gate) to signal that Panopticon has run the test suite
+ * (post-review gate) to signal that Overdeck has run the test suite
  * against this exact commit. The `test` job in .github/workflows/ci.yml
  * reads this status and skips its own vitest run when it's `success`,
  * eliminating duplicate test execution for pipeline-managed PRs.
@@ -551,7 +551,7 @@ export async function reportCommitStatus(
  * Failures are non-fatal: status posting is informational and must never
  * block the verification or test specialist's primary outcome.
  */
-export async function postPanopticonTestsStatus(
+export async function postOverdeckTestsStatus(
   workspacePath: string,
   owner: string,
   repo: string,

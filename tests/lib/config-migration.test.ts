@@ -235,16 +235,16 @@ describe('config-migration', () => {
       expect(result.total).toBe(result.cleaned.length);
     });
 
-    it('should remove only Panopticon-managed symlinks', () => {
+    it('should remove only Overdeck-managed symlinks', () => {
       const tmpDir = join(testDir, 'fake-runtime', 'skills');
       mkdirSync(tmpDir, { recursive: true });
 
-      // Create a Panopticon-managed symlink (target contains '.panopticon')
+      // Create a Overdeck-managed symlink (target contains '.panopticon')
       const panSymlinkPath = join(tmpDir, 'pan-skill');
       const panTarget = join(process.env.OVERDECK_HOME ?? join(process.cwd(), '.test-migration-pan-home'), '.panopticon', 'skills', 'pan-skill');
       symlinkSync(panTarget, panSymlinkPath);
 
-      // Create a non-Panopticon symlink (user-managed)
+      // Create a non-Overdeck symlink (user-managed)
       const userSymlinkPath = join(tmpDir, 'user-skill');
       const userTarget = join(homedir(), '.other', 'skill');
       symlinkSync(userTarget, userSymlinkPath);
@@ -254,7 +254,7 @@ describe('config-migration', () => {
       writeFileSync(regularFilePath, 'content');
 
       // We can't easily redirect homedir() in the function, so call with real dirs.
-      // Instead, verify the function correctly identifies and removes only Panopticon symlinks
+      // Instead, verify the function correctly identifies and removes only Overdeck symlinks
       // when given a realistic setup. We test the logic by checking it ran without throwing.
       const result = cleanupLegacyRuntimeSymlinksSync();
 

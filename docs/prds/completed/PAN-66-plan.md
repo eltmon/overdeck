@@ -22,28 +22,28 @@ Update GitHub issue PAN-66 with a categorized list of all available skills.
 
 ## Skills Available to Agents
 
-### Panopticon Workflow (pan-*)
+### Overdeck Workflow (pan-*)
 
 | Skill | Description |
 |-------|-------------|
 | pan-plan | Interactive planning workflow with AI-assisted discovery |
-| pan-setup | First-time configuration wizard for Panopticon |
-| pan-install | Guide through installing Panopticon prerequisites |
+| pan-setup | First-time configuration wizard for Overdeck |
+| pan-install | Guide through installing Overdeck prerequisites |
 | pan-quickstart | Quick start guide combining installation, setup, and first workspace |
-| pan-up | Start Panopticon dashboard and services |
-| pan-down | Stop Panopticon dashboard and services gracefully |
-| pan-restart | Restart the Panopticon dashboard (frontend and API server) |
+| pan-up | Start Overdeck dashboard and services |
+| pan-down | Stop Overdeck dashboard and services gracefully |
+| pan-restart | Restart the Overdeck dashboard (frontend and API server) |
 | pan-status | Check running agents, workspaces, and system health |
-| pan-health | Check Panopticon system health |
-| pan-diagnose | Troubleshoot common Panopticon issues |
+| pan-health | Check Overdeck system health |
+| pan-diagnose | Troubleshoot common Overdeck issues |
 | pan-logs | View and analyze agent and system logs |
-| pan-config | View and edit Panopticon configuration |
-| pan-projects | Add, remove, and manage Panopticon-managed projects |
+| pan-config | View and edit Overdeck configuration |
+| pan-projects | Add, remove, and manage Overdeck-managed projects |
 | pan-docker | Docker template selection and configuration for workspaces |
 | pan-network | Traefik, local domains, and platform-specific networking setup |
 | pan-tracker | Configure issue tracker integration (Linear, GitHub, GitLab) |
-| pan-help | Overview of all Panopticon commands and capabilities |
-| pan-sync | Sync Panopticon skills to Claude Code and other AI tools |
+| pan-help | Overview of all Overdeck commands and capabilities |
+| pan-sync | Sync Overdeck skills to Claude Code and other AI tools |
 | pan-issue | Create workspace and spawn autonomous agent for an issue |
 | pan-tell | Send a message to a running agent |
 | pan-kill | Stop a running agent |
@@ -51,7 +51,7 @@ Update GitHub issue PAN-66 with a categorized list of all available skills.
 | pan-rescue | Recover work from crashed or stopped agents |
 | pan-convoy-synthesis | Synthesize results from parallel agent work in a convoy |
 | pan-code-review | Orchestrated parallel code review with automatic synthesis |
-| pan-skill-creator | Guide for creating and distributing Panopticon skills |
+| pan-skill-creator | Guide for creating and distributing Overdeck skills |
 | pan-subagent-creator | Create custom Claude Code subagents with isolated context |
 
 ### Development Workflow

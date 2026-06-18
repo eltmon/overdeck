@@ -1,14 +1,14 @@
 # Codex Authentication
 
-How Panopticon manages OpenAI Codex CLI OAuth authentication and the automatic re-authentication flow.
+How Overdeck manages OpenAI Codex CLI OAuth authentication and the automatic re-authentication flow.
 
 ---
 
 ## Overview
 
-Panopticon uses **OpenAI Codex CLI** (via CLIProxy) for `gpt-5.4` agent work. Codex CLI authenticates with OpenAI using **OAuth** rather than API keys. The OAuth JWT has a limited lifetime and must be refreshed periodically. When the token expires (or is burned by a concurrent refresh), Panopticon detects the failure, surfaces a dashboard banner, and guides you through re-authentication.
+Overdeck uses **OpenAI Codex CLI** (via CLIProxy) for `gpt-5.4` agent work. Codex CLI authenticates with OpenAI using **OAuth** rather than API keys. The OAuth JWT has a limited lifetime and must be refreshed periodically. When the token expires (or is burned by a concurrent refresh), Overdeck detects the failure, surfaces a dashboard banner, and guides you through re-authentication.
 
-**Key principle**: Panopticon never stores Codex credentials itself. It reads the JWT that Codex CLI writes to disk and bridges it into CLIProxy's runtime path.
+**Key principle**: Overdeck never stores Codex credentials itself. It reads the JWT that Codex CLI writes to disk and bridges it into CLIProxy's runtime path.
 
 ---
 
@@ -22,7 +22,7 @@ Panopticon uses **OpenAI Codex CLI** (via CLIProxy) for `gpt-5.4` agent work. Co
 | Burn risk | None | High — concurrent refreshes invalidate the refresh token |
 | Fallback | Anthropic models | None (spawn is blocked until re-auth) |
 
-Because Codex OAuth tokens expire and can be burned, Panopticon implements **automatic detection** and **one-click re-authentication** so you don't discover the failure mid-agent-run.
+Because Codex OAuth tokens expire and can be burned, Overdeck implements **automatic detection** and **one-click re-authentication** so you don't discover the failure mid-agent-run.
 
 ---
 
@@ -49,7 +49,7 @@ CLIProxy (the sidecar that proxies Codex CLI API calls) expects credentials at:
 ~/.codex/
 ```
 
-Panopticon **bridges** the token by copying `codex-primary.json` into `~/.codex/config.json` whenever:
+Overdeck **bridges** the token by copying `codex-primary.json` into `~/.codex/config.json` whenever:
 1. The dashboard server starts
 2. A re-authentication session completes
 
@@ -59,7 +59,7 @@ This bridge is performed asynchronously (`bridgeCodexAuthToCliproxyAsync`) and i
 
 ## Detection Strategy
 
-Panopticon detects expired/burned tokens through two complementary mechanisms:
+Overdeck detects expired/burned tokens through two complementary mechanisms:
 
 ### 1. JWT Expiry (Primary)
 
@@ -82,7 +82,7 @@ When the JWT expiry check returns `valid`, the server also tails the last 50 lin
 refresh token has already been used
 ```
 
-This catches **burned tokens** — when the refresh token was consumed by another process (e.g., you ran `codex login` in a different terminal) but the new token wasn't bridged to Panopticon's path.
+This catches **burned tokens** — when the refresh token was consumed by another process (e.g., you ran `codex login` in a different terminal) but the new token wasn't bridged to Overdeck's path.
 
 If this string is found, the status is reported as `burned`.
 
@@ -137,7 +137,7 @@ codex login
 pan bridge-codex-auth
 ```
 
-Or, if Panopticon doesn't expose `pan bridge-codex-auth` yet, manually copy:
+Or, if Overdeck doesn't expose `pan bridge-codex-auth` yet, manually copy:
 
 ```bash
 cp ~/.panopticon/cliproxy/auth/codex-primary.json ~/.codex/config.json

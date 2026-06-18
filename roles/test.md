@@ -1,6 +1,6 @@
 ---
 name: test
-description: Panopticon test role — runs project verification and browser UAT when requirements need end-to-end proof.
+description: Overdeck test role — runs project verification and browser UAT when requirements need end-to-end proof.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.test.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
@@ -44,7 +44,7 @@ hooks:
           command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
-# Panopticon Test Role
+# Overdeck Test Role
 
 The test role verifies that a feature branch is ready to leave review. It owns both ordinary project test-suite execution and browser-based UAT. There is no separate UAT role: when the issue requires end-to-end proof, this role uses Playwright MCP tools directly.
 
@@ -67,7 +67,7 @@ The test role verifies that a feature branch is ready to leave review. It owns b
 8. Emit exactly one final test sentinel:
    - `TESTS PASSED` when the configured test suite passes and required UAT passes or is not required.
    - `TESTS FAILED` when any test-suite command fails, the app cannot start, Playwright cannot verify required behavior, or an acceptance criterion remains unproven.
-9. For Pi sessions, end your final response with exactly one structured Panopticon sentinel line:
+9. For Pi sessions, end your final response with exactly one structured Overdeck sentinel line:
    - `OVERDECK_SPECIALIST_RESULT: test-agent passed`
    - `OVERDECK_SPECIALIST_RESULT: test-agent failed`
 

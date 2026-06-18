@@ -1,7 +1,7 @@
 /**
  * Traefik Configuration Generator
  *
- * Generates the Panopticon dashboard Traefik routing config
+ * Generates the Overdeck dashboard Traefik routing config
  * from a template, substituting values from config.toml.
  * Also generates TLS certificate configuration from discovered certs.
  */
@@ -49,7 +49,7 @@ export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikR
  * Otherwise the frontend route points to the bundled Node server on the API port,
  * which is the production layout. See template header for the full rationale.
  */
-export function generatePanopticonTraefikConfigSync(mode?: TraefikRenderMode): boolean {
+export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boolean {
   const templatePath = join(SYNC_SOURCES.traefikTemplates, 'dynamic', 'panopticon.yml.template');
   if (!existsSync(templatePath)) {
     return false;
@@ -211,7 +211,7 @@ export function ensureProjectCertsSync(): string[] {
  * config files that also contain http: routers. This function strips those
  * dead sections to avoid confusion.
  *
- * Called during `pan up` to clean up configs from older Panopticon versions.
+ * Called during `pan up` to clean up configs from older Overdeck versions.
  */
 export function cleanupStaleTlsSectionsSync(): void {
   // Clean static config (traefik.yml)
@@ -240,15 +240,15 @@ export function cleanupStaleTlsSectionsSync(): void {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /** Render the dashboard Traefik config from the template. */
-export const generatePanopticonTraefikConfig = (
+export const generateOverdeckTraefikConfig = (
   mode?: TraefikRenderMode,
 ): Effect.Effect<boolean, FsError> =>
   Effect.try({
-    try: () => generatePanopticonTraefikConfigSync(mode),
+    try: () => generateOverdeckTraefikConfigSync(mode),
     catch: (cause) =>
       new FsError({
         path: TRAEFIK_DYNAMIC_DIR,
-        operation: 'generatePanopticonTraefikConfig',
+        operation: 'generateOverdeckTraefikConfig',
         cause,
       }),
   });

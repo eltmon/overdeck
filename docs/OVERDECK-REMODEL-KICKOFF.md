@@ -7,7 +7,7 @@ lean: pull detail from the artifacts on demand rather than front-loading it.
 
 ## The goal
 
-A **big-bang data-architecture remodel + rebrand** — Panopticon → **Overdeck** (DNS already parked).
+A **big-bang data-architecture remodel + rebrand** — Overdeck → **Overdeck** (DNS already parked).
 Collapse a sprawling, drift-prone data layer into **one source of truth**: the SQLite DB becomes a
 disposable cache behind **one canonical resolver per domain** (reads) and **one write surface** (writes);
 nothing touches a store directly. Design the **target schema and resolvers, domain by domain**, then cut

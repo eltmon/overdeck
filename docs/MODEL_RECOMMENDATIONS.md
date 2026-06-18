@@ -1,8 +1,8 @@
-# Panopticon Model Recommendations
+# Overdeck Model Recommendations
 
 **Last updated: 2026-05-23.** Previous revision was 2026-04-20 — see "Stale from prior version" below for the diff.
 
-This doc recommends models for each Panopticon agent role and documents the pricing and benchmark data the recommendations are derived from. Every figure carries a confidence label (**H**igh / **M**edium / **L**ow) and the URL it came from. **UNVERIFIED** means we searched and could not find a credible source — we do not substitute plausible guesses for those.
+This doc recommends models for each Overdeck agent role and documents the pricing and benchmark data the recommendations are derived from. Every figure carries a confidence label (**H**igh / **M**edium / **L**ow) and the URL it came from. **UNVERIFIED** means we searched and could not find a credible source — we do not substitute plausible guesses for those.
 
 ## Summary
 
@@ -121,7 +121,7 @@ No public JSONSchemaBench results for any 2026 model. Vendor claims only:
 - **Google (Gemini 3.x)** — Native `response_schema` with enums; the JSONSchemaBench paper noted Gemini had gaps on complex schemas in older versions.
 - **Moonshot, Zhipu, MiniMax, Xiaomi MiMo** — OpenAI-compatible JSON mode / tool calling; vendor-claimed only.
 
-For Panopticon's flywheel orchestrator (which depends on schema-clean output), we recommend the verified-strict-mode providers — Anthropic, OpenAI, Google — over the OpenAI-compatible non-strict vendors until third-party JSON evals exist.
+For Overdeck's flywheel orchestrator (which depends on schema-clean output), we recommend the verified-strict-mode providers — Anthropic, OpenAI, Google — over the OpenAI-compatible non-strict vendors until third-party JSON evals exist.
 
 ### Effective context (RULER / NIAH long-context retrieval) — UNVERIFIED across the board
 
@@ -214,7 +214,7 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 
 ### Flywheel orchestrator (continuously inventory issues, diagnose pipeline state, emit ranked JSON suggestions)
 
-The Panopticon flywheel is high-frequency, stateless, schema-strict, and cost-sensitive. Per-poll work is: read N open issues, classify, rank, emit JSON. It is **not** a long-running agent workflow — each invocation is bounded.
+The Overdeck flywheel is high-frequency, stateless, schema-strict, and cost-sensitive. Per-poll work is: read N open issues, classify, rank, emit JSON. It is **not** a long-running agent workflow — each invocation is bounded.
 
 **Top 3** ranked by `(quality × speed) / cost`, restricted to models with verified pricing AND verified core benchmarks:
 

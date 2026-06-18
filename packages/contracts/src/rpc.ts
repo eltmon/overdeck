@@ -549,7 +549,7 @@ export const GetConversationStatsRpc = Rpc.make(WS_METHODS.getConversationStats,
 
 // ─── RPC Group ────────────────────────────────────────────────────────────────
 
-/** All Panopticon WebSocket RPC methods */
+/** All Overdeck WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
   SubscribeIssueEventsRpc,

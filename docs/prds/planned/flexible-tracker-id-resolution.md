@@ -2,7 +2,7 @@
 
 ## Problem
 
-Panopticon's issue ID parsing assumes all IDs follow the `PREFIX-NUMBER` format (e.g., `MIN-123`, `PAN-456`). This is hardcoded throughout the codebase via `extractTeamPrefix()` which uses the regex `/^([A-Z]+)-\d+$/i` and numerous `split('-')` calls.
+Overdeck's issue ID parsing assumes all IDs follow the `PREFIX-NUMBER` format (e.g., `MIN-123`, `PAN-456`). This is hardcoded throughout the codebase via `extractTeamPrefix()` which uses the regex `/^([A-Z]+)-\d+$/i` and numerous `split('-')` calls.
 
 Issue trackers like Rally use a different format: **type prefix directly concatenated with the number** — `F29698` (Feature), `US12345` (User Story), `DE118304` (Defect), `TA4567` (Task). There is no dash separator.
 

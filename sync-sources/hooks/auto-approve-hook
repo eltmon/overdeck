@@ -54,7 +54,7 @@ fi
 echo "[$(date -Iseconds)] auto-approve-hook: AGENT=${OVERDECK_AGENT_ID:-unset} tool=${TOOL_NAME:-unknown}" \
   >> "$LOG_DIR/auto-approve.log" 2>/dev/null || true
 
-# Panopticon pipeline agents (work + planning). Conversations (human present,
+# Overdeck pipeline agents (work + planning). Conversations (human present,
 # currently bypass) and plain human sessions (unset) keep normal prompts.
 case "${OVERDECK_AGENT_ID:-}" in
   agent-*|planning-*|flywheel-*|strike-*|inspect-*) : ;;
@@ -66,7 +66,7 @@ if [ "$TOOL_NAME" = "AskUserQuestion" ]; then
   exit 0
 fi
 
-REASON='Panopticon autonomous pipeline agent auto-approve: headless agent-* sessions replace --dangerously-skip-permissions with this scoped PreToolUse allow hook.'
+REASON='Overdeck autonomous pipeline agent auto-approve: headless agent-* sessions replace --dangerously-skip-permissions with this scoped PreToolUse allow hook.'
 
 if command -v jq >/dev/null 2>&1; then
   jq -n --arg reason "$REASON" '{
@@ -77,7 +77,7 @@ if command -v jq >/dev/null 2>&1; then
     }
   }'
 else
-  printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"Panopticon autonomous pipeline agent auto-approve"}}'
+  printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow","permissionDecisionReason":"Overdeck autonomous pipeline agent auto-approve"}}'
 fi
 
 exit 0

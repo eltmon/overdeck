@@ -58,7 +58,7 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 <ThemedImage
   light="/images/specialists/01-board-hero-light.png"
   dark="/images/specialists/01-board-hero-dark.png"
-  alt="Panopticon kanban board with specialists running"
+  alt="Overdeck kanban board with specialists running"
 />
 ```
 

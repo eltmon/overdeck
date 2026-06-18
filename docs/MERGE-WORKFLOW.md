@@ -1,6 +1,6 @@
 # Merge Workflow
 
-Panopticon's merge workflow is a four-state pipeline between two actors: the
+Overdeck's merge workflow is a four-state pipeline between two actors: the
 **dashboard server** and **GitHub**. Agents participate in the upstream work
 (implementation, review, test) but no agent makes the merge decision and no
 agent performs the rebase.
@@ -53,7 +53,7 @@ agent performs the rebase.
 
 ### Dashboard server
 
-The only Panopticon component that mutates git state on the merge side. It:
+The only Overdeck component that mutates git state on the merge side. It:
 
 - Runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)` from
   [`src/lib/cloister/merge-rebase.ts`](../src/lib/cloister/merge-rebase.ts)

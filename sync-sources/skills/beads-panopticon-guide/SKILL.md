@@ -1,7 +1,7 @@
 ---
 name: beads-panopticon-guide
 description: >
-  Panopticon-specific beads usage patterns. Covers common mistakes agents make
+  Overdeck-specific beads usage patterns. Covers common mistakes agents make
   when filtering beads by issue number (PAN-XXX) and working with Linear-synced beads.
 version: "1.1.0"
 allowed-tools: "Read,Bash(bd:*)"
@@ -13,9 +13,9 @@ triggers:
   - "panopticon-"
 ---
 
-# Beads Quick Reference for Panopticon Agents
+# Beads Quick Reference for Overdeck Agents
 
-**Context:** Panopticon uses beads to track tasks for Linear issues (PAN-XXX). Each Linear issue spawns multiple bead tasks with IDs like `panopticon-abc`.
+**Context:** Overdeck uses beads to track tasks for Linear issues (PAN-XXX). Each Linear issue spawns multiple bead tasks with IDs like `panopticon-abc`.
 
 ## ⚠️ Common Mistakes
 
@@ -37,7 +37,7 @@ bd list --label PAN-116
 bd search "PAN-116"
 ```
 
-## Finding Beads for a Panopticon Issue
+## Finding Beads for a Overdeck Issue
 
 **Pattern:** Linear issue `PAN-XXX` → Multiple beads `panopticon-{random}`
 
@@ -75,11 +75,11 @@ bd list --no-assignee             # Unassigned
 bd list --title-contains "PAN-116" --status open --priority 1
 ```
 
-## Worktree Hydration in Panopticon
+## Worktree Hydration in Overdeck
 
 beads v1.0.4 can hydrate a worktree database from committed `issues.jsonl` through its post-pull/checkout auto-import hook.
 
-Panopticon workspaces still use a manual `.beads/redirect` file that points at the main repository's shared `.beads` database. That follow-up was deliberately deferred in PAN-1111, so agents must preserve the redirect-managed flow for now.
+Overdeck workspaces still use a manual `.beads/redirect` file that points at the main repository's shared `.beads` database. That follow-up was deliberately deferred in PAN-1111, so agents must preserve the redirect-managed flow for now.
 
 Never run `bd init` inside a redirect-managed worktree. If `.beads/redirect` exists, use `bd ping --json` to probe it and `bd doctor --fix` to repair it; initializing a second local database splits bead state away from the shared workspace.
 

@@ -1,8 +1,8 @@
-# Panopticon settings UI redesign
+# Overdeck settings UI redesign
 
 ## Context
 
-Panopticon’s settings page already exposes a lot of real power, but the presentation has become visually busy and structurally inconsistent. Compared with t3code’s settings UI, the current Panopticon page asks the user to parse too many bespoke section treatments, too many high-emphasis cards, and too many global actions competing for attention.
+Overdeck’s settings page already exposes a lot of real power, but the presentation has become visually busy and structurally inconsistent. Compared with t3code’s settings UI, the current Overdeck page asks the user to parse too many bespoke section treatments, too many high-emphasis cards, and too many global actions competing for attention.
 
 Today the page mixes:
 - a sticky action bar
@@ -16,7 +16,7 @@ Today the page mixes:
 
 Each area works in isolation, but together the page feels louder and heavier than it should. The result is that a critical operator surface feels harder to scan, harder to trust at a glance, and less polished than the rest of the dashboard should be.
 
-The goal of this work is to make Panopticon settings feel as neat, calm, and coherent as t3code’s settings page while preserving Panopticon’s much richer configuration surface.
+The goal of this work is to make Overdeck settings feel as neat, calm, and coherent as t3code’s settings page while preserving Overdeck’s much richer configuration surface.
 
 ## Problem statement
 
@@ -39,7 +39,7 @@ The current settings implementation in `src/dashboard/frontend/src/components/Se
    - This exposes useful information, but the interaction is too noisy for a default settings view.
 
 5. **No shared settings primitives**
-   - Unlike t3code, Panopticon does not yet consistently use a small set of reusable settings layout primitives such as section wrappers, row layouts, inline reset affordances, and summary-first detail expansion.
+   - Unlike t3code, Overdeck does not yet consistently use a small set of reusable settings layout primitives such as section wrappers, row layouts, inline reset affordances, and summary-first detail expansion.
 
 ## Design target
 
@@ -166,7 +166,7 @@ Requirements:
 
 ### 4. Add explicit local settings navigation
 
-Panopticon’s settings surface is now large enough to warrant local settings navigation.
+Overdeck’s settings surface is now large enough to warrant local settings navigation.
 
 Required behavior:
 - add a local settings nav rail or settings sidebar, inspired by t3code’s settings nav
@@ -255,7 +255,7 @@ Required rules:
 - fewer outline + badge + tinted background combinations competing at once
 - prefer neutral cards with selective status color only where it conveys state
 - use small uppercase/kicker section labels or compact headers instead of repeated giant headings where appropriate
-- preserve Panopticon branding, but do not let visual drama overpower operator clarity
+- preserve Overdeck branding, but do not let visual drama overpower operator clarity
 - remove the current “gawd ugly colors” effect where multiple saturated surfaces and badges compete in the same viewport
 - no section should require bright tinted backgrounds unless it is conveying a real warning, error, success, or selection state
 - capability fit, provider health, and warning states should be legible without making the entire page look color-coded by default
@@ -289,7 +289,7 @@ Required cleanup:
 
 ### 10. Preserve power-user trust
 
-The redesign must not make Panopticon feel toy-like or overly consumerized.
+The redesign must not make Overdeck feel toy-like or overly consumerized.
 
 Required product tone:
 - concise, direct operator copy
@@ -322,7 +322,7 @@ Existing modal/editor flows should be reused where they already work, but the pa
 
 ### Styling direction
 
-Use the existing Panopticon design language, but pull it toward t3code’s restraint.
+Use the existing Overdeck design language, but pull it toward t3code’s restraint.
 
 Required styling characteristics:
 - constrained content width
@@ -411,6 +411,6 @@ Required behavior:
 
 ## Why this matters
 
-Settings is where Panopticon proves whether it feels like a serious operator product or a collection of internal tools bolted together. The functionality is already strong. The problem is the surface discipline.
+Settings is where Overdeck proves whether it feels like a serious operator product or a collection of internal tools bolted together. The functionality is already strong. The problem is the surface discipline.
 
 This work should make the settings page feel intentionally designed, high-trust, and easy to operate — without reducing any power.

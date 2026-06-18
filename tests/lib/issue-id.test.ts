@@ -15,7 +15,7 @@ import {
 
 const tempRoots: string[] = [];
 
-function makePanopticonHome(): string {
+function makeOverdeckHome(): string {
   const root = mkdtempSync(join(tmpdir(), 'pan-1173-issue-id-'));
   tempRoots.push(root);
   return root;
@@ -272,14 +272,14 @@ describe('extractStandardNumber', () => {
 
 describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
   it('returns null when no agent state matches the bare number', () => {
-    const panopticonHome = makePanopticonHome();
+    const panopticonHome = makeOverdeckHome();
     writeAgentState(panopticonHome, 'PAN-4');
 
     expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
   });
 
   it('returns null when multiple agent states match the bare number', () => {
-    const panopticonHome = makePanopticonHome();
+    const panopticonHome = makeOverdeckHome();
     writeAgentState(panopticonHome, 'PAN-3');
     writeAgentState(panopticonHome, 'MIN-3');
 
@@ -287,14 +287,14 @@ describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
   });
 
   it('returns the fully-prefixed issue ID from the single matching state file', () => {
-    const panopticonHome = makePanopticonHome();
+    const panopticonHome = makeOverdeckHome();
     writeAgentState(panopticonHome, 'MIN-3');
 
     expect(resolveBareNumericIdSync('3', panopticonHome)).toBe('MIN-3');
   });
 
   it('delegates already-prefixed inputs without probing the agent state directory', () => {
-    const panopticonHome = makePanopticonHome();
+    const panopticonHome = makeOverdeckHome();
     writeAgentState(panopticonHome, 'MIN-3');
 
     expect(resolveBareNumericIdSync('PAN-3', panopticonHome)).toBe('PAN-3');
@@ -303,7 +303,7 @@ describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
   });
 
   it('returns null without throwing when the agents directory is absent', () => {
-    const panopticonHome = makePanopticonHome();
+    const panopticonHome = makeOverdeckHome();
 
     expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
   });

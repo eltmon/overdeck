@@ -3,7 +3,7 @@ import { CheckCircle, Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TtsVoiceListItem } from './SavedVoicesTab';
 
-const TEST_TEXT = 'This is the current Panopticon system voice.';
+const TEST_TEXT = 'This is the current Overdeck system voice.';
 
 async function requireTtsSpoken(res: Response, fallback: string): Promise<void> {
   const body = await res.json().catch(() => undefined) as { spoken?: unknown; result?: unknown; error?: unknown } | undefined;

@@ -1,6 +1,6 @@
-# Panopticon AI model call inventory
+# Overdeck AI model call inventory
 
-This document is a grep-verified audit of every AI model invocation in Panopticon. It lists the default model for each call site, how to configure it, whether the call is gated by a Settings toggle, and the cost-ledger tag it writes. The goal is to make expensive or hidden defaults visible at a glance.
+This document is a grep-verified audit of every AI model invocation in Overdeck. It lists the default model for each call site, how to configure it, whether the call is gated by a Settings toggle, and the cost-ledger tag it writes. The goal is to make expensive or hidden defaults visible at a glance.
 
 **Legend**
 

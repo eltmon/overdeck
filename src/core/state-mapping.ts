@@ -1,11 +1,11 @@
 /**
- * Panopticon State Mapping System
+ * Overdeck State Mapping System
  *
- * Maps Panopticon's canonical workflow states to various issue tracker states.
+ * Maps Overdeck's canonical workflow states to various issue tracker states.
  * Supports auto-creation of missing states where possible, and label fallbacks.
  */
 
-// Panopticon's canonical workflow states
+// Overdeck's canonical workflow states
 export type CanonicalState =
   | 'backlog'
   | 'todo'
@@ -108,7 +108,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
       missingStateStrategy: 'error',
       projectBoard: {
         enabled: true,
-        name: 'Panopticon',
+        name: 'Overdeck',
         columnMap: {
           backlog: 'Backlog',
           todo: 'Todo',
@@ -163,7 +163,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
 };
 
 // Virtual state tracking for issues
-export interface PanopticonIssueState {
+export interface OverdeckIssueState {
   issueId: string;
   panopticonState: CanonicalState;
   trackerState: string;

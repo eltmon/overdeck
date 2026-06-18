@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Panopticon's current skill distribution has three critical problems:
+Overdeck's current skill distribution has three critical problems:
 
 1. **Stale copies** — `pan install` copies skills to `~/.panopticon/skills/` once and never updates them. `pan sync` only recreates symlinks. Users run stale versions indefinitely.
 2. **Symlink discovery bug** — Claude Code ([#14836](https://github.com/anthropics/claude-code/issues/14836)) doesn't list symlinked skills in `/skills`, even though they work when invoked directly. Causes repeated confusion.
@@ -18,15 +18,15 @@ All `.claude/` content (skills, agents, rules) is distributed as file copies, ne
 ### D2: The Devroot Pattern
 The **devroot** is the parent directory where all projects live (e.g., `~/Projects/`). It is NOT a git repo. Claude Code treats it as the project root when launched from there.
 
-Panopticon places skills at `<devroot>/.claude/skills/` (project level) instead of `~/.claude/skills/` (personal level). Since workspace agents run from inside workspaces (which ARE git repos with separate project roots), devroot skills and workspace skills are in completely isolated scopes — no precedence conflicts.
+Overdeck places skills at `<devroot>/.claude/skills/` (project level) instead of `~/.claude/skills/` (personal level). Since workspace agents run from inside workspaces (which ARE git repos with separate project roots), devroot skills and workspace skills are in completely isolated scopes — no precedence conflicts.
 
 **Verified**: Tested by placing a skill at `~/Projects/.claude/skills/devroot-test/` and confirming Claude Code discovered it when launched from `~/Projects/`.
 
 ### D3: `~/.claude/` is the user's personal space
-Panopticon NEVER touches `~/.claude/skills/`, `~/.claude/agents/`, or `~/.claude/rules/`. Users can put overrides there that beat everything (personal > project).
+Overdeck NEVER touches `~/.claude/skills/`, `~/.claude/agents/`, or `~/.claude/rules/`. Users can put overrides there that beat everything (personal > project).
 
 ### D4: Manifest-based tracking
-JSON manifests at devroot and workspace levels track what Panopticon placed (file hashes, source, install time). Enables safe updates, conflict detection, and clean removal.
+JSON manifests at devroot and workspace levels track what Overdeck placed (file hashes, source, install time). Enables safe updates, conflict detection, and clean removal.
 
 ### D5: Frozen workspaces
 Running workspaces are never updated. Skills are installed at `pan workspace create` time only. Explicit `pan workspace update` for refreshing existing workspaces.
@@ -62,15 +62,15 @@ PANOPTICON CACHE (~/.panopticon/)
   .manifest.json    Hashes of all cached files
         │
         ├─── pan sync ───────────────► DEVROOT (<devroot>/.claude/)
-        │                               skills/    (all Panopticon skills)
-        │                               agents/    (all Panopticon agents)
-        │                               rules/     (all Panopticon rules)
+        │                               skills/    (all Overdeck skills)
+        │                               agents/    (all Overdeck agents)
+        │                               rules/     (all Overdeck rules)
         │                               .panopticon-manifest.json
         │
         └─── pan workspace create ───► WORKSPACE (workspace/.claude/)
-                                        skills/    (Panopticon + project template)
-                                        agents/    (Panopticon + project template)
-                                        rules/     (Panopticon + project template)
+                                        skills/    (Overdeck + project template)
+                                        agents/    (Overdeck + project template)
+                                        rules/     (Overdeck + project template)
                                         commands/  (legacy, from template)
                                         .manifest.json
 ```
@@ -79,7 +79,7 @@ PANOPTICON CACHE (~/.panopticon/)
 
 ```
 ~/.claude/skills/              Personal — user's overrides (WINS over everything)
-                               Panopticon NEVER writes here
+                               Overdeck NEVER writes here
 
 <devroot>/.claude/skills/      Project (devroot) — for manual Claude Code sessions
                                Isolated from workspaces (different project root)
@@ -116,9 +116,9 @@ For each file to install:
   if file does NOT exist at target:
     → COPY (new install, add to manifest)
   else if file exists AND hash matches manifest:
-    → UPDATE (Panopticon placed it, user didn't modify)
+    → UPDATE (Overdeck placed it, user didn't modify)
   else if file exists AND hash differs from manifest:
-    → WARN "Skipping skills/beads — modified since Panopticon installed it"
+    → WARN "Skipping skills/beads — modified since Overdeck installed it"
     → with --force: overwrite anyway
     → with --diff: show diff between installed and current
   else if file exists AND NOT in manifest:
@@ -138,14 +138,14 @@ devroot: ~/Projects        # where you launch Claude Code from
 ```
 pan workspace create MIN-678
   │
-  ├── 1. Copy Panopticon defaults from ~/.panopticon/ cache
+  ├── 1. Copy Overdeck defaults from ~/.panopticon/ cache
   │      skills/ → workspace/.claude/skills/
   │      agents/ → workspace/.claude/agents/
   │      rules/  → workspace/.claude/rules/
   │
-  ├── 2. Copy project template ON TOP (overrides Panopticon defaults)
-  │      e.g., MYN's session-health overwrites Panopticon's session-health
-  │      e.g., MYN's code-reviewer.md overwrites Panopticon's
+  ├── 2. Copy project template ON TOP (overrides Overdeck defaults)
+  │      e.g., MYN's session-health overwrites Overdeck's session-health
+  │      e.g., MYN's code-reviewer.md overwrites Overdeck's
   │      e.g., MYN's no-localias added (MYN-only skill)
   │
   ├── 3. Write workspace/.claude/.manifest.json
@@ -230,8 +230,8 @@ pan workspace create MIN-678
 ### Phase 3: Migration
 **Goal**: Clean transition from old symlink approach.
 
-1. Detect existing Panopticon symlinks in `~/.claude/skills/`, `~/.claude/agents/`
-2. Remove Panopticon symlinks (preserve user-created content)
+1. Detect existing Overdeck symlinks in `~/.claude/skills/`, `~/.claude/agents/`
+2. Remove Overdeck symlinks (preserve user-created content)
 3. Run Phase 2 logic to populate devroot
 4. Print migration summary
 5. Tests: verify old symlinks removed, user content preserved, devroot populated
@@ -256,7 +256,7 @@ pan workspace create MIN-678
 ### Phase 6: Commands → Skills Migration
 **Goal**: Convert MYN legacy commands to skills.
 
-1. Audit MYN commands — map to existing Panopticon skills or create new project-template skills
+1. Audit MYN commands — map to existing Overdeck skills or create new project-template skills
 2. Convert remaining commands to skill format
 3. Update `projects.yaml` template config
 4. Keep commands for backward compatibility with deprecation warning
@@ -273,7 +273,7 @@ pan workspace create MIN-678
 - [ ] `pan sync` NEVER touches `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/rules/`
 - [ ] `pan workspace create` copies from cache + project template overlay (no symlinks)
 - [ ] `pan workspace create` writes workspace manifest with source tracking
-- [ ] Project template overrides work (MYN's session-health beats Panopticon's at workspace level)
+- [ ] Project template overrides work (MYN's session-health beats Overdeck's at workspace level)
 - [ ] `pan workspace update` refreshes skills in existing workspace
 - [ ] `pan workspace update` blocks if agent is running
 - [ ] `devroot` config setting works; `null` disables devroot placement

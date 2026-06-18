@@ -1,6 +1,6 @@
 # Architecture
 
-Panopticon is a multi-agent orchestrator for AI coding work: a CLI (`pan`), a
+Overdeck is a multi-agent orchestrator for AI coding work: a CLI (`pan`), a
 dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 ## Top-level layout

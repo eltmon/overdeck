@@ -15,7 +15,7 @@ export interface ManifestEntry {
 }
 
 /**
- * The manifest schema: tracks what Panopticon placed at a target location.
+ * The manifest schema: tracks what Overdeck placed at a target location.
  */
 export interface Manifest {
   version: 1;

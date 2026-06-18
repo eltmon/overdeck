@@ -1,8 +1,8 @@
 # Review Role Architecture
 
-**How Panopticon runs code review after the Role primitive migration.**
+**How Overdeck runs code review after the Role primitive migration.**
 
-This document describes the end-to-end architecture for automatic code review in the role-based pipeline. The review lifecycle is owned by the `review` role (`roles/review.md`). Its four convoy reviewers are harness-agnostic prompt templates owned by Panopticon, inlined into each convoy spawn message by the orchestrator.
+This document describes the end-to-end architecture for automatic code review in the role-based pipeline. The review lifecycle is owned by the `review` role (`roles/review.md`). Its four convoy reviewers are harness-agnostic prompt templates owned by Overdeck, inlined into each convoy spawn message by the orchestrator.
 
 For the broader mental model — what a Role is, how it relates to Claude Code subagent files, and why `.claude/agents/` is a sync target rather than a source of truth — see [ROLES.md](./ROLES.md).
 
@@ -45,7 +45,7 @@ spawnReviewRoleForIssue(issueId)
   ├─ Deacon is the rare backup: only signals when the launcher's own bash
   │    process was SIGKILLed before it could (no reviewer-signaled marker)
   ├─ synthesis reads ready output files and synthesizes one verdict
-  └─ synthesis signals via Panopticon's CLI
+  └─ synthesis signals via Overdeck's CLI
         │
         ├─ pan specialists done review <id> --status passed  → review.approved → test role
         └─ pan specialists done review <id> --status blocked → notify `work` with blockers
@@ -70,9 +70,9 @@ roles/
 └── review-requirements.md
 ```
 
-The convoy templates are read by `src/lib/cloister/review-agent.ts` via `readConvoySubRoleTemplate(subRole)`, which resolves them from `packageRoot/roles/` — Panopticon's own install, **not** the agent's workspace. This keeps the prompts:
+The convoy templates are read by `src/lib/cloister/review-agent.ts` via `readConvoySubRoleTemplate(subRole)`, which resolves them from `packageRoot/roles/` — Overdeck's own install, **not** the agent's workspace. This keeps the prompts:
 
-- **Harness-agnostic.** The same body is delivered to a Claude Code reviewer, a Pi reviewer, or any future harness as its first user message. The harness never has to parse Panopticon-specific frontmatter.
+- **Harness-agnostic.** The same body is delivered to a Claude Code reviewer, a Pi reviewer, or any future harness as its first user message. The harness never has to parse Overdeck-specific frontmatter.
 - **Workflow-injected, not auto-discovered.** Work agents running in project workspaces never see these files in their tree, so there is no risk of a work agent ambiently spawning a reviewer subagent or "self-reviewing" before the convoy fires.
 - **Versioned with code.** Behavior changes ship in the same commit as the role file change, reviewed under the same gates.
 

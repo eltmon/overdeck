@@ -1,9 +1,9 @@
 ---
 name: pan-map
-description: "Topical: bootstrap or refresh Panopticon codebase map files for project orientation before planning"
+description: "Topical: bootstrap or refresh Overdeck codebase map files for project orientation before planning"
 ---
 
-# Panopticon Codebase Map
+# Overdeck Codebase Map
 
 Use this skill when a project needs durable orientation files before or during planning. There is no `pan map` CLI verb; the deliverable is committed markdown under `.pan/context/codebase/`.
 

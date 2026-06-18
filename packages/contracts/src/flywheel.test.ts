@@ -24,7 +24,7 @@ const validPayload = {
   activePipeline: [
     {
       issueId: "PAN-1189",
-      title: "Bake the Fix-All Flywheel into Panopticon",
+      title: "Bake the Fix-All Flywheel into Overdeck",
       verb: "working",
       status: "running",
       progressPercent: 35,

@@ -7,7 +7,7 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Conversations & Handoff
 
-Panopticon is as much a tool for **managing conversations with agents** as it is a
+Overdeck is as much a tool for **managing conversations with agents** as it is a
 workflow engine. Command Deck treats every agent session as a first-class
 conversation: you spawn it, watch it work, talk to it mid-task, branch it to try
 a different approach, and — when it nears the context wall or you want to switch
@@ -123,7 +123,7 @@ The dialog keeps the common case to one screen. Everything else lives behind
 | **External session** *(default)* | A clean session reads the transcript from disk and writes the document. The source conversation is never touched — its context stays clean, and the source can even be ended. Pick the authoring model and harness here. |
 | **Source session** | The live source agent writes the document in-conversation. This adds the prompt and document to the source's context, and uses whatever model the source is running. Right when the source has live state — open files, recent commands, in-flight reasoning — a transcript reader would miss. |
 
-If a source-authored handoff stalls or produces an invalid document, Panopticon
+If a source-authored handoff stalls or produces an invalid document, Overdeck
 falls back to a summary fork automatically.
 
 ## The help panel
@@ -203,7 +203,7 @@ emphasizes.
 ### Fallback behavior
 
 `pan handoff <conv>` always tries to create a usable new conversation. If the
-live-agent handoff can't complete, Panopticon falls back to a summary fork and
+live-agent handoff can't complete, Overdeck falls back to a summary fork and
 prints the reason:
 
 | Reason | Meaning |

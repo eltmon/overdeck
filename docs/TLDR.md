@@ -1,6 +1,6 @@
 # TLDR Code Analysis System
 
-Token-efficient code analysis for Panopticon agents. Produces structured summaries at 500-1,200 tokens per file instead of 10-25k for raw reads.
+Token-efficient code analysis for Overdeck agents. Produces structured summaries at 500-1,200 tokens per file instead of 10-25k for raw reads.
 
 **PRD**: [PAN-173](./prds/completed/PAN-173-plan.md) | **Skill**: `pan-tldr` | **CLI**: `pan tldr`
 
@@ -201,7 +201,7 @@ Gitignore-syntax file controlling what gets indexed. Default excludes: `node_mod
 
 ### Full Codebase Analysis (2026-02-21)
 
-Measured across the entire Panopticon CLI codebase (243 code files > 3KB) with llm-tldr v1.5.2 + tsx patch. Token counts approximate (1 token ~ 4 chars).
+Measured across the entire Overdeck CLI codebase (243 code files > 3KB) with llm-tldr v1.5.2 + tsx patch. Token counts approximate (1 token ~ 4 chars).
 
 #### Summary
 

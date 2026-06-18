@@ -9,7 +9,7 @@
 
 ## Vision
 
-Replace Panopticon's 5 overlapping agent type enums with a single concept: **Role**. A Role is a `.md` file that tells an agent what to do. An agent process is a **Run** — a `(role, model, harness)` tuple. Cloister becomes a reactive scheduler that watches the issue tracker for state changes and spawns the appropriate role. State lives with the issue, not the agent.
+Replace Overdeck's 5 overlapping agent type enums with a single concept: **Role**. A Role is a `.md` file that tells an agent what to do. An agent process is a **Run** — a `(role, model, harness)` tuple. Cloister becomes a reactive scheduler that watches the issue tracker for state changes and spawns the appropriate role. State lives with the issue, not the agent.
 
 ## Problem
 
@@ -17,7 +17,7 @@ The current system has 5 separate enums that all describe "what kind of agent is
 
 | Enum | Count | Location | What it represents |
 |------|-------|----------|--------------------|
-| `PanopticonAgentType` | 7 | `src/lib/agents.ts:108` | Agent identity (work, planning, review, test, inspect, uat, merge) |
+| `OverdeckAgentType` | 7 | `src/lib/agents.ts:108` | Agent identity (work, planning, review, test, inspect, uat, merge) |
 | `SpecialistType` | 5 | `src/lib/cloister/specialists.ts:172` | Specialist identity (merge-agent, review-agent, test-agent, inspect-agent, uat-agent) |
 | `LauncherAgentType` | 9 | `src/lib/launcher-generator.ts:1` | Agent types + spawn modes conflated (work, planning, specialist-dispatch, specialist-init, review, conversation, remote, runtime, resume) |
 | `WorkTypeId` | 24 | `src/lib/work-types.ts` | Model routing keys across 7 categories |
@@ -31,7 +31,7 @@ These enums conflate four orthogonal concerns:
 
 This causes real bugs. PAN-1044: a planning agent spawned with `phase: "planning"` instead of `type: "planning"` + `agentPhase: "planning"` — the dashboard couldn't render the Done button. The agent then called `pan done` (work completion) instead of `pan plan done` (planning completion) because it didn't know what kind of agent it was.
 
-Three naming conventions exist for the same concepts: `review-agent` (SpecialistType), `review` (PanopticonAgentType), `pan-review-agent` (.md file name). Agent IDs use `agent-pan-<issueId>` while agent definitions use `pan-<type>-agent`. Even the basic structure isn't consistent.
+Three naming conventions exist for the same concepts: `review-agent` (SpecialistType), `review` (OverdeckAgentType), `pan-review-agent` (.md file name). Agent IDs use `agent-pan-<issueId>` while agent definitions use `pan-<type>-agent`. Even the basic structure isn't consistent.
 
 The settings UI (`AgentCardsPanel.tsx:8-114`) exposes 17 separate agent cards organized by 4 categories with 24 WorkTypeId keys — a user has to understand all of this just to say "use opus for reviews."
 
@@ -206,7 +206,7 @@ The `(role, model, harness)` tuple enables systematic evaluation. Hold two axes 
                           × harness (claude-code, pi)
 ```
 
-Example: "Does review quality degrade from opus to sonnet?" Hold role=review and harness=claude-code constant, run both models on the same 10 PRs, compare results. This isn't possible today because "review" is spread across `review` (PanopticonAgentType), `review-agent` (SpecialistType), `specialist-review-agent` (WorkTypeId), and `review-specialist` (ActivitySource).
+Example: "Does review quality degrade from opus to sonnet?" Hold role=review and harness=claude-code constant, run both models on the same 10 PRs, compare results. This isn't possible today because "review" is spread across `review` (OverdeckAgentType), `review-agent` (SpecialistType), `specialist-review-agent` (WorkTypeId), and `review-specialist` (ActivitySource).
 
 ---
 
@@ -355,7 +355,7 @@ function activitySource(state: AgentState): string {
 
 ### Role file location
 
-Role definitions live at `roles/<name>.md` in the Panopticon repo. These are Panopticon's own concept, spawned via `claude --agent roles/<name>.md`. They are NOT in `.claude/agents/` — that path is for Claude Code's built-in subagent types (Explore, Plan, General-purpose, statusline-setup, claude-code-guide), which remain separate and unchanged.
+Role definitions live at `roles/<name>.md` in the Overdeck repo. These are Overdeck's own concept, spawned via `claude --agent roles/<name>.md`. They are NOT in `.claude/agents/` — that path is for Claude Code's built-in subagent types (Explore, Plan, General-purpose, statusline-setup, claude-code-guide), which remain separate and unchanged.
 
 ---
 
@@ -403,7 +403,7 @@ Ship    → model: [ Workhorse: Mid ▾ ]
 
 When a picker shows `Workhorse: Mid`, the actual model id is read from `workhorses.mid` at resolution time, not frozen at the moment the user clicked. Hovering the picker reveals the current literal value as a tooltip.
 
-**Subagent model overrides** (explore, plan, bash, general-purpose) are a Claude Code concern, not a Panopticon role concern. They can be configured via Claude Code's own settings or environment variables (`ANTHROPIC_DEFAULT_HAIKU_MODEL`, etc.), not through the Panopticon settings page.
+**Subagent model overrides** (explore, plan, bash, general-purpose) are a Claude Code concern, not a Overdeck role concern. They can be configured via Claude Code's own settings or environment variables (`ANTHROPIC_DEFAULT_HAIKU_MODEL`, etc.), not through the Overdeck settings page.
 
 **CLI contexts** (interactive, quick-command) are not roles — they're user sessions. Drop them from the agent settings page entirely.
 
@@ -708,13 +708,13 @@ During the transition, both `agents/pan-<type>-agent.md` (old) and `roles/<role>
 
 | Old enum value | New role | What happens to the old value |
 |----------------|---------|-------------------------------|
-| `PanopticonAgentType.planning` | `plan` | Enum deleted |
-| `PanopticonAgentType.work` | `work` | Enum deleted |
-| `PanopticonAgentType.review` | `review` | Enum deleted |
-| `PanopticonAgentType.inspect` | *(folded into `work`)* | Enum deleted |
-| `PanopticonAgentType.test` | `test` | Enum deleted |
-| `PanopticonAgentType.uat` | *(folded into `test`)* | Enum deleted |
-| `PanopticonAgentType.merge` | `ship` | Enum deleted |
+| `OverdeckAgentType.planning` | `plan` | Enum deleted |
+| `OverdeckAgentType.work` | `work` | Enum deleted |
+| `OverdeckAgentType.review` | `review` | Enum deleted |
+| `OverdeckAgentType.inspect` | *(folded into `work`)* | Enum deleted |
+| `OverdeckAgentType.test` | `test` | Enum deleted |
+| `OverdeckAgentType.uat` | *(folded into `test`)* | Enum deleted |
+| `OverdeckAgentType.merge` | `ship` | Enum deleted |
 | `SpecialistType.review-agent` | `review` | Type deleted |
 | `SpecialistType.test-agent` | `test` | Type deleted |
 | `SpecialistType.merge-agent` | `ship` | Type deleted |
@@ -731,7 +731,7 @@ During the transition, both `agents/pan-<type>-agent.md` (old) and `roles/<role>
 | `LauncherAgentType.runtime` | *(removed)* | Not a role or spawn mode |
 | `WorkTypeId.issue-agent:*` (5) | `work` | Phases become prompt-internal |
 | `WorkTypeId.specialist-*` (5) | role mapping per above | Type deleted |
-| `WorkTypeId.subagent:*` (4) | *(Claude Code concern)* | Removed from Panopticon |
+| `WorkTypeId.subagent:*` (4) | *(Claude Code concern)* | Removed from Overdeck |
 | `WorkTypeId.review:*` (6) | sub-runs within `review` | Type deleted |
 | `WorkTypeId.planning-agent` | `plan` | Type deleted |
 | `WorkTypeId.status-review` | *(workflow job)* | Removed |
@@ -792,7 +792,7 @@ Backend dead-code deletion
   └─ Delete LauncherAgentType branches (specialist-dispatch, specialist-init)
 
 Enum deletions (each its own bead — TypeScript surfaces every callsite)
-  ├─ PanopticonAgentType + panopticonAgentName()
+  ├─ OverdeckAgentType + panopticonAgentName()
   ├─ SpecialistType + SpecialistMetadata + SpecialistStatus
   ├─ LauncherAgentType (replace with Role + spawnMode field)
   ├─ WorkTypeId (already orphaned by work-types.ts deletion; this confirms zero refs)
@@ -813,7 +813,7 @@ Old agent .md cleanup
      (after every spawn path is migrated)
 
 Documentation
-  └─ Update CLAUDE.md "Panopticon Agent Taxonomy", docs/HARNESSES.md,
+  └─ Update CLAUDE.md "Overdeck Agent Taxonomy", docs/HARNESSES.md,
      dashboard architecture sections — replace specialist references with role references
      (lands alongside specialist-machinery deletion, not at the very end)
 
@@ -836,7 +836,7 @@ Administrative
 2. `state.json` uses a single `role` field — no `type`, `agentPhase`, or `phase`
 3. Cloister spawns roles reactively based on issue state transitions via `stateToRole()`
 4. No specialist session files, no specialist queues, no dispatch machinery
-5. All 5 old enums (`PanopticonAgentType`, `SpecialistType`, `LauncherAgentType`, `WorkTypeId`, `ActivitySource`) are deleted
+5. All 5 old enums (`OverdeckAgentType`, `SpecialistType`, `LauncherAgentType`, `WorkTypeId`, `ActivitySource`) are deleted
 6. Dashboard renders correctly using `role` field for all agent states
 7. Settings page shows the Workhorse Models panel at the top (3 slots) plus 5 role cards (not 17 agent cards); Review and Work cards are expandable to reveal sub-role pickers
 8. `pan plan`, `pan work`, and the full pipeline work end-to-end with the role model

@@ -1,18 +1,18 @@
 ---
 name: pan-release
-description: Panopticon-specific stable vs canary release workflow from main
+description: Overdeck-specific stable vs canary release workflow from main
 allowed-tools:
   - Bash
   - Read
 ---
 
-# Panopticon Release Workflow
+# Overdeck Release Workflow
 
-Use this skill when the user asks how to release Panopticon, whether they should use a `develop` branch, or how stable vs canary publishing works.
+Use this skill when the user asks how to release Overdeck, whether they should use a `develop` branch, or how stable vs canary publishing works.
 
 ## Core policy
 
-Panopticon develops directly on `main`.
+Overdeck develops directly on `main`.
 
 `main` is the active development branch, not the stable channel by itself. A release only happens when someone intentionally cuts and pushes a tag.
 

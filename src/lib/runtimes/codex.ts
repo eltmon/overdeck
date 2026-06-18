@@ -147,7 +147,7 @@ export class CodexSpawnTimeout extends Error {
  *     a fresh per-agent CODEX_HOME has no entry, so without this the wizard
  *     fires on every conversation launch and blocks the pane.
  *   - approvalPolicy / sandboxMode: autonomy for interactive conversations,
- *     derived from the Panopticon yolo setting. Headless `codex exec` overrides
+ *     derived from the Overdeck yolo setting. Headless `codex exec` overrides
  *     these via -c/-s flags at launch, so the defaults here only matter for TUI.
  *
  * In addition to the config seeding, this copies the user's global Codex
@@ -178,7 +178,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
 
   const configPath = join(codexHomeDir, 'config.toml')
   // Always (re)write config.toml so permission-mode changes take effect on
-  // resume. The file is Panopticon-managed ("do not edit manually") and
+  // resume. The file is Overdeck-managed ("do not edit manually") and
   // contains no user state — only launch-time settings.
   {
     // Codex config keys are flat top-level scalars, NOT TOML table sections:
@@ -188,7 +188,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     // load with "invalid type: map, expected a string in `model`".)
     const notifyHookPath = join(homedir(), '.panopticon', 'bin', 'codex-notify-hook')
     const lines = [
-      '# Panopticon-managed Codex config — do not edit manually',
+      '# Overdeck-managed Codex config — do not edit manually',
       '# model/provider set at launch via -m flag',
       '',
       `approval_policy = "${opts.approvalPolicy ?? 'never'}"`,
@@ -237,14 +237,14 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     if (existsSync(globalCodexContext)) {
       copyFileSync(globalCodexContext, agentsMdPath)
     } else {
-      writeFileSync(agentsMdPath, '# Panopticon Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
+      writeFileSync(agentsMdPath, '# Overdeck Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
     }
   }
 }
 
 /**
- * Translate Panopticon's abstract sandbox mode token into a value the codex
- * CLI actually accepts. Panopticon config uses 'workspace' as its mode name
+ * Translate Overdeck's abstract sandbox mode token into a value the codex
+ * CLI actually accepts. Overdeck config uses 'workspace' as its mode name
  * (see config-yaml.ts permission modes); codex only accepts read-only,
  * workspace-write, danger-full-access. Passing the abstract token raw made
  * `codex exec -s workspace` exit instantly with an invalid-value error, which

@@ -133,7 +133,7 @@ The PRD proposes:
 - `packages/contracts/package.json`
 - `exports: { ".": "./src/index.ts" }`
 
-That is fine for local Bun/Vite dev, but Panopticon is published as an npm CLI and the root package currently only ships:
+That is fine for local Bun/Vite dev, but Overdeck is published as an npm CLI and the root package currently only ships:
 
 - `dist`
 - `templates`

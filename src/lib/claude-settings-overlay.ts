@@ -32,14 +32,14 @@ interface OverlayResult {
 }
 
 /**
- * Permission deny patterns for Panopticon shared infrastructure. Work agents have
+ * Permission deny patterns for Overdeck shared infrastructure. Work agents have
  * NO legitimate reason to delete or modify these — they're the orchestration substrate
  * that the agent itself depends on. Without these guards a vBRIEF action like
  * "delete the legacy .claude/agents/pan-*-agent.md files" can convince an agent
  * to brick its own runtime and every other running agent's runtime (PAN-1048
  * incident, 2026-05-09).
  *
- * Anything destructive on these paths must go through Panopticon CLI commands or
+ * Anything destructive on these paths must go through Overdeck CLI commands or
  * a human, never an agent's Bash/Write/Edit tool.
  */
 // Claude Code's permission matcher requires `:*` at the END of the pattern
@@ -65,7 +65,7 @@ const OVERDECK_INFRA_DENY_PATTERNS = [
   'Bash(rm -r .claude/hooks/:*)',
   'Edit(.claude/hooks/**)',
   'Write(.claude/hooks/**)',
-  // Panopticon installed binaries / hooks / config (~/.panopticon)
+  // Overdeck installed binaries / hooks / config (~/.panopticon)
   'Bash(rm ~/.panopticon/:*)',
   'Bash(rm -rf ~/.panopticon/:*)',
   'Bash(rm -r ~/.panopticon/:*)',
@@ -150,11 +150,11 @@ function backupIfNeeded(
 }
 
 /**
- * Inject Panopticon-infrastructure permission deny rules into the workspace's
+ * Inject Overdeck-infrastructure permission deny rules into the workspace's
  * .claude/settings.local.json. Idempotent — re-running merges patterns into
  * any existing permissions.deny block without disturbing other entries.
  */
-export function injectPanopticonInfraDeny(workingDir: string): Effect.Effect<void, FsError> {
+export function injectOverdeckInfraDeny(workingDir: string): Effect.Effect<void, FsError> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const claudeDir = join(workingDir, '.claude');
@@ -264,7 +264,7 @@ export function injectProviderEnvOverlay(
 }
 
 /**
- * Remove Panopticon's provider env overlay from settings.local.json.
+ * Remove Overdeck's provider env overlay from settings.local.json.
  * Restores the file to its pre-overlay state by removing only the
  * provider env keys we injected.
  */
@@ -306,7 +306,7 @@ export function removeProviderEnvOverlay(workingDir: string): Effect.Effect<void
 
 /**
  * Detect provider env var conflicts between ~/.claude/settings.json
- * and what Panopticon would set for the given model.
+ * and what Overdeck would set for the given model.
  * Returns only keys where the user's value DIFFERS from the proposed value.
  */
 export function detectProviderEnvConflicts(

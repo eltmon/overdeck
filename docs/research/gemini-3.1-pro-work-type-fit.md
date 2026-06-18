@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Google's Gemini 3.1 Pro Preview against Panopticon's 23 work types. Still in preview (since Feb 19, 2026) with no announced GA date. Google states agentic workflow improvements are the primary focus before GA.
+Evaluates Google's Gemini 3.1 Pro Preview against Overdeck's 23 work types. Still in preview (since Feb 19, 2026) with no announced GA date. Google states agentic workflow improvements are the primary focus before GA.
 
 ## Model Profile
 
@@ -86,7 +86,7 @@ Evaluates Google's Gemini 3.1 Pro Preview against Panopticon's 23 work types. St
 #### `issue-agent:exploration`
 **Current default:** Claude Opus 4.6 | **Gemini 3.1 Pro fit:** Excellent
 
-This is Gemini's strongest Panopticon use case. 1M context window enables full-codebase ingestion in a single pass. 130-142 tok/s is 2-3x faster than Opus for rapid scanning. GPQA 94.3% shows deep analytical capability for understanding unfamiliar code. 7.5x cheaper than Opus. Native multimodal means it can process architecture diagrams, screenshots, and PDFs alongside code.
+This is Gemini's strongest Overdeck use case. 1M context window enables full-codebase ingestion in a single pass. 130-142 tok/s is 2-3x faster than Opus for rapid scanning. GPQA 94.3% shows deep analytical capability for understanding unfamiliar code. 7.5x cheaper than Opus. Native multimodal means it can process architecture diagrams, screenshots, and PDFs alongside code.
 
 **Concern:** The 200K pricing cliff means cost-efficient exploration stays under 200K. Above that, cost approaches Opus levels.
 
@@ -97,7 +97,7 @@ This is Gemini's strongest Panopticon use case. 1M context window enables full-c
 
 SWE-Bench Verified 80.6% is competitive. 1M context helps with large refactors. 130 tok/s is much faster than Kimi (35 tok/s) and GLM-5.1 (40 tok/s). LiveCodeBench Pro Elo 2887 shows strong coding.
 
-**Critical concern:** The agentic execution reliability weakness is directly relevant. "Gets stuck in loops" and "weird file editing" are exactly what Panopticon agents do for hours. This is the #1 blocker. Benchmark extensively before routing implementation work here.
+**Critical concern:** The agentic execution reliability weakness is directly relevant. "Gets stuck in loops" and "weird file editing" are exactly what Overdeck agents do for hours. This is the #1 blocker. Benchmark extensively before routing implementation work here.
 
 #### `specialist-test-agent`
 **Current default:** Claude Sonnet 4.6 | **Gemini 3.1 Pro fit:** Good
@@ -186,7 +186,7 @@ At $2/$12, too expensive for subagent work. Use Flash or Flash-Lite instead (see
 
 ## Preview Risk Assessment
 
-Gemini 3.1 Pro is still in preview. For Panopticon:
+Gemini 3.1 Pro is still in preview. For Overdeck:
 
 - **503 errors and latency spikes** could cause agent timeouts and stuck detection false positives
 - **Rate limits (250 req/day Tier 1)** may be insufficient for active development with multiple parallel agents
@@ -209,7 +209,7 @@ Gemini 3.1 Pro is still in preview. For Panopticon:
 
 ## Integration Notes
 
-- Google is already a configured provider in Panopticon
+- Google is already a configured provider in Overdeck
 - Model ID: `gemini-3.1-pro-preview`
 - Available via Google AI API (API key)
 - Must handle 503s and rate limits gracefully in Cloister

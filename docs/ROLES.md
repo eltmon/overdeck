@@ -1,8 +1,8 @@
-# Roles: Panopticon's Agent Definition Primitive
+# Roles: Overdeck's Agent Definition Primitive
 
 **Source of truth for what an agent does, harness-independent.**
 
-A Role is a markdown file in `roles/` that tells an agent what to do. The role primitive replaced five overlapping "agent type" enums (`PanopticonAgentType`, `SpecialistType`, `LauncherAgentType`, `WorkTypeId`, `ActivitySource`) with a single concept owned by one file per role.
+A Role is a markdown file in `roles/` that tells an agent what to do. The role primitive replaced five overlapping "agent type" enums (`OverdeckAgentType`, `SpecialistType`, `LauncherAgentType`, `WorkTypeId`, `ActivitySource`) with a single concept owned by one file per role.
 
 See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's motivation.
 
@@ -30,7 +30,7 @@ A **Run** is a process playing a role: `(role, model, harness)`. Runs are epheme
 
 ## `verifying_on_main` phase
 
-A merged issue is not done. After the human Merge button lands the prepared branch, Panopticon moves the issue into canonical state `verifying_on_main` and applies the GitHub label `verifying-on-main`. This phase keeps the issue open and visible while operators run post-merge UAT against `main`.
+A merged issue is not done. After the human Merge button lands the prepared branch, Overdeck moves the issue into canonical state `verifying_on_main` and applies the GitHub label `verifying-on-main`. This phase keeps the issue open and visible while operators run post-merge UAT against `main`.
 
 Role responsibilities during this phase:
 
@@ -55,13 +55,13 @@ A sub-role is a configuration slot under a role, not a separate pipeline stage. 
 | `work` | `inspect`, `inspect-deep` | Harness-agnostic prompt templates. The orchestrator's `pan inspect` CLI spawns a separate run with the prompt inlined; nothing lives in `.claude/agents/`. |
 | `review` | `security`, `correctness`, `performance`, `requirements` | Harness-agnostic prompt templates the orchestrator inlines into each convoy spawn message. See `roles/review-<subRole>.md`. |
 
-All sub-roles share the same delivery shape: **workflow-injected prompts orchestrated by Panopticon**, never ambient subagents auto-discovered by Claude Code. The prompts live in Panopticon's own files and are inlined at spawn time. This is a deliberate choice — see "Why no ambient subagents" below.
+All sub-roles share the same delivery shape: **workflow-injected prompts orchestrated by Overdeck**, never ambient subagents auto-discovered by Claude Code. The prompts live in Overdeck's own files and are inlined at spawn time. This is a deliberate choice — see "Why no ambient subagents" below.
 
 ---
 
 ## File shapes you will see
 
-There are three on-disk shapes that interact with the Panopticon agent system. They are easy to confuse, so the distinctions matter:
+There are three on-disk shapes that interact with the Overdeck agent system. They are easy to confuse, so the distinctions matter:
 
 ### 1. Role file — `roles/*.md`
 
@@ -73,15 +73,15 @@ For a Role with no Claude-specific frontmatter (the review convoy sub-roles), th
 
 **Source of truth. Never deleted. Lives in the repo.**
 
-### 2. Panopticon pipeline agent — `agents/pan-*-agent.md`
+### 2. Overdeck pipeline agent — `agents/pan-*-agent.md`
 
-Claude Code subagent definitions used by Panopticon's pipeline. These are committed under `agents/` in the panopticon-cli repo and synced to every devroot's `<devroot>/.claude/agents/` by `pan install` / `pan sync`. From there, `mergeSkillsIntoWorkspace()` copies them into each workspace's `.claude/agents/` so Claude Code can load them when a pipeline run uses the `--agent` flag.
+Claude Code subagent definitions used by Overdeck's pipeline. These are committed under `agents/` in the panopticon-cli repo and synced to every devroot's `<devroot>/.claude/agents/` by `pan install` / `pan sync`. From there, `mergeSkillsIntoWorkspace()` copies them into each workspace's `.claude/agents/` so Claude Code can load them when a pipeline run uses the `--agent` flag.
 
 These agent definitions still exist for legacy spawn paths; the role primitive will eventually replace them. They are not the same thing as Role files — `agents/pan-review-agent.md` is the legacy Claude Code subagent that drove the old reviewer; `roles/review.md` is the current Role.
 
 ### 3. Claude Code subagent — `.claude/agents/*.md`
 
-Files that Claude Code auto-discovers and exposes via the in-session `Agent` tool. **Panopticon deliberately ships nothing here.** The directory exists in worktrees only as a sync target the harness may write to, but the Panopticon repo's `.claude/agents/` is empty and stays empty.
+Files that Claude Code auto-discovers and exposes via the in-session `Agent` tool. **Overdeck deliberately ships nothing here.** The directory exists in worktrees only as a sync target the harness may write to, but the Overdeck repo's `.claude/agents/` is empty and stays empty.
 
 When a role needs a subagent (codebase exploration, general-purpose work), it uses Claude Code's **built-in subagent types** (`Explore`, `general-purpose`), not a custom file. Built-ins inherit the parent's model and routing context properly — including `ANTHROPIC_BASE_URL` for CLIProxy-routed sessions — and avoid the model-pinning hazards that custom subagent files exhibit.
 
@@ -89,7 +89,7 @@ When a role needs a subagent (codebase exploration, general-purpose work), it us
 
 ## Why no ambient subagents
 
-We learned this the hard way. Ambient subagents under `.claude/agents/` cause two problems for a multi-harness, multi-provider system like Panopticon:
+We learned this the hard way. Ambient subagents under `.claude/agents/` cause two problems for a multi-harness, multi-provider system like Overdeck:
 
 1. **They leak into every session.** Anything in `.claude/agents/` is callable from any Claude Code session in that workspace. A work agent in mid-implementation can ambiently invoke a subagent the workflow never intended to expose at that moment. Workflow-injected prompts, in contrast, only appear when the orchestrator inlines them at the right point.
 2. **They hardcode model assumptions that don't survive provider routing.** A custom subagent with `model: haiku` in frontmatter fails when the parent runs via CLIProxy serving gpt-5.5 — the harness doesn't always thread provider routing through to the subagent call, so the subagent hits a provider error. Built-in subagents (`Explore`, `general-purpose`) inherit the parent's model and routing cleanly; custom subagent files do not, reliably.
@@ -155,4 +155,4 @@ Pick the shape that matches the use case before you start writing.
 3. Do not pass `--agent` for the sub-role from `getRoleRuntimeBaseCommand` — return `null` from `roleAgentDefinitionPath`.
 4. Add coverage in `src/lib/__tests__/role-definitions.test.ts` asserting the file exists with no frontmatter and instructs the manifest/output-file contract.
 
-When in doubt: the workflow-injected pattern is the default for **everything** Panopticon orchestrates. `.claude/agents/` stays empty.
+When in doubt: the workflow-injected pattern is the default for **everything** Overdeck orchestrates. `.claude/agents/` stays empty.

@@ -26,7 +26,7 @@ describe('skills-merge', () => {
       expect(result).toEqual({ cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 });
     });
 
-    it('should return early for file without Panopticon section', () => {
+    it('should return early for file without Overdeck section', () => {
       const gitignorePath = join(testDir, '.gitignore');
       writeFileSync(gitignorePath, '# Some other gitignore\nnode_modules\ndist\n');
 
@@ -38,12 +38,12 @@ describe('skills-merge', () => {
       expect(content).toBe('# Some other gitignore\nnode_modules\ndist\n');
     });
 
-    it('should remove Panopticon section entirely (skills are copies now)', () => {
+    it('should remove Overdeck section entirely (skills are copies now)', () => {
       const gitignorePath = join(testDir, '.gitignore');
       const originalContent = `# User content
 node_modules
 dist
-# Panopticon-managed symlinks (not committed)
+# Overdeck-managed symlinks (not committed)
 beads
 feature-work
 release
@@ -55,22 +55,22 @@ release
       expect(result.duplicatesRemoved).toBe(0);
       expect(result.entriesAfter).toBe(0);
 
-      // Verify content no longer has Panopticon section
+      // Verify content no longer has Overdeck section
       const content = readFileSync(gitignorePath, 'utf-8');
-      expect(content).not.toContain('# Panopticon-managed symlinks');
+      expect(content).not.toContain('# Overdeck-managed symlinks');
       expect(content).toContain('# User content');
       expect(content).toContain('node_modules');
     });
 
-    it('should remove entire Panopticon section including duplicates', () => {
+    it('should remove entire Overdeck section including duplicates', () => {
       const gitignorePath = join(testDir, '.gitignore');
       const duplicatedContent = `# User content
 node_modules
-# Panopticon-managed symlinks (not committed)
+# Overdeck-managed symlinks (not committed)
 beads
 feature-work
 release
-# Panopticon-managed symlinks (not committed)
+# Overdeck-managed symlinks (not committed)
 beads
 feature-work
 release
@@ -83,9 +83,9 @@ bug-fix
       expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
       expect(result.entriesAfter).toBe(0); // Entire section removed
 
-      // Verify content no longer has Panopticon section
+      // Verify content no longer has Overdeck section
       const content = readFileSync(gitignorePath, 'utf-8');
-      expect(content).not.toContain('# Panopticon-managed symlinks');
+      expect(content).not.toContain('# Overdeck-managed symlinks');
       expect(content).not.toContain('beads');
       expect(content).not.toContain('bug-fix');
 
@@ -94,7 +94,7 @@ bug-fix
       expect(content).toContain('node_modules');
     });
 
-    it('should preserve user content before Panopticon section', () => {
+    it('should preserve user content before Overdeck section', () => {
       const gitignorePath = join(testDir, '.gitignore');
       const content = `# IDE files
 .idea/
@@ -106,7 +106,7 @@ build/
 
 # Dependencies
 node_modules/
-# Panopticon-managed symlinks (not committed)
+# Overdeck-managed symlinks (not committed)
 beads
 beads
 feature-work
@@ -126,15 +126,15 @@ feature-work
       expect(newContent).toContain('dist/');
       expect(newContent).toContain('node_modules/');
 
-      // Panopticon section removed
-      expect(newContent).not.toContain('# Panopticon-managed symlinks');
+      // Overdeck section removed
+      expect(newContent).not.toContain('# Overdeck-managed symlinks');
       expect(newContent).not.toContain('beads');
       expect(newContent).not.toContain('feature-work');
     });
 
     it('should remove entire section (sorting no longer applicable)', () => {
       const gitignorePath = join(testDir, '.gitignore');
-      const content = `# Panopticon-managed symlinks (not committed)
+      const content = `# Overdeck-managed symlinks (not committed)
 zebra
 alpha
 middle
@@ -146,7 +146,7 @@ middle
       expect(result.entriesAfter).toBe(0);
 
       const newContent = readFileSync(gitignorePath, 'utf-8');
-      expect(newContent).not.toContain('# Panopticon-managed symlinks');
+      expect(newContent).not.toContain('# Overdeck-managed symlinks');
       expect(newContent).not.toContain('zebra');
       expect(newContent).not.toContain('alpha');
       expect(newContent).not.toContain('middle');
@@ -160,7 +160,7 @@ middle
 
       // Add the same section multiple times (simulating repeated pan sync calls)
       for (let i = 0; i < 5; i++) {
-        content += `# Panopticon-managed symlinks (not committed)\n`;
+        content += `# Overdeck-managed symlinks (not committed)\n`;
         content += skills.join('\n') + '\n';
       }
 
@@ -171,9 +171,9 @@ middle
       expect(result.duplicatesRemoved).toBe(0); // Section removal, not deduplication
       expect(result.entriesAfter).toBe(0); // Entire section removed
 
-      // Verify no Panopticon section remains
+      // Verify no Overdeck section remains
       const newContent = readFileSync(gitignorePath, 'utf-8');
-      const headerMatches = newContent.match(/# Panopticon-managed symlinks/g);
+      const headerMatches = newContent.match(/# Overdeck-managed symlinks/g);
       expect(headerMatches).toBeNull();
 
       // Verify user content is preserved
@@ -194,7 +194,7 @@ middle
       mkdirSync(skillsDir, { recursive: true });
 
       const gitignorePath = join(skillsDir, '.gitignore');
-      writeFileSync(gitignorePath, `# Panopticon-managed symlinks (not committed)
+      writeFileSync(gitignorePath, `# Overdeck-managed symlinks (not committed)
 skill1
 skill1
 skill2
@@ -207,7 +207,7 @@ skill2
 
       // Verify section is removed
       const content = readFileSync(gitignorePath, 'utf-8');
-      expect(content).not.toContain('# Panopticon-managed symlinks');
+      expect(content).not.toContain('# Overdeck-managed symlinks');
       expect(content).not.toContain('skill1');
       expect(content).not.toContain('skill2');
     });

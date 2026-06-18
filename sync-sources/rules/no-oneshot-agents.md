@@ -3,7 +3,7 @@ scope: dev
 ---
 ### Work agents must be live sessions, never one-shot execs
 
-Panopticon work agents must run as persistent, attachable TUI sessions. Do not
+Overdeck work agents must run as persistent, attachable TUI sessions. Do not
 spawn work agents through one-shot/headless execution. For Codex, the current
 work-agent path records `codexMode: work-tui` in `src/lib/agents.ts`; legacy
 `codex exec` code still exists in the runtime adapter and must not be used as a

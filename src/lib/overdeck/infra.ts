@@ -20,7 +20,7 @@ import {
   type PanIssueRecord,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
-import { packageRoot, getPanopticonHome } from '../paths.js';
+import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
 
@@ -285,7 +285,7 @@ export const TmuxLive = Layer.succeed(
     readRuntimeJson: (agentId) =>
       Effect.promise(async () => {
         try {
-          const path = join(getPanopticonHome(), 'agents', agentId, 'runtime.json');
+          const path = join(getOverdeckHome(), 'agents', agentId, 'runtime.json');
           const text = await readFile(path, 'utf8');
           return JSON.parse(text) as unknown;
         } catch {

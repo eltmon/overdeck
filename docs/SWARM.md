@@ -1,6 +1,6 @@
 # Swarm — Per-Item DAG Dispatch
 
-**Reference for Panopticon's parallel-dispatch system: per-item DAG readiness, synthesis agents at convergence points, file-overlap serialization, and slot-merge auto-advance.**
+**Reference for Overdeck's parallel-dispatch system: per-item DAG readiness, synthesis agents at convergence points, file-overlap serialization, and slot-merge auto-advance.**
 
 PAN-970 shipped wave-based swarm v1. PAN-977 evolves the dispatcher to per-item readiness and moves runtime state out of the `~/.panopticon/swarms/*.json` sidecar into the continue vBRIEF.
 

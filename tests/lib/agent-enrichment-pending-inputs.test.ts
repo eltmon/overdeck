@@ -88,7 +88,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // The deny hook returns an is_error: true tool_result whose content
     // mentions PAN-1520 — the scanner must treat this as "operator has not
     // actually answered yet" and keep the question pending.
-    const denyReason = 'AskUserQuestion is blocked in Panopticon environments to prevent silent corruption (PAN-1520).'
+    const denyReason = 'AskUserQuestion is blocked in Overdeck environments to prevent silent corruption (PAN-1520).'
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },

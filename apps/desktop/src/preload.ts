@@ -1,5 +1,5 @@
 /**
- * Preload script for the Panopticon Electron renderer.
+ * Preload script for the Overdeck Electron renderer.
  *
  * Exposes `window.panopticonBridge` via contextBridge.exposeInMainWorld.
  * The renderer uses this bridge to communicate with the main process over IPC.
@@ -53,7 +53,7 @@ export interface DesktopSettings {
 
 export type NotificationEventType = keyof DesktopSettings["notifications"];
 
-export interface PanopticonBridge {
+export interface OverdeckBridge {
   /** Returns true — used by renderer to detect desktop vs browser mode */
   isDesktopApp(): boolean;
 
@@ -104,7 +104,7 @@ export interface PanopticonBridge {
 
 // ─── Bridge implementation ────────────────────────────────────────────────────
 
-const bridge: PanopticonBridge = {
+const bridge: OverdeckBridge = {
   isDesktopApp: () => true,
 
   getServerUrl: () => {
@@ -158,6 +158,6 @@ contextBridge.exposeInMainWorld("panopticonBridge", bridge);
 
 declare global {
   interface Window {
-    panopticonBridge?: PanopticonBridge;
+    panopticonBridge?: OverdeckBridge;
   }
 }

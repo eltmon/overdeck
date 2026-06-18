@@ -497,7 +497,7 @@ async function createBeadsFromVBriefPromise(
 
     // beads v1.0.3 auto-recovers corrupt Dolt manifests, and v1.0.4 repairs
     // .beads permissions. Let `bd doctor --fix` own recovery instead of
-    // duplicating stale-artifact heuristics in Panopticon.
+    // duplicating stale-artifact heuristics in Overdeck.
     console.warn(`[beads] bd ping failed (${firstLine}); running bd doctor --fix before retry`);
     try {
       await execFileAsync('bd', ['doctor', '--fix'], {

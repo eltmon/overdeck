@@ -1,9 +1,9 @@
 /**
- * Correlator — links discovered sessions to Panopticon-managed conversations (PAN-457).
+ * Correlator — links discovered sessions to Overdeck-managed conversations (PAN-457).
  *
  * Queries the `conversations` table for session_file matches and the
  * `cost_events` table for session_id matches to determine if a discovered
- * JSONL file was spawned by Panopticon.
+ * JSONL file was spawned by Overdeck.
  */
 
 import { Effect } from 'effect';

@@ -16,7 +16,7 @@ Options:
   -h, --help                      display help for command
 
 Commands:
-  init                            Initialize Panopticon (~/.panopticon/)
+  init                            Initialize Overdeck (~/.panopticon/)
   sync [options]                  Sync skills/agents to ~/.claude/ and render
                                   the context layers
   context                         Manage the layered context model (global /
@@ -69,12 +69,12 @@ Commands:
   tts                             Local TTS daemon helpers
   release                         Intentional release flow for stable and
                                   canary publishes
-  memory                          Search and inspect Panopticon memory
+  memory                          Search and inspect Overdeck memory
   admin                           Plumbing commands: watchdog, specialists,
                                   infra, db, config, and more
   conversations|conv              Discover, index, and search Claude Code
                                   session history
-  install [options]               Install Panopticon prerequisites
+  install [options]               Install Overdeck prerequisites
   inspect [options] <issueId>     Request inspection of a completed bead before
                                   proceeding to the next
   caveman-compress <file>         Compress a static reference doc using
@@ -90,7 +90,7 @@ Commands:
                                   HMR
   up [options]                    Start dashboard (and Traefik if enabled)
   down [options]                  Stop dashboard (and Traefik if enabled)
-  reload [options]                Build Panopticon, then restart the dashboard
+  reload [options]                Build Overdeck, then restart the dashboard
                                   only after the build succeeds
   restart [options]               Restart a platform component (default:
                                   dashboard only — leaves CLIProxy, Traefik,
@@ -99,11 +99,11 @@ Commands:
                                   support
   projects                        Project registry for multi-project workspace
                                   support
-  health                          Show runtime health of Panopticon services
+  health                          Show runtime health of Overdeck services
   doctor [options]                Check system health and dependencies
   resources [options]             Show RAM usage by agents, conversations, and
                                   system processes
-  update [options]                Update Panopticon to latest version
+  update [options]                Update Overdeck to latest version
   cost                            Track and report AI usage costs
   serve [options]                 Start the dashboard server and open it in the
                                   default browser (npx launcher)

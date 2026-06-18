@@ -8,7 +8,7 @@
 
 2. **Lifecycle is split across nesting levels.** `pan work plan <id>` creates a plan but `pan plan-finalize <id>` finalizes it — same verb, different depths. `pan inspect <id>` is top-level but `pan work done <id>` is nested. `pan status` is top-level but `pan work pending` is nested. There's no consistent rule.
 
-3. **Plumbing crowds the happy path.** `cloister`, `specialists`, `beads`, `db`, `remote`, `migrate-config`, `sync-costs`, `config` all sit at the top level next to user-facing verbs like `status` and `up`. `pan --help` reads as "everything Panopticon can do" rather than "things you'd reach for today."
+3. **Plumbing crowds the happy path.** `cloister`, `specialists`, `beads`, `db`, `remote`, `migrate-config`, `sync-costs`, `config` all sit at the top level next to user-facing verbs like `status` and `up`. `pan --help` reads as "everything Overdeck can do" rather than "things you'd reach for today."
 
 **Impact:**
 - New users can't discover commands by guessing. Existing users rely on muscle memory that newcomers don't have.
@@ -127,7 +127,7 @@ The dashboard is the other user-facing surface and must stay in lockstep with th
 ### Phase 5 — Docs and tests
 
 15. Update every doc in `docs/` that references an old command path. Priority order: `USAGE.md`, `INDEX.md`, all `PRD-*.md`, all `prds/active/*.md`.
-16. Update hook scripts in `scripts/` and any Panopticon-installed shell aliases.
+16. Update hook scripts in `scripts/` and any Overdeck-installed shell aliases.
 17. Add a snapshot test of `pan --help` output so future drift is caught.
 18. Update the `pan doctor` check to flag any remaining legacy invocations in user config.
 

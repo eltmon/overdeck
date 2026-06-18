@@ -1,6 +1,6 @@
 ---
 name: pan-install
-description: Guide through installing Panopticon prerequisites
+description: Guide through installing Overdeck prerequisites
 triggers:
   - install panopticon
   - setup panopticon dependencies
@@ -10,22 +10,22 @@ allowed-tools:
   - Read
 ---
 
-# Panopticon Installation Guide
+# Overdeck Installation Guide
 
 ## Overview
 
-This skill guides you through installing all prerequisites for Panopticon, including Node.js, Docker, tmux, and other required dependencies.
+This skill guides you through installing all prerequisites for Overdeck, including Node.js, Docker, tmux, and other required dependencies.
 
 ## When to Use
 
-- First-time installation of Panopticon
+- First-time installation of Overdeck
 - User reports missing dependencies
-- Setting up Panopticon on a new machine
+- Setting up Overdeck on a new machine
 - Troubleshooting installation issues
 
 ## Prerequisites
 
-Panopticon requires:
+Overdeck requires:
 - **Node.js** v18+ (for CLI and dashboard)
 - **Docker** and Docker Compose (for workspaces)
 - **tmux** (for agent sessions)
@@ -48,7 +48,7 @@ This will show you which dependencies are missing or need updates.
 
 #### Automated Installation
 
-The easiest way is to use Panopticon's built-in installer:
+The easiest way is to use Overdeck's built-in installer:
 
 ```bash
 pan install
@@ -119,7 +119,7 @@ brew install git
 sudo apt-get install -y git
 ```
 
-### Step 3: Install Panopticon
+### Step 3: Install Overdeck
 
 ```bash
 # Clone the repository (if not already done)
@@ -166,15 +166,15 @@ Should show all green checkmarks. If not, address any remaining issues.
 ### macOS
 
 - Install Docker Desktop (includes Docker Compose)
-- Ensure Docker Desktop is running before using Panopticon
+- Ensure Docker Desktop is running before using Overdeck
 - May need to increase Docker memory limit (Preferences → Resources)
 
 ### WSL2 (Windows)
 
 - Install Docker Desktop for Windows (not Docker in WSL)
 - Enable WSL2 integration in Docker Desktop settings
-- Use WSL2 Ubuntu distribution for Panopticon
-- Clone Panopticon inside WSL filesystem (`~/projects/`), not Windows filesystem (`/mnt/c/`)
+- Use WSL2 Ubuntu distribution for Overdeck
+- Clone Overdeck inside WSL filesystem (`~/projects/`), not Windows filesystem (`/mnt/c/`)
 
 ## Troubleshooting
 
@@ -305,7 +305,7 @@ pan up
 
 After successful installation:
 
-1. **Configure Panopticon**: Use `/pan-setup` skill
+1. **Configure Overdeck**: Use `/pan-setup` skill
 2. **Start services**: `pan up`
 3. **Verify health**: `pan doctor`
 4. **Create first workspace**: Use `/pan-issue` skill

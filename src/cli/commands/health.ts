@@ -144,7 +144,7 @@ export async function healthCommand(
 
     case 'daemon': {
       // Start the health monitoring daemon
-      console.log(chalk.bold('Starting Panopticon Health Daemon'));
+      console.log(chalk.bold('Starting Overdeck Health Daemon'));
       console.log(chalk.dim(`Check interval: ${config.checkIntervalMs / 1000}s`));
       console.log(chalk.dim(`Failure threshold: ${config.consecutiveFailures}`));
       console.log(chalk.dim(`Cooldown: ${config.cooldownMs / (1000 * 60)}m`));

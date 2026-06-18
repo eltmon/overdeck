@@ -31,7 +31,7 @@ let workspace: string;
 let sessions: Map<string, SupervisorSession>;
 let tmuxSessions: Set<string>;
 let routeDispose: (() => Promise<void>) | undefined;
-let originalPanopticonHome: string | undefined;
+let originalOverdeckHome: string | undefined;
 let originalHome: string | undefined;
 let originalTrustedOrigins: string | undefined;
 let actualTmux: typeof TmuxModule | undefined;
@@ -330,7 +330,7 @@ beforeEach(async () => {
   sessions = new Map();
   tmuxSessions = new Set();
   actualTmux = undefined;
-  originalPanopticonHome = process.env.OVERDECK_HOME;
+  originalOverdeckHome = process.env.OVERDECK_HOME;
   originalHome = process.env.HOME;
   originalTrustedOrigins = process.env.OVERDECK_TRUSTED_ORIGINS;
   process.env.OVERDECK_HOME = tmpHome;
@@ -407,8 +407,8 @@ afterEach(async () => {
   tmuxSessions.clear();
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
-  if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-  else process.env.OVERDECK_HOME = originalPanopticonHome;
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
   if (originalTrustedOrigins === undefined) delete process.env.OVERDECK_TRUSTED_ORIGINS;

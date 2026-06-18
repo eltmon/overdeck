@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export type RestartTrigger = 'pan reload' | 'pan restart' | 'watchdog';
 
@@ -18,7 +18,7 @@ export interface RestartStatus {
   /** PID of the process that wrote this entry — identifies the writer when
    *  multiple restart flows overlap (see PAN-1714 follow-up). */
   pid?: number;
-  /** Panopticon actor that ran the restart (OVERDECK_AGENT_ID), e.g.
+  /** Overdeck actor that ran the restart (OVERDECK_AGENT_ID), e.g.
    *  'conv-20260610-8858' or 'agent-pan-1647-review'. Absent = unmanaged shell. */
   initiator?: string;
   /** Issue the initiating agent was working on (OVERDECK_ISSUE_ID). */
@@ -26,7 +26,7 @@ export interface RestartStatus {
 }
 
 function restartStatusPath(): string {
-  return join(getPanopticonHome(), 'restart-status.json');
+  return join(getOverdeckHome(), 'restart-status.json');
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

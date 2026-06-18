@@ -7,7 +7,7 @@ export interface BriefingCommandOptions {
 
 export function createBriefingCommand(): Command {
   return new Command('briefing')
-    .description('Print the live Panopticon session briefing markdown')
+    .description('Print the live Overdeck session briefing markdown')
     .option('--cwd <path>', 'Resolve workspace context from this directory')
     .action(briefingCommandAction);
 }

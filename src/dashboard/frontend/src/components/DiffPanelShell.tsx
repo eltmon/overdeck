@@ -1,6 +1,6 @@
 /**
  * Diff panel shell — layout wrapper for the diff viewer.
- * Adapted from T3Code's DiffPanelShell.tsx for Panopticon (no Electron drag region).
+ * Adapted from T3Code's DiffPanelShell.tsx for Overdeck (no Electron drag region).
  */
 
 import { useCallback, useRef, useState, type ReactNode } from 'react'

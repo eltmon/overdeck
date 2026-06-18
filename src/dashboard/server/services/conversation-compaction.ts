@@ -80,7 +80,7 @@ function buildContinuationSummary(summary: string, model: string): string {
     '',
     summary,
     '',
-    `Panopticon native compaction model: ${model}`,
+    `Overdeck native compaction model: ${model}`,
     '',
     'Continue from this summary without redoing already-completed work.',
   ].join('\n');

@@ -1,14 +1,14 @@
 import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadConfigSync, saveConfigSync, PanopticonConfig } from '../../lib/config.js';
+import { loadConfigSync, saveConfigSync, OverdeckConfig } from '../../lib/config.js';
 import { getShadowModeFromEnv } from '../../lib/env-loader.js';
 import { listShadowedIssues, getPendingSyncCount } from '../../lib/shadow-state.js';
 
 export function registerConfigCommand(program: Command): void {
   const config = program
     .command('config')
-    .description('Manage Panopticon configuration');
+    .description('Manage Overdeck configuration');
 
   // Shadow mode subcommand
   config

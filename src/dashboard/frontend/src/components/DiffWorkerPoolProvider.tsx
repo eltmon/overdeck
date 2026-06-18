@@ -1,6 +1,6 @@
 /**
  * Diff worker pool provider — wraps @pierre/diffs WorkerPoolContextProvider.
- * Adapted from T3Code's DiffWorkerPoolProvider.tsx for Panopticon.
+ * Adapted from T3Code's DiffWorkerPoolProvider.tsx for Overdeck.
  */
 
 import { WorkerPoolContextProvider, useWorkerPool } from '@pierre/diffs/react'

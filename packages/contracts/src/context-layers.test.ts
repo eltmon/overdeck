@@ -23,7 +23,7 @@ describe("context dashboard contracts", () => {
       projects: [
         {
           projectKey: "panopticon-cli",
-          name: "Panopticon CLI",
+          name: "Overdeck CLI",
           path: "/repo/panopticon-cli",
           issuePrefix: "PAN",
           tracker: "github",
@@ -102,14 +102,14 @@ describe("context dashboard contracts", () => {
       previews: {
         "claude-code": "Claude Code rendered context",
         pi: "Pi rendered context",
-        fullPrompt: "Panopticon injected prompt audit",
+        fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],
     })
 
     expect(parsed.previews["claude-code"]).toBe("Claude Code rendered context")
     expect(parsed.previews.pi).toBe("Pi rendered context")
-    expect(parsed.previews.fullPrompt).toBe("Panopticon injected prompt audit")
+    expect(parsed.previews.fullPrompt).toBe("Overdeck injected prompt audit")
   })
 
   it("keeps preview, save, and sync operations distinct", () => {

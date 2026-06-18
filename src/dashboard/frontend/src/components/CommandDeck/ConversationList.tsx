@@ -52,7 +52,7 @@ export interface Conversation {
   forkError?: string | null;
   /** Error message when background spawn failed (quota, auth, etc.). Null = spawned OK. */
   spawnError?: string | null;
-  /** True when a Panopticon-native compaction is actively running for this conversation. */
+  /** True when a Overdeck-native compaction is actively running for this conversation. */
   compacting?: boolean;
   /** Delivery method: auto (try channels, fallback tmux), channels (strict), tmux (always tmux). */
   deliveryMethod?: 'auto' | 'channels' | 'tmux' | null;

@@ -1,4 +1,4 @@
-# PRD — Overdeck: the Panopticon data-architecture remodel + rebrand
+# PRD — Overdeck: the Overdeck data-architecture remodel + rebrand
 
 **Epic:** [PAN-1938](https://github.com/eltmon/panopticon-cli/issues/1938) · **Status:** ready for implementation · **Authored:** 2026-06-17
 
@@ -13,13 +13,13 @@
 
 ## 1. Summary
 
-Panopticon's recurring state and pipeline bugs all trace to one disease: a single
+Overdeck's recurring state and pipeline bugs all trace to one disease: a single
 fact is written from many places with no owner, so the stores drift. Overdeck
 cures it structurally — **one read door (resolver) and one write door (writer)
 per domain, nothing else touching a store** — rebuilt on a fresh, empty
 `overdeck.db`, all-in on Effect v4-beta with Drizzle over `node:sqlite`. The old
 `panopticon.db` is kept untouched as a backup, so this is a low-risk big-bang, and
-the product is renamed **Panopticon → Overdeck**. Full narrative:
+the product is renamed **Overdeck → Overdeck**. Full narrative:
 [`END-STATE.md`](END-STATE.md).
 
 **The bar is functional parity:** keep every piece of functionality the system has
@@ -82,7 +82,7 @@ Functional:
 - **FR-8 — Functional-parity repairs the audits exposed.** Re-wire the dead
   cost-limit breaker; ingest native pi/codex cost (PAN-1935); build the memory FTS
   rebuilder; specify the Observability replay-gap error before trimming `events`.
-- **FR-9 — Rebrand.** Rename Panopticon → Overdeck across code, the DB filename,
+- **FR-9 — Rebrand.** Rename Overdeck → Overdeck across code, the DB filename,
   DNS, and docs. `panopticon.db` is retained untouched as a rollback backup.
 
 Non-functional:
@@ -122,7 +122,7 @@ the dependencies.
   Observability replay-gap error; relocate every remaining direct-store caller onto
   its door; delete the dead tables/paths.
 - **Phase 5 — Cutover & rebrand (FR-9).** Point the app at the fresh `overdeck.db`;
-  rename Panopticon → Overdeck (code, DB name, DNS, docs); turn on the CI guard
+  rename Overdeck → Overdeck (code, DB name, DNS, docs); turn on the CI guard
   (NFR-3); retire the old access paths. Keep `panopticon.db` as backup.
 
 ## 6. Build gates (hard prerequisites)
@@ -159,7 +159,7 @@ the dependencies.
 - **Cutover sequencing** — in-flight pipeline/agent state at the switch moment;
   the rebuild-from-sources must cover active issues. (Phase 3 design point.)
 - **Rebrand mechanics** — DNS (already parked), the DB filename, and the breadth
-  of `Panopticon` references; sequence the rename so nothing half-renamed ships.
+  of `Overdeck` references; sequence the rename so nothing half-renamed ships.
 - **Named drops to confirm** — the dead `pan cost budget` store-B path, the
   `flywheel_substrate_bugs` telemetry, and the display-only fields the audits
   dropped: each is a recorded decision, not a silent loss.

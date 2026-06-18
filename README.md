@@ -1,6 +1,6 @@
 <div align="center">
 
-# Panopticon CLI
+# Overdeck CLI
 
 **The IDE for the agent era**
 
@@ -9,17 +9,17 @@
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/panopticon-cli/pulls)
 
-> *"The Panopticon had six sides, one for each of the Founders of Gallifrey..."*
+> *"The Overdeck had six sides, one for each of the Founders of Gallifrey..."*
 >
-> — Classic Doctor Who. The Panopticon was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
+> — Classic Doctor Who. The Overdeck was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
 
 </div>
 
-IDEs were built for humans who type code. Panopticon is built for humans who **direct** code. Command Deck is a live development environment where you spawn agents, watch them work, and stay in control. You see every file change as it lands, review diffs without leaving the conversation, talk to agents to course-correct, hot-swap the model behind them when the task shifts, and branch a conversation to try a different approach without losing the original. When you like where things are headed, the built-in specialist pipeline picks it up — automated code review, tests, and merge — so you never context-switch to a separate CI tab.
+IDEs were built for humans who type code. Overdeck is built for humans who **direct** code. Command Deck is a live development environment where you spawn agents, watch them work, and stay in control. You see every file change as it lands, review diffs without leaving the conversation, talk to agents to course-correct, hot-swap the model behind them when the task shifts, and branch a conversation to try a different approach without losing the original. When you like where things are headed, the built-in specialist pipeline picks it up — automated code review, tests, and merge — so you never context-switch to a separate CI tab.
 
 <div align="center">
 
-<img src="docs/screenshot-board.png" alt="Panopticon Command Deck" width="800" />
+<img src="docs/screenshot-board.png" alt="Overdeck Command Deck" width="800" />
 
 </div>
 
@@ -62,10 +62,10 @@ Project tree, activity feed, kanban board, agent status, cost analytics, convoy 
 
 ---
 
-## Why Panopticon?
+## Why Overdeck?
 
 - **You stay in the loop without being in the way.** Watch agents code, review their diffs live, send a message when they drift. You're pair-programming, not babysitting a terminal.
-- **The right model for every phase.** Opus plans the architecture, Kimi or Sonnet writes the code, Haiku handles quick commands. Panopticon routes automatically — or you override with two clicks when you know better.
+- **The right model for every phase.** Opus plans the architecture, Kimi or Sonnet writes the code, Haiku handles quick commands. Overdeck routes automatically — or you override with two clicks when you know better.
 - **Context that outlasts the conversation.** PRDs, plans, checkpoints, beads, and skills carry forward across sessions. Agents pick up where the last one left off, not from a blank slate.
 - **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI. 70+ ship out of the box.
 - **A pipeline that ships while you move on.** When the implementation looks right, hand it to the specialist pipeline — automated code review, tests, and merge. You click Merge when you're satisfied, or keep working on the next issue.
@@ -95,7 +95,7 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 
 ## Agent Auto-Resume Controls
 
-Panopticon auto-recovers stopped work agents, but operators can deliberately gate that behavior:
+Overdeck auto-recovers stopped work agents, but operators can deliberately gate that behavior:
 
 - `pan dev --no-resume` and `pan up --no-resume` start the dashboard with boot-scoped no-resume mode. Orphan recovery and stopped-agent auto-resume stay disabled until the dashboard is restarted without `--no-resume`.
 - `pan pause <id> [--reason <text>]` persists a per-agent pause gate and stops the agent if it is running. `pan unpause <id>` clears the gate without spawning; `pan start <id> --force` clears it and starts immediately.
@@ -127,7 +127,7 @@ These controls are visible in the dashboard through top-level no-resume warnings
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/cli`; keep `pan` for headless and CI, or use `@overdeck/desktop` for the packaged desktop app.
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/cli`; keep `pan` for headless and CI, or use `@overdeck/desktop` for the packaged desktop app.
 
 ---
 
@@ -185,7 +185,7 @@ Panopticon started as a CLI and grew into **Command Deck**, a desktop-class deve
 
 ## Maturity
 
-Panopticon is actively used in production to develop itself and multiple other projects.
+Overdeck is actively used in production to develop itself and multiple other projects.
 
 - **70+ skills** shipped and synced across tools
 - **4 tracker integrations** (GitHub, Linear, GitLab, Rally)

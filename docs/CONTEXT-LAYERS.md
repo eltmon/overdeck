@@ -1,6 +1,6 @@
 # Layered Context Distribution
 
-How Panopticon distributes context — engineering rules, project guidance,
+How Overdeck distributes context — engineering rules, project guidance,
 skills, agents — to the coding-agent harnesses it drives. Introduced by
 PAN-1201, which replaced the `sync.devroot` model.
 
@@ -16,7 +16,7 @@ Context composes from three layers, outermost to innermost:
 
 The global layer is per-machine and lives under `~/.panopticon`. The project
 layer is committed to the repo. The workspace layer is **auto-assembled** by
-Panopticon at workspace creation — never hand-authored — and is gitignored.
+Overdeck at workspace creation — never hand-authored — and is gitignored.
 
 The global layer may also carry the user's own skills and agents under
 `~/.panopticon/context/global/{skills,agents}/`.
@@ -110,14 +110,14 @@ like `CLAUDE.md`. A project with no `project.md` gets neither file touched.
 
 `pan sync` also:
 
-- distributes Panopticon's bundled skills → `~/.claude/skills/` and agent
+- distributes Overdeck's bundled skills → `~/.claude/skills/` and agent
   definitions → `~/.claude/agents/`, with manifest-based conflict resolution
   (a file you modified is left alone; an unmodified one is updated);
 - folds the bundled **engineering rules** into the global CLAUDE.md region.
 
 ## Respecting your existing context
 
-Panopticon is designed to **augment, never replace** any context files you
+Overdeck is designed to **augment, never replace** any context files you
 already maintain. Three guarantees:
 
 1. **Managed-region surgery.** `pan sync` only ever owns the span between the
@@ -138,7 +138,7 @@ already maintain. Three guarantees:
 
 The Pi **global** layer is the one exception to "we only write managed
 regions": it renders to `~/.panopticon/context/pi-global.md`, a
-Panopticon-owned file (whole-file write), not your `AGENTS.md`. Project-level
+Overdeck-owned file (whole-file write), not your `AGENTS.md`. Project-level
 Pi context *does* go into your `AGENTS.md` as a managed region.
 
 The dashboard Context page surfaces all of this: for the selected layer it
@@ -147,12 +147,12 @@ lists the exact target files, whether each already has your own content
 
 ## Bundled rules
 
-Panopticon ships engineering rules under `sync-sources/rules/`. Each rule
+Overdeck ships engineering rules under `sync-sources/rules/`. Each rule
 carries a `scope:` frontmatter key:
 
 - `scope: universal` — folded into the rendered CLAUDE.md everywhere;
 - `scope: dev` — folded in only on a panopticon-cli checkout (`isDevMode()`),
-  for rules about developing Panopticon itself.
+  for rules about developing Overdeck itself.
 
 ## `pan context` CLI
 
@@ -176,17 +176,17 @@ and workspace selectors choose the registered project or workspace whose
 `.pan/context/project.md` or `.pan/context/workspace.md` file is loaded.
 
 The editor shows per-harness previews for Claude Code and Pi. A separate **Full
-injected prompt** pane shows the complete Panopticon-controlled bundle that will
+injected prompt** pane shows the complete Overdeck-controlled bundle that will
 be injected, including rendered layer content and audit sections for memory,
 status, and workspace briefing. It does not fabricate private harness base
-prompts that Panopticon cannot read.
+prompts that Overdeck cannot read.
 
 Previewing is read-only. **Save** writes only the selected layer file. **Save &
 Sync** writes the selected layer first, then explicitly runs `pan context sync`
 so the rendered Claude Code target files update. Live preview and ordinary Save
 do not run sync.
 
-## `sync-sources/` — Panopticon's own bundled content
+## `sync-sources/` — Overdeck's own bundled content
 
 Everything `pan sync` distributes *from the package itself* lives under one
 explicit top-level directory:

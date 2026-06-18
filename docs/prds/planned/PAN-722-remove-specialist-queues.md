@@ -2,7 +2,7 @@
 
 ## Problem
 
-Panopticon currently has a queue system for every specialist agent (review, test, inspect, uat, merge). For review and test specialists, the queue exists only as a fallback when the specialist is already busy with another workspace — work is otherwise dispatched immediately. The queue adds significant complexity (file-based hooks, deacon drain loops, status-tracking states, CLI commands, API endpoints, dashboard UI) for a problem that no longer needs to exist: review and test specialists are now ephemeral and can be spawned in parallel per workspace.
+Overdeck currently has a queue system for every specialist agent (review, test, inspect, uat, merge). For review and test specialists, the queue exists only as a fallback when the specialist is already busy with another workspace — work is otherwise dispatched immediately. The queue adds significant complexity (file-based hooks, deacon drain loops, status-tracking states, CLI commands, API endpoints, dashboard UI) for a problem that no longer needs to exist: review and test specialists are now ephemeral and can be spawned in parallel per workspace.
 
 The **merge queue** is fundamentally different — it is a persistent, SQLite-backed, per-project serialization mechanism because humans approve merges serially. It must stay.
 

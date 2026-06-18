@@ -3803,7 +3803,7 @@ Service()("effect/Effect/Transaction");
 //#region ../../src/lib/paths.ts
 const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), ".panopticon");
 /** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
-function getPanopticonHome() {
+function getOverdeckHome() {
 	return process.env.OVERDECK_HOME || join(homedir(), ".panopticon");
 }
 const CONFIG_DIR = OVERDECK_HOME;
@@ -3838,7 +3838,7 @@ function resolvePackageRootForDir(dir) {
 	return dir.endsWith(`${sep}lib`) ? dirname(dirname(dir)) : dirname(dir);
 }
 /**
-* Root of Panopticon's own bundled sync sources (PAN-1201).
+* Root of Overdeck's own bundled sync sources (PAN-1201).
 *
 * Everything `pan sync` distributes from the package itself lives under this
 * single explicit top-level directory — skills, dev-skills, agents, rules,
@@ -4368,7 +4368,7 @@ function loadNodeSqlite() {
 		return _require("node:sqlite");
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		throw new Error(`Unable to load node:sqlite (${message}). Panopticon requires Node 22.16+ or Node 24+ for the bundled SQLite driver; older Node 22 builds may require --experimental-sqlite and are not supported.`, { cause: error });
+		throw new Error(`Unable to load node:sqlite (${message}). Overdeck requires Node 22.16+ or Node 24+ for the bundled SQLite driver; older Node 22 builds may require --experimental-sqlite and are not supported.`, { cause: error });
 	}
 }
 function openDatabase(path, options = {}) {
@@ -4552,7 +4552,7 @@ function buildNamedParams(row) {
 * has no live session is marked stopped.
 */
 function backfillAgentsFromStateJsonSync(db, options) {
-	const agentsDir = join$1(getPanopticonHome(), "agents");
+	const agentsDir = join$1(getOverdeckHome(), "agents");
 	const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNames();
 	let processed = 0;
 	let skipped = 0;
@@ -5939,7 +5939,7 @@ function runMigrations(db, dbPath) {
 	}
 	if (currentVersion < 55) {
 		try {
-			const resolvedDbPath = dbPath ?? join(getPanopticonHome(), "panopticon.db");
+			const resolvedDbPath = dbPath ?? join(getOverdeckHome(), "panopticon.db");
 			const snapshotPath = `${resolvedDbPath}.v54-backfill-snapshot`;
 			if (existsSync(resolvedDbPath) && !existsSync(snapshotPath)) {
 				writeFileSync(snapshotPath, readFileSync(resolvedDbPath));
@@ -6015,7 +6015,7 @@ function runMigrations(db, dbPath) {
 //#endregion
 //#region ../../src/lib/database/index.ts
 /**
-* Panopticon Unified Database
+* Overdeck Unified Database
 *
 * Single panopticon.db at ~/.panopticon/panopticon.db.
 * Singleton pattern — one connection shared across the process.
@@ -6037,7 +6037,7 @@ let _db = null;
 * Get the path to panopticon.db (dynamic, respects OVERDECK_HOME override for tests)
 */
 function getDatabasePath() {
-	return join(getPanopticonHome(), "panopticon.db");
+	return join(getOverdeckHome(), "panopticon.db");
 }
 /**
 * Initialize and return the singleton database connection.
@@ -6045,7 +6045,7 @@ function getDatabasePath() {
 */
 function getDatabase() {
 	if (_db) return _db;
-	const home = getPanopticonHome();
+	const home = getOverdeckHome();
 	if (!existsSync(home)) mkdirSync(home, { recursive: true });
 	const dbPath = getDatabasePath();
 	_db = openDatabase(dbPath);
@@ -12810,7 +12810,7 @@ function extractPrefixSync(issueId) {
 //#endregion
 //#region ../../src/lib/projects.ts
 /**
-* Project Registry - Multi-project support for Panopticon
+* Project Registry - Multi-project support for Overdeck
 *
 * Maps Linear team prefixes and labels to project paths for workspace creation.
 */

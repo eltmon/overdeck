@@ -584,7 +584,7 @@ function buildHierarchy(issues: Issue[]): HierarchyGroup[] {
   return groups;
 }
 
-// Tracker vs Shadow state badges — shows when Rally state differs from Panopticon shadow state
+// Tracker vs Shadow state badges — shows when Rally state differs from Overdeck shadow state
 function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact?: boolean }) {
   const trackerState = issue.rawTrackerState || issue.shadowTrackerStatus;
   const shadowState = issue.shadowStatus || issue.targetCanonicalState;

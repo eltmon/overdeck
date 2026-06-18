@@ -9,9 +9,9 @@
 
 ## Problem
 
-The Panopticon dashboard has no canonical landing page. Users land on whatever route happens to be default (Mission Control / Workspaces depending on session). There's no at-a-glance view of "what's happening across the system right now."
+The Overdeck dashboard has no canonical landing page. Users land on whatever route happens to be default (Mission Control / Workspaces depending on session). There's no at-a-glance view of "what's happening across the system right now."
 
-Worse: every agent and every user conversation starts cold. The agent has no idea what's running in adjacent workspaces, what was decided in past sessions, what Panopticon-specific behaviors apply, or how to use the memory system effectively. PAN-1052 captures observations but they only inject if the agent thinks to search. The user re-explains the project on every fresh session.
+Worse: every agent and every user conversation starts cold. The agent has no idea what's running in adjacent workspaces, what was decided in past sessions, what Overdeck-specific behaviors apply, or how to use the memory system effectively. PAN-1052 captures observations but they only inject if the agent thinks to search. The user re-explains the project on every fresh session.
 
 ## Goal
 
@@ -64,17 +64,17 @@ Click target: workspace card → workspace overview page (not a specific convers
 The dashboard server writes `~/.panopticon/session-context.md` on every state change, debounced ~500ms. Content structure (borrowed from Subspace's four-section pattern, with our honesty pass):
 
 ```markdown
-# Working Inside Panopticon
+# Working Inside Overdeck
 
-You're piloting an agent inside **Panopticon** — a multi-agent orchestrator for
-AI coding work. Panopticon is the environment around you: it remembers what's
+You're piloting an agent inside **Overdeck** — a multi-agent orchestrator for
+AI coding work. Overdeck is the environment around you: it remembers what's
 happened, tracks what's changing across sibling workspaces, and hands you
 context before you ask.
 
-Think of it as an exoskeleton. You bring the reasoning; Panopticon brings the
+Think of it as an exoskeleton. You bring the reasoning; Overdeck brings the
 instruments.
 
-## What Panopticon Gives You
+## What Overdeck Gives You
 
 - **Persistent memory across sessions.** Observations (what happened), status
   updates (synthesized state), and daily summaries (workspace digests) are
@@ -256,7 +256,7 @@ async function onStopHook(turn: TurnRecord) {
 `compliance.miss` is written as a special observation type to PAN-1052's memory store. The UserPromptSubmit hook on the *next* prompt checks for recent misses (last 1 prompt) and prepends a soft warning:
 
 ```markdown
-[Panopticon nudge] Last turn included a memory-first trigger phrase ("we recently fixed the focus issue") but `pan memory search` wasn't called. Consider searching memory first next time — it has the decision trail and reasoning that git doesn't.
+[Overdeck nudge] Last turn included a memory-first trigger phrase ("we recently fixed the focus issue") but `pan memory search` wasn't called. Consider searching memory first next time — it has the decision trail and reasoning that git doesn't.
 ```
 
 **Modes** (configurable in `~/.panopticon/config.yaml`):

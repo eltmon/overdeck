@@ -1,7 +1,7 @@
 ---
 name: pan-docs
-description: Find, update, and structure Panopticon documentation using the docs index and documentation guide
-author: Panopticon
+description: Find, update, and structure Overdeck documentation using the docs index and documentation guide
+author: Overdeck
 version: 2.0.0
 triggers:
   - panopticon docs
@@ -20,21 +20,21 @@ allowed-tools:
 
 # Pan-Docs Skill
 
-**Purpose:** Be the single Panopticon-specific skill for finding, updating, and improving documentation.
+**Purpose:** Be the single Overdeck-specific skill for finding, updating, and improving documentation.
 
 Use this skill for three kinds of work:
 - answering questions from existing docs
 - deciding where new documentation should live
 - updating docs so they stay newcomer-friendly, consistent, and discoverable
 
-This is the primary Panopticon documentation skill. If you need general prose cleanup, use `clear-writing` as a supporting skill, not as a replacement for Panopticon-specific documentation judgment.
+This is the primary Overdeck documentation skill. If you need general prose cleanup, use `clear-writing` as a supporting skill, not as a replacement for Overdeck-specific documentation judgment.
 
 ---
 
 ## Core Rules
 
 1. **Start with the docs index.** Use `docs/INDEX.md` before guessing where information lives.
-2. **Write for the reader who is new to Panopticon.** Lead with purpose and mental model before code paths or implementation details.
+2. **Write for the reader who is new to Overdeck.** Lead with purpose and mental model before code paths or implementation details.
 3. **One document should do one job well.** Keep overview docs, routing references, workflow guides, and implementation deep dives distinct.
 4. **Prefer linking over duplicating.** If another doc already owns the detail, summarize briefly and point there.
 5. **Keep the index current.** If docs coverage changes, update `docs/INDEX.md` too.

@@ -1015,7 +1015,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
   // close authority to GitHub, which fires the moment the PR's head becomes
   // reachable from main and races the pipeline's verifying_on_main → close-out
   // lifecycle (the first UAT batch promote closed 2 of 3 member issues
-  // mid-handoff, 2026-06-11). Panopticon's close-out owns issue closing.
+  // mid-handoff, 2026-06-11). Overdeck's close-out owns issue closing.
   lines.push(`**Issue:** #${extractNumberSync(issueId) ?? issueId}`);
   lines.push('');
 
@@ -3568,8 +3568,8 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
             const [owner, name] = repo.split('/');
             const wsInfo = getWorkspaceInfoForIssue(issueId);
             if (!wsInfo?.localPath) return;
-            const { postPanopticonTestsStatus } = await import('../../../lib/github-app.js');
-            await postPanopticonTestsStatus(wsInfo.localPath, owner!, name!, 'success', 'Test specialist passed');
+            const { postOverdeckTestsStatus } = await import('../../../lib/github-app.js');
+            await postOverdeckTestsStatus(wsInfo.localPath, owner!, name!, 'success', 'Test specialist passed');
           } catch (err: any) {
             console.warn(`[review-status] Failed to post panopticon/tests for ${issueId}: ${err.message}`);
           }
@@ -5328,7 +5328,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
 
     // Step 1b: Validate that the PR is still OPEN before rebasing/merging.
     // A cancel-flow or manual `gh pr close` can leave stale `prUrl` pointing at a
-    // CLOSED PR while Panopticon state still shows readyForMerge=true. Without this
+    // CLOSED PR while Overdeck state still shows readyForMerge=true. Without this
     // check, the rebase + merge pipeline runs against a dead PR and dies silently
     // inside `gh pr merge` (see PAN-509 cancel-flow divergence).
     if (githubPrRef) {
@@ -5337,7 +5337,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
         if (isGitHubAppConfigured()) {
           const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
           if (prState.state !== 'OPEN' && !prState.merged) {
-            const error = `PR #${githubPrRef.number} is ${prState.state} (not OPEN). Panopticon state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.`;
+            const error = `PR #${githubPrRef.number} is ${prState.state} (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.`;
             console.error(`[merge] ${error}`);
             setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
             completePendingOperation(issueId, error);
@@ -5704,7 +5704,7 @@ const postWorkspaceMergeRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:issueId/forge-approve ──────────────────────
 // Approves the PR/MR on GitHub/GitLab (submits an approving review).
-// This is distinct from the Panopticon /approve endpoint which runs the
+// This is distinct from the Overdeck /approve endpoint which runs the
 // full merge flow. This just clicks "Approve" on the forge.
 
 const postForgeApproveRoute = HttpRouter.add(
@@ -5808,7 +5808,7 @@ const postForgeApproveRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:issueId/forge-merge ────────────────────────
 // Merges the PR/MR directly on GitHub/GitLab via the forge adapter.
-// This is a lightweight forge-level merge — it does NOT run Panopticon's
+// This is a lightweight forge-level merge — it does NOT run Overdeck's
 // full post-merge lifecycle (label cleanup, workspace teardown, etc.).
 
 const postForgeMergeRoute = HttpRouter.add(

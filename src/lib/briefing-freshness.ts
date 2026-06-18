@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { mkdir, readFile, rename, stat, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export const BRIEFING_UPDATE_TAG = 'panopticon-briefing-update';
 
@@ -40,7 +40,7 @@ export async function ensureSessionContextBriefingFile(): Promise<string> {
   } catch (error) {
     if (!isNotFound(error)) throw error;
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, '# Panopticon Session Context\n\nNo live briefing has been generated yet.\n', 'utf8');
+    await writeFile(path, '# Overdeck Session Context\n\nNo live briefing has been generated yet.\n', 'utf8');
   }
   return path;
 }
@@ -144,11 +144,11 @@ async function writeMarker(marker: BriefingSessionMarker): Promise<void> {
 }
 
 function briefingFilePath(): string {
-  return join(getPanopticonHome(), 'session-context.md');
+  return join(getOverdeckHome(), 'session-context.md');
 }
 
 function markerFilePath(sessionId: string): string {
-  return join(getPanopticonHome(), 'briefing', 'sessions', `${Buffer.from(sessionId).toString('base64url')}.json`);
+  return join(getOverdeckHome(), 'briefing', 'sessions', `${Buffer.from(sessionId).toString('base64url')}.json`);
 }
 
 function isNotFound(error: unknown): boolean {

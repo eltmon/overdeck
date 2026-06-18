@@ -38,7 +38,7 @@ import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
-import { getPanopticonHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
@@ -71,7 +71,7 @@ initDashboardLogFile();
 console.log(`[panopticon] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
-await mkdir(getPanopticonHome(), { recursive: true });
+await mkdir(getOverdeckHome(), { recursive: true });
 
 // Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
@@ -642,7 +642,7 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
 await (async () => {
   try {
     const overdeckDbPath = getOverdeckDatabasePath();
-    const legacyDbPath = join(getPanopticonHome(), 'panopticon.db');
+    const legacyDbPath = join(getOverdeckHome(), 'panopticon.db');
 
     if (!existsSync(overdeckDbPath)) {
       createOverdeckDatabase({ dbPath: overdeckDbPath });

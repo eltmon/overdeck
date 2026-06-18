@@ -5,7 +5,7 @@
  * which can then be rendered or converted to MessagesTimelineRow[].
  *
  * Mirrors the core pattern from T3Code's MessagesTimeline.logic.ts, simplified
- * for Panopticon (no attachment handling, etc.).
+ * for Overdeck (no attachment handling, etc.).
  */
 
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from './chat-types';

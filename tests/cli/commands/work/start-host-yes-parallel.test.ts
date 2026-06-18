@@ -70,16 +70,16 @@ vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({
     projectKey: 'panopticon',
-    projectName: 'Panopticon',
+    projectName: 'Overdeck',
     projectPath: projectRoot,
   })),
   getProjectSync: vi.fn(() => ({
-    name: 'Panopticon',
+    name: 'Overdeck',
     path: projectRoot,
     issue_prefix: 'PAN',
   })),
   hasProjectsSync: vi.fn(() => true),
-  listProjectsSync: vi.fn(() => [{ key: 'panopticon', config: { name: 'Panopticon', path: projectRoot } }]),
+  listProjectsSync: vi.fn(() => [{ key: 'panopticon', config: { name: 'Overdeck', path: projectRoot } }]),
 }));
 
 vi.mock('../../../../src/lib/prd-draft.js', () => ({
@@ -134,7 +134,7 @@ vi.mock('../../../../src/lib/cloister/work-agent-prompt.js', () => ({
 }));
 
 let projectRoot = '';
-let originalPanopticonHome: string | undefined;
+let originalOverdeckHome: string | undefined;
 let stdinIsTTYDescriptor: PropertyDescriptor | undefined;
 
 type Bead = { id: string; title: string; labels: string[] };
@@ -161,7 +161,7 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
     vi.clearAllMocks();
     vi.resetModules();
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-start-host-yes-parallel-'));
-    originalPanopticonHome = process.env.OVERDECK_HOME;
+    originalOverdeckHome = process.env.OVERDECK_HOME;
     process.env.OVERDECK_HOME = join(projectRoot, '.panopticon-home');
     stdinIsTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
     Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
@@ -190,8 +190,8 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
     } else {
       delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
     }
-    if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-    else process.env.OVERDECK_HOME = originalPanopticonHome;
+    if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalOverdeckHome;
     rmSync(projectRoot, { recursive: true, force: true });
     vi.restoreAllMocks();
   });

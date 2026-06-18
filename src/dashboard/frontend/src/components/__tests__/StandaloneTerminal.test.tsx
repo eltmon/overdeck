@@ -49,7 +49,7 @@ describe('StandaloneTerminal', () => {
     window.panopticonBridge = {
       isDesktopApp: () => true,
       setAlwaysOnTop,
-    } as unknown as PanopticonBridge;
+    } as unknown as OverdeckBridge;
 
     render(<StandaloneTerminal sessionName="agent" />);
 

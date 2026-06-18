@@ -1,6 +1,6 @@
 ---
 name: pan-memory
-description: "pan memory <subcommand> — search and inspect Panopticon memory observations, status, reset markers, summaries, and health"
+description: "pan memory <subcommand> — search and inspect Overdeck memory observations, status, reset markers, summaries, and health"
 triggers:
   - pan memory
   - memory search

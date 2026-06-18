@@ -30,7 +30,7 @@ Changes needed:
 ### 2. Deep Merge Strategy
 **Decision:** Use a simple recursive deep merge function.
 
-Rather than adding a dependency (lodash.merge, deepmerge), implement a lightweight merge utility that handles the PanopticonConfig structure.
+Rather than adding a dependency (lodash.merge, deepmerge), implement a lightweight merge utility that handles the OverdeckConfig structure.
 
 The merge should:
 - Recursively merge nested objects
@@ -116,14 +116,14 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
 ### Updated loadConfig()
 
 ```typescript
-export function loadConfig(): PanopticonConfig {
+export function loadConfig(): OverdeckConfig {
   if (!existsSync(CONFIG_FILE)) {
     return DEFAULT_CONFIG;
   }
 
   try {
     const content = readFileSync(CONFIG_FILE, 'utf8');
-    const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+    const parsed = parse(content) as unknown as Partial<OverdeckConfig>;
     return deepMerge(DEFAULT_CONFIG, parsed);
   } catch (error) {
     console.error('Warning: Failed to parse config, using defaults');

@@ -1,6 +1,6 @@
 # Settings UI Design (Stitch)
 
-**Project**: Panopticon Settings Page Redesign
+**Project**: Overdeck Settings Page Redesign
 **Stitch Project ID**: `8973105193959682086`
 **Status**: ✅ Designs Complete
 **Date**: 2026-01-26

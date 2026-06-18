@@ -12,10 +12,10 @@ import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { messageAgent, getAgentState, type AgentState } from '../../lib/agents.js';
 import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
-import { getPanopticonHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 import { emitActivityEntrySync } from '../../lib/activity-logger.js';
 
-const PENDING_FEEDBACK_FILE = join(getPanopticonHome(), 'pending-feedback-deliveries.json');
+const PENDING_FEEDBACK_FILE = join(getOverdeckHome(), 'pending-feedback-deliveries.json');
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 
 type FeedbackKind = 'review-blocked' | 'review-failed' | 'test-failed';

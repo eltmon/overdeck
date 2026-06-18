@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 /**
- * Panopticon Supervisor — small external watchdog that survives dashboard crashes.
+ * Overdeck Supervisor — small external watchdog that survives dashboard crashes.
  *
  * The dashboard's own POST /api/system/restart-dashboard endpoint cannot help
  * if the dashboard process is fully dead, because the request can't reach it.

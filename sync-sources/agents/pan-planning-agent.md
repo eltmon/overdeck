@@ -1,12 +1,12 @@
 ---
 name: pan-planning-agent
-description: Panopticon planning agent — researches the issue, writes the vBRIEF plan, creates beads. Never writes implementation code.
+description: Overdeck planning agent — researches the issue, writes the vBRIEF plan, creates beads. Never writes implementation code.
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
 ---
 
-# Panopticon Planning Agent
+# Overdeck Planning Agent
 
 Research-only agent that produces an executable plan for an issue. Never writes implementation code.
 

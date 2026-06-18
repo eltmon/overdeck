@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { readdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { MemoryObservation, MemoryStatus, ResetMarker } from '@overdeck/contracts';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import { runMemoryFtsTransaction, withMemoryFtsDatabase } from './fts-db.js';
 import { resolveExtractionProviderSelection } from './providers/index.js';
 import { getMemoryRollupPendingThreshold, loadMemorySettings } from './settings.js';
@@ -419,7 +419,7 @@ async function readIssueDoctorSnapshots(projectId: string): Promise<MemoryDoctor
 }
 
 async function readActiveAgents(): Promise<Array<{ id: string; issueId: string }>> {
-  const agentsDir = join(getPanopticonHome(), 'agents');
+  const agentsDir = join(getOverdeckHome(), 'agents');
   const entries = await readdir(agentsDir, { withFileTypes: true }).catch((error: unknown) => {
     if (isEnoent(error)) return [];
     throw error;

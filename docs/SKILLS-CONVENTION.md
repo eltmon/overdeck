@@ -1,6 +1,6 @@
-# Panopticon Skills ↔ CLI Convention
+# Overdeck Skills ↔ CLI Convention
 
-How Panopticon's Claude Code skills relate to the `pan` CLI binary, and the rules
+How Overdeck's Claude Code skills relate to the `pan` CLI binary, and the rules
 for keeping the two in sync.
 
 ## TL;DR
@@ -18,7 +18,7 @@ for keeping the two in sync.
 | **CLI-sub-wrapper** | Wraps a sub-namespaced command. | `/pan-admin-hooks` → `pan admin hooks` |
 | **Workflow** | Orchestrates multiple CLI verbs in a specific order to accomplish a higher-level goal. | `/pan-code-review`, `/pan-oversee` |
 | **Reference** | Documentation-only. Does not directly invoke commands; tells the agent how to think about a concept or where to look. | `/pan-workflow`, `/pan-quickstart`, `/pan-help` |
-| **Topical** | Covers a topic that doesn't map to a single CLI verb but lives in Panopticon's namespace. | `/pan-network`, `/pan-docker`, `/pan-tts` |
+| **Topical** | Covers a topic that doesn't map to a single CLI verb but lives in Overdeck's namespace. | `/pan-network`, `/pan-docker`, `/pan-tts` |
 
 ## Rules
 
@@ -31,7 +31,7 @@ for keeping the two in sync.
 
 ### For workflow / reference / topical skills
 
-1. Still use the `pan-` prefix — the prefix is what tells discovery tooling and agents the skill belongs to Panopticon's namespace.
+1. Still use the `pan-` prefix — the prefix is what tells discovery tooling and agents the skill belongs to Overdeck's namespace.
 2. Frontmatter description should make the shape obvious: `"Workflow:"`, `"Reference:"`, `"Topical:"` is allowed as a lead-in but not required.
 3. These skills are exempt from the strict CLI-flag matching the wrappers are subject to — they're allowed to discuss CLI verbs descriptively without being required to enumerate every flag.
 

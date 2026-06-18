@@ -127,7 +127,7 @@ export interface LauncherConfig {
   unsetProviderEnv?: boolean;
   cavemanExports?: string;
   panopticonEnv?: { agentId?: string; issueId?: string; sessionType?: string };
-  unsetPanopticonEnv?: boolean;
+  unsetOverdeckEnv?: boolean;
   extraEnvExports?: string[];
 
   // Shell hygiene
@@ -260,23 +260,23 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     lines.push('export PATH="/usr/local/bin:$PATH"');
   }
 
-  // Track which Panopticon env vars are explicitly set so unsetPanopticonEnv
+  // Track which Overdeck env vars are explicitly set so unsetOverdeckEnv
   // can avoid clearing them (review agent pins agentId but clears issueId/type).
-  const explicitlySetPanopticonKeys = new Set<string>();
+  const explicitlySetOverdeckKeys = new Set<string>();
 
-  // Panopticon env vars
+  // Overdeck env vars
   if (config.panopticonEnv) {
     if (config.panopticonEnv.agentId != null) {
       lines.push(`export OVERDECK_AGENT_ID=${shellQuote(config.panopticonEnv.agentId)}`);
-      explicitlySetPanopticonKeys.add('OVERDECK_AGENT_ID');
+      explicitlySetOverdeckKeys.add('OVERDECK_AGENT_ID');
     }
     if (config.panopticonEnv.issueId != null) {
       lines.push(`export OVERDECK_ISSUE_ID=${shellQuote(config.panopticonEnv.issueId)}`);
-      explicitlySetPanopticonKeys.add('OVERDECK_ISSUE_ID');
+      explicitlySetOverdeckKeys.add('OVERDECK_ISSUE_ID');
     }
     if (config.panopticonEnv.sessionType != null) {
       lines.push(`export OVERDECK_SESSION_TYPE=${shellQuote(config.panopticonEnv.sessionType)}`);
-      explicitlySetPanopticonKeys.add('OVERDECK_SESSION_TYPE');
+      explicitlySetOverdeckKeys.add('OVERDECK_SESSION_TYPE');
     }
   }
 
@@ -320,10 +320,10 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
     }
   }
 
-  // Unset Panopticon env (review agent — prevents parent attribution)
-  if (config.unsetPanopticonEnv) {
+  // Unset Overdeck env (review agent — prevents parent attribution)
+  if (config.unsetOverdeckEnv) {
     const keysToUnset = ['OVERDECK_AGENT_ID', 'OVERDECK_ISSUE_ID', 'OVERDECK_SESSION_TYPE']
-      .filter(k => !explicitlySetPanopticonKeys.has(k));
+      .filter(k => !explicitlySetOverdeckKeys.has(k));
     if (keysToUnset.length > 0) {
       lines.push(`unset ${keysToUnset.join(' ')}`);
     }
@@ -648,7 +648,7 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
   // Disable approval prompts (codex exec rejects --ask-for-approval; use -c instead)
   tokens.push('-c', 'approval_policy=never');
 
-  // Sandbox mode: translate Panopticon's abstract 'workspace' token to the
+  // Sandbox mode: translate Overdeck's abstract 'workspace' token to the
   // codex CLI's 'workspace-write' (PAN-1799 — raw 'workspace' is rejected and
   // the agent dies at boot). Resume path uses -c (not -s) because
   // `codex exec resume` rejects -s.
@@ -705,7 +705,7 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   tokens.push('--no-context-files');
 
-  // PAN-1566: deliver Panopticon's injected context (global engineering-rules
+  // PAN-1566: deliver Overdeck's injected context (global engineering-rules
   // layer, workspace/briefing) via --append-system-prompt. The pi-extension
   // session_start fold cannot do this — @earendil-works/pi-coding-agent's ctx
   // exposes no appendSystemPrompt method, so that path silently no-ops. The CLI

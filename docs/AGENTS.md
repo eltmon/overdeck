@@ -1,6 +1,6 @@
 # Agent Directory Structure
 
-Panopticon stores per-agent and per-role-run state under `~/.panopticon/agents/`. Each active run gets its own directory named after the run ID.
+Overdeck stores per-agent and per-role-run state under `~/.panopticon/agents/`. Each active run gets its own directory named after the run ID.
 
 ## Valid Directory Naming Patterns
 

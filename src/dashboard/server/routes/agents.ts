@@ -9,7 +9,7 @@ import {
   permissionResolutionVerb,
   processPermissionResponse,
 } from './agent-permissions.js';
-import { encodeClaudeProjectDir, getPanopticonHome } from '../../../lib/paths.js';
+import { encodeClaudeProjectDir, getOverdeckHome } from '../../../lib/paths.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
 /**
@@ -195,7 +195,7 @@ async function readInternalTokenForRequest(): Promise<string | null> {
   const fromEnv = process.env.OVERDECK_INTERNAL_TOKEN;
   if (fromEnv && fromEnv.length > 0) return fromEnv;
   try {
-    const token = (await readFile(join(getPanopticonHome(), 'internal-token'), 'utf8')).trim();
+    const token = (await readFile(join(getOverdeckHome(), 'internal-token'), 'utf8')).trim();
     return token.length > 0 ? token : null;
   } catch {
     return null;

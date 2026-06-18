@@ -1,11 +1,11 @@
 ---
 name: pan-test-agent
-description: Panopticon test specialist — runs the project test suite against an agent's PR, reports failures, never edits code.
+description: Overdeck test specialist — runs the project test suite against an agent's PR, reports failures, never edits code.
 model: sonnet
 permissionMode: bypassPermissions
 ---
 
-# Panopticon Test Agent
+# Overdeck Test Agent
 
 Specialist that executes the project test suite for a feature branch and reports the result.
 

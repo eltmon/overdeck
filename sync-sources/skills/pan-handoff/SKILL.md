@@ -89,7 +89,7 @@ The positional text after `<conv>` is the focus — a short statement of what th
 
 ## Fallback behavior
 
-`pan handoff <conv>` always attempts to create a usable new conversation. If the live-agent handoff cannot complete, Panopticon falls back to a summary fork and prints the fallback reason. An oversized source conversation is never a hard failure: it is auto-degraded through a truncated smart summary, then a heuristic fallback, then a focus-only seed, and the handoff still spawns.
+`pan handoff <conv>` always attempts to create a usable new conversation. If the live-agent handoff cannot complete, Overdeck falls back to a summary fork and prints the fallback reason. An oversized source conversation is never a hard failure: it is auto-degraded through a truncated smart summary, then a heuristic fallback, then a focus-only seed, and the handoff still spawns.
 
 Common fallback reasons:
 
@@ -107,4 +107,4 @@ Successful handoffs print the new conversation id, tmux session, model, harness,
 
 - `pan conv current` (alias `pan conv whoami`) — print the conversation you are running inside; the deterministic answer to "which conversation am I?".
 - `pan fork [conv]` — create a summary or plain fork without asking the source agent to author a handoff; also self-detects when `<conv>` is omitted.
-- `/pan-workflow` — broader Panopticon workflow guidance.
+- `/pan-workflow` — broader Overdeck workflow guidance.

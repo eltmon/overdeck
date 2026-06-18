@@ -6,7 +6,7 @@
  * `features.ts` (which imports `config-yaml`).
  */
 
-/** Every background AI feature Panopticon can run automatically. */
+/** Every background AI feature Overdeck can run automatically. */
 export const BACKGROUND_AI_FEATURES = [
   'conversationTitles',
   'titleRefinement',

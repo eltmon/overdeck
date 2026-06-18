@@ -12,10 +12,10 @@ import { readFile, writeFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
 import type { IssueState } from './tracker/interface.js';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 function shadowStateDir(): string {
-  return join(getPanopticonHome(), 'shadow-state');
+  return join(getOverdeckHome(), 'shadow-state');
 }
 
 /**
@@ -45,7 +45,7 @@ export type CanonicalState = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 
 export interface ShadowState {
   /** Issue ID (e.g., "MIN-123") */
   issueId: string;
-  /** Panopticon's view of the issue status */
+  /** Overdeck's view of the issue status */
   shadowStatus: IssueState;
   /** Target canonical state for Kanban column placement */
   targetCanonicalState?: CanonicalState;

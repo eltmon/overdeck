@@ -51,7 +51,7 @@ export interface PanMigrationResult {
  * - Only migrates the specific runtime subdirs (events, prompts, legacy output).
  *   .pan/skills/ is not migrated here since it may not have existed before.
  */
-export function migratePanopticonToPanSync(projectPath: string): PanMigrationResult {
+export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResult {
   const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
 
   // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths.
@@ -107,8 +107,8 @@ export function migratePanopticonToPanSync(projectPath: string): PanMigrationRes
 }
 
 /**
- * Copy Panopticon global configuration into a workspace so that agents testing
- * Panopticon itself have the same projects, model assignments, and hooks.
+ * Copy Overdeck global configuration into a workspace so that agents testing
+ * Overdeck itself have the same projects, model assignments, and hooks.
  *
  * Copies:
  *   - ~/.panopticon/config.yaml      → <workspace>/.panopticon/config.yaml
@@ -118,7 +118,7 @@ export function migratePanopticonToPanSync(projectPath: string): PanMigrationRes
  *
  * Safe to call multiple times — merges rather than overwrites.
  */
-export function copyPanopticonSettingsToWorkspaceSync(workspacePath: string): { copied: string[]; errors: string[] } {
+export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { copied: string[]; errors: string[] } {
   const result = { copied: [] as string[], errors: [] as string[] };
   const panopticonDir = join(workspacePath, '.panopticon');
   const claudeDir = join(workspacePath, '.claude');
@@ -235,7 +235,7 @@ export function copyPanopticonSettingsToWorkspaceSync(workspacePath: string): { 
 }
 
 /**
- * Ensure runtime-only Panopticon and Claude Code sync paths are excluded from git tracking
+ * Ensure runtime-only Overdeck and Claude Code sync paths are excluded from git tracking
  * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
  * since project-specific skills should be committed.
  */
@@ -254,7 +254,7 @@ export function ensurePanGitignoreSync(projectPath: string): void {
     content += '\n';
   }
   if (!lines.some(l => l.includes('.pan/'))) {
-    content += '\n# Panopticon runtime artifacts (ephemeral, not tracked)\n';
+    content += '\n# Overdeck runtime artifacts (ephemeral, not tracked)\n';
   }
   content += missing.join('\n') + '\n';
 
@@ -698,10 +698,10 @@ function copyProjectTemplateDirs(
     result.steps.push('Cleared stale workspace-local .pan runtime state');
   }
 
-  // Ensure runtime-only Panopticon and Claude Code sync paths are in the project's .gitignore
+  // Ensure runtime-only Overdeck and Claude Code sync paths are in the project's .gitignore
   try {
     ensurePanGitignoreSync(projectConfig.path);
-    result.steps.push('Verified runtime-only Panopticon and Claude Code sync paths are in .gitignore');
+    result.steps.push('Verified runtime-only Overdeck and Claude Code sync paths are in .gitignore');
   } catch (gitignoreErr: any) {
     // Non-fatal — log but don't block workspace creation
     result.steps.push(`Warning: could not update .gitignore: ${gitignoreErr.message}`);
@@ -876,12 +876,12 @@ function copyProjectTemplateDirs(
     }
   }
 
-  // Install base Panopticon skills/agents/rules from cache
-  progress('Installing skills & templates', 'Panopticon skills, agents, rules');
+  // Install base Overdeck skills/agents/rules from cache
+  progress('Installing skills & templates', 'Overdeck skills, agents, rules');
   const mergeResult = mergeSkillsIntoWorkspaceSync(workspacePath);
   const mergeTotal = mergeResult.added.length + mergeResult.updated.length;
   if (mergeTotal > 0) {
-    result.steps.push(`Installed ${mergeTotal} Panopticon files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
+    result.steps.push(`Installed ${mergeTotal} Overdeck files (${mergeResult.added.length} new, ${mergeResult.updated.length} updated)`);
   }
 
   // Overlay project-local skills from .pan/skills/ (higher precedence than global cache)
@@ -890,7 +890,7 @@ function copyProjectTemplateDirs(
     result.steps.push(`Installed ${panMergeResult.added.length} project-local skill file(s) from .pan/skills/ (${panMergeResult.overlayed.join(', ')})`);
   }
 
-  // Process agent templates (project template overlay — wins over Panopticon base)
+  // Process agent templates (project template overlay — wins over Overdeck base)
   if (workspaceConfig.agent?.template_dir) {
     const templateDir = join(projectConfig.path, workspaceConfig.agent.template_dir);
 
@@ -1050,15 +1050,15 @@ function copyProjectTemplateDirs(
     result.steps.push(`Caveman setup skipped: ${cavemanErr instanceof Error ? cavemanErr.message : String(cavemanErr)}`);
   }
 
-  // Copy Panopticon global settings into workspace so agents testing Panopticon
+  // Copy Overdeck global settings into workspace so agents testing Overdeck
   // itself have the same projects, model assignments, and hooks.
   try {
-    const settingsResult = copyPanopticonSettingsToWorkspaceSync(workspacePath);
+    const settingsResult = copyOverdeckSettingsToWorkspaceSync(workspacePath);
     if (settingsResult.copied.length > 0) {
-      result.steps.push(`Copied Panopticon settings into workspace (${settingsResult.copied.length} file(s))`);
+      result.steps.push(`Copied Overdeck settings into workspace (${settingsResult.copied.length} file(s))`);
     }
   } catch (settingsErr: unknown) {
-    result.steps.push(`Panopticon settings copy skipped: ${settingsErr instanceof Error ? settingsErr.message : String(settingsErr)}`);
+    result.steps.push(`Overdeck settings copy skipped: ${settingsErr instanceof Error ? settingsErr.message : String(settingsErr)}`);
   }
 
   try {
@@ -1089,7 +1089,7 @@ function copyProjectTemplateDirs(
  *    under `--dangerously-skip-permissions`. The default selection on that
  *    prompt is "No, exit", so an undismissed dialog tears the session down
  *    the moment any code (dev-channels dismisser, readiness poll) sends Enter.
- *    Spawning under Panopticon implies the user already opted into bypass
+ *    Spawning under Overdeck implies the user already opted into bypass
  *    via `claude.permissionMode` / `--yolo`, so this is a pre-acknowledgement
  *    of a choice already made, not a silent escalation.
  *
@@ -1541,22 +1541,22 @@ const toWmProcessError = (op: string, cause: unknown): ProcessSpawnError =>
   });
 
 /** Migrate any pre-PAN-967 .panopticon/* subdirs to the .pan/ layout. */
-export const migratePanopticonToPan = (
+export const migrateOverdeckToPan = (
   projectPath: string,
 ): Effect.Effect<PanMigrationResult, FsError> =>
   Effect.try({
-    try: () => migratePanopticonToPanSync(projectPath),
-    catch: (cause) => toWmFsError('migratePanopticonToPan', projectPath, cause),
+    try: () => migrateOverdeckToPanSync(projectPath),
+    catch: (cause) => toWmFsError('migrateOverdeckToPan', projectPath, cause),
   });
 
 /** Mirror ~/.claude settings/agents into the workspace's .claude/ dir. */
-export const copyPanopticonSettingsToWorkspace = (
+export const copyOverdeckSettingsToWorkspace = (
   workspacePath: string,
 ): Effect.Effect<{ copied: string[]; errors: string[] }, FsError> =>
   Effect.try({
-    try: () => copyPanopticonSettingsToWorkspaceSync(workspacePath),
+    try: () => copyOverdeckSettingsToWorkspaceSync(workspacePath),
     catch: (cause) =>
-      toWmFsError('copyPanopticonSettingsToWorkspace', workspacePath, cause),
+      toWmFsError('copyOverdeckSettingsToWorkspace', workspacePath, cause),
   });
 
 /** Ensure the project gitignore covers `.pan/continue.json` (PAN-1124). */

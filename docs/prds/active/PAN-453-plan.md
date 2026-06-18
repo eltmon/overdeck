@@ -4,7 +4,7 @@
 
 ## Problem
 
-Panopticon uses ~40% of the vBRIEF v0.5 spec. Several fields are missing: `uid`, `author` (both vBRIEFInfo and plan levels), `sequence`, `references`, `created/updated/completed` timestamps, and `priority` on items. We want full spec compliance for the Deft team conversation and better audit trail.
+Overdeck uses ~40% of the vBRIEF v0.5 spec. Several fields are missing: `uid`, `author` (both vBRIEFInfo and plan levels), `sequence`, `references`, `created/updated/completed` timestamps, and `priority` on items. We want full spec compliance for the Deft team conversation and better audit trail.
 
 ## Decisions
 

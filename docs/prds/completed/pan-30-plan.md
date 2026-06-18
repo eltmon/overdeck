@@ -25,7 +25,7 @@ This provides maximum value for the dashboard at minimal overhead cost.
 When running `pan setup hooks`:
 - Read existing `~/.claude/settings.json`
 - Preserve any existing PostToolUse hooks
-- Append Panopticon heartbeat hook to the array
+- Append Overdeck heartbeat hook to the array
 - Never clobber user's custom hooks
 
 ### 3. Heartbeat Mode
@@ -62,7 +62,7 @@ Benefits:
 **Decision:** Yes
 
 `pan setup hooks` will:
-- Check if Panopticon heartbeat hook already exists in settings.json
+- Check if Overdeck heartbeat hook already exists in settings.json
 - Skip if already present (print "Already configured")
 - Update if version/path has changed
 
@@ -72,7 +72,7 @@ Benefits:
 On first `pan work issue`:
 - Detect hooks not configured
 - Automatically run setup
-- Print single line: "Configured Panopticon heartbeat hooks"
+- Print single line: "Configured Overdeck heartbeat hooks"
 - Continue with agent spawn
 
 ### 8. Dependency Handling
@@ -100,7 +100,7 @@ The heartbeat hook script will:
 **Setup Command:**
 - Implement `pan setup hooks` CLI command
 - Read/modify `~/.claude/settings.json`
-- Merge Panopticon hook with existing hooks
+- Merge Overdeck hook with existing hooks
 - Idempotent (safe to run multiple times)
 - Install `jq` dependency if missing
 

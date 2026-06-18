@@ -1,4 +1,4 @@
-# Fizzy Visual Pipeline — Kanban Mirror for Panopticon
+# Fizzy Visual Pipeline — Kanban Mirror for Overdeck
 
 **Status:** Draft
 **Created:** 2026-04-30
@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-Panopticon's specialist pipeline (work agent → review → test → merge → close-out) produces rich output — review findings, test results, agent progress — but it's all buried in tmux sessions, workspace files (`.planning/feedback/`), and SQLite state. There's no visual surface where you can see an issue move through the pipeline, read reviewer comments, or interact with a running agent without opening a terminal.
+Overdeck's specialist pipeline (work agent → review → test → merge → close-out) produces rich output — review findings, test results, agent progress — but it's all buried in tmux sessions, workspace files (`.planning/feedback/`), and SQLite state. There's no visual surface where you can see an issue move through the pipeline, read reviewer comments, or interact with a running agent without opening a terminal.
 
 GitHub Issues tracks state (open/closed + labels) but has no native column-based workflow view, and the specialist pipeline's comments go to workspace files rather than the issue thread.
 
@@ -24,13 +24,13 @@ Add Fizzy (37signals' open-source Kanban board) as a **visual mirror layer** on 
 
 - Replacing GitHub Issues as the canonical tracker
 - Building a full bidirectional sync (Fizzy card creation doesn't create GitHub issues)
-- Multi-tenant / managed instance (this is for Panopticon's own development use)
+- Multi-tenant / managed instance (this is for Overdeck's own development use)
 
 ---
 
 ## Column Mapping
 
-Fizzy columns map to Panopticon's pipeline stages, extending the existing canonical states:
+Fizzy columns map to Overdeck's pipeline stages, extending the existing canonical states:
 
 | Fizzy Column | Canonical State | Trigger |
 |---|---|---|
@@ -43,7 +43,7 @@ Fizzy columns map to Panopticon's pipeline stages, extending the existing canoni
 
 "Awaiting Merge" and "Closed Out" are Fizzy-specific columns that provide finer granularity than the canonical state model. Internally they map to existing states with additional metadata (review passed, cleanup completed).
 
-Column colors follow the existing Panopticon dashboard palette:
+Column colors follow the existing Overdeck dashboard palette:
 - Triage: `#6b7280` (gray)
 - Working: `#eab308` (yellow)
 - In Review: `#ec4899` (pink)
@@ -57,12 +57,12 @@ Column colors follow the existing Panopticon dashboard palette:
 
 ### Fizzy as a Secondary Tracker
 
-Fizzy is NOT a replacement for the primary tracker (GitHub). It's a **secondary output channel** — a read-heavy mirror that receives state from Panopticon.
+Fizzy is NOT a replacement for the primary tracker (GitHub). It's a **secondary output channel** — a read-heavy mirror that receives state from Overdeck.
 
 ```
 GitHub Issues (source of truth)
        ↓ (existing tracker adapter)
-  Panopticon Core
+  Overdeck Core
        ↓ (new: FizzySyncService)
   Fizzy Board (visual mirror)
        ↑ (new: webhook receiver)
@@ -105,7 +105,7 @@ CREATE TABLE fizzy_card_mapping (
 
 #### 3. FizzySyncService (`src/lib/fizzy/sync-service.ts`)
 
-Listens to Panopticon's existing `PipelineEvent` notifications and mirrors state to Fizzy:
+Listens to Overdeck's existing `PipelineEvent` notifications and mirrors state to Fizzy:
 
 **State transitions → column moves:**
 - `pan start` (issue picked up) → create card in "Working" column, or move existing card
@@ -131,7 +131,7 @@ Receives Fizzy webhook events, specifically `comment_created`:
 1. Verify HMAC-SHA256 signature (`X-Webhook-Signature` header)
 2. Parse the comment payload — extract card ID, author, body
 3. Look up `fizzy_card_mapping` to find the associated issue ID
-4. **Loop prevention**: skip comments authored by the Panopticon bot user
+4. **Loop prevention**: skip comments authored by the Overdeck bot user
 5. Identify the running agent for that issue (via `parseSpecialistAgentSession()`)
 6. Deliver the comment body to the agent via `sendKeysAsync()` — equivalent to `pan tell`
 7. Post a confirmation reaction on the Fizzy comment (acknowledgment)
@@ -176,7 +176,7 @@ fizzy:
 
 ## Comment Threading
 
-### Outbound (Panopticon → Fizzy)
+### Outbound (Overdeck → Fizzy)
 
 Comments are posted by the bot user and formatted with markdown:
 
@@ -208,12 +208,12 @@ Branch: `feature/PAN-123`
 - Tests: PASS (147/147, 12.3s)
 ```
 
-### Inbound (Fizzy → Panopticon)
+### Inbound (Fizzy → Overdeck)
 
 When the user writes a comment on a card:
 
 1. Webhook fires `comment_created`
-2. Panopticon identifies the running agent
+2. Overdeck identifies the running agent
 3. Comment body is delivered via `pan tell` semantics
 4. Agent processes the feedback and posts a reply as a new Fizzy comment
 
@@ -264,8 +264,8 @@ The `TrackerType` union and `state-mapping.ts` do NOT need modification. Fizzy c
 
 ## Dependencies
 
-- Fizzy personal access token (free tier: 1,000 cards, sufficient for Panopticon development)
-- Webhook endpoint reachable from Fizzy (requires Panopticon dashboard to be publicly accessible, or use a tunnel for local dev)
+- Fizzy personal access token (free tier: 1,000 cards, sufficient for Overdeck development)
+- Webhook endpoint reachable from Fizzy (requires Overdeck dashboard to be publicly accessible, or use a tunnel for local dev)
 - Fizzy SDK (`@37signals/fizzy` npm package) OR direct HTTP calls — evaluate SDK maturity vs. thin client
 
 ---

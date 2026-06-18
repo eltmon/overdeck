@@ -375,7 +375,7 @@ Read-side status/identity resolvers are already single (`rollup.ts:readCurrentSt
 
 7. **`bd remember` is NOT part of `src/lib/memory/*`.** The task pairs them, but
    `bd remember` is a **beads** command (the git-backed issue tracker's own
-   persistent-knowledge store), entirely separate from the Panopticon Memory
+   persistent-knowledge store), entirely separate from the Overdeck Memory
    subsystem audited here. They share the word "memory" and nothing else — no
    shared store, table, or code path. The `pan memory` verb
    (`src/cli/commands/memory.ts`: `search`/`status`/`reset`/`summary`/`doctor`/`config`)

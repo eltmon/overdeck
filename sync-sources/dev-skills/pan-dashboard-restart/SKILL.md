@@ -1,6 +1,6 @@
 ---
 name: pan-dashboard-restart
-description: Safely restart the Panopticon dashboard server (production Node 22 dist) using a detached process. Use when pan up / pan restart hang, the dashboard churns/reconnects in a loop, two dashboards are dueling, or the server is running from a workspace path / wrong port.
+description: Safely restart the Overdeck dashboard server (production Node 22 dist) using a detached process. Use when pan up / pan restart hang, the dashboard churns/reconnects in a loop, two dashboards are dueling, or the server is running from a workspace path / wrong port.
 triggers:
   - restart dashboard
   - dashboard restart
@@ -16,7 +16,7 @@ allowed-tools:
   - Read
 ---
 
-# Panopticon Dashboard Restart (production-safe, detached)
+# Overdeck Dashboard Restart (production-safe, detached)
 
 The dashboard the browser talks to is the **pre-built `dist/dashboard/server.js` running under Node 22**, started from the **primary repo checkout** (NOT a `workspaces/feature-*` copy). It serves both the built frontend and the API on one port. **Never** run the production server via `npm run dev`, `tsx`, `vite`, or Bun — that violates the dashboard-node22-only rule (node-pty native addon + circular ESM). `pan dev` is the *development* path (vite HMR for the frontend + Node server); `pan up` is the *production* path.
 

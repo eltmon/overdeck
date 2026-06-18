@@ -1,6 +1,6 @@
 ---
 name: pan-stop-all-agents
-description: "Drain Panopticon: kill every running work agent and its review/test specialists, optionally stop the dashboard, and preserve conversation tmux sessions and shared sidecars."
+description: "Drain Overdeck: kill every running work agent and its review/test specialists, optionally stop the dashboard, and preserve conversation tmux sessions and shared sidecars."
 triggers:
   - stop all agents
   - kill all agents
@@ -13,7 +13,7 @@ allowed-tools:
   - Read
 ---
 
-# Drain Panopticon (Stop All Agents)
+# Drain Overdeck (Stop All Agents)
 
 ## Overview
 

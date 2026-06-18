@@ -51,3 +51,11 @@ _apply 'PANOPTICON_' 's/PANOPTICON_/OVERDECK_/g'
 # ===========================================================================
 echo "Family 2: @panctl -> @overdeck"
 _apply '@panctl' 's/\@panctl/\@overdeck/g'
+
+# ===========================================================================
+# Family 3 — brand word:  Panopticon  ->  Overdeck   (CASE-SENSITIVE)
+# Covers prose, comments, UI/log strings AND code symbols (PanopticonX -> OverdeckX).
+# Case-sensitive, so it never touches lowercase panopticon / panopticon.db / PANOPTICON_.
+# ===========================================================================
+echo "Family 3: Panopticon -> Overdeck"
+_apply 'Panopticon' 's/Panopticon/Overdeck/g'

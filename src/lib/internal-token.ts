@@ -13,7 +13,7 @@
  * The dashboard server calls `ensureInternalToken()` once at startup, which
  * generates a random token and persists it with mode 0600 if neither source is
  * present. CLI processes (running as the same user) read it via
- * `getInternalToken()` and attach it as the `X-Panopticon-Internal-Token`
+ * `getInternalToken()` and attach it as the `X-Overdeck-Internal-Token`
  * header. If the CLI cannot resolve a token (e.g. dashboard never started),
  * `notifyPipeline()` skips the cross-process forward — the SQLite write is
  * already durable, so no domain event is ever lost.
@@ -23,7 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 import { FsError } from './errors.js';
 
 export const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token';
@@ -32,7 +32,7 @@ const TOKEN_FILE_NAME = 'internal-token';
 let cachedToken: string | null | undefined;
 
 function tokenFilePath(): string {
-  return join(getPanopticonHome(), TOKEN_FILE_NAME);
+  return join(getOverdeckHome(), TOKEN_FILE_NAME);
 }
 
 /**
@@ -78,7 +78,7 @@ export function ensureInternalTokenSync(): string {
   const existing = getInternalTokenSync();
   if (existing) return existing;
 
-  const home = getPanopticonHome();
+  const home = getOverdeckHome();
   if (!existsSync(home)) {
     mkdirSync(home, { recursive: true, mode: 0o700 });
   }

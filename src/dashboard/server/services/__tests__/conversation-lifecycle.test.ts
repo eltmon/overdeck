@@ -363,7 +363,7 @@ describe('ConversationLifecycleService — detectOrphanedClaudeCodeSessions (PAN
     expect(mockSetClearedToConvId).not.toHaveBeenCalled();
   });
 
-  it('skips orphans with no Panopticon parent in the same cwd', async () => {
+  it('skips orphans with no Overdeck parent in the same cwd', async () => {
     const orphan = 'dddddddd-4444-4444-4444-dddddddddddd';
     writeJsonl(
       `${orphan}.jsonl`,

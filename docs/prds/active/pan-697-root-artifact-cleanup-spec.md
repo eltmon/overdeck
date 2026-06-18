@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The Panopticon repository root currently mixes canonical entrypoint files with screenshots, audit notes, exploratory writeups, implementation summaries, and other one-off artifacts. Even when those files are committed and historically useful, their presence at the top level makes the repo look improvised instead of intentional.
+The Overdeck repository root currently mixes canonical entrypoint files with screenshots, audit notes, exploratory writeups, implementation summaries, and other one-off artifacts. Even when those files are committed and historically useful, their presence at the top level makes the repo look improvised instead of intentional.
 
 For a seasoned developer opening the repository, the root should immediately answer:
 - what this project is,
@@ -19,7 +19,7 @@ This cleanup is about professional presentation and navigability, not deleting h
 
 ### Must Have
 
-- Create and follow an explicit root-directory policy for Panopticon.
+- Create and follow an explicit root-directory policy for Overdeck.
 - Keep true root-level entrypoint files at root.
 - Move root-level stray markdown and image artifacts into intentional subdirectories.
 - Update all internal references that break because of file moves.

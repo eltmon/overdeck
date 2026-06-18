@@ -1,6 +1,6 @@
 ## Summary
 
-Add QuantumLlama as a supported AI provider in Panopticon. QuantumLlama is a model provider with three model tiers (Reason 70B, Swift 8B, Nano 1B) that must integrate with Panopticon's provider registry, cost tracking, model routing, and dashboard/CLI display.
+Add QuantumLlama as a supported AI provider in Overdeck. QuantumLlama is a model provider with three model tiers (Reason 70B, Swift 8B, Nano 1B) that must integrate with Overdeck's provider registry, cost tracking, model routing, and dashboard/CLI display.
 
 **The complete provider specification is at `benchmarks/specs/quantumllama.md`** — read this file first. It is the authoritative source of truth for all API details, pricing, model capabilities, and integration requirements.
 

@@ -1,4 +1,4 @@
-# Panopticon Evals — Research & Framework Proposal
+# Overdeck Evals — Research & Framework Proposal
 
 **Status:** Research / proposal
 **Date:** 2026-05-15
@@ -20,12 +20,12 @@ You curate a fixed dataset, run candidate prompts/models against it, score each 
 - **Promptfoo** (MIT). YAML-config CLI, strong on red-teaming and prompt A/B.
 - **RAGAS** (MIT). RAG-specific. Not relevant for our two targets.
 
-**TypeScript ecosystem** (matters — Panopticon is TS):
+**TypeScript ecosystem** (matters — Overdeck is TS):
 - **`autoevals`** (Braintrust, MIT). TS-native *scorer library* — G-Eval, faithfulness, answer-relevancy, factuality, summary-quality, JSON-validity, Levenshtein, embedding-similarity. Just an npm import, no SaaS dependency. Solves the "we have to write our own judges" problem.
 - **`evalite`** (MIT). Vitest-native eval runner with a local web UI. Thin layer on top — datasets, scorers, watch-mode.
 - **Langfuse SDK** (MIT core, self-hostable). TS-first observability + eval. Could host the Layer-2 production monitor.
 
-For Panopticon we want a *library*, not a SaaS. The realistic finalists are: **(Python) Inspect AI** via sidecar, or **(TS-native) evalite + autoevals** in-tree.
+For Overdeck we want a *library*, not a SaaS. The realistic finalists are: **(Python) Inspect AI** via sidecar, or **(TS-native) evalite + autoevals** in-tree.
 
 ### Layer 2 — Online evals on live traces (the "production monitor" layer)
 
@@ -46,7 +46,7 @@ The OTel GenAI SIG finalized semantic conventions in early 2026: `gen_ai.*` attr
 
 ---
 
-## 2. What to evaluate in Panopticon
+## 2. What to evaluate in Overdeck
 
 ### 2.1 Compaction (`src/lib/conversations/smart-compaction.ts`)
 
@@ -102,7 +102,7 @@ The user-prompt-submit hook expands the prompt into 3–5 search terms and retri
 - **Recall@k.** Build (query → relevant-memory) pairs from real sessions. Did expansion retrieve them?
 - **Re-ranking lift.** Compare raw BM25 vs the re-ranked output. The 0.02 decay and +0.3 tag boost magic numbers should be *tuned by eval*, not guessed.
 
-### 2.3 Other Panopticon surfaces (out of scope now, in scope soon)
+### 2.3 Other Overdeck surfaces (out of scope now, in scope soon)
 
 Worth flagging so the framework is built to handle them:
 - Planning-agent vBRIEF generation
@@ -115,19 +115,19 @@ A single framework should serve all of them.
 
 ---
 
-## 3. Recommended framework for Panopticon
+## 3. Recommended framework for Overdeck
 
 ### 3.1 Choice of base library: **`evalite` + `autoevals`** (both MIT, TS-native), in-tree under `evals/`.
 
 Reasoning:
 
-- **Same language as Panopticon.** No Python sidecar, no IPC, no second toolchain. Authoring an eval is just writing a `.eval.ts` file next to the code it tests.
+- **Same language as Overdeck.** No Python sidecar, no IPC, no second toolchain. Authoring an eval is just writing a `.eval.ts` file next to the code it tests.
 - **`autoevals` gives us judges for free.** G-Eval, faithfulness, answer-relevancy, factuality, summary-quality, JSON-validity, Levenshtein, embedding-similarity — all importable, all swappable for our own implementations later. We are *not* writing a judge library from scratch.
 - **`evalite` gives us the runner + a local viewer.** Vitest-native (we already run vitest), with watch-mode and a built-in UI for inspecting runs. Maps cleanly to `pan evals run`.
-- **Composable with Panopticon's existing infra** — eval runs are just node processes; we can spawn them in workspaces, attach them to the agent runner, gate CI on them.
+- **Composable with Overdeck's existing infra** — eval runs are just node processes; we can spawn them in workspaces, attach them to the agent runner, gate CI on them.
 - **No SaaS lock-in.** Both are libraries you import; neither phones home.
 
-We considered Inspect AI (MIT, UK AISI). It is the strongest *Python* eval framework and we will continue to lift ideas from it — particularly its Task/Solver/Scorer data model, sample-level log schema, and the meta-eval pattern. But adopting Inspect would mean either (a) a Python sidecar, adding a toolchain to a TS repo, or (b) porting its abstractions into TS and calling the result "Inspect-style", which is just building a new framework with borrowed vocabulary. Neither is worth the cost when `evalite` + `autoevals` already cover the runner + judge surfaces natively. The capability/safety benchmarks Inspect ships are not in scope for Panopticon's eval surfaces.
+We considered Inspect AI (MIT, UK AISI). It is the strongest *Python* eval framework and we will continue to lift ideas from it — particularly its Task/Solver/Scorer data model, sample-level log schema, and the meta-eval pattern. But adopting Inspect would mean either (a) a Python sidecar, adding a toolchain to a TS repo, or (b) porting its abstractions into TS and calling the result "Inspect-style", which is just building a new framework with borrowed vocabulary. Neither is worth the cost when `evalite` + `autoevals` already cover the runner + judge surfaces natively. The capability/safety benchmarks Inspect ships are not in scope for Overdeck's eval surfaces.
 
 DeepEval was rejected for the same Python-toolchain reason. Braintrust / Langfuse / Arize are production-monitoring vendors, not eval frameworks; we may emit OTel GenAI traces *toward* a self-hosted Langfuse later for Layer-2, but that's a wire-protocol choice downstream of this one.
 
@@ -179,7 +179,7 @@ Tied to the existing `pan` taxonomy; lives under the `pan admin` or top-level `p
 
 ### 3.4 Dataset capture — dogfood
 
-Panopticon already records every agent transcript. Build a one-shot:
+Overdeck already records every agent transcript. Build a one-shot:
 
 ```
 pan evals datasets capture --from <conversationId> --as compaction/<name>

@@ -13,15 +13,15 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# Panopticon Quick Start
+# Overdeck Quick Start
 
 ## Overview
 
-This skill provides a streamlined onboarding experience for new Panopticon users, combining installation, configuration, and creating your first workspace in a single guided workflow.
+This skill provides a streamlined onboarding experience for new Overdeck users, combining installation, configuration, and creating your first workspace in a single guided workflow.
 
 ## When to Use
 
-- First-time Panopticon users
+- First-time Overdeck users
 - User wants fastest path to productive use
 - User asks "how do I get started?"
 - User wants to go from zero to running agent quickly
@@ -42,9 +42,9 @@ Before starting, verify you have:
 pan doctor
 ```
 
-If `pan` command not found, Panopticon isn't installed yet.
+If `pan` command not found, Overdeck isn't installed yet.
 
-#### Install Panopticon
+#### Install Overdeck
 ```bash
 # Clone the repository
 git clone https://github.com/eltmon/panopticon-cli.git
@@ -231,11 +231,11 @@ Here's the entire workflow in one script:
 
 ```bash
 #!/bin/bash
-# Panopticon Quick Start
+# Overdeck Quick Start
 
-echo "=== Panopticon Quick Start ==="
+echo "=== Overdeck Quick Start ==="
 
-# 1. Install Panopticon (skip if already done)
+# 1. Install Overdeck (skip if already done)
 if ! command -v pan &> /dev/null; then
     git clone https://github.com/eltmon/panopticon-cli.git
     cd panopticon-cli
@@ -357,7 +357,7 @@ cat ~/.panopticon/logs/agent-*.log
 ## What You've Accomplished
 
 After completing this quick start, you have:
-- ✅ Panopticon installed and configured
+- ✅ Overdeck installed and configured
 - ✅ Issue tracker connected
 - ✅ Dashboard running at http://localhost:3001
 - ✅ First workspace created
@@ -437,4 +437,4 @@ If you encounter issues:
 - [ ] Can send messages to agent with `pan tell`
 - [ ] Understand how to approve work with `pan approve`
 
-**Congratulations!** You're now ready to use Panopticon for multi-agent development workflows.
+**Congratulations!** You're now ready to use Overdeck for multi-agent development workflows.

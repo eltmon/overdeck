@@ -103,7 +103,7 @@ export async function readPackageVersion(): Promise<string> {
 // Lazy-initialized to avoid top-level await (which would make misc.ts an async ESM module,
 // risking ERR_REQUIRE_ASYNC_MODULE for any module that require()-chains through here).
 let _panopticonVersion: string | null = null;
-async function getPanopticonVersion(): Promise<string> {
+async function getOverdeckVersion(): Promise<string> {
   if (_panopticonVersion === null) {
     _panopticonVersion = await readPackageVersion();
   }
@@ -807,7 +807,7 @@ const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
   Effect.promise(async () => {
-    const version = await getPanopticonVersion();
+    const version = await getOverdeckVersion();
     // Expose supervisor URL so the frontend can cache it while the dashboard
     // is healthy, then use it as a fallback when the dashboard is dead.
     let supervisorUrl: string | null = null;

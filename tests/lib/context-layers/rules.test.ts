@@ -51,8 +51,8 @@ describe('renderBundledRules', () => {
     expect(out).toContain('Single Deacon invariant');
   });
 
-  it('produces a single Panopticon Engineering Rules section', () => {
+  it('produces a single Overdeck Engineering Rules section', () => {
     const out = renderBundledRules('claude-code', true);
-    expect(out.match(/## Panopticon Engineering Rules/g)).toHaveLength(1);
+    expect(out.match(/## Overdeck Engineering Rules/g)).toHaveLength(1);
   });
 });

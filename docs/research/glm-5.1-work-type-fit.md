@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Z.ai's GLM-5.1 against Panopticon's 23 work types to identify where it would add value as a routing option.
+Evaluates Z.ai's GLM-5.1 against Overdeck's 23 work types to identify where it would add value as a routing option.
 
 ## Model Profile
 
@@ -156,7 +156,7 @@ Per-bead inspection needs to be fast (3-8 min per bead). Runs frequently during 
 ## Integration Notes
 
 - GLM-5.1 is available via Z.AI API and OpenRouter
-- Provider ID in Panopticon: `zai` (already exists in provider config)
+- Provider ID in Overdeck: `zai` (already exists in provider config)
 - Model ID: `glm-5.1`
 - Would need capability scores added to `model-capabilities.ts`
 - Suggested scores: code-generation 92, code-review 88, debugging 85, planning 78, documentation 72, testing 88, security 80, performance 82, synthesis 80, speed 35, context-length 80

@@ -33,7 +33,7 @@ vi.mock('os', async () => {
   };
 });
 
-describe('copyPanopticonSettingsToWorkspace', () => {
+describe('copyOverdeckSettingsToWorkspace', () => {
   let tempDir: string;
   let homeDir: string;
   let workspaceDir: string;
@@ -59,7 +59,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should remove hooks whose absolute path does not exist', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -70,7 +70,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.copied).toContain(join(workspaceDir, '.claude', 'settings.json'));
     expect(result.errors.some((e) => e.includes('Removed broken hook'))).toBe(true);
@@ -80,7 +80,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should preserve hooks whose absolute path exists', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const hookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -95,7 +95,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -105,7 +105,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should not validate relative hook paths', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -116,7 +116,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -126,7 +126,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should not validate shell commands with pipes', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -137,7 +137,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(0);
 
@@ -147,7 +147,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should handle mixed valid and invalid hooks', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const validHookPath = join(homeDir, '.claude', 'hooks', 'valid-hook.py');
     mkdirSync(join(homeDir, '.claude', 'hooks'), { recursive: true });
@@ -164,7 +164,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');
@@ -176,7 +176,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should remove empty hook categories after filtering', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -186,7 +186,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(2);
 
@@ -195,7 +195,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
   });
 
   it('should detect broken script path inside wrapper command', async () => {
-    const { copyPanopticonSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
+    const { copyOverdeckSettingsToWorkspaceSync } = await import('../../src/lib/workspace-manager.js');
 
     const globalSettings = {
       hooks: {
@@ -206,7 +206,7 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     };
     writeFileSync(join(homeDir, '.claude', 'settings.json'), JSON.stringify(globalSettings), 'utf8');
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspaceDir);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspaceDir);
 
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]).toContain('Removed broken hook');

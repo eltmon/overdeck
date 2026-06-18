@@ -25,7 +25,7 @@ import { existsSync } from 'node:fs';
 import { appendFile, chmod, mkdir, unlink } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 
 const DEFAULT_COLS = 80;
@@ -48,11 +48,11 @@ export interface PtySupervisorPayload {
 }
 
 export function getPtySupervisorSocketPath(agentId: string): string {
-  return join(getPanopticonHome(), 'sockets', `pty-${agentId}.sock`);
+  return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
 export function getPtySupervisorLogPath(agentId: string): string {
-  return join(getPanopticonHome(), 'logs', `pty-supervisor-${agentId}.log`);
+  return join(getOverdeckHome(), 'logs', `pty-supervisor-${agentId}.log`);
 }
 
 function resolveAgentIdOrExit(): string {
@@ -127,7 +127,7 @@ function payloadCaller(payload: PtySupervisorPayload): string | undefined {
 async function appendSocketWriteLog(agentId: string, payload: PtySupervisorPayload): Promise<void> {
   try {
     const logPath = getPtySupervisorLogPath(agentId);
-    await mkdir(join(getPanopticonHome(), 'logs'), { recursive: true, mode: 0o700 });
+    await mkdir(join(getOverdeckHome(), 'logs'), { recursive: true, mode: 0o700 });
     const caller = payloadCaller(payload);
     await appendFile(
       logPath,
@@ -157,7 +157,7 @@ async function appendEchoFailureLog(
 ): Promise<void> {
   try {
     const logPath = getPtySupervisorLogPath(agentId);
-    await mkdir(join(getPanopticonHome(), 'logs'), { recursive: true, mode: 0o700 });
+    await mkdir(join(getOverdeckHome(), 'logs'), { recursive: true, mode: 0o700 });
     const caller = payloadCaller(payload);
     await appendFile(
       logPath,
@@ -367,7 +367,7 @@ function waitForServerClose(server: Server): Promise<void> {
 }
 
 async function bindSocket(server: Server, socketPath: string): Promise<void> {
-  await mkdir(join(getPanopticonHome(), 'sockets'), { recursive: true, mode: 0o700 });
+  await mkdir(join(getOverdeckHome(), 'sockets'), { recursive: true, mode: 0o700 });
   await unlinkIfExists(socketPath);
   await new Promise<void>((resolve, reject) => {
     const onError = (error: Error) => {

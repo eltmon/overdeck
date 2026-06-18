@@ -7,11 +7,11 @@
  * (inside Docker); these stubs prevent TS2307 errors in non-Docker envs.
  */
 
-// ─── Panopticon Desktop Bridge ────────────────────────────────────────────────
+// ─── Overdeck Desktop Bridge ────────────────────────────────────────────────
 // Injected by apps/desktop/src/preload.ts via contextBridge.exposeInMainWorld.
 // Only present when running inside the Electron desktop app.
 
-interface PanopticonBridgeDesktopSettings {
+interface OverdeckBridgeDesktopSettings {
   tray: { showBadge: boolean; tooltipDetail: 'minimal' | 'full' };
   notifications: {
     inputNeeded: boolean;
@@ -24,7 +24,7 @@ interface PanopticonBridgeDesktopSettings {
   autoStart: { enabled: boolean; nagCount: number; nagDismissed: boolean };
 }
 
-interface PanopticonBridge {
+interface OverdeckBridge {
   isDesktopApp(): boolean;
   getServerUrl(): string | null;
   getWsUrl(): string | null;
@@ -33,10 +33,10 @@ interface PanopticonBridge {
   openTerminalWindow(sessionName: string, title: string): void;
   setAlwaysOnTop(value: boolean): void;
   onMenuAction(listener: (action: string) => void): () => void;
-  getDesktopSettings(): Promise<PanopticonBridgeDesktopSettings>;
+  getDesktopSettings(): Promise<OverdeckBridgeDesktopSettings>;
   updateDesktopSetting(key: string, value: unknown): Promise<void>;
   notify(
-    eventType: keyof PanopticonBridgeDesktopSettings['notifications'],
+    eventType: keyof OverdeckBridgeDesktopSettings['notifications'],
     title: string,
     body: string,
   ): Promise<void>;
@@ -44,7 +44,7 @@ interface PanopticonBridge {
 }
 
 interface Window {
-  panopticonBridge?: PanopticonBridge;
+  panopticonBridge?: OverdeckBridge;
 }
 
 declare module 'framer-motion' {

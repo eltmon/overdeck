@@ -42,7 +42,7 @@ describe('stashes', () => {
 
   // PAN-1531: CanonicalStashKind narrowed to 'salvageable' only.
   // pre-spawn, pre-merge, review-temp are LegacyStashKind — recognized by
-  // the parser for cleanup but never created by Panopticon code.
+  // the parser for cleanup but never created by Overdeck code.
   it('builds canonical (salvageable-only) stash messages', () => {
     const when = new Date('2026-04-27T14:15:16.123Z');
     expect(buildStashMessage('salvageable', 'pan-879', when, 'UI Draft + notes')).toBe('salvageable:PAN-879:2026-04-27T14:15:16Z:ui-draft-notes');

@@ -64,7 +64,7 @@ describe('auto-approve-hook', () => {
     }
     expect(parsed.hookSpecificOutput?.hookEventName).toBe('PreToolUse')
     expect(parsed.hookSpecificOutput?.permissionDecision).toBe('allow')
-    expect(parsed.hookSpecificOutput?.permissionDecisionReason).toContain('Panopticon autonomous pipeline agent auto-approve')
+    expect(parsed.hookSpecificOutput?.permissionDecisionReason).toContain('Overdeck autonomous pipeline agent auto-approve')
   })
 
   it.each([

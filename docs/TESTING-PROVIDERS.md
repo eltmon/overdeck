@@ -1,6 +1,6 @@
 # Provider Testing Guide
 
-Guide for testing Panopticon's provider routing with both the Claude Code and Pi harnesses.
+Guide for testing Overdeck's provider routing with both the Claude Code and Pi harnesses.
 
 ## Provider Compatibility Overview
 
@@ -34,7 +34,7 @@ Guide for testing Panopticon's provider routing with both the Claude Code and Pi
 
 - Pi installed (`npm install -g @mariozechner/pi-coding-agent`)
 - `pan doctor` reports Pi OK
-- Panopticon bridges API keys into Pi automatically; no separate Pi auth needed for API-key providers
+- Overdeck bridges API keys into Pi automatically; no separate Pi auth needed for API-key providers
 
 ## Testing Direct Providers
 
@@ -78,7 +78,7 @@ tmux -L panopticon show-environment -t agent-pan-999 | grep KIMI_API_KEY
 export ZAI_API_KEY="YOUR_ZAI_API_KEY"
 ```
 
-**Test via Panopticon agent:**
+**Test via Overdeck agent:**
 ```bash
 pan start PAN-998 --model glm-4.7
 # Verify: ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic
@@ -96,7 +96,7 @@ pan admin specialists codex login
 # or: Dashboard → Settings → Codex Login
 ```
 
-**Test via Panopticon agent:**
+**Test via Overdeck agent:**
 ```bash
 pan start PAN-997 --model gpt-5.4
 
@@ -111,7 +111,7 @@ pan start PAN-997 --model gpt-5.4
 export GOOGLE_API_KEY="AIza..."
 ```
 
-**Test via Panopticon agent:**
+**Test via Overdeck agent:**
 ```bash
 pan start PAN-996 --model gemini-3.1-pro-preview
 
@@ -122,11 +122,11 @@ pan start PAN-996 --model gemini-3.1-pro-preview
 
 ### Pi with API-key providers
 
-For all API-key providers, Panopticon automatically injects the native env var
+For all API-key providers, Overdeck automatically injects the native env var
 into Pi's environment at launch. You do **not** need to run `/login` inside Pi
 or edit `~/.pi/agent/auth.json` manually.
 
-| Provider | Panopticon Config | Pi Env Var Injected |
+| Provider | Overdeck Config | Pi Env Var Injected |
 |----------|-------------------|---------------------|
 | Kimi | `api_keys.kimi` or `KIMI_API_KEY` | `KIMI_API_KEY` |
 | MiniMax | `api_keys.minimax` or `MINIMAX_API_KEY` | `MINIMAX_API_KEY` |
@@ -238,9 +238,9 @@ pan down && pan up
 ### Pi Harness Issues
 
 **Problem:** Pi spawns but provider auth fails
-- Verify the provider API key is configured in Panopticon Settings
+- Verify the provider API key is configured in Overdeck Settings
 - Pi auth is bridged automatically; manual `/login` in Pi is only needed for subscription providers
-- Check `~/.pi/agent/auth.json` only if you intentionally want Pi-managed auth separate from Panopticon
+- Check `~/.pi/agent/auth.json` only if you intentionally want Pi-managed auth separate from Overdeck
 
 ## Test Checklist
 

@@ -90,7 +90,7 @@ export interface ReadModelState {
   resolvedChannelPermissionDecisionsById: Record<string, ResolvedChannelPermissionDecision>
   resolvedChannelPermissionDecisionIdsByAgentId: Record<string, string[]>
   dashboardLifecycle: DashboardLifecycleState
-  /** Conversation names currently undergoing Panopticon-native compaction. */
+  /** Conversation names currently undergoing Overdeck-native compaction. */
   conversationsCompactingByName: Record<string, boolean>
   /** Conversation names currently waiting for user permission (PermissionRequest hook). */
   conversationsAwaitingPermissionByName: Record<string, boolean>

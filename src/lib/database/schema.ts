@@ -1,5 +1,5 @@
 /**
- * Panopticon Database Schema
+ * Overdeck Database Schema
  *
  * Defines the unified schema for panopticon.db.
  * All persistent application state lives here.
@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { SqliteDatabase } from './driver.js';
-import { encodeClaudeProjectDir, getPanopticonHome } from '../paths.js';
+import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
@@ -1512,7 +1512,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     // event-driven registry misbehaves. The snapshot is a one-time file copy
     // made before any schema change or backfill runs.
     try {
-      const resolvedDbPath = dbPath ?? join(getPanopticonHome(), 'panopticon.db');
+      const resolvedDbPath = dbPath ?? join(getOverdeckHome(), 'panopticon.db');
       const snapshotPath = `${resolvedDbPath}.v54-backfill-snapshot`;
       if (existsSync(resolvedDbPath) && !existsSync(snapshotPath)) {
         const source = readFileSync(resolvedDbPath);

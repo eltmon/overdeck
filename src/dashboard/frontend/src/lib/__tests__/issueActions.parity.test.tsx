@@ -72,7 +72,7 @@ function issue(): Issue {
     url: 'https://example.test/PAN-1331',
     createdAt: '2026-05-23T00:00:00.000Z',
     updatedAt: '2026-05-23T00:00:00.000Z',
-    project: { id: 'pan', name: 'Panopticon', color: '#fff' },
+    project: { id: 'pan', name: 'Overdeck', color: '#fff' },
     hasPlan: true,
     hasBeads: true,
     workspacePath: '/tmp/feature-pan-1331',

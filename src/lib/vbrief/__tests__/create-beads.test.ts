@@ -28,7 +28,7 @@ import { createBeadsFromVBrief, resolveBdTimeout, retryBd, clearBeadsForIssue } 
 import { writeAutoStartVBrief } from '../auto-synthesize.js';
 import { findPlanSync, readWorkspacePlanSync } from '../io.js';
 
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 function testSleep(ms: number) {
   return (vi as any).isFakeTimers()
@@ -169,10 +169,10 @@ describe('createBeadsFromVBrief', () => {
   afterEach(() => {
     vi.useRealTimers();
     delete process.env.OVERDECK_BD_TIMEOUT_MS;
-    if (originalPanopticonHome === undefined) {
+    if (originalOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     }
     rmSync(projectRoot, { recursive: true, force: true });
   });

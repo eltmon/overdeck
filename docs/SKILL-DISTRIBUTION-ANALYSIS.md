@@ -3,7 +3,7 @@
 > **Status**: Analysis complete — Feb 2026
 > **Issue**: [PAN-266](https://github.com/eltmon/panopticon-cli/issues/266)
 > **PRD**: `docs/prds/active/PAN-266-plan.md`
-> **Context**: Investigation into how Panopticon distributes skills, rules, agents, and commands — how Claude Code resolves conflicts, what's broken today, and the agreed end-state.
+> **Context**: Investigation into how Overdeck distributes skills, rules, agents, and commands — how Claude Code resolves conflicts, what's broken today, and the agreed end-state.
 
 ---
 
@@ -56,7 +56,7 @@ LOWEST PRIORITY
 
 ### The Complete .claude/ Universe
 
-| Thing | What It Is | Loaded When | Precedence | Panopticon Manages? |
+| Thing | What It Is | Loaded When | Precedence | Overdeck Manages? |
 |-------|-----------|-------------|-----------|-------------------|
 | **CLAUDE.md** | Free-form instructions | Always, at conversation start | Managed > Project > User | Yes — generates workspace CLAUDE.md |
 | **Rules** (`.claude/rules/`) | Modular, path-scoped instructions | Always, but filtered by file paths being touched | Project + User (both loaded) | **Planned** — will distribute via pan sync |
@@ -110,7 +110,7 @@ export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1  # Force OFF
 
 ---
 
-## 2. Panopticon's Current Distribution (Broken)
+## 2. Overdeck's Current Distribution (Broken)
 
 ### The Three-Tier Flow
 
@@ -160,10 +160,10 @@ This has caused repeated confusion — skills seem to disappear from discovery b
 
 ### Problem 3: Wrong Priority Level
 
-Panopticon skills land in `~/.claude/skills/` (personal level). Under Claude Code's precedence rules, personal **overrides** project. This means:
+Overdeck skills land in `~/.claude/skills/` (personal level). Under Claude Code's precedence rules, personal **overrides** project. This means:
 
-- A project-specific skill in `.claude/skills/beads/` gets silently overridden by Panopticon's version in `~/.claude/skills/beads/`
-- Project teams cannot customize Panopticon skills — Panopticon always wins
+- A project-specific skill in `.claude/skills/beads/` gets silently overridden by Overdeck's version in `~/.claude/skills/beads/`
+- Project teams cannot customize Overdeck skills — Overdeck always wins
 - This contradicts PAN-3's design goal: "git-tracked always wins"
 
 **Solved by the devroot pattern** — see Section 6.
@@ -194,32 +194,32 @@ MYN has project-specific content in `myn/infra/.agent-template/.claude/`:
 
 ### Skill Audit (Feb 2026)
 
-Detailed comparison of all MYN skills against Panopticon revealed three categories:
+Detailed comparison of all MYN skills against Overdeck revealed three categories:
 
 **Duplicates removed from MYN:**
 
 | Skill | Finding | Action Taken |
 |-------|---------|-------------|
-| `web-design-guidelines` | Byte-for-byte identical to Panopticon | Removed from MYN |
-| `skill-creator` | Identical to Panopticon | Removed from MYN |
-| `beads` | MYN had truncated stale copy (100 lines vs Panopticon's 214). Missing critical ID Systems section and full CLI reference | Replaced with current Panopticon version |
-| `react-best-practices` | Generic Vercel React/Next.js guide, not MYN-specific | Removed from MYN, promoted to Panopticon |
+| `web-design-guidelines` | Byte-for-byte identical to Overdeck | Removed from MYN |
+| `skill-creator` | Identical to Overdeck | Removed from MYN |
+| `beads` | MYN had truncated stale copy (100 lines vs Overdeck's 214). Missing critical ID Systems section and full CLI reference | Replaced with current Overdeck version |
+| `react-best-practices` | Generic Vercel React/Next.js guide, not MYN-specific | Removed from MYN, promoted to Overdeck |
 
-**Promoted to Panopticon (genericized):**
+**Promoted to Overdeck (genericized):**
 
 | Skill | What Changed |
 |-------|-------------|
 | `react-best-practices` | Moved as-is (already generic Vercel guide) |
-| `workspace-status` | Generic version created in Panopticon with `{PROJECT_DOMAIN}` / `{TRACKER_URL}` placeholders. MYN keeps its version with MYN-specific URLs as a project-level override |
+| `workspace-status` | Generic version created in Overdeck with `{PROJECT_DOMAIN}` / `{TRACKER_URL}` placeholders. MYN keeps its version with MYN-specific URLs as a project-level override |
 
 **Correctly customized (kept in MYN):**
 
 | Skill | What's Customized |
 |-------|------------------|
 | `session-health` | Same detection logic, but examples use MYN paths (`agent-min-XXX`, `/work-issue`). This is the right pattern: inherit generic, customize examples |
-| `workspace-status` | MYN-specific URLs (myn.localhost), Linear issue IDs, GitLab MR URLs. Overrides the generic Panopticon version |
+| `workspace-status` | MYN-specific URLs (myn.localhost), Linear issue IDs, GitLab MR URLs. Overrides the generic Overdeck version |
 
-**MYN-specific (kept in MYN, not candidates for Panopticon):**
+**MYN-specific (kept in MYN, not candidates for Overdeck):**
 
 | Skill | Why It's MYN-Specific |
 |-------|----------------------|
@@ -238,12 +238,12 @@ pan workspace create MIN-678
         │   └── session-health/SKILL.md  (MYN-customized version)
         │
         └── pan sync already placed → ~/.claude/skills/session-health/  (personal level)
-            └── session-health/SKILL.md  (Panopticon generic version)
+            └── session-health/SKILL.md  (Overdeck generic version)
 
 Claude Code loads both, personal wins → MYN's customization is ignored
 ```
 
-**Solved by the devroot pattern** — Panopticon places skills at the devroot (project level), not `~/.claude/skills/` (personal level). Workspace agents don't see devroot skills because they run from within the workspace (a different project root). Project templates override Panopticon defaults cleanly at workspace level. See Section 6.
+**Solved by the devroot pattern** — Overdeck places skills at the devroot (project level), not `~/.claude/skills/` (personal level). Workspace agents don't see devroot skills because they run from within the workspace (a different project root). Project templates override Overdeck defaults cleanly at workspace level. See Section 6.
 
 ### MYN Project Configuration
 
@@ -303,9 +303,9 @@ The **devroot** is the parent directory where all projects live — typically `~
 ```
 DEVROOT (~/Projects/)                    Not a git repo
 ├── .claude/
-│   ├── skills/                          Panopticon skills — visible during manual work
-│   ├── agents/                          Panopticon agents
-│   └── rules/                           Panopticon rules
+│   ├── skills/                          Overdeck skills — visible during manual work
+│   ├── agents/                          Overdeck agents
+│   └── rules/                           Overdeck rules
 ├── panopticon-cli/                      Git repo (own project root)
 ├── myn/                                 Git repos (own project roots)
 └── ...
@@ -325,11 +325,11 @@ This is an opinionated pattern. Users who don't want it can configure `pan sync`
 
 ### Core Principles
 
-1. **Panopticon provides defaults. Everything can be overridden by the layer above.**
+1. **Overdeck provides defaults. Everything can be overridden by the layer above.**
 2. **Copies, not symlinks** — avoids the Claude Code symlink discovery bug.
 3. **Devroot for manual work, workspace for agents** — skills go to the devroot (project level) for non-workspace use AND to each workspace for agent use. No precedence conflicts because they're separate project roots.
-4. **`~/.claude/` is the user's personal space** — Panopticon NEVER touches `~/.claude/skills/`, `~/.claude/agents/`, or `~/.claude/rules/`. The user can put overrides there that beat everything (personal > project).
-5. **Manifest tracking** — Panopticon tracks what it placed at the devroot and in workspaces, enabling safe updates and clean removal.
+4. **`~/.claude/` is the user's personal space** — Overdeck NEVER touches `~/.claude/skills/`, `~/.claude/agents/`, or `~/.claude/rules/`. The user can put overrides there that beat everything (personal > project).
+5. **Manifest tracking** — Overdeck tracks what it placed at the devroot and in workspaces, enabling safe updates and clean removal.
 6. **No mid-work updates** — running workspaces are frozen. Updates only happen at `pan workspace create` time (or explicit `pan workspace update`).
 
 ### What `pan sync` Does: Today vs End-State
@@ -353,10 +353,10 @@ pan sync
   │   └── .manifest.json    (hashes of all cached files)
   │
   ├── Copies to <devroot>/.claude/ (PROJECT level — for manual/non-workspace use)
-  │   ├── skills/           (all Panopticon skills)
-  │   ├── agents/           (all Panopticon agents)
-  │   └── rules/            (all Panopticon rules)
-  │   📋 Tracks what Panopticon placed in <devroot>/.claude/.panopticon-manifest.json
+  │   ├── skills/           (all Overdeck skills)
+  │   ├── agents/           (all Overdeck agents)
+  │   └── rules/            (all Overdeck rules)
+  │   📋 Tracks what Overdeck placed in <devroot>/.claude/.panopticon-manifest.json
   │
   ├── Cleans up old symlinks in ~/.claude/ (migration from current broken state)
   │
@@ -364,12 +364,12 @@ pan sync
 
 pan workspace create <ISSUE-ID>
   ├── COPIES all content from ~/.panopticon/ → workspace/.claude/
-  │   ├── skills/           (Panopticon defaults)
-  │   ├── agents/           (Panopticon defaults)
-  │   └── rules/            (Panopticon defaults)
+  │   ├── skills/           (Overdeck defaults)
+  │   ├── agents/           (Overdeck defaults)
+  │   └── rules/            (Overdeck defaults)
   │
-  ├── COPIES project template ON TOP (overrides Panopticon defaults)
-  │   ├── skills/           (e.g., MYN's session-health overrides Panopticon's)
+  ├── COPIES project template ON TOP (overrides Overdeck defaults)
+  │   ├── skills/           (e.g., MYN's session-health overrides Overdeck's)
   │   ├── agents/           (e.g., MYN's code-reviewer)
   │   ├── rules/            (e.g., MYN-specific rules)
   │   └── commands/         (legacy, from template)
@@ -380,7 +380,7 @@ pan workspace create <ISSUE-ID>
 
 ### Why the Devroot Solves the Precedence Problem
 
-The old approach put Panopticon skills in `~/.claude/skills/` (personal level). Claude Code's precedence: personal > project. This meant Panopticon's generic skills silently overrode project-specific customizations in workspaces.
+The old approach put Overdeck skills in `~/.claude/skills/` (personal level). Claude Code's precedence: personal > project. This meant Overdeck's generic skills silently overrode project-specific customizations in workspaces.
 
 The devroot approach eliminates this entirely:
 
@@ -392,7 +392,7 @@ The devroot approach eliminates this entirely:
 
 **Devroot and workspace are separate project roots** — they never compete. An agent running in a workspace only sees `workspace/.claude/skills/`, never `<devroot>/.claude/skills/`.
 
-If a user wants to override a Panopticon skill globally, they put their version in `~/.claude/skills/` (personal level) — which Panopticon never touches.
+If a user wants to override a Overdeck skill globally, they put their version in `~/.claude/skills/` (personal level) — which Overdeck never touches.
 
 ### Devroot Configuration
 
@@ -407,7 +407,7 @@ Users who don't work from a single parent directory can set `devroot: null` to s
 
 ### Manifest Tracking
 
-Two manifests track Panopticon-managed content:
+Two manifests track Overdeck-managed content:
 
 **`<devroot>/.claude/.panopticon-manifest.json`** — tracks devroot-level content:
 ```json
@@ -441,13 +441,13 @@ Two manifests track Panopticon-managed content:
 | Scenario | Action |
 |----------|--------|
 | File doesn't exist in devroot | Copy it (new install) |
-| File exists, hash matches manifest | Safe to update (Panopticon placed it, user didn't modify) |
-| File exists, hash differs from manifest | **Warning**: "Skipping skills/beads — modified since Panopticon installed it" |
+| File exists, hash matches manifest | Safe to update (Overdeck placed it, user didn't modify) |
+| File exists, hash differs from manifest | **Warning**: "Skipping skills/beads — modified since Overdeck installed it" |
 | File exists, NOT in manifest | Skip entirely (user placed it themselves) |
 
 **During `pan workspace create`:**
 
-Same logic, but workspace is typically fresh so conflicts are rare. Project template files always overwrite Panopticon defaults at the same level (later copy wins).
+Same logic, but workspace is typically fresh so conflicts are rare. Project template files always overwrite Overdeck defaults at the same level (later copy wins).
 
 **CLI flags:**
 - `--force` — overwrite even modified files (useful after `pan install` upgrades)
@@ -470,7 +470,7 @@ The workspace CLAUDE.md is generated (not hand-written) by `generateClaudeMd()` 
 ```
 pan workspace create MIN-678
   │
-  ├── 1. Load Panopticon default sections:
+  ├── 1. Load Overdeck default sections:
   │      templates/claude-md/sections/
   │      ├── workspace-info.md
   │      ├── beads.md
@@ -519,9 +519,9 @@ Agent starts on MIN-678 workspace
       ├── ~/.claude/CLAUDE.md          (user preferences)
       ├── ~/.claude/skills/*           (user's personal overrides, if any)
       ├── ~/.claude/rules/*            (user's personal rules, if any)
-      ├── workspace/.claude/skills/*   (Panopticon + project template skills)
-      ├── workspace/.claude/rules/*    (Panopticon + project template rules)
-      ├── workspace/.claude/agents/*   (Panopticon + project template agents)
+      ├── workspace/.claude/skills/*   (Overdeck + project template skills)
+      ├── workspace/.claude/rules/*    (Overdeck + project template rules)
+      ├── workspace/.claude/agents/*   (Overdeck + project template agents)
       └── ~/.claude/projects/*/memory/ (auto memory)
       NOTE: devroot skills are NOT visible — agent runs from workspace, not devroot
 ```
@@ -541,22 +541,22 @@ Environment variables available to agents:
 ├── skills/                             64 skills (kept fresh by pan sync)
 ├── dev-skills/                         3 dev-only skills
 ├── agents/                             8 agent definitions
-├── rules/                              Panopticon rules (NEW)
+├── rules/                              Overdeck rules (NEW)
 ├── .manifest.json                      Hashes of all cached content
 ├── config.yaml                         (includes devroot setting)
 └── projects.yaml
 
 <devroot>/                              DEVROOT (e.g., ~/Projects/) — not a git repo
 ├── .claude/
-│   ├── skills/                         Panopticon skills (for manual/non-workspace use)
+│   ├── skills/                         Overdeck skills (for manual/non-workspace use)
 │   │   ├── beads/SKILL.md
 │   │   ├── code-review/SKILL.md
 │   │   ├── session-health/SKILL.md
 │   │   └── ... (all 64 skills)
-│   ├── agents/                         Panopticon agents
-│   ├── rules/                          Panopticon rules
+│   ├── agents/                         Overdeck agents
+│   ├── rules/                          Overdeck rules
 │   ├── settings.local.json             (pre-existing user settings)
-│   └── .panopticon-manifest.json       Tracks what Panopticon placed here
+│   └── .panopticon-manifest.json       Tracks what Overdeck placed here
 ├── panopticon-cli/                     Git repo
 ├── myn/                                Git repos
 └── ...
@@ -570,18 +570,18 @@ Environment variables available to agents:
 └── settings.json                       User settings
 
 workspace/feature-min-678/              WORKSPACE (project level)
-├── CLAUDE.md                           Generated by Panopticon
+├── CLAUDE.md                           Generated by Overdeck
 ├── .claude/
-│   ├── skills/                         Panopticon defaults + project template overrides
-│   │   ├── beads/SKILL.md             (from Panopticon)
-│   │   ├── session-health/SKILL.md    (from MYN template — overrides Panopticon)
+│   ├── skills/                         Overdeck defaults + project template overrides
+│   │   ├── beads/SKILL.md             (from Overdeck)
+│   │   ├── session-health/SKILL.md    (from MYN template — overrides Overdeck)
 │   │   ├── myn-standards/SKILL.md     (MYN-only, from template)
 │   │   └── ...
-│   ├── agents/                         Panopticon + project template agents
-│   │   ├── planning-agent.md          (from Panopticon)
-│   │   ├── code-reviewer.md           (from MYN template — overrides Panopticon)
+│   ├── agents/                         Overdeck + project template agents
+│   │   ├── planning-agent.md          (from Overdeck)
+│   │   ├── code-reviewer.md           (from MYN template — overrides Overdeck)
 │   │   └── ...
-│   ├── rules/                          Panopticon + project template rules
+│   ├── rules/                          Overdeck + project template rules
 │   ├── commands/                       From project template (legacy)
 │   └── .manifest.json                  Tracks what was installed, for safe updates
 ├── .planning/
@@ -595,7 +595,7 @@ workspace/feature-min-678/              WORKSPACE (project level)
 ~/.claude/skills/my-override/               ← WINS (personal — user's own overrides)
   over
 workspace/.claude/skills/session-health/    ← Project template version (workspace project level)
-workspace/.claude/skills/beads/             ← Panopticon default (workspace project level)
+workspace/.claude/skills/beads/             ← Overdeck default (workspace project level)
 
 NOTE: Devroot skills are NOT visible here — different project root.
 ```
@@ -604,15 +604,15 @@ NOTE: Devroot skills are NOT visible here — different project root.
 ```
 ~/.claude/skills/my-override/               ← WINS (personal — user's own overrides)
   over
-<devroot>/.claude/skills/beads/             ← Panopticon-installed (devroot project level)
-<devroot>/.claude/skills/session-health/    ← Panopticon-installed (devroot project level)
+<devroot>/.claude/skills/beads/             ← Overdeck-installed (devroot project level)
+<devroot>/.claude/skills/session-health/    ← Overdeck-installed (devroot project level)
 ```
 
-**Project template overriding Panopticon default** (within workspace):
+**Project template overriding Overdeck default** (within workspace):
 ```
 workspace/.claude/skills/session-health/   ← MYN template version (copied second, overwrites
-  was originally                              Panopticon's version AT THE SAME LEVEL)
-~/.panopticon/skills/session-health/       ← Panopticon generic version (copied first)
+  was originally                              Overdeck's version AT THE SAME LEVEL)
+~/.panopticon/skills/session-health/       ← Overdeck generic version (copied first)
 ```
 
 **No conflicts**: Devroot and workspace never compete because they're separate project roots. User overrides in `~/.claude/skills/` (personal level) win over both — as intended.
@@ -631,12 +631,12 @@ This fixes the "pan install never updates" problem.
 ```
 For each symlink in ~/.claude/skills/ pointing to ~/.panopticon/:
   - Remove the symlink
-  - Do NOT replace (Panopticon no longer touches ~/.claude/)
+  - Do NOT replace (Overdeck no longer touches ~/.claude/)
 
 For each symlink in ~/.claude/agents/ pointing to ~/.panopticon/:
   - Remove the symlink
 
-For each non-Panopticon content (user-created files, non-Panopticon symlinks):
+For each non-Overdeck content (user-created files, non-Overdeck symlinks):
   - Leave it alone
 ```
 
@@ -648,7 +648,7 @@ Write <devroot>/.claude/.panopticon-manifest.json
 
 **Step 4: Print summary**
 ```
-Panopticon sync migration:
+Overdeck sync migration:
   ✓ Removed 64 skill symlinks from ~/.claude/skills/
   ✓ Removed 8 agent symlinks from ~/.claude/agents/
   ⚠ Preserved 2 user-created items in ~/.claude/skills/
@@ -668,7 +668,7 @@ MYN's project template currently has 8+ legacy commands in `.claude/commands/`. 
 1. **Audit MYN commands**: Determine which commands have skill equivalents already
 2. **Convert remaining commands to skills**: Each command becomes a skill in the project template
 3. **Update `projects.yaml`**: Change template `symlinks` config from `commands` to `skills` (or both during transition)
-4. **Update Panopticon's workspace creation**: Ensure commands are still copied for backward compatibility during transition, with a deprecation warning
+4. **Update Overdeck's workspace creation**: Ensure commands are still copied for backward compatibility during transition, with a deprecation warning
 
 **MYN commands to migrate:**
 
@@ -682,7 +682,7 @@ MYN's project template currently has 8+ legacy commands in `.claude/commands/`. 
 | `work-unlock` | → skill |
 | `work-issues` | → skill |
 | `work-pending` | → skill |
-| `beads/`, `dev/`, `git/`, `pan/` | → evaluate: some may already be covered by Panopticon skills |
+| `beads/`, `dev/`, `git/`, `pan/` | → evaluate: some may already be covered by Overdeck skills |
 
 This doesn't need to happen atomically — commands and skills coexist. But the end goal is skills only.
 
@@ -690,9 +690,9 @@ This doesn't need to happen atomically — commands and skills coexist. But the 
 
 ## 7. Rules: Planned Content
 
-Rules are a new content type Panopticon should distribute. Some content currently in generated workspace CLAUDE.md is better expressed as path-scoped rules.
+Rules are a new content type Overdeck should distribute. Some content currently in generated workspace CLAUDE.md is better expressed as path-scoped rules.
 
-**Planned Panopticon rules** (tracked in [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263)):
+**Planned Overdeck rules** (tracked in [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263)):
 
 | Candidate Rule | Path Scope | Currently In |
 |---------------|-----------|-------------|
@@ -707,14 +707,14 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 
 | Candidate Rule | Path Scope | Currently In |
 |---------------|-----------|-------------|
-| No localias — use Panopticon | `**` | Skill (should be a rule — always-on guidance, not invocable) |
+| No localias — use Overdeck | `**` | Skill (should be a rule — always-on guidance, not invocable) |
 | MYN domain conventions | `**/*.ts`, `**/*.tsx` | Scattered in CLAUDE.md |
 
 ---
 
 ## 8. Complete Content Inventory
 
-### Panopticon Skills (64)
+### Overdeck Skills (64)
 
 **Developer Power Tools** (useful everywhere, not just workspaces):
 
@@ -722,7 +722,7 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 |-------|-------------|
 | `beads` | Git-backed issue tracker for multi-session work |
 | `beads-completion-check` | Verify all beads closed before review |
-| `beads-panopticon-guide` | Panopticon-specific beads patterns |
+| `beads-panopticon-guide` | Overdeck-specific beads patterns |
 | `bug-fix` | Systematic bug investigation workflow |
 | `clear-writing` | Prose quality rules for documentation |
 | `code-review` | Comprehensive code review |
@@ -745,17 +745,17 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 | `stitch-setup` | Set up Stitch MCP server |
 | `web-design-guidelines` | Web Interface Guidelines compliance |
 
-**Panopticon Operations** (useful everywhere for Panopticon users):
+**Overdeck Operations** (useful everywhere for Overdeck users):
 
 | Skill | Description |
 |-------|-------------|
 | `pan-approve` | Approve agent work and merge |
 | `pan-code-review` | Orchestrated parallel code review |
-| `pan-config` | View and edit Panopticon config |
+| `pan-config` | View and edit Overdeck config |
 | `pan-convoy-synthesis` | Synthesize parallel agent results |
 | `pan-diagnose` | Troubleshoot common issues |
 | `pan-docker` | Docker template selection |
-| `pan-docs` | Find info in Panopticon docs |
+| `pan-docs` | Find info in Overdeck docs |
 | `pan-down` | Stop dashboard and services |
 | `pan-health` | Check system health |
 | `pan-help` | Overview of all commands |
@@ -766,14 +766,14 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 | `pan-network` | Traefik and local domain setup |
 | `pan-oversee` | Supervise agent through full lifecycle |
 | `pan-plan` | Interactive planning workflow |
-| `pan-projects` | Manage Panopticon projects |
+| `pan-projects` | Manage Overdeck projects |
 | `pan-quickstart` | Quick start guide |
-| `pan-reload` | Rebuild and reload Panopticon |
+| `pan-reload` | Rebuild and reload Overdeck |
 | `pan-reopen` | Reopen a closed workspace |
 | `pan-rescue` | Recover work from crashed agents |
 | `pan-restart` | Restart the dashboard |
 | `pan-setup` | First-time configuration wizard |
-| `pan-skill-creator` | Create and distribute Panopticon skills |
+| `pan-skill-creator` | Create and distribute Overdeck skills |
 | `pan-status` | Check running agents and workspaces |
 | `pan-subagent-creator` | Create custom Claude Code subagents |
 | `pan-sync` | Sync skills to Claude Code |
@@ -795,15 +795,15 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 | `work-complete` | Agent completion checklist |
 | `workspace-status` | Display workspace info with URLs/commands |
 
-### Panopticon Dev-Skills (3)
+### Overdeck Dev-Skills (3)
 
 | Skill | Description |
 |-------|-------------|
 | `pan-dashboard-restart` | Dev: restart dashboard process |
-| `pan-skill-creator` | Dev: skill creation for Panopticon contributors |
+| `pan-skill-creator` | Dev: skill creation for Overdeck contributors |
 | `test-specialist-workflow` | Dev: test review→test→merge pipeline |
 
-### Panopticon Agents (8)
+### Overdeck Agents (8)
 
 | Agent | Description |
 |-------|-------------|
@@ -816,17 +816,17 @@ Rules are a new content type Panopticon should distribute. Some content currentl
 | `codebase-explorer` | Systematic codebase exploration |
 | `health-monitor` | Agent health monitoring |
 
-### Project-Scoped (Panopticon repo only)
+### Project-Scoped (Overdeck repo only)
 
 | Type | Item | Description |
 |------|------|-------------|
-| Skill | `update-panopticon-docs` | Guide for updating Panopticon docs (in `.claude/skills/`) |
+| Skill | `update-panopticon-docs` | Guide for updating Overdeck docs (in `.claude/skills/`) |
 
 ### MYN Project Template Content
 
 | Type | Item | Description |
 |------|------|-------------|
-| Skill | `beads` | Panopticon copy (was stale, replaced) |
+| Skill | `beads` | Overdeck copy (was stale, replaced) |
 | Skill | `blog-writer` | MYN engineering blog voice |
 | Skill | `myn-prod-backup` | DOKS cluster backup |
 | Skill | `myn-standards` | Brand, design system, patterns |
@@ -854,18 +854,18 @@ Decisions agreed upon during analysis, for reference during implementation.
 |---|----------|-----------|
 | D1 | Copies, not symlinks, everywhere | Claude Code symlink bug #14836; affects skills and likely agents/rules too |
 | D2 | Devroot for manual work, workspace for agents | Devroot (`~/Projects/.claude/`) for non-workspace use; workspace `.claude/` for agent use. Separate project roots = no precedence conflicts |
-| D3 | Manifest-based tracking | Know what Panopticon placed vs. what user placed; enable safe updates and removal |
-| D4 | `~/.claude/` is the user's personal space — Panopticon never touches it | User can put overrides at personal level that beat everything; Panopticon targets devroot (project level) instead |
+| D3 | Manifest-based tracking | Know what Overdeck placed vs. what user placed; enable safe updates and removal |
+| D4 | `~/.claude/` is the user's personal space — Overdeck never touches it | User can put overrides at personal level that beat everything; Overdeck targets devroot (project level) instead |
 | D5 | Frozen workspaces — no mid-work updates | Untested skill changes should never affect running agents |
 | D6 | `pan workspace update` for explicit refresh | Opt-in mechanism for updating skills in an existing workspace |
-| D7 | `--force` flag to overwrite on conflict | Escape hatch when user wants to accept Panopticon's version |
+| D7 | `--force` flag to overwrite on conflict | Escape hatch when user wants to accept Overdeck's version |
 | D8 | `--diff` flag to show changes | Let user see what changed before deciding |
 | D9 | Warning messages on conflict (default) | Not silent skip, not silent overwrite — inform the user |
-| D10 | Clean up old symlinks from `~/.claude/` during migration | Panopticon no longer touches `~/.claude/`; old symlinks must be removed |
+| D10 | Clean up old symlinks from `~/.claude/` during migration | Overdeck no longer touches `~/.claude/`; old symlinks must be removed |
 | D11 | Distribute rules via same mechanism | Same copy + manifest plumbing for `.claude/rules/` |
 | D12 | File GitHub issues for rule analysis | Research which rules to create, including community suggestions |
-| D13 | `no-localias` is MYN-specific | NOT promoted to Panopticon — MYN project template only |
-| D14 | Project template overrides by copying second | Later copy at workspace level overwrites Panopticon defaults |
+| D13 | `no-localias` is MYN-specific | NOT promoted to Overdeck — MYN project template only |
+| D14 | Project template overrides by copying second | Later copy at workspace level overwrites Overdeck defaults |
 | D15 | Migrate MYN commands to skills as part of this effort | Commands are legacy; skills have richer metadata and win in precedence |
 | D16 | All content from `~/Documents/` hierarchy docs incorporated here | Those files are now deleted; this analysis doc is the single source of truth |
 | D17 | Devroot is configurable, opt-out | Default: `~/Projects/`. Users can set `devroot: null` in config to skip devroot placement |
@@ -878,7 +878,7 @@ Items tracked as GitHub issues (follow-up work, not blocking implementation):
 
 | Issue | Title | Notes |
 |-------|-------|-------|
-| [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263) | Analyze and create initial Panopticon rules | Research candidates, community patterns, create `.claude/rules/` files |
+| [PAN-263](https://github.com/eltmon/panopticon-cli/issues/263) | Analyze and create initial Overdeck rules | Research candidates, community patterns, create `.claude/rules/` files |
 | [PAN-264](https://github.com/eltmon/panopticon-cli/issues/264) | Audit localias references across all code and docs | Clean up stale localias references in all repos |
 | [PAN-265](https://github.com/eltmon/panopticon-cli/issues/265) | Review skill categorization: all skills available everywhere | Confirm all 64 skills work gracefully outside workspace context |
 

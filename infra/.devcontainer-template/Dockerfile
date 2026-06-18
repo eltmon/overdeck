@@ -1,4 +1,4 @@
-# Development container for Panopticon Dashboard
+# Development container for Overdeck Dashboard
 FROM node:22-alpine
 
 # Install development tools

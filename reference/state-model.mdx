@@ -1,17 +1,17 @@
 ---
 title: State Model
-description: Where Panopticon keeps state, what is durable, and why the local database is a disposable cache.
+description: Where Overdeck keeps state, what is durable, and why the local database is a disposable cache.
 ---
 
 # State Model
 
-Panopticon keeps **almost no irreplaceable state of its own**. The durable record of your work lives in systems that already exist for their own reasons — **GitHub and git** — and the local database is a **derived cache**: a fast view over those sources that holds nothing which can't be rebuilt from them.
+Overdeck keeps **almost no irreplaceable state of its own**. The durable record of your work lives in systems that already exist for their own reasons — **GitHub and git** — and the local database is a **derived cache**: a fast view over those sources that holds nothing which can't be rebuilt from them.
 
 If you remember one thing from this page: **the database is a cache, not a source of truth.**
 
 ## The sources of truth
 
-Everything Panopticon needs — to show you a board, run the pipeline, or recover after a crash — is a function of four things that live outside its database:
+Everything Overdeck needs — to show you a board, run the pipeline, or recover after a crash — is a function of four things that live outside its database:
 
 | Source of truth | What it holds | Where it lives |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ Everything Panopticon needs — to show you a board, run the pipeline, or recove
 
 ## The local database is a cache
 
-Panopticon uses a local SQLite database (`~/.panopticon/panopticon.db`) for two jobs:
+Overdeck uses a local SQLite database (`~/.panopticon/panopticon.db`) for two jobs:
 
 1. **A uniform read/write API** for the dashboard, the deacon, and the CLI — so every component talks to state the same way instead of each parsing files.
 2. **A materialized view of the pipeline** — so the board renders instantly instead of re-scanning every workspace on each page load.
@@ -44,7 +44,7 @@ An issue's pipeline phase is a **function of GitHub + its workspace**, not a val
 | PR approved | **Merge** |
 | Issue closed on GitHub | **Done** |
 
-Panopticon computes this view by walking the workspaces and reading GitHub, then caches the result. The cache is for speed; the derivation is the truth.
+Overdeck computes this view by walking the workspaces and reading GitHub, then caches the result. The cache is for speed; the derivation is the truth.
 
 ## What lives where
 
@@ -64,7 +64,7 @@ The only things that vanish on a database loss are **ephemeral counters** — re
 
 ## Search indexes are the exception
 
-Panopticon also keeps **search indexes** in SQLite — full-text and semantic search over conversations and docs. Unlike pipeline state, a search index is *legitimately* a database's job and persists as one. These indexes are rebuildable from the transcripts on disk, but they are a search feature, not part of the "pipeline is a cache" model.
+Overdeck also keeps **search indexes** in SQLite — full-text and semantic search over conversations and docs. Unlike pipeline state, a search index is *legitimately* a database's job and persists as one. These indexes are rebuildable from the transcripts on disk, but they are a search feature, not part of the "pipeline is a cache" model.
 
 ## The rules that keep this true
 
@@ -75,6 +75,6 @@ Panopticon also keeps **search indexes** in SQLite — full-text and semantic se
 
 ## Why it matters
 
-- **Recovery is trivial.** Lost database, corrupted file, fresh machine — `git clone`, start Panopticon, and the board rebuilds. No backups to restore, no event logs to replay.
+- **Recovery is trivial.** Lost database, corrupted file, fresh machine — `git clone`, start Overdeck, and the board rebuilds. No backups to restore, no event logs to replay.
 - **Work is portable.** Because the durable record travels in git, another machine — or another engineer — can pull a branch and continue exactly where the last agent left off.
 - **The system is simple to reason about.** Every piece of state has a clear home: if it isn't derivable from GitHub + the workspaces, it lives in the per-issue git record — never only in the local cache.

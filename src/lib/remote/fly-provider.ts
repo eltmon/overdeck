@@ -627,7 +627,7 @@ with open(path, "w") as f:
     const scriptB64 = Buffer.from(onboardingScript).toString('base64');
     await this.sshImpl(vmName, `echo '${scriptB64}' | base64 -d | python3`);
 
-    // Write ~/.claude/settings.json honoring the user's Panopticon permission mode.
+    // Write ~/.claude/settings.json honoring the user's Overdeck permission mode.
     // The defaultMode here is the fallback applied to any `claude` invocation on the
     // VM that doesn't pass --permission-mode; hardcoding bypass would silently
     // escalate any unflagged invocation even when the user has chosen Auto.

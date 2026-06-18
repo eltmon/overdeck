@@ -1,4 +1,4 @@
-# PAN-442: Electron Desktop App for Panopticon Dashboard
+# PAN-442: Electron Desktop App for Overdeck Dashboard
 
 ## Status: Planning Complete
 
@@ -55,7 +55,7 @@
 
 **Menu bar + command palette:**
 - Standard Electron menus: File, Edit, View, Window, Help
-- Panopticon menu: Start/Stop Cloister, Emergency Stop All, Open Workspace, Settings
+- Overdeck menu: Start/Stop Cloister, Emergency Stop All, Open Workspace, Settings
 - Cmd+K / Ctrl+K command palette for quick access to all actions
 - Command palette searches: workspaces, agents, actions, settings
 

@@ -82,7 +82,7 @@ My strongest objection: the design sells the big-bang as "low risk" because the 
 
 **Claim:** The design correctly identifies a read-only violation, but it is not just a note; it blocks the Transcript model.
 
-**Evidence:** Overdeck says transcript backing files are sacred and "STRICTLY READ-ONLY" (`docs/overdeck-remodel/overdeck-schema.ts:137-144`). The live compaction service appends Panopticon-authored compact entries directly to the existing session file (`src/dashboard/server/services/conversation-compaction.ts:1-2`, `src/dashboard/server/services/conversation-compaction.ts:164`). The backing-file investigation calls this the one in-place mutation that must be addressed (`docs/overdeck-remodel/investigations/conversation-backing-files.md:163-170`, `docs/overdeck-remodel/investigations/conversation-backing-files.md:205`).
+**Evidence:** Overdeck says transcript backing files are sacred and "STRICTLY READ-ONLY" (`docs/overdeck-remodel/overdeck-schema.ts:137-144`). The live compaction service appends Overdeck-authored compact entries directly to the existing session file (`src/dashboard/server/services/conversation-compaction.ts:1-2`, `src/dashboard/server/services/conversation-compaction.ts:164`). The backing-file investigation calls this the one in-place mutation that must be addressed (`docs/overdeck-remodel/investigations/conversation-backing-files.md:163-170`, `docs/overdeck-remodel/investigations/conversation-backing-files.md:205`).
 
 **Fix:** Treat the compaction rewrite as a P0 cutover prerequisite: convert it to the fork/new-file pattern, then add a test or static check that no production code appends to or rewrites existing transcript files except harness-owned creation/append paths.
 

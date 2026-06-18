@@ -4,7 +4,7 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { acquireRestartLock } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
-import { getPanopticonHome } from '../lib/paths.js';
+import { getOverdeckHome } from '../lib/paths.js';
 
 export interface SupervisorWatchdogConfig {
   enabled: boolean;
@@ -64,7 +64,7 @@ interface WatchdogPersistentState {
 }
 
 function watchdogStatePath(): string {
-  return join(getPanopticonHome(), 'supervisor-watchdog.json');
+  return join(getOverdeckHome(), 'supervisor-watchdog.json');
 }
 
 function readWatchdogPersistentState(): WatchdogPersistentState {

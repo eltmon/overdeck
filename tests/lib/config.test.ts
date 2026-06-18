@@ -50,7 +50,7 @@ describe('config', () => {
     });
   });
 
-  describe('PanopticonConfig type', () => {
+  describe('OverdeckConfig type', () => {
     it('should have all required sections', async () => {
       const { getDefaultConfigSync } = await import('../../src/lib/config.js');
       const config = getDefaultConfigSync();

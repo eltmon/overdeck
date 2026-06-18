@@ -146,8 +146,8 @@ export class RallyTracker implements IssueTracker {
       server: config.server || 'https://rally1.rallydev.com',
       requestOptions: {
         headers: {
-          'X-RallyIntegrationType': 'Panopticon',
-          'X-RallyIntegrationName': 'Panopticon CLI',
+          'X-RallyIntegrationType': 'Overdeck',
+          'X-RallyIntegrationName': 'Overdeck CLI',
           'X-RallyIntegrationVendor': 'Mind Your Now',
           'X-RallyIntegrationVersion': '0.2.0',
         },
@@ -519,7 +519,7 @@ export class RallyTracker implements IssueTracker {
               id: postResult.CreateResult.Object.ObjectID,
               issueId,
               body,
-              author: 'Panopticon',
+              author: 'Overdeck',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             })),

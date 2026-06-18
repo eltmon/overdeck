@@ -1,9 +1,9 @@
 - generic [ref=e3]:
   - complementary [ref=e4]:
     - generic [ref=e5]:
-      - button "Panopticon v0.21.0" [ref=e531] [cursor=pointer]:
+      - button "Overdeck v0.21.0" [ref=e531] [cursor=pointer]:
         - img [ref=e7]
-        - generic [ref=e10]: Panopticon
+        - generic [ref=e10]: Overdeck
         - generic [ref=e532]: v0.21.0
       - button "Collapse sidebar ([)" [ref=e11] [cursor=pointer]:
         - img [ref=e12]
@@ -116,7 +116,7 @@
         - generic [ref=e136]:
           - button "Settings" [ref=e137] [cursor=pointer]:
             - img [ref=e138]
-          - button "Rebuild Panopticon (npm run build)" [ref=e574] [cursor=pointer]:
+          - button "Rebuild Overdeck (npm run build)" [ref=e574] [cursor=pointer]:
             - img [ref=e575]
           - button "Switch to light mode" [ref=e141] [cursor=pointer]:
             - img [ref=e142]
@@ -945,7 +945,7 @@
                       - generic [ref=e1181]:
                         - generic [ref=e1183]:
                           - paragraph [ref=e1184]: "FLYWHEEL ORCHESTRATOR TASK for RUN-20:"
-                          - paragraph [ref=e1185]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
+                          - paragraph [ref=e1185]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Overdeck roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
                           - paragraph [ref=e1186]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                           - paragraph [ref=e1187]:
                             - text: "Brief path:"
@@ -1042,7 +1042,7 @@
                       - generic [ref=e1299]:
                         - generic [ref=e1301]:
                           - paragraph [ref=e1302]: "FLYWHEEL ORCHESTRATOR TASK for RUN-20:"
-                          - paragraph [ref=e1303]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
+                          - paragraph [ref=e1303]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Overdeck roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
                           - paragraph [ref=e1304]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                           - paragraph [ref=e1305]:
                             - text: "Brief path:"
@@ -1125,7 +1125,7 @@
                     - generic [ref=e1418]:
                       - generic [ref=e1420]:
                         - paragraph [ref=e1421]: "FLYWHEEL ORCHESTRATOR TASK for RUN-20:"
-                        - paragraph [ref=e1422]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
+                        - paragraph [ref=e1422]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Overdeck roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
                         - paragraph [ref=e1423]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                         - paragraph [ref=e1424]:
                           - text: "Brief path:"
@@ -1163,7 +1163,7 @@
                     - generic [ref=e1474]:
                       - generic [ref=e1476]:
                         - paragraph [ref=e1477]: "FLYWHEEL ORCHESTRATOR TASK for RUN-20:"
-                        - paragraph [ref=e1478]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
+                        - paragraph [ref=e1478]: Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Overdeck roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.
                         - paragraph [ref=e1479]: "Run configuration: Harness: claude-code Effort: xhigh Min concurrent agents (target): 2 Max concurrent agents (ceiling): 4 Scope: pan-only"
                         - paragraph [ref=e1480]:
                           - text: "Brief path:"
@@ -1375,14 +1375,14 @@
                       - generic [ref=e1715]: Claude Code
                       - time [ref=e1716]: 1h ago
                     - paragraph [ref=e1717]: Minecraft server installed but not running
-              - button "Claude Code 1h ago Panopticon text rendering clarity issue" [ref=e1718] [cursor=pointer]:
+              - button "Claude Code 1h ago Overdeck text rendering clarity issue" [ref=e1718] [cursor=pointer]:
                 - generic [ref=e1719]:
                   - img [ref=e1721]
                   - generic [ref=e1724]:
                     - generic [ref=e1725]:
                       - generic [ref=e1726]: Claude Code
                       - time [ref=e1727]: 1h ago
-                    - paragraph [ref=e1728]: Panopticon text rendering clarity issue
+                    - paragraph [ref=e1728]: Overdeck text rendering clarity issue
           - generic [ref=e1729]:
             - heading "8 PM" [level=3] [ref=e1730]
             - generic [ref=e1731]:
@@ -1402,14 +1402,14 @@
                       - generic [ref=e1751]: Claude Code
                       - time [ref=e1752]: 3h ago
                     - paragraph [ref=e1753]: "Handoff: Install open-design.ai on this machine and extract the current Mind Y…"
-              - 'button "Claude Code 3h ago Handoff: Execute the Panopticon rebrand. Read docs/marketing/private/REBRAND.m…" [ref=e1754] [cursor=pointer]':
+              - 'button "Claude Code 3h ago Handoff: Execute the Overdeck rebrand. Read docs/marketing/private/REBRAND.m…" [ref=e1754] [cursor=pointer]':
                 - generic [ref=e1755]:
                   - img [ref=e1757]
                   - generic [ref=e1760]:
                     - generic [ref=e1761]:
                       - generic [ref=e1762]: Claude Code
                       - time [ref=e1763]: 3h ago
-                    - paragraph [ref=e1764]: "Handoff: Execute the Panopticon rebrand. Read docs/marketing/private/REBRAND.m…"
+                    - paragraph [ref=e1764]: "Handoff: Execute the Overdeck rebrand. Read docs/marketing/private/REBRAND.m…"
               - 'button "Claude Code 3h ago Handoff: Drive the Mind Your Now local-first relaunch. Read ~/Projects/flightp…" [ref=e1765] [cursor=pointer]':
                 - generic [ref=e1766]:
                   - img [ref=e1768]
@@ -1775,22 +1775,22 @@
                       - generic [ref=e2261]: Claude Code
                       - time [ref=e2262]: 3d ago
                     - paragraph [ref=e2263]: Skills scoping by audience and agent role
-              - button "Claude Code 3d ago Panopticon repo goes private" [ref=e2264] [cursor=pointer]:
+              - button "Claude Code 3d ago Overdeck repo goes private" [ref=e2264] [cursor=pointer]:
                 - generic [ref=e2265]:
                   - img [ref=e2267]
                   - generic [ref=e2270]:
                     - generic [ref=e2271]:
                       - generic [ref=e2272]: Claude Code
                       - time [ref=e2273]: 3d ago
-                    - paragraph [ref=e2274]: Panopticon repo goes private
-              - button "Claude Code 3d ago Hand-drawn Panopticon architecture graph" [ref=e2275] [cursor=pointer]:
+                    - paragraph [ref=e2274]: Overdeck repo goes private
+              - button "Claude Code 3d ago Hand-drawn Overdeck architecture graph" [ref=e2275] [cursor=pointer]:
                 - generic [ref=e2276]:
                   - img [ref=e2278]
                   - generic [ref=e2281]:
                     - generic [ref=e2282]:
                       - generic [ref=e2283]: Claude Code
                       - time [ref=e2284]: 3d ago
-                    - paragraph [ref=e2285]: Hand-drawn Panopticon architecture graph
+                    - paragraph [ref=e2285]: Hand-drawn Overdeck architecture graph
               - button "Claude Code 3d ago Ship role Docker stack failures" [ref=e2286] [cursor=pointer]:
                 - generic [ref=e2287]:
                   - img [ref=e2289]
@@ -1906,14 +1906,14 @@
           - generic [ref=e2439]:
             - heading "Saturday Jun 6" [level=3] [ref=e2440]
             - generic [ref=e2441]:
-              - 'button "Claude Code 4d ago Renaming Panopticon: celestial navigation themes" [ref=e2442] [cursor=pointer]':
+              - 'button "Claude Code 4d ago Renaming Overdeck: celestial navigation themes" [ref=e2442] [cursor=pointer]':
                 - generic [ref=e2443]:
                   - img [ref=e2445]
                   - generic [ref=e2448]:
                     - generic [ref=e2449]:
                       - generic [ref=e2450]: Claude Code
                       - time [ref=e2451]: 4d ago
-                    - paragraph [ref=e2452]: "Renaming Panopticon: celestial navigation themes"
+                    - paragraph [ref=e2452]: "Renaming Overdeck: celestial navigation themes"
               - button "Claude Code 4d ago New conversation" [ref=e2453] [cursor=pointer]:
                 - generic [ref=e2454]:
                   - img [ref=e2456]
@@ -1973,14 +1973,14 @@
                       - generic [ref=e2530]: Claude Code
                       - time [ref=e2531]: 5d ago
                     - paragraph [ref=e2532]: New conversation
-              - button "Claude Code 5d ago Add Panopticon to CLIProxyAPI users" [ref=e2533] [cursor=pointer]:
+              - button "Claude Code 5d ago Add Overdeck to CLIProxyAPI users" [ref=e2533] [cursor=pointer]:
                 - generic [ref=e2534]:
                   - img [ref=e2536]
                   - generic [ref=e2539]:
                     - generic [ref=e2540]:
                       - generic [ref=e2541]: Claude Code
                       - time [ref=e2542]: 5d ago
-                    - paragraph [ref=e2543]: Add Panopticon to CLIProxyAPI users
+                    - paragraph [ref=e2543]: Add Overdeck to CLIProxyAPI users
               - button "Claude Code 5d ago Portable monitor HDMI no signal" [ref=e2544] [cursor=pointer]:
                 - generic [ref=e2545]:
                   - img [ref=e2547]
@@ -2250,14 +2250,14 @@
           - generic [ref=e2906]:
             - heading "May 30" [level=3] [ref=e2907]
             - generic [ref=e2908]:
-              - button "Claude Code May 30 Which Panopticon progress report to run" [ref=e2909] [cursor=pointer]:
+              - button "Claude Code May 30 Which Overdeck progress report to run" [ref=e2909] [cursor=pointer]:
                 - generic [ref=e2910]:
                   - img [ref=e2912]
                   - generic [ref=e2915]:
                     - generic [ref=e2916]:
                       - generic [ref=e2917]: Claude Code
                       - time [ref=e2918]: May 30
-                    - paragraph [ref=e2919]: Which Panopticon progress report to run
+                    - paragraph [ref=e2919]: Which Overdeck progress report to run
               - button "Claude Code May 30 Model picker harness switcher adjustments" [ref=e2920] [cursor=pointer]:
                 - generic [ref=e2921]:
                   - img [ref=e2923]
@@ -2434,14 +2434,14 @@
                       - generic [ref=e3155]: Pi
                       - time [ref=e3156]: May 30
                     - paragraph [ref=e3157]: Verify engineering rules in context
-              - button "P Pi May 30 Verify Panopticon engineering rules in context" [ref=e3158] [cursor=pointer]:
+              - button "P Pi May 30 Verify Overdeck engineering rules in context" [ref=e3158] [cursor=pointer]:
                 - generic [ref=e3159]:
                   - generic [ref=e3161]: P
                   - generic [ref=e3163]:
                     - generic [ref=e3164]:
                       - generic [ref=e3165]: Pi
                       - time [ref=e3166]: May 30
-                    - paragraph [ref=e3167]: Verify Panopticon engineering rules in context
+                    - paragraph [ref=e3167]: Verify Overdeck engineering rules in context
               - 'button "P Pi May 30 Handoff: Implement PAN-1567: make the memory pipeline ingest Pi work-agent tra…" [ref=e3168] [cursor=pointer]':
                 - generic [ref=e3169]:
                   - generic [ref=e3171]: P
@@ -2905,14 +2905,14 @@
                       - generic [ref=e3788]: Pi
                       - time [ref=e3789]: May 25
                     - paragraph [ref=e3790]: New conversation
-              - button "Claude Code May 25 Pricing for Panopticon" [ref=e3791] [cursor=pointer]:
+              - button "Claude Code May 25 Pricing for Overdeck" [ref=e3791] [cursor=pointer]:
                 - generic [ref=e3792]:
                   - img [ref=e3794]
                   - generic [ref=e3797]:
                     - generic [ref=e3798]:
                       - generic [ref=e3799]: Claude Code
                       - time [ref=e3800]: May 25
-                    - paragraph [ref=e3801]: Pricing for Panopticon
+                    - paragraph [ref=e3801]: Pricing for Overdeck
               - button "Claude Code May 25 Fix false positive chip and explain JSON escaping" [ref=e3802] [cursor=pointer]:
                 - generic [ref=e3803]:
                   - img [ref=e3805]
@@ -3571,14 +3571,14 @@
                       - generic [ref=e4696]: Claude Code
                       - time [ref=e4697]: May 18
                     - paragraph [ref=e4698]: Recent updates to directive repository
-              - button "Claude Code May 18 Panopticon CLI Handoff Acknowledged" [ref=e4699] [cursor=pointer]:
+              - button "Claude Code May 18 Overdeck CLI Handoff Acknowledged" [ref=e4699] [cursor=pointer]:
                 - generic [ref=e4700]:
                   - img [ref=e4702]
                   - generic [ref=e4705]:
                     - generic [ref=e4706]:
                       - generic [ref=e4707]: Claude Code
                       - time [ref=e4708]: May 18
-                    - paragraph [ref=e4709]: Panopticon CLI Handoff Acknowledged
+                    - paragraph [ref=e4709]: Overdeck CLI Handoff Acknowledged
               - button "Claude Code May 18 DIFF issue" [ref=e4710] [cursor=pointer]:
                 - generic [ref=e4711]:
                   - img [ref=e4713]
@@ -3745,14 +3745,14 @@
                       - generic [ref=e4933]: Claude Code
                       - time [ref=e4934]: May 16
                     - paragraph [ref=e4935]: links to evalite and autoevals
-              - button "Claude Code May 16 Review recent Panopticon reviewer substrate fixes" [ref=e4936] [cursor=pointer]:
+              - button "Claude Code May 16 Review recent Overdeck reviewer substrate fixes" [ref=e4936] [cursor=pointer]:
                 - generic [ref=e4937]:
                   - img [ref=e4939]
                   - generic [ref=e4942]:
                     - generic [ref=e4943]:
                       - generic [ref=e4944]: Claude Code
                       - time [ref=e4945]: May 16
-                    - paragraph [ref=e4946]: Review recent Panopticon reviewer substrate fixes
+                    - paragraph [ref=e4946]: Review recent Overdeck reviewer substrate fixes
               - button "Claude Code May 16 Nous Research" [ref=e4947] [cursor=pointer]:
                 - generic [ref=e4948]:
                   - img [ref=e4950]
@@ -4234,14 +4234,14 @@
                       - generic [ref=e5596]: Claude Code
                       - time [ref=e5597]: May 12
                     - paragraph [ref=e5598]: "Summary Fork: Check git status on main"
-              - button "Claude Code May 12 Test Panopticon workflow with auto-plan on PAN-1069" [ref=e5599] [cursor=pointer]:
+              - button "Claude Code May 12 Test Overdeck workflow with auto-plan on PAN-1069" [ref=e5599] [cursor=pointer]:
                 - generic [ref=e5600]:
                   - img [ref=e5602]
                   - generic [ref=e5605]:
                     - generic [ref=e5606]:
                       - generic [ref=e5607]: Claude Code
                       - time [ref=e5608]: May 12
-                    - paragraph [ref=e5609]: Test Panopticon workflow with auto-plan on PAN-1069
+                    - paragraph [ref=e5609]: Test Overdeck workflow with auto-plan on PAN-1069
               - button "Claude Code May 12 Current context summary" [ref=e5610] [cursor=pointer]:
                 - generic [ref=e5611]:
                   - img [ref=e5613]
@@ -4710,14 +4710,14 @@
           - generic [ref=e6193]:
             - heading "May 5" [level=3] [ref=e6194]
             - generic [ref=e6195]:
-              - button "U Unknown May 5 Panopticon memories" [ref=e6196] [cursor=pointer]:
+              - button "U Unknown May 5 Overdeck memories" [ref=e6196] [cursor=pointer]:
                 - generic [ref=e6197]:
                   - generic [ref=e6199]: U
                   - generic [ref=e6201]:
                     - generic [ref=e6202]:
                       - generic [ref=e6203]: Unknown
                       - time [ref=e6204]: May 5
-                    - paragraph [ref=e6205]: Panopticon memories
+                    - paragraph [ref=e6205]: Overdeck memories
               - button "U Unknown May 5 Dark Mode color enhancements" [ref=e6206] [cursor=pointer]:
                 - generic [ref=e6207]:
                   - generic [ref=e6209]: U
@@ -4761,14 +4761,14 @@
                       - generic [ref=e6256]: Unknown
                       - time [ref=e6257]: May 4
                     - paragraph [ref=e6258]: Research Deft swarm flow multi-agent dependency synthesis
-              - button "U Unknown May 4 Adopt T3Code patterns into Panopticon" [ref=e6259] [cursor=pointer]:
+              - button "U Unknown May 4 Adopt T3Code patterns into Overdeck" [ref=e6259] [cursor=pointer]:
                 - generic [ref=e6260]:
                   - generic [ref=e6262]: U
                   - generic [ref=e6264]:
                     - generic [ref=e6265]:
                       - generic [ref=e6266]: Unknown
                       - time [ref=e6267]: May 4
-                    - paragraph [ref=e6268]: Adopt T3Code patterns into Panopticon
+                    - paragraph [ref=e6268]: Adopt T3Code patterns into Overdeck
               - button "U Unknown May 4 Create vbrief after finishing PAN-946" [ref=e6269] [cursor=pointer]:
                 - generic [ref=e6270]:
                   - generic [ref=e6272]: U
@@ -5181,14 +5181,14 @@
                       - generic [ref=e6778]: Unknown
                       - time [ref=e6779]: Apr 30
                     - paragraph [ref=e6780]: MYN CONTAINERS
-              - button "U Unknown Apr 30 Panopticon Backlog Triage — Permission Required" [ref=e6781] [cursor=pointer]:
+              - button "U Unknown Apr 30 Overdeck Backlog Triage — Permission Required" [ref=e6781] [cursor=pointer]:
                 - generic [ref=e6782]:
                   - generic [ref=e6784]: U
                   - generic [ref=e6786]:
                     - generic [ref=e6787]:
                       - generic [ref=e6788]: Unknown
                       - time [ref=e6789]: Apr 30
-                    - paragraph [ref=e6790]: Panopticon Backlog Triage — Permission Required
+                    - paragraph [ref=e6790]: Overdeck Backlog Triage — Permission Required
           - generic [ref=e6791]:
             - heading "Apr 29" [level=3] [ref=e6792]
             - generic [ref=e6793]:

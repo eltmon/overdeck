@@ -20,9 +20,9 @@ AI coding assistants are trained on modern, well-documented open-source code. Wh
 
 ...they stumble. Repeatedly. Every session starts from zero.
 
-## Panopticon's Unique Solution: Adaptive Learning
+## Overdeck's Unique Solution: Adaptive Learning
 
-Panopticon includes two AI self-monitoring skills that **no other orchestration framework provides**:
+Overdeck includes two AI self-monitoring skills that **no other orchestration framework provides**:
 
 | Skill | What It Does | Business Impact |
 |-------|--------------|-----------------|
@@ -48,7 +48,7 @@ Session 5: Refactor Radar detects: "Same entity called 'user', 'account', 'membe
 
 ### The Compound Effect
 
-| Week | Without Panopticon | With Panopticon |
+| Week | Without Overdeck | With Overdeck |
 |------|-------------------|-----------------|
 | 1 | AI makes 20 mistakes/day on conventions | AI makes 20 mistakes, captures 8 learnings |
 | 2 | AI makes 20 mistakes/day (no memory) | AI makes 12 mistakes, captures 5 more |
@@ -76,7 +76,7 @@ No more repeating the same corrections to AI across 10 different developers. No 
 
 ### For Technical Leaders
 
-**What gets measured gets managed.** Panopticon's Refactor Radar surfaces the specific patterns that are costing you AI productivity:
+**What gets measured gets managed.** Overdeck's Refactor Radar surfaces the specific patterns that are costing you AI productivity:
 
 - "Here are the 5 naming inconsistencies causing 40% of AI errors"
 - "These 3 missing FK constraints led to 12 incorrect deletions last month"
@@ -95,7 +95,7 @@ Each proposal includes:
 - That's $50K/year in wasted productivity per developer
 - Team of 10 = **$500K/year** in AI friction
 
-Panopticon's learning system:
+Overdeck's learning system:
 - Captures corrections once, applies them forever
 - Identifies root causes (not just symptoms)
 - Creates actionable improvement proposals
@@ -105,7 +105,7 @@ Panopticon's learning system:
 
 ### Configurable Per Team and Per Developer
 
-Different teams have different ownership boundaries. Individual developers have different preferences. Panopticon respects both:
+Different teams have different ownership boundaries. Individual developers have different preferences. Overdeck respects both:
 
 ```markdown
 # In ~/.claude/CLAUDE.md (developer's personal config)
@@ -130,9 +130,9 @@ The AI adapts to your org structure, not the other way around.
 
 ## Shadow Mode
 
-Shadow mode lets you run Panopticon agents without updating your issue tracker. This is useful when:
+Shadow mode lets you run Overdeck agents without updating your issue tracker. This is useful when:
 
-- You're evaluating Panopticon on a real issue without committing tracker changes to stakeholders
+- You're evaluating Overdeck on a real issue without committing tracker changes to stakeholders
 - You want to test the pipeline on a legacy codebase before going live
 - You're running training or demos and don't want to pollute your issue tracker
 

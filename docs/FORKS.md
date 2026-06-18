@@ -1,6 +1,6 @@
 # Conversation Forks
 
-Panopticon lets you fork any conversation to create a new session that continues the work. Forking is useful when:
+Overdeck lets you fork any conversation to create a new session that continues the work. Forking is useful when:
 
 - A conversation is running out of context window
 - You want to switch models mid-task
@@ -14,7 +14,7 @@ Panopticon lets you fork any conversation to create a new session that continues
 A **summary fork** distills the conversation history into a structured summary and injects it as the first message in the new session.
 
 **What happens:**
-1. Panopticon reads the entire JSONL history (from the last compact boundary, if any)
+1. Overdeck reads the entire JSONL history (from the last compact boundary, if any)
 2. A summary model (configurable, default: Sonnet 4.6) generates a structured checkpoint covering goals, progress, decisions, and next steps
 3. The new conversation spawns with the summary as its initial context
 4. The model acknowledges the summary and waits for your next instruction
@@ -35,7 +35,7 @@ A **summary fork** distills the conversation history into a structured summary a
 A **plain fork** copies the raw JSONL history (from the last compact boundary) into a new session file and resumes it with `--resume`.
 
 **What happens:**
-1. Panopticon copies JSONL entries from the last `compact_boundary` forward
+1. Overdeck copies JSONL entries from the last `compact_boundary` forward
 2. Thinking blocks are sanitized: `thinking` blocks with signatures are converted to plain `text` blocks to prevent cross-model API errors
 3. The new conversation spawns with `claude --resume <sessionId>`
 4. Claude Code loads the full raw transcript directly
@@ -55,11 +55,11 @@ A **plain fork** copies the raw JSONL history (from the last compact boundary) i
 A **handoff fork** asks the live source agent to write the seed text itself, then starts the new conversation from that authored handoff document.
 
 **What happens:**
-1. Panopticon creates a handoff document path under `${OVERDECK_HOME}/handoffs/` using the source conversation id and timestamp, for example `${OVERDECK_HOME}/handoffs/<source-conv-id>-<iso-ts>.md`.
-2. Panopticon renders the inlined prompt template from `roles/handoff.md`, substituting the optional `--focus` text and the exact output path.
+1. Overdeck creates a handoff document path under `${OVERDECK_HOME}/handoffs/` using the source conversation id and timestamp, for example `${OVERDECK_HOME}/handoffs/<source-conv-id>-<iso-ts>.md`.
+2. Overdeck renders the inlined prompt template from `roles/handoff.md`, substituting the optional `--focus` text and the exact output path.
 3. The prompt is delivered to the source conversation through `deliverAgentMessage()` so Channels and tmux fallback use the same message-delivery primitive as normal agent communication.
 4. The source agent writes the Markdown handoff document and then creates the sibling sentinel file `<source-conv-id>-<iso-ts>.md.done` only after the document is complete.
-5. Panopticon polls asynchronously for both the document and sentinel, validates the document, and injects the document text into the target conversation as the first message.
+5. Overdeck polls asynchronously for both the document and sentinel, validates the document, and injects the document text into the target conversation as the first message.
 
 **Document contract:**
 - The document must be at least 200 characters after trimming.
@@ -77,7 +77,7 @@ A **handoff fork** asks the live source agent to write the seed text itself, the
 - Fallback keeps the command useful: the target conversation still starts, but its title is `Summary Fork: ...` instead of `Handoff: ...`.
 
 **Caveats:**
-- Workspace devcontainer sources cannot write to the host `${OVERDECK_HOME}/handoffs/` in v1, so Panopticon falls back to summary fork when the source cwd is a workspace path and that workspace stack is up.
+- Workspace devcontainer sources cannot write to the host `${OVERDECK_HOME}/handoffs/` in v1, so Overdeck falls back to summary fork when the source cwd is a workspace path and that workspace stack is up.
 - Handoff seed text is portable Markdown, so Pi targets consume it the same way they consume summary forks. Plain forks remain Claude-Code-only because Pi cannot resume Claude JSONL history.
 
 Implementation lives in `src/lib/conversations/summary-fork.ts`; the authoring prompt template lives in `roles/handoff.md`.

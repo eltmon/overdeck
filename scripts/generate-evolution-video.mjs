@@ -131,7 +131,7 @@ function drawFrame(frameNum) {
   ctx.fillStyle = TEXT;
   ctx.font = 'bold 48px "Inter", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Panopticon Evolution', WIDTH / 2, 70);
+  ctx.fillText('Overdeck Evolution', WIDTH / 2, 70);
 
   ctx.fillStyle = MUTED;
   ctx.font = '20px "Inter", sans-serif';

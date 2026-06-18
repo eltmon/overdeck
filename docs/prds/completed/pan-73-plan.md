@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add a search feature to the Panopticon dashboard using the `cmdk` library for a command palette UI. Search will filter issues client-side from the React Query cache, respecting current board filters.
+Add a search feature to the Overdeck dashboard using the `cmdk` library for a command palette UI. Search will filter issues client-side from the React Query cache, respecting current board filters.
 
 ## Decisions Made
 

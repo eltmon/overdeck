@@ -9,11 +9,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
 import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src/dashboard/server/config.js';
 
-// Prevent loadPanopticonEnv from loading ~/.panopticon.env during tests
+// Prevent loadOverdeckEnv from loading ~/.panopticon.env during tests
 // so env var presence/absence is fully controlled by the test.
 vi.mock('../../../src/lib/env-loader.js', () => ({
-  loadPanopticonEnv: () => ({ loaded: [], skipped: [] }),
-  loadPanopticonEnvSync: () => ({ loaded: [], skipped: [] }),
+  loadOverdeckEnv: () => ({ loaded: [], skipped: [] }),
+  loadOverdeckEnvSync: () => ({ loaded: [], skipped: [] }),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

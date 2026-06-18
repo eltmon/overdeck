@@ -138,7 +138,7 @@ describe('Sidebar pipeline filter groups', () => {
     }));
     useDashboardStore.setState({
       issuesRaw: [
-        issue({ identifier: 'PAN-1', status: 'In Progress', state: 'in_progress', project: { id: 'pan', name: 'Panopticon', color: '#fff' } }),
+        issue({ identifier: 'PAN-1', status: 'In Progress', state: 'in_progress', project: { id: 'pan', name: 'Overdeck', color: '#fff' } }),
         issue({ identifier: 'PAN-2', status: 'Todo', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
         issue({ identifier: 'PAN-3', status: 'Done', stateType: 'completed' }),
       ],

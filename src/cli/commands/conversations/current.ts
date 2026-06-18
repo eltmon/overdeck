@@ -19,7 +19,7 @@ export async function currentAction(opts: { json?: boolean }): Promise<void> {
       return;
     }
     console.error(chalk.yellow('Could not determine the current conversation.'));
-    console.error(chalk.gray('  This command only resolves when run from inside a Panopticon conversation session.'));
+    console.error(chalk.gray('  This command only resolves when run from inside a Overdeck conversation session.'));
     process.exit(1);
   }
 

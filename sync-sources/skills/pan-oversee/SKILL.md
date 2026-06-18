@@ -1,6 +1,6 @@
 ---
 name: pan-oversee
-description: Test the Panopticon framework by supervising an agent through the full lifecycle, identifying and filing every bug encountered
+description: Test the Overdeck framework by supervising an agent through the full lifecycle, identifying and filing every bug encountered
 triggers:
   - oversee issue
   - oversee agent
@@ -17,11 +17,11 @@ allowed-tools:
   - Task
 ---
 
-# Pan Oversee — Panopticon Framework Testing
+# Pan Oversee — Overdeck Framework Testing
 
 ## Purpose
 
-**This skill exists to test the Panopticon framework itself.** The issue being overseen is a test payload — the real goal is exercising the full agent lifecycle pipeline and identifying every bug, glitch, and rough edge along the way.
+**This skill exists to test the Overdeck framework itself.** The issue being overseen is a test payload — the real goal is exercising the full agent lifecycle pipeline and identifying every bug, glitch, and rough edge along the way.
 
 Supervise an agent working on an issue through the **entire lifecycle**:
 `spawn/resume → work → completion → review → feedback loop → test → merge-ready`
@@ -328,7 +328,7 @@ At this point, the user clicks **MERGE** in the dashboard.
 
 ## Intervention Protocol
 
-When you find a bug in the Panopticon infrastructure:
+When you find a bug in the Overdeck infrastructure:
 
 1. **Log the finding** — add to your running bug list with symptom, expected behavior, and actual behavior
 2. **Check for existing issues** — `gh issue list --state open --search "keyword"` to avoid duplicates

@@ -2,20 +2,20 @@
 
 ## Problem
 
-Panopticon's long-term value depends on the quality of its agents — their prompts, their skills, their context. **Skills are the agents' learned wisdom.** Every skill encodes "here's how to do X correctly based on past experience." But right now, the learning loop is ad-hoc and lossy:
+Overdeck's long-term value depends on the quality of its agents — their prompts, their skills, their context. **Skills are the agents' learned wisdom.** Every skill encodes "here's how to do X correctly based on past experience." But right now, the learning loop is ad-hoc and lossy:
 
 1. **Retrospection is manual.** After an issue merges, nothing captures what went well or badly in a structured way. Insight lives in Edward's head until it fades.
 2. **Skill refinement is episodic.** Skills get added/updated when someone remembers to write one. There's no continuous mechanism — no guarantee that the pattern you saw yesterday becomes the skill everyone benefits from tomorrow.
-3. **Substrate fixes dominate flywheel runs.** The current `/all-up` flywheel is excellent at fixing Panopticon bugs, but bugs are bounded (eventually they run out). Skill improvement is unbounded — there's always more nuance to encode — but it's not currently in the loop.
+3. **Substrate fixes dominate flywheel runs.** The current `/all-up` flywheel is excellent at fixing Overdeck bugs, but bugs are bounded (eventually they run out). Skill improvement is unbounded — there's always more nuance to encode — but it's not currently in the loop.
 4. **Skill audiences are undifferentiated.** `work-complete` and `rebase-and-submit` are meant for autonomous work agents. `pan-approve` and `all-up` are meant for human operators. `pan sync` treats them identically, pushing all 80 skills to every Claude Code session regardless of audience. No frontmatter field, no directory split, no enforcement.
 5. **Approval friction halts the flywheel.** When `/all-up` edits a skill file directly, Claude Code prompts the user for approval. The session blocks until answered. This is incompatible with an autonomous always-running flywheel.
 6. **Q&A state is invisible.** Planning agents in discovery Q&A and flywheel sessions waiting on approval both look "stuck" to deacon, which can trigger incorrect interventions or loss of context.
 
-**Impact:** Panopticon plateaus at whatever skill set was written the last time someone sat down to write skills. The differentiator stops being "runs agents that learn" and stays at "runs agents that execute what they were told." The compounding mechanism never engages.
+**Impact:** Overdeck plateaus at whatever skill set was written the last time someone sat down to write skills. The differentiator stops being "runs agents that learn" and stays at "runs agents that execute what they were told." The compounding mechanism never engages.
 
 ## Decision
 
-Build an end-to-end self-improvement system where every completed issue feeds a structured retrospective, retrospectives propose concrete skill changes, skill changes flow through the normal Panopticon pipeline as PAN issues (reviewed, tested, merged like any other change), and the whole loop runs autonomously via a Cloister-hosted daemon.
+Build an end-to-end self-improvement system where every completed issue feeds a structured retrospective, retrospectives propose concrete skill changes, skill changes flow through the normal Overdeck pipeline as PAN issues (reviewed, tested, merged like any other change), and the whole loop runs autonomously via a Cloister-hosted daemon.
 
 **Core principles:**
 - **Skill changes are issues**, not inline edits. This eliminates approval friction *by eliminating the approval* — the flywheel files issues, agents implement them, the user reviews diffs on Awaiting Merge on their own schedule.
@@ -23,7 +23,7 @@ Build an end-to-end self-improvement system where every completed issue feeds a 
 - **Signal threshold**: a skill change requires **3+ independent retros pointing at the same gap** before synthesis proposes it. Below that threshold, the gap goes on a watchlist in `FLYWHEEL-REPORT.md` — tracked but not acted on.
 - **Audience-aware distribution**: every skill declares its audience (`operator` | `agent` | `both`). `pan sync` respects this — operator skills to `~/.claude/skills/`, agent skills injected into workspace CLAUDE.md at creation time.
 - **Autonomous by default, interruptive only for blockers**: the daemon fires on events and on schedule, files issues for everything, and only falls back to inline edits for blocker-tier substrate fixes that are stopping issues from merging *right now*.
-- **Every improvement is public**: `docs/FLYWHEEL-REPORT.md` is an append-only, user-facing changelog of how Panopticon is teaching itself. Rendered at `panopticon-cli.com/flywheel` as a living marketing artifact.
+- **Every improvement is public**: `docs/FLYWHEEL-REPORT.md` is an append-only, user-facing changelog of how Overdeck is teaching itself. Rendered at `panopticon-cli.com/flywheel` as a living marketing artifact.
 
 Ship all of this in one epic. No phased rollout.
 
@@ -174,10 +174,10 @@ If PAN-709's retro process proposes a new operator-audience skill, it **must** f
 
 **Prompt framing — surprise-centered, not narrative-centered:**
 
-> You are retro-agent. Your ONLY job is to identify what **surprised** you about how this issue moved through the Panopticon pipeline. Not what happened — surprises.
+> You are retro-agent. Your ONLY job is to identify what **surprised** you about how this issue moved through the Overdeck pipeline. Not what happened — surprises.
 >
 > A surprise is any moment where:
-> - An agent did something that an experienced Panopticon operator would not have predicted
+> - An agent did something that an experienced Overdeck operator would not have predicted
 > - A skill that should have existed was missing, so the agent improvised
 > - A skill that exists was invoked but didn't help (or hurt)
 > - The pipeline cycled, retried, or bypassed in a way that suggests a gap
@@ -247,7 +247,7 @@ Append-only. One section per flywheel run or autonomous daemon cycle.
 ```markdown
 # Flywheel Report
 
-_Living record of how Panopticon teaches itself. Each section documents one flywheel revolution._
+_Living record of how Overdeck teaches itself. Each section documents one flywheel revolution._
 
 ---
 
@@ -361,7 +361,7 @@ The rendered public version at `panopticon-cli.com/flywheel` uses this file as i
 
 ### 9. Q&A / waiting-on-human detection — enhancement
 
-**Current state:** Panopticon has two agent states: `running` (actively working) and `stuck` (deacon should intervene). Reality is three:
+**Current state:** Overdeck has two agent states: `running` (actively working) and `stuck` (deacon should intervene). Reality is three:
 1. **Working** — agent is productively executing
 2. **Stuck** — actually stuck, needs intervention
 3. **Waiting on human** — productively paused for input (planning Q&A, approval prompt in a Claude Code session, interactive confirmation)
@@ -429,7 +429,7 @@ flywheel:
 - Metrics: skills added, retros processed, substrate bugs fixed — cumulative and per-month sparklines
 - Top patterns recognized this month
 - Wins highlighted
-- Public marketing artifact: "Panopticon taught itself 47 new patterns this month."
+- Public marketing artifact: "Overdeck taught itself 47 new patterns this month."
 
 Add a new nav entry in the docs site under "How It Works" → "The Flywheel."
 
@@ -583,7 +583,7 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 
 - **A/B testing of skills.** The provenance infrastructure makes it *possible* later, but we're not building experimentation/attribution in this epic.
 - **Auto-merging skill-change issues.** Humans still click merge. Always.
-- **Retros for non-Panopticon projects.** Initial scope is PAN issues only. If the pattern works, we extend to MIN, AUR, KRUX later as a separate epic.
+- **Retros for non-Overdeck projects.** Initial scope is PAN issues only. If the pattern works, we extend to MIN, AUR, KRUX later as a separate epic.
 - **Retro-agent interacting with agents during their run.** Retro-agent is strictly post-mortem. No in-flight coaching.
 - **Migrating every existing skill to the new audience field in this epic.** Backfill ships as a separate dog-fooded skill-change issue once the pipeline is live.
 

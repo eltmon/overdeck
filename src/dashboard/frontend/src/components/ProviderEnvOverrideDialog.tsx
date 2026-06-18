@@ -82,7 +82,7 @@ export function ProviderEnvOverrideDialog({
             </div>
             <div>
               <h3 className="text-lg font-medium text-foreground">Provider Config Conflict</h3>
-              <p className="text-sm text-muted-foreground">Your Claude Code settings override Panopticon&apos;s provider</p>
+              <p className="text-sm text-muted-foreground">Your Claude Code settings override Overdeck&apos;s provider</p>
             </div>
           </div>
           <button
@@ -99,7 +99,7 @@ export function ProviderEnvOverrideDialog({
             <>
               <p className="text-sm text-muted-foreground mb-4">
                 Your <span className="font-mono text-xs text-foreground">~/.claude/settings.json</span> has
-                provider env vars that will override Panopticon&apos;s configuration, routing API calls to the wrong endpoint.
+                provider env vars that will override Overdeck&apos;s configuration, routing API calls to the wrong endpoint.
               </p>
 
               <div className="rounded-xl border border-border overflow-hidden">
@@ -108,7 +108,7 @@ export function ProviderEnvOverrideDialog({
                     <tr className="bg-muted/30">
                       <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">Variable</th>
                       <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">Your Value</th>
-                      <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">Panopticon</th>
+                      <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">Overdeck</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -134,7 +134,7 @@ export function ProviderEnvOverrideDialog({
               </div>
 
               <p className="text-xs text-muted-foreground mt-3">
-                Panopticon will inject overrides into the project-level{' '}
+                Overdeck will inject overrides into the project-level{' '}
                 <span className="font-mono">.claude/settings.local.json</span>.
                 Your global settings are not modified.
               </p>

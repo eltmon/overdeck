@@ -139,7 +139,7 @@ async function closeIssue(issueId: string, tracker: IssueTracker): Promise<StepR
   await tracker.transitionIssue(issueId, 'closed');
 
   // 4. Add completion comment
-  await tracker.addComment(issueId, 'Merged to main via Panopticon lifecycle');
+  await tracker.addComment(issueId, 'Merged to main via Overdeck lifecycle');
 }
 ```
 

@@ -199,8 +199,8 @@ export function getMigrationStatusSync(): {
 /**
  * Clean up legacy runtime symlinks from removed runtimes.
  *
- * PAN-142: Panopticon consolidated to Claude Code as the sole runtime.
- * This removes any Panopticon-managed symlinks from legacy runtime directories
+ * PAN-142: Overdeck consolidated to Claude Code as the sole runtime.
+ * This removes any Overdeck-managed symlinks from legacy runtime directories
  * (codex, cursor, gemini, opencode).
  */
 export interface LegacyCleanupResult {
@@ -234,7 +234,7 @@ export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
             if (!stats.isSymbolicLink()) continue;
 
             const linkTarget = readlinkSync(entryPath);
-            // Only remove symlinks pointing to Panopticon directories
+            // Only remove symlinks pointing to Overdeck directories
             if (linkTarget.includes('.panopticon')) {
               unlinkSync(entryPath);
               cleaned.push(`${name}/${subdir}/${entry}`);

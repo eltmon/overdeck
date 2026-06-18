@@ -1,16 +1,16 @@
 ---
 title: Harness Landscape
-description: A survey of coding-agent harnesses Panopticon could drive, and how each one handles skills, MCP, and AGENTS.md
+description: A survey of coding-agent harnesses Overdeck could drive, and how each one handles skills, MCP, and AGENTS.md
 ---
 
 # Harness Landscape
 
-A survey of the AI coding-agent harnesses Panopticon could drive, the skill /
+A survey of the AI coding-agent harnesses Overdeck could drive, the skill /
 extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Panopticon supports exactly
+**This is a planning survey, not a support matrix.** Overdeck supports exactly
 two harnesses today — `claude-code` and `pi` (see [Harnesses](/configuration/harnesses)
 for the operational guide). Every other harness on this page is surveyed for
 *evaluation*; it is **not integrated**. Facts are current as of May 2026 and
@@ -24,7 +24,7 @@ The field is now large enough, and converging fast enough on shared standards,
 that "which harness next?" is a real product question. It is also entangled with
 a specific feature request — [template conversations](/reference/template-conversations),
 the ability to load a curated *group* of skills into one conversation. Some
-harnesses have a native primitive for exactly that; others would need Panopticon
+harnesses have a native primitive for exactly that; others would need Overdeck
 to synthesize it. This survey records the facts needed to weigh both.
 
 ## Harness vs. model
@@ -32,7 +32,7 @@ to synthesize it. This survey records the facts needed to weigh both.
 A **harness** is the binary that runs in tmux and drives a workspace — it owns
 the agent loop, tool calls, context management, and the on-disk extensibility
 surface. A **model** is the LLM the harness calls. They are chosen
-independently. "Adding a harness" means teaching Panopticon a new
+independently. "Adding a harness" means teaching Overdeck a new
 `AgentRuntime` adapter (`src/lib/runtimes/`): how to spawn it, deliver prompts,
 detect readiness/heartbeat/completion, and parse cost. "Adding a model" is a
 routing-table change. This document is about **harnesses**.
@@ -65,7 +65,7 @@ are not competitors — a mature setup uses all three.
   holdout (Pi).
 
 <Info>
-**Why this matters for Panopticon:** `SKILL.md` portability means Panopticon's
+**Why this matters for Overdeck:** `SKILL.md` portability means Overdeck's
 own `skills/` tree is *already* harness-agnostic. The same skill directories
 `pan sync` writes to `~/.claude/skills/` are loadable, unmodified, by Codex,
 Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, and Pi. Adding a harness does
@@ -73,7 +73,7 @@ Gemini CLI, Cursor, OpenCode, Goose, Amp, Crush, and Pi. Adding a harness does
 them.
 </Info>
 
-## What Panopticon supports today
+## What Overdeck supports today
 
 | Harness | Status | Runtime adapter |
 | --- | --- | --- |
@@ -81,7 +81,7 @@ them.
 | `pi` | **Supported** (alternative) | `src/lib/runtimes/pi.ts` + vendored `packages/pi-extension/` |
 
 Everything else in this document is **not supported** — surveyed for planning.
-One nuance: Panopticon already authenticates **ChatGPT-subscription OAuth
+One nuance: Overdeck already authenticates **ChatGPT-subscription OAuth
 tokens** via CLIProxy to drive GPT *models*. That is model routing, not a Codex
 *harness* integration — but it lowers the auth cost of adding the Codex CLI
 harness later.
@@ -115,7 +115,7 @@ and should be re-checked before any decision.
 - **Headless:** `claude -p` / print mode; structured output; `--agent` to run
   the main thread as a named agent.
 - **Why it's the default:** required for Anthropic-subscription users; the
-  largest agent/skill/plugin surface; Panopticon's pipeline prompts assume it.
+  largest agent/skill/plugin surface; Overdeck's pipeline prompts assume it.
 
 ### Pi Coding Agent — Supported (alternative)
 
@@ -126,7 +126,7 @@ and should be re-checked before any decision.
 - **OSS / license:** MIT. TypeScript / Node.
 - **Repo / package:** `github.com/badlogic/pi-mono`. **⚠ verify:** the project
   is mirrored under `earendil-works/pi` and current docs name the package
-  `@earendil-works/pi-coding-agent`; Panopticon's [Harnesses](/configuration/harnesses)
+  `@earendil-works/pi-coding-agent`; Overdeck's [Harnesses](/configuration/harnesses)
   guide and `doctor.ts` still reference `@mariozechner/pi-coding-agent`. Confirm
   the canonical install target on the next Pi version bump.
 - **Extensibility:**
@@ -134,17 +134,17 @@ and should be re-checked before any decision.
     `.pi/skills/`, `~/.agents/skills/`, `.agents/skills/`, `skills/` in
     `package.json`, the `skills` array in `settings.json`, **and the repeatable
     `--skill <path>` CLI flag.** The `settings.json` `skills` array accepts
-    arbitrary directories — Panopticon already exploits this by writing
+    arbitrary directories — Overdeck already exploits this by writing
     `~/.pi/agent/settings.json` with `"skills": ["~/.claude/skills"]`.
   - **Extensions** — TypeScript modules subscribing to a rich lifecycle-event
     bus (`session_start`, `tool_execution_end`, `agent_start/end`, …); loaded by
-    auto-discovery, `settings.json`, or `--extension`. Panopticon vendors one at
+    auto-discovery, `settings.json`, or `--extension`. Overdeck vendors one at
     `packages/pi-extension/`.
   - **No MCP** — a deliberate design stance. Pi tells users to wrap CLI tools as
     skills instead. The only path to MCP is a custom extension.
   - **AGENTS.md** read by default.
 - **Headless:** `pi --mode rpc` — JSONL command/event protocol over stdin/stdout
-  (Panopticon delivers commands via a named-pipe `mkfifo`).
+  (Overdeck delivers commands via a named-pipe `mkfifo`).
 - **Why it's supported:** multi-provider without CLIProxy; named-pipe RPC is
   faster than tmux paste-buffer; the only ToS-blocked cell is `pi` + Anthropic
   model + Anthropic subscription auth.
@@ -157,7 +157,7 @@ and should be re-checked before any decision.
 - **OSS / license:** Open source, **Apache-2.0**. Written in **Rust**. Install
   via `npm i -g @openai/codex` or Homebrew. v0.133.0 (2026-05-21).
 - **Auth:** Sign in with ChatGPT (Plus/Pro/Business/Edu/Enterprise) **or** API
-  key. Panopticon's CLIProxy already mints ChatGPT-subscription tokens.
+  key. Overdeck's CLIProxy already mints ChatGPT-subscription tokens.
 - **Extensibility:**
   - **Skills — yes**, `SKILL.md`, Claude Code-compatible. `~/.codex/skills/`,
     `.codex/skills/`.
@@ -169,7 +169,7 @@ and should be re-checked before any decision.
   event stream; `--output-schema` for validated output; `codex mcp-server` for
   stdio orchestration. Among the strongest headless interfaces in the field.
 - **Why a candidate:** Apache-2.0, native AGENTS.md + skills, excellent headless
-  story, and Panopticon's ChatGPT-subscription auth already exists. The Codex
+  story, and Overdeck's ChatGPT-subscription auth already exists. The Codex
   *harness* would let GPT-subscription users run a first-party OpenAI agent loop
   instead of CLIProxy-routing GPT into Claude Code.
 
@@ -217,7 +217,7 @@ and should be re-checked before any decision.
   - **Skills — yes** (since 2025-12-18), `SKILL.md`, Claude Code-compatible
     frontmatter. Discovery: `~/.copilot/skills/`, **`~/.agents/skills/`**, plus
     project skills; `/skills reload` re-scans mid-session. Does **not** read
-    `.claude/skills/` natively — but Panopticon already writes the open
+    `.claude/skills/` natively — but Overdeck already writes the open
     `~/.agents/skills/` tree, so portability holds.
   - **Custom agents** — `.agent.md` files in `.github/agents/` (repo) and
     `~/.copilot/agents/` (user, wins on name conflict), selected via `--agent`.
@@ -229,7 +229,7 @@ and should be re-checked before any decision.
 - **Headless / RPC:** `copilot --prompt "…"` non-interactive; `--agent <name>`;
   `--allow-all` / `--yolo` for unattended tool use; `--resume` / `--continue`.
   **⚠ No documented JSON or stream-json output** — interactive terminal text
-  only. This is the load-bearing gap for Panopticon, which parses a
+  only. This is the load-bearing gap for Overdeck, which parses a
   machine-readable event/cost stream to drive readiness, heartbeat, and spend.
 - **Why a candidate:** same harness as the Copilot coding agent, native
   AGENTS.md + `SKILL.md` + MCP, and it *defaults to Claude Sonnet 4.5* — a
@@ -325,7 +325,7 @@ and should be re-checked before any decision.
 - **Headless / RPC:** CLI run mode, Web mode, **Server/SDK** mode — drivable by
   an orchestrator (**⚠ verify** exact flags/JSON schema).
 - **Why a candidate:** fully open, multi-provider, `SKILL.md`-native, and its
-  custom-Agent model is a clean fit for Panopticon's role taxonomy.
+  custom-Agent model is a clean fit for Overdeck's role taxonomy.
 
 ### Goose (Block) — Not supported (strongest "bundle" primitive)
 
@@ -350,7 +350,7 @@ and should be re-checked before any decision.
     servers.
 - **Headless / RPC:** `goose run` (`-t`, `--recipe`, `--no-session`); embeddable
   API.
-- **Why notable:** if Panopticon ever wants a *native* per-session bundle
+- **Why notable:** if Overdeck ever wants a *native* per-session bundle
   instead of synthesizing one, Goose Recipes are the reference design — and a
   concrete reason to consider adopting Goose specifically.
 
@@ -390,7 +390,7 @@ and should be re-checked before any decision.
   unsupported, unstable Python API.
 - **Why a poor fit:** no skills, no MCP, no machine-readable output. Aider's
   one-commit-per-change model is excellent for solo pairing but ill-suited to an
-  orchestrator. Skill portability gives Panopticon *nothing* here — Aider can't
+  orchestrator. Skill portability gives Overdeck *nothing* here — Aider can't
   read the `skills/` tree at all.
 
 ### Cline — Not supported
@@ -411,7 +411,7 @@ and should be re-checked before any decision.
 - **Headless / RPC:** preview CLI with JSON output; `@cline/sdk` programmatic
   agent API.
 - **Why not yet:** historically IDE-bound; uncertain `SKILL.md` support means
-  Panopticon's `skills/` tree may not port cleanly.
+  Overdeck's `skills/` tree may not port cleanly.
 
 ### Continue — Not supported (notable for the bundle primitive)
 
@@ -428,7 +428,7 @@ and should be re-checked before any decision.
 
 ## Comparison matrix
 
-| Harness | OSS / License | Lang | `SKILL.md` | Reads `.claude/skills` | AGENTS.md | MCP | Headless JSON | Native per-session bundle | Panopticon |
+| Harness | OSS / License | Lang | `SKILL.md` | Reads `.claude/skills` | AGENTS.md | MCP | Headless JSON | Native per-session bundle | Overdeck |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Claude Code** | Proprietary | — | ✅ | ✅ (own) | Fallback only¹ | ✅ | ✅ | Synth via `--plugin-dir` | **Supported** |
 | **Pi** | MIT | TS | ✅ | ✅ | ✅ | ❌ (by design) | ✅ (RPC) | `--skill` flag | **Supported** |
@@ -451,9 +451,9 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 
 ⭐ = a native primitive relevant to [template conversations](/reference/template-conversations).
 
-## Implications for Panopticon
+## Implications for Overdeck
 
-1. **Skill portability is real and already paid for.** Panopticon's `skills/`
+1. **Skill portability is real and already paid for.** Overdeck's `skills/`
    tree is `SKILL.md`-format. Codex, Gemini CLI, Cursor, OpenCode, Goose, Amp,
    Warp, and Pi all read `SKILL.md`, and most read `.claude/skills/` directly.
    Adding any of them is a *runtime adapter* problem, not a *skill re-authoring*
@@ -462,13 +462,13 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
 
 2. **Codex CLI is the highest-value next harness.** Apache-2.0, native
    AGENTS.md + skills, a best-in-class headless interface (`codex exec --json`,
-   and it can *be* an MCP server), and Panopticon **already mints
+   and it can *be* an MCP server), and Overdeck **already mints
    ChatGPT-subscription tokens via CLIProxy**. The Codex harness would give
    GPT-subscription users a first-party OpenAI agent loop instead of routing GPT
    through Claude Code.
 
 3. **For template conversations, harness choice matters.** Three harnesses ship
-   a *native* loadable-bundle primitive that Panopticon would otherwise have to
+   a *native* loadable-bundle primitive that Overdeck would otherwise have to
    synthesize:
    - **Goose Recipes** — parameterized YAML bundles of prompt + extensions +
      subrecipes. Structurally identical to a "conversation template."
@@ -479,7 +479,7 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
    Claude Code via `--plugin-dir`, Pi via repeatable `--skill`. The
    [template-conversations proposal](/reference/template-conversations) builds
    on those. "Adding a harness specifically for its bundle primitive" is
-   therefore a *real option* — Goose is the candidate if Panopticon wants the
+   therefore a *real option* — Goose is the candidate if Overdeck wants the
    primitive native rather than synthesized.
 
 4. **MCP is near-universal; Pi is the exception.** Any feature that assumes MCP
@@ -489,9 +489,9 @@ open feature request ([anthropics/claude-code#34235](https://github.com/anthropi
    Cursor, and Amp have first-class JSON/stream interfaces. Aider has none.
    Crush's is underdocumented. **Copilot CLI has a non-interactive `--prompt`
    mode but no documented machine-readable output** — a real gate, since
-   Panopticon parses an event/cost stream to drive readiness, heartbeat, and
+   Overdeck parses an event/cost stream to drive readiness, heartbeat, and
    spend. A harness without a machine-readable interface is expensive for
-   Panopticon to drive, regardless of how good its model access is.
+   Overdeck to drive, regardless of how good its model access is.
 
 6. **Re-verify before deciding.** Flagged ⚠ items — Warp's license, Pi's
    canonical package name, OpenCode/Crush licenses and headless schemas, Cline's
@@ -530,4 +530,4 @@ Primary documentation consulted (May 2026):
   supported harnesses (install, picker locations, ToS rules, troubleshooting)
 - [Template Conversations](/reference/template-conversations) — proposal:
   loading curated skill bundles into a single conversation
-- [Skills System](/features/skills) — how Panopticon distributes skills
+- [Skills System](/features/skills) — how Overdeck distributes skills

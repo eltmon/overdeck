@@ -194,7 +194,7 @@ function isRfc1918(ip: number): boolean {
  * True when `addr` is the IP of a container on one of THIS host's Docker bridge
  * interfaces (docker0 / br-*). Such a peer can only be a process running on this
  * machine — our own host-local Traefik fronting pan.localhost, or another
- * Panopticon container — never a LAN client (a direct LAN hit to the 0.0.0.0
+ * Overdeck container — never a LAN client (a direct LAN hit to the 0.0.0.0
  * API port arrives with a LAN peer that is not inside any Docker bridge subnet).
  *
  * Pure for testability: the interface map is injected. We only ever trust

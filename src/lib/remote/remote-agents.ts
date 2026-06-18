@@ -27,8 +27,8 @@ const REMOTE_TMUX_DIR = `${REMOTE_PAN_DIR}/tmux`;
 const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/panopticon.tmux.conf`;
 const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
 const REMOTE_TMUX_CONFIG_CONTENT = [
-  '# Panopticon-managed tmux config',
-  '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
+  '# Overdeck-managed tmux config',
+  '# Keep this minimal and include only behavior Overdeck intentionally depends on.',
   'set -g mouse on',
   '',
 ].join('\n');
@@ -90,7 +90,7 @@ export function generatePushDaemonScript(options: PushDaemonOptions): string {
     `      const message = 'wip(remote): heartbeat for ' + ${issueIdLiteral};`,
     '      execFile(',
     "        'git',",
-    `        ['-C', cwd, '-c', 'user.name=Panopticon Remote', '-c', 'user.email=remote@panopticon.local', 'commit', '-m', message],`,
+    `        ['-C', cwd, '-c', 'user.name=Overdeck Remote', '-c', 'user.email=remote@panopticon.local', 'commit', '-m', message],`,
     '        (err) => {',
     '          if (err) {',
     "            log('git commit failed: ' + (err.message || String(err)));",

@@ -1,6 +1,6 @@
 ## Problem
 
-The merge-train (per-issue auto-merge toggle, conflict-aware order, reconciler, UAT candidate — [PAN-1691](https://github.com/eltmon/panopticon-cli/issues/1691)) is a **per-project pipeline** concern (how ready work *lands*), but it's currently presented as a **Flywheel** feature (which is really the *orchestrator* — keeping agents working). The Flywheel began as a Panopticon-dev tool; the merge-train is broadly useful to every project.
+The merge-train (per-issue auto-merge toggle, conflict-aware order, reconciler, UAT candidate — [PAN-1691](https://github.com/eltmon/panopticon-cli/issues/1691)) is a **per-project pipeline** concern (how ready work *lands*), but it's currently presented as a **Flywheel** feature (which is really the *orchestrator* — keeping agents working). The Flywheel began as a Overdeck-dev tool; the merge-train is broadly useful to every project.
 
 It's already ~80% structurally decoupled — the engine lives in `src/lib/` + `src/lib/cloister/`, and the reconciler fires from the **post-merge path** (`specialists.ts`), not the flywheel run loop. The remaining coupling is cosmetic/locational:
 

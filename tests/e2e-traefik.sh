@@ -50,7 +50,7 @@ test_fail() {
 cleanup() {
     log_info "Cleaning up test environment..."
 
-    # Stop Panopticon
+    # Stop Overdeck
     pan down 2>/dev/null || true
 
     # Remove test installation

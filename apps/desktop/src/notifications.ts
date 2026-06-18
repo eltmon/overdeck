@@ -1,5 +1,5 @@
 /**
- * Native desktop notifications for Panopticon events.
+ * Native desktop notifications for Overdeck events.
  *
  * Event types and their default enabled state (all configurable in Settings):
  *   inputNeeded   — Agent needs user input (default: on)

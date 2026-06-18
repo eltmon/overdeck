@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Save, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-export const DEFAULT_VOICE_DESIGN_TEST_TEXT = 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.';
+export const DEFAULT_VOICE_DESIGN_TEST_TEXT = 'The quick brown fox jumps over the lazy dog. Overdeck dashboard is now online.';
 
 interface PreviewDesignVoiceInput {
   description: string;

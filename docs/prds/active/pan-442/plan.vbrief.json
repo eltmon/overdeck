@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-07T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-442: Electron desktop app for Panopticon dashboard"
+    "description": "Plan for PAN-442: Electron desktop app for Overdeck dashboard"
   },
   "plan": {
     "id": "pan-442",
-    "title": "Electron desktop app for Panopticon dashboard",
+    "title": "Electron desktop app for Overdeck dashboard",
     "status": "approved",
     "uid": "c8f2a1d4-7e3b-4f6a-9d5c-2b8e4f1a3c7d",
     "author": "agent:claude-opus-4-6",
@@ -19,7 +19,7 @@
     ],
     "tags": ["electron", "desktop", "dashboard", "native-app"],
     "narratives": {
-      "Problem": "Panopticon dashboard requires terminal commands (pan up) and a browser tab. Users want a native desktop experience with one-click launch, system tray monitoring, and OS-level notifications for agent events.",
+      "Problem": "Overdeck dashboard requires terminal commands (pan up) and a browser tab. Users want a native desktop experience with one-click launch, system tray monitoring, and OS-level notifications for agent events.",
       "Proposal": "Wrap the existing dashboard in an Electron shell at apps/desktop/. Main process spawns the Node.js server as a child process, BrowserWindow loads the frontend via custom protocol (packaged) or localhost (dev). Full native integration: system tray with configurable status, per-event-type notifications, playful auto-start nag flow, Cmd+K command palette, and pan up CLI integration."
     },
     "items": [
@@ -259,7 +259,7 @@
       },
       {
         "id": "menu-bar",
-        "title": "Menu bar with Panopticon actions",
+        "title": "Menu bar with Overdeck actions",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-07T18:00:00Z",
@@ -268,12 +268,12 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Build Electron Menu with standard menus (File, Edit, View, Window, Help) plus a Panopticon menu containing: Start Cloister, Stop Cloister, Emergency Stop All Agents, separator, Open Workspace (submenu of active workspaces), separator, Settings, separator, Quit. Menu actions call server API endpoints. Ensure macOS app menu follows platform conventions (app name menu, About, Preferences mapped to Settings)."
+          "Action": "Build Electron Menu with standard menus (File, Edit, View, Window, Help) plus a Overdeck menu containing: Start Cloister, Stop Cloister, Emergency Stop All Agents, separator, Open Workspace (submenu of active workspaces), separator, Settings, separator, Quit. Menu actions call server API endpoints. Ensure macOS app menu follows platform conventions (app name menu, About, Preferences mapped to Settings)."
         },
         "subItems": [
           {
             "id": "menu-bar.ac1",
-            "title": "Panopticon menu with Start/Stop Cloister, Emergency Stop, Open Workspace, Settings, Quit actions",
+            "title": "Overdeck menu with Start/Stop Cloister, Emergency Stop, Open Workspace, Settings, Quit actions",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -342,7 +342,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Modify pan up in src/cli/index.ts to detect if the Electron app is installed (check standard install locations: /usr/local/bin/panopticon, /opt/Panopticon/, ~/Applications/Panopticon.app, /Applications/Panopticon.app). If found, launch the Electron app instead of spawning bare server + opening browser. Add --no-desktop flag to force bare server mode. Falls back gracefully if Electron app not found."
+          "Action": "Modify pan up in src/cli/index.ts to detect if the Electron app is installed (check standard install locations: /usr/local/bin/panopticon, /opt/Overdeck/, ~/Applications/Overdeck.app, /Applications/Overdeck.app). If found, launch the Electron app instead of spawning bare server + opening browser. Add --no-desktop flag to force bare server mode. Falls back gracefully if Electron app not found."
         },
         "subItems": [
           {
@@ -438,7 +438,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Configure electron-builder in apps/desktop/package.json for two targets: Linux (AppImage) and macOS (DMG, both arm64 and x64). Include dist/dashboard/server.js, dist/dashboard/public/, and native addon binaries in the package. Configure electron-rebuild in postinstall to rebuild node-pty for Electron's Node version. Create app icons (Panopticon logo) for both platforms. Add npm scripts: dist:linux, dist:mac. Verify packaged app starts correctly on both platforms."
+          "Action": "Configure electron-builder in apps/desktop/package.json for two targets: Linux (AppImage) and macOS (DMG, both arm64 and x64). Include dist/dashboard/server.js, dist/dashboard/public/, and native addon binaries in the package. Configure electron-rebuild in postinstall to rebuild node-pty for Electron's Node version. Create app icons (Overdeck logo) for both platforms. Add npm scripts: dist:linux, dist:mac. Verify packaged app starts correctly on both platforms."
         },
         "subItems": [
           {

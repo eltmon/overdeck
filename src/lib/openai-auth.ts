@@ -33,7 +33,7 @@ export interface OpenAIAuthStatus {
   accessTokenExpiresAt: number | null;
   /** True when an OpenAI API key is present in auth.json or env. */
   hasOpenAIApiKey: boolean;
-  /** True when Panopticon bridged ~/.codex/auth.json into CLIProxy config. */
+  /** True when Overdeck bridged ~/.codex/auth.json into CLIProxy config. */
   bridgedFromCodex: boolean;
 }
 

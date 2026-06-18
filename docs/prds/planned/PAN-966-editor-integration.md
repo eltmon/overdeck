@@ -2,11 +2,11 @@
 
 ## Summary
 
-Add an **Open in Editor** feature to the Panopticon dashboard, allowing users to open agent workspaces directly in Cursor, VS Code, Windsurf, Zed, or any installed editor with a single click. The implementation adopts T3Code's proven `open.ts` / `editor.ts` / `OpenInPicker.tsx` architecture verbatim (MIT-licensed), preserving class names, interfaces, and file structure to enable ongoing upstream merge from [T3Code](https://github.com/nicepkg/t3code).
+Add an **Open in Editor** feature to the Overdeck dashboard, allowing users to open agent workspaces directly in Cursor, VS Code, Windsurf, Zed, or any installed editor with a single click. The implementation adopts T3Code's proven `open.ts` / `editor.ts` / `OpenInPicker.tsx` architecture verbatim (MIT-licensed), preserving class names, interfaces, and file structure to enable ongoing upstream merge from [T3Code](https://github.com/nicepkg/t3code).
 
 ## Motivation
 
-Panopticon manages agent workspaces as git worktrees (`workspaces/feature-<issue-id>/`). Today, opening one in an editor requires manually copying the path from the InspectorPanel and running `cursor /path` or `code /path` in a terminal. This is friction that compounds across dozens of daily workspace interactions.
+Overdeck manages agent workspaces as git worktrees (`workspaces/feature-<issue-id>/`). Today, opening one in an editor requires manually copying the path from the InspectorPanel and running `cursor /path` or `code /path` in a terminal. This is friction that compounds across dozens of daily workspace interactions.
 
 T3Code already solved this with a clean, cross-platform, well-tested implementation. Rather than reinvent, we adopt their exact patterns — renaming only `t3` → `pan` in service tags and storage keys — so we can pull upstream improvements with minimal merge conflicts.
 
@@ -16,7 +16,7 @@ T3Code already solved this with a clean, cross-platform, well-tested implementat
 2. **Zero native integration**: Launch editors via CLI commands (`cursor`, `code`, `windsurf`), not editor extensions. Fire-and-forget detached processes.
 3. **Auto-detect installed editors**: Scan `$PATH` at server startup, broadcast available editors to the frontend.
 4. **Remember preference**: Persist last-used editor in localStorage, restore on next session.
-5. **Async-only server code**: T3Code uses `statSync`/`accessSync` in `isCommandAvailable()`. Panopticon's server forbids sync FS calls (PAN-70, PAN-446). Port these to `fs/promises` equivalents.
+5. **Async-only server code**: T3Code uses `statSync`/`accessSync` in `isCommandAvailable()`. Overdeck's server forbids sync FS calls (PAN-70, PAN-446). Port these to `fs/promises` equivalents.
 
 ## Upstream Divergence Strategy
 
@@ -77,9 +77,9 @@ Mirrors T3Code exactly, with `@t3tools/contracts` → `@overdeck/contracts`:
  Cursor  Windsurf  VS Code  Zed   File Manager
 ```
 
-## File Mapping (T3Code → Panopticon)
+## File Mapping (T3Code → Overdeck)
 
-| T3Code source | Panopticon target | Changes |
+| T3Code source | Overdeck target | Changes |
 |--------------|-------------------|---------|
 | `packages/contracts/src/editor.ts` | `packages/contracts/src/editor.ts` | Add Windsurf entry; `OpenError` → reuse `PanRpcError` |
 | `apps/server/src/open.ts` | `src/dashboard/server/services/open.ts` | `"t3/open"` → `"pan/open"`; async FS; cache available editors |

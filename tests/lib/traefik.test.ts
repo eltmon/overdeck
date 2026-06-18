@@ -5,29 +5,29 @@ import { tmpdir } from 'os';
 
 describe('traefik config generation', () => {
   let tempDir: string;
-  let originalPanopticonHome: string | undefined;
-  let originalPanopticonDev: string | undefined;
+  let originalOverdeckHome: string | undefined;
+  let originalOverdeckDev: string | undefined;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-traefik-test-'));
-    originalPanopticonHome = process.env.OVERDECK_HOME;
-    originalPanopticonDev = process.env.OVERDECK_DEV;
+    originalOverdeckHome = process.env.OVERDECK_HOME;
+    originalOverdeckDev = process.env.OVERDECK_DEV;
     process.env.OVERDECK_HOME = tempDir;
     delete process.env.OVERDECK_DEV;
     vi.resetModules();
   });
 
   afterEach(() => {
-    if (originalPanopticonHome === undefined) {
+    if (originalOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     }
 
-    if (originalPanopticonDev === undefined) {
+    if (originalOverdeckDev === undefined) {
       delete process.env.OVERDECK_DEV;
     } else {
-      process.env.OVERDECK_DEV = originalPanopticonDev;
+      process.env.OVERDECK_DEV = originalOverdeckDev;
     }
 
     rmSync(tempDir, { recursive: true, force: true });
@@ -45,9 +45,9 @@ describe('traefik config generation', () => {
       '',
     ].join('\n'));
 
-    const { generatePanopticonTraefikConfigSync } = await import('../../src/lib/traefik.js');
+    const { generateOverdeckTraefikConfigSync } = await import('../../src/lib/traefik.js');
 
-    expect(generatePanopticonTraefikConfigSync()).toBe(true);
+    expect(generateOverdeckTraefikConfigSync()).toBe(true);
 
     const rendered = readFileSync(join(tempDir, 'traefik', 'dynamic', 'panopticon.yml'), 'utf-8');
 

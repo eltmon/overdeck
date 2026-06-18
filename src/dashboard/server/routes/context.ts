@@ -31,7 +31,7 @@ import {
   codexGlobalContextFile,
 } from '../../../lib/context-layers/layers.js';
 import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context-layers/render.js';
-import { CLAUDE_DIR, getPanopticonHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
+import { CLAUDE_DIR, getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -72,8 +72,8 @@ const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
 const decodeSaveRequest = Schema.decodeUnknownSync(ContextLayerSaveRequest);
 
-function globalContextFile(panopticonHome = getPanopticonHome()): string {
-  return panopticonHome === getPanopticonHome()
+function globalContextFile(panopticonHome = getOverdeckHome()): string {
+  return panopticonHome === getOverdeckHome()
     ? defaultGlobalContextFile()
     : join(panopticonHome, 'context', 'global.md');
 }
@@ -252,10 +252,10 @@ async function describeSyncTarget(
 }
 
 /**
- * The files `pan sync` writes Panopticon-managed regions into: the global
+ * The files `pan sync` writes Overdeck-managed regions into: the global
  * Claude Code CLAUDE.md, and — for each project with a `project.md` — that
  * project's CLAUDE.md (Claude Code) and AGENTS.md (Pi). The Pi global layer is
- * a Panopticon-owned file, not a user file, so it is not listed as a target.
+ * a Overdeck-owned file, not a user file, so it is not listed as a target.
  */
 async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTarget[]> {
   const targets: ContextSyncTarget[] = [
@@ -279,7 +279,7 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
 
 export async function buildContextLayerState(
   projects: ProjectEntry[],
-  panopticonHome = getPanopticonHome(),
+  panopticonHome = getOverdeckHome(),
 ): Promise<ContextLayerState> {
   const catalog = await buildContextCatalog(projects);
   const resolvedLayers: ResolvedLayer[] = [
@@ -313,7 +313,7 @@ export async function buildContextLayerState(
 
 export async function loadContextLayers(
   projects: ProjectEntry[],
-  panopticonHome = getPanopticonHome(),
+  panopticonHome = getOverdeckHome(),
 ): Promise<ContextLayersResponse> {
   const { resolvedLayers: _resolvedLayers, ...response } = await buildContextLayerState(projects, panopticonHome);
   return response;
@@ -371,7 +371,7 @@ async function renderBundledRulesAsync(harness: Harness): Promise<string> {
       }),
   );
   const rendered = sections.filter((section) => section.length > 0);
-  return rendered.length > 0 ? `## Panopticon Engineering Rules\n\n${rendered.join('\n\n')}` : '';
+  return rendered.length > 0 ? `## Overdeck Engineering Rules\n\n${rendered.join('\n\n')}` : '';
 }
 
 function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): string {
@@ -391,7 +391,7 @@ function renderLayerSections(layers: readonly ResolvedLayer[], drafts: ReadonlyM
 async function previewForHarness(layers: readonly ResolvedLayer[], drafts: ReadonlyMap<string, string>, harness: Harness): Promise<string> {
   const title = harness === 'claude-code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : 'Pi';
   return [
-    `# Panopticon injected context preview (${title})`,
+    `# Overdeck injected context preview (${title})`,
     renderLayerSections(layers, drafts, harness),
     await renderBundledRulesAsync(harness),
   ].filter((section) => section.trim().length > 0).join('\n\n---\n\n');
@@ -401,17 +401,17 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
   return [
     '# Full injected prompt preview',
     '',
-    'Private harness base prompt: Unavailable. Panopticon cannot inspect or reproduce the private base prompt owned by the harness provider.',
+    'Private harness base prompt: Unavailable. Overdeck cannot inspect or reproduce the private base prompt owned by the harness provider.',
     '',
-    '## Panopticon-controlled Claude Code bundle',
+    '## Overdeck-controlled Claude Code bundle',
     '',
     previews['claude-code'] || '(no rendered context)',
     '',
-    '## Panopticon-controlled Pi bundle',
+    '## Overdeck-controlled Pi bundle',
     '',
     previews.pi || '(no rendered context)',
     '',
-    '## Panopticon-controlled Codex bundle',
+    '## Overdeck-controlled Codex bundle',
     '',
     previews.codex || '(no rendered context)',
     '',
@@ -452,19 +452,19 @@ export async function previewContextLayers(
 export async function previewContextLayers(
   projects: ProjectEntry[],
   requestOrSelectedLayer: ContextPreviewRequest | ContextLayerTarget,
-  maybeDraftsOrPanopticonHome?: readonly ContextLayerDraft[] | string,
-  maybePanopticonHome = getPanopticonHome(),
+  maybeDraftsOrOverdeckHome?: readonly ContextLayerDraft[] | string,
+  maybeOverdeckHome = getOverdeckHome(),
 ): Promise<ContextPreviewResponse> {
   const request = 'operation' in requestOrSelectedLayer
     ? requestOrSelectedLayer
     : {
         operation: 'preview' as const,
         selectedLayer: requestOrSelectedLayer,
-        drafts: Array.isArray(maybeDraftsOrPanopticonHome) ? maybeDraftsOrPanopticonHome : [],
+        drafts: Array.isArray(maybeDraftsOrOverdeckHome) ? maybeDraftsOrOverdeckHome : [],
       };
-  const panopticonHome = typeof maybeDraftsOrPanopticonHome === 'string'
-    ? maybeDraftsOrPanopticonHome
-    : maybePanopticonHome;
+  const panopticonHome = typeof maybeDraftsOrOverdeckHome === 'string'
+    ? maybeDraftsOrOverdeckHome
+    : maybeOverdeckHome;
   const state = await buildContextLayerState(projects, panopticonHome);
   requireLayer(state, request.selectedLayer);
   const drafts = draftContentByTarget(state, request.drafts);
@@ -499,19 +499,19 @@ export async function saveContextLayer(
 export async function saveContextLayer(
   projects: ProjectEntry[],
   requestOrTarget: ContextLayerSaveRequest | ContextLayerTarget,
-  maybeContentOrPanopticonHome?: string,
-  maybePanopticonHome = getPanopticonHome(),
+  maybeContentOrOverdeckHome?: string,
+  maybeOverdeckHome = getOverdeckHome(),
 ): Promise<ContextLayerSaveResponse> {
   const request = 'operation' in requestOrTarget
     ? requestOrTarget
     : {
         operation: 'save' as const,
         target: requestOrTarget,
-        content: maybeContentOrPanopticonHome ?? '',
+        content: maybeContentOrOverdeckHome ?? '',
       };
   const panopticonHome = 'operation' in requestOrTarget
-    ? maybeContentOrPanopticonHome ?? maybePanopticonHome
-    : maybePanopticonHome;
+    ? maybeContentOrOverdeckHome ?? maybeOverdeckHome
+    : maybeOverdeckHome;
   const state = await buildContextLayerState(projects, panopticonHome);
   const layer = requireLayer(state, request.target);
   if (!pathWithin(layer.dir, layer.file)) {

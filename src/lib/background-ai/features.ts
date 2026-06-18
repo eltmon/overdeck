@@ -1,7 +1,7 @@
 /**
  * Background AI enablement gate (PAN-1583).
  *
- * Panopticon makes a number of automatic, background LLM calls on the user's
+ * Overdeck makes a number of automatic, background LLM calls on the user's
  * behalf — conversation titles, memory extraction, enrichment, TTS narration,
  * etc. — independent of the work/plan/review/test/ship pipeline agents.
  *

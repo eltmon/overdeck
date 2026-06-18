@@ -311,7 +311,7 @@ describe('AgentState role persistence', () => {
     const emitActivityEntry = vi.fn();
     const resolvedProject = {
       projectKey: 'panopticon',
-      projectName: 'Panopticon',
+      projectName: 'Overdeck',
       projectPath: workspace,
       linearTeam: 'PAN',
     };

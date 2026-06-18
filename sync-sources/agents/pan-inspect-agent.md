@@ -10,7 +10,7 @@ tools:
   - Bash
 ---
 
-# Panopticon Inspect Agent
+# Overdeck Inspect Agent
 
 Per-bead specification verifier. Runs against the scoped diff of a single bead immediately after `bd close`.
 

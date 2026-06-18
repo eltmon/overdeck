@@ -1,7 +1,7 @@
 /**
  * Workspace context assembly (PAN-1201).
  *
- * The workspace layer is not hand-authored — Panopticon assembles it when a
+ * The workspace layer is not hand-authored — Overdeck assembles it when a
  * workspace is created, into `<workspace>/.pan/context/workspace.md`. It is a
  * single bundle composed, in order, of:
  *

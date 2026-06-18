@@ -167,7 +167,7 @@ export function buildStatusRollupPrompt(input: {
   archivedStatuses: MemoryStatus[];
 }): string {
   return [
-    'Synthesize the current Panopticon workspace memory status from recent evidence.',
+    'Synthesize the current Overdeck workspace memory status from recent evidence.',
     'Return the full status object. This status is a fresh replacement, not a cumulative append-only summary.',
     'You may add, update, delete, or leave fields unchanged relative to previous statuses based only on current evidence.',
     'Refresh workingSet every cycle from files currently relevant in the evidence; do not carry forward stale files.',

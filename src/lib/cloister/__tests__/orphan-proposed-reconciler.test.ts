@@ -137,7 +137,7 @@ describe('orphan proposed spec reconciler', () => {
       prNumber: 1707,
     }));
     const options = {
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [] as string[],
       getAgentStateForIssue: async () => ({ status: 'stopped' as const, paused: false, troubled: false }),
       getReviewStatusForIssue,
@@ -163,7 +163,7 @@ describe('orphan proposed spec reconciler', () => {
     writeBeads(projectPath, 'PAN-3402');
 
     await expect(findOrphanProposedSpecsForReconciler({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       getReviewStatusForIssue: () => ({
@@ -194,7 +194,7 @@ describe('orphan proposed spec reconciler', () => {
     });
 
     await expect(findOrphanProposedSpecsForReconciler({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -217,7 +217,7 @@ describe('orphan proposed spec reconciler', () => {
     writeBeads(projectPath, 'PAN-3004');
 
     await expect(findOrphanProposedSpecsForReconciler({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: ['agent-pan-3002'],
       getAgentStateForIssue: async (agentId) => agentId === 'agent-pan-3003'
         ? { status: 'stopped', paused: true, troubled: false }
@@ -226,7 +226,7 @@ describe('orphan proposed spec reconciler', () => {
     })).resolves.toEqual([
       expect.objectContaining({
         projectKey: 'panopticon',
-        projectName: 'Panopticon CLI',
+        projectName: 'Overdeck CLI',
         issueId: 'PAN-3001',
         beadCount: 2,
         planItemCount: 2,
@@ -241,7 +241,7 @@ describe('orphan proposed spec reconciler', () => {
     writeBeads(projectPath, 'PAN-3501');
 
     await expect(findOrphanProposedSpecsForReconciler({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: ['agent-pan-3501-review-security'],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -255,7 +255,7 @@ describe('orphan proposed spec reconciler', () => {
     writeBeads(projectPath, 'PAN-3501');
 
     await expect(findOrphanProposedSpecsForReconciler({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: ['agent-pan-35011-review-security'],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -271,7 +271,7 @@ describe('orphan proposed spec reconciler', () => {
     writeRedirectBeads(projectPath, 'PAN-3005');
 
     await expect(findOrphanProposedSpecsForReconciler({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -290,7 +290,7 @@ describe('orphan proposed spec reconciler', () => {
     writeSpec(projectPath, 'PAN-3101', 'proposed');
     writeBeads(projectPath, 'PAN-3101');
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3101' }));
-    const projects = [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }];
+    const projects = [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }];
 
     await expect(reconcileOrphanProposedSpecs({
       projects,
@@ -324,7 +324,7 @@ describe('orphan proposed spec reconciler', () => {
     const hasOpenPrForBranch = vi.fn(async () => true);
 
     await expect(reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -350,7 +350,7 @@ describe('orphan proposed spec reconciler', () => {
     });
 
     await expect(reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -375,7 +375,7 @@ describe('orphan proposed spec reconciler', () => {
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3603' }));
 
     await expect(reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -399,7 +399,7 @@ describe('orphan proposed spec reconciler', () => {
     writeBeads(projectPath, 'PAN-3151');
 
     await reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
@@ -441,7 +441,7 @@ describe('orphan proposed spec reconciler', () => {
       error: 'Issue PAN-3153 is already closed (done). Cannot start an agent for a closed issue.',
     }));
     const baseOpts = {
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [] as string[],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set<string>(),
@@ -470,7 +470,7 @@ describe('orphan proposed spec reconciler', () => {
     writeBeads(projectPath, 'PAN-3152');
 
     const baseOpts = {
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [] as string[],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set<string>(),
@@ -491,7 +491,7 @@ describe('orphan proposed spec reconciler', () => {
     const spawnWorkAgent = vi.fn(async () => ({ spawned: true, agentId: 'agent-pan-3201' }));
 
     await expect(reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: join(testDir, 'missing') } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: join(testDir, 'missing') } }],
       config: { enabled: false },
       spawnWorkAgent,
     })).resolves.toEqual([]);

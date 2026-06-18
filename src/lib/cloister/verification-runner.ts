@@ -500,8 +500,8 @@ function getSyncTargetBranch(
         const repo = project?.github_repo;
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
-        const { postPanopticonTestsStatus } = await import('../github-app.js');
-        await postPanopticonTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed');
+        const { postOverdeckTestsStatus } = await import('../github-app.js');
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed');
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post panopticon/tests status: ${err.message}`);
       }

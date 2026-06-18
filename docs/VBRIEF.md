@@ -1,16 +1,16 @@
 # vBRIEF Plan Format & Lifecycle
 
-Panopticon uses [vBRIEF v0.6](https://github.com/deftai/vBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
+Overdeck uses [vBRIEF v0.6](https://github.com/deftai/vBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
 
 ## Specification
 
 The canonical vBRIEF specification is maintained at **[github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)**.
 
-Panopticon emits vBRIEF v0.6 files with metadata extensions for issue tracking and difficulty estimation. Readers remain compatible with v0.5 documents. We also maintain a [fork of the spec](https://github.com/eltmon/vBRIEF) and have an open [extension proposal](https://github.com/deftai/vBRIEF/issues/1).
+Overdeck emits vBRIEF v0.6 files with metadata extensions for issue tracking and difficulty estimation. Readers remain compatible with v0.5 documents. We also maintain a [fork of the spec](https://github.com/eltmon/vBRIEF) and have an open [extension proposal](https://github.com/deftai/vBRIEF/issues/1).
 
 ## v0.6 Compatibility
 
-Panopticon emits `"version": "0.6"` for new vBRIEF documents. Readers accept both `"0.5"` and `"0.6"` documents.
+Overdeck emits `"version": "0.6"` for new vBRIEF documents. Readers accept both `"0.5"` and `"0.6"` documents.
 
 v0.6 uses nested `items` for acceptance-criterion child items. Legacy v0.5 `subItems` are still read as an alias, and readers prefer `items` when both fields are present.
 
@@ -22,7 +22,7 @@ The item status enum includes `failed` in addition to `draft`, `proposed`, `appr
 
 ### Directory Structure
 
-All Panopticon orchestration state lives under `.pan/` — a single dot-directory at the project root (same convention as `.git/`, `.github/`, `.beads/`).
+All Overdeck orchestration state lives under `.pan/` — a single dot-directory at the project root (same convention as `.git/`, `.github/`, `.beads/`).
 
 #### On main (project root):
 
@@ -356,9 +356,9 @@ Edge semantics:
 
 Only `blocks` edges are used for critical path computation and bead scheduling (`bd ready`).
 
-### Panopticon Extensions (via `metadata`)
+### Overdeck Extensions (via `metadata`)
 
-The vBRIEF spec supports arbitrary `metadata` on items and child items. Panopticon uses these metadata fields:
+The vBRIEF spec supports arbitrary `metadata` on items and child items. Overdeck uses these metadata fields:
 
 | Field | Location | Description |
 |-------|----------|-------------|
@@ -408,7 +408,7 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 
 ---
 
-## How Panopticon Uses vBRIEF
+## How Overdeck Uses vBRIEF
 
 1. **PRD authored** — human or planning agent writes a PRD to `.pan/drafts/` on main.
 2. **Planning agent** converts the PRD into a vBRIEF spec during the discovery session. Creates `plan.vbrief.json` in the workspace `.pan/` directory.
@@ -501,15 +501,15 @@ The `readPlan()` function in `src/lib/vbrief/io.ts` normalizes flat format plans
 
 ## Divergence from deft
 
-Panopticon adapts deft's lifecycle model for multi-agent, multi-issue orchestration:
+Overdeck adapts deft's lifecycle model for multi-agent, multi-issue orchestration:
 
-| deft Constraint | Panopticon Divergence |
+| deft Constraint | Overdeck Divergence |
 |-----------------|----------------------|
 | One `plan.vbrief.json` per project | N concurrent vBRIEFs per project (one per issue) |
 | Serialized changes | N agents on N issues in parallel, each in its own workspace |
 | `history/changes/` folder structure | Issue-keyed filenames in `.pan/specs/` |
 | Status = directory location | Status = JSON field (files never move) |
 | `specification.vbrief.json` required | Optional (exists in repo but not enforced) |
-| `playbook-{name}.vbrief.json` | Panopticon uses skills for this |
+| `playbook-{name}.vbrief.json` | Overdeck uses skills for this |
 
-The vBRIEF format itself works without modification — it's the single-plan-per-project constraint that Panopticon relaxes.
+The vBRIEF format itself works without modification — it's the single-plan-per-project constraint that Overdeck relaxes.

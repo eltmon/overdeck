@@ -96,7 +96,7 @@ export const ContextLayerDraft = Schema.Struct({
 export type ContextLayerDraft = typeof ContextLayerDraft.Type
 
 /**
- * A rendered output file `pan sync` writes a Panopticon-managed region into
+ * A rendered output file `pan sync` writes a Overdeck-managed region into
  * (e.g. ~/.claude/CLAUDE.md, a project's CLAUDE.md or AGENTS.md). Distinct from
  * the editable *layer source* files — this describes the injection *target* so
  * the dashboard can show the user exactly where context lands and reassure them
@@ -111,7 +111,7 @@ export const ContextSyncTarget = Schema.Struct({
   /** Resolved absolute path of the target file. */
   path: Schema.String,
   exists: Schema.Boolean,
-  /** True when the file already contains a Panopticon-managed region. */
+  /** True when the file already contains a Overdeck-managed region. */
   hasManagedRegion: Schema.Boolean,
   /** True when the file has hand-authored content outside the managed region. */
   hasUserContent: Schema.Boolean,

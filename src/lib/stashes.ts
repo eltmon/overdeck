@@ -6,10 +6,10 @@ import { GitError } from './errors.js';
 const execAsync = promisify(exec);
 
 /**
- * Canonical stash kinds Panopticon creates.
+ * Canonical stash kinds Overdeck creates.
  *
  * PAN-1531: collapsed from four kinds to one. The retired kinds (`pre-merge`,
- * `pre-spawn`, `review-temp`) are no longer created by Panopticon code, but
+ * `pre-spawn`, `review-temp`) are no longer created by Overdeck code, but
  * `parseCanonicalStashMessage` still recognizes them so existing stashes in
  * `refs/stash` parse correctly during cleanup. Only `salvageable` may be
  * created going forward — see /home/eltmon/.panopticon/context/global.md
@@ -28,7 +28,7 @@ export interface ParsedStashEntry {
   createdAt?: Date;
   issueId?: string;
   /**
-   * `'salvageable'` for canonical stashes Panopticon creates today.
+   * `'salvageable'` for canonical stashes Overdeck creates today.
    * `'pre-merge' | 'pre-spawn' | 'review-temp'` for stashes left behind by
    * the pre-PAN-1531 pipeline; recognized for cleanup but never created anew.
    * `'unknown'` for hand-typed or otherwise unrecognized stashes.
@@ -78,10 +78,10 @@ function validateIssueId(issueId: string): string {
 /**
  * Build a canonical stash message.
  *
- * PAN-1531: `salvageable` is the only canonical kind Panopticon creates.
+ * PAN-1531: `salvageable` is the only canonical kind Overdeck creates.
  * Retired overloads for `pre-merge` / `pre-spawn` / `review-temp` were
  * removed when their callers were deleted. Any human who wants a stash
- * Panopticon will leave alone uses `salvageable:`.
+ * Overdeck will leave alone uses `salvageable:`.
  */
 export function buildStashMessage(
   kind: CanonicalStashKind,

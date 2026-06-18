@@ -1,7 +1,7 @@
 # PAN-3: Comprehensive Agent Skills Suite - STATE
 
 ## Issue Summary
-Create a full suite of `pan-*` skills that guide AI assistants through Panopticon operations. Skills should enable conversational guidance so users never need to learn CLI commands directly.
+Create a full suite of `pan-*` skills that guide AI assistants through Overdeck operations. Skills should enable conversational guidance so users never need to learn CLI commands directly.
 
 ## Key Decisions
 
@@ -11,7 +11,7 @@ Create a full suite of `pan-*` skills that guide AI assistants through Panoptico
 Skills help AI assistants:
 - Understand when to invoke which `pan` CLI commands
 - Guide users through configuration decisions
-- Provide context about how Panopticon components work together
+- Provide context about how Overdeck components work together
 - Offer troubleshooting guidance
 
 ### 2. Naming Convention
@@ -49,10 +49,10 @@ repo/skills/pan-*/           ← SOURCE OF TRUTH (version controlled)
 - `~/.panopticon/skills/pan-*/` (working now via `pan sync`)
 - `./skills/pan-*/` (committed to repo)
 
-**Project-specific skills** (not Panopticon generic):
+**Project-specific skills** (not Overdeck generic):
 - Live in `{project}/.claude/skills/` (git-tracked in the project)
-- These are NOT managed by Panopticon
-- `pan sync` adds Panopticon skills alongside, never replaces project skills
+- These are NOT managed by Overdeck
+- `pan sync` adds Overdeck skills alongside, never replaces project skills
 - "Git-tracked always wins" - project skills take precedence
 
 ### 4. Docker Templates
@@ -98,7 +98,7 @@ No new infrastructure needed - just guidance skills.
 | P0 | `pan-status` | Check running agents, workspaces, health |
 | P0 | `pan-plan` | Planning workflow with AI discovery |
 | P0 | `pan-issue` | Create workspace + spawn agent |
-| P1 | `pan-config` | View/edit Panopticon configuration |
+| P1 | `pan-config` | View/edit Overdeck configuration |
 | P1 | `pan-tracker` | Configure issue tracker (Linear/GitHub/GitLab) |
 | P1 | `pan-projects` | Add/remove managed projects |
 | P1 | `pan-docker` | Docker template selection and configuration |
@@ -143,7 +143,7 @@ pan-{name}/
 ```yaml
 ---
 name: pan-help
-description: Overview of all Panopticon commands and capabilities
+description: Overview of all Overdeck commands and capabilities
 triggers:
   - pan help
   - panopticon help
@@ -276,16 +276,16 @@ Reference implementation for new skills:
 ```markdown
 ---
 name: pan-help
-description: Overview of all Panopticon commands and capabilities
+description: Overview of all Overdeck commands and capabilities
 ---
 
-# Panopticon Help
+# Overdeck Help
 
 ## Overview
 [What this skill helps with]
 
 ## When to Use
-- User asks about Panopticon capabilities
+- User asks about Overdeck capabilities
 - User is confused about which command to use
 - First-time users exploring the system
 

@@ -173,7 +173,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   const bootGates = resolveBootGates(options);
   console.log(chalk.dim(`  Boot gates: ${formatBootGateState(bootGates)}`));
 
-  console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
+  console.log(chalk.bold(`Restarting Overdeck (${scope})...\n`));
 
   // Refuse to hijack a running `pan dev` session into detached production mode.
   if (scope === 'dashboard' || scope === 'full') {

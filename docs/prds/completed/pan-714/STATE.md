@@ -70,7 +70,7 @@ User chose "both" over "helpers only" or "command-level only". Plan:
 - **No scope creep.** This is a cleanup issue. Do not rewrite `doneCommand`; only extract pre-flight checks. Do not restructure `approveCommand`; only export and test the helpers it already has.
 - **Preserve existing behavior exactly.** Pre-flight extraction must produce identical failure output and exit codes. Add a snapshot/golden-output test for one failing-pre-flight run to lock this in.
 - **Don't break `pan sync` for non-panopticon projects.** The new project-level `.claude/skills/` mirror must only activate when a top-level `./skills/` directory exists with at least one `SKILL.md` descendant. Every other project behaves exactly as before.
-- **Keep `.gitignore` inside `.claude/skills/`** — it ignores Panopticon-managed symlinks created by older `pan sync` versions.
+- **Keep `.gitignore` inside `.claude/skills/`** — it ignores Overdeck-managed symlinks created by older `pan sync` versions.
 - **Vitest + existing test conventions only.** No new test frameworks.
 
 ## Out of scope

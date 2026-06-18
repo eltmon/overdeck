@@ -2,12 +2,12 @@ import { randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export const PTY_TOKEN_HEADER = 'x-panopticon-pty-token';
 
 function ptyTokenDir(agentId: string): string {
-  return join(getPanopticonHome(), 'agents', agentId);
+  return join(getOverdeckHome(), 'agents', agentId);
 }
 
 export function getPtyTokenPath(agentId: string): string {

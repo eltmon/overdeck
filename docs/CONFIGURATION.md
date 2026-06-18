@@ -1,6 +1,6 @@
 # Configuration Guide
 
-Complete guide to configuring Panopticon's multi-model routing system.
+Complete guide to configuring Overdeck's multi-model routing system.
 
 ## Table of Contents
 
@@ -36,13 +36,13 @@ Complete guide to configuring Panopticon's multi-model routing system.
    ZAI_API_KEY=...
    ```
 
-3. **Start using Panopticon** - it works!
+3. **Start using Overdeck** - it works!
 
 ---
 
 ## Configuration Files
 
-Panopticon uses two configuration file types:
+Overdeck uses two configuration file types:
 
 ### Global Configuration: `~/.panopticon/config.yaml`
 
@@ -141,7 +141,7 @@ LINEAR_API_KEY=lin_api_...
 HUME_API_KEY=your-hume-api-key
 ```
 
-**Note**: Direct-compatible providers (Kimi, GLM, MiniMax, MiMo) route through their native Anthropic-compatible endpoints. OpenAI and Gemini route through Panopticon's built-in CLIProxy sidecar.
+**Note**: Direct-compatible providers (Kimi, GLM, MiniMax, MiMo) route through their native Anthropic-compatible endpoints. OpenAI and Gemini route through Overdeck's built-in CLIProxy sidecar.
 
 **Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below).
 
@@ -149,14 +149,14 @@ HUME_API_KEY=your-hume-api-key
 
 ## Permission Mode
 
-Every Claude Code agent Panopticon spawns runs autonomously — no human is sitting at the
+Every Claude Code agent Overdeck spawns runs autonomously — no human is sitting at the
 prompt to click "approve" on each tool call. To make that work, every spawn site passes
-permission flags to `claude`. Panopticon ships with two modes for those flags:
+permission flags to `claude`. Overdeck ships with two modes for those flags:
 
 | Mode | Flags passed | Behavior |
 |------|--------------|----------|
 | `auto` (**default since 0.8.16**) | `--permission-mode auto` | Claude Code's built-in classifier auto-approves safe tool calls and **blocks destructive ones** — force pushes, exfiltration, `rm -rf`, writes outside the workspace, etc. |
-| `bypass` | `--dangerously-skip-permissions --permission-mode bypassPermissions` | Historical Panopticon behavior: every tool call auto-approved, no classifier. Use when you genuinely want zero gating, or when an agent runs against a non-Anthropic backend that rejects the `auto` flag. |
+| `bypass` | `--dangerously-skip-permissions --permission-mode bypassPermissions` | Historical Overdeck behavior: every tool call auto-approved, no classifier. Use when you genuinely want zero gating, or when an agent runs against a non-Anthropic backend that rejects the `auto` flag. |
 
 ### Prereq for `auto` mode
 
@@ -224,7 +224,7 @@ Highest wins:
 
 - **`claudish`-routed providers** (Kimi, MiniMax, GLM, OpenRouter, Mimo, OpenAI non-subscription, Google CodeAssist) are **always pinned to `bypass`**, regardless of config. `auto` is a Claude Code research-preview feature that doesn't translate through claudish to the upstream provider. Tracked in [#1015](https://github.com/eltmon/panopticon-cli/issues/1015) — once claudish is fully replaced by CLIProxy, every provider will honor the config.
 - **CLIProxy-routed OpenAI subscription** does honor the config — `claude` is still the binary, only `ANTHROPIC_BASE_URL` points at the local sidecar.
-- Settings on **`~/.claude/settings.json`** are per-user, not per-project. Each developer needs `skipAutoPermissionPrompt: true` on their own machine. Panopticon doesn't write this for you.
+- Settings on **`~/.claude/settings.json`** are per-user, not per-project. Each developer needs `skipAutoPermissionPrompt: true` on their own machine. Overdeck doesn't write this for you.
 
 ### When to switch back to `bypass`
 
@@ -366,11 +366,11 @@ models:
 
 ## Parallel Review Agents
 
-Panopticon's review specialist runs multiple reviewer agents in parallel before producing a synthesis report. You can customize which agents run, their models, and their focus areas via the `specialists.review_agents` list in `~/.panopticon/cloister.toml`.
+Overdeck's review specialist runs multiple reviewer agents in parallel before producing a synthesis report. You can customize which agents run, their models, and their focus areas via the `specialists.review_agents` list in `~/.panopticon/cloister.toml`.
 
 ### Default Reviewers
 
-When `review_agents` is not configured, Panopticon uses three built-in reviewers:
+When `review_agents` is not configured, Overdeck uses three built-in reviewers:
 
 | Name | Focus |
 |---|---|
@@ -448,7 +448,7 @@ Enable or disable entire model families.
 ```yaml
 models:
   providers:
-    anthropic: true   # Always enabled (Panopticon requires Claude)
+    anthropic: true   # Always enabled (Overdeck requires Claude)
     openai: true      # Enable OpenAI models (gpt-*, o3-*)
     google: true      # Enable Google models (gemini-*)
     zai: false        # Disable Z.AI models (glm-*)
@@ -476,11 +476,11 @@ models:
 
 ## Model Deprecation & Migration
 
-When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Panopticon automatically migrates your configuration to use the current model IDs.
+When model IDs change (e.g., `claude-opus-4-5` → `claude-opus-4-6`), Overdeck automatically migrates your configuration to use the current model IDs.
 
 ### How It Works
 
-1. **Auto-Detection**: When you load settings (via Dashboard or CLI), Panopticon checks your model overrides against a deprecation mapping
+1. **Auto-Detection**: When you load settings (via Dashboard or CLI), Overdeck checks your model overrides against a deprecation mapping
 2. **Automatic Backup**: If deprecated models are found, `config.yaml.bak` is created before any changes
 3. **Silent Migration**: Deprecated model IDs are replaced with current equivalents in memory and on disk
 4. **Console Logging**: Migration actions are logged to the console
@@ -552,7 +552,7 @@ cp ~/.panopticon/config.yaml.bak ~/.panopticon/config.yaml
 
 ## Fallback Strategy
 
-When API keys are missing or providers disabled, Panopticon falls back to Anthropic models.
+When API keys are missing or providers disabled, Overdeck falls back to Anthropic models.
 
 ### Fallback Mappings
 
@@ -597,7 +597,7 @@ Warning: Model gpt-5.2-codex requires openai API key - falling back to claude-so
 
 ### Example 1: Default Setup (Balanced)
 
-Use Panopticon with sensible defaults.
+Use Overdeck with sensible defaults.
 
 **~/.panopticon/config.yaml**:
 ```yaml
@@ -732,7 +732,7 @@ models:
 
 ## Precedence Rules
 
-When multiple configuration sources exist, Panopticon resolves model selection in this order:
+When multiple configuration sources exist, Overdeck resolves model selection in this order:
 
 ### Resolution Order
 
@@ -770,7 +770,7 @@ models:
 
 To see which model is selected for a specific work type:
 
-Use the Settings page and the documented YAML files as the source of truth for model routing. Panopticon does not currently expose a `pan admin config show|get|set|validate` CLI for router inspection.
+Use the Settings page and the documented YAML files as the source of truth for model routing. Overdeck does not currently expose a `pan admin config show|get|set|validate` CLI for router inspection.
 
 For the older TOML-backed runtime config, the currently supported admin CLI surface is shadow mode only:
 
@@ -784,7 +784,7 @@ pan config get issue-agent:implementation
 
 ### Validation
 
-Panopticon validates configuration on startup:
+Overdeck validates configuration on startup:
 - Invalid work type IDs → Warning logged, ignored
 - Missing API keys → Fallback applied
 - Syntax errors → Error message, defaults used
@@ -805,7 +805,7 @@ pan migrate-config
 
 ## Using Alternative LLM APIs with Claude Code
 
-When working on Panopticon, you can configure Claude Code itself to use third-party LLM APIs like Kimi instead of Anthropic's API. This is separate from Panopticon's multi-model routing and affects the Claude Code CLI tool you use to interact with Panopticon.
+When working on Overdeck, you can configure Claude Code itself to use third-party LLM APIs like Kimi instead of Anthropic's API. This is separate from Overdeck's multi-model routing and affects the Claude Code CLI tool you use to interact with Overdeck.
 
 ### API Compatibility Levels
 
@@ -889,7 +889,7 @@ You should see the custom API endpoint listed in the status output.
 
 ### CLIProxy Sidecar (OpenAI, Gemini)
 
-For providers whose APIs differ from Anthropic's format (OpenAI, Gemini), Panopticon
+For providers whose APIs differ from Anthropic's format (OpenAI, Gemini), Overdeck
 runs a local CLIProxy sidecar that translates requests. The sidecar starts
 automatically with the dashboard — no manual installation needed.
 
@@ -899,11 +899,11 @@ automatically with the dashboard — no manual installation needed.
 
 ### Important Notes
 
-- This configures **Claude Code** (the CLI tool), not Panopticon's agent routing
-- Panopticon agents spawned via `pan work issue` will inherit this configuration
+- This configures **Claude Code** (the CLI tool), not Overdeck's agent routing
+- Overdeck agents spawned via `pan work issue` will inherit this configuration
 - All Claude Code sessions in the terminal will use the configured endpoint
 - To switch back to Anthropic, unset the environment variables
-- For Panopticon multi-model routing (mixing providers in one workflow), see PAN-78
+- For Overdeck multi-model routing (mixing providers in one workflow), see PAN-78
 
 ### Resources
 
@@ -915,13 +915,13 @@ automatically with the dashboard — no manual installation needed.
 
 ## External Service Integrations
 
-Panopticon can manage external service configurations as part of the workspace lifecycle. These are configured per-project in `~/.panopticon/projects.yaml` under the `workspace` section.
+Overdeck can manage external service configurations as part of the workspace lifecycle. These are configured per-project in `~/.panopticon/projects.yaml` under the `workspace` section.
 
 ## Project Registry Source Of Truth
 
-The runtime project registry is `~/.panopticon/projects.yaml`; `PROJECTS_CONFIG_FILE` resolves to that file and the dashboard reads it directly. The tracked `.panopticon/projects.yaml` in this repository is a portable seed/snapshot for Panopticon development workspaces, not the active runtime config.
+The runtime project registry is `~/.panopticon/projects.yaml`; `PROJECTS_CONFIG_FILE` resolves to that file and the dashboard reads it directly. The tracked `.panopticon/projects.yaml` in this repository is a portable seed/snapshot for Overdeck development workspaces, not the active runtime config.
 
-When Panopticon creates a workspace for this repo, `workspace-manager.ts` copies the live `~/.panopticon/projects.yaml` into `<workspace>/.panopticon/projects.yaml` so agents see the same project registry as the host. Keep the tracked snapshot aligned with intended defaults, but apply active-machine changes to `~/.panopticon/projects.yaml` by hand and restart/reload the dashboard when gate command behavior changes.
+When Overdeck creates a workspace for this repo, `workspace-manager.ts` copies the live `~/.panopticon/projects.yaml` into `<workspace>/.panopticon/projects.yaml` so agents see the same project registry as the host. Keep the tracked snapshot aligned with intended defaults, but apply active-machine changes to `~/.panopticon/projects.yaml` by hand and restart/reload the dashboard when gate command behavior changes.
 
 ### Change-Scoped Verification Gates
 

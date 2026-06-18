@@ -10,12 +10,12 @@ import { tmpdir } from 'os';
 
 describe('prd-draft', () => {
   let tempDir: string;
-  let originalPanopticonHome: string | undefined;
+  let originalOverdeckHome: string | undefined;
 
   async function registerTestProject() {
     const { registerProjectSync } = await import('../../src/lib/projects.js');
     registerProjectSync('pan', {
-      name: 'Panopticon Test',
+      name: 'Overdeck Test',
       path: tempDir,
       issue_prefix: 'PAN',
     });
@@ -26,7 +26,7 @@ describe('prd-draft', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-prd-test-'));
 
     // Override OVERDECK_HOME for this test
-    originalPanopticonHome = process.env.OVERDECK_HOME;
+    originalOverdeckHome = process.env.OVERDECK_HOME;
     process.env.OVERDECK_HOME = tempDir;
 
     // Clear module cache to reload with new env var
@@ -38,8 +38,8 @@ describe('prd-draft', () => {
 
   afterEach(() => {
     // Restore original env var
-    if (originalPanopticonHome) {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+    if (originalOverdeckHome) {
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     } else {
       delete process.env.OVERDECK_HOME;
     }

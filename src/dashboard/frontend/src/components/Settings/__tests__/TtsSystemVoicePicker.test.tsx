@@ -70,7 +70,7 @@ describe('TtsSystemVoicePicker', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           voiceId: 'voice-design',
-          text: 'This is the current Panopticon system voice.',
+          text: 'This is the current Overdeck system voice.',
           preview: true,
         }),
       });

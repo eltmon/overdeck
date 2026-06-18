@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import type { RunLogEntry } from './specialist-logs.js';
 import { getProjectSync } from '../projects.js';
@@ -33,7 +33,7 @@ function execAsync(command: string, options: { encoding: 'utf-8'; maxBuffer: num
 
 /** Get specialists directory (lazy to support test env overrides) */
 function getSpecialistsDir(): string {
-  return join(getPanopticonHome(), 'specialists');
+  return join(getOverdeckHome(), 'specialists');
 }
 
 /**
@@ -160,7 +160,7 @@ function getDigestModel(projectKey: string, specialistType: string): string {
 
     // Use Claude Code CLI to generate digest
     // Write prompt to temp file to avoid shell escaping issues
-    const tempDir = join(getPanopticonHome(), 'tmp');
+    const tempDir = join(getOverdeckHome(), 'tmp');
     if (!existsSync(tempDir)) {
       mkdirSync(tempDir, { recursive: true });
     }

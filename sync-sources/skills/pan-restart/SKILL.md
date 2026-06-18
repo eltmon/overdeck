@@ -3,9 +3,9 @@ name: pan-restart
 description: "pan restart — scoped restart (dashboard by default; --cliproxy, --traefik, or --full) that will not strand shared sidecars"
 ---
 
-# Restart Panopticon
+# Restart Overdeck
 
-Use this whenever a Panopticon component needs to be restarted. The `pan restart`
+Use this whenever a Overdeck component needs to be restarted. The `pan restart`
 command is scope-aware: by default it restarts **only the dashboard** and leaves
 CLIProxy, Traefik, and TLDR running — so a dashboard restart cannot strand the
 system or kill unrelated dependencies.

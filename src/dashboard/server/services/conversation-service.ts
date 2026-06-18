@@ -1337,7 +1337,7 @@ export async function parseFromLastCompactBoundary(
  *
  * Root-cause context: claude-code session transcripts are **append-only at a
  * fixed path**. `claude --resume <id>` reuses the same session UUID/file
- * (PAN-830), and both claude-native and Panopticon-native compaction *append*
+ * (PAN-830), and both claude-native and Overdeck-native compaction *append*
  * a `compact_boundary` marker rather than truncating. A read that shows the
  * file SHRINK is therefore never a real content reset — it is a transient
  * truncate-rewrite window (a respawn re-writing the resumed file, a read that

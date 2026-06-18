@@ -29,10 +29,10 @@ Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the fir
 
 ## What Happens Next
 
-1. **Command Deck opens** — Panopticon launches the local server and opens the dashboard in your browser
-2. **Add a project** — click the project picker and point Panopticon at a GitHub or GitLab repo
+1. **Command Deck opens** — Overdeck launches the local server and opens the dashboard in your browser
+2. **Add a project** — click the project picker and point Overdeck at a GitHub or GitLab repo
 3. **Pick an issue** — select an open issue from the kanban board
-4. **Spawn an agent** — Panopticon creates an isolated workspace and the agent starts planning and coding
+4. **Spawn an agent** — Overdeck creates an isolated workspace and the agent starts planning and coding
 5. **Stay in control** — watch diffs land as the agent works, send messages to steer it, swap models if the task shifts, fork the conversation to explore alternatives
 
 <ThemedImage
@@ -76,4 +76,4 @@ Prefer a standalone app? Download the latest release for your platform:
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/cli`, use `@overdeck/desktop` for the packaged desktop app, and keep `pan` for headless and CI.
+Overdeck started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @overdeck/cli`, use `@overdeck/desktop` for the packaged desktop app, and keep `pan` for headless and CI.

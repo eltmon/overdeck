@@ -3,13 +3,13 @@
 > Draft authored 2026-06-07 by an operator agent (conv-3095 lineage) at the end of a long
 > session that landed the 3 "brake" PRs, decoupled docs-index, and shipped graceful-reconnect
 > + non-destructive hot-reload. This PRD rolls those learnings into the **next phase**: make
-> Panopticon run *many* work agents reliably without stampeding/saturating the host, and scale
+> Overdeck run *many* work agents reliably without stampeding/saturating the host, and scale
 > out to remote (fly.io) capacity. Intended to become a GitHub **milestone** + an **umbrella
 > epic** with the issues below as children.
 
 ## Vision
 
-Panopticon should be able to keep a large number of **work** agents busy continuously, on a
+Overdeck should be able to keep a large number of **work** agents busy continuously, on a
 mix of **local** and **remote (fly.io)** workspaces, with the pipeline-advancing roles
 (review / test / ship) spawned **on demand** and **rate-limited** so the host never stampedes
 into resource exhaustion — and never deadlocks. Turning the Deacon on (or letting the Flywheel

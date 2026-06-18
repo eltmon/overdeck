@@ -1,14 +1,14 @@
 # QuantumLlama Provider Specification v1.0
 
 > **This is a synthetic benchmark specification.** QuantumLlama is a fictional AI provider
-> used to test Panopticon's agent pipeline. This document serves as the authoritative
+> used to test Overdeck's agent pipeline. This document serves as the authoritative
 > source of truth for benchmark runs — agents should implement exactly what is described
 > here without researching external sources.
 
 ## Overview
 
 QuantumLlama is a fictional AI model provider that exposes a REST API for text generation.
-Panopticon must support QuantumLlama as a first-class provider alongside Anthropic, OpenAI,
+Overdeck must support QuantumLlama as a first-class provider alongside Anthropic, OpenAI,
 and Google — including model routing, cost tracking, and dashboard visibility.
 
 ## Provider Details
@@ -122,7 +122,7 @@ X-QL-RateLimit-Reset: 1712000060
 
 ## Integration Requirements
 
-The following must be implemented in Panopticon to support QuantumLlama:
+The following must be implemented in Overdeck to support QuantumLlama:
 
 ### 1. Provider Configuration
 
@@ -142,10 +142,10 @@ The API key should be read from `QUANTUMLLAMA_API_KEY` environment variable
 
 Add pricing entries to the cost calculation module so that token usage from
 QuantumLlama models is correctly costed. The pricing table above is the
-source of truth. Map the API response `usage` fields to Panopticon's
+source of truth. Map the API response `usage` fields to Overdeck's
 standard token categories:
 
-| QuantumLlama field | Panopticon field |
+| QuantumLlama field | Overdeck field |
 |---|---|
 | `input_tokens` | `inputTokens` |
 | `output_tokens` | `outputTokens` |

@@ -5,11 +5,11 @@ description: Containerized development with local HTTPS
 
 # Docker & HTTPS Setup
 
-Configure Docker, Traefik, and local HTTPS for Panopticon workspaces.
+Configure Docker, Traefik, and local HTTPS for Overdeck workspaces.
 
 ## Overview
 
-Panopticon uses Docker for isolated development environments and Traefik as a reverse proxy for local HTTPS. This enables:
+Overdeck uses Docker for isolated development environments and Traefik as a reverse proxy for local HTTPS. This enables:
 
 - **Isolated workspaces** - Each feature branch runs in its own containers
 - **Local HTTPS** - Trusted certificates for `.localhost` or custom domains
@@ -31,14 +31,14 @@ brew install mkcert  # macOS
 # Install the local CA
 mkcert -install
 
-# Run Panopticon's setup
+# Run Overdeck's setup
 pan install
 pan doctor  # Verify setup
 ```
 
 ## Traefik Configuration
 
-Panopticon manages Traefik configuration in `~/.panopticon/traefik/`:
+Overdeck manages Traefik configuration in `~/.panopticon/traefik/`:
 
 ```
 ~/.panopticon/traefik/
@@ -162,7 +162,7 @@ dns:
 For custom domains, add entries to `/etc/hosts`:
 
 ```bash
-# Add manually or let Panopticon manage it
+# Add manually or let Overdeck manage it
 127.0.0.1 feature-min-123.myapp.test
 127.0.0.1 api-feature-min-123.myapp.test
 ```
@@ -248,7 +248,7 @@ networks:
 
 ### Network Setup
 
-Create the shared Panopticon network:
+Create the shared Overdeck network:
 
 ```bash
 docker network create panopticon

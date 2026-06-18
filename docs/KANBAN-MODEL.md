@@ -1,6 +1,6 @@
 # Kanban Board Model
 
-This document defines Panopticon's kanban board design: the columns, the mental model behind state transitions, how states map to external trackers, and the workflow lifecycle.
+This document defines Overdeck's kanban board design: the columns, the mental model behind state transitions, how states map to external trackers, and the workflow lifecycle.
 
 ## Columns
 
@@ -152,13 +152,13 @@ For polyrepo projects (e.g., MYN with frontend, api, infra, docs, splash, meta r
 
 Currently the PRD directory path is hardcoded to `{projectPath}/docs/prds/`. A `prdDir` config option should be added to `WorkspaceConfig` so projects can customize where PRDs live (e.g., a project without a `docs/` repo could put them at the root).
 
-**Strongly discouraged: per-repo PRDs.** Some teams with separate frontend and backend repos may want separate PRDs for each. This is an anti-pattern — a single PRD per issue keeps scope unified and prevents drift between frontend and backend plans. If the implementation touches multiple repos, that context belongs in one PRD with sections for each repo, not scattered across repos. Panopticon will not support per-repo PRD directories.
+**Strongly discouraged: per-repo PRDs.** Some teams with separate frontend and backend repos may want separate PRDs for each. This is an anti-pattern — a single PRD per issue keeps scope unified and prevents drift between frontend and backend plans. If the implementation touches multiple repos, that context belongs in one PRD with sections for each repo, not scattered across repos. Overdeck will not support per-repo PRD directories.
 
 ## Tracker Mapping
 
 The 4-column model maps cleanly to all supported trackers:
 
-| Panopticon | Linear (defaults) | GitHub | Rally (User Stories) |
+| Overdeck | Linear (defaults) | GitHub | Rally (User Stories) |
 |---|---|---|---|
 | Backlog | Backlog | open | New |
 | Todo | Todo | open | Defined |
@@ -175,7 +175,7 @@ Key implications:
 
 ## Canonical States (Internal)
 
-Panopticon's internal state model (used in code, shadow state, and drag-drop):
+Overdeck's internal state model (used in code, shadow state, and drag-drop):
 
 ```
 backlog      -- Hidden from board, separate view
@@ -192,11 +192,11 @@ The previous `planning` canonical state is **removed**.
 
 **Principle: Labels describe WHAT something is, not WHERE it is in the workflow.** Workflow tracking belongs in states. Labels are for classification and metadata.
 
-The one exception: GitHub and GitLab need "workflow labels" because they only have open/closed natively. These are Panopticon-managed and should feel invisible to users.
+The one exception: GitHub and GitLab need "workflow labels" because they only have open/closed natively. These are Overdeck-managed and should feel invisible to users.
 
 ### Workflow Labels (GitHub/GitLab only)
 
-Auto-managed by Panopticon on every state transition. Users should never add or remove these manually.
+Auto-managed by Overdeck on every state transition. Users should never add or remove these manually.
 
 | Label | Color | Applied When | Removed When |
 |-------|-------|-------------|-------------|
@@ -206,7 +206,7 @@ Auto-managed by Panopticon on every state transition. Users should never add or 
 
 That's the complete set. Three labels.
 
-**Auto-cleanup rule**: On every state transition for GitHub/GitLab issues, Panopticon removes all workflow labels that don't match the target state, then adds the label for the new state (if applicable). This replaces the current approach where cleanup only happens on reopen and deep-wipe.
+**Auto-cleanup rule**: On every state transition for GitHub/GitLab issues, Overdeck removes all workflow labels that don't match the target state, then adds the label for the new state (if applicable). This replaces the current approach where cleanup only happens on reopen and deep-wipe.
 
 **Not applicable to**: Linear, Rally, Jira — these have native workflow states and don't need label-based pseudo-states.
 
@@ -245,12 +245,12 @@ These are defaults. Projects can add custom classification labels — they just 
 | `done` | Redundant — closing the issue IS marking it done |
 | `review-ready` | Redundant — In Review state already signals this |
 | `Review Ready` (Linear) | Redundant — `readyForMerge` on the SQLite-backed `review_status` row tracks runtime merge readiness; durable verdicts live in the permanent record's `pipeline` block. In Review column signals stakeholder involvement |
-| `wontfix` | Optional GitHub convention, not Panopticon-managed |
+| `wontfix` | Optional GitHub convention, not Overdeck-managed |
 | `pan:*` prefix | Over-engineered fallback strategy; direct labels are simpler |
 
 ### Label Anti-Patterns
 
 - **Don't use labels for workflow state** on trackers that have native states (Linear, Rally, Jira). That's what states are for.
 - **Don't duplicate state in labels** (e.g., adding a "Review Ready" label when the issue is already in an "In Review" state). Pick one source of truth.
-- **Don't use labels for priority**. Linear, Rally, and Jira have native priority fields. For GitHub, use the Panopticon shadow state for priority rather than labels.
+- **Don't use labels for priority**. Linear, Rally, and Jira have native priority fields. For GitHub, use the Overdeck shadow state for priority rather than labels.
 - **Don't use labels for assignee or ownership**. That's what the assignee field is for.

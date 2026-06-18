@@ -34,7 +34,7 @@ describe('resolveTrackerType', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         panopticon: {
-          name: 'Panopticon',
+          name: 'Overdeck',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
           issue_prefix: 'PAN',
@@ -92,7 +92,7 @@ describe('resolveTrackerType', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         panopticon: {
-          name: 'Panopticon',
+          name: 'Overdeck',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
           issue_prefix: 'PAN',

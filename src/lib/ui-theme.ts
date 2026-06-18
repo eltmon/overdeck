@@ -12,7 +12,7 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 export type UiTheme = 'dark' | 'light';
 
@@ -28,7 +28,7 @@ export const TERMINAL_BG: Record<UiTheme, string> = {
 };
 
 function uiThemeFile(): string {
-  return join(getPanopticonHome(), 'ui-theme.json');
+  return join(getOverdeckHome(), 'ui-theme.json');
 }
 
 export async function getUiTheme(): Promise<UiTheme> {
@@ -60,6 +60,6 @@ export function colorFgBgForTheme(theme: UiTheme): string {
 }
 
 export async function setUiTheme(theme: UiTheme): Promise<void> {
-  await mkdir(getPanopticonHome(), { recursive: true });
+  await mkdir(getOverdeckHome(), { recursive: true });
   await writeFile(uiThemeFile(), JSON.stringify({ theme }) + '\n', 'utf-8');
 }

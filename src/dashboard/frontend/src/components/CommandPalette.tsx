@@ -1,5 +1,5 @@
 /**
- * Cmd+K command palette for Panopticon.
+ * Cmd+K command palette for Overdeck.
  *
  * Opens on Cmd+K (macOS) / Ctrl+K (Linux/Windows).
  * Also opened from the desktop app via panopticonBridge.onMenuAction.
@@ -471,7 +471,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     {
       id: 'open-terminal',
       label: 'Open Terminal',
-      description: 'Access the Panopticon terminal',
+      description: 'Access the Overdeck terminal',
       icon: Terminal,
       group: 'Navigation',
       keywords: ['shell', 'console'],

@@ -90,7 +90,7 @@ The workspace root is NOT a git repo. You must `cd` into each subdirectory to ru
     (`ORIG_HEAD` is set by git at merge time — always points to pre-merge state.)
 {{#DO_PUSH}}
 {{^SKIP_DONE_REPORT}}
-    Then report failure by calling the Panopticon API:
+    Then report failure by calling the Overdeck API:
     ```bash
     curl -s -X POST {{API_URL}}/api/specialists/done \
       -H "Content-Type: application/json" \
@@ -119,7 +119,7 @@ DO NOT call `/api/specialists/done` — the server manages status for this merge
 After pushing, simply STOP. If you need to rollback, rollback and STOP.
 {{/SKIP_DONE_REPORT}}
 {{^SKIP_DONE_REPORT}}
-Call the Panopticon API to report results:
+Call the Overdeck API to report results:
 ```bash
 curl -s -X POST {{API_URL}}/api/specialists/done \
   -H "Content-Type: application/json" \

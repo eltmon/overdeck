@@ -1,6 +1,6 @@
 ---
 name: pan-dev
-description: Start Panopticon in development mode with Vite HMR for the frontend and the Node 22 server
+description: Start Overdeck in development mode with Vite HMR for the frontend and the Node 22 server
 triggers:
   - pan dev
   - start panopticon dev
@@ -11,13 +11,13 @@ allowed-tools:
   - Read
 ---
 
-# Start Panopticon in Development Mode
+# Start Overdeck in Development Mode
 
 Start the dashboard server (Node 22, bundled) and the Vite frontend dev server (HMR on port 3010) for active dashboard development. Traefik, skills sync, and TLDR are started the same as `pan up`.
 
 ## When to Use
 
-- User is actively developing the Panopticon dashboard (frontend or server)
+- User is actively developing the Overdeck dashboard (frontend or server)
 - User wants HMR for frontend changes
 - User says "start panopticon in dev mode", "pan dev", or "bring up dev"
 
@@ -63,7 +63,7 @@ sleep 1
 export OVERDECK_DEV=1
 ```
 
-This is read by `generatePanopticonTraefikConfig()` (src/lib/traefik.ts) so the
+This is read by `generateOverdeckTraefikConfig()` (src/lib/traefik.ts) so the
 Traefik dynamic config routes the frontend to Vite (port 3010) instead of the
 bundled Node server (3011). Without this, https://pan.localhost serves the
 production-mode static build and you do not get HMR. Export it before any
@@ -106,7 +106,7 @@ import('~/Projects/panopticon-cli/src/lib/traefik.ts').catch(()=>{});
 
 # Or, more reliably via tsx:
 cd ~/Projects/panopticon-cli && \
-  OVERDECK_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generatePanopticonTraefikConfig())" 2>&1
+  OVERDECK_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generateOverdeckTraefikConfig())" 2>&1
 ```
 
 Verify the rendered file has the frontend on port 3010:

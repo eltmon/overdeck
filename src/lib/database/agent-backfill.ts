@@ -15,7 +15,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import type { SqliteDatabase } from './driver.js';
 import { getDatabase } from './index.js';
 import { agentStateToDbAgent } from './agent-mappers.js';
@@ -80,7 +80,7 @@ const COLUMN_MAP: Record<keyof DbAgent, string> = {
 };
 
 function getAgentDir(agentId: string): string {
-  return join(getPanopticonHome(), 'agents', agentId);
+  return join(getOverdeckHome(), 'agents', agentId);
 }
 
 function getManagedTmuxSocketName(): string {
@@ -168,7 +168,7 @@ export function backfillAgentsFromStateJsonSync(
   db: SqliteDatabase,
   options?: BackfillAgentsOptions,
 ): BackfillAgentsResult {
-  const agentsDir = join(getPanopticonHome(), 'agents');
+  const agentsDir = join(getOverdeckHome(), 'agents');
   const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNames();
   let processed = 0;
   let skipped = 0;

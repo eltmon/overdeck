@@ -24,7 +24,7 @@
  * button — flows through
  * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The review role
  * launches four isolated review sub-role sessions via `pan review spawn-reviewer`,
- * then writes the report and signals the verdict via Panopticon's CLI inside
+ * then writes the report and signals the verdict via Overdeck's CLI inside
  * the role itself (see roles/review.md).
  *
  * Surface area kept:
@@ -56,7 +56,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 /**
  * Read a convoy sub-role prompt template from the panopticon-cli install.
  *
- * Sub-role prompts are harness-agnostic templates owned by Panopticon. The
+ * Sub-role prompts are harness-agnostic templates owned by Overdeck. The
  * orchestrator reads them from its own install (packageRoot/roles/) and
  * inlines the body into the spawn message — they never live in the agent's
  * workspace, and they are never loaded via the Claude-specific `--agent` flag.
@@ -132,7 +132,7 @@ async function buildConvoyPromptPromise(opts: {
     '',
     'Write exactly one final report to the output file shown above, then stop',
     'and wait. You do NOT need to signal synthesis or run any pan command —',
-    'when you finish your turn with the report written, Panopticon detects it',
+    'when you finish your turn with the report written, Overdeck detects it',
     'and signals the synthesis agent REVIEWER_READY automatically. Your only',
     'job is to write the report file, then stop.',
     'Only the output file is consumed by synthesis; your chat response is not the review report.',
@@ -159,7 +159,7 @@ function buildReviewRolePrompt(opts: {
   const prompt = [
     `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
     '',
-    'Do NOT do anything yet. The Panopticon server has already spawned the four',
+    'Do NOT do anything yet. The Overdeck server has already spawned the four',
     'convoy reviewers (security, correctness, performance, requirements) and they',
     'are running in parallel right now. Your work begins only once they finish.',
     '',
@@ -202,7 +202,7 @@ function buildReviewRolePrompt(opts: {
     'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
     '',
-    'After writing the synthesis report, signal the verdict with Panopticon CLI:',
+    'After writing the synthesis report, signal the verdict with Overdeck CLI:',
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
     '',

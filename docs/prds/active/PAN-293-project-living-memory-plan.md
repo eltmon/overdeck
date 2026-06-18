@@ -12,7 +12,7 @@ Research foundation: `docs/research/ai-memory-layer-research.md` (mem0 analysis)
 
 ## Problem Statement
 
-Panopticon has **zero semantic memory**. Every agent session generates valuable learnings — debugging approaches, codebase patterns, architectural decisions — but all knowledge evaporates when the workspace is torn down. The next agent working on a similar problem starts from scratch.
+Overdeck has **zero semantic memory**. Every agent session generates valuable learnings — debugging approaches, codebase patterns, architectural decisions — but all knowledge evaporates when the workspace is torn down. The next agent working on a similar problem starts from scratch.
 
 | What Exists Today | Limitation |
 |-------------------|------------|

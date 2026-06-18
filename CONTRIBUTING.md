@@ -1,6 +1,6 @@
-# Contributing to Panopticon CLI
+# Contributing to Overdeck CLI
 
-Panopticon is a multi-agent orchestration platform for AI coding assistants. This document covers everything you need to contribute effectively — whether you're a human engineer, an AI agent working an issue, or someone trying to understand how this codebase evolves itself.
+Overdeck is a multi-agent orchestration platform for AI coding assistants. This document covers everything you need to contribute effectively — whether you're a human engineer, an AI agent working an issue, or someone trying to understand how this codebase evolves itself.
 
 ---
 
@@ -70,7 +70,7 @@ Without this, agents cannot start even when planning succeeds. `pan sync` attemp
 ### Verify Your Setup
 
 ```bash
-pan status          # Should show "Panopticon is running" or offer to start it
+pan status          # Should show "Overdeck is running" or offer to start it
 pan --version       # Should match package.json
 bd list             # Should show empty list (not a "database not found" error)
 ```
@@ -412,7 +412,7 @@ What should have happened.
 What actually happened. Include relevant log output, error messages, or screenshots.
 
 ## Context
-- Panopticon version: (run `pan --version`)
+- Overdeck version: (run `pan --version`)
 - Node version: (run `node --version`)
 - OS: (e.g., Ubuntu 24.04)
 ```
@@ -584,7 +584,7 @@ pan done PAN-xxx -c "Brief summary"         # MANDATORY — triggers review pipe
 
 ### Infrastructure bugs you find while working
 
-When you find a Panopticon bug:
+When you find a Overdeck bug:
 
 1. **File a GitHub issue immediately**: `gh issue create --title "..." --body "..."`
 2. **Blocker?** Fix the code, rebuild, restart, continue. Root cause, not workaround.
@@ -615,4 +615,4 @@ These properties must be preserved across all changes. A change that would viola
 
 ---
 
-*This document reflects Panopticon 0.5.x. As the pipeline evolves — branch protection, polyrepo support, remote agents — update this file in the same PR as the feature it documents.*
+*This document reflects Overdeck 0.5.x. As the pipeline evolves — branch protection, polyrepo support, remote agents — update this file in the same PR as the feature it documents.*

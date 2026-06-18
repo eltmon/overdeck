@@ -1,13 +1,13 @@
 ---
 title: Project Registry
-description: Managing multiple projects with Panopticon
+description: Managing multiple projects with Overdeck
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Project Registry
 
-Panopticon's project registry enables multi-project management with intelligent issue routing and label-based workspace creation.
+Overdeck's project registry enables multi-project management with intelligent issue routing and label-based workspace creation.
 
 ## Overview
 
@@ -17,16 +17,16 @@ Projects are registered in `~/.panopticon/projects.yaml`. Each project can have:
 - **Custom workspace commands** - For complex polyrepo setups
 - **Linear team mapping** - Connect projects to Linear teams
 
-While `projects.yaml` is the source of truth, much of this configuration is also surfaced in the dashboard's **Settings** page, alongside model routing for the agents and conversations Panopticon runs and tracker API keys.
+While `projects.yaml` is the source of truth, much of this configuration is also surfaced in the dashboard's **Settings** page, alongside model routing for the agents and conversations Overdeck runs and tracker API keys.
 
 <ThemedImage
   light="/images/dashboard/settings-light.png"
   dark="/images/dashboard/settings-dark.png"
-  alt="Panopticon Settings page showing model routing, tracker API keys, and project configuration"
+  alt="Overdeck Settings page showing model routing, tracker API keys, and project configuration"
 />
 
 <Note>
-  Panopticon manages both the workflow pipeline and the agents and conversations
+  Overdeck manages both the workflow pipeline and the agents and conversations
   that move issues through it. The Settings page is where model routing for those
   agents lives, while per-project routing and workspace rules below are edited in
   `~/.panopticon/projects.yaml`.
@@ -64,7 +64,7 @@ projects:
         path: /home/user/projects/myn
 
   panopticon:
-    name: "Panopticon"
+    name: "Overdeck"
     path: /home/user/projects/panopticon
     issue_prefix: PAN
 ```
@@ -136,9 +136,9 @@ projects:
     workspace_remove_command: /home/user/projects/myn/infra/remove-feature
 ```
 
-When `workspace_command` is specified, Panopticon calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
+When `workspace_command` is specified, Overdeck calls your script instead of creating a standard git worktree. The script receives the normalized issue ID (e.g., `min-123`) as an argument.
 
-When `workspace_remove_command` is specified, Panopticon calls your script when deleting workspaces (e.g., aborting planning with "delete workspace" enabled). This is important for complex setups that need to:
+When `workspace_remove_command` is specified, Overdeck calls your script when deleting workspaces (e.g., aborting planning with "delete workspace" enabled). This is important for complex setups that need to:
 - Stop Docker containers and remove volumes
 - Clean up root-owned files created by containers
 - Remove git worktrees from multiple repositories
@@ -174,7 +174,7 @@ The standard `pan workspace create` command will automatically detect and use yo
 
 ## Project Initialization
 
-When registering a new project with Panopticon (`pan project add`), the system will:
+When registering a new project with Overdeck (`pan project add`), the system will:
 
 1. **Check for existing PRD** - Look for `docs/PRD.md`, `PRD.md`, `README.md`, or similar
 2. **If found**: Use it to create/update the canonical PRD format, prompting for any missing crucial information
@@ -183,7 +183,7 @@ When registering a new project with Panopticon (`pan project add`), the system w
    - Identifying key technologies and patterns
    - Asking discovery questions about the product
 
-This ensures every Panopticon-managed project has a well-defined canonical PRD that agents can reference.
+This ensures every Overdeck-managed project has a well-defined canonical PRD that agents can reference.
 
 ## Progressive Workspaces
 

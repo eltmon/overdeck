@@ -12,7 +12,7 @@ allowed-tools:
   - Read
 ---
 
-# Panopticon Status Overview
+# Overdeck Status Overview
 
 ## Lead with the pipeline-status table
 
@@ -34,7 +34,7 @@ continue with the detailed sections below.
 
 ## Overview
 
-This skill guides you through checking the status of all Panopticon components, including running agents, workspaces, services, and system health.
+This skill guides you through checking the status of all Overdeck components, including running agents, workspaces, services, and system health.
 
 ## When to Use
 
@@ -165,7 +165,7 @@ pan doctor
 
 **Example output:**
 ```
-Panopticon System Health
+Overdeck System Health
 
 ✓ Node.js v18.17.0
 ✓ Docker 24.0.5 (running)
@@ -388,7 +388,7 @@ curl -X POST https://api.linear.app/graphql \
 # ~/scripts/pan-dashboard.sh
 
 clear
-echo "=== Panopticon Status Dashboard ==="
+echo "=== Overdeck Status Dashboard ==="
 echo ""
 
 echo "Services:"
@@ -422,9 +422,9 @@ watch -n 5 ~/scripts/pan-dashboard.sh
 
 while true; do
   if pan status | grep -q "crashed"; then
-    echo "Alert: Agent crashed!" | mail -s "Panopticon Alert" user@example.com
+    echo "Alert: Agent crashed!" | mail -s "Overdeck Alert" user@example.com
     # Or use desktop notification
-    notify-send "Panopticon Alert" "An agent has crashed"
+    notify-send "Overdeck Alert" "An agent has crashed"
   fi
   sleep 60
 done

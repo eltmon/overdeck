@@ -32,7 +32,7 @@ Separate from electron-updater. The `npm view @panopticon/desktop version` retur
 
 ### Menu Integration
 - Help menu → "Check for Updates…" → manual trigger
-- Help menu → "About Panopticon" (already exists via `role: about`) → shows current version
+- Help menu → "About Overdeck" (already exists via `role: about`) → shows current version
 - After update downloaded: "Install Update and Restart" menu item appears
 
 ### Release Workflow Changes

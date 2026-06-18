@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { migratePanopticonToPanSync, ensurePanGitignoreSync } from '../../src/lib/workspace-manager.js';
+import { migrateOverdeckToPanSync, ensurePanGitignoreSync } from '../../src/lib/workspace-manager.js';
 import { mergePanSkillsIntoWorkspaceSync } from '../../src/lib/skills-merge.js';
 
 function makeTmp(): string {
@@ -71,15 +71,15 @@ describe('ensurePanGitignore', () => {
   });
 });
 
-// ─── migratePanopticonToPan ─────────────────────────────────────────────────
+// ─── migrateOverdeckToPan ─────────────────────────────────────────────────
 
-describe('migratePanopticonToPan', () => {
+describe('migrateOverdeckToPan', () => {
   let dir: string;
   beforeEach(() => { dir = makeTmp(); });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
   it('returns empty result when no .panopticon/ subdirs exist', () => {
-    const result = migratePanopticonToPanSync(dir);
+    const result = migrateOverdeckToPanSync(dir);
     expect(result.migrated).toHaveLength(0);
     expect(result.skipped).toHaveLength(0);
     expect(result.errors).toHaveLength(0);
@@ -90,7 +90,7 @@ describe('migratePanopticonToPan', () => {
     mkdirSync(oldDir, { recursive: true });
     writeFileSync(join(oldDir, 'PAN-1.jsonl'), '{}', 'utf-8');
 
-    const result = migratePanopticonToPanSync(dir);
+    const result = migrateOverdeckToPanSync(dir);
     expect(result.migrated.some(m => m.includes('.panopticon/events'))).toBe(true);
     expect(existsSync(join(dir, '.pan', 'events', 'PAN-1.jsonl'))).toBe(true);
     expect(existsSync(join(dir, '.panopticon', 'events'))).toBe(false);
@@ -100,7 +100,7 @@ describe('migratePanopticonToPan', () => {
     mkdirSync(join(dir, '.panopticon', 'triage'), { recursive: true });
     writeFileSync(join(dir, '.panopticon', 'triage', 'out.md'), 'triage', 'utf-8');
 
-    migratePanopticonToPanSync(dir);
+    migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
@@ -108,7 +108,7 @@ describe('migratePanopticonToPan', () => {
     mkdirSync(join(dir, '.panopticon', 'health'), { recursive: true });
     writeFileSync(join(dir, '.panopticon', 'health', 'out.md'), 'health', 'utf-8');
 
-    migratePanopticonToPanSync(dir);
+    migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
@@ -116,7 +116,7 @@ describe('migratePanopticonToPan', () => {
     mkdirSync(join(dir, '.panopticon', 'prompts'), { recursive: true });
     writeFileSync(join(dir, '.panopticon', 'prompts', 'agent.md'), 'prompt', 'utf-8');
 
-    migratePanopticonToPanSync(dir);
+    migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.pan', 'prompts', 'agent.md'))).toBe(true);
   });
 
@@ -124,7 +124,7 @@ describe('migratePanopticonToPan', () => {
     mkdirSync(join(dir, '.panopticon', 'events'), { recursive: true });
     mkdirSync(join(dir, '.pan', 'events'), { recursive: true });
 
-    const result = migratePanopticonToPanSync(dir);
+    const result = migrateOverdeckToPanSync(dir);
     expect(result.skipped).toContain('.panopticon/events');
     // Old dir not removed
     expect(existsSync(join(dir, '.panopticon', 'events'))).toBe(true);
@@ -132,7 +132,7 @@ describe('migratePanopticonToPan', () => {
 
   it('never touches paths outside the project directory', () => {
     // Verify ~/.panopticon is untouched by confirming migration only checks project path
-    const result = migratePanopticonToPanSync(dir);
+    const result = migrateOverdeckToPanSync(dir);
     // No errors from attempting to access global ~/.panopticon/
     expect(result.errors).toHaveLength(0);
   });
@@ -140,7 +140,7 @@ describe('migratePanopticonToPan', () => {
   it('removes empty .panopticon/ directory after migration', () => {
     mkdirSync(join(dir, '.panopticon', 'events'), { recursive: true });
 
-    migratePanopticonToPanSync(dir);
+    migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.panopticon'))).toBe(false);
   });
 });

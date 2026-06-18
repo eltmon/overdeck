@@ -33,11 +33,11 @@ export interface ContextWindowSnapshot {
   /** 100 − usedPercentage, clamped to ≥0. null when usedPercentage is unknown. */
   readonly remainingPercentage: number | null;
   /**
-   * Raw active bytes from the JSONL session file. Panopticon-specific (t3code
+   * Raw active bytes from the JSONL session file. Overdeck-specific (t3code
    * doesn't expose this); useful for debugging the heuristic. Optional.
    */
   readonly activeBytes?: number;
-  // ─── Panopticon-specific breakdown surfaced in the click popover ───────
+  // ─── Overdeck-specific breakdown surfaced in the click popover ───────
   /** input_tokens from the most recent assistant turn's `usage`. */
   readonly lastInputTokens?: number;
   /** cache_read_input_tokens from the most recent assistant turn. */

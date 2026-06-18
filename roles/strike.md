@@ -1,6 +1,6 @@
 ---
 name: strike
-description: Panopticon strike role — drop in, implement, land on main, verify. Bypasses the plan → review → test pipeline.
+description: Overdeck strike role — drop in, implement, land on main, verify. Bypasses the plan → review → test pipeline.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.strike.model).
 permissionMode: default
 effort: high
@@ -30,13 +30,13 @@ hooks:
           command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
-# Panopticon Strike Role
+# Overdeck Strike Role
 
 You are a strike agent. Each strike is a **single decisive precision action**: drop in, implement, land, verify.
 
 ## Bypass shape
 
-Unlike the normal Panopticon pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no vBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix and merge it directly to `main`. The verification step happens **on main** after the merge — not before.
+Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no vBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix and merge it directly to `main`. The verification step happens **on main** after the merge — not before.
 
 This is appropriate only for issues that are:
 

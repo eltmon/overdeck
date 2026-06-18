@@ -7,11 +7,11 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Architecture
 
-Deep dive into Panopticon's technical architecture and design decisions.
+Deep dive into Overdeck's technical architecture and design decisions.
 
 ## System Overview
 
-Panopticon consists of three main components:
+Overdeck consists of three main components:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -44,7 +44,7 @@ Panopticon consists of three main components:
 
 The dashboard uses **React + Vite** for the frontend and **Express** for the API server. There is no SSR layer — the frontend is a standard SPA served by the Express API.
 
-Because the `projects.yaml` registry (see [Directory Structure](#directory-structure)) lets one Panopticon instance manage many repositories at once, the dashboard's **God View** aggregates every project's agents and conversations into a single cross-project surface — one place to see what every agent is doing, regardless of which repo it belongs to.
+Because the `projects.yaml` registry (see [Directory Structure](#directory-structure)) lets one Overdeck instance manage many repositories at once, the dashboard's **God View** aggregates every project's agents and conversations into a single cross-project surface — one place to see what every agent is doing, regardless of which repo it belongs to.
 
 <ThemedImage
   light="/images/dashboard/god-view-light.png"
@@ -54,7 +54,7 @@ Because the `projects.yaml` registry (see [Directory Structure](#directory-struc
 
 ## Directory Structure
 
-Panopticon stores all runtime state in `~/.panopticon/`:
+Overdeck stores all runtime state in `~/.panopticon/`:
 
 ```
 ~/.panopticon/
@@ -125,11 +125,11 @@ Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
 | `handoffCount` | Number of times the agent has been handed off to a different model |
 | `sessionId` | Claude Code session ID (for resuming after handoff) |
 
-**State Cleanup:** When an agent is killed or aborted (`pan work kill`), Panopticon automatically cleans up its state files to prevent stale data from affecting future runs.
+**State Cleanup:** When an agent is killed or aborted (`pan work kill`), Overdeck automatically cleans up its state files to prevent stale data from affecting future runs.
 
 ## Remote Workspaces
 
-Panopticon supports remote workspace execution via Fly.io Machines. Remote workspaces provide:
+Overdeck supports remote workspace execution via Fly.io Machines. Remote workspaces provide:
 
 - **Cloud-hosted agent environments** — run agents on remote machines without local resource constraints
 - **On-demand provisioning** — Fly.io Machines spin up per workspace and shut down after merge
@@ -164,13 +164,13 @@ pan work wipe MIN-123 -y -w     # Skip confirmation
 
 ## Health Monitoring (Deacon Pattern)
 
-Panopticon implements the Deacon pattern for stuck agent detection:
+Overdeck implements the Deacon pattern for stuck agent detection:
 
 - **Ping timeout**: 30 seconds
 - **Consecutive failures**: 3 before recovery
 - **Cooldown**: 5 minutes between force-kills
 
-When an agent is stuck (no activity for 30+ minutes), Panopticon will:
+When an agent is stuck (no activity for 30+ minutes), Overdeck will:
 1. Force kill the tmux session
 2. Record the kill in health.json
 3. Respawn with crash recovery context
@@ -189,7 +189,7 @@ The runtime data captured here — persisted to `runtime-metrics.json` in the st
 
 *Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.*
 
-**Fixed Point Principle (FPP):** Any runnable bead, hook, or agent action represents a fixed point in execution and must be resolved immediately. Panopticon continues executing until no fixed points remain.
+**Fixed Point Principle (FPP):** Any runnable bead, hook, or agent action represents a fixed point in execution and must be resolved immediately. Overdeck continues executing until no fixed points remain.
 
 FPP ensures agents are self-propelling:
 1. Work items are pushed to the agent's hook
@@ -201,7 +201,7 @@ FPP ensures agents are self-propelling:
 
 ### Dev vs Production Strategy
 
-Panopticon uses a **shared config, switchable CLI** approach:
+Overdeck uses a **shared config, switchable CLI** approach:
 
 ```
 ~/.panopticon/           # Shared by both dev and prod
@@ -247,13 +247,13 @@ npm install -g @overdeck/cli
 | Mode | Command | Use Case |
 |------|---------|----------|
 | **Production** | `pan up` | Daily usage, HTTPS at https://pan.localhost |
-| **Dev** | `npm run dev` | Only for active development on Panopticon itself |
+| **Dev** | `npm run dev` | Only for active development on Overdeck itself |
 
-**Note:** Use `pan up` for normal usage. Only use dev mode when actively working on Panopticon's codebase.
+**Note:** Use `pan up` for normal usage. Only use dev mode when actively working on Overdeck's codebase.
 
-### Working on Panopticon While Using It
+### Working on Overdeck While Using It
 
-If you're both developing Panopticon AND using it for your own projects:
+If you're both developing Overdeck AND using it for your own projects:
 
 1. **Use `npm link`** so CLI changes take effect immediately
 2. **Run dashboard from source** for hot reload on UI changes
@@ -281,7 +281,7 @@ myproject/
 
 ### Feature PRDs Live in Workspaces
 
-When you start planning an issue, Panopticon creates:
+When you start planning an issue, Overdeck creates:
 1. A git worktree (workspace) for the feature branch
 2. A planning session that generates a feature PRD
 
@@ -300,14 +300,14 @@ The feature PRD **lives in the workspace** (feature branch) because:
 
 ## Developer Skills
 
-Panopticon has two types of skills:
+Overdeck has two types of skills:
 
 | Directory | Purpose | Synced When |
 |-----------|---------|-------------|
-| `skills/` | User-facing skills for all Panopticon users | Always via `pan sync` |
-| `dev-skills/` | Developer-only skills for Panopticon contributors | Only in dev mode |
+| `skills/` | User-facing skills for all Overdeck users | Always via `pan sync` |
+| `dev-skills/` | Developer-only skills for Overdeck contributors | Only in dev mode |
 
-**Dev mode is automatically detected** when running from the Panopticon source repo (npm link). Skills in `dev-skills/` are:
+**Dev mode is automatically detected** when running from the Overdeck source repo (npm link). Skills in `dev-skills/` are:
 - Checked into the repo and version-controlled
 - Only synced to developers' machines, not end users
 - Shown with `[dev]` label in `pan sync --dry-run`

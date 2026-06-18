@@ -1,4 +1,4 @@
-# PAN-277: SageOx Integration — Fork PR + Panopticon Wiring
+# PAN-277: SageOx Integration — Fork PR + Overdeck Wiring
 
 ## Problem Statement
 
@@ -6,19 +6,19 @@ SageOx (`ox`) captures session reasoning from Claude Code conversations — key 
 
 However, two problems prevent integration:
 
-1. **Devroot discovery**: SageOx assumes Claude Code starts from within a project directory. Panopticon uses a **devroot pattern** where Claude Code always starts from `~/Projects/` (the parent of all repos). SageOx's `FindProjectRoot()` walks UP from CWD, which fails when CWD is above the initialized repo.
+1. **Devroot discovery**: SageOx assumes Claude Code starts from within a project directory. Overdeck uses a **devroot pattern** where Claude Code always starts from `~/Projects/` (the parent of all repos). SageOx's `FindProjectRoot()` walks UP from CWD, which fails when CWD is above the initialized repo.
 
-2. **Recording is manual**: `ox agent prime` (the hook) only injects team context — it does NOT start session recording. Recording requires a separate explicit call to `/ox-session-start`. For Panopticon agents, there's no reliable way to ensure recording starts/stops with the agent lifecycle.
+2. **Recording is manual**: `ox agent prime` (the hook) only injects team context — it does NOT start session recording. Recording requires a separate explicit call to `/ox-session-start`. For Overdeck agents, there's no reliable way to ensure recording starts/stops with the agent lifecycle.
 
-Additionally, SageOx should only be used for **Panopticon** (open source, freely shareable). MYN is a closed-source commercial product and must never have sessions uploaded to sageox.ai.
+Additionally, SageOx should only be used for **Overdeck** (open source, freely shareable). MYN is a closed-source commercial product and must never have sessions uploaded to sageox.ai.
 
 ## Decisions Made
 
 ### D1: Per-project `.sageox/`, not devroot-level
-`.sageox/` stays inside `panopticon-cli/` (Panopticon team on sageox.ai). NOT in devroot. NOT in MYN repos. This ensures project isolation and prevents commercial code from leaking.
+`.sageox/` stays inside `panopticon-cli/` (Overdeck team on sageox.ai). NOT in devroot. NOT in MYN repos. This ensures project isolation and prevents commercial code from leaking.
 
 ### D2: Fork SageOx, contribute upstream PR
-Rather than building native Panopticon features, contribute a PR to SageOx that adds explicit project root override and auto-recording. Benefits their project, solves our problem, supports the founder (Milkana Brace, known personally).
+Rather than building native Overdeck features, contribute a PR to SageOx that adds explicit project root override and auto-recording. Benefits their project, solves our problem, supports the founder (Milkana Brace, known personally).
 
 ### D3: `OX_PROJECT_ROOT` env var is the primary mechanism
 Simple, composable, works with any hook system. The hook in devroot sets this env var before calling `ox agent prime`. No marker files, no magic discovery.
@@ -27,13 +27,13 @@ Simple, composable, works with any hook system. The hook in devroot sets this en
 For CLI usage and debugging: `ox agent prime --project /path/to/repo`. Same precedence as env var but more explicit.
 
 ### D5: `--auto-record` flag on `ox agent prime`
-Combines context injection + session recording start into a single command. Panopticon's hook becomes one call instead of two separate steps. This is the key enabler for reliable agent session capture.
+Combines context injection + session recording start into a single command. Overdeck's hook becomes one call instead of two separate steps. This is the key enabler for reliable agent session capture.
 
 ### D6: Server-side summarization is SageOx's value
 SageOx's `POST /api/v1/session/summarize` provides structured LLM summarization (title, key decisions, aha moments, chapters, outcome assessment). This is their likely monetization path — the prompt template is open source but inference + dashboard are SaaS. We consume this, not rebuild it.
 
 ### D7: Two SageOx teams, one active
-- **Panopticon** team on sageox.ai — active, used for all Panopticon sessions
+- **Overdeck** team on sageox.ai — active, used for all Overdeck sessions
 - **Mind Your Now** team — created accidentally during initial `ox init`, should be ignored/deleted
 - MYN repos never get `ox init`
 
@@ -43,7 +43,7 @@ Both use identical capture/summarization pipeline:
 2. **PRD planning sessions** (secondary) — capture reasoning behind product decisions
 
 ### D9: Multi-agent issue pipeline uses parent-child session linking
-Panopticon issues go through up to 5 agents: planner → worker → reviewer → tester → merger. SageOx already has parent-child session linking via `subagents.jsonl`. The planner session acts as the "parent" and all subsequent specialist sessions report as subagents. Each session gets an `--issue` tag for grouping.
+Overdeck issues go through up to 5 agents: planner → worker → reviewer → tester → merger. SageOx already has parent-child session linking via `subagents.jsonl`. The planner session acts as the "parent" and all subsequent specialist sessions report as subagents. Each session gets an `--issue` tag for grouping.
 
 ### D10: `--issue` flag for external issue tracking
 Add an `--issue PAN-279` flag to `ox agent session start` (and to `--auto-record`). Stored as `ExternalIssueID` in session metadata. Enables filtering "show me all sessions for PAN-279" — the planner's planning, the worker's implementation tradeoffs, the reviewer's concerns, the tester's diagnostics, and the merger's conflict resolution.
@@ -77,10 +77,10 @@ User/agent explicitly runs → /ox-session-stop skill
 
 ### The Problem With Agent Sessions
 
-Panopticon agents don't know to call `/ox-session-start`. The session lifecycle is:
+Overdeck agents don't know to call `/ox-session-start`. The session lifecycle is:
 
 ```
-Panopticon creates agent → starts Claude Code in worktree
+Overdeck creates agent → starts Claude Code in worktree
   → SessionStart hook fires ox agent prime ✓ (context injected)
   → Agent works on implementation...
   → Agent finishes, Claude Code exits
@@ -90,7 +90,7 @@ Panopticon creates agent → starts Claude Code in worktree
 ### How It Works After Fork PR
 
 ```
-Panopticon creates agent → starts Claude Code in worktree
+Overdeck creates agent → starts Claude Code in worktree
   → SessionStart hook fires: ox agent prime --auto-record
   → Context injected AND recording started in one call ✓
   → Agent works on implementation...
@@ -116,7 +116,7 @@ SageOx captures both. The sageox.ai dashboard lets you browse/search them.
 
 ### Multi-Agent Issue Pipeline
 
-A single Panopticon issue (e.g., PAN-279) goes through up to 5 agents sequentially. Each runs in its own Claude Code session, each makes different kinds of decisions:
+A single Overdeck issue (e.g., PAN-279) goes through up to 5 agents sequentially. Each runs in its own Claude Code session, each makes different kinds of decisions:
 
 | Phase | Agent | Decisions Worth Capturing |
 |-------|-------|--------------------------|
@@ -160,7 +160,7 @@ Planner Session (parent)
 Total issue duration: 85 min | 5 sessions | 37 key decisions captured
 ```
 
-**How Panopticon wires this:**
+**How Overdeck wires this:**
 
 1. Planner starts → hook fires `ox agent prime --auto-record --issue PAN-279 --title "PAN-279: Planning"`
 2. Planner finishes → Stop hook fires `ox session stop` → planner session saved, gets a session path
@@ -169,14 +169,14 @@ Total issue duration: 85 min | 5 sessions | 37 key decisions captured
 5. (Repeat for reviewer, tester, merger — each reports to planner as parent)
 6. On sageox.ai: all 5 sessions linked under PAN-279, planner shows aggregated subagent list
 
-Panopticon already tracks the issue ID and specialist phase. It passes these as `--issue` and `--title` to the hooks.
+Overdeck already tracks the issue ID and specialist phase. It passes these as `--issue` and `--title` to the hooks.
 
 ### What You See on sageox.ai After a Full Issue Workflow
 
 After PAN-279 goes through all 5 agents, you browse sageox.ai and see:
 
 ```
-Panopticon Team → Sessions → Filter: PAN-279
+Overdeck Team → Sessions → Filter: PAN-279
 
 ┌─────────────────────────────────────────────────────────────────┐
 │ 📋 PAN-279: Convoy auto-synthesis                               │
@@ -330,7 +330,7 @@ if agentPrimeAutoRecord {
 }
 ```
 
-~30 lines. Uses existing `session.StartRecording()` Go API. The `--parent-session` flag enables Panopticon to chain specialist sessions: planner is parent, worker/reviewer/tester/merger are subagents.
+~30 lines. Uses existing `session.StartRecording()` Go API. The `--parent-session` flag enables Overdeck to chain specialist sessions: planner is parent, worker/reviewer/tester/merger are subagents.
 
 ### Change 5: Session adapter project root hint (MEDIUM risk)
 
@@ -383,7 +383,7 @@ If `SAGEOX_AGENT_ID` is available as an env var in the Stop hook context, this w
 - Update `CLAUDE.md` with devroot workflow section
 - Add env vars to `ox agent prime --help`
 
-## Scope: Panopticon Wiring (After PR Merged)
+## Scope: Overdeck Wiring (After PR Merged)
 
 ### Hook Configuration
 
@@ -411,10 +411,10 @@ The devroot hook (managed by PAN-266 mechanism) sets `OX_PROJECT_ROOT` and enabl
 
 **For agent sessions (worktrees):**
 
-Panopticon sets environment variables when spawning agents. The worktree-level hooks read them:
+Overdeck sets environment variables when spawning agents. The worktree-level hooks read them:
 
 ```bash
-# Panopticon sets these env vars when creating the agent's Claude Code session:
+# Overdeck sets these env vars when creating the agent's Claude Code session:
 export PAN_ISSUE_ID="PAN-279"
 export PAN_PHASE="implementation"          # planning|implementation|review|testing|merge
 export PAN_PARENT_SESSION="/path/to/planner/session"  # empty for planner
@@ -449,9 +449,9 @@ The worktree hook template uses these:
 
 2. Planner finishes:
    ox agent <id> session stop
-   → Session processed + uploaded. Panopticon captures the session path.
+   → Session processed + uploaded. Overdeck captures the session path.
 
-3. Worker starts (Panopticon passes planner's session path):
+3. Worker starts (Overdeck passes planner's session path):
    ox agent prime --auto-record --issue PAN-279 --title "PAN-279: Implementation" \
      --parent-session /path/to/planner/session
 
@@ -466,22 +466,22 @@ Result: sageox.ai shows all 5 sessions linked under PAN-279
 
 ### Commit `.sageox/` in panopticon-cli
 
-Currently staged but uncommitted. After confirming Panopticon team:
+Currently staged but uncommitted. After confirming Overdeck team:
 
 ```bash
 cd ~/Projects/panopticon-cli
 cat .sageox/config.json | jq .team_id
-# Verify Panopticon team, not Mind Your Now
+# Verify Overdeck team, not Mind Your Now
 git add .sageox/
-git commit -m "Initialize SageOx for session capture (Panopticon team)"
+git commit -m "Initialize SageOx for session capture (Overdeck team)"
 ```
 
 ### Agent Lifecycle Integration
 
-Panopticon's cloister (agent lifecycle manager) needs to:
+Overdeck's cloister (agent lifecycle manager) needs to:
 
 1. **Pass env vars to agent sessions** — `PAN_ISSUE_ID`, `PAN_PHASE`, `PAN_PARENT_SESSION`
-2. **Capture planner session path** — when planner's `ox session stop` runs, Panopticon reads the session path from the output and stores it for subsequent agents
+2. **Capture planner session path** — when planner's `ox session stop` runs, Overdeck reads the session path from the output and stores it for subsequent agents
 3. **Chain subsequent agents** — each specialist gets `--parent-session` pointing to the planner's session
 
 This is lightweight — it's env vars passed through `createSession()` in `agents.ts`, not new API calls.
@@ -500,21 +500,21 @@ This is lightweight — it's env vars passed through `createSession()` in `agent
 | `CLAUDE.md` | Document devroot workflow, env var, auto-record, issue linking | LOW |
 | Tests for above | New test cases | LOW |
 
-## Files to Modify (Panopticon Side)
+## Files to Modify (Overdeck Side)
 
 | File | Change | Risk |
 |------|--------|------|
 | Devroot hooks (via PAN-266 mechanism) | Add `OX_PROJECT_ROOT` + `--auto-record` + `--issue` + Stop hook | LOW |
-| `.sageox/config.json` | Verify Panopticon team, commit | LOW |
+| `.sageox/config.json` | Verify Overdeck team, commit | LOW |
 | `src/lib/agents.ts` (or cloister) | Pass issue ID + parent session path to hook env vars | LOW |
 
 ## Documentation Draft: How SageOx Integration Works
 
-*(For Panopticon docs — `docs/sageox-integration.md`)*
+*(For Overdeck docs — `docs/sageox-integration.md`)*
 
 ### Overview
 
-Panopticon integrates with [SageOx](https://sageox.ai) to capture session reasoning from both human planning sessions and agent implementation sessions. After a session ends, structured summaries — key decisions, trade-offs, "aha moments" — are browsable on the SageOx dashboard.
+Overdeck integrates with [SageOx](https://sageox.ai) to capture session reasoning from both human planning sessions and agent implementation sessions. After a session ends, structured summaries — key decisions, trade-offs, "aha moments" — are browsable on the SageOx dashboard.
 
 ### What Gets Captured
 
@@ -557,13 +557,13 @@ git add .sageox/
 git commit -m "Initialize SageOx for session capture"
 ```
 
-Hooks are managed by Panopticon's devroot hook system (PAN-266). No manual hook configuration needed.
+Hooks are managed by Overdeck's devroot hook system (PAN-266). No manual hook configuration needed.
 
 ### Constraints
 
-- **Panopticon only** — MYN and other closed-source projects are never initialized with SageOx
+- **Overdeck only** — MYN and other closed-source projects are never initialized with SageOx
 - **Secrets are redacted** — SageOx strips API keys, tokens, passwords before upload
-- **Sessions are per-team** — only Panopticon team members see Panopticon sessions
+- **Sessions are per-team** — only Overdeck team members see Overdeck sessions
 
 ### Architecture
 
@@ -581,7 +581,7 @@ ox agent <id> session stop
   ↓ POST /api/v1/session/summarize (SageOx server)
   ↓ structured summary returned
   ↓ saved locally + uploaded to team ledger
-Browse at sageox.ai → Panopticon team → Sessions
+Browse at sageox.ai → Overdeck team → Sessions
 ```
 
 ## Outcome: Experiment Concluded
@@ -600,7 +600,7 @@ Browse at sageox.ai → Panopticon team → Sessions
 
 ### Decision: Disable SageOx Integration
 
-All SageOx integration has been removed from the Panopticon codebase:
+All SageOx integration has been removed from the Overdeck codebase:
 - Claude Code hooks (settings.local.json) — cleared
 - AGENTS.md directives — removed
 - Agent env vars (agents.ts) — removed
@@ -614,16 +614,16 @@ The fork PR (OX_PROJECT_ROOT, --auto-record, --issue flags) remains in our fork 
 
 ### Recommendation for Future
 
-If SageOx addresses the prompt injection concerns (makes attribution opt-in, removes capture_prior, documents what prime injects), the integration could be revisited. The multi-agent session linking architecture mapped naturally to Panopticon's specialist pipeline and would be valuable if the trust issues are resolved.
+If SageOx addresses the prompt injection concerns (makes attribution opt-in, removes capture_prior, documents what prime injects), the integration could be revisited. The multi-agent session linking architecture mapped naturally to Overdeck's specialist pipeline and would be valuable if the trust issues are resolved.
 
 ## Email Draft: Milkana
 
 ```
-Subject: SageOx feedback from Panopticon integration
+Subject: SageOx feedback from Overdeck integration
 
 Hi Milkana,
 
-I spent some real time integrating SageOx into Panopticon (my open source
+I spent some real time integrating SageOx into Overdeck (my open source
 multi-agent orchestrator — github.com/eltmon/panopticon-cli). Wanted to share
 what I learned and some contributions.
 
@@ -653,7 +653,7 @@ Edward
 ## Out of Scope
 
 - **MYN integration** — MYN is closed source, no SageOx
-- **Native session summarization in Panopticon** — use SageOx's server-side summarization
+- **Native session summarization in Overdeck** — use SageOx's server-side summarization
 - **Collaborative PRD refinement** — separate feature, different mechanism
 - **Retroactive batch processing of historical sessions** — future work
 - **`.ox-devroot` marker file** — over-engineered, env var is sufficient
@@ -670,7 +670,7 @@ Edward
 
 5. **Auto-upload on session stop** — Currently `ox session stop` processes locally but doesn't auto-upload. Should the PR add `--auto-upload` or leave that as a separate step? Recommendation: include it — the whole point is fire-and-forget for agents.
 
-6. **Planner session path capture** — When the planner agent's `ox session stop` runs, Panopticon needs to capture the session path from its output to pass as `--parent-session` to subsequent agents. Where does Panopticon store this? Recommendation: in the workspace state alongside the agent metadata.
+6. **Planner session path capture** — When the planner agent's `ox session stop` runs, Overdeck needs to capture the session path from its output to pass as `--parent-session` to subsequent agents. Where does Overdeck store this? Recommendation: in the workspace state alongside the agent metadata.
 
 7. **Dashboard filtering by issue** — The `--issue` flag stores `ExternalIssueID` in session metadata, but sageox.ai needs a frontend filter to actually use it. Is this something the SageOx team would build, or is it a feature request for later? For the POC, title-based visual scanning works.
 

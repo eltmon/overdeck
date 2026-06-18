@@ -90,7 +90,7 @@ if [ -n "$TMUX" ]; then
 fi
 
 if [ "$IS_OVERDECK_SESSION" = "1" ]; then
-    echo "🤖 Panopticon session detected - auto-reverting to main branch..."
+    echo "🤖 Overdeck session detected - auto-reverting to main branch..."
     git checkout main --quiet
     echo "✓ Reverted to main branch. Agents/planning must use workspaces for feature branches."
     exit 0

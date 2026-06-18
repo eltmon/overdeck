@@ -2,7 +2,7 @@
  * @panopticon/pi-extension (PAN-636, PAN-1134)
  *
  * Vendored extension loaded by the Pi Coding Agent (`pi --extension <path>`)
- * to emit Panopticon lifecycle signals via filesystem markers and HTTP POSTs.
+ * to emit Overdeck lifecycle signals via filesystem markers and HTTP POSTs.
  */
 
 import { appendFile, mkdir, open, readFile, stat, unlink, writeFile } from 'node:fs/promises'
@@ -60,7 +60,7 @@ export interface PiCommand {
   handler: (args: string, ctx: unknown) => void | Promise<void>
 }
 
-export interface PanopticonPaths {
+export interface OverdeckPaths {
   agentDir: string
   heartbeatsDir: string
   readyPath: string
@@ -72,7 +72,7 @@ export interface PanopticonPaths {
   progressStatePath: string
 }
 
-export function panopticonPathsFor(agentId: string, home: string = homedir()): PanopticonPaths {
+export function panopticonPathsFor(agentId: string, home: string = homedir()): OverdeckPaths {
   const agentDir = join(home, '.panopticon', 'agents', agentId)
   const heartbeatsDir = join(home, '.panopticon', 'heartbeats')
   return {
@@ -265,7 +265,7 @@ export interface HookEnv {
 }
 
 function envFor(env: HookEnv): {
-  paths: PanopticonPaths
+  paths: OverdeckPaths
   pid: number
   now: () => string
 } {
@@ -666,7 +666,7 @@ export default function panopticonPiExtension(pi: PiExtensionAPI): void {
   })
 
   pi.registerCommand('pan-done', {
-    description: 'Signal Panopticon that this agent has completed its work.',
+    description: 'Signal Overdeck that this agent has completed its work.',
     handler: async args => {
       try {
         await handlePanDone(env, typeof args === 'string' ? args : '')

@@ -72,7 +72,7 @@ Each one is a symptom of the same root cause: **beads has been growing native su
 - [ ] Update \`src/cli/commands/install.ts\` version check to v1.0.4
 - [ ] Update \`pan install\` install URL/script
 
-### 2. Update Panopticon beads skill + docs
+### 2. Update Overdeck beads skill + docs
 - [ ] Bump \`skills/beads/SKILL.md\` version metadata
 - [ ] Document \`bd ping\` and \`bd doctor --fix\` as the canonical health/repair calls
 - [ ] Document \`bd prune\` for DB hygiene
@@ -123,7 +123,7 @@ Upgraded beads to v1.0.4: replaced bd list --json --limit 0 probe with bd ping -
 Completed all PAN-1111 beads, removed stale bd sync usage discovered during verification, pushed feature/pan-1111, and verified typecheck/lint/test/build.
 
 --- comment ---
-Merged to main via Panopticon merge-agent
+Merged to main via Overdeck merge-agent
 
 --- comment ---
 Code audit result: INCOMPLETE. Reopening.

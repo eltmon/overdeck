@@ -1,5 +1,5 @@
 /**
- * pan update - Update Panopticon to latest version
+ * pan update - Update Overdeck to latest version
  */
 
 import { execSync } from 'child_process';
@@ -60,7 +60,7 @@ export async function updateCommand(options: {
   check?: boolean;
   force?: boolean;
 }) {
-  console.log(chalk.bold('Panopticon Update\n'));
+  console.log(chalk.bold('Overdeck Update\n'));
 
   const currentVersion = getCurrentVersion();
   console.log(`Current version: ${chalk.cyan(currentVersion)}`);
@@ -94,7 +94,7 @@ export async function updateCommand(options: {
   }
 
   // Perform the update
-  console.log(chalk.dim('\nUpdating Panopticon...'));
+  console.log(chalk.dim('\nUpdating Overdeck...'));
 
   try {
     execSync('npm install -g @overdeck/cli@latest', {

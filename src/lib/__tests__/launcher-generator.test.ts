@@ -265,7 +265,7 @@ describe('generateLauncherScript', () => {
       role: 'review',
       workingDir: '/workspace/project',
       setPipefail: true,
-      unsetPanopticonEnv: true,
+      unsetOverdeckEnv: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });

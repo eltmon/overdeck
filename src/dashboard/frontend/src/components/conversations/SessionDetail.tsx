@@ -195,7 +195,7 @@ export function SessionDetail({ session, onClose }: Props) {
             className={displaySession.panopticonManaged
               ? 'rounded border border-emerald-500/40 bg-emerald-950/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300'
               : 'rounded border border-amber-500/40 bg-amber-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300'}
-            title={displaySession.panopticonManaged ? 'Panopticon-managed session' : 'Ad-hoc discovered session'}
+            title={displaySession.panopticonManaged ? 'Overdeck-managed session' : 'Ad-hoc discovered session'}
           >
             {displaySession.panopticonManaged ? `Managed${displaySession.panIssueId ? ` · ${displaySession.panIssueId}` : ''}` : 'Ad-hoc'}
           </span>

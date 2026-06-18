@@ -26,9 +26,9 @@ import {
   getPendingSyncCount,
   getDisplayStatus,
 } from '../../src/lib/shadow-state.js';
-import { getPanopticonHome } from '../../src/lib/paths.js';
+import { getOverdeckHome } from '../../src/lib/paths.js';
 
-const TEST_SHADOW_STATE_DIR = join(getPanopticonHome(), 'shadow-state');
+const TEST_SHADOW_STATE_DIR = join(getOverdeckHome(), 'shadow-state');
 
 // Unique prefix for this test file to avoid conflicts with shadow-mode.test.ts
 const TEST_PREFIX = 'TEST-SSTATE';

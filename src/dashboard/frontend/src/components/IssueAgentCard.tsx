@@ -272,7 +272,7 @@ export function IssueAgentCard({
     },
   });
 
-  // PAN-1675: 'Resume (compact)' — out-of-band Panopticon-side compaction of the
+  // PAN-1675: 'Resume (compact)' — out-of-band Overdeck-side compaction of the
   // saved session before relaunch, to recover a context-wedged agent without the
   // harness /compact deadlock.
   const resumeCompactMutation = useMutation({
@@ -654,7 +654,7 @@ export function IssueAgentCard({
                 disabled={resumeCompactMutation.isPending}
                 className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
                 title="Resume (compact) — compact the saved session out-of-band before relaunch to recover a context-wedged agent"
-                aria-label={`Resume ${agent.id} with Panopticon-side compaction (out-of-band recovery for a context-wedged agent)`}
+                aria-label={`Resume ${agent.id} with Overdeck-side compaction (out-of-band recovery for a context-wedged agent)`}
               >
                 <Minimize2 className="w-4 h-4" />
               </button>

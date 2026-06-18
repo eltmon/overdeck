@@ -1,11 +1,11 @@
 ---
 title: Prompt Templates
-description: How Panopticon builds the prompts it sends to Claude — the Mustache-based loader, frontmatter contract, template catalogue, and authoring guide.
+description: How Overdeck builds the prompts it sends to Claude — the Mustache-based loader, frontmatter contract, template catalogue, and authoring guide.
 ---
 
 # Prompt Templates
 
-Every prompt that Panopticon sends to Claude — the work agent that implements a
+Every prompt that Overdeck sends to Claude — the work agent that implements a
 feature, the review specialist that audits the diff, the merge agent that lands
 a PR, the planning agent that generates a vBRIEF — is built from a versioned
 Markdown template under `src/lib/cloister/prompts/`.
@@ -409,7 +409,7 @@ Two templates wrap their output in HTML comments:
 
 - `planning.md` — marks the orchestration-context block so that session
   summarizers and the dashboard know which part of the planning prompt is
-  Panopticon setup vs. the agent's actual work.
+  Overdeck setup vs. the agent's actual work.
 - `inspect-agent.ts` — wraps its rendered prompt in the same markers via a
   wrapping template literal.
 

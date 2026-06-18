@@ -47,14 +47,14 @@ Fix-All is a **self-improving orchestration loop**:
 2. **Between Cycles**: Infrastructure improvements
    - Dashboard team (or dedicated agent) fixes bugs found in Cycle N
    - Fixes are committed to main
-   - Panopticon itself is working under the workflow (via agents)
+   - Overdeck itself is working under the workflow (via agents)
 
 3. **Cycle N+1**: Run pan-oversee again
    - More issues complete autonomously (bugs from N are fixed)
    - New classes of bugs emerge
    - System improves incrementally
 
-**Key insight**: Panopticon's workflow orchestration layer is the target of improvement, not separate from it. The system debugs itself.
+**Key insight**: Overdeck's workflow orchestration layer is the target of improvement, not separate from it. The system debugs itself.
 
 ## Architecture
 
@@ -178,7 +178,7 @@ Bug log analyzed:
   - How often? By which agents?
   - Root causes identified
   ↓
-Panopticon infrastructure improved:
+Overdeck infrastructure improved:
   - Cloister agent fixes bugs in its own code
   - Dashboard routes updated
   - Specialist dispatch logic refined

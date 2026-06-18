@@ -6,7 +6,7 @@ The dashboard has no way to see agent work except through raw tmux terminal outp
 
 ## Goal
 
-Replicate T3Code's conversation UI in Panopticon, using the **same component patterns, data structures, and dependencies** so we can easily pull updates from T3Code as they evolve. Add a toggle for switching between the rendered conversation view and the live tmux terminal view.
+Replicate T3Code's conversation UI in Overdeck, using the **same component patterns, data structures, and dependencies** so we can easily pull updates from T3Code as they evolve. Add a toggle for switching between the rendered conversation view and the live tmux terminal view.
 
 ## Design Principle: Mirror T3Code
 

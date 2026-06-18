@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mission Control is Panopticon's default landing view — a unified monitoring interface for all active projects, features, and AI agent activity. Shadow Engineering is a companion mode for teams adopting AI-assisted development incrementally.
+Mission Control is Overdeck's default landing view — a unified monitoring interface for all active projects, features, and AI agent activity. Shadow Engineering is a companion mode for teams adopting AI-assisted development incrementally.
 
 ## Mission Control
 
@@ -87,7 +87,7 @@ Shadow Engineering is for teams that want AI assistance without replacing their 
 
 > **AI that learns your team before it leads.**
 
-Shadow Engineering lets existing engineers keep working their way while Panopticon's AI observes, documents, and assists. It learns the codebase, patterns, and team approach — so when you're ready to go further, the AI already understands how you build.
+Shadow Engineering lets existing engineers keep working their way while Overdeck's AI observes, documents, and assists. It learns the codebase, patterns, and team approach — so when you're ready to go further, the AI already understands how you build.
 
 **Target audience**: Engineering leaders at organizations that:
 - Want to adopt AI-assisted development gradually

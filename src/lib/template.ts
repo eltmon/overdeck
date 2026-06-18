@@ -60,7 +60,7 @@ export function generateClaudeMdSync(
 
 ## Getting Started
 
-This workspace was created by Panopticon. Use \`bd\` commands to track your work.
+This workspace was created by Overdeck. Use \`bd\` commands to track your work.
 `;
   }
 

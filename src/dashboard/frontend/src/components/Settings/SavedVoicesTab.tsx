@@ -48,7 +48,7 @@ async function playTtsVoice(id: string): Promise<void> {
   const res = await fetch('/api/tts/speak', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ voiceId: id, text: 'This is a Panopticon TTS voice test.', preview: true }),
+    body: JSON.stringify({ voiceId: id, text: 'This is a Overdeck TTS voice test.', preview: true }),
   });
   await requireTtsSpoken(res, 'Failed to play TTS voice');
 }

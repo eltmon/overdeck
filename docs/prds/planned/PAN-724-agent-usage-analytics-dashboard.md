@@ -2,7 +2,7 @@
 
 ## Problem
 
-Panopticon can track raw cost events, but it still lacks a first-class product surface that explains **where usage is going** and **why**. We need one place in the dashboard that answers:
+Overdeck can track raw cost events, but it still lacks a first-class product surface that explains **where usage is going** and **why**. We need one place in the dashboard that answers:
 
 - Which issues and workspaces are burning the most tokens and money?
 - Which agent types are expensive?
@@ -14,12 +14,12 @@ Today, this information is fragmented across transcript JSONL files, cost tables
 
 ## Goal
 
-Add a **Panopticon-native usage analytics and reporting page** that surfaces tokens, cost, retries, one-shot rate, and activity breakdowns across issue/workspace/agent lifecycle data.
+Add a **Overdeck-native usage analytics and reporting page** that surfaces tokens, cost, retries, one-shot rate, and activity breakdowns across issue/workspace/agent lifecycle data.
 
-This is not a standalone wrapper product. It is a core Panopticon dashboard capability tied directly to:
+This is not a standalone wrapper product. It is a core Overdeck dashboard capability tied directly to:
 
 - GitHub issues
-- Panopticon workspaces
+- Overdeck workspaces
 - agent types and specialist stages
 - existing cost tracking and transcript reconciliation
 - TLDR indexing metrics
@@ -27,7 +27,7 @@ This is not a standalone wrapper product. It is a core Panopticon dashboard capa
 ## Non-Goals
 
 - Replacing the existing cost event architecture
-- Building a separate terminal-only analytics tool outside Panopticon
+- Building a separate terminal-only analytics tool outside Overdeck
 - Supporting every external coding agent on day one
 - Perfect semantic classification in v1 using LLM inference
 - Creating speculative infrastructure for providers we do not yet ingest
@@ -35,7 +35,7 @@ This is not a standalone wrapper product. It is a core Panopticon dashboard capa
 ## Users and Core Questions
 
 ### Primary users
-- Edward operating Panopticon day-to-day
+- Edward operating Overdeck day-to-day
 - Anyone debugging why an issue/workspace/agent pipeline is wasteful
 - Anyone validating whether tooling changes improved efficiency
 
@@ -121,7 +121,7 @@ At minimum:
 - interactive/manual
 - delegated/subagent
 
-If Panopticon has richer phase labels, use them. The key requirement is that users can compare lifecycle stages on the same issue.
+If Overdeck has richer phase labels, use them. The key requirement is that users can compare lifecycle stages on the same issue.
 
 ### 2.4 By Activity
 The UI must expose at least these user-facing categories:
@@ -182,14 +182,14 @@ For edit-heavy work, calculate:
 ### Interpretation requirement
 The page must make it easy to identify where token burn is caused by repeated edit/test/fix cycles rather than initial solution cost.
 
-## 4. Panopticon-Specific Attribution
+## 4. Overdeck-Specific Attribution
 
-Panopticon must go beyond raw transcript grouping.
+Overdeck must go beyond raw transcript grouping.
 
 ### Required attribution hierarchy
 - Provider/source
 - Claude/Codex session
-- Panopticon agent
+- Overdeck agent
 - session type / phase
 - issue ID
 - workspace
@@ -234,7 +234,7 @@ At minimum:
 
 ## 6. Data Sources
 
-The analytics page should compose existing Panopticon sources rather than inventing a parallel system.
+The analytics page should compose existing Overdeck sources rather than inventing a parallel system.
 
 ### Primary sources
 - SQLite `cost_events`
@@ -293,7 +293,7 @@ This compact mode should answer, at minimum:
 Activity classification should be deterministic in v1 and derived from:
 - tool usage patterns
 - shell command patterns
-- known Panopticon phase/agent type metadata
+- known Overdeck phase/agent type metadata
 - limited keyword rules on user prompts when necessary
 
 Do not require an LLM call for per-turn classification in v1.
@@ -326,7 +326,7 @@ The critical requirement is analytical usefulness, not chart polish.
 - Keep API responses shaped for dashboard drilldown, not just raw logs
 
 ### Important constraint
-Do not reduce analytics to project-level totals only. Panopticon's differentiator is issue/workspace/agent-type attribution.
+Do not reduce analytics to project-level totals only. Overdeck's differentiator is issue/workspace/agent-type attribution.
 
 ## 12. Acceptance Criteria
 
@@ -336,7 +336,7 @@ Do not reduce analytics to project-level totals only. Panopticon's differentiato
 - [ ] The page includes all required activity buckets, including Coding and Debugging
 - [ ] One-shot rate is shown by activity and by agent type
 - [ ] Retry-heavy hotspots are visible by issue/workspace/activity
-- [ ] Usage is associated with Panopticon issues and workspaces, not just raw session files
+- [ ] Usage is associated with Overdeck issues and workspaces, not just raw session files
 - [ ] Planning, implementation, review, test, and merge usage can be compared on the same issue
 - [ ] TLDR impact is shown with token savings and bypass/interception metrics
 - [ ] Users can answer whether TLDR is reducing exploration overhead from the analytics page

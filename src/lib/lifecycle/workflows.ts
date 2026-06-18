@@ -85,7 +85,7 @@ export function approve(
     // 2. Close issue
     const closeSteps = yield* closeIssue(ctx, {
       tracker: opts.tracker,
-      comment: 'Merged to main via Panopticon lifecycle',
+      comment: 'Merged to main via Overdeck lifecycle',
       applyLabel: true,
     });
     allSteps.push(...closeSteps);

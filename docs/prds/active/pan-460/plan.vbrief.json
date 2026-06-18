@@ -21,7 +21,7 @@
     ],
     "tags": ["frontend", "design-system", "rebrand", "light-mode-fix", "navigation"],
     "narratives": {
-      "Problem": "The Panopticon dashboard has 3 divergent visual languages, completely broken light mode (292 hardcoded color classes ignoring CSS tokens), an overcrowded 13-item horizontal nav, and a 'Mission Control' name that collides with competing AI orchestrators. The result is a tool that looks like 3 different products stitched together.",
+      "Problem": "The Overdeck dashboard has 3 divergent visual languages, completely broken light mode (292 hardcoded color classes ignoring CSS tokens), an overcrowded 13-item horizontal nav, and a 'Mission Control' name that collides with competing AI orchestrators. The result is a tool that looks like 3 different products stitched together.",
       "Proposal": "Complete visual rebrand: establish a T3Code-inspired semantic token architecture (OKLCH, color-mix, --alpha borders), migrate all 54 component files to semantic tokens fixing light/dark mode, replace horizontal nav with grouped collapsible sidebar, rename Mission Control to Command Deck (frontend + API), update typography to DM Sans body font, add fractal noise texture and visual polish. Delivered as one cohesive feature."
     },
     "items": [

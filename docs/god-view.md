@@ -4,7 +4,7 @@ The God View is a full-screen dashboard tab providing a real-time overview of al
 
 ## Access
 
-Navigate to the **God View** tab (Zap icon) in the Panopticon dashboard header, or visit `/god-view` directly.
+Navigate to the **God View** tab (Zap icon) in the Overdeck dashboard header, or visit `/god-view` directly.
 
 ## Layout
 

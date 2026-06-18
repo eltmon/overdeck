@@ -32,9 +32,9 @@ live-window cache.
   per deduplicated assistant API response: tokens + computed USD + attribution.
 - **Claude transcript** — `~/.claude/projects/<encoded-cwd>/<session>.jsonl`,
   written by Claude Code. Carries per-response `message.usage` token counts and
-  `requestId`, but **no cost** (cost is computed by Panopticon from tokens ×
+  `requestId`, but **no cost** (cost is computed by Overdeck from tokens ×
   pricing). The reconciler's source of truth for Claude/CLIProxy agents.
-- **events.jsonl** — `~/.panopticon/costs/events.jsonl`, Panopticon's own
+- **events.jsonl** — `~/.panopticon/costs/events.jsonl`, Overdeck's own
   append-only cost log written by `appendCostEventSync`. Carries the **computed
   cost** at write time. The source of truth for background-AI events that have no
   transcript at all.
@@ -115,7 +115,7 @@ WALs) is retained.** No cost datum lives *only* in the DB **as a value**, but on
 subset has a single-file backing: the **74,899 `reconciler:*` rows are written
 DB-only and are backed solely by the Claude transcript** (not in events.jsonl,
 not in any WAL). Their rebuildability is therefore equivalent to transcript
-persistence. Within Panopticon's control this is safe — Panopticon never deletes
+persistence. Within Overdeck's control this is safe — Overdeck never deletes
 `~/.claude/projects/` transcripts and actively guards against it (`rm
 ~/.claude/projects/*` is in the denied-Bash list, `claude-settings-overlay.ts:73-75`,
 consistent with the "JSONL is sacred" rule). Only **external / Claude-Code-side

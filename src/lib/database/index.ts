@@ -1,5 +1,5 @@
 /**
- * Panopticon Unified Database
+ * Overdeck Unified Database
  *
  * Single panopticon.db at ~/.panopticon/panopticon.db.
  * Singleton pattern — one connection shared across the process.
@@ -14,7 +14,7 @@
 import { Data, Effect } from 'effect';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import { openDatabase, type SqliteDatabase } from './driver.js';
 import { runMigrations } from './schema.js';
 
@@ -34,7 +34,7 @@ let _db: SqliteDatabase | null = null;
  * Get the path to panopticon.db (dynamic, respects OVERDECK_HOME override for tests)
  */
 export function getDatabasePath(): string {
-  return join(getPanopticonHome(), 'panopticon.db');
+  return join(getOverdeckHome(), 'panopticon.db');
 }
 
 /**
@@ -46,7 +46,7 @@ export function getDatabase(): SqliteDatabase {
     return _db;
   }
 
-  const home = getPanopticonHome();
+  const home = getOverdeckHome();
   if (!existsSync(home)) {
     mkdirSync(home, { recursive: true });
   }
@@ -77,7 +77,7 @@ export function getDatabase(): SqliteDatabase {
   // One-time migration: enable incremental auto_vacuum.
   //
   // SQLite's auto_vacuum default is NONE — when rows are deleted the freed
-  // pages stay allocated to the file forever. Panopticon's event store and
+  // pages stay allocated to the file forever. Overdeck's event store and
   // status_history are aggressively retained (95%+ of rows are eventually
   // deleted), so without auto_vacuum the file just grows monotonically.
   // Observed at 1.1 GB on disk for 154 MB of live data (904 MB freelist).

@@ -20,7 +20,7 @@ import { getDefaultConfigSync, saveConfigSync, loadConfigSync } from '../../lib/
 import { Effect } from 'effect';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
-import { generatePanopticonTraefikConfigSync, cleanupTemplateFilesSync, ensureProjectCertsSync, generateTlsConfigSync } from '../../lib/traefik.js';
+import { generateOverdeckTraefikConfigSync, cleanupTemplateFilesSync, ensureProjectCertsSync, generateTlsConfigSync } from '../../lib/traefik.js';
 import { refreshCacheSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
@@ -29,7 +29,7 @@ import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
 export function registerInstallCommand(program: Command): void {
   program
     .command('install')
-    .description('Install Panopticon prerequisites')
+    .description('Install Overdeck prerequisites')
     .option('--check', 'Check prerequisites only')
     .option('--minimal', 'Skip Traefik and mkcert (use port-based routing)')
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
@@ -214,7 +214,7 @@ function printPrereqStatus(prereqs: { results: PrereqResult[]; allPassed: boolea
 }
 
 async function installCommand(options: InstallOptions): Promise<void> {
-  console.log(chalk.bold('\nPanopticon Installation\n'));
+  console.log(chalk.bold('\nOverdeck Installation\n'));
 
   const plat = await Effect.runPromise(detectPlatform());
   console.log(`Platform: ${chalk.cyan(plat)}\n`);
@@ -236,7 +236,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   // Step 2: Initialize directories
-  const spinner = ora('Initializing Panopticon directories...').start();
+  const spinner = ora('Initializing Overdeck directories...').start();
   for (const dir of INIT_DIRS) {
     mkdirSync(dir, { recursive: true });
   }
@@ -541,7 +541,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
       }
 
       // Always regenerate panopticon.yml from template to pick up config changes
-      if (generatePanopticonTraefikConfigSync()) {
+      if (generateOverdeckTraefikConfigSync()) {
         spinner.succeed('Traefik dynamic config generated (panopticon.yml)');
       }
 
@@ -614,7 +614,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   const { shadowModeChoice } = await inquirer.prompt([{
     type: 'list',
     name: 'shadowModeChoice',
-    message: 'How should Panopticon interact with issue trackers?',
+    message: 'How should Overdeck interact with issue trackers?',
     choices: [
       { name: 'Normal - Update issue status in tracker (default)', value: 'normal' },
       { name: 'Shadow - Track status locally, don\'t modify tracker', value: 'shadow' },
@@ -661,7 +661,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
   // Regenerate Traefik dynamic config now that config is saved
   if (config.traefik?.enabled) {
-    generatePanopticonTraefikConfigSync();
+    generateOverdeckTraefikConfigSync();
   }
 
   // Ensure base domain DNS entry

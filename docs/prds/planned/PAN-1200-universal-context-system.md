@@ -9,15 +9,15 @@
 
 ## Vision
 
-Make Panopticon a coherent multi-harness, multi-project context system. Every agent — Claude Code, Pi, future harnesses — receives the same global rules, the same project-specific guidance, the same live workspace briefing, and the same Panopticon-docs awareness. Every agent can produce inspectable HTML artifacts. The system deprecates the `sync.devroot` model entirely and stops assuming projects live under `~/Projects/`.
+Make Overdeck a coherent multi-harness, multi-project context system. Every agent — Claude Code, Pi, future harnesses — receives the same global rules, the same project-specific guidance, the same live workspace briefing, and the same Overdeck-docs awareness. Every agent can produce inspectable HTML artifacts. The system deprecates the `sync.devroot` model entirely and stops assuming projects live under `~/Projects/`.
 
 ## Problem
 
-Today an agent launched in any Panopticon workspace shows up cold:
+Today an agent launched in any Overdeck workspace shows up cold:
 
 - It doesn't know what was decided last week (memory exists per-issue but its retrieval is uneven)
 - It doesn't know what other agents are doing in adjacent workspaces
-- It doesn't know the Panopticon-specific way to do things (no docs RAG)
+- It doesn't know the Overdeck-specific way to do things (no docs RAG)
 - The config that's supposed to provide context (CLAUDE.md, skills, rules) only reaches Claude Code, and only via filesystem walks
 - `~/Projects/.claude/` has skills and agents in it, but `sync.devroot` is unset so nothing pushes them to `~/.claude/` or to harness-specific locations
 - The whole `~/Projects/` assumption breaks down for projects that live elsewhere (clients/, archives/, recovered repos)
@@ -74,7 +74,7 @@ PAN-1052 (in progress) is the **memory-and-observations substrate**: per-turn LL
 | # | Title | One-liner |
 |---|---|---|
 | [PAN-1201](https://github.com/eltmon/panopticon-cli/issues/1201) | Hybrid context distribution | Replace devroot with global/project/workspace layers; single-source → harness-specific render |
-| [PAN-1203](https://github.com/eltmon/panopticon-cli/issues/1203) | Panopticon-docs RAG | Ship prebuilt index; UserPromptSubmit hook injects top-k snippets |
+| [PAN-1203](https://github.com/eltmon/panopticon-cli/issues/1203) | Overdeck-docs RAG | Ship prebuilt index; UserPromptSubmit hook injects top-k snippets |
 | [PAN-1204](https://github.com/eltmon/panopticon-cli/issues/1204) | Home tab + live briefing | Dashboard landing; live session-context.md; knowledge registry; compliance audit hook (advisory) |
 | [PAN-1205](https://github.com/eltmon/panopticon-cli/issues/1205) | HTML artifacts | `pan artifacts` CLI; real validation; isolated `/s/<slug>` + `/a/<slug>` origins; full provenance |
 
@@ -86,7 +86,7 @@ Claude Code (primary) + Pi (alternative, PAN-636). Codex / Cursor / Gemini / Ope
 
 Borrows the briefing structure and HTML-artifacts mechanism from Subspace, with concrete improvements at every cut corner Subspace's own agent confirmed:
 
-| Concern | Subspace | Panopticon |
+| Concern | Subspace | Overdeck |
 |---|---|---|
 | Memory extraction cost ceiling | None | Per-day cap + non-substantive-turn short-circuit |
 | Briefing freshness | Written once at session start | Live-updated on state change; re-injected on prompt if newer |
@@ -105,7 +105,7 @@ The epic is complete when all four children are merged and:
 - `pan sync` no longer references `sync.devroot`; the config field is deprecated with a warning on read
 - `~/.panopticon/context/global.md` round-trips to `~/.claude/CLAUDE.md` (and Pi's equivalent) via `pan sync`
 - A newly-spawned agent in any registered project receives the live session-context briefing on first turn
-- Asking any agent "how do I X in Panopticon?" triggers docs-RAG injection (when X matches the configured trigger set)
+- Asking any agent "how do I X in Overdeck?" triggers docs-RAG injection (when X matches the configured trigger set)
 - An agent can produce an HTML artifact, validate it, publish it to `panopticon.localhost/s/<slug>`, and the dashboard renders the workspace-record artifacts tab linking to it
 - Compliance audit hook fires when past-tense triggers match without preceding memory search; misses logged to PAN-1052's store; next-turn soft warning prepended
 

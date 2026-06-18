@@ -11,7 +11,7 @@ import {
 
 export function createMemoryCommand(): Command {
   const memory = new Command('memory')
-    .description('Search and inspect Panopticon memory');
+    .description('Search and inspect Overdeck memory');
 
   memory
     .command('search <query>')

@@ -10,7 +10,7 @@ Replace `claude-code-router` with `claudish` as the multi-model router and exten
 
 **For API key auth:** Both `config.yaml` (primary) and environment variables (fallback for CI/automation). No change to existing pattern.
 
-**For OAuth auth:** Refer to claudish documentation. Users run `claudish login` for their provider (e.g., ChatGPT Plus/Pro, Google OAuth). Panopticon detects claudish auth state and routes accordingly.
+**For OAuth auth:** Refer to claudish documentation. Users run `claudish login` for their provider (e.g., ChatGPT Plus/Pro, Google OAuth). Overdeck detects claudish auth state and routes accordingly.
 
 **Config schema addition** (`config-yaml.ts`):
 ```yaml
@@ -132,7 +132,7 @@ SmartSelector.select(model, availableModels, workType) → best model
 
 1. **cx@ prefix:** Not confirmed in claudish v6.12.2 docs. Verify during implementation.
 2. **claudish config file:** Does claudish read a config file? Or does it use `.env` / env vars? Need to understand how claudish picks up auth for each prefix.
-3. **OAuth token storage:** Where does claudish store OAuth tokens? Panopticon should check if tokens exist before suggesting `claudish login`.
+3. **OAuth token storage:** Where does claudish store OAuth tokens? Overdeck should check if tokens exist before suggesting `claudish login`.
 
 ## Out of Scope
 

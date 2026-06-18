@@ -1,5 +1,5 @@
 /**
- * Test fixtures for Panopticon tests
+ * Test fixtures for Overdeck tests
  */
 
 import { readFileSync } from 'fs';

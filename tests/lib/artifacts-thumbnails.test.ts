@@ -9,7 +9,7 @@ import {
   resolveArtifactThumbnailUrl,
 } from '../../src/lib/artifacts/thumbnails.js';
 
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 function metadata(overrides: Partial<ArtifactMetadata> = {}): ArtifactMetadata {
   return {
@@ -43,7 +43,7 @@ describe('artifact thumbnails', () => {
   });
 
   afterEach(async () => {
-    process.env.OVERDECK_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalOverdeckHome;
     await rm(panopticonHome, { recursive: true, force: true });
   });
 

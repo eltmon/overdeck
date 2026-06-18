@@ -1,6 +1,6 @@
-# Panopticon Usage Guide
+# Overdeck Usage Guide
 
-**Detailed installation, configuration, and usage guide for Panopticon CLI**
+**Detailed installation, configuration, and usage guide for Overdeck CLI**
 
 ---
 
@@ -25,7 +25,7 @@
 npx @overdeck/cli
 ```
 
-**That's it!** Panopticon starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
+**That's it!** Overdeck starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
 
 For a full local install with reusable `panctl` and `pan` commands:
 
@@ -95,7 +95,7 @@ npm install -g @overdeck/cli && pan install && pan up
 
 ### Platform Support
 
-The Panopticon dashboard includes terminal streaming, which requires a native binary (`node-pty`). Prebuilt binaries are available for:
+The Overdeck dashboard includes terminal streaming, which requires a native binary (`node-pty`). Prebuilt binaries are available for:
 
 | Platform | Architecture | Support |
 |----------|-------------|---------|
@@ -110,7 +110,7 @@ If a prebuilt binary is not available for your platform, node-gyp will automatic
 
 ### Why CLI tools instead of API tokens?
 
-Panopticon uses `gh` and `glab` CLIs instead of raw API tokens because:
+Overdeck uses `gh` and `glab` CLIs instead of raw API tokens because:
 - **Better auth**: OAuth tokens that auto-refresh (no expiring PATs)
 - **Simpler setup**: `gh auth login` handles everything
 - **Agent-friendly**: Agents can use them for PRs, merges, reviews
@@ -131,7 +131,7 @@ RALLY_API_KEY=_xxxxx    # Optional: for Rally as secondary tracker
 
 ### Issue Trackers
 
-Panopticon supports multiple issue trackers:
+Overdeck supports multiple issue trackers:
 
 | Tracker | Role | Configuration |
 |---------|------|---------------|
@@ -147,14 +147,14 @@ Secondary trackers sync issues to the dashboard alongside Linear issues, allowin
 Rally Features (PortfolioItems) get special treatment in the dashboard:
 
 - **Derived Status**: Features automatically reflect their children's aggregate status. If any child User Story is "In Progress", the Feature shows as "In Progress" — even if Rally still says "Discovering". If all children are "Done", the Feature shows as "Done".
-- **Raw State Preservation**: The original Rally state name (e.g., "Discovering", "In-Progress") is always visible alongside Panopticon's canonical state, so you can see both what Rally says and what Panopticon derives.
+- **Raw State Preservation**: The original Rally state name (e.g., "Discovering", "In-Progress") is always visible alongside Overdeck's canonical state, so you can see both what Rally says and what Overdeck derives.
 - **Shadow State Badges**: When shadow state differs from Rally's tracker state, cards show both states clearly: `🔗 Discovering → 👁 In Progress`.
 - **Kanban Board**: Features render as rich cards with progress bars (`3/5 done, 2 active`) and expandable child story folders.
 - **Mission Control**: Rally Features appear in the sidebar with child counts. Clicking a Feature shows its child stories with status indicators, assignees, and Rally state badges. The Sync button fetches Rally story statuses alongside GitHub/Linear discussions.
 
 ### Multi-Model Support
 
-Panopticon supports multiple AI model providers through direct Anthropic-compatible endpoints (Kimi, GLM, MiniMax, MiMo, OpenRouter) and a built-in CLIProxy sidecar (OpenAI, Gemini). You can also use the [Pi harness](https://github.com/badlogic/pi-mono) for native multi-provider routing.
+Overdeck supports multiple AI model providers through direct Anthropic-compatible endpoints (Kimi, GLM, MiniMax, MiMo, OpenRouter) and a built-in CLIProxy sidecar (OpenAI, Gemini). You can also use the [Pi harness](https://github.com/badlogic/pi-mono) for native multi-provider routing.
 
 📖 **[Complete work types guide →](WORK-TYPES.md)**
 📋 **[Configuration file reference →](CONFIGURATION.md)**
@@ -183,7 +183,7 @@ Panopticon supports multiple AI model providers through direct Anthropic-compati
 
 #### Configuration via Dashboard
 
-1. Open the Panopticon dashboard and navigate to **Settings**
+1. Open the Overdeck dashboard and navigate to **Settings**
 2. Configure **API keys** for external providers
 3. Configure **models per agent type** (review, test, merge, planning)
 4. Configure **models by task complexity** (trivial → expert)
@@ -253,7 +253,7 @@ Configure which local directory each Linear project maps to. Create/edit `~/.pan
   },
   {
     "linearProjectId": "def456",
-    "linearProjectName": "Panopticon",
+    "linearProjectName": "Overdeck",
     "linearPrefix": "PAN",
     "localPath": "/home/user/projects/panopticon"
   }
@@ -395,7 +395,7 @@ pan release notes v0.7.0 HEAD
 pan release notes v0.7.0 v0.7.1 --write .release/v0.7.1.md
 ```
 
-Panopticon develops directly on `main`. Releases are intentional promotions by tag, not automatic publishes from every commit. GitHub Releases now use a structured body generated from these notes instead of the bare default compare-only text.
+Overdeck develops directly on `main`. Releases are intentional promotions by tag, not automatic publishes from every commit. GitHub Releases now use a structured body generated from these notes instead of the bare default compare-only text.
 
 ---
 
@@ -655,7 +655,7 @@ claude config --list-skills
 
 ### Remote Workspaces
 
-Panopticon supports remote workspace execution via exe.dev:
+Overdeck supports remote workspace execution via exe.dev:
 
 ```bash
 # Create remote workspace
@@ -699,12 +699,12 @@ The heartbeat hook updates agent status in real-time on the dashboard.
 
 ## Desktop App
 
-The Panopticon desktop app wraps the dashboard in a native Electron window with system tray integration, native notifications, and automatic server embedding.
+The Overdeck desktop app wraps the dashboard in a native Electron window with system tray integration, native notifications, and automatic server embedding.
 
 ### Installation
 
 - **Linux**: Download the `.AppImage` from the releases page. `pan up` detects it automatically if placed at `~/.local/bin/panopticon` or in `~/Applications/`.
-- **macOS**: Open the `.dmg` and drag `Panopticon.app` to `/Applications/`. `pan up` launches it automatically.
+- **macOS**: Open the `.dmg` and drag `Overdeck.app` to `/Applications/`. `pan up` launches it automatically.
 
 ### Key Features
 
@@ -720,9 +720,9 @@ The Panopticon desktop app wraps the dashboard in a native Electron window with 
 
 `pan up` checks for the desktop app before starting the server:
 
-1. Linux: `~/.local/bin/panopticon`, then `~/Applications/Panopticon*.AppImage`
-2. macOS: `/Applications/Panopticon.app`
-3. Windows: `%LOCALAPPDATA%\Programs\Panopticon`
+1. Linux: `~/.local/bin/panopticon`, then `~/Applications/Overdeck*.AppImage`
+2. macOS: `/Applications/Overdeck.app`
+3. Windows: `%LOCALAPPDATA%\Programs\Overdeck`
 
 If found, it spawns the app detached and exits — the desktop app handles server startup internally. If not found, `pan up` starts the server normally.
 
@@ -749,6 +749,6 @@ This starts the server and opens it in your default browser after 1.5 seconds. U
 ---
 
 <div align="center">
-<p><strong>Made with ❤️ by the Panopticon team</strong></p>
+<p><strong>Made with ❤️ by the Overdeck team</strong></p>
 <p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="INDEX.md">Documentation</a></p>
 </div>

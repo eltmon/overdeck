@@ -2,7 +2,7 @@
 name: pipeline-status
 description: >
   Cross-room visual status board for every active issue moving through the
-  Panopticon pipeline. One row per issue, one column per phase
+  Overdeck pipeline. One row per issue, one column per phase
   (agent → review → test → verify → merge → ready), with a checkmark or X in
   each cell. Designed to be readable from across the room while agents work
   autonomously. Surface this BEFORE the verbose pan-status / agent-status
@@ -222,7 +222,7 @@ For deeper detail beyond the pipeline view:
 - During an active long-running operation (e.g. mid-merge, mid-build) — the
   table reflects steady state and will mislead during transitions.
 - For Mind Your Now (MIN-*), Auricle (AUR-*), Krux (KRUX-*) — this skill is
-  Panopticon-specific. Other trackers have their own dashboards.
+  Overdeck-specific. Other trackers have their own dashboards.
 
 ## Notes
 

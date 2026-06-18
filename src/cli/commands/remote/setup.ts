@@ -5,7 +5,7 @@ import { Effect } from 'effect';
  * Interactive setup for Fly.io integration:
  * 1. Check if flyctl is installed
  * 2. Check FLY_API_TOKEN env var or fly auth status
- * 3. Configure Panopticon remote settings
+ * 3. Configure Overdeck remote settings
  */
 
 import chalk from 'chalk';
@@ -79,9 +79,9 @@ export async function setupCommand(): Promise<void> {
     }
   }
 
-  // Step 3: Configure Panopticon
+  // Step 3: Configure Overdeck
   console.log('');
-  console.log(chalk.bold('  Step 3: Configure Panopticon'));
+  console.log(chalk.bold('  Step 3: Configure Overdeck'));
   console.log('');
 
   const config = loadConfigSync();

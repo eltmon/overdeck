@@ -69,7 +69,7 @@ git status
 ## Next Steps
 The user can now:
 1. Test the changes in the workspace
-2. Click "Approve & Merge" in Panopticon dashboard to merge and close
+2. Click "Approve & Merge" in Overdeck dashboard to merge and close
 3. Or request changes if needed
 ```
 

@@ -49,7 +49,7 @@ if declare -f pan_resolve_agent_id >/dev/null && pan_resolve_agent_id; then
   fi
 fi
 
-REASON='Your question has been surfaced to the operator in the Panopticon dashboard (PAN-1520), where they answer it directly. Restate the question and its options to the operator as a short plain-text message and wait for their reply (it arrives as a normal user message).'
+REASON='Your question has been surfaced to the operator in the Overdeck dashboard (PAN-1520), where they answer it directly. Restate the question and its options to the operator as a short plain-text message and wait for their reply (it arrives as a normal user message).'
 
 CONTEXT=$(echo "$INPUT" | jq -r '
   def fmt_option:

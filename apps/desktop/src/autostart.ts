@@ -1,5 +1,5 @@
 /**
- * Auto-start nag flow for the Panopticon desktop app.
+ * Auto-start nag flow for the Overdeck desktop app.
  *
  * Flow:
  *   Launch 1:   Full explanation dialog (warm, inviting)
@@ -62,10 +62,10 @@ function showFirstLaunchDialog(): void {
     void dialog
       .showMessageBox({
         type: "info",
-        title: "Start Panopticon automatically?",
+        title: "Start Overdeck automatically?",
         message: "Keep an eye on your agents — even when you forget to open the app.",
         detail:
-          "Panopticon can start automatically when you log in, so you never miss an agent " +
+          "Overdeck can start automatically when you log in, so you never miss an agent " +
           "asking for help or a merge that's ready to ship.\n\n" +
           "You can change this at any time in Settings → Desktop → Auto-start.",
         buttons: ["Enable Auto-start", "Not Yet"],

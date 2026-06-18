@@ -46,7 +46,7 @@ import { parsePiSessionSync } from '../cost-parsers/pi-parser.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
-import { getPanopticonHome } from '../paths.js'
+import { getOverdeckHome } from '../paths.js'
 
 const execAsync = promisify(exec)
 
@@ -58,7 +58,7 @@ const ACTIVE_HEARTBEAT_TTL_MS = 60_000
 const SPAWN_READY_TIMEOUT_MS = 30_000
 
 function panopticonDir(): string {
-  return getPanopticonHome()
+  return getOverdeckHome()
 }
 function heartbeatsDir(): string {
   return join(panopticonDir(), 'heartbeats')

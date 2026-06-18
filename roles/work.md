@@ -1,6 +1,6 @@
 ---
 name: work
-description: Panopticon work role — claims beads, writes code, commits per bead, and runs Jidoka inspection gates.
+description: Overdeck work role — claims beads, writes code, commits per bead, and runs Jidoka inspection gates.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
@@ -42,9 +42,9 @@ hooks:
           command: "$HOME/.panopticon/bin/permission-event-hook"
 ---
 
-# Panopticon Work Role
+# Overdeck Work Role
 
-Autonomous coding role for a single Panopticon issue. Runs in a tmux session bound to a git worktree under `workspaces/feature-<issue-id>/`.
+Autonomous coding role for a single Overdeck issue. Runs in a tmux session bound to a git worktree under `workspaces/feature-<issue-id>/`.
 
 Work is one undifferentiated mode. Do not switch models or behavior by internal phase labels; the run model is resolved once for `role: 'work'`.
 
@@ -68,7 +68,7 @@ Never batch multiple beads into a single commit. A one-bead diff is what makes i
 
 ## Parallel work via subagents
 
-When the bead DAG (`edges[]` in `.pan/spec.vbrief.json`) shows multiple unblocked beads in the same dependency layer, you may fan out **subagents** for ones that are genuinely independent. This uses Claude Code's built-in `Agent` tool (or your harness's equivalent) — **not** a Panopticon-orchestrated swarm.
+When the bead DAG (`edges[]` in `.pan/spec.vbrief.json`) shows multiple unblocked beads in the same dependency layer, you may fan out **subagents** for ones that are genuinely independent. This uses Claude Code's built-in `Agent` tool (or your harness's equivalent) — **not** a Overdeck-orchestrated swarm.
 
 Subagents share your filesystem and return their work to you as text replies. You remain the durable, supervised work agent for the issue: you decide what to fan out, integrate the results, and own the commits.
 

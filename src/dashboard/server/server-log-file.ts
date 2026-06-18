@@ -17,13 +17,13 @@
 
 import { createWriteStream, fstatSync, statSync, mkdirSync, type WriteStream } from 'fs';
 import { join } from 'path';
-import { getPanopticonHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 
 let installed = false;
 
 /** Absolute path the dashboard server persists its console output to. */
 export function dashboardLogPath(): string {
-  return join(getPanopticonHome(), 'logs', 'dashboard.log');
+  return join(getOverdeckHome(), 'logs', 'dashboard.log');
 }
 
 /**
@@ -74,7 +74,7 @@ export function initDashboardLogFile(): void {
   try {
     const logPath = dashboardLogPath();
     if (stdoutAlreadyTargetsLog(logPath)) return;
-    mkdirSync(join(getPanopticonHome(), 'logs'), { recursive: true });
+    mkdirSync(join(getOverdeckHome(), 'logs'), { recursive: true });
     const stream = createWriteStream(logPath, { flags: 'a' });
     // A regular-file append stream should not emit 'error' in normal operation,
     // but attach a handler so an unexpected failure can't crash the process via

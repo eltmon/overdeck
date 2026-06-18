@@ -3,19 +3,19 @@
 **Author:** Edward Becker (eltmon)
 **Date:** 2026-04-28
 **Model:** Claude 4 (Opus)
-**Purpose:** Survey comparable frameworks, identify gaps in Panopticon's current approach, and propose concrete enhancements.
+**Purpose:** Survey comparable frameworks, identify gaps in Overdeck's current approach, and propose concrete enhancements.
 
 ---
 
 ## Executive Summary
 
-Panopticon currently implements a mature specialist pipeline (inspect → review → test → uat → merge) over vBRIEF plans, with Cloister as the watchdog and beads as the execution unit. This document surveys vBRIEF's ecosystem (Deft, Superpowers) and related frameworks (Spec Kit) to identify what Panopticon could borrow or improve upon.
+Overdeck currently implements a mature specialist pipeline (inspect → review → test → uat → merge) over vBRIEF plans, with Cloister as the watchdog and beads as the execution unit. This document surveys vBRIEF's ecosystem (Deft, Superpowers) and related frameworks (Spec Kit) to identify what Overdeck could borrow or improve upon.
 
 **Key findings:**
 - The **Ralph Wiggum self-assessment loop** from Deft is the single highest-value addition: agents detect their own "danger" states before presenting work, reducing review cycles.
-- **Spec Kit's five-phase gated workflow** (Principles → Specify → Plan → Tasks → Implement) maps cleanly onto Panopticon's planning-to-execution pipeline with better upfront "why" capture.
-- **Superpowers' subagent-driven development** pattern is already implicit in Panopticon's specialist pipeline, but lacks the two-stage review gate (spec compliance before code quality) that Superpowers enforces.
-- **Deft's four-tier verification ladder** (Static → Command → Behavioral → Human) is more rigorous than Panopticon's current inspection model and would improve specialist accuracy.
+- **Spec Kit's five-phase gated workflow** (Principles → Specify → Plan → Tasks → Implement) maps cleanly onto Overdeck's planning-to-execution pipeline with better upfront "why" capture.
+- **Superpowers' subagent-driven development** pattern is already implicit in Overdeck's specialist pipeline, but lacks the two-stage review gate (spec compliance before code quality) that Superpowers enforces.
+- **Deft's four-tier verification ladder** (Static → Command → Behavioral → Human) is more rigorous than Overdeck's current inspection model and would improve specialist accuracy.
 
 ---
 
@@ -27,21 +27,21 @@ Panopticon currently implements a mature specialist pipeline (inspect → review
 
 **Canonical spec:** github.com/deftai/vBRIEF v0.5
 
-**What Panopticon uses:**
+**What Overdeck uses:**
 - `plan.vbrief.json` as the structured plan artifact
 - DAG edges (`blocks`, `informs`, `invalidates`, `suggests`) for dependency modeling
 - `subItems` with `metadata.kind: "acceptance_criterion"` for acceptance criteria
 - TRON encoding (35–40% token reduction) for LLM context windows
 - Graduated complexity: minimal plans need 4 fields; complex plans add narratives, edges, and metadata
 
-**What's missing from Panopticon's vBRIEF usage:**
+**What's missing from Overdeck's vBRIEF usage:**
 - `fork` metadata for derived plans
 - `changeLog` array for audit trail
 - `reviewers` array
 - `agent` and `lastModifiedBy` tracking
 - `planRef` for feature→story decomposition (partially implemented via Rally integration)
 
-**Assessment:** Well-adopted. The vBRIEF foundation is solid and the spec is actively maintained by Jonathan Taylor (visionik/deft). Panopticon's extensions (difficulty, issueLabel, kind metadata) are a clean overlay. The main gap is richer audit trail and change tracking within the plan itself.
+**Assessment:** Well-adopted. The vBRIEF foundation is solid and the spec is actively maintained by Jonathan Taylor (visionik/deft). Overdeck's extensions (difficulty, issueLabel, kind metadata) are a clean overlay. The main gap is richer audit trail and change tracking within the plan itself.
 
 ---
 
@@ -85,7 +85,7 @@ Named after the Simpsons character ("I'm in danger!"), this is a bounded interna
 - User never sees intermediate failed attempts
 - Transparent when activated ("🚨 Ralph loop: iteration 2...")
 
-**Assessment:** The Ralph loop is the single highest-value pattern Panopticon does NOT currently implement. Agents present work to specialists without self-filtering, which causes unnecessary review cycles.
+**Assessment:** The Ralph loop is the single highest-value pattern Overdeck does NOT currently implement. Agents present work to specialists without self-filtering, which causes unnecessary review cycles.
 
 #### Swarm Coordination
 
@@ -145,7 +145,7 @@ This ordering is intentional: spec compliance gates code quality. If the code is
 
 Agents work through each task, inspecting and reviewing their own work, continuing forward. Human checkpoints are available but not required.
 
-**Assessment:** Panopticon's specialist pipeline is a productionized version of this. The two-stage review pattern (spec compliance before code quality) is the main thing Superpowers has that Panopticon doesn't — currently Panopticon's inspect-agent does both simultaneously, which can mask spec drift.
+**Assessment:** Overdeck's specialist pipeline is a productionized version of this. The two-stage review pattern (spec compliance before code quality) is the main thing Superpowers has that Overdeck doesn't — currently Overdeck's inspect-agent does both simultaneously, which can mask spec drift.
 
 ---
 
@@ -197,7 +197,7 @@ Before implementation:
 
 ~1–4 hours of work per task. Use vBRIEF `blocks` edges for dependencies (replaces old `[P]`/`[S]`/`[B]` markers).
 
-**Assessment:** Spec Kit's phased approach with explicit gates maps well onto Panopticon's existing pipeline. The Principles phase (establishing non-negotiables before spec writing) would improve PRD quality. The Simplicity Gate and Test-First Gate before Phase 3 would reduce implementation surprises.
+**Assessment:** Spec Kit's phased approach with explicit gates maps well onto Overdeck's existing pipeline. The Principles phase (establishing non-negotiables before spec writing) would improve PRD quality. The Simplicity Gate and Test-First Gate before Phase 3 would reduce implementation surprises.
 
 ---
 
@@ -214,7 +214,7 @@ These may be private, renamed, or defunct. If they surface, re-evaluate.
 
 ---
 
-## 2. Gap Analysis: What Panopticon Is Missing
+## 2. Gap Analysis: What Overdeck Is Missing
 
 ### 2.1 Ralph Wiggum Self-Assessment Loop
 
@@ -234,9 +234,9 @@ These may be private, renamed, or defunct. If they surface, re-evaluate.
 
 ### 2.2 Two-Stage Specialist Review Gate
 
-**Gap:** Panopticon's inspect-agent combines spec fidelity and constraint compliance in one check. Superpowers enforces spec compliance first, then code quality — so code that doesn't match spec is rejected before quality review.
+**Gap:** Overdeck's inspect-agent combines spec fidelity and constraint compliance in one check. Superpowers enforces spec compliance first, then code quality — so code that doesn't match spec is rejected before quality review.
 
-**Impact:** When spec drift occurs, Panopticon's review-agent spends effort reviewing code that doesn't implement the right thing.
+**Impact:** When spec drift occurs, Overdeck's review-agent spends effort reviewing code that doesn't implement the right thing.
 
 **Proposed implementation:** Split inspect-agent into two sequential passes:
 1. **Spec compliance pass** — Does the diff match the bead narrative and acceptance criteria?
@@ -250,7 +250,7 @@ Only after spec compliance passes does quality review occur.
 
 ### 2.3 Principles Phase Before PRD
 
-**Gap:** Panopticon's planning agent starts with PRD discovery but has no mechanism to establish governing principles first. The PRD can grow without bounds.
+**Gap:** Overdeck's planning agent starts with PRD discovery but has no mechanism to establish governing principles first. The PRD can grow without bounds.
 
 **Impact:** Scope creep in planning, issues that lack clear "what we will NOT do" boundaries.
 
@@ -266,11 +266,11 @@ Only after spec compliance passes does quality review occur.
 
 ### 2.4 Richer Audit Trail in vBRIEF
 
-**Gap:** Panopticon's vBRIEF plan tracks item status but not change history, reviewers, or last-modified-by.
+**Gap:** Overdeck's vBRIEF plan tracks item status but not change history, reviewers, or last-modified-by.
 
 **Impact:** Hard to reconstruct why a plan changed over time, who reviewed it, or what the evolution looked like.
 
-**Proposed implementation:** Extend vBRIEF with Panopticon-specific fields:
+**Proposed implementation:** Extend vBRIEF with Overdeck-specific fields:
 - `changeLog[]` — Array of `{ timestamp, author, field, oldValue, newValue }` objects
 - `reviewers[]` — Array of reviewer identifiers
 - `lastModifiedBy` — Agent or human who last touched the plan
@@ -282,7 +282,7 @@ Only after spec compliance passes does quality review occur.
 
 ### 2.5 Fractal Context Summaries
 
-**Gap:** Panopticon's agents operate in long sessions but have no systematic context summarization strategy. Large codebases exhaust context.
+**Gap:** Overdeck's agents operate in long sessions but have no systematic context summarization strategy. Large codebases exhaust context.
 
 **Impact:** Agents lose coherence in extended sessions; TLDR is available but used ad-hoc.
 
@@ -327,11 +327,11 @@ Only after spec compliance passes does quality review occur.
 
 ---
 
-## 4. What's Already Better in Panopticon
+## 4. What's Already Better in Overdeck
 
-It would be a mistake to conclude that Panopticon is behind these frameworks. In several areas, Panopticon is ahead:
+It would be a mistake to conclude that Overdeck is behind these frameworks. In several areas, Overdeck is ahead:
 
-| Capability | Panopticon | Others |
+| Capability | Overdeck | Others |
 |------------|-----------|--------|
 | **Multi-agent pipeline** | inspect → review → test → uat → merge | Superpowers has review; Deft has verification but no pipeline |
 | **Cloister watchdog** | Active heartbeat monitoring, stuck detection, emergency stop | Not present in any comparable framework |
@@ -341,13 +341,13 @@ It would be a mistake to conclude that Panopticon is behind these frameworks. In
 | **Worktree isolation** | Git worktree per workspace, Docker-backed | Superpowers uses worktrees; others use directories |
 | **Model routing** | Opus → Sonnet → Haiku via complexity | Not present in any comparable framework |
 | **UAT with real browser** | Playwright-based CORS, visual, auth flow verification | Not present in any comparable framework |
-| **vBRIEF native** | Panopticon generates beads from vBRIEF items automatically | Deft references vBRIEF but doesn't generate from it |
+| **vBRIEF native** | Overdeck generates beads from vBRIEF items automatically | Deft references vBRIEF but doesn't generate from it |
 
 ---
 
 ## 5. Conclusion
 
-Panopticon has a strong foundation — the vBRIEF adoption, specialist pipeline, and Cloister watchdog are ahead of comparable frameworks. The highest-value additions would be:
+Overdeck has a strong foundation — the vBRIEF adoption, specialist pipeline, and Cloister watchdog are ahead of comparable frameworks. The highest-value additions would be:
 
 1. **Ralph Wiggum self-assessment loop** — Agents catch their own quality issues before presenting work, reducing specialist cycles.
 2. **Two-stage inspect** — Spec compliance gate before code quality gate, preventing quality review of wrong code.
@@ -364,7 +364,7 @@ The others (BMAD, Taskmaster, Agent OS, OpenSpec) could not be located and shoul
 - [Deft Framework](https://deft.md)
 - [Superpowers](https://github.com/obra/superpowers)
 - [Spec Kit (Deft strategies)](https://github.com/visionik/deft/blob/main/strategies/speckit.md)
-- [Panopticon vBRIEF docs](./VBRIEF.md)
-- [Panopticon Specialist Workflow](./SPECIALIST_WORKFLOW.md)
-- [Panopticon Hierarchical Planning](./HIERARCHICAL-PLANNING.md)
-- [Panopticon Cloister](./PRD-CLOISTER.md)
+- [Overdeck vBRIEF docs](./VBRIEF.md)
+- [Overdeck Specialist Workflow](./SPECIALIST_WORKFLOW.md)
+- [Overdeck Hierarchical Planning](./HIERARCHICAL-PLANNING.md)
+- [Overdeck Cloister](./PRD-CLOISTER.md)

@@ -1,4 +1,4 @@
-# Panopticon Job Agent Types Audit Report
+# Overdeck Job Agent Types Audit Report
 **Date:** 2026-04-13  
 **Scope:** Complete inventory of all agent types, their usage, spawning locations, prompt configuration, and model selection
 
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-Panopticon has **7 active agent types** across two categories:
+Overdeck has **7 active agent types** across two categories:
 - **Primary agents:** work-agent, planning-agent
 - **Specialist agents:** review-agent, test-agent, merge-agent, inspect-agent, uat-agent
 

@@ -48,5 +48,5 @@ The following `createSessionAsync()` uses do not create work or role agents and 
 - `src/lib/planning/spawn-planning-session.ts:557` creates planning sessions. Planning is intentionally exempt because it produces the workspace plan before work starts.
 - `src/lib/cloister/inspect-agent.ts:263` creates inspection sessions after work; inspection is not a work/role spawn path.
 - `src/lib/cloister/deacon.ts:812` resumes an existing agent launcher path from saved runtime state rather than constructing a fresh work/role spawn.
-- `src/lib/runtimes/pi.ts:338`, `src/lib/runtimes/claude-code.ts:340`, and `src/lib/runtime/claude.ts:72` are runtime abstractions not used by the Panopticon work/role spawn chokepoints documented above.
+- `src/lib/runtimes/pi.ts:338`, `src/lib/runtimes/claude-code.ts:340`, and `src/lib/runtime/claude.ts:72` are runtime abstractions not used by the Overdeck work/role spawn chokepoints documented above.
 - Dashboard utility sessions under `src/dashboard/server/routes/misc.ts`, `src/dashboard/server/routes/codex-auth.ts`, and `src/dashboard/server/routes/conversations.ts` are interactive/user utility sessions, not autonomous work/role agents.

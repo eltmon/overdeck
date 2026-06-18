@@ -1,7 +1,7 @@
 import { access, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { ArtifactMetadata } from '@overdeck/contracts';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 export interface ArtifactThumbnailOptions {
   rawUrl?: string;
@@ -35,7 +35,7 @@ const DEFAULT_THUMBNAIL_HEIGHT = 360;
 const DEFAULT_THUMBNAIL_TIMEOUT_MS = 10_000;
 
 export function getArtifactThumbnailDir(slug: string): string {
-  return join(getPanopticonHome(), 'artifacts', 'thumbnails', slug);
+  return join(getOverdeckHome(), 'artifacts', 'thumbnails', slug);
 }
 
 export function getArtifactThumbnailPath(slug: string, publishedHash: string): string {

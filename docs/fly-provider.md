@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Fly.io provider replaces the former exe.dev integration and enables Panopticon to run
+The Fly.io provider replaces the former exe.dev integration and enables Overdeck to run
 Claude agent workspaces on [Fly Machines](https://fly.io/docs/machines/) instead of your
 local machine. Each workspace gets its own Fly Machine — an ephemeral VM that is created
 on demand, stopped when idle, and destroyed when the workspace is deleted.
@@ -56,7 +56,7 @@ endpoint; port tunnelling uses `fly proxy`.
    pan workspace create --remote PAN-42
    ```
 
-   Panopticon will:
+   Overdeck will:
    - Create a Fly Machine in your configured app
    - Wait up to 120 s for it to reach `started`
    - Clone the repository and check out the feature branch
@@ -191,7 +191,7 @@ Each workspace maps to exactly one Fly Machine inside the configured app.
 - `auto_destroy = false` — machines persist after the process that created them exits
 
 After creation the provider polls `GET /apps/:app/machines/:id/wait?state=started` for
-up to 120 seconds. Once the machine is running, Panopticon runs setup commands over the
+up to 120 seconds. Once the machine is running, Overdeck runs setup commands over the
 exec endpoint (clone repo, install beads, sync credentials).
 
 Machine identity is stored in `~/.panopticon/workspaces/<issue-id>.yaml`:
@@ -247,7 +247,7 @@ fly proxy 4173:4173 -a pan-workspaces
 ## Credential Sync
 
 When a workspace is created (or on demand via `pan workspace sync-auth <issue>`),
-Panopticon copies credentials from your local machine into the remote VM using the exec
+Overdeck copies credentials from your local machine into the remote VM using the exec
 API and base64 encoding:
 
 | Credential | Local source | Remote destination |
@@ -278,7 +278,7 @@ Every Claude API call made by a remote agent appends an event to
 receives usage via the agent's output stream). The pre-computed cache at
 `~/.panopticon/costs/by-issue.json` is updated in real time.
 
-Fly.io compute costs (machine uptime) are not tracked by Panopticon. Monitor those
+Fly.io compute costs (machine uptime) are not tracked by Overdeck. Monitor those
 directly in the Fly.io dashboard or with `fly status -a pan-workspaces`.
 
 To view Claude token costs per issue:

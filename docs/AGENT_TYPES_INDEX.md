@@ -1,8 +1,8 @@
 # Agent Types Index
 
-High-level map of the roles, sub-roles, and helper agents you will encounter in Panopticon.
+High-level map of the roles, sub-roles, and helper agents you will encounter in Overdeck.
 
-This document is for someone who is new to Panopticon and wants to understand:
+This document is for someone who is new to Overdeck and wants to understand:
 - which lifecycle roles exist,
 - what each role does,
 - when each role shows up in the workflow,
@@ -12,7 +12,7 @@ If you want implementation details, routing settings, or workflow internals, use
 
 ## The big picture
 
-Panopticon no longer models the issue pipeline as a flat collection of named agent types. The runtime primitive is the issue-scoped role, with server-side shipping handling merge preparation after review and test pass.
+Overdeck no longer models the issue pipeline as a flat collection of named agent types. The runtime primitive is the issue-scoped role, with server-side shipping handling merge preparation after review and test pass.
 
 There are three layers to keep distinct:
 
@@ -22,7 +22,7 @@ There are three layers to keep distinct:
 
 ## Runtime role inventory
 
-These are the roles a new Panopticon user is most likely to care about first.
+These are the roles a new Overdeck user is most likely to care about first.
 
 | Role | Status | When it runs | Instruction basis |
 |---|---|---|---|
@@ -34,7 +34,7 @@ These are the roles a new Panopticon user is most likely to care about first.
 
 ## Sub-roles
 
-Sub-roles are not standalone Panopticon pipeline stages. They are model and instruction slots that a parent role may invoke.
+Sub-roles are not standalone Overdeck pipeline stages. They are model and instruction slots that a parent role may invoke.
 
 | Sub-role | Parent role | Purpose |
 |---|---|---|
@@ -70,13 +70,13 @@ Examples:
 - `subagent:explore`
 - `cli:interactive`
 
-These are real and important, but they are better understood as **role-internal helpers or routed contexts** than as the primary Panopticon roles a newcomer should picture first.
+These are real and important, but they are better understood as **role-internal helpers or routed contexts** than as the primary Overdeck roles a newcomer should picture first.
 
 ## Where model selection fits
 
 Model choice is configured separately from this document.
 
-Panopticon uses three workhorse model slots (`expensive`, `mid`, `cheap`) plus per-role and per-sub-role overrides. Role launch resolves the final model at spawn time, so changing a workhorse slot changes every role that references it.
+Overdeck uses three workhorse model slots (`expensive`, `mid`, `cheap`) plus per-role and per-sub-role overrides. Role launch resolves the final model at spawn time, so changing a workhorse slot changes every role that references it.
 
 If you want to tune or override models, use the routing/configuration docs rather than this page.
 

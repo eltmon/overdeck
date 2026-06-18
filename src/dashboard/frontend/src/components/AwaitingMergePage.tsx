@@ -133,8 +133,8 @@ export function AwaitingMergePage() {
         if (issue?.state === 'canceled') return false;
         if (isVerifyingIssue(issue)) return false;
         // Filter out issues that are 'done' with a failed merge OR a 'merged' tracker label —
-        // they were completed outside Panopticon (PR merged manually on GitHub).
-        // Only keep 'done' issues whose Panopticon mergeStatus is still non-failed with no
+        // they were completed outside Overdeck (PR merged manually on GitHub).
+        // Only keep 'done' issues whose Overdeck mergeStatus is still non-failed with no
         // 'merged' label (the PR is genuinely open and waiting for a merge click).
         if (issue?.state === 'done') {
           if (rs.mergeStatus === 'failed' || issue?.mergeStatus === 'failed') return false;
@@ -844,7 +844,7 @@ function PipelineOverrideSection({
         <>
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 mb-4 text-[12px] text-amber-700 dark:text-amber-300">
             These issues have open PRs but haven't completed the review/test pipeline.
-            Merging here bypasses Panopticon's rebase, verification, and cleanup steps.
+            Merging here bypasses Overdeck's rebase, verification, and cleanup steps.
           </div>
           <ul className="space-y-3">
             {openMergeRequests.map((rs) => {
@@ -908,7 +908,7 @@ function OpenMergeRequestRow({
   const handleApprove = async () => {
     const confirmed = await confirm({
       title: `Force Approve ${identifier}`,
-      message: `This bypasses Panopticon's review pipeline and submits an approving review directly on ${forgeName}.\n\nThe automated review/test pipeline will continue running independently.`,
+      message: `This bypasses Overdeck's review pipeline and submits an approving review directly on ${forgeName}.\n\nThe automated review/test pipeline will continue running independently.`,
       confirmLabel: 'Force Approve',
     });
     if (confirmed) {

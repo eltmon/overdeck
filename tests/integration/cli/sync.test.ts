@@ -4,11 +4,11 @@ import { join } from 'path';
 import { TEMP_DIR } from '../../setup.js';
 
 // Mock paths to use temp directories
-const mockPanopticonSkills = join(TEMP_DIR, '.panopticon', 'skills');
+const mockOverdeckSkills = join(TEMP_DIR, '.panopticon', 'skills');
 const mockClaudeSkills = join(TEMP_DIR, '.claude', 'skills');
 
 vi.mock('../../../src/lib/paths.js', () => ({
-  SKILLS_DIR: mockPanopticonSkills,
+  SKILLS_DIR: mockOverdeckSkills,
   SYNC_TARGET: {
     skills: mockClaudeSkills,
     commands: join(TEMP_DIR, '.claude', 'commands'),
@@ -29,11 +29,11 @@ vi.mock('../../../src/lib/config.js', async (importActual) => ({
 describe('sync command', () => {
   beforeEach(() => {
     // Create mock directories (TEMP_DIR is created by global setup)
-    mkdirSync(mockPanopticonSkills, { recursive: true });
+    mkdirSync(mockOverdeckSkills, { recursive: true });
     mkdirSync(mockClaudeSkills, { recursive: true });
 
     // Create a test skill
-    const skillDir = join(mockPanopticonSkills, 'test-skill');
+    const skillDir = join(mockOverdeckSkills, 'test-skill');
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), '# Test Skill');
   });
@@ -42,19 +42,19 @@ describe('sync command', () => {
 
   describe('skill discovery', () => {
     it('should find skills in panopticon directory', () => {
-      const skills = readdirSync(mockPanopticonSkills);
+      const skills = readdirSync(mockOverdeckSkills);
       expect(skills).toContain('test-skill');
     });
 
     it('should only sync directories with SKILL.md', () => {
       // Create a non-skill directory
-      const nonSkillDir = join(mockPanopticonSkills, 'not-a-skill');
+      const nonSkillDir = join(mockOverdeckSkills, 'not-a-skill');
       mkdirSync(nonSkillDir, { recursive: true });
       writeFileSync(join(nonSkillDir, 'README.md'), '# Not a skill');
 
-      const skills = readdirSync(mockPanopticonSkills)
+      const skills = readdirSync(mockOverdeckSkills)
         .filter(name => {
-          const skillPath = join(mockPanopticonSkills, name, 'SKILL.md');
+          const skillPath = join(mockOverdeckSkills, name, 'SKILL.md');
           return existsSync(skillPath);
         });
 
@@ -68,7 +68,7 @@ describe('sync command', () => {
       // Simulate sync by creating symlink
       const { symlinkSync } = require('fs');
       const targetPath = join(mockClaudeSkills, 'test-skill');
-      const sourcePath = join(mockPanopticonSkills, 'test-skill');
+      const sourcePath = join(mockOverdeckSkills, 'test-skill');
 
       try {
         symlinkSync(sourcePath, targetPath);
@@ -98,8 +98,8 @@ describe('sync command', () => {
     it('should report what would be synced', () => {
       const skillsToSync: string[] = [];
 
-      readdirSync(mockPanopticonSkills).forEach(name => {
-        if (existsSync(join(mockPanopticonSkills, name, 'SKILL.md'))) {
+      readdirSync(mockOverdeckSkills).forEach(name => {
+        if (existsSync(join(mockOverdeckSkills, name, 'SKILL.md'))) {
           skillsToSync.push(name);
         }
       });

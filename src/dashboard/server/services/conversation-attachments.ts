@@ -4,7 +4,7 @@ import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { getPanopticonHome } from '../../../lib/paths.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
 
@@ -57,7 +57,7 @@ function assertSafeName(name: string): void {
 }
 
 export function getConversationAttachmentsRoot(): string {
-  return join(getPanopticonHome(), CONVERSATION_ATTACHMENTS_DIR);
+  return join(getOverdeckHome(), CONVERSATION_ATTACHMENTS_DIR);
 }
 
 export function getConversationAttachmentDir(name: string): string {

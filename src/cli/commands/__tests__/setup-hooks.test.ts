@@ -4,7 +4,7 @@ import { join } from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  addPanopticonHookIfMissing,
+  addOverdeckHookIfMissing,
   parseHookHarness,
   setupHooksCommand,
   type ClaudeSettings,
@@ -32,13 +32,13 @@ describe('setup hooks', () => {
   it('adds the PermissionRequest hook once', () => {
     const settings: ClaudeSettings = {};
 
-    const first = addPanopticonHookIfMissing(
+    const first = addOverdeckHookIfMissing(
       settings,
       'PermissionRequest',
       '/home/user/.panopticon/bin',
       'permission-event-hook',
     );
-    const second = addPanopticonHookIfMissing(
+    const second = addOverdeckHookIfMissing(
       settings,
       'PermissionRequest',
       '/home/user/.panopticon/bin',
@@ -68,14 +68,14 @@ describe('setup hooks', () => {
   ] as const)('adds restored tool-event hook %s:%s once', (hookType, scriptName, matcher) => {
     const settings: ClaudeSettings = {};
 
-    const first = addPanopticonHookIfMissing(
+    const first = addOverdeckHookIfMissing(
       settings,
       hookType,
       '/home/user/.panopticon/bin',
       scriptName,
       matcher,
     );
-    const second = addPanopticonHookIfMissing(
+    const second = addOverdeckHookIfMissing(
       settings,
       hookType,
       '/home/user/.panopticon/bin',
@@ -166,7 +166,7 @@ describe('setup hooks', () => {
       },
     };
 
-    const added = addPanopticonHookIfMissing(
+    const added = addOverdeckHookIfMissing(
       settings,
       'PermissionRequest',
       '/home/user/.panopticon/bin',

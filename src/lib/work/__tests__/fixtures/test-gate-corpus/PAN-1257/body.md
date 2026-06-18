@@ -11,7 +11,7 @@ function classifyAgentKind(agentId: string): HealthAgentProcess['kind'] {
 }
 ```
 
-**Modern Panopticon agents ALL start with `agent-`.** Review/test/ship specialists are named like:
+**Modern Overdeck agents ALL start with `agent-`.** Review/test/ship specialists are named like:
 - `agent-pan-1228-review`
 - `agent-pan-1228-review-correctness`
 - `agent-pan-1228-ship`
@@ -19,7 +19,7 @@ function classifyAgentKind(agentId: string): HealthAgentProcess['kind'] {
 
 All return `kind: 'work'` from this function, inflating `workAgentCount` to include every specialist.
 
-The `specialist-*` and `planning-*` prefixes appear to be from an older naming convention; current Panopticon uses `agent-<issueid>-<role-or-subrole>` for everything.
+The `specialist-*` and `planning-*` prefixes appear to be from an older naming convention; current Overdeck uses `agent-<issueid>-<role-or-subrole>` for everything.
 
 ## Impact
 

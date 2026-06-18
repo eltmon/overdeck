@@ -95,7 +95,7 @@ This PRD fixes the detection gap, adds circuit-breaker recovery, and provides cl
 1. **Kanban card pulsing border** when deacon is actively retrying recovery.
 2. **"Recovery: N/3" badge** showing retry count.
 3. **"Infrastructure failure — manual review needed" badge** when stuck flag is set.
-4. **Consistent with Panopticon style** using existing Tailwind tokens (`badge-bg-destructive`, `animate-pulse`, etc.).
+4. **Consistent with Overdeck style** using existing Tailwind tokens (`badge-bg-destructive`, `animate-pulse`, etc.).
 
 ---
 
@@ -652,7 +652,7 @@ const phaseLabel =
 
 #### E.6 Style compliance
 
-All badge classes use existing Panopticon Tailwind tokens:
+All badge classes use existing Overdeck Tailwind tokens:
 - `badge-bg-destructive` — red background for error/stuck states
 - `text-destructive-foreground` — white text on red
 - `animate-pulse` — Tailwind built-in pulse animation

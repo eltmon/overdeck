@@ -53,7 +53,7 @@ Create professional documentation website using Mintlify at www.panopticon-cli.c
 Transform README.md top section with:
 1. Centered hero with badges (npm, license, Node.js, PRs welcome)
 2. Hero screenshot (dashboard-overview.png)
-3. "What is Panopticon?" with comparison table
+3. "What is Overdeck?" with comparison table
 4. Screenshot grid (3 planning workflow images)
 5. Feature table with icons
 6. Legacy Codebase Support moved UP (marketing value)
@@ -201,7 +201,7 @@ Implementation is complete when:
 **Tasks:**
 1. Add badges row (npm, license, Node.js version, PRs welcome)
 2. Insert hero screenshot (dashboard-overview.png)
-3. Create comparison table ("Without vs With Panopticon")
+3. Create comparison table ("Without vs With Overdeck")
 4. Add screenshot grid (3 planning workflow images)
 5. Create feature table with visual hierarchy
 6. Move "Legacy Codebase Support" section UP (currently at line 33)
@@ -222,7 +222,7 @@ Implementation is complete when:
 **Tasks by target file:**
 
 **Priority 1 (Launch) - 6 files:**
-1. introduction.mdx - Overview, What is Panopticon, Features, Dashboard section
+1. introduction.mdx - Overview, What is Overdeck, Features, Dashboard section
 2. quickstart.mdx - Installation, requirements, quick start, HTTPS setup
 3. concepts.mdx - Core concepts overview (extract from various sections)
 4. cli/overview.mdx - CLI overview and philosophy
@@ -335,7 +335,7 @@ Use `bd ready` to see which tasks are currently unblocked and ready to work on.
 ## Summary for Implementation Agent
 
 ### What You're Building
-A complete Mintlify documentation website for Panopticon at www.panopticon-cli.com (currently visible at mindyournow.mintlify.app while domain purchase completes).
+A complete Mintlify documentation website for Overdeck at www.panopticon-cli.com (currently visible at mindyournow.mintlify.app while domain purchase completes).
 
 ### Key Files to Create/Modify
 - **18 new .mdx files** in organized directory structure (cli/, features/, configuration/, guides/, reference/)

@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Effect } from 'effect';
 
-import { injectPanopticonInfraDeny } from '../claude-settings-overlay.js';
+import { injectOverdeckInfraDeny } from '../claude-settings-overlay.js';
 
 const tempDirs: string[] = [];
 
@@ -23,7 +23,7 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
 });
 
-describe('injectPanopticonInfraDeny', () => {
+describe('injectOverdeckInfraDeny', () => {
   it('denies tmux session input commands idempotently while preserving existing permissions', async () => {
     const workspace = await makeTempWorkspace();
     const claudeDir = join(workspace, '.claude');
@@ -33,8 +33,8 @@ describe('injectPanopticonInfraDeny', () => {
       JSON.stringify({ permissions: { deny: ['Bash(existing:*)'] }, other: true }, null, 2),
     );
 
-    await Effect.runPromise(injectPanopticonInfraDeny(workspace));
-    await Effect.runPromise(injectPanopticonInfraDeny(workspace));
+    await Effect.runPromise(injectOverdeckInfraDeny(workspace));
+    await Effect.runPromise(injectOverdeckInfraDeny(workspace));
 
     const settings = await readSettings(workspace);
     expect(settings.other).toBe(true);

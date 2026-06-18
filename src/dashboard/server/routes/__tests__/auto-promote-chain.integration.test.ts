@@ -26,7 +26,7 @@ import { completePlanningArtifacts, completePlanningAutoSpawn } from '../issues.
 
 let testDir: string;
 let oldDashboardUrl: string | undefined;
-let oldPanopticonHome: string | undefined;
+let oldOverdeckHome: string | undefined;
 
 function makeDoc(issueId: string, status: VBriefDocument['plan']['status'] = 'draft'): VBriefDocument {
   return {
@@ -153,7 +153,7 @@ function readJson<T>(path: string): T {
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'auto-promote-chain-'));
   oldDashboardUrl = process.env.DASHBOARD_URL;
-  oldPanopticonHome = process.env.OVERDECK_HOME;
+  oldOverdeckHome = process.env.OVERDECK_HOME;
   process.env.DASHBOARD_URL = 'http://dashboard.test';
   mocks.createBeadsFromVBrief.mockReset();
   mocks.emitActivityEntrySync.mockReset();
@@ -165,8 +165,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   if (oldDashboardUrl === undefined) delete process.env.DASHBOARD_URL;
   else process.env.DASHBOARD_URL = oldDashboardUrl;
-  if (oldPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-  else process.env.OVERDECK_HOME = oldPanopticonHome;
+  if (oldOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = oldOverdeckHome;
   if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
 });
 
@@ -392,7 +392,7 @@ describe('plan-finalize auto-promote chain regression', () => {
     writeBeads(projectPath, issueId);
 
     await expect(reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Panopticon CLI', path: projectPath } }],
+      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),

@@ -1,6 +1,6 @@
 ---
 name: pan-projects
-description: "pan project <subcommand> — add, remove, and manage Panopticon-monitored projects"
+description: "pan project <subcommand> — add, remove, and manage Overdeck-monitored projects"
 triggers:
   - pan projects
   - add project
@@ -17,18 +17,18 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through managing projects with Panopticon. Projects must be registered before Panopticon can create workspaces and spawn agents for them.
+This skill guides you through managing projects with Overdeck. Projects must be registered before Overdeck can create workspaces and spawn agents for them.
 
 ## When to Use
 
-- Adding a new project to Panopticon
+- Adding a new project to Overdeck
 - Listing managed projects
-- Removing a project from Panopticon
+- Removing a project from Overdeck
 - Setting up project-to-tracker mappings
 
 ## Core Concepts
 
-**Project**: A local git repository that Panopticon manages
+**Project**: A local git repository that Overdeck manages
 **Workspace**: Isolated environment created within a project for an issue
 **Mapping**: Link between tracker project/repo and local project path
 
@@ -73,11 +73,11 @@ pan project remove myproject
 pan project remove myapp
 ```
 
-**Note:** This only removes the project from Panopticon's registry. It does NOT delete the actual project files.
+**Note:** This only removes the project from Overdeck's registry. It does NOT delete the actual project files.
 
 ## Project Requirements
 
-For a project to work well with Panopticon:
+For a project to work well with Overdeck:
 
 1. **Git repository**: Must be a git repo (has `.git/`)
 2. **Clean state**: Should have a clean working tree for worktree creation
@@ -204,9 +204,9 @@ services:
       - "3000:3000"
 ```
 
-### 3. Panopticon Integration
+### 3. Overdeck Integration
 
-When you run `pan start ISSUE-1`, Panopticon will:
+When you run `pan start ISSUE-1`, Overdeck will:
 1. Create a workspace (git worktree)
 2. Detect the `dev` script
 3. Offer to start containers for the workspace

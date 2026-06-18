@@ -29,7 +29,7 @@ const issue = {
   url: 'https://example.com/PAN-1148',
   createdAt: now,
   updatedAt: now,
-  project: { id: 'pan', name: 'Panopticon', color: 'var(--primary)' },
+  project: { id: 'pan', name: 'Overdeck', color: 'var(--primary)' },
 };
 
 const agent = {
@@ -49,7 +49,7 @@ const agent = {
 const feature = {
   issueId: 'PAN-1148',
   title: 'Styleguide conformance issue',
-  projectName: 'Panopticon',
+  projectName: 'Overdeck',
   branch: 'feature/pan-1148',
   status: 'In Progress',
   stateLabel: 'In Progress',
@@ -175,7 +175,7 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
-      if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Panopticon', path: '/tmp/panopticon' }]);
+      if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Overdeck', path: '/tmp/panopticon' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/conversations') return json([]);
@@ -284,7 +284,7 @@ describe('styleguide rendered surface conformance', () => {
     await board.context.close();
 
     const commandDeck = await openRoute('/command-deck');
-    await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
+    await commandDeck.page.getByText('Overdeck', { exact: true }).nth(1).click();
     // CommandDeck uses FeatureItem (not IssueRow) since the ProjectTree remodel
     await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();

@@ -78,7 +78,7 @@ function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions,
     : '';
   return `FLYWHEEL ORCHESTRATOR TASK for ${runId}:
 
-Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.${configSection}${briefSection}`;
+Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Overdeck roles through the normal pipeline surfaces, respect the configured run scope and agent cap, and wait for explicit lifecycle instructions when the run is paused or complete.${configSection}${briefSection}`;
 }
 
 function getLocalFlywheelRunDir(runId: string): string {

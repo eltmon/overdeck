@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Moonshot AI's Kimi K2.5 (GA) and K2.6 Code Preview against Panopticon's 23 work types. K2.5 is the current default for `issue-agent:implementation`. K2.6 is in preview — data is limited but promising.
+Evaluates Moonshot AI's Kimi K2.5 (GA) and K2.6 Code Preview against Overdeck's 23 work types. K2.5 is the current default for `issue-agent:implementation`. K2.6 is in preview — data is limited but promising.
 
 **Data labeling convention:** Benchmarks and claims are tagged `[K2.5]` or `[K2.6]` to indicate which version they come from. Where only K2.5 data exists, we assume K2.6 matches or exceeds it (no known regressions). K2.6-specific improvements are called out explicitly.
 
@@ -129,7 +129,7 @@ K2.6 is a coding-specialized variant built on the same K2.5 foundation. Released
 
 K2.5 is already the default here and performing well. The key question is whether K2.6's improvements in reasoning and tool call reliability justify switching. Given that K2.6 addresses orchestrator collapse and adds deeper reasoning — both directly relevant to long implementation sessions — upgrading to K2.6 is recommended once it exits preview.
 
-**vs GLM-5.1:** GLM-5.1 leads on SWE-Bench Pro (58.4 vs 50.7) and Code Arena (~1530 vs ~1430). GLM's 8-hour autonomous endurance is a stronger story than K2.5's Agent Swarm for sustained single-agent work. However, K2.6's improvements may close the gap. Recommend benchmarking both on real Panopticon issues.
+**vs GLM-5.1:** GLM-5.1 leads on SWE-Bench Pro (58.4 vs 50.7) and Code Arena (~1530 vs ~1430). GLM's 8-hour autonomous endurance is a stronger story than K2.5's Agent Swarm for sustained single-agent work. However, K2.6's improvements may close the gap. Recommend benchmarking both on real Overdeck issues.
 
 ### Excellent Fit
 
@@ -168,7 +168,7 @@ Logic and edge case review. K2.5's 87.6% GPQA Diamond suggests decent reasoning.
 #### `specialist-uat-agent`
 **Current default:** Claude Sonnet 4.6 | **Fit:** Moderate `[K2.5]`
 
-**Unlike GLM-5.1, Kimi has vision.** MoonViT can process screenshots and visual regression checks. However, Playwright MCP integration hasn't been tested with Kimi models in Panopticon, and OCR quality for UI elements is untested. Would need careful validation. The vision capability makes this theoretically possible where GLM-5.1 is disqualified.
+**Unlike GLM-5.1, Kimi has vision.** MoonViT can process screenshots and visual regression checks. However, Playwright MCP integration hasn't been tested with Kimi models in Overdeck, and OCR quality for UI elements is untested. Would need careful validation. The vision capability makes this theoretically possible where GLM-5.1 is disqualified.
 
 ### Poor Fit — Do Not Route
 
@@ -228,7 +228,7 @@ The key routing decision for `issue-agent:implementation`:
 | SWE-Bench Pro | 50.7% | 58.4% | GLM-5.1 |
 | SWE-Bench Verified | 76.8% | 77.8% | GLM-5.1 (narrow) |
 | Code Arena Elo | ~1430 | ~1530 | GLM-5.1 |
-| Autonomous endurance | Agent Swarm (parallel) | 8-hour single-agent | GLM-5.1 (for Panopticon's model) |
+| Autonomous endurance | Agent Swarm (parallel) | 8-hour single-agent | GLM-5.1 (for Overdeck's model) |
 | MCP Atlas (agentic) | 29.5% | 71.8% | GLM-5.1 |
 | Vision | Yes (MoonViT) | No | Kimi K2.5 |
 | Context window | 256K | 200K | Kimi K2.5 |
@@ -237,7 +237,7 @@ The key routing decision for `issue-agent:implementation`:
 | Speed | 34.6 tok/s | 40.3 tok/s | GLM-5.1 (slightly) |
 | Open-weight | Yes (Modified MIT) | Yes (MIT) | Tie |
 
-**Assessment:** GLM-5.1 is the stronger model for implementation work on benchmarks, especially for Panopticon's single-agent-per-workspace architecture where sustained sequential autonomy matters more than parallel sub-agent swarms. However, K2.5 is cheaper and K2.6 may close the gap. Recommend running both on 5-10 real issues and comparing output quality, completion rate, and effective cost (factoring in verbosity).
+**Assessment:** GLM-5.1 is the stronger model for implementation work on benchmarks, especially for Overdeck's single-agent-per-workspace architecture where sustained sequential autonomy matters more than parallel sub-agent swarms. However, K2.5 is cheaper and K2.6 may close the gap. Recommend running both on 5-10 real issues and comparing output quality, completion rate, and effective cost (factoring in verbosity).
 
 ---
 

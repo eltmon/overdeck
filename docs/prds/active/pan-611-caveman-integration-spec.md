@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Output tokens are the dominant cost driver for long-running Panopticon agents. Work, review, test, and merge agents generate substantial prose narration — status updates, reasoning, code explanations — that no one reads in real-time. This narration is burned on every bead, every inspection cycle, every specialist wake. Caveman compresses that narration ~65-75% while keeping full technical accuracy and leaving code, commands, and structured output untouched.
+Output tokens are the dominant cost driver for long-running Overdeck agents. Work, review, test, and merge agents generate substantial prose narration — status updates, reasoning, code explanations — that no one reads in real-time. This narration is burned on every bead, every inspection cycle, every specialist wake. Caveman compresses that narration ~65-75% while keeping full technical accuracy and leaving code, commands, and structured output untouched.
 
 ## Requirements
 
@@ -39,13 +39,13 @@ Output tokens are the dominant cost driver for long-running Panopticon agents. W
 
 ### Hook Architecture (Option B — native caveman design)
 
-Caveman uses a `SessionStart` hook + `UserPromptSubmit` hook, not prompt injection. This is the right approach for Panopticon because:
+Caveman uses a `SessionStart` hook + `UserPromptSubmit` hook, not prompt injection. This is the right approach for Overdeck because:
 
 1. Rules are in context from turn 1, before any task prompt
 2. Mid-session switching works (`pan tell <agent> "/caveman lite"` becomes a real lever)
 3. Statusline integration works out of the box
 4. No pollution of workspace CLAUDE.md or specialist prompts
-5. The global flag file (`~/.claude/.caveman-active`) is not a collision risk for Panopticon — autonomous agents never issue `/caveman` mode commands; all agents boot with the same configured intensity
+5. The global flag file (`~/.claude/.caveman-active`) is not a collision risk for Overdeck — autonomous agents never issue `/caveman` mode commands; all agents boot with the same configured intensity
 
 **Hook files location:** `~/.panopticon/hooks/caveman/`
 - `caveman-activate.js` — SessionStart hook (from JuliusBrussee/caveman repo)
@@ -89,7 +89,7 @@ Per-project override in `.panopticon.yaml` uses the same schema; project config 
 Each agent's caveman context must include this override, injected alongside the standard caveman skill via the SessionStart hook's output (or appended to the caveman SKILL.md content that gets emitted):
 
 ```
-## Panopticon Overrides (non-negotiable)
+## Overdeck Overrides (non-negotiable)
 
 STATE.md updates: ALWAYS use full prose with exact section headers (## Status, ## Current Phase, ## Completed Work, ## Remaining Work, ## Key Decisions, ## Specialist Feedback). Crash recovery depends on this format.
 
@@ -118,13 +118,13 @@ At workspace creation:
 
 ## Technical Notes
 
-### Verification: Do hooks fire for Panopticon agent sessions?
+### Verification: Do hooks fire for Overdeck agent sessions?
 
-Panopticon spawns agents via Claude Code CLI running interactively in tmux (identity-wake prompt sent via paste-buffer). `SessionStart` hooks fire for interactive Claude Code sessions. **This must be verified as the first step of implementation** — run a test workspace with a SessionStart hook that writes a marker file; confirm the marker appears when the agent session starts.
+Overdeck spawns agents via Claude Code CLI running interactively in tmux (identity-wake prompt sent via paste-buffer). `SessionStart` hooks fire for interactive Claude Code sessions. **This must be verified as the first step of implementation** — run a test workspace with a SessionStart hook that writes a marker file; confirm the marker appears when the agent session starts.
 
 ### Hook file sourcing
 
-The caveman hook JS files (`caveman-activate.js`, `caveman-mode-tracker.js`) must be downloaded from `https://github.com/JuliusBrussee/caveman` at install time. Pin to a specific commit hash to avoid breaking changes. Store the pinned version in Panopticon config.
+The caveman hook JS files (`caveman-activate.js`, `caveman-mode-tracker.js`) must be downloaded from `https://github.com/JuliusBrussee/caveman` at install time. Pin to a specific commit hash to avoid breaking changes. Store the pinned version in Overdeck config.
 
 ### Workspace settings.json merge
 

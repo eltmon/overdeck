@@ -28,7 +28,7 @@ The summary is injected as the first message in the new session, and the agent i
 ### Agent handoff
 Asks an agent to write a Markdown handoff document, optionally focused on a specific next task or question. The document becomes the seed message for the new conversation.
 
-By default a clean **external** session reads the transcript from disk and writes the document — the source conversation is never touched and can even be ended. Optionally the **source** agent can write it in-conversation (this adds the prompt and doc to the source's context). If a source-authored handoff stalls or produces an invalid document, Panopticon falls back to a summary.
+By default a clean **external** session reads the transcript from disk and writes the document — the source conversation is never touched and can even be ended. Optionally the **source** agent can write it in-conversation (this adds the prompt and doc to the source's context). If a source-authored handoff stalls or produces an invalid document, Overdeck falls back to a summary.
 
 **Best for:** Deliberate handoffs where the dead ends, important files, and suggested next steps matter.
 

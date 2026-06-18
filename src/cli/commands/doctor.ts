@@ -620,7 +620,7 @@ export interface DoctorOptions {
 }
 
 export async function doctorCommand(options: DoctorOptions = {}): Promise<void> {
-  console.log(chalk.bold('\nPanopticon Doctor\n'));
+  console.log(chalk.bold('\nOverdeck Doctor\n'));
   console.log(chalk.dim('Checking system health...\n'));
 
   const checks: CheckResult[] = [];
@@ -664,9 +664,9 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Codex CLI (alternative harness — PAN-1574). Optional: missing → warn.
   for (const c of checkCodex()) checks.push(c);
 
-  // Check Panopticon directories
+  // Check Overdeck directories
   const directories = [
-    { path: OVERDECK_HOME, name: 'Panopticon Home', fix: 'Run: pan init' },
+    { path: OVERDECK_HOME, name: 'Overdeck Home', fix: 'Run: pan init' },
     { path: SKILLS_DIR, name: 'Skills Directory', fix: 'Run: pan init' },
     { path: COMMANDS_DIR, name: 'Commands Directory', fix: 'Run: pan init' },
     { path: AGENTS_DIR, name: 'Agents Directory', fix: 'Run: pan init' },
@@ -894,7 +894,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   if (hasErrors) {
     console.log(chalk.red('Some required components are missing.'));
-    console.log(chalk.dim('Fix the errors above before using Panopticon.'));
+    console.log(chalk.dim('Fix the errors above before using Overdeck.'));
   } else if (hasWarnings) {
     console.log(chalk.yellow('System is functional with some optional features missing.'));
   } else {

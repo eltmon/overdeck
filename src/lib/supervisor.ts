@@ -1,5 +1,5 @@
 /**
- * Panopticon Supervisor lifecycle (CLI side).
+ * Overdeck Supervisor lifecycle (CLI side).
  *
  * Spawns the supervisor sidecar (`dist/supervisor/server.js`) as a detached
  * child process when `pan up` runs. The supervisor exposes

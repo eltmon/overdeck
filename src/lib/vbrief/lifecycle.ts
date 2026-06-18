@@ -11,7 +11,7 @@
  *   ./vbrief/cancelled/  — abandoned, immutable archive
  *
  * Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json` where
- * the date is the immutable creation date. Issue ID gives Panopticon ergonomics
+ * the date is the immutable creation date. Issue ID gives Overdeck ergonomics
  * (one vBRIEF per issue) and slug gives human readability.
  */
 

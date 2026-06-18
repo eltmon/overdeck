@@ -1,11 +1,11 @@
 # t3code Drift Plan
 
-**Goal:** Hand-port Panopticon CLI toward the t3code upstream codebase where the patterns are cleaner, while preserving Panopticon's unique multi-agent orchestration functionality. Effort is not a constraint; architectural clarity is.
+**Goal:** Hand-port Overdeck CLI toward the t3code upstream codebase where the patterns are cleaner, while preserving Overdeck's unique multi-agent orchestration functionality. Effort is not a constraint; architectural clarity is.
 
 **Companion research:** [`t3code-research.md`](./t3code-research.md) — what t3code is, how it's laid out, what's already been mirrored.
 
 **Scope anchors:**
-- Panopticon is on `effect@4.0.0-beta.43`; upstream and t3code are on `4.0.0-beta.48`.
+- Overdeck is on `effect@4.0.0-beta.43`; upstream and t3code are on `4.0.0-beta.48`.
 - PAN-428 (server split) and PAN-521 (store atomic slices) are **already landed** and match t3code's architecture. Confirmed in [`src/dashboard/server/ws-rpc.ts`](../../src/dashboard/server/ws-rpc.ts) and [`src/dashboard/frontend/src/lib/store.ts`](../../src/dashboard/frontend/src/lib/store.ts).
 - t3code `main` is 107 commits ahead of the local clone at `/home/eltmon/Projects/t3code`.
 
@@ -36,7 +36,7 @@ Between beta.43 and beta.48, Effect renamed `ServiceMap` back to `Context` acros
 
 Verified by diffing `v43/src/unstable/rpc/RpcServer.ts`, `v43/src/unstable/rpc/RpcGroup.ts`, and `v43/src/unstable/http/HttpRouter.ts` against v48. The rename happened in one of beta.44–.47.
 
-### 0.2 Files affected in Panopticon
+### 0.2 Files affected in Overdeck
 
 Grep for `ServiceMap|Effect\.services|provideServices|\.services\.mapUnsafe` returns 11 dashboard server files:
 
@@ -52,7 +52,7 @@ Grep for `ServiceMap|Effect\.services|provideServices|\.services\.mapUnsafe` ret
 - `src/dashboard/server/read-model.ts`
 - `src/dashboard/server/config.ts`
 
-Plus a second breaking change in `RpcServer`: inside RPC handler middleware, `{ clientId: number }` becomes `{ client: Rpc.ServerClient }`. Panopticon's `ws-rpc.ts` does not currently read `clientId`, but any future middleware will use the new shape.
+Plus a second breaking change in `RpcServer`: inside RPC handler middleware, `{ clientId: number }` becomes `{ client: Rpc.ServerClient }`. Overdeck's `ws-rpc.ts` does not currently read `clientId`, but any future middleware will use the new shape.
 
 ### 0.3 Execution
 
@@ -82,7 +82,7 @@ This is the most important architectural decision in this plan. The user explici
 - Terminal data flows as **schema-shaped `TerminalEvent`** objects through the same RpcSerialization.layerJson transport — not raw PTY bytes. Server owns a `TerminalManager` with a per-session history buffer (default 5000 lines), debounced persistence (40 ms), inactive-session GC (128 retained), and dual-runtime PTY (Bun or Node).
 - Server-owned sessions: the server keeps the PTY alive independent of client connections; clients subscribe for replay + live events.
 
-### 1.2 What Panopticon does today
+### 1.2 What Overdeck does today
 
 - **Two** WebSocket endpoints:
   - `/ws/rpc` — Effect RPC (`PanRpcGroup`) for snapshots, domain events, conversation stream. [`ws-rpc.ts`](../../src/dashboard/server/ws-rpc.ts).
@@ -94,12 +94,12 @@ This is the most important architectural decision in this plan. The user explici
 
 Adopt t3code's architecture for terminal transport. Reasoning, not ranked:
 
-- One WebSocket, one serialization layer, one reconnect policy, one auth check. Panopticon's monkey-patch of `server.on('upgrade', …)` in `ws-terminal.ts` to route `/ws/terminal` around Effect's handler is a workaround, not a design choice — it exists because the raw path was bolted on after the Effect path stopped working. The forcing function is gone.
-- Structured `TerminalEvent` (schema-typed) is better than raw bytes for observability, replay, and adding server-owned history buffers. The t3code `TerminalManager` already solved history replay on reconnect — which Panopticon also wants for browser tab reloads.
+- One WebSocket, one serialization layer, one reconnect policy, one auth check. Overdeck's monkey-patch of `server.on('upgrade', …)` in `ws-terminal.ts` to route `/ws/terminal` around Effect's handler is a workaround, not a design choice — it exists because the raw path was bolted on after the Effect path stopped working. The forcing function is gone.
+- Structured `TerminalEvent` (schema-typed) is better than raw bytes for observability, replay, and adding server-owned history buffers. The t3code `TerminalManager` already solved history replay on reconnect — which Overdeck also wants for browser tab reloads.
 - The original "queueing never delivered" bug was in older Effect RPC stream plumbing; `RpcServer.toHttpEffectWebsocket` in beta.48 is the same primitive t3code uses in production today, so the historical reason to diverge no longer applies.
-- Panopticon's `pty-hub.ts` fan-out (one PTY, many subscribers) maps cleanly onto t3code's server-owned session model — `TerminalManager` already does this upstream.
+- Overdeck's `pty-hub.ts` fan-out (one PTY, many subscribers) maps cleanly onto t3code's server-owned session model — `TerminalManager` already does this upstream.
 
-**What stays Panopticon-specific:** the PTY spawn target is `tmux attach-session -t <name>`, not a bare shell. tmux is Panopticon's substrate for agent sessions and that does not change. We adopt t3code's **transport** (structured events over single `/ws`), not its **backend** (direct shell spawn).
+**What stays Overdeck-specific:** the PTY spawn target is `tmux attach-session -t <name>`, not a bare shell. tmux is Overdeck's substrate for agent sessions and that does not change. We adopt t3code's **transport** (structured events over single `/ws`), not its **backend** (direct shell spawn).
 
 **What stays raw if we're wrong:** if at integration time `TerminalEvent` throughput measurably can't keep up with interactive tmux output (backpressure on JSON serialization of e.g. `fzf` redraws), document the measurement and keep `/ws/terminal` — but that's a measured failure mode, not a prospective one, and must be revisited post-bump since beta.48's stream primitives differ from whatever broke pre-PAN-435.
 
@@ -123,9 +123,9 @@ This is the **valid architectural reason to diverge** that the user asked me to 
 
 t3code's server only has 3 HTTP route layers in [`apps/server/src/server.ts`](../../../t3code/apps/server/src/server.ts): `attachmentsRouteLayer`, `projectFaviconRouteLayer`, `staticAndDevRouteLayer`, plus `websocketRpcRouteLayer`. Everything else runs over `/ws`. This works because t3code has **one** audience: the single t3code browser/desktop client that owns the WebSocket connection.
 
-### 2.2 Why Panopticon cannot
+### 2.2 Why Overdeck cannot
 
-Panopticon's HTTP routes serve **two** audiences:
+Overdeck's HTTP routes serve **two** audiences:
 
 1. **Browser dashboard** — can talk WebSocket RPC, has a persistent connection, already uses `/ws/rpc` for snapshots/events.
 2. **Machine-to-machine callers** — Cloister, specialists, `pan tell`, merge-agent, CI webhooks, the CLI itself. These are fire-and-forget HTTP clients that shouldn't hold a WebSocket open per request. They hit endpoints like `POST /api/agents/:id/deep-wipe`, `POST /api/specialists/done`, `POST /api/workspaces/:id/start-agent`, `POST /api/remote/trigger`, `GET /api/workspaces/:id/plan`, etc.
@@ -180,17 +180,17 @@ Codex side ([`apps/server/src/providers/CodexProvider.ts`](../../../t3code/apps/
 - New files `composerMenuHighlight.ts`, `composerSlashCommandSearch.ts`, plus tests.
 - `formatProviderSkillInstallSource` helper in a new `~/providerSkillPresentation` module.
 
-### 3.2 Why Panopticon wants it
+### 3.2 Why Overdeck wants it
 
-Panopticon's 60 bundled skills in `~/.claude/skills/` are exactly the shape this discovery path would expose automatically. Today Panopticon has no UI to run a skill from the dashboard composer — users have to drop into tmux and type. Porting 58e5f714 gives:
+Overdeck's 60 bundled skills in `~/.claude/skills/` are exactly the shape this discovery path would expose automatically. Today Overdeck has no UI to run a skill from the dashboard composer — users have to drop into tmux and type. Porting 58e5f714 gives:
 
 - Live list of installed Claude Code slash commands (including user-added ones under `.claude/commands/`) in the dashboard composer.
-- Free integration with the existing `@anthropic-ai/claude-agent-sdk` — Panopticon already uses this SDK for agent spawning.
+- Free integration with the existing `@anthropic-ai/claude-agent-sdk` — Overdeck already uses this SDK for agent spawning.
 - 5-minute cached discovery so repeated composer opens are cheap.
 
 ### 3.3 Work breakdown
 
-1. Add `ClaudeProvider` / `CodexProvider` modules under `src/dashboard/server/services/providers/` (if they don't exist yet — Panopticon currently launches the SDK through `src/lib/agent-runner.ts`). Wire `query().initializationResult()` + `settingSources: ["user","project","local"]`.
+1. Add `ClaudeProvider` / `CodexProvider` modules under `src/dashboard/server/services/providers/` (if they don't exist yet — Overdeck currently launches the SDK through `src/lib/agent-runner.ts`). Wire `query().initializationResult()` + `settingSources: ["user","project","local"]`.
 2. Port `parseClaudeInitializationCommands` and `dedupeSlashCommands` verbatim.
 3. Add a `Cache.make` wrapper with 5-minute TTL keyed on `cwd`.
 4. Add `ProviderSkill` / `ProviderSlashCommand` schemas to `@panopticon/contracts`.
@@ -215,7 +215,7 @@ Why: splits `ChatView` into subcomponents that each select their own minimal sli
 
 Size caps: `MAX_THREAD_MESSAGES = 2000`, `MAX_THREAD_CHECKPOINTS = 500`, `MAX_THREAD_PROPOSED_PLANS = 200`, `MAX_THREAD_ACTIVITIES = 500`.
 
-### 4.2 Panopticon status: already done (PAN-521)
+### 4.2 Overdeck status: already done (PAN-521)
 
 [`src/dashboard/frontend/src/lib/store.ts`](../../src/dashboard/frontend/src/lib/store.ts) already follows this exact pattern:
 
@@ -223,7 +223,7 @@ Size caps: `MAX_THREAD_MESSAGES = 2000`, `MAX_THREAD_CHECKPOINTS = 500`, `MAX_TH
 - Selector factories / hooks: `selectAgentList`, `selectAgentById`, `selectSpecialistList`, `selectReviewStatus`, `selectAwaitingMerge`, `selectAgentOutput`, `selectIsBootstrapped`, `selectDashboardLifecycle`, `selectResources`, `selectIssues`, `selectIssuesByCycle`.
 - `DashboardState extends ReadModelState`, `DashboardStore extends DashboardState` — same two-layer split.
 
-**Action:** no port required. Validate parity by checking that Panopticon's reducer functions are pure (no closure over the store) and that there are no remaining consumers calling `useStore((s) => s)` to pull the whole state. If 1ec346c2 introduces size caps we don't have, mirror them: check `src/dashboard/server/read-model.ts` for thread-style buffers and add caps if missing.
+**Action:** no port required. Validate parity by checking that Overdeck's reducer functions are pure (no closure over the store) and that there are no remaining consumers calling `useStore((s) => s)` to pull the whole state. If 1ec346c2 introduces size caps we don't have, mirror them: check `src/dashboard/server/read-model.ts` for thread-style buffers and add caps if missing.
 
 ---
 
@@ -231,20 +231,20 @@ Size caps: `MAX_THREAD_MESSAGES = 2000`, `MAX_THREAD_CHECKPOINTS = 500`, `MAX_TH
 
 Four files under `src/dashboard/frontend/src/components/chat/` were originally hand-ported from t3code in commits `b4519457` and `de034e19` (2026-04-05, PAN-451):
 
-| Panopticon file              | t3code source                                      | Panopticon LOC | Upstream LOC |
+| Overdeck file              | t3code source                                      | Overdeck LOC | Upstream LOC |
 | ---------------------------- | -------------------------------------------------- | -------------: | -----------: |
 | `ChatMarkdown.tsx`           | `apps/web/src/components/ChatMarkdown.tsx`         | 247            | 300          |
 | `MessagesTimeline.tsx`       | `apps/web/src/components/chat/MessagesTimeline.tsx`| 450            | 891          |
 | `ComposerPromptEditor.tsx`   | `apps/web/src/components/ComposerPromptEditor.tsx` | 573            | 1177         |
 | `session-logic.ts`           | `apps/web/src/components/chat/MessagesTimeline.logic.ts` | 144      | 199          |
 
-They've since been modified by Panopticon-only commits `ef2b3aea` (dedupe), `2a0a328c` (measurement), `e8ffddf2` (persist model), `eb59af05` (virtualizer ref stability). The upstream versions have moved significantly (roughly 2× in LOC) with features Panopticon doesn't have.
+They've since been modified by Overdeck-only commits `ef2b3aea` (dedupe), `2a0a328c` (measurement), `e8ffddf2` (persist model), `eb59af05` (virtualizer ref stability). The upstream versions have moved significantly (roughly 2× in LOC) with features Overdeck doesn't have.
 
 **Strategy:** cherry-pick by feature, not by file.
 
 1. Identify the upstream commits that touched these files between `b4519457` and current t3code `main`. Candidates flagged during research: `33dadb5a`, `7c0849fe`, `1bf048eb`, `5467d119`, `869789b4`.
-2. For each upstream commit, read the diff, decide whether the feature is in-scope for the Panopticon dashboard.
-3. Port the in-scope changes through a three-way merge: (Panopticon-current vs Panopticon-b4519457 vs t3code-main). Preserve the four Panopticon-only modifications above.
+2. For each upstream commit, read the diff, decide whether the feature is in-scope for the Overdeck dashboard.
+3. Port the in-scope changes through a three-way merge: (Overdeck-current vs Overdeck-b4519457 vs t3code-main). Preserve the four Overdeck-only modifications above.
 4. Do not wholesale replace the files — that would drop dedupe, measurement, persist-model, and ref stability fixes.
 5. After each cherry-pick, verify the timeline renders correctly with a real agent conversation in the dashboard.
 
@@ -252,7 +252,7 @@ They've since been modified by Panopticon-only commits `ef2b3aea` (dedupe), `2a0
 
 ## 6. Themed upstream adoption (the other ~95 commits)
 
-Full enumeration of all 107 commits in `t3code/origin/main` ahead of the local clone, grouped by theme. Applicability column: **Y** = port to Panopticon, **P** = partially applicable (port the idea, not the code), **N** = not applicable (desktop-only, codex-only, or upstream-UI-only), **✓** = already covered by sections 1–5 above.
+Full enumeration of all 107 commits in `t3code/origin/main` ahead of the local clone, grouped by theme. Applicability column: **Y** = port to Overdeck, **P** = partially applicable (port the idea, not the code), **N** = not applicable (desktop-only, codex-only, or upstream-UI-only), **✓** = already covered by sections 1–5 above.
 
 ### 6.1 Effect infrastructure
 
@@ -262,7 +262,7 @@ Full enumeration of all 107 commits in `t3code/origin/main` ahead of the local c
 
 ### 6.2 WebSocket / RPC resilience cluster
 
-This is the most important theme not already in the plan. Upstream spent heavy work hardening the `/ws` transport in the last 50 commits. Panopticon's `WsTransport.ts` in the frontend is likely to have the same failure modes because it uses the same `RpcClient` primitive.
+This is the most important theme not already in the plan. Upstream spent heavy work hardening the `/ws` transport in the last 50 commits. Overdeck's `WsTransport.ts` in the frontend is likely to have the same failure modes because it uses the same `RpcClient` primitive.
 
 | SHA | Title | Applies |
 | --- | --- | --- |
@@ -273,11 +273,11 @@ This is the most important theme not already in the plan. Upstream spent heavy w
 | `9bedd714` | Debounce reconnect disconnect logging | **Y** |
 | `528bb2a1` | [codex] Harden WebSocket reconnect recovery | **Y** |
 | `da107f31` | Fix websocket closing and reopening connections too eagerly | **Y** |
-| `70f5dfce` | Stabilize keybindings toast stream setup | **P** (pattern only; no keybindings in Panopticon yet) |
+| `70f5dfce` | Stabilize keybindings toast stream setup | **P** (pattern only; no keybindings in Overdeck yet) |
 | `6de4b47e` | Return replay retry state from orchestration recovery | **Y** |
-| `d18e43b6` | Fix lost provider session recovery | **P** (maps to Panopticon's conversation-recovery path) |
+| `d18e43b6` | Fix lost provider session recovery | **P** (maps to Overdeck's conversation-recovery path) |
 
-**Port strategy:** land this cluster as a single PR after section 0. These are transport-level bugs whose fingerprints we will hit as soon as we put Panopticon's `/ws/rpc` under real usage. `f5ecca44` in particular fixes a leak where tracked RPCs from a killed connection re-fire on reconnect — Panopticon's event replay sequence is vulnerable to the same.
+**Port strategy:** land this cluster as a single PR after section 0. These are transport-level bugs whose fingerprints we will hit as soon as we put Overdeck's `/ws/rpc` under real usage. `f5ecca44` in particular fixes a leak where tracked RPCs from a killed connection re-fire on reconnect — Overdeck's event replay sequence is vulnerable to the same.
 
 ### 6.3 Terminal / shell
 
@@ -285,19 +285,19 @@ This is the most important theme not already in the plan. Upstream spent heavy w
 | --- | --- | --- |
 | Section 1 (TerminalManager, history, dual-runtime) | | ✓ |
 | `2e42f3fd` | Improve shell PATH hydration and fallback detection | **Y** (applies to PTY env for tmux-launched agents) |
-| `c9b07d66` | Backfill projected shell summaries and stale approval cleanup | **P** (maps to Panopticon's agent output summary) |
+| `c9b07d66` | Backfill projected shell summaries and stale approval cleanup | **P** (maps to Overdeck's agent output summary) |
 | `f7fa62aa` | Add shell snapshot queries for orchestration state | **Y** (feeds the "what is this agent doing right now" question) |
-| `9013c07f` | Clean up terminal state when threads are archived | **Y** (maps to Panopticon workspace cleanup) |
+| `9013c07f` | Clean up terminal state when threads are archived | **Y** (maps to Overdeck workspace cleanup) |
 | `1f4a3f65` | Fix opening urls wrapped across lines in the terminal | **Y** |
 | `340dbbb3` | Unwrap windows shell command wrappers | **N** (Linux-only dashboard) |
 
 ### 6.4 Git / worktree
 
-Panopticon already manages worktrees, but upstream has been aggressively fixing edge cases. Most of these translate.
+Overdeck already manages worktrees, but upstream has been aggressively fixing edge cases. Most of these translate.
 
 | SHA | Title | Applies |
 | --- | --- | --- |
-| `8515f027` | Move worktree bootstrap to the server and persist terminal launch context | **Y** (aligns with Panopticon specialist flow) |
+| `8515f027` | Move worktree bootstrap to the server and persist terminal launch context | **Y** (aligns with Overdeck specialist flow) |
 | `9dcea68b` | Refresh git status after branch rename and worktree setup | **Y** |
 | `5f7ec73a` | Fix new-thread draft reuse for worktree defaults | **P** |
 | `77fcad35` | Prevent live thread branches from regressing to temp worktree names | **P** |
@@ -308,8 +308,8 @@ Panopticon already manages worktrees, but upstream has been aggressively fixing 
 | `2aa73985` | Refresh local git status on turn completion | **Y** |
 | `f9019cd6` | Coalesce status refreshes by remote | **Y** |
 | `e0e01b4a` | Handle deleted git directories as non-repositories | **Y** |
-| `1cba2f64` | Harden workspace git indexing against repo-configured fsmonitor execution | **Y** (fsmonitor is a real Panopticon footgun) |
-| `d2822a88` | Use explicit refspec for push in worktrees with slashed branch names | **Y** (feature/PAN-123 branches are Panopticon's default) |
+| `1cba2f64` | Harden workspace git indexing against repo-configured fsmonitor execution | **Y** (fsmonitor is a real Overdeck footgun) |
+| `d2822a88` | Use explicit refspec for push in worktrees with slashed branch names | **Y** (feature/PAN-123 branches are Overdeck's default) |
 | `b547fee7` | Scope git toast state by thread ref | **P** |
 
 ### 6.5 Auth / pairing / multi-environment
@@ -322,9 +322,9 @@ User flagged in section 7 that this is conditional on the remote-dashboard story
 | `cf9f236c` | Add headless `t3 serve` pairing output | **Y** (maps to `pan up --remote`) |
 | `4ae9de31` | Stabilize auth session cookies per server mode | **Y** |
 | `5b3b31b6` | Use dev proxy for loopback auth and environment requests | **Y** |
-| `b96308fc` | Prepare datamodel for multi-environment | **P** — Panopticon's "projects" are the equivalent; watch for schema ideas |
+| `b96308fc` | Prepare datamodel for multi-environment | **P** — Overdeck's "projects" are the equivalent; watch for schema ideas |
 | `e32077ce` | Persist client settings and saved environment secrets | **Y** |
-| `e3004ae8` | Harden secret store and resolve catalog overrides | **Y** (Panopticon has `~/.panopticon.env` — same concerns) |
+| `e3004ae8` | Harden secret store and resolve catalog overrides | **Y** (Overdeck has `~/.panopticon.env` — same concerns) |
 | `1a05d8ca` | Document remote server network access setup | **Y** (docs) |
 
 ### 6.6 Observability / tracing
@@ -335,7 +335,7 @@ User flagged in section 7 that this is conditional on the remote-dashboard story
 | `e9ed849b` | Persist server OTLP tracing settings across restarts | **Y** |
 | `04a1ae77` | Proxy browser OTLP traces through the server | **Y** |
 
-Additive Effect instrumentation — low-risk but high-value for Panopticon's multi-agent concurrency debugging. Port after sections 0 and 6.2 land.
+Additive Effect instrumentation — low-risk but high-value for Overdeck's multi-agent concurrency debugging. Port after sections 0 and 6.2 land.
 
 ### 6.7 Provider / model runtime
 
@@ -344,16 +344,16 @@ Additive Effect instrumentation — low-risk but high-value for Panopticon's mul
 | `58e5f714` | Add provider skill discovery | ✓ (section 3) |
 | `008ac5c3` | Cache provider status and gate desktop startup | **P** (gate server startup, not desktop) |
 | `740d7a32` | Use lazy stream accessors for provider runtime events | **Y** |
-| `678f827f` | Remove Claude subscription-based model adjustment | **Y** (Panopticon's model-routing should not key off subscription type either) |
+| `678f827f` | Remove Claude subscription-based model adjustment | **Y** (Overdeck's model-routing should not key off subscription type either) |
 | `226ed997` | Assign default capabilities to Codex custom models | **N** (no Codex) |
 | `7a008461` | Align token usage metrics for both Claude and Codex | **P** (align Claude-only) |
-| `0d280262` | Emit plan events for TodoWrite during input streaming | **Y** — high value; Panopticon's work-agent UI should show TodoWrite as live plan updates |
+| `0d280262` | Emit plan events for TodoWrite during input streaming | **Y** — high value; Overdeck's work-agent UI should show TodoWrite as live plan updates |
 
 ### 6.8 Chat / composer / messages
 
 Section 5 cherry-pick list expanded with the full set of touchpoints:
 
-| SHA | Title | Target file(s) in Panopticon |
+| SHA | Title | Target file(s) in Overdeck |
 | --- | --- | --- |
 | `33dadb5a` | Fix thread timeline autoscroll and simplify branch state | `MessagesTimeline.tsx` |
 | `7c0849fe` | Harmonize typography in chat messages and code blocks | `ChatMarkdown.tsx`, `MessagesTimeline.tsx` |
@@ -378,14 +378,14 @@ Section 5 cherry-pick list expanded with the full set of touchpoints:
 
 ### 6.9 Sidebar / threads / projects
 
-Panopticon doesn't have a "thread" concept but does have "workspaces" and "issues" — most of these translate to the workspace list.
+Overdeck doesn't have a "thread" concept but does have "workspaces" and "issues" — most of these translate to the workspace list.
 
 | SHA | Title | Applies |
 | --- | --- | --- |
 | `569fea87` | Warm sidebar thread detail subscriptions | **Y** (warm issue detail on hover) |
 | `cadd7086` | Show full thread title in tooltip when hovering sidebar | **Y** |
 | `6f699346` | Use latest user message time for thread timestamps | **P** (use latest agent activity for workspace ordering) |
-| `a2215429` | Add project rename support in the sidebar | **N** (Panopticon projects come from `projects.yaml`) |
+| `a2215429` | Add project rename support in the sidebar | **N** (Overdeck projects come from `projects.yaml`) |
 | `b80e8476` | Memoize derived thread reads | **Y** (same memoization patterns) |
 | `11d456f6` | Support multi-select pending user inputs | **P** (maps to specialist "awaiting approval" UX) |
 | `28e481eb` | Distinguish singular/plural in pending action submit label | **Y** |
@@ -404,7 +404,7 @@ Panopticon doesn't have a "thread" concept but does have "workspaces" and "issue
 
 ### 6.11 Desktop (Electron) — mostly N/A
 
-Panopticon currently ships as a CLI + browser dashboard, not a desktop app. Some of these become relevant once the Electron shell lands (see `memory/panopticon-electron-npx.md`).
+Overdeck currently ships as a CLI + browser dashboard, not a desktop app. Some of these become relevant once the Electron shell lands (see `memory/panopticon-electron-npx.md`).
 
 | SHA | Title | Applies |
 | --- | --- | --- |
@@ -414,7 +414,7 @@ Panopticon currently ships as a CLI + browser dashboard, not a desktop app. Some
 | `12c3af78` | Add "Copy Image" to right-click context menu | **P** (future) |
 | `abb84c09` | Use different bundle ID for dev runner | **N** |
 | `5d9eb183` | Don't let un-updateable builds check for an update | **N** |
-| `e82b9873` | Select desktop backend port by sequential scan | **P** (maps to Panopticon dashboard port collision handling) |
+| `e82b9873` | Select desktop backend port by sequential scan | **P** (maps to Overdeck dashboard port collision handling) |
 
 ### 6.12 CLI
 
@@ -426,7 +426,7 @@ Panopticon currently ships as a CLI + browser dashboard, not a desktop app. Some
 
 | SHA | Title | Applies |
 | --- | --- | --- |
-| `c6f57a10` | Rename "Chat" to "Build" in interaction mode toggle | **N** (Panopticon has no mode toggle) |
+| `c6f57a10` | Rename "Chat" to "Build" in interaction mode toggle | **N** (Overdeck has no mode toggle) |
 | `7372184d` | Map runtime modes to correct permission levels | **P** (maps to agent permission routing) |
 | `7b3cdc6a` | Clarify environment and workspace picker labels | **P** |
 | `047a0a69` | Add pointer cursor to permissions mode select trigger | **Y** (micro-fix pattern) |
@@ -442,7 +442,7 @@ Panopticon currently ships as a CLI + browser dashboard, not a desktop app. Some
 | `b1934b92` | Add explicit timeouts to CI and release workflows | **Y** |
 | `8244fb80` | Support devcontainer development | **P** |
 | `9b29be91` | Document environment prep before local development | **Y** (docs) |
-| `f59ee36b` | Allow concurrent browser tests to retry ports | **Y** (Panopticon tests have the same contention) |
+| `f59ee36b` | Allow concurrent browser tests to retry ports | **Y** (Overdeck tests have the same contention) |
 | `9847e9b6` | fix build | **N** |
 
 ### 6.15 Codex-specific — N/A
@@ -473,7 +473,7 @@ Store slices (section 4) are already done; only validation is needed.
 ## 8. Rules we do not violate
 
 - **Node 22 only for the dashboard server.** `pan up` runs `dist/dashboard/server.js` under Node 22. [`.claude/rules/dashboard-node22-only.md`](../../.claude/rules/dashboard-node22-only.md). The Effect bump does not change this; `node-pty` still requires Node and circular ESM imports still forbid tsx source-mode.
-- **No blocking calls in dashboard server code.** Section 1's new `TerminalManager` must use `fs/promises` or the Effect `FileSystem` service, not `readFileSync` / `writeFileSync`, even though t3code upstream may use sync calls (t3code is single-user; Panopticon is multi-agent-concurrent).
+- **No blocking calls in dashboard server code.** Section 1's new `TerminalManager` must use `fs/promises` or the Effect `FileSystem` service, not `readFileSync` / `writeFileSync`, even though t3code upstream may use sync calls (t3code is single-user; Overdeck is multi-agent-concurrent).
 - **tmux stays the PTY backend.** Section 1 changes transport only.
 - **HTTP routes for machine-to-machine callers stay HTTP.** Section 2.
 - **`postMergeLifecycle` idempotency guards** (PAN-328) and **Docker cleanup step** survive unchanged through any refactor.
@@ -482,6 +482,6 @@ Store slices (section 4) are already done; only validation is needed.
 
 ## 9. Open questions
 
-1. Do we want to push Panopticon's `TerminalManager` history buffer *upstream* to t3code once it's built on top of tmux? t3code's current spawn is a bare shell; Panopticon's tmux backend is strictly more powerful.
+1. Do we want to push Overdeck's `TerminalManager` history buffer *upstream* to t3code once it's built on top of tmux? t3code's current spawn is a bare shell; Overdeck's tmux backend is strictly more powerful.
 2. Does `packages/contracts` need a major version bump when `ServiceMap` → `Context` propagates through its public types? It probably does; pin consumers explicitly.
 3. Does the dashboard need a feature flag for the new `TerminalEvent` path so we can roll it back per-user if integration surprises hit?

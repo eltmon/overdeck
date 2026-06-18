@@ -1,6 +1,6 @@
 ---
 name: pan
-description: "pan <verb> <args> — umbrella dispatch for all Panopticon CLI commands. Invoke bare to see the six-bucket taxonomy, or pass a full command to run it."
+description: "pan <verb> <args> — umbrella dispatch for all Overdeck CLI commands. Invoke bare to see the six-bucket taxonomy, or pass a full command to run it."
 triggers:
   - pan help
   - pan commands
@@ -11,7 +11,7 @@ allowed-tools:
   - Read
 ---
 
-# Panopticon CLI Umbrella Skill
+# Overdeck CLI Umbrella Skill
 
 Dispatch to any `pan` command, or show the full command taxonomy.
 

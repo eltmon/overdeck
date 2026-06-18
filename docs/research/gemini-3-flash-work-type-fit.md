@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Google's Gemini 3 Flash Preview against Panopticon's 23 work types. Still in preview with no GA date announced — Google appears to have leapfrogged to 3.1 Pro for GA while leaving 3 Flash in preview.
+Evaluates Google's Gemini 3 Flash Preview against Overdeck's 23 work types. Still in preview with no GA date announced — Google appears to have leapfrogged to 3.1 Pro for GA while leaving 3 Flash in preview.
 
 ## Model Profile
 
@@ -202,7 +202,7 @@ Hallucination rate makes it unreliable for user-facing responses. Quick commands
 
 ## The Hallucination Problem
 
-The 91% hallucination rate is Flash's defining limitation. In concrete terms for Panopticon:
+The 91% hallucination rate is Flash's defining limitation. In concrete terms for Overdeck:
 
 - An implementation agent may claim it fixed a bug when it didn't
 - A review agent may fabricate reasoning about why code is correct
@@ -225,7 +225,7 @@ This doesn't mean Flash is useless — it means Flash should only be deployed in
 
 ## Integration Notes
 
-- Google already configured as provider in Panopticon
+- Google already configured as provider in Overdeck
 - Model ID: `gemini-3-flash-preview`
 - Available via Google AI API (API key)
 - Thinking level should be configurable per work type in Cloister

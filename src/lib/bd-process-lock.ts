@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, open, readFile, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { Data, Effect } from 'effect';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 const TRANSIENT_BD_ERRNO_CODES = new Set(['EAGAIN', 'EBUSY', 'EWOULDBLOCK', 'ETIMEDOUT']);
 
@@ -178,7 +178,7 @@ export async function resolveSharedBeadsDir(workspacePath = process.cwd()): Prom
     const target = (await readFile(redirectPath, 'utf8')).trim();
     if (target.length > 0) {
       // bd resolves .beads/redirect relative to the worktree root (the parent of
-      // .beads/), not relative to the .beads directory itself. Panopticon must
+      // .beads/), not relative to the .beads directory itself. Overdeck must
       // mirror that exactly so every worktree sharing ../../.beads hashes to the
       // same process lock as the canonical project-root Dolt store.
       const redirected = isAbsolute(target) ? target : resolve(workspacePath, target);
@@ -188,7 +188,7 @@ export async function resolveSharedBeadsDir(workspacePath = process.cwd()): Prom
     if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
   }
 
-  // Standard Panopticon workspaces live at <projectRoot>/workspaces/feature-* and
+  // Standard Overdeck workspaces live at <projectRoot>/workspaces/feature-* and
   // normally contain .beads/redirect -> ../../.beads. During first materialization
   // that gitignored redirect may not exist yet; key the lock to the project-root
   // .beads directory when it is already present so redirect recovery itself is
@@ -206,7 +206,7 @@ export async function resolveSharedBeadsDir(workspacePath = process.cwd()): Prom
 export async function bdProcessLockPath(workspacePath = process.cwd()): Promise<string> {
   const sharedBeadsDir = await resolveSharedBeadsDir(workspacePath);
   const digest = createHash('sha256').update(sharedBeadsDir).digest('hex').slice(0, 16);
-  return join(getPanopticonHome(), 'locks', `bd-${digest}.lock`);
+  return join(getOverdeckHome(), 'locks', `bd-${digest}.lock`);
 }
 
 type LockFileState =

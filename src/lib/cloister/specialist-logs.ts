@@ -11,11 +11,11 @@
 import { existsSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
 import { Data, Effect } from 'effect';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 /** Get specialists directory (lazy to support test env overrides) */
 function getSpecialistsDir(): string {
-  return join(getPanopticonHome(), 'specialists');
+  return join(getOverdeckHome(), 'specialists');
 }
 
 /**

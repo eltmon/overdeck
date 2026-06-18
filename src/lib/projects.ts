@@ -1,5 +1,5 @@
 /**
- * Project Registry - Multi-project support for Panopticon
+ * Project Registry - Multi-project support for Overdeck
  *
  * Maps Linear team prefixes and labels to project paths for workspace creation.
  */
@@ -486,7 +486,7 @@ export function initializeProjectsConfigSync(): void {
     return;
   }
 
-  const exampleYaml = `# Panopticon Project Registry
+  const exampleYaml = `# Overdeck Project Registry
 # Maps Linear teams to project paths for workspace creation
 
 projects:
@@ -525,9 +525,9 @@ projects:
   #       command: npx vitest run --changed {{CHANGED_BASE}}
   #       required: true
 
-  # Example: Panopticon itself
+  # Example: Overdeck itself
   # panopticon:
-  #   name: "Panopticon"
+  #   name: "Overdeck"
   #   path: /home/user/projects/panopticon
   #   linear_team: PAN
 `;

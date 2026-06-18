@@ -173,7 +173,7 @@ export function queueAutoCommit(opts: {
 /**
  * PAN-1441: queue an auto-commit of the host-main beads export files.
  *
- * Unlike the .pan/* writers, there is no single Panopticon write site for these:
+ * Unlike the .pan/* writers, there is no single Overdeck write site for these:
  * `.beads/issues.jsonl` and `.beads/export-state.json` drift on `main` as a
  * side-effect of the `bd` binary re-exporting after dolt syncs (other machines /
  * workspaces pushing to the shared dolt remote). So this is called from the

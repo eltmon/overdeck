@@ -1,7 +1,7 @@
 # PAN-655: PRD Pipeline Test Marker
 
 ## Goal
-Smoke-test the Panopticon planning → work → review → test → merge pipeline end-to-end, validating that PRD/STATE.md/vBRIEF artifacts land in canonical lowercase locations and survive close-out.
+Smoke-test the Overdeck planning → work → review → test → merge pipeline end-to-end, validating that PRD/STATE.md/vBRIEF artifacts land in canonical lowercase locations and survive close-out.
 
 ## Scope
 Add a single new file: `docs/prd-pipeline-test-marker.md` containing the marker text from the issue body.

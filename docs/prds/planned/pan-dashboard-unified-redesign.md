@@ -1,4 +1,4 @@
-# Panopticon Dashboard — Unified Redesign
+# Overdeck Dashboard — Unified Redesign
 
 > **Status:** Design complete · Awaiting PAN issue · Author: Opus 4.7 pass · 2026-05-16
 > **Mockups (canonical):** [`docs/design/mockups/system-map-opus.html`](../../design/mockups/system-map-opus.html) (entry point — links to all five surface mocks)
@@ -22,7 +22,7 @@ The split forces operators to mentally translate between dialects (a card "in re
 
 **One vocabulary, one row, one drawer — used everywhere.**
 
-Replace the six destinations with **four operations lenses** on the same data, plus a single shared **Issue Detail drawer** that opens from any of them. Use the canonical Panopticon style guide for every surface (no scoped overrides except God View).
+Replace the six destinations with **four operations lenses** on the same data, plus a single shared **Issue Detail drawer** that opens from any of them. Use the canonical Overdeck style guide for every surface (no scoped overrides except God View).
 
 The four lenses:
 

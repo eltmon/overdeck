@@ -2586,7 +2586,7 @@ export function SettingsPage() {
               <p className="text-xs text-muted-foreground mt-0.5">
                 {(formData.conversations?.manual_compact_mode || 'claude-code') === 'claude-code'
                   ? 'Pass through to Claude Code'
-                  : 'Panopticon-native compaction'}
+                  : 'Overdeck-native compaction'}
               </p>
             </div>
             <select
@@ -3079,7 +3079,7 @@ export function SettingsPage() {
           Background AI
         </h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Automatic, behind-the-scenes model calls Panopticon makes on your behalf — conversation
+          Automatic, behind-the-scenes model calls Overdeck makes on your behalf — conversation
           titles, memory extraction, enrichment, narration. Token spend for these is recorded in the
           cost ledger under <code className="font-mono">background:&lt;feature&gt;</code>.
         </p>
@@ -3182,7 +3182,7 @@ export function SettingsPage() {
               <span className="text-sm font-medium text-foreground">tmux configuration</span>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {(formData.tmux?.config_mode || 'managed') === 'managed'
-                  ? 'Using Panopticon-managed tmux socket and config'
+                  ? 'Using Overdeck-managed tmux socket and config'
                   : 'Inheriting your user tmux configuration'}
               </p>
             </div>

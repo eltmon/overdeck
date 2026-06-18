@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Anthropic's Claude Sonnet 4.6 against Panopticon's 23 work types. Sonnet 4.6 is Panopticon's current workhorse — the default for the largest number of work types (testing, documentation, review-response, convoy reviewers, and most specialist agents).
+Evaluates Anthropic's Claude Sonnet 4.6 against Overdeck's 23 work types. Sonnet 4.6 is Overdeck's current workhorse — the default for the largest number of work types (testing, documentation, review-response, convoy reviewers, and most specialist agents).
 
 ## Model Profile
 
@@ -54,7 +54,7 @@ Evaluates Anthropic's Claude Sonnet 4.6 against Panopticon's 23 work types. Sonn
 ## Standout Capabilities
 
 1. **Near-Opus coding at 60% cost** — SWE-Bench Verified 79.6% vs Opus 4.6's 80.8%. Only 1.2 points behind at 60% the price.
-2. **Best-in-class tool use** — MCP-Atlas 61.3% actually beats Opus 4.6 (60.3%). Critical for Panopticon's tool-heavy agent workflows.
+2. **Best-in-class tool use** — MCP-Atlas 61.3% actually beats Opus 4.6 (60.3%). Critical for Overdeck's tool-heavy agent workflows.
 3. **Best-in-class enterprise tasks** — GDPval-AA Elo 1633, ahead of every model including Opus 4.6 (1606) and GPT-5.4 (1462).
 4. **1M context at $3/M** — Full codebase loading without long-context surcharge. Cheaper than Opus for the same context window.
 5. **Speed** — 50-55 tok/s is substantially faster than Opus 4.6 (~40 tok/s). Sub-second TTFT in standard mode.
@@ -80,7 +80,7 @@ Evaluates Anthropic's Claude Sonnet 4.6 against Panopticon's 23 work types. Sonn
 
 ### The Workhorse
 
-Sonnet 4.6 is Panopticon's volume model — it handles the largest number of work types because it balances quality, speed, and cost better than any other model. It's not the best at any single dimension, but it's good enough at everything to be the safe default.
+Sonnet 4.6 is Overdeck's volume model — it handles the largest number of work types because it balances quality, speed, and cost better than any other model. It's not the best at any single dimension, but it's good enough at everything to be the safe default.
 
 ### Excellent Fit (Current Defaults)
 
@@ -198,7 +198,7 @@ Quick commands need speed and low cost. Sonnet is overkill at 3x Haiku's price.
 
 ## Integration Notes
 
-- Anthropic is the primary provider in Panopticon
+- Anthropic is the primary provider in Overdeck
 - Model ID: `claude-sonnet-4-6`
 - Suggested capability scores: code-generation 84, code-review 82, debugging 80, planning 72, documentation 84, testing 82, security 74, performance 80, synthesis 78, speed 68, context-length 98
 - **Verbosity warning:** Monitor output token usage — Sonnet 4.6's verbosity can make effective costs approach Opus levels on some tasks. Consider prompt engineering to constrain output length.

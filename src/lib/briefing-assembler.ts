@@ -37,13 +37,13 @@ export async function assembleLiveBriefingMarkdown(input: AssembleLiveBriefingIn
   const status = workspace ? await readWorkspaceStatus(projectId, workspace.issueId) : null;
 
   return [
-    '# Working Inside Panopticon',
+    '# Working Inside Overdeck',
     '',
     `Generated: ${now.toISOString()}`,
     '',
-    "You're piloting an agent inside **Panopticon** — a multi-agent orchestrator for AI coding work. Panopticon tracks active work, preserves memory, and hands you current context before you ask.",
+    "You're piloting an agent inside **Overdeck** — a multi-agent orchestrator for AI coding work. Overdeck tracks active work, preserves memory, and hands you current context before you ask.",
     '',
-    '## What Panopticon Gives You',
+    '## What Overdeck Gives You',
     '',
     '- Persistent memory across sessions through observations, status updates, and rollups.',
     '- Situational awareness from the live dashboard read model.',
@@ -126,7 +126,7 @@ async function readWorkspaceStatus(projectId: string, issueId: string): Promise<
 function renderLocalWorkspaceSection(workspace: WorkspaceContext | null, status: BriefingStatus | null): string[] {
   if (!workspace) {
     return [
-      '- No Panopticon workspace was detected from the current directory.',
+      '- No Overdeck workspace was detected from the current directory.',
       '- Run `pan briefing` from inside a `workspaces/feature-<issue>` checkout to include workspace-specific context.',
     ];
   }

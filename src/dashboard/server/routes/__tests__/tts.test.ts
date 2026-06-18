@@ -335,7 +335,7 @@ describe('TTS embedding extraction route helpers', () => {
     expect(EXTRACT_EMBEDDING_TIMEOUT_MS).toBe(60_000);
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/extract-embedding', {
       method: 'POST',
-      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Panopticon-TTS-Token': expect.any(String) }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Overdeck-TTS-Token': expect.any(String) }),
       body: JSON.stringify({ design: 'warm narrator', text: 'sample text' }),
       signal: expect.any(AbortSignal),
     });

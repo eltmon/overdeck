@@ -18,7 +18,7 @@
  * we extract a readable transcript from the source format and seed a fresh
  * session in the target format with that transcript carried in as a single
  * continuation/summary message — the same "faux compaction boundary" mechanism
- * Panopticon already uses for native compaction. Tool-call structure, thinking
+ * Overdeck already uses for native compaction. Tool-call structure, thinking
  * blocks, and per-message token accounting do not round-trip; the conversation
  * *content* does. This keeps the converter robust as both harness formats
  * continue to evolve.

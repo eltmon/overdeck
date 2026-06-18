@@ -5,14 +5,14 @@ import { tmpdir } from 'os';
 
 describe('settings', () => {
   let tempDir: string;
-  let originalPanopticonHome: string | undefined;
+  let originalOverdeckHome: string | undefined;
 
   beforeEach(() => {
     // Create temp directory for isolated tests
     tempDir = mkdtempSync(join(tmpdir(), 'pan-settings-test-'));
 
     // Override OVERDECK_HOME for this test
-    originalPanopticonHome = process.env.OVERDECK_HOME;
+    originalOverdeckHome = process.env.OVERDECK_HOME;
     process.env.OVERDECK_HOME = tempDir;
 
     // Clear module cache to reload with new env var
@@ -21,8 +21,8 @@ describe('settings', () => {
 
   afterEach(() => {
     // Restore original env var
-    if (originalPanopticonHome) {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+    if (originalOverdeckHome) {
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     } else {
       delete process.env.OVERDECK_HOME;
     }

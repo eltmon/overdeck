@@ -209,7 +209,7 @@ async function installRtk(binDir: string): Promise<boolean> {
 }
 
 /**
- * Per-hook-type detection of whether a Panopticon hook is already registered.
+ * Per-hook-type detection of whether a Overdeck hook is already registered.
  * PAN-800: rewritten from an all-or-nothing short-circuit to a delta-install
  * check so users with older installs still get SessionStart/Notification/etc.
  * added without having to wipe their settings.
@@ -229,7 +229,7 @@ function isHookConfigured(
   );
 }
 
-export function addPanopticonHookIfMissing(
+export function addOverdeckHookIfMissing(
   settings: ClaudeSettings,
   hookType: keyof NonNullable<ClaudeSettings['hooks']>,
   binDir: string,
@@ -301,19 +301,19 @@ export function parseHookHarness(value: string | undefined): HookHarness | undef
 
 export function hooksStatusCommand(): void {
   const detected = detectInstalledHookHarnesses();
-  console.log(chalk.bold('Panopticon hook harness status\n'));
+  console.log(chalk.bold('Overdeck hook harness status\n'));
   console.log(`${detected.claudeCode ? '✓' : '○'} Claude Code binary: ${detected.claudeCode ? 'installed' : 'not found'}`);
   console.log(`${detected.pi ? '✓' : '○'} Pi binary: ${detected.pi ? 'installed' : 'not found'}`);
   verifyPiExtensionBuilt();
 }
 
 /**
- * Setup Claude Code / Pi hooks for Panopticon heartbeat
+ * Setup Claude Code / Pi hooks for Overdeck heartbeat
  */
 export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<void> {
   const dryRun = opts.dryRun === true;
   const harness = resolveHookHarnessSelection(opts.harness);
-  console.log(chalk.bold('Setting up Panopticon heartbeat hooks\n'));
+  console.log(chalk.bold('Setting up Overdeck heartbeat hooks\n'));
   console.log(chalk.dim(`Harness target: ${harness}\n`));
 
   if (harness === 'pi' || harness === 'both') {
@@ -475,16 +475,16 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     scriptName: string,
     matcher: string = '.*',
   ): void => {
-    if (addPanopticonHookIfMissing(settings, hookType, binDir, scriptName, matcher)) {
+    if (addOverdeckHookIfMissing(settings, hookType, binDir, scriptName, matcher)) {
       added.push(`${hookType}:${scriptName}`);
     }
   };
 
   // PAN-1402: Tool-event hooks briefly lived in per-agent frontmatter during
-  // PAN-982, but Claude Code did not honor them when Panopticon invoked agents
+  // PAN-982, but Claude Code did not honor them when Overdeck invoked agents
   // with path-form `--agent roles/<role>.md`, so these registrations are global again.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
-  // Auto-approve tool calls for Panopticon agents (self-scoped via
+  // Auto-approve tool calls for Overdeck agents (self-scoped via
   // OVERDECK_AGENT_ID inside the hook) — replaces launching agents with
   // --dangerously-skip-permissions so headless agents never hang on Claude
   // Code's "Do you want to proceed?" prompt (PAN-1024). A frontmatter PreToolUse
@@ -512,7 +512,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   }
 
   if (added.length === 0) {
-    console.log(chalk.cyan('\n✓ All Panopticon hooks already registered'));
+    console.log(chalk.cyan('\n✓ All Overdeck hooks already registered'));
   } else {
     console.log(chalk.green(`\n✓ Registered ${added.length} hook(s):`));
     for (const entry of added) console.log(chalk.dim(`  • ${entry}`));
@@ -574,5 +574,5 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   console.log(chalk.dim('  • RTK Bash filter   - Token-efficient Bash output hooks (activate with agents.rtk.enabled: true)'));
   console.log('');
   console.log(chalk.dim('When you run agents via `pan start`, they will report'));
-  console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
+  console.log(chalk.dim('their status in real-time to the Overdeck dashboard.\n'));
 }

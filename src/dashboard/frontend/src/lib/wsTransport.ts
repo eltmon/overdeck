@@ -1,5 +1,5 @@
 /**
- * WsTransport — Effect-based WebSocket RPC client for the Panopticon dashboard (PAN-428 B4)
+ * WsTransport — Effect-based WebSocket RPC client for the Overdeck dashboard (PAN-428 B4)
  *
  * Connects to /ws/rpc using the PanRpcGroup contract.
  * Provides request (unary), requestStream (stream to completion), and

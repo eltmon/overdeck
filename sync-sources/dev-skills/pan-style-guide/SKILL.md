@@ -1,7 +1,7 @@
 ---
 name: pan-style-guide
 description: >
-  Panopticon dashboard UI style guide — canonical typography, color-signal
+  Overdeck dashboard UI style guide — canonical typography, color-signal
   semantics, badge formula, and color-restraint rules. Use whenever writing,
   reviewing, or mocking up dashboard frontend UI (components, badges, colors,
   fonts, status indicators, kanban cards, tree rows). Prevents the common
@@ -22,7 +22,7 @@ allowed-tools:
   - Bash
 ---
 
-# Panopticon Style Guide (dev skill)
+# Overdeck Style Guide (dev skill)
 
 ## Sources of truth — read in this order
 
@@ -48,7 +48,7 @@ allowed-tools:
 - **SF Mono** (`font-mono`) ONLY for technical identifiers: code, paths,
   branch names, PR numbers, issue IDs, session/run IDs, model IDs, hashes,
   env vars. Never on titles, badge labels, or button text.
-- **Space Grotesk** (`font-display`) ONLY for the sidebar "Panopticon"
+- **Space Grotesk** (`font-display`) ONLY for the sidebar "Overdeck"
   wordmark. Nowhere else (God View is the lone scoped exception).
 - **`font-medium` (500) for everything.** No semibold, no bold. Hierarchy
   comes from size and color contrast, not weight.

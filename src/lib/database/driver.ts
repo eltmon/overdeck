@@ -277,7 +277,7 @@ function loadNodeSqlite(): { DatabaseSync: new (path: string, options?: OpenData
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Unable to load node:sqlite (${message}). Panopticon requires Node 22.16+ or Node 24+ for the bundled SQLite driver; older Node 22 builds may require --experimental-sqlite and are not supported.`,
+      `Unable to load node:sqlite (${message}). Overdeck requires Node 22.16+ or Node 24+ for the bundled SQLite driver; older Node 22 builds may require --experimental-sqlite and are not supported.`,
       { cause: error },
     );
   }

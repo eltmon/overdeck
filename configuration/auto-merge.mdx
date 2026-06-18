@@ -1,21 +1,21 @@
 ---
 title: Auto-Merge
-description: Opt-in scheduled auto-merge for solo Panopticon workflows
+description: Opt-in scheduled auto-merge for solo Overdeck workflows
 ---
 
 # Auto-Merge
 
 When the Flywheel orchestrator is trusted to ship work without a human clicking
-MERGE, you can flip a single toggle and Panopticon will schedule eligible PRs
+MERGE, you can flip a single toggle and Overdeck will schedule eligible PRs
 for merge with a short cooldown window. During the cooldown an audible
 announcement fires, a cancellable banner appears in the dashboard, and the
 merge runs through the exact same code path as the MERGE button when the
 cooldown expires.
 
 <Warning>
-**Solo Panopticon workflows only.** Auto-merge moves the merge-consent decision
+**Solo Overdeck workflows only.** Auto-merge moves the merge-consent decision
 from per-PR click to a configuration toggle. That trade is appropriate when the
-operator is the only human in the loop. In a shared Panopticon instance it
+operator is the only human in the loop. In a shared Overdeck instance it
 shifts consent away from the person who would normally click MERGE — not
 appropriate for team workflows.
 </Warning>
@@ -44,7 +44,7 @@ for any issue that satisfies the eligibility predicate.
 
 <Note>
 **Auto-merge vs. UAT batch trains.** This toggle controls *per-issue* scheduled
-auto-merge — Panopticon merging one eligible PR at a time without a human click.
+auto-merge — Overdeck merging one eligible PR at a time without a human click.
 The separate `flywheel.merge_train_enabled` flag enables [UAT batch
 trains](/features/merge-batches), where ready features are assembled into one
 tested batch you promote together. They are independent flags: auto-merge ships

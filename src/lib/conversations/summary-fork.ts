@@ -413,7 +413,7 @@ export function prependFallbackFocus(summary: string, focus: string | undefined,
   const trimmedFocus = focus?.trim();
   if (!trimmedFocus) return summary;
   const header = [
-    `**Note from Panopticon:** the intended handoff fell back to a summary fork (\`${fallbackReason}\`). The focus you requested is preserved below; the summary that follows is auto-generated, not an authored handoff document.`,
+    `**Note from Overdeck:** the intended handoff fell back to a summary fork (\`${fallbackReason}\`). The focus you requested is preserved below; the summary that follows is auto-generated, not an authored handoff document.`,
     '',
     '**Requested focus:**',
     '',

@@ -3,7 +3,7 @@ name: cliproxy
 description: >
   Check and restart the CLIProxy sidecar (port 8317). CLIProxy bridges
   ChatGPT subscription OAuth tokens to an Anthropic-compatible /v1/messages
-  endpoint so Panopticon agents can use GPT models without an OpenAI API key.
+  endpoint so Overdeck agents can use GPT models without an OpenAI API key.
   Use when GPT-model agents are returning API errors or when cliproxy is down.
 triggers:
   - cliproxy is down
@@ -23,7 +23,7 @@ allowed-tools:
 # CLIProxy — Check and Restart
 
 CLIProxy is a background sidecar that proxies Anthropic-compatible API calls to GPT
-models via ChatGPT subscription OAuth tokens. Panopticon agents talk to it via
+models via ChatGPT subscription OAuth tokens. Overdeck agents talk to it via
 `ANTHROPIC_BASE_URL=http://127.0.0.1:8317`.
 
 ## Quick Status Check
@@ -85,9 +85,9 @@ api-keys:
 debug: false
 ```
 
-## Lifecycle in Panopticon
+## Lifecycle in Overdeck
 
-Panopticon's `startCliproxy()` in `src/lib/cliproxy.ts` handles:
+Overdeck's `startCliproxy()` in `src/lib/cliproxy.ts` handles:
 1. Ensuring binary is installed
 2. Writing `~/.panopticon/cliproxy/config.yaml`
 3. Bridging `~/.codex/auth.json` → `auth/codex-primary.json`
@@ -111,7 +111,7 @@ cat ~/.codex/auth.json | python3 -c "import sys,json; d=json.load(sys.stdin); pr
 
 ## Dashboard Re-Auth Flow (PAN-913)
 
-The Panopticon dashboard can trigger interactive Codex re-authentication when
+The Overdeck dashboard can trigger interactive Codex re-authentication when
 ChatGPT subscription tokens expire. This avoids requiring the user to run
 `codex login` manually in a terminal.
 
@@ -167,6 +167,6 @@ node -e "require('./src/lib/cliproxy.js').bridgeCodexAuthToCliproxyAsync().then(
 
 ## See Also
 
-- `src/lib/cliproxy.ts` — full lifecycle implementation in Panopticon
-- `/pan:health` — overall Panopticon health check
-- `/pan:up` — start Panopticon (also starts cliproxy)
+- `src/lib/cliproxy.ts` — full lifecycle implementation in Overdeck
+- `/pan:health` — overall Overdeck health check
+- `/pan:up` — start Overdeck (also starts cliproxy)

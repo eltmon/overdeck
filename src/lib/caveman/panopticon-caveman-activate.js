@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Panopticon wrapper around caveman-activate.js
+// Overdeck wrapper around caveman-activate.js
 //
 // Runs caveman-activate.js to inject the standard caveman rules, then appends
-// Panopticon-specific overrides that take precedence over the default caveman rules.
+// Overdeck-specific overrides that take precedence over the default caveman rules.
 // These overrides are non-negotiable: crash recovery and specialist feedback depend on them.
 //
 // Install location: ~/.panopticon/hooks/caveman/panopticon-caveman-activate.js
@@ -32,11 +32,11 @@ if (baseOutput.trim() === 'OK') {
   process.exit(0);
 }
 
-// Append Panopticon-specific override block.
+// Append Overdeck-specific override block.
 // These rules are injected after the caveman rules so they win on any conflict.
 const panopticonOverrides = `
 
-## Panopticon Overrides (non-negotiable)
+## Overdeck Overrides (non-negotiable)
 
 continue.vbrief.json updates: ALWAYS use full prose for narrative fields (decisions[].rationale, hazards[].mitigation, approach, sessionHistory[].note). Crash recovery and specialist context depend on complete information in these fields.
 

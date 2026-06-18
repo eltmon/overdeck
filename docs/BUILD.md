@@ -1,6 +1,6 @@
 # Build Pipeline
 
-How Panopticon's TypeScript source is built into distributable artifacts.
+How Overdeck's TypeScript source is built into distributable artifacts.
 
 ## Build Commands
 

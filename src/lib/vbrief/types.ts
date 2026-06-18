@@ -13,7 +13,7 @@
  *   - VBriefItem: created, completed timestamps
  *   - VBriefSubItem: created, completed timestamps
  *
- * Panopticon extensions (via metadata fields):
+ * Overdeck extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
  *   - metadata.issueLabel: issue ID for beads label filtering
  *   - metadata.kind: "acceptance_criterion" on child items
@@ -119,7 +119,7 @@ export interface VBriefPlan {
     [key: string]: string | undefined;
   };
   /**
-   * Panopticon-specific plan metadata. Free-form per-key storage for
+   * Overdeck-specific plan metadata. Free-form per-key storage for
    * lifecycle bookkeeping (e.g. canonicalFilename for the issue-keyed
    * filename convention).
    */
@@ -146,7 +146,7 @@ export interface VBriefDocument {
     author?: string;
     /** Human-readable description of the plan */
     description?: string;
-    /** Panopticon inspection routing policy. Defaults to auto when omitted. */
+    /** Overdeck inspection routing policy. Defaults to auto when omitted. */
     inspectionPolicy?: VBriefInspectionPolicy;
   };
   plan: VBriefPlan;

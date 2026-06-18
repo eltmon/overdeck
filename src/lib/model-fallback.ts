@@ -3,7 +3,7 @@
  *
  * When a non-Anthropic model is selected but its API key is missing,
  * automatically fallback to an equivalent Anthropic model. This ensures
- * Panopticon always works even without configuring external providers.
+ * Overdeck always works even without configuring external providers.
  */
 
 import { Effect } from 'effect';

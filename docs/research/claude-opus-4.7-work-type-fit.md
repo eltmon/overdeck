@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Anthropic's Claude Opus 4.7 against Panopticon's 23 work types. Released April 16, 2026 — Anthropic's newest and most capable model. Panopticon needs to be updated to support it (breaking API changes from 4.6).
+Evaluates Anthropic's Claude Opus 4.7 against Overdeck's 23 work types. Released April 16, 2026 — Anthropic's newest and most capable model. Overdeck needs to be updated to support it (breaking API changes from 4.6).
 
 ## Model Profile
 
@@ -54,7 +54,7 @@ Evaluates Anthropic's Claude Opus 4.7 against Panopticon's 23 work types. Releas
 
 1. **SWE-Bench SOTA** — 87.6% Verified and 64.3% Pro are the highest scores of any GA model. A 6.8-point jump on Verified and 10.9 on Pro over Opus 4.6.
 2. **Vision transformation** — 54.5% → 98.5% accuracy on visual-acuity benchmark. Max resolution 2,576px (was 1,568px). 1:1 pixel coordinate mapping.
-3. **Tool error reduction** — ~1/3 the tool errors of Opus 4.6 on long agentic runs. Critical for Panopticon's multi-hour agent sessions.
+3. **Tool error reduction** — ~1/3 the tool errors of Opus 4.6 on long agentic runs. Critical for Overdeck's multi-hour agent sessions.
 4. **Multi-step agentic reasoning** — 14% improvement on complex multi-step workflows. Fewer subagents spawned, more direct problem-solving.
 5. **Speed doubled** — ~81 tok/s vs Opus 4.6's ~40.6 tok/s. Still slower than Sonnet (50-55 tok/s is Sonnet's standard; Opus 4.7 is now faster than Sonnet).
 6. **MCP-Atlas leader** — 77.3% on multi-tool coordination. Highest of any model evaluated.
@@ -94,7 +94,7 @@ Evaluates Anthropic's Claude Opus 4.7 against Panopticon's 23 work types. Releas
 - **Task budgets (beta):** Header `task-budgets-2026-03-13` + `output_config.task_budget` — advisory token budget across full agentic loop. Model sees a running countdown. Minimum 20K tokens.
 - **`xhigh` effort level:** Recommended starting point for coding and agentic use cases. Minimum `high` recommended for intelligence-sensitive tasks.
 
-### Panopticon Impact
+### Overdeck Impact
 
 These changes require updates to:
 1. **`model-capabilities.ts`** — Add `claude-opus-4-7` with updated capability scores

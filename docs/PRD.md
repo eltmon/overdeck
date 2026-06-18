@@ -1,4 +1,4 @@
-# Panopticon: Multi-Agent Orchestration for Claude Code
+# Overdeck: Multi-Agent Orchestration for Claude Code
 
 **Issue:** MIN-630
 **Related:** MIN-648 (Research & Expanded Architecture), MIN-650 (V2: Advanced Portability), MIN-651 (MYN Migration)
@@ -10,14 +10,14 @@
 
 ## ⚠️ DECOUPLING FROM MYN (CRITICAL)
 
-**Panopticon is being extracted from MYN into a standalone open-source project.**
+**Overdeck is being extracted from MYN into a standalone open-source project.**
 
 ### DO NOT rely on MYN infrastructure:
 - ❌ `/home/eltmon/projects/myn/infra/` - MYN-specific, not portable
 - ❌ `myn-traefik` container - Should be `panopticon-traefik`
 - ❌ `*.localhost` domains - Project-specific, users will have their own
 
-### Panopticon MUST be self-contained:
+### Overdeck MUST be self-contained:
 - ✅ All Traefik config in `~/.panopticon/traefik/`
 - ✅ All certs in `~/.panopticon/traefik/certs/`
 - ✅ Generic domain patterns (e.g., `*.pan.localhost` or configurable)
@@ -31,23 +31,23 @@
 - [ ] Docker network setup - Partially done
 
 ### When working on infrastructure:
-1. **Always check:** Is this change in Panopticon or MYN?
-2. **If in MYN infra:** Port it to Panopticon first, then use Panopticon's version
-3. **Never add new MYN-specific infra** - Add to Panopticon instead
+1. **Always check:** Is this change in Overdeck or MYN?
+2. **If in MYN infra:** Port it to Overdeck first, then use Overdeck's version
+3. **Never add new MYN-specific infra** - Add to Overdeck instead
 
 ---
 
 ## Executive Summary
 
-Panopticon is an **opinionated multi-agent orchestration system** for Claude Code. It manages projects, agents, and provides a unified set of skills, commands, and integrations that sync to your Claude Code environment.
+Overdeck is an **opinionated multi-agent orchestration system** for Claude Code. It manages projects, agents, and provides a unified set of skills, commands, and integrations that sync to your Claude Code environment.
 
 ### Opinionated Decisions
 
-Panopticon makes deliberate, opinionated choices to reduce complexity and ensure consistent behavior:
+Overdeck makes deliberate, opinionated choices to reduce complexity and ensure consistent behavior:
 
 | Decision | Rationale |
 |----------|-----------|
-| **SSH for all git operations** | HTTPS requires interactive credentials or credential helpers that vary by platform. SSH keys work consistently across local machines, remote VMs, and CI environments. Panopticon automatically converts HTTPS URLs to SSH format. |
+| **SSH for all git operations** | HTTPS requires interactive credentials or credential helpers that vary by platform. SSH keys work consistently across local machines, remote VMs, and CI environments. Overdeck automatically converts HTTPS URLs to SSH format. |
 | **Beads over GitHub Issues** | Local-first issue tracking that works offline, integrates with git, and provides resumability across sessions. |
 | **Skills over custom prompts** | Standardized SKILL.md format works across AI coding assistants. |
 | **Linear as source of truth** | One issue tracker, synced to beads. No scattered TODO files. |
@@ -61,12 +61,12 @@ This document synthesizes insights from:
 1. **Cursor's Dynamic Context Discovery** - Pull context on demand, reduce token usage by 46.9%
 2. **Gastown's Agent Orchestration** - Beads, FPP, hooks, health monitoring
 3. **GSD-Plus Context Engineering** - Structured state management (STATE.md, WORKSPACE.md, SUMMARY.md)
-4. **Current Panopticon Implementation** - What we've already built in MYN infra
+4. **Current Overdeck Implementation** - What we've already built in MYN infra
 5. **Claude Code Skills** - Progressive disclosure, cross-platform compatibility
 
 ### Core Insight
 
-**Panopticon should be a context orchestration system, not just an agent monitor.** The real power lies in intelligently managing what context agents have access to, when they get it, and how work state persists across sessions.
+**Overdeck should be a context orchestration system, not just an agent monitor.** The real power lies in intelligently managing what context agents have access to, when they get it, and how work state persists across sessions.
 
 ### Skills over Molecules
 
@@ -80,15 +80,15 @@ The AI coding tool ecosystem has converged on `SKILL.md` format. **Six major too
 |------|------------------|-----------------|
 | **Claude Code** | ✅ Native | `~/.claude/skills/`, `.claude/skills/` |
 
-Panopticon syncs skills to Claude Code's `~/.claude/skills/` directory. Alternative models are accessed through `claude-code-router`, not separate runtimes.
+Overdeck syncs skills to Claude Code's `~/.claude/skills/` directory. Alternative models are accessed through `claude-code-router`, not separate runtimes.
 
 ### About the Name
 
-The name "Panopticon" is inspired by *Doctor Who*, where the Panopticon served as the Time Lords' parliament and seat of State on Gallifrey. The Eye of Harmony—the source of all Time Lord power—was kept hidden beneath it. When Gallifrey's suns shone on the Panopticon, the interior glowed turquoise, and its ceiling was so high that clouds formed near it.
+The name "Overdeck" is inspired by *Doctor Who*, where the Overdeck served as the Time Lords' parliament and seat of State on Gallifrey. The Eye of Harmony—the source of all Time Lord power—was kept hidden beneath it. When Gallifrey's suns shone on the Overdeck, the interior glowed turquoise, and its ceiling was so high that clouds formed near it.
 
 The parallels to our project are intentional:
 
-| Doctor Who Panopticon | Our Panopticon |
+| Doctor Who Overdeck | Our Overdeck |
 |----------------------|----------------|
 | Time Lords' parliament & central oversight | Agent orchestration & central oversight |
 | Eye of Harmony hidden beneath (source of power) | The "eye" watching all agents (source of visibility) |
@@ -98,7 +98,7 @@ The parallels to our project are intentional:
 
 The original Greek etymology also applies: "pan" (πᾶν) meaning "all" + "opticon" (ὀπτικόν) meaning "view" = **all-seeing**. Which is exactly what an agent monitoring dashboard should be.
 
-*"The Panopticon had six sides, one for each of the Founders of Gallifrey..."* — PROSE: The Ancestor Cell
+*"The Overdeck had six sides, one for each of the Founders of Gallifrey..."* — PROSE: The Ancestor Cell
 
 ---
 
@@ -106,7 +106,7 @@ The original Greek etymology also applies: "pan" (πᾶν) meaning "all" + "opti
 
 ### Core Concept
 
-Panopticon sits **above** individual projects and manages them:
+Overdeck sits **above** individual projects and manages them:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -116,14 +116,14 @@ Panopticon sits **above** individual projects and manages them:
          │              │              │              │
          ▼              ▼              ▼              ▼
     ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
-    │   MYN   │   │Panopticon│   │Househunt│   │ Auricle │
+    │   MYN   │   │Overdeck│   │Househunt│   │ Auricle │
     │(project)│   │ (itself) │   │(project)│   │(project)│
     └─────────┘   └─────────┘   └─────────┘   └─────────┘
 ```
 
 ### Unified Architecture
 
-![Panopticon System Architecture](./diagrams/panopticon-architecture.png)
+![Overdeck System Architecture](./diagrams/panopticon-architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -193,7 +193,7 @@ Panopticon sits **above** individual projects and manages them:
 
 ### The Mayor Architecture: Dual-Interface Design
 
-Panopticon provides **two first-class interfaces** to the same underlying system:
+Overdeck provides **two first-class interfaces** to the same underlying system:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -212,13 +212,13 @@ Panopticon provides **two first-class interfaces** to the same underlying system
 │   • Terminal purists                • Context-aware suggestions          │
 │   • When AI isn't running           • Small tasks without spawning agents│
 │                                                                          │
-│   Both interfaces call the same underlying Panopticon APIs               │
+│   Both interfaces call the same underlying Overdeck APIs               │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 #### The Mayor Concept (from Gastown)
 
-In Gastown, the **Mayor** is the orchestration entity that dispatches work. In Panopticon:
+In Gastown, the **Mayor** is the orchestration entity that dispatches work. In Overdeck:
 
 - **The Mayor** = Human + AI tool (Claude Code, Codex, Gemini CLI, etc.) running in the project root
 - **The Agents** = AI instances running in isolated workspaces on specific issues
@@ -299,9 +299,9 @@ In Gastown, the **Mayor** is the orchestration entity that dispatches work. In P
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Panopticon Ships Batteries-Included
+#### Overdeck Ships Batteries-Included
 
-Unlike minimal tools that ship empty, Panopticon ships with a **comprehensive** library:
+Unlike minimal tools that ship empty, Overdeck ships with a **comprehensive** library:
 
 **Skills (converted from Gastown molecules + new):**
 
@@ -324,7 +324,7 @@ Unlike minimal tools that ship empty, Panopticon ships with a **comprehensive** 
 | `/work-status` | Show all running agents and their status |
 | `/work-approve <id>` | Approve agent work, merge MR, update Linear |
 | `/work-tell <id> <msg>` | Send message to running agent |
-| `/pan:up` | Start Panopticon dashboard and services |
+| `/pan:up` | Start Overdeck dashboard and services |
 | `/pan:down` | Stop dashboard and optionally agents |
 | `/pan:sync` | Sync skills/commands to all targets |
 | `/pan:health` | Show health of all agents |
@@ -389,7 +389,7 @@ const outputFile = await runCommand("npm test", { materialize: true });
 return `Output written to ${outputFile}. Use tail/grep to inspect.`;
 ```
 
-**Panopticon Implementation:**
+**Overdeck Implementation:**
 - Add `--materialize` flag to workspace operations
 - Dashboard shows "materialized outputs" with file browser
 - Agents learn to use grep/tail for discovery
@@ -476,7 +476,7 @@ Dashboard already captures this. Add agent-accessible paths.
 
 ### Context Budget Manager
 
-New Panopticon component: **Context Budget Manager**
+New Overdeck component: **Context Budget Manager**
 
 ```typescript
 interface ContextBudget {
@@ -544,7 +544,7 @@ This transforms agents from passive responders to **self-propelling workers**:
 
 ### Hooks as Primary Interface
 
-Every Panopticon agent gets a **hook** - a persistent work queue backed by Beads:
+Every Overdeck agent gets a **hook** - a persistent work queue backed by Beads:
 
 ```bash
 # Hook structure
@@ -642,11 +642,11 @@ async function recoverAgent(agentId: string) {
 }
 ```
 
-### Beads Flow with Panopticon
+### Beads Flow with Overdeck
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Linear      │────▶│  Panopticon  │────▶│    Beads     │
+│  Linear      │────▶│  Overdeck  │────▶│    Beads     │
 │  (issues)    │     │ (orchestrate)│     │  (tracking)  │
 └──────────────┘     └──────────────┘     └──────────────┘
                             │
@@ -657,8 +657,8 @@ async function recoverAgent(agentId: string) {
                      └──────────────┘
 ```
 
-1. **Issue Created in Linear** → Panopticon sees it via API/CLI
-2. **Agent Spawned** → Panopticon creates Bead for tracking
+1. **Issue Created in Linear** → Overdeck sees it via API/CLI
+2. **Agent Spawned** → Overdeck creates Bead for tracking
 3. **Agent Works** → Progress logged to Bead via `bd notes add`
 4. **Agent Completes** → Bead closed, MR link attached
 5. **Work Approved** → Bead marked as merged
@@ -673,7 +673,7 @@ Gastown's molecule system (TOML-based workflow templates) was designed **before 
 
 **Key insight:** Skills provide the same benefits as molecules with significant advantages:
 
-| Aspect | Molecules (Gastown) | Skills (Panopticon) |
+| Aspect | Molecules (Gastown) | Skills (Overdeck) |
 |--------|---------------------|---------------------|
 | Context usage | Heavy (full TOML loaded) | Light (progressive disclosure) |
 | Cross-platform | No (`gt` CLI specific) | Yes (Claude, Cursor, Codex) |
@@ -717,7 +717,7 @@ Instructions in markdown...
 
 **For maximum compatibility:** Use `name` + `description` only, keep description ≤500 chars (Codex limit).
 
-### The Panopticon Skills Model
+### The Overdeck Skills Model
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -866,7 +866,7 @@ vim ~/.panopticon/skills/feature-work/SKILL.md
 │           UNIFIED SKILL FORMAT - NO CONVERSION NEEDED            │
 └─────────────────────────────────────────────────────────────────┘
 
-Panopticon Canonical Source:
+Overdeck Canonical Source:
 ~/.panopticon/skills/feature-work/SKILL.md
 
         │
@@ -1311,7 +1311,7 @@ Create a summary with:
 For teams coming from Gastown, molecules can be converted to skills:
 
 ```bash
-# Convert Gastown molecule to Panopticon skill
+# Convert Gastown molecule to Overdeck skill
 pan convert --from molecule --input mol-polecat-work.formula.toml
 
 # Extracts the instructional content from each step
@@ -1332,18 +1332,18 @@ GSD-Plus demonstrates that **structured context files** dramatically improve AI 
 
 > "The complexity is in the system, not in your workflow."
 
-### Adopting GSD Patterns for Panopticon
+### Adopting GSD Patterns for Overdeck
 
 #### PROJECT.md → Workspace Context
 
-Each Panopticon workspace gets structured context:
+Each Overdeck workspace gets structured context:
 
 ```markdown
 # Workspace Context: MIN-648
 
 ## What This Is
 
-Research and documentation project for expanding Panopticon architecture.
+Research and documentation project for expanding Overdeck architecture.
 
 ## Core Value
 
@@ -1370,7 +1370,7 @@ Persistent state that survives compaction:
 
 ## Current Position
 
-Issue: MIN-648 "Panopticon Architecture Expanded Thoughts"
+Issue: MIN-648 "Overdeck Architecture Expanded Thoughts"
 Status: In Progress
 Last activity: 2026-01-17 08:40 — Completed resource reviews
 
@@ -1399,7 +1399,7 @@ Each completed piece of work produces a summary:
 
 ## What Was Done
 
-1. Read Panopticon Architecture PRD
+1. Read Overdeck Architecture PRD
 2. Reviewed Cursor Dynamic Context Discovery
 3. Studied Gastown architecture (glossary, overview, formulas)
 4. Examined GSD-Plus context engineering templates
@@ -1633,7 +1633,7 @@ Cooldown (5min after force-kill):
     └──▶ Skip force-kill, continue monitoring
 ```
 
-### Panopticon Health Dashboard
+### Overdeck Health Dashboard
 
 ```typescript
 interface AgentHealth {
@@ -1698,7 +1698,7 @@ async function handleStuckAgent(agentId: string) {
 
 ## Part 8: Directory Structure and Configuration
 
-### Global Panopticon Home (`~/.panopticon/`)
+### Global Overdeck Home (`~/.panopticon/`)
 
 ```
 ~/.panopticon/
@@ -1820,7 +1820,7 @@ workspace_pattern = "workspaces/feature-{issue}"
 name = "panopticon"
 path = "/home/eltmon/projects/panopticon"  # After extraction
 type = "standalone"
-is_self = true  # Panopticon manages itself
+is_self = true  # Overdeck manages itself
 
 [[projects]]
 name = "househunt"
@@ -1874,7 +1874,7 @@ primary = "linear"      # Internal planning, PRDs, roadmap
 secondary = "github"    # Community bug reports, feature requests
 
 [trackers.linear]
-team = "PAN"            # Panopticon Linear team
+team = "PAN"            # Overdeck Linear team
 
 [trackers.github]
 repo = "eltmon/panopticon"
@@ -1885,18 +1885,18 @@ auto_sync = false       # Manual triage
 
 ## Part 9: Commands
 
-### `pan` Commands (Panopticon management)
+### `pan` Commands (Overdeck management)
 
 | Command | Description |
 |---------|-------------|
-| `pan init` | Initialize Panopticon globally (`~/.panopticon/`) |
-| `pan projects add <path>` | Register a project with Panopticon |
+| `pan init` | Initialize Overdeck globally (`~/.panopticon/`) |
+| `pan projects add <path>` | Register a project with Overdeck |
 | `pan projects list` | List all managed projects |
 | `pan project <subcommand>` | Compatibility alias for `pan projects <subcommand>` |
 | `pan sync` | Render layered context and install bundled skills and agents |
 | `pan up` | Start the dashboard |
 | `pan down` | Stop dashboard and optionally agents |
-| `pan update` | Update Panopticon itself |
+| `pan update` | Update Overdeck itself |
 | `pan doctor` | Check system health, dependencies |
 | `pan convoy start <type>` | Start parallel agent convoy |
 | `pan help` | Show all commands |
@@ -1904,7 +1904,7 @@ auto_sync = false       # Manual triage
 
 ### `ccr` Utility Script
 
-Panopticon provides a `ccr` script for convenient Claude Code access through the router with permissions bypass.
+Overdeck provides a `ccr` script for convenient Claude Code access through the router with permissions bypass.
 
 **Location:** `~/projects/ccr`
 
@@ -1931,7 +1931,7 @@ source ~/projects/ccr
 - Works from any directory
 
 **Installation:**
-The script is placed in `~/projects/` during Panopticon setup. To use it directly:
+The script is placed in `~/projects/` during Overdeck setup. To use it directly:
 
 ```bash
 # Make executable (if needed)
@@ -1966,7 +1966,7 @@ echo 'alias ccr="source ~/projects/ccr"' >> ~/.bashrc
 
 #### What Gets Synced
 
-When you run `pan sync`, Panopticon creates symlinks from `~/.panopticon/` to all supported tool locations:
+When you run `pan sync`, Overdeck creates symlinks from `~/.panopticon/` to all supported tool locations:
 
 ```
 ~/.panopticon/skills/*     →  ~/.claude/skills/           # Claude Code + Cursor
@@ -1982,7 +1982,7 @@ When you run `pan sync`, Panopticon creates symlinks from `~/.panopticon/` to al
 #### Auto-Sync
 
 With `auto_sync = true`, sync happens automatically when:
-- Panopticon starts (`pan up`)
+- Overdeck starts (`pan up`)
 - After `pan update`
 - When adding new commands/skills
 
@@ -1997,7 +1997,7 @@ strategy = "symlink"  # or "copy"
 
 #### Safe Sync: Backup & Detection
 
-**Principle:** Never destroy user data without explicit consent. Panopticon detects what it's overwriting and acts accordingly.
+**Principle:** Never destroy user data without explicit consent. Overdeck detects what it's overwriting and acts accordingly.
 
 **Detection Logic:**
 
@@ -2039,7 +2039,7 @@ function detectTargetState(path: string): SyncTargetState {
 $ pan sync
 
 Checking ~/.claude/skills/...
-  ⚠️  Found 3 custom skills not managed by Panopticon:
+  ⚠️  Found 3 custom skills not managed by Overdeck:
       - my-custom-skill/
       - company-internal/
       - experimental/
@@ -2058,7 +2058,7 @@ Checking ~/.claude/skills/...
   ✓ Synced 47 skills to ~/.claude/skills/
 
 Checking ~/.claude/commands/...
-  ✓ Already Panopticon-managed, updating...
+  ✓ Already Overdeck-managed, updating...
   ✓ Synced 12 commands to ~/.claude/commands/
 ```
 
@@ -2069,7 +2069,7 @@ pan sync                    # Default: detect, backup if needed, prompt
 pan sync --no-backup        # Skip backup (destructive, requires --force)
 pan sync --backup-only      # Just backup, don't sync
 pan sync --dry-run          # Show what would happen without doing it
-pan sync --merge            # Keep user content, add Panopticon alongside
+pan sync --merge            # Keep user content, add Overdeck alongside
 pan sync --force            # No prompts (for CI/automation)
 pan sync --skip <target>    # Skip specific target (e.g., --skip ~/.claude/skills)
 ```
@@ -2110,15 +2110,15 @@ pan sync --skip <target>    # Skip specific target (e.g., --skip ~/.claude/skill
 $ pan restore 2026-01-17T22:30:00
 
 This will:
-  - Remove current Panopticon symlinks from ~/.claude/skills/
+  - Remove current Overdeck symlinks from ~/.claude/skills/
   - Restore original contents from backup
 
 Continue? [y/N]: y
 
 ✓ Restored ~/.claude/skills/ from backup
-✓ Panopticon symlinks removed
+✓ Overdeck symlinks removed
 
-Note: Run 'pan sync' to re-apply Panopticon skills
+Note: Run 'pan sync' to re-apply Overdeck skills
 ```
 
 **Config Options:**
@@ -2146,7 +2146,7 @@ Checking existing configuration...
   ~/.claude/skills/: 5 custom skills found
   ~/.claude/commands/: 2 custom commands found
 
-Panopticon will backup your existing configuration before installing.
+Overdeck will backup your existing configuration before installing.
 Backup location: ~/.panopticon/backups/2026-01-17T22:30:00/
 
 Continue with installation? [Y/n]:
@@ -2154,7 +2154,7 @@ Continue with installation? [Y/n]:
 
 #### Git Worktree Merge: Project-Specific + Generic Skills
 
-**The Problem:** When creating a worktree, the target repo may already have project-specific skills in `.claude/skills/` (git-tracked). Panopticon needs to *add* generic skills alongside them, not replace them.
+**The Problem:** When creating a worktree, the target repo may already have project-specific skills in `.claude/skills/` (git-tracked). Overdeck needs to *add* generic skills alongside them, not replace them.
 
 **Two-Layer Architecture:**
 
@@ -2164,7 +2164,7 @@ Layer 1: Git Repository (project-specific)
 ├── .claude/skills/company-internal/  # Company-specific patterns
 └── .claude/skills/project-foo/       # Project-specific skill
 
-Layer 2: Panopticon (generic tooling)
+Layer 2: Overdeck (generic tooling)
 ├── ~/.panopticon/skills/beads/              # Task tracking
 ├── ~/.panopticon/skills/react-best-practices/
 ├── ~/.panopticon/skills/session-health/
@@ -2209,15 +2209,15 @@ Scanning .claude/skills/...
     - myn-standards/ (git-tracked)
     - company-internal/ (git-tracked)
 
-# 3. Identify Panopticon skills to add (that don't conflict)
-Panopticon skills to add:
+# 3. Identify Overdeck skills to add (that don't conflict)
+Overdeck skills to add:
     - beads/
     - react-best-practices/
     - session-health/
     - web-design-guidelines/
 
-# 4. Add Panopticon symlinks alongside git content
-Adding Panopticon skills...
+# 4. Add Overdeck symlinks alongside git content
+Adding Overdeck skills...
   ✓ beads/ → ~/.panopticon/skills/beads/
   ✓ react-best-practices/ → ~/.panopticon/skills/react-best-practices/
   ✓ session-health/ → ~/.panopticon/skills/session-health/
@@ -2225,13 +2225,13 @@ Adding Panopticon skills...
 
 # 5. Result
 Workspace ready: workspaces/feature-xyz/
-  Skills: 2 project-specific + 4 Panopticon = 6 total
+  Skills: 2 project-specific + 4 Overdeck = 6 total
 ```
 
 **Conflict Resolution:**
 
 ```typescript
-// If same skill name exists in both git and Panopticon
+// If same skill name exists in both git and Overdeck
 if (gitTrackedSkills.includes(skillName) && panopticonSkills.includes(skillName)) {
   // Git wins - project-specific takes precedence
   console.log(`Skipping ${skillName}: project has custom version (git-tracked)`);
@@ -2252,30 +2252,30 @@ workspaces/feature-xyz/.claude/skills/
 
 **Key Principles:**
 
-1. **Git-tracked always wins** - Project-specific skills take precedence over Panopticon generic skills
-2. **Additive merge** - Panopticon adds its skills alongside, never replaces git content
-3. **No gitignore pollution** - Panopticon symlinks should be gitignored (added to `.gitignore` in template)
+1. **Git-tracked always wins** - Project-specific skills take precedence over Overdeck generic skills
+2. **Additive merge** - Overdeck adds its skills alongside, never replaces git content
+3. **No gitignore pollution** - Overdeck symlinks should be gitignored (added to `.gitignore` in template)
 4. **Clean separation** - Easy to see what's project-specific vs generic (ls -la shows symlinks)
 
 **Gitignore Template Addition:**
 
 ```gitignore
-# .claude/skills/.gitignore (added by Panopticon)
-# Panopticon-managed symlinks - these are added per-workspace, not committed
+# .claude/skills/.gitignore (added by Overdeck)
+# Overdeck-managed symlinks - these are added per-workspace, not committed
 beads
 react-best-practices
 session-health
 skill-creator
 web-design-guidelines
 blog-writer
-# Add new Panopticon skills here
+# Add new Overdeck skills here
 ```
 
 ---
 
 ## Part 10: Issue Tracker Architecture
 
-Panopticon uses an abstraction layer to support multiple issue trackers. This enables both single-tracker and multi-tracker workflows.
+Overdeck uses an abstraction layer to support multiple issue trackers. This enables both single-tracker and multi-tracker workflows.
 
 ### Supported Trackers
 
@@ -2375,7 +2375,7 @@ default_branch = "main"
 
 | Type | Description | Example |
 |------|-------------|---------|
-| `simple` | Single repo, worktree at workspace root | Panopticon |
+| `simple` | Single repo, worktree at workspace root | Overdeck |
 | `monorepo` | Multiple subrepos as worktrees in subdirs | MYN (fe/, api/) |
 
 For `monorepo` projects, the agent should `cd` into the appropriate subdir based on the work being done.
@@ -2396,9 +2396,9 @@ For `monorepo` projects, the agent should `cd` into the appropriate subdir based
 
 ### State Mapping Architecture
 
-Panopticon uses a **richer workflow** than most trackers provide out of the box. We need to map our internal states to each tracker's capabilities.
+Overdeck uses a **richer workflow** than most trackers provide out of the box. We need to map our internal states to each tracker's capabilities.
 
-#### Panopticon's Internal Workflow States
+#### Overdeck's Internal Workflow States
 
 ```
 ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌─────────────┐    ┌───────────┐    ┌──────────┐
@@ -2444,7 +2444,7 @@ Panopticon uses a **richer workflow** than most trackers provide out of the box.
 ```yaml
 # ~/.panopticon/state-mappings.yaml
 
-# Panopticon's canonical states (source of truth)
+# Overdeck's canonical states (source of truth)
 canonical_states:
   - name: backlog
     type: backlog
@@ -2471,7 +2471,7 @@ canonical_states:
 # Tracker-specific mappings
 trackers:
   linear:
-    # Map Panopticon states to Linear state names
+    # Map Overdeck states to Linear state names
     state_map:
       backlog: "Backlog"
       todo: "Todo"
@@ -2520,7 +2520,7 @@ trackers:
     # Optional: Use GitHub Projects for visual board
     project_board:
       enabled: true
-      name: "Panopticon"
+      name: "Overdeck"
       column_map:
         backlog: "Backlog"
         todo: "Todo"
@@ -2548,7 +2548,7 @@ trackers:
     # GitLab boards can show label-based lists
     board:
       enabled: true
-      name: "Panopticon"
+      name: "Overdeck"
 
   jira:
     # Jira workflows are highly customizable but often locked down
@@ -2570,7 +2570,7 @@ trackers:
 
 #### Virtual State Layer
 
-Panopticon maintains its **own state tracking** as the source of truth:
+Overdeck maintains its **own state tracking** as the source of truth:
 
 ```typescript
 // ~/.panopticon/issue-states.json
@@ -2586,8 +2586,8 @@ Panopticon maintains its **own state tracking** as the source of truth:
 ```
 
 **Why virtual state layer?**
-- Panopticon knows the TRUE state even if tracker can't represent it
-- Dashboard shows Panopticon's view, not just tracker's limited view
+- Overdeck knows the TRUE state even if tracker can't represent it
+- Dashboard shows Overdeck's view, not just tracker's limited view
 - Enables "planning" state even on GitHub (which only has open/closed)
 - Handles sync conflicts gracefully
 
@@ -2595,13 +2595,13 @@ Panopticon maintains its **own state tracking** as the source of truth:
 
 ```typescript
 interface StateManager {
-  // Get Panopticon's view of issue state
-  getState(issueId: string): Promise<PanopticonState>;
+  // Get Overdeck's view of issue state
+  getState(issueId: string): Promise<OverdeckState>;
 
-  // Transition to new state (updates both Panopticon + tracker)
+  // Transition to new state (updates both Overdeck + tracker)
   transition(issueId: string, newState: CanonicalState): Promise<TransitionResult>;
 
-  // Sync tracker state to Panopticon (pull)
+  // Sync tracker state to Overdeck (pull)
   syncFromTracker(issueId: string): Promise<SyncResult>;
 
   // Ensure tracker has required states (auto-create if configured)
@@ -2629,7 +2629,7 @@ type CanonicalState =
 
 #### Setup Flow
 
-When a project is first configured, Panopticon checks tracker compatibility:
+When a project is first configured, Overdeck checks tracker compatibility:
 
 ```
 $ pan projects add ~/projects/myn --tracker linear --team MIN
@@ -2670,7 +2670,7 @@ When user clicks "Plan" on an issue:
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ 1. TRANSITION TO PLANNING                                                │
-│    - Update Panopticon state → "planning"                                │
+│    - Update Overdeck state → "planning"                                │
 │    - Update tracker state → "In Planning" (or fallback)                  │
 │    - Log state transition                                                │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -2764,7 +2764,7 @@ Features already implemented:
 ### Initial Setup
 
 ```bash
-# 1. Install Panopticon
+# 1. Install Overdeck
 npm install -g panopticon-dashboard
 
 # 2. Initialize
@@ -2814,10 +2814,10 @@ work plan MIN-648
 work issue MIN-648
 ```
 
-### Updating Panopticon
+### Updating Overdeck
 
 ```bash
-# Update Panopticon itself
+# Update Overdeck itself
 pan update
 
 # This automatically:
@@ -2829,7 +2829,7 @@ pan update
 
 ### Self-Management
 
-Panopticon manages itself as a project:
+Overdeck manages itself as a project:
 
 ```toml
 # In projects.toml
@@ -2839,7 +2839,7 @@ path = "/home/eltmon/projects/panopticon"
 is_self = true
 ```
 
-When you modify Panopticon's skills/commands, run:
+When you modify Overdeck's skills/commands, run:
 ```bash
 pan sync
 ```
@@ -2852,7 +2852,7 @@ Changes are immediately available in Claude Code (if using symlinks).
 
 ### Phase 1: Core Foundation (Saturday Morning)
 
-- [ ] Extract Panopticon to standalone repo
+- [ ] Extract Overdeck to standalone repo
 - [ ] Set up `~/.panopticon/` directory structure
 - [ ] Implement `pan init` and `pan sync` (symlink-based)
 - [ ] Create 10 high-value SKILL.md files
@@ -2897,7 +2897,7 @@ Changes are immediately available in Claude Code (if using symlinks).
 
 ## Part 14: Installation, CLI Distribution & Portability
 
-This section covers how Panopticon will be installed, distributed, and how we'll support different tech stacks beyond MYN's Spring Boot + React setup.
+This section covers how Overdeck will be installed, distributed, and how we'll support different tech stacks beyond MYN's Spring Boot + React setup.
 
 ### Current MYN Architecture (Reference)
 
@@ -3029,7 +3029,7 @@ npx panopticon install --minimal
 
 ### Workspace Portability: Bring Your Own Docker
 
-Instead of mandating a specific tech stack, Panopticon uses a **"Bring Your Own Docker"** approach:
+Instead of mandating a specific tech stack, Overdeck uses a **"Bring Your Own Docker"** approach:
 
 #### How It Works
 
@@ -3039,7 +3039,7 @@ cd ~/projects/my-saas
 ls
 # docker-compose.yml  src/  package.json
 
-# Initialize Panopticon in this project
+# Initialize Overdeck in this project
 pan init
 
 # Creates .panopticon/ with project config
@@ -3048,7 +3048,7 @@ pan init
 # Create a workspace for a feature
 pan workspace create my-feature-123
 
-# Panopticon:
+# Overdeck:
 # 1. Creates workspaces/feature-my-feature-123/
 # 2. Copies your docker-compose.yml
 # 3. Injects Traefik labels for routing
@@ -3056,7 +3056,7 @@ pan workspace create my-feature-123
 # 5. Sets up networking
 ```
 
-#### What Panopticon Injects
+#### What Overdeck Injects
 
 ```yaml
 # Your original docker-compose.yml
@@ -3066,7 +3066,7 @@ services:
     ports:
       - "3000:3000"
 
-# Panopticon transforms it to:
+# Overdeck transforms it to:
 services:
   app:
     build: .
@@ -3081,7 +3081,7 @@ services:
       - "traefik.http.routers.app-my-feature-123.tls=true"
       - "traefik.http.services.app-my-feature-123.loadbalancer.server.port=3000"
 
-  # Injected by Panopticon
+  # Injected by Overdeck
   dev:
     image: panopticon/dev-container:latest
     volumes:
@@ -3154,7 +3154,7 @@ docker = ">=24.0.0"
 
 ### CLAUDE.md Templating System
 
-Each workspace gets a `CLAUDE.md` file that provides context to Claude Code. This file is assembled from **Panopticon-provided sections** (generic) and **project-specific sections** (customizable).
+Each workspace gets a `CLAUDE.md` file that provides context to Claude Code. This file is assembled from **Overdeck-provided sections** (generic) and **project-specific sections** (customizable).
 
 #### The Problem
 
@@ -3162,7 +3162,7 @@ MYN's current `CLAUDE.md.template` contains:
 - Generic content (Beads commands, how to edit skills)
 - MYN-specific content (MYN Principles, test users, ./dev commands, entity docs)
 
-For Panopticon to be open source, we need to separate these concerns.
+For Overdeck to be open source, we need to separate these concerns.
 
 #### Layered Template System
 
@@ -3170,7 +3170,7 @@ For Panopticon to be open source, we need to separate these concerns.
 ┌─────────────────────────────────────────────────────────────────┐
 │  CLAUDE.md Assembly                                              │
 │                                                                  │
-│  ~/.panopticon/templates/claude-md/     (Panopticon provides)    │
+│  ~/.panopticon/templates/claude-md/     (Overdeck provides)    │
 │  ├── base.md.template                                            │
 │  └── sections/                                                   │
 │      ├── workspace-info.md      # {{FEATURE_FOLDER}}, URLs       │
@@ -3225,7 +3225,7 @@ LINEAR_TEAM_NAME = "Your Team"
 
 #### Built-in Variables
 
-Panopticon automatically provides these variables for substitution:
+Overdeck automatically provides these variables for substitution:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -3238,7 +3238,7 @@ Panopticon automatically provides these variables for substitution:
 | `{{PROJECT_DOMAIN}}` | From project.toml | `myproject.localhost` |
 | `{{PROJECT_NAME}}` | From project.toml | `My Project` |
 
-#### Example: Panopticon-Provided Section
+#### Example: Overdeck-Provided Section
 
 ```markdown
 <!-- ~/.panopticon/templates/claude-md/sections/workspace-info.md -->
@@ -3285,13 +3285,13 @@ pan workspace create min-648
 
 #### Fallback Behavior
 
-- If project doesn't have `.panopticon/claude-md/`, use only Panopticon sections
+- If project doesn't have `.panopticon/claude-md/`, use only Overdeck sections
 - If a referenced section file doesn't exist, skip it with a warning
 - If no `[claude_md]` config, use default section order
 
 ### Traefik Auto-Configuration
 
-Panopticon manages Traefik configuration automatically:
+Overdeck manages Traefik configuration automatically:
 
 ```
 ~/.panopticon/
@@ -3308,7 +3308,7 @@ Panopticon manages Traefik configuration automatically:
 
 #### Dynamic Config Generation
 
-When a workspace starts, Panopticon generates:
+When a workspace starts, Overdeck generates:
 
 ```yaml
 # ~/.panopticon/traefik/dynamic/feature-min-648.yml
@@ -3346,7 +3346,7 @@ http:
 | `api-feature-{issue}.{project}.localhost` | `api-feature-min-648.myn.localhost` | Workspace API |
 | `{project}.localhost` | `myn.localhost` | Main branch (production-like) |
 | `api.{project}.localhost` | `api.myn.localhost` | Main branch API |
-| `pan.localhost` | `pan.localhost` | Panopticon dashboard |
+| `pan.localhost` | `pan.localhost` | Overdeck dashboard |
 | `traefik.pan.localhost` | `traefik.pan.localhost` | Traefik dashboard |
 
 ### WSL2/Windows DNS Setup
@@ -3428,7 +3428,7 @@ Windows doesn't see dnsmasq, so we sync explicit hosts entries.
 # Run sync every 5 minutes (or on-demand when workspaces change)
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File C:\Users\<user>\sync-hosts.ps1"
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
-Register-ScheduledTask -TaskName "PanopticonHostsSync" -Action $action -Trigger $trigger
+Register-ScheduledTask -TaskName "OverdeckHostsSync" -Action $action -Trigger $trigger
 ```
 
 #### Component 3: Passwordless Hosts Updates
@@ -3479,7 +3479,7 @@ echo "127.0.0.1 api-feature-min-648.myn.localhost" >> ~/.wsl2hosts
 
 #### Reference Script Locations (MYN)
 
-These existing scripts will be referenced when building Panopticon's installer:
+These existing scripts will be referenced when building Overdeck's installer:
 
 | Script | Purpose | Location |
 |--------|---------|----------|
@@ -3487,7 +3487,7 @@ These existing scripts will be referenced when building Panopticon's installer:
 | `sync-hosts.ps1` | Windows hosts file sync from WSL2 | `/home/eltmon/projects/myn/infra/sync-hosts.ps1` |
 | `setup-hosts-automation.sh` | Passwordless hosts updates | `/home/eltmon/projects/myn/infra/setup-hosts-automation.sh` |
 
-**Note:** Panopticon uses `.localhost` domains with project-specific subdomains (e.g., `myproject.localhost`). This avoids HSTS issues that affect `.test` domains in some browsers.
+**Note:** Overdeck uses `.localhost` domains with project-specific subdomains (e.g., `myproject.localhost`). This avoids HSTS issues that affect `.test` domains in some browsers.
 
 ### V1 vs V2 Features
 
@@ -3514,7 +3514,7 @@ These existing scripts will be referenced when building Panopticon's installer:
 | Remote workspace support (SSH) | 🔜 Planned |
 | Auto-update mechanism | 🔜 Planned |
 
-**Linear Issue:** [MIN-650: Panopticon v2: Advanced Portability & Distribution](https://linear.app/mind-your-now/issue/MIN-650)
+**Linear Issue:** [MIN-650: Overdeck v2: Advanced Portability & Distribution](https://linear.app/mind-your-now/issue/MIN-650)
 
 ### Configuration Reference
 
@@ -3571,7 +3571,7 @@ backend = { port = 4000, healthcheck = "/actuator/health" }
 
 ### Project Hooks
 
-Panopticon provides lifecycle hooks for project-specific automation. **Hooks are project tooling, not Panopticon tooling** - they let projects define their own scripts that Panopticon triggers at the right time.
+Overdeck provides lifecycle hooks for project-specific automation. **Hooks are project tooling, not Overdeck tooling** - they let projects define their own scripts that Overdeck triggers at the right time.
 
 #### Why Hooks Need Working Directories
 
@@ -3667,7 +3667,7 @@ description = "Sync version from package.json to backend and mobile apps"
 
 #### Hook Variables
 
-Hooks can use variables that Panopticon injects:
+Hooks can use variables that Overdeck injects:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -3700,7 +3700,7 @@ required = false        # If false, failure is logged but doesn't stop operation
 
 ### npm Publishing Setup
 
-Panopticon is distributed via npm for easy installation via `npx`.
+Overdeck is distributed via npm for easy installation via `npx`.
 
 #### Package Name
 
@@ -3710,7 +3710,7 @@ Panopticon is distributed via npm for easy installation via `npx`.
 | `@overdeck/cli` | **Available** ✅ | `npx @overdeck/cli` |
 | `@mindyournow/*` | **Reserved** | For MYN-specific packages |
 
-**Decision:** Use the scoped package `@overdeck/cli` for the official zero-install entrypoint. Panopticon is a general tool, not MYN-specific.
+**Decision:** Use the scoped package `@overdeck/cli` for the official zero-install entrypoint. Overdeck is a general tool, not MYN-specific.
 
 #### npm Account & Organization
 
@@ -3725,10 +3725,10 @@ Panopticon is distributed via npm for easy installation via `npx`.
 
 | Project | Platform | Reason |
 |---------|----------|--------|
-| **Panopticon** | **GitHub** | Open source, community contributions, GitHub Actions, npm provenance |
+| **Overdeck** | **GitHub** | Open source, community contributions, GitHub Actions, npm provenance |
 | **MYN** | **GitLab** | Private, existing infrastructure |
 
-Panopticon is a standalone open-source project hosted on GitHub at `github.com/eltmon/panopticon-cli`. It has no dependency on MYN's GitLab infrastructure.
+Overdeck is a standalone open-source project hosted on GitHub at `github.com/eltmon/panopticon-cli`. It has no dependency on MYN's GitLab infrastructure.
 
 #### Supply Chain Security (npm Provenance)
 
@@ -4029,7 +4029,7 @@ All major AI coding tools log token usage to local files:
 
 ### Solution: Session-to-Issue Linking
 
-When Panopticon spawns an agent for an issue, it records the session ID in the agent state. When the agent completes, Panopticon:
+When Overdeck spawns an agent for an issue, it records the session ID in the agent state. When the agent completes, Overdeck:
 
 1. **Parses the JSONL file** for that session ID
 2. **Sums all token usage** across messages
@@ -4124,11 +4124,11 @@ bd show MIN-123
 
 ## Appendix B: Comparisons (FAQ)
 
-### How does Panopticon compare to Gastown?
+### How does Overdeck compare to Gastown?
 
 **Gastown** (by Steve Yegge) is a Go-based CLI tool for multi-agent workspace management. It's a comprehensive system with many advanced concepts.
 
-| Aspect | Panopticon | Gastown |
+| Aspect | Overdeck | Gastown |
 |--------|------------|---------|
 | **Language** | TypeScript/Node.js | Go |
 | **Interface** | Web dashboard + CLI commands | CLI only (`gt` command) |
@@ -4145,13 +4145,13 @@ bd show MIN-123
 - **Deacon** - Watchdog agent for stuck detection
 
 **Why not just use Gastown?**
-Gastown is excellent but represents a different paradigm. It's a complete replacement for your development workflow. Panopticon is designed to **extend Claude Code** rather than replace it. If you're already invested in Claude Code's ecosystem (skills, commands, MCP servers), Panopticon feels like a natural extension.
+Gastown is excellent but represents a different paradigm. It's a complete replacement for your development workflow. Overdeck is designed to **extend Claude Code** rather than replace it. If you're already invested in Claude Code's ecosystem (skills, commands, MCP servers), Overdeck feels like a natural extension.
 
-### How does Panopticon compare to Vibe Kanban?
+### How does Overdeck compare to Vibe Kanban?
 
 **Vibe Kanban** (by BloopAI) is a Rust/React task orchestration dashboard for coding agents.
 
-| Aspect | Panopticon | Vibe Kanban |
+| Aspect | Overdeck | Vibe Kanban |
 |--------|------------|-------------|
 | **Language** | TypeScript/Node.js | Rust + React |
 | **Install** | `npm install -g panopticon` | `npx vibe-kanban` |
@@ -4168,13 +4168,13 @@ Gastown is excellent but represents a different paradigm. It's a complete replac
 - MCP config centralization
 - Remote SSH support for server deployments
 
-**Where Panopticon differs:**
-- **Opinionated Linear workflow** - Vibe Kanban uses its own task board; Panopticon syncs with Linear
+**Where Overdeck differs:**
+- **Opinionated Linear workflow** - Vibe Kanban uses its own task board; Overdeck syncs with Linear
 - **Claude Code native** - Skills, commands, and agents are first-class Claude Code concepts
 - **Beads for durability** - Git-backed state survives crashes, can be audited, and syncs across machines
 - **Workspace isolation** - Full Docker containers per feature branch, not just worktrees
 
-### Can Panopticon and Vibe Kanban work together?
+### Can Overdeck and Vibe Kanban work together?
 
 **Theoretically yes, but with friction.** They solve similar problems differently:
 
@@ -4182,39 +4182,39 @@ Gastown is excellent but represents a different paradigm. It's a complete replac
 - Both track agent status and output
 - Both support multiple runtimes
 
-The conflict is in **task management**: Vibe Kanban wants to be your task source (its kanban board), while Panopticon syncs from Linear. Running both would mean duplicate task tracking.
+The conflict is in **task management**: Vibe Kanban wants to be your task source (its kanban board), while Overdeck syncs from Linear. Running both would mean duplicate task tracking.
 
-**Possible integration path:** Use Vibe Kanban's runtime abstraction layer inside Panopticon. Their runtime switching code is well-designed and could be extracted as a library.
+**Possible integration path:** Use Vibe Kanban's runtime abstraction layer inside Overdeck. Their runtime switching code is well-designed and could be extracted as a library.
 
-### Can Panopticon and Gastown work together?
+### Can Overdeck and Gastown work together?
 
 **Yes, through Beads.** This is the recommended integration:
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Panopticon │────▶│   Beads     │◀────│   Gastown   │
+│  Overdeck │────▶│   Beads     │◀────│   Gastown   │
 │  (TypeScript)│     │  (shared)   │     │    (Go)     │
 └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
 Beads is a standalone Git-backed tracking system. Both tools can read/write to the same `.beads/` directory:
 
-1. Panopticon spawns agent for MIN-630 → creates Bead
+1. Overdeck spawns agent for MIN-630 → creates Bead
 2. Gastown's `gt status` sees the same Bead
 3. Either tool can update progress
 4. Git sync keeps everything in sync across machines
 
 **What you get:**
-- Use Panopticon's dashboard for visualization
+- Use Overdeck's dashboard for visualization
 - Use Gastown's `gt` CLI for power-user operations
 - Use Gastown's Deacon for stuck agent detection
 - Share work history across both tools
 
-### Why build Panopticon when these tools exist?
+### Why build Overdeck when these tools exist?
 
 **Short answer:** Neither tool fits the exact workflow we need.
 
-| Requirement | Gastown | Vibe Kanban | Panopticon |
+| Requirement | Gastown | Vibe Kanban | Overdeck |
 |-------------|---------|-------------|------------|
 | Linear as source of truth | Partial | No | Yes |
 | Claude Code skills/commands | No | No | Yes |
@@ -4223,11 +4223,11 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
 | Git-backed state | Yes (Beads) | No (SQLite) | Yes (Beads) |
 | Opinionated MYN workflow | No | No | Yes |
 
-**The real reason:** Panopticon started as the internal tooling for Mind Your Now development. It's opinionated because it encodes **our** workflow. Open-sourcing it means others with similar workflows can benefit, while those with different needs can fork or use Gastown/Vibe Kanban.
+**The real reason:** Overdeck started as the internal tooling for Mind Your Now development. It's opinionated because it encodes **our** workflow. Open-sourcing it means others with similar workflows can benefit, while those with different needs can fork or use Gastown/Vibe Kanban.
 
-### Should I use Panopticon, Gastown, or Vibe Kanban?
+### Should I use Overdeck, Gastown, or Vibe Kanban?
 
-**Use Panopticon if:**
+**Use Overdeck if:**
 - You use Linear for issue tracking
 - You're invested in Claude Code's ecosystem
 - You want Docker-isolated workspaces per feature
@@ -4247,7 +4247,7 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
 - You need remote server deployment with SSH
 
 **Use multiple:**
-- Panopticon + Gastown (via shared Beads) is a valid setup
+- Overdeck + Gastown (via shared Beads) is a valid setup
 - Vibe Kanban is harder to combine due to task management overlap
 
 ---
@@ -4282,7 +4282,7 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
    - Canonical source stays in `~/.panopticon/skills/`
 
 3. ~~**Project templates?**~~ → **"Bring Your Own Docker" + starter templates** (See Part 14)
-   - Users provide their own docker-compose, Panopticon injects Traefik labels
+   - Users provide their own docker-compose, Overdeck injects Traefik labels
    - 3 starter templates for users without existing setup (minimal, node-fullstack, spring-react)
 
 4. ~~**Agent handoff?**~~ → **Beads state + SUMMARY.md**
@@ -4293,8 +4293,8 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
 
 5. ~~**Context budget enforcement**~~ → **Not needed, Claude Code handles it**
    - Claude Code automatically compacts context when needed
-   - Panopticon just ensures Beads state survives compaction
-   - No need for Panopticon to enforce budgets or warn about limits
+   - Overdeck just ensures Beads state survives compaction
+   - No need for Overdeck to enforce budgets or warn about limits
 
 6. ~~**Skill versioning**~~ → **Instant updates via symlinks are fine**
    - Skills are guidance, not executable code
@@ -4323,7 +4323,7 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
     - `~/.panopticon/config.toml` and `.panopticon/project.toml`
 
 11. ~~**npm package structure**~~ → **Single repo, single package.json**
-    - Panopticon is one application, not a library ecosystem
+    - Overdeck is one application, not a library ecosystem
     - Structure: `src/cli/`, `src/dashboard/`, `server/`
     - No need for monorepo complexity
 
@@ -4337,7 +4337,7 @@ When multiple agents work in parallel (convoy), they need to share findings for 
 |----------|--------------|------|------|
 | **File-based (chosen)** | Each agent writes to `.convoy/<role>.md` | Simple, debuggable, works offline | Requires filesystem access |
 | **Shared Beads** | Agents write notes to shared Bead | Integrated with existing system | Beads is for tracking, not data sharing |
-| **Message passing** | Panopticon relays messages between agents | Real-time coordination | Complex, requires always-on server |
+| **Message passing** | Overdeck relays messages between agents | Real-time coordination | Complex, requires always-on server |
 | **Database** | Shared SQLite/Postgres | Structured queries | Overkill, adds dependency |
 
 **Chosen: File-based sharing**
@@ -4360,7 +4360,7 @@ workspaces/feature-min-648/
 # 1. Mayor spawns convoy
 /work-review MIN-648 --convoy
 
-# 2. Panopticon creates manifest
+# 2. Overdeck creates manifest
 {
   "convoy_id": "review-min-648",
   "issue": "MIN-648",
@@ -4391,7 +4391,7 @@ workspaces/feature-min-648/
 
 ### All Questions Resolved ✅
 
-All open questions have been answered. Panopticon PRD is ready for implementation.
+All open questions have been answered. Overdeck PRD is ready for implementation.
 
 ---
 
@@ -4399,7 +4399,7 @@ All open questions have been answered. Panopticon PRD is ready for implementatio
 
 ### The Canonical PRD
 
-Every Panopticon-managed project has a **canonical PRD** (`docs/PRD.md`) that defines the core product vision, architecture, and requirements. This serves as the ground truth that agents reference when working on the project.
+Every Overdeck-managed project has a **canonical PRD** (`docs/PRD.md`) that defines the core product vision, architecture, and requirements. This serves as the ground truth that agents reference when working on the project.
 
 ### PRD Hierarchy
 
@@ -4419,7 +4419,7 @@ Every Panopticon-managed project has a **canonical PRD** (`docs/PRD.md`) that de
 
 ### Feature PRDs Live in Workspaces
 
-When planning starts for an issue, Panopticon creates a feature PRD in the workspace (git worktree). This design decision is intentional:
+When planning starts for an issue, Overdeck creates a feature PRD in the workspace (git worktree). This design decision is intentional:
 
 | Approach | Pros | Cons |
 |----------|------|------|
@@ -4434,7 +4434,7 @@ When planning starts for an issue, Panopticon creates a feature PRD in the works
 
 ### Project Initialization Flow
 
-When registering a new project with `pan projects add`, Panopticon performs PRD discovery. The singular `pan project add` form remains a compatibility alias:
+When registering a new project with `pan projects add`, Overdeck performs PRD discovery. The singular `pan project add` form remains a compatibility alias:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

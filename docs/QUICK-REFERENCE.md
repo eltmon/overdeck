@@ -1,4 +1,4 @@
-# Panopticon Quick Reference
+# Overdeck Quick Reference
 
 **The fast path through `pan`.** Commands are organized by what you're trying to *do*, not by internal structure. `<id>` is always an issue id (e.g. `PAN-415`, `MIN-794`).
 
@@ -126,7 +126,7 @@ pan serve             One-shot npx launcher (dashboard + open browser)
 
 ## 5. Releases
 
-Panopticon develops on `main`, then publishes intentionally by tag.
+Overdeck develops on `main`, then publishes intentionally by tag.
 
 ```
 pan release check                         Verify branch, tree, build, tests, CLI
@@ -146,7 +146,7 @@ pan init              Initialize ~/.panopticon/
 pan install           Install prerequisites (ttyd, beads, Traefik, mkcert)
 pan setup             Interactive setup wizard
 pan doctor            Check system health and dependencies
-pan update            Update Panopticon to latest version
+pan update            Update Overdeck to latest version
 pan sync              Sync skills/agents/rules to devroot
 pan backup            Manage backups
 pan restore [ts]      Restore from backup

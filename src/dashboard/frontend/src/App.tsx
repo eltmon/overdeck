@@ -1244,7 +1244,7 @@ export default function App() {
     const messages = [
       "Auto-start means never missing an agent asking for help.",
       "Your agents could be waiting for you right now.",
-      "Panopticon works best when it's always watching.",
+      "Overdeck works best when it's always watching.",
       "One click enables auto-start. You can disable it anytime.",
     ];
     const msg = messages[(count - 2) % messages.length] ?? messages[0];

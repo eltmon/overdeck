@@ -2,7 +2,7 @@
 
 ## Problem
 
-Panopticon's dashboard has three competing typography systems:
+Overdeck's dashboard has three competing typography systems:
 
 1. The intended canonical system (`tailwind.config.js`: `font-display` = Space Grotesk, `font-body` = DM Sans, `font-mono` = SF Mono stack; DM Sans set as `body` default in `index.css`).
 2. Mission Control's local island in `mission-control.module.css` (`--mc-font-family` → Inter/SF Pro, `.chatMarkdown` → Segoe UI, list titles defaulting to mono).
@@ -14,7 +14,7 @@ Result: visible inconsistency across nav, metrics, list views, and especially co
 
 - **DM Sans** — universal app sans for all non–God-View UI (body, headings, labels, nav, buttons, dialogs, tables, forms, metric values, conversation prose, list titles, metadata).
 - **SF Mono** — code blocks, inline code, terminal output, command snippets, and identifiers presented as technical strings (session IDs, run IDs, file paths, env vars, hashes, model IDs, branch names, tool names, vBRIEF IDs).
-- **Space Grotesk (`font-display`)** — **only** the upper-left `Panopticon` wordmark in `Sidebar.tsx`. No other non–God-View surface.
+- **Space Grotesk (`font-display`)** — **only** the upper-left `Overdeck` wordmark in `Sidebar.tsx`. No other non–God-View surface.
 - **God View** (`src/dashboard/frontend/src/components/GodView/*`) — explicit, scoped typography exception. **Untouched** by this issue.
 
 ## Approach

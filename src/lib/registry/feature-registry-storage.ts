@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { openDatabase, type SqliteDatabase, type SqliteBindValue } from '../database/driver.js';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 import type {
   FeatureRegistryEntry,
   FeatureRegistryListFilter,
@@ -46,7 +46,7 @@ const databases = new Map<string, SqliteDatabase>();
 const STATUSES = new Set<FeatureRegistryStatus>(['active', 'archived', 'merged', 'deferred']);
 
 export function resolveFeatureRegistryDbPath(): string {
-  return join(getPanopticonHome(), 'registry', 'features.sqlite');
+  return join(getOverdeckHome(), 'registry', 'features.sqlite');
 }
 
 export function initializeFeatureRegistryStorage(): Promise<void> {

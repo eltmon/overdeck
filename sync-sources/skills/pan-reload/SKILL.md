@@ -1,11 +1,11 @@
 ---
 name: pan-reload
-description: Build Panopticon, then restart the dashboard only if the build succeeds.
+description: Build Overdeck, then restart the dashboard only if the build succeeds.
 ---
 
 # Pan Reload
 
-Use this after code changes that should run in the local Panopticon dashboard.
+Use this after code changes that should run in the local Overdeck dashboard.
 
 ## Command
 

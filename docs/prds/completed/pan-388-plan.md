@@ -2,7 +2,7 @@
 
 ## Problem
 
-Panopticon's planning pipeline has three structural weaknesses:
+Overdeck's planning pipeline has three structural weaknesses:
 
 1. **Plans are freeform Markdown** — PRD.md and STATE.md are human-readable but not machine-parseable. Cloister can't extract task ordering, dependencies, or completion state from them.
 

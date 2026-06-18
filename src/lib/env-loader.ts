@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { FsError } from './errors.js';
 
 /**
- * Path to the Panopticon environment file
+ * Path to the Overdeck environment file
  */
 export const ENV_FILE_PATH = join(homedir(), '.panopticon.env');
 
@@ -48,7 +48,7 @@ function parseEnvFile(content: string): Record<string, string> {
  *
  * @returns Object with loaded variables and any errors
  */
-export function loadPanopticonEnvSync(): {
+export function loadOverdeckEnvSync(): {
   loaded: string[];
   skipped: string[];
   error?: string;
@@ -128,17 +128,17 @@ export function getEnvFilePath(): string {
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
- * Effect-native version of loadPanopticonEnv. Mutates process.env as a side
+ * Effect-native version of loadOverdeckEnv. Mutates process.env as a side
  * effect (like the original). Fails with FsError if the env file is present
  * but unreadable; missing file is reported via the loaded/skipped/error
  * payload, not via the typed error channel.
  */
-export const loadPanopticonEnv = (): Effect.Effect<
+export const loadOverdeckEnv = (): Effect.Effect<
   { loaded: string[]; skipped: string[]; error?: string },
   FsError
 > =>
   Effect.try({
-    try: () => loadPanopticonEnvSync(),
+    try: () => loadOverdeckEnvSync(),
     catch: (cause) =>
-      new FsError({ path: ENV_FILE_PATH, operation: 'loadPanopticonEnv', cause }),
+      new FsError({ path: ENV_FILE_PATH, operation: 'loadOverdeckEnv', cause }),
   });

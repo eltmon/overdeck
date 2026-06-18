@@ -60,7 +60,7 @@ Scanning .claude/rules/...
 Summary: 2 contradictions, 3 merge opportunities
 ```
 
-## Panopticon Integration
+## Overdeck Integration
 
 Add to `pan sync` or pre-flight checks:
 

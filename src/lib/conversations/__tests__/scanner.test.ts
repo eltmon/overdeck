@@ -124,7 +124,7 @@ describe('scanner', () => {
     expect(r2.inserted + r2.updated).toBe(0);
   });
 
-  it('refreshes Panopticon correlation metadata for unchanged files', async () => {
+  it('refreshes Overdeck correlation metadata for unchanged files', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'late-correlated.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');
 

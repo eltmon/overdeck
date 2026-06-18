@@ -8,7 +8,7 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Cloister: AI Lifecycle Manager
 
-Cloister is Panopticon's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
+Cloister is Overdeck's intelligent agent lifecycle manager. It monitors all running agents and automatically handles:
 
 - **Model Routing** - Routes tasks to appropriate models based on complexity, across multiple providers
 - **Stuck Detection** - Identifies agents that have stopped making progress
@@ -266,7 +266,7 @@ Heartbeat files are stored in `~/.panopticon/heartbeats/`:
 
 ### Heartbeat Hook Installation
 
-The heartbeat hook is automatically synced to `~/.panopticon/bin/heartbeat-hook` via `pan sync`. It's also installed automatically when you install or upgrade Panopticon via npm.
+The heartbeat hook is automatically synced to `~/.panopticon/bin/heartbeat-hook` via `pan sync`. It's also installed automatically when you install or upgrade Overdeck via npm.
 
 **Manual installation:**
 ```bash
@@ -308,7 +308,7 @@ stuck-detection signals it produces.
 <ThemedImage
   light="/images/dashboard/health-light.png"
   dark="/images/dashboard/health-dark.png"
-  alt="Health page showing system health checks and diagnostics for Panopticon's services and agent monitoring plumbing"
+  alt="Health page showing system health checks and diagnostics for Overdeck's services and agent monitoring plumbing"
 />
 
 ## Configuration

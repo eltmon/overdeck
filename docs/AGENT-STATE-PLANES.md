@@ -1,6 +1,6 @@
 # Agent State Planes
 
-Panopticon splits every piece of agent and pipeline state into exactly one of three planes. Keeping the boundaries strict prevents the "directory-as-registry" and `state.json`-as-authority problems that caused dashboard stalls, deacon log bloat, and phantom incidents.
+Overdeck splits every piece of agent and pipeline state into exactly one of three planes. Keeping the boundaries strict prevents the "directory-as-registry" and `state.json`-as-authority problems that caused dashboard stalls, deacon log bloat, and phantom incidents.
 
 ## The three planes
 
@@ -46,7 +46,7 @@ Each project in `projects.yaml` declares where `.pan/` records are committed:
 ```yaml
 projects:
   panopticon-cli:
-    name: Panopticon
+    name: Overdeck
     path: /home/eltmon/Projects/panopticon-cli
     issue_prefix: PAN
     pan_records:

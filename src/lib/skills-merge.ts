@@ -57,7 +57,7 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
 }
 
 /**
- * Merge Panopticon skills, agents, and rules into a workspace using file copies.
+ * Merge Overdeck skills, agents, and rules into a workspace using file copies.
  *
  * Flow:
  * 1. Copy from cache (skills, agent-definitions, rules) → workspace/.claude/
@@ -139,10 +139,10 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
 }
 
 /**
- * Apply project template overlay on top of Panopticon base files in a workspace.
+ * Apply project template overlay on top of Overdeck base files in a workspace.
  *
  * This copies files from the project's agent template directory into
- * workspace/.claude/, overwriting Panopticon files where the project
+ * workspace/.claude/, overwriting Overdeck files where the project
  * provides its own version. Updates the manifest with source="project-template".
  *
  * @param workspacePath - Path to the workspace
@@ -221,7 +221,7 @@ export function cleanupGitignoreSync(gitignorePath: string): {
     return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
   }
 
-  const OVERDECK_HEADER = '# Panopticon-managed symlinks (not committed)';
+  const OVERDECK_HEADER = '# Overdeck-managed symlinks (not committed)';
   let content: string;
   try {
     content = readFileSync(gitignorePath, 'utf-8');
@@ -229,31 +229,31 @@ export function cleanupGitignoreSync(gitignorePath: string): {
     return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
   }
 
-  // If no Panopticon section, nothing to clean
+  // If no Overdeck section, nothing to clean
   if (!content.includes(OVERDECK_HEADER)) {
     return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
   }
 
-  // Remove the entire Panopticon section (skills are copies now, not symlinks)
+  // Remove the entire Overdeck section (skills are copies now, not symlinks)
   const lines = content.split('\n');
   const newLines: string[] = [];
-  let inPanopticonSection = false;
+  let inOverdeckSection = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === OVERDECK_HEADER) {
-      inPanopticonSection = true;
+      inOverdeckSection = true;
       continue;
     }
-    if (inPanopticonSection) {
+    if (inOverdeckSection) {
       if (trimmed.startsWith('#') && trimmed !== '') {
-        inPanopticonSection = false;
+        inOverdeckSection = false;
         newLines.push(line);
       } else if (trimmed === '') {
-        // Skip blank lines in Panopticon section
+        // Skip blank lines in Overdeck section
         continue;
       }
-      // Skip entries in Panopticon section
+      // Skip entries in Overdeck section
       continue;
     }
     newLines.push(line);

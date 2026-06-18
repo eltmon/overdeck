@@ -5,7 +5,7 @@ description: Connect GitHub, Linear, GitLab, and Rally
 
 # Issue Tracker Integration
 
-Panopticon integrates with popular issue tracking systems to provide unified project management.
+Overdeck integrates with popular issue tracking systems to provide unified project management.
 
 ## Supported Trackers
 
@@ -31,7 +31,7 @@ RALLY_API_KEY=_xxxxx       # For Rally-tracked projects
 
 ## Unified Issue ID Parser
 
-Panopticon uses a unified issue ID parser that handles multiple formats through configurable project patterns. This eliminates the hardcoded `PREFIX-NUMBER` assumption that doesn't work for Rally-style IDs.
+Overdeck uses a unified issue ID parser that handles multiple formats through configurable project patterns. This eliminates the hardcoded `PREFIX-NUMBER` assumption that doesn't work for Rally-style IDs.
 
 ### Supported Formats
 
@@ -89,7 +89,7 @@ The prefix is the project key uppercased. Configure via `projects.yaml`:
 ```yaml
 projects:
   panopticon-cli:
-    name: "Panopticon CLI"
+    name: "Overdeck CLI"
     path: /home/user/projects/panopticon-cli
     github_repo: eltmon/panopticon-cli
 ```
@@ -129,7 +129,7 @@ projects:
 
 ### Issue States
 
-Panopticon tracks and updates Linear issue states:
+Overdeck tracks and updates Linear issue states:
 
 | State | Description |
 |-------|-------------|
@@ -196,7 +196,7 @@ Rally uses a different ID format than most trackers. Instead of `PREFIX-NUMBER`,
 | `TA` | Task | `TA4567` |
 | `TC` | Test Case | `TC78901` |
 
-Panopticon's unified issue ID parser handles these formats automatically. Configure `issue_prefixes` to map all Rally artifact types to your project:
+Overdeck's unified issue ID parser handles these formats automatically. Configure `issue_prefixes` to map all Rally artifact types to your project:
 
 ```yaml
 issue_prefixes: [F, US, DE, TA, TC]
@@ -209,7 +209,7 @@ With this configuration:
 
 ### Shadow Mode
 
-Rally integration supports **shadow mode** — tracking Rally issues locally without modifying the tracker. This is useful for teams transitioning to Panopticon or evaluating the workflow.
+Rally integration supports **shadow mode** — tracking Rally issues locally without modifying the tracker. This is useful for teams transitioning to Overdeck or evaluating the workflow.
 
 ```yaml
 projects:
@@ -221,7 +221,7 @@ projects:
 ```
 
 In shadow mode:
-- Issue states are tracked locally in Panopticon
+- Issue states are tracked locally in Overdeck
 - No updates are sent to Rally
 - Agents can read Rally data but changes stay local
 
@@ -295,7 +295,7 @@ projects:
 
 ### Syncing Between Trackers
 
-Panopticon doesn't sync issues between trackers — each issue lives in its source system. However, agents can reference issues from multiple trackers:
+Overdeck doesn't sync issues between trackers — each issue lives in its source system. However, agents can reference issues from multiple trackers:
 
 ```markdown
 <!-- In an agent's STATE.md -->

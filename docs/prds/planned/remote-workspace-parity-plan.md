@@ -157,7 +157,7 @@ Note: `${WORKSPACE_URL}` is replaced at build time with `https://vm-name.exe.xyz
 
 ## Implementation Checklist
 
-### Code Changes Required in Panopticon
+### Code Changes Required in Overdeck
 
 1. **`src/lib/remote/exe-provider.ts`** ✅ COMPLETE
    - [x] Add `setupNginxProxy(vmName, config)` method

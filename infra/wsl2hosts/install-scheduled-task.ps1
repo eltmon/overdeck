@@ -1,11 +1,11 @@
-# Install Panopticon WSL2Hosts Sync Scheduled Task
+# Install Overdeck WSL2Hosts Sync Scheduled Task
 # Run this script as Administrator to set up automatic DNS sync
 #
 # The task runs every 5 minutes and on login to keep hosts in sync
 
 $ErrorActionPreference = "Stop"
 
-$taskName = "PanopticonWsl2HostsSync"
+$taskName = "OverdeckWsl2HostsSync"
 $scriptPath = "$env:USERPROFILE\.panopticon\sync-wsl2hosts.ps1"
 $panopticonDir = "$env:USERPROFILE\.panopticon"
 

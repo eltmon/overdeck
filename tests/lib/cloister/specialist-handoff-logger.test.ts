@@ -16,14 +16,14 @@ import {
 import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { getPanopticonHome } from '../../../src/lib/paths.js';
+import { getOverdeckHome } from '../../../src/lib/paths.js';
 
 function getTestLogFile(): string {
-  return join(getPanopticonHome(), 'logs', 'specialist-handoffs.jsonl');
+  return join(getOverdeckHome(), 'logs', 'specialist-handoffs.jsonl');
 }
 
 function getTestLogDir(): string {
-  return join(getPanopticonHome(), 'logs');
+  return join(getOverdeckHome(), 'logs');
 }
 
 // Isolated temp directory for hook files — prevents tests from reading real AGENTS_DIR

@@ -1,12 +1,12 @@
 /**
  * Bundled engineering rules (PAN-1201).
  *
- * Panopticon ships a small set of engineering rules under sync-sources/rules/.
+ * Overdeck ships a small set of engineering rules under sync-sources/rules/.
  * Each rule carries a `scope:` frontmatter key:
  *
  *   universal — distributed everywhere (relevant to anyone running agents)
  *   dev       — distributed only on a panopticon-cli checkout (rules about
- *               developing Panopticon itself)
+ *               developing Overdeck itself)
  *
  * `pan sync` folds the applicable rules into the rendered global CLAUDE.md.
  * Their `paths:` frontmatter (Claude Code path-scoping) is dropped on fold —
@@ -74,5 +74,5 @@ export function renderBundledRules(harness: Harness, includeDev: boolean): strin
     .map((r) => renderForHarness(r.body, harness).trim())
     .filter((s) => s.length > 0);
   if (sections.length === 0) return '';
-  return `## Panopticon Engineering Rules\n\n${sections.join('\n\n')}`;
+  return `## Overdeck Engineering Rules\n\n${sections.join('\n\n')}`;
 }

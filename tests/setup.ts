@@ -1,5 +1,5 @@
 /**
- * Global test setup for Panopticon tests
+ * Global test setup for Overdeck tests
  */
 
 import { vi, beforeEach, afterEach } from 'vitest';

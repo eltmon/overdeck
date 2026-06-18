@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { acquireRestartLock, readRestartLockHolder } from '../restart-lock.js';
 
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testHome: string;
 
 function lockPath(): string {
@@ -24,10 +24,10 @@ describe('restart lock', () => {
   });
 
   afterEach(() => {
-    if (originalPanopticonHome === undefined) {
+    if (originalOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     }
     rmSync(testHome, { recursive: true, force: true });
   });

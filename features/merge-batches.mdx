@@ -7,7 +7,7 @@ description: Always one tested batch of every ready feature, ready to merge in o
 
 When agents land merge-ready features faster than you can review and merge them
 one at a time, the bottleneck becomes the last-mile UAT. **UAT batch trains** fix
-that: Panopticon keeps **one assembled, testable batch of every ready feature**
+that: Overdeck keeps **one assembled, testable batch of every ready feature**
 available at all times, so you can exercise the combined result and then land
 exactly what you tested — in a single click.
 
@@ -54,7 +54,7 @@ so simply restales the live batches and a fresh one reassembles automatically.
 
 Each generation can serve a live dashboard at
 `uat-<codename>.pan.localhost`, spun on demand from the batch's worktree.
-Panopticon runs **at most two UAT stacks at once** (Docker's network pool is
+Overdeck runs **at most two UAT stacks at once** (Docker's network pool is
 limited) and tears down the oldest when you start a third; promoting or
 invalidating a batch always tears its stack down.
 

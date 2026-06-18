@@ -73,7 +73,7 @@ export async function systemHealthCommand(): Promise<void> {
   }
 
   // Print results
-  console.log(chalk.bold('\nPanopticon Health\n'));
+  console.log(chalk.bold('\nOverdeck Health\n'));
 
   const icons: Record<HealthCheck['status'], string> = {
     healthy: chalk.green('✓'),

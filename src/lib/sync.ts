@@ -58,9 +58,9 @@ function removeTarget(targetPath: string): void {
 }
 
 /**
- * Check if a path is a Panopticon-managed symlink
+ * Check if a path is a Overdeck-managed symlink
  */
-export function isPanopticonSymlinkSync(targetPath: string): boolean {
+export function isOverdeckSymlinkSync(targetPath: string): boolean {
   if (!existsSync(targetPath)) return false;
 
   try {
@@ -82,7 +82,7 @@ export interface MigrationResult {
 }
 
 /**
- * One-time migration: remove Panopticon-managed symlinks from ~/.claude/.
+ * One-time migration: remove Overdeck-managed symlinks from ~/.claude/.
  *
  * Detects symlinks in ~/.claude/skills/ and ~/.claude/agents/ that point to
  * .panopticon directories. Removes only those symlinks, preserving any
@@ -90,11 +90,11 @@ export interface MigrationResult {
  *
  * This is safe to run multiple times — it's a no-op if nothing remains to clean up.
  *
- * Removes stale Panopticon content from ~/.claude/:
+ * Removes stale Overdeck content from ~/.claude/:
  * - Symlinks pointing to .panopticon or panopticon-cli (legacy sync method)
  *
  * Plain directories are always preserved as user content — there is no reliable
- * way to prove a plain directory was created by Panopticon vs the user.
+ * way to prove a plain directory was created by Overdeck vs the user.
  */
 export function migrateStalePersonalContentSync(): MigrationResult {
   const claudeDir = join(homedir(), '.claude');
@@ -261,7 +261,7 @@ export function refreshCacheSync(): RefreshCacheResult {
   //
   // PAN-982: This pass deploys both Claude Code subagent definitions
   // (codebase-explorer, planning-agent, triage-agent, health-monitor — used by
-  // the in-session Agent tool) and the Panopticon pipeline agents
+  // the in-session Agent tool) and the Overdeck pipeline agents
   // (pan-work-agent, pan-planning-agent, pan-review-agent, pan-test-agent,
   // pan-inspect-agent, pan-uat-agent, pan-merge-agent — used by `claude --agent
   // pan-<type>-agent` when Cloister spawns the work/review/test/inspect/uat/
@@ -270,7 +270,7 @@ export function refreshCacheSync(): RefreshCacheResult {
   // Both kinds live side by side in the repo's `agents/` directory and both get
   // mirrored into ~/.panopticon/agent-definitions/ here, then on to
   // <devroot>/.claude/agents/ via planSync/executeSync. The downstream sync
-  // never deletes existing files in the target, so non-Panopticon agent
+  // never deletes existing files in the target, so non-Overdeck agent
   // definitions a project may have authored stay intact.
   if (existsSync(SYNC_SOURCES.agents)) {
     mkdirSync(CACHE_AGENTS_DIR, { recursive: true });
@@ -363,7 +363,7 @@ export function planSyncSync(): SyncPlan {
       } else if (status.action === 'modified') {
         syncStatus = 'conflict';
       } else if (status.action === 'user-owned') {
-        // Identical content sitting at the target from a previous Panopticon
+        // Identical content sitting at the target from a previous Overdeck
         // era is not a conflict — it would simply be adopted on the real run.
         syncStatus = hashFileSync(targetFile) === hashFileSync(file.absolutePath) ? 'exists' : 'conflict';
       }
@@ -407,7 +407,7 @@ export interface SyncResult {
  * into the rendered CLAUDE.md instead (see syncContextLayers()).
  *
  * Conflict resolution is manifest-based. A file already at the target but
- * absent from the manifest (a prior Panopticon era, or a fresh ~/.claude)
+ * absent from the manifest (a prior Overdeck era, or a fresh ~/.claude)
  * is *adopted* when its content is byte-identical to our source — recorded
  * into the manifest so future syncs can update it. A target file that
  * differs is genuinely user-owned and is left untouched.
@@ -1108,12 +1108,12 @@ export function syncPiSettingsSync(): PiSettingsSyncResult {
 const toSyncFsError = (op: string, cause: unknown): FsError =>
   new FsError({ path: SYNC_TARGET.skills, operation: op, cause });
 
-/** True if `targetPath` is a Panopticon-managed symlink. */
-export const isPanopticonSymlink = (
+/** True if `targetPath` is a Overdeck-managed symlink. */
+export const isOverdeckSymlink = (
   targetPath: string,
-): Effect.Effect<boolean> => Effect.sync(() => isPanopticonSymlinkSync(targetPath));
+): Effect.Effect<boolean> => Effect.sync(() => isOverdeckSymlinkSync(targetPath));
 
-/** Migrate Panopticon-owned content out of ~/.claude/ (idempotent). */
+/** Migrate Overdeck-owned content out of ~/.claude/ (idempotent). */
 export const migrateStalePersonalContent = (): Effect.Effect<MigrationResult, FsError> =>
   Effect.try({
     try: () => migrateStalePersonalContentSync(),
@@ -1186,7 +1186,7 @@ export const mirrorProjectSkills = (
     catch: (cause) => toSyncFsError('mirrorProjectSkills', cause),
   });
 
-/** Inject the Panopticon skills path into `pi` CLI settings (idempotent). */
+/** Inject the Overdeck skills path into `pi` CLI settings (idempotent). */
 export const syncPiSettings = (): Effect.Effect<PiSettingsSyncResult, FsError> =>
   Effect.try({
     try: () => syncPiSettingsSync(),

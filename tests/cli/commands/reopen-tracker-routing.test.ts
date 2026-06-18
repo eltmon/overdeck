@@ -55,7 +55,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         panopticon: {
-          name: 'Panopticon',
+          name: 'Overdeck',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
           issue_prefix: 'PAN',
@@ -100,7 +100,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         panopticon: {
-          name: 'Panopticon',
+          name: 'Overdeck',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
           issue_prefix: 'PAN',
@@ -119,7 +119,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
         panopticon: {
-          name: 'Panopticon',
+          name: 'Overdeck',
           path: '/home/user/panopticon',
           github_repo: 'eltmon/panopticon-cli',
           issue_prefix: 'PAN',
@@ -143,7 +143,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
     // Mock resolveProjectFromIssue to return appropriate project for each prefix
     mockResolveProjectFromIssue.mockImplementation((issueId: string) => {
       if (issueId.toUpperCase().startsWith('PAN-')) {
-        return { projectKey: 'panopticon', projectName: 'Panopticon', projectPath: '/home/user/panopticon' };
+        return { projectKey: 'panopticon', projectName: 'Overdeck', projectPath: '/home/user/panopticon' };
       }
       if (issueId.toUpperCase().startsWith('MIN-')) {
         return { projectKey: 'myn', projectName: 'Mind Your Now', projectPath: '/home/user/myn' };

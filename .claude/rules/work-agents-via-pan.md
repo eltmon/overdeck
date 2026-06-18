@@ -3,13 +3,13 @@ scope: universal
 ---
 ## Work Agents Run Through `pan` — Never the Claude Code `Agent` Tool
 
-Spawn work agents only through the Panopticon CLI — `pan start <id>`,
+Spawn work agents only through the Overdeck CLI — `pan start <id>`,
 `pan swarm <id>`, `pan plan <id>`. NEVER spawn a *work* agent via Claude
 Code's `Agent`/subagent tool.
 
 ### Why
 
-`pan`-spawned agents are registered with Panopticon: a
+`pan`-spawned agents are registered with Overdeck: a
 `~/.panopticon/agents/agent-<id>/state.json` carrying `issueId`, a tmux
 session on the `panopticon` socket, and (for swarms) a swarm-runtime entry.
 The dashboard's resource-discovery service nests them under their issue with

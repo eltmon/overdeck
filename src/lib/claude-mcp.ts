@@ -20,7 +20,7 @@ export function ensurePlaywrightIsolationSync(mcpConfig: Record<string, any>): b
 
 /**
  * Off-the-shelf Excalidraw MCP server (npm package: excalidraw-mcp).
- * Provisioned by `pan sync` so every Panopticon user gets the `/excalidraw`
+ * Provisioned by `pan sync` so every Overdeck user gets the `/excalidraw`
  * skill's MCP backend without manual `claude mcp add` steps. The canvas
  * server URL defaults to localhost:3000 (the upstream convention) and can
  * be overridden per-machine by setting EXPRESS_SERVER_URL in the user's

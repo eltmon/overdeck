@@ -1,4 +1,4 @@
-# Panopticon Reporting & Metrics PRD
+# Overdeck Reporting & Metrics PRD
 
 **Status:** In Progress
 **Created:** 2026-01-19

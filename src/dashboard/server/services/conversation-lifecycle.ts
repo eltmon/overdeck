@@ -198,8 +198,8 @@ async function backfillOrphanedSpecialistConversations(aliveSessions: string[]):
  *
  * For each orphan found, attribute it to the parent conversation whose
  * `claudeSessionId` JSONL has the most-recent mtime in the same `cwd` strictly
- * before the orphan's first-message timestamp. If no Panopticon conversation
- * owns that `cwd` (e.g., a standalone `claude` invocation outside Panopticon),
+ * before the orphan's first-message timestamp. If no Overdeck conversation
+ * owns that `cwd` (e.g., a standalone `claude` invocation outside Overdeck),
  * skip — we only adopt orphans that descend from one of our conversations.
  *
  * Insert a sibling `conversations` row inheriting parent's `cwd`, `tmuxSession`,
@@ -268,7 +268,7 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
       }
 
       if (!parent) {
-        // No Panopticon conversation owns the cwd-window before this orphan started.
+        // No Overdeck conversation owns the cwd-window before this orphan started.
         // It's a standalone `claude` invocation — leave it alone.
         continue;
       }

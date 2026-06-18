@@ -102,7 +102,7 @@ export async function forkConversationViaServer(
     });
   } catch (err) {
     throw new ForkServerError(
-      `Could not reach the Panopticon dashboard at ${base}. Forks and handoffs are spawned by the dashboard server — start it with \`pan up\`. (${(err as Error).message})`,
+      `Could not reach the Overdeck dashboard at ${base}. Forks and handoffs are spawned by the dashboard server — start it with \`pan up\`. (${(err as Error).message})`,
     );
   }
 

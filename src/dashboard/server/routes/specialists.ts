@@ -1064,7 +1064,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       ?? getTmuxSessionName(type, project, issueId);
 
     yield* Effect.promise(() => Effect.runPromise(killSession(tmuxSession)).catch(() => {}));
-    // Leave Claude JSONL/session artifacts intact; only reset Panopticon runtime state.
+    // Leave Claude JSONL/session artifacts intact; only reset Overdeck runtime state.
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
       lastActivity: new Date().toISOString(),

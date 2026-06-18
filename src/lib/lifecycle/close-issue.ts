@@ -236,7 +236,7 @@ async function closeGitHubPrImpl(ctx: LifecycleContext): Promise<StepResult> {
   try {
     // Pull number + merge status. Closing without checking can land us in the
     // PAN-1030 state: issue closed + PR left OPEN with real unmerged code,
-    // or worse — close a not-yet-merged PR with a "Merged via Panopticon
+    // or worse — close a not-yet-merged PR with a "Merged via Overdeck
     // lifecycle" comment that lies about what happened.
     const { stdout: prListRaw } = await execAsync(
       `gh pr list --repo ${owner}/${repo} --head "${branchName}" --state open --json number,mergedAt,mergeCommit --jq '.[0]'`,
@@ -265,7 +265,7 @@ async function closeGitHubPrImpl(ctx: LifecycleContext): Promise<StepResult> {
       );
     }
     await execAsync(
-      `gh pr close ${pr.number} --repo ${owner}/${repo} --comment "Merged via Panopticon lifecycle"`,
+      `gh pr close ${pr.number} --repo ${owner}/${repo} --comment "Merged via Overdeck lifecycle"`,
       { encoding: 'utf-8' },
     );
     return stepOk(step, [`Closed PR #${pr.number} on ${owner}/${repo}`]);

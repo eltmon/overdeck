@@ -396,7 +396,7 @@ async function reopenGitHubIssueCommand(id: string, options: ReopenOptions): Pro
     const reasonText = options.reason ? ` Reason: ${options.reason}.` : '';
     await addGitHubComment(
       id,
-      `Issue reopened for re-work via Panopticon.${reasonText}\n\nPrevious state: ${issue.state}`
+      `Issue reopened for re-work via Overdeck.${reasonText}\n\nPrevious state: ${issue.state}`
     );
     commentSpinner.succeed('Added reopen comment');
 
@@ -536,7 +536,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
     const reasonText = options.reason ? ` Reason: ${options.reason}.` : '';
     await client.createComment({
       issueId: issue.id,
-      body: `Issue reopened for re-work via Panopticon.${reasonText}\n\nPrevious state: ${issue.state}`,
+      body: `Issue reopened for re-work via Overdeck.${reasonText}\n\nPrevious state: ${issue.state}`,
     });
     commentSpinner.succeed('Added reopen comment');
 

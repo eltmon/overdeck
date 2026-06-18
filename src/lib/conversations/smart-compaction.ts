@@ -256,7 +256,7 @@ function formatFileOperations(readFiles: string[], modifiedFiles: string[]): str
 function findPreviousCompactBoundary(entries: any[]): { index: number; summary: string } | null {
   for (let i = entries.length - 1; i >= 0; i--) {
     const entry = entries[i];
-    // Panopticon native compaction writes compact_boundary then a user summary entry
+    // Overdeck native compaction writes compact_boundary then a user summary entry
     if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
       // Look immediately after for the summary user message
       if (i + 1 < entries.length) {

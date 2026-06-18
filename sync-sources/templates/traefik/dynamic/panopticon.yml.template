@@ -1,4 +1,4 @@
-# Dynamic routing configuration for Panopticon Dashboard
+# Dynamic routing configuration for Overdeck Dashboard
 # Generated from panopticon.yml.template -- do not edit manually
 # Variables: {{TRAEFIK_DOMAIN}}, {{DASHBOARD_FRONTEND_PORT}}, {{DASHBOARD_API_PORT}}
 #

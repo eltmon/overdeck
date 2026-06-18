@@ -27,7 +27,7 @@ const initialLayersResponse: ContextLayersResponse = {
   projects: [
     {
       projectKey: 'panopticon-cli',
-      name: 'Panopticon CLI',
+      name: 'Overdeck CLI',
       path: '/repo/panopticon-cli',
       workspaceRoot: '/repo/panopticon-cli/workspaces',
     },

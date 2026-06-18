@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates OpenAI's GPT-5.4 (standard variant) against Panopticon's 23 work types.
+Evaluates OpenAI's GPT-5.4 (standard variant) against Overdeck's 23 work types.
 
 ## Model Profile
 
@@ -62,7 +62,7 @@ Evaluates OpenAI's GPT-5.4 (standard variant) against Panopticon's 23 work types
 2. **Over-refactoring** — tends to change nearby code not part of the request. Generates weak test assertions. Import-cycle risks.
 3. **Long session degradation** — loses track of earlier instructions after 20+ messages.
 4. **Non-deterministic** — temperature 0.0 is not deterministic across requests.
-5. **Tool behavior bug (unresolved)** — ignores built-in tools when custom function tools are present (GitHub issue #13773). Critical for Panopticon's tool-heavy agents.
+5. **Tool behavior bug (unresolved)** — ignores built-in tools when custom function tools are present (GitHub issue #13773). Critical for Overdeck's tool-heavy agents.
 6. **Hallucinations persist** — still fabricates citations. Deep Research misses contradictions.
 7. **No multi-agent orchestration** — lacks built-in agent team coordination.
 8. **ARC-AGI-2 gap** — 73.3% vs Gemini's 84.6%. Behind on novel reasoning tasks.
@@ -78,7 +78,7 @@ Evaluates OpenAI's GPT-5.4 (standard variant) against Panopticon's 23 work types
 
 Terminal-Bench 75.1% and SWE-Bench Verified 84% are both best-in-class. Native tool search reduces token costs by 47% in tool-heavy workflows. Adjustable reasoning lets you run `medium` for routine beads and `high` for complex ones. At $2.50/$15, it's 6x cheaper than Opus while leading on most coding benchmarks.
 
-**Concerns:** Over-refactoring tendency, long session degradation, and the tool behavior bug (ignoring built-in tools when custom functions present) could cause real issues in Panopticon's multi-tool agent environment. The bug needs investigation before deployment.
+**Concerns:** Over-refactoring tendency, long session degradation, and the tool behavior bug (ignoring built-in tools when custom functions present) could cause real issues in Overdeck's multi-tool agent environment. The bug needs investigation before deployment.
 
 #### `specialist-review-agent`
 **Current default:** Claude Opus 4.6 | **GPT-5.4 fit:** Good-Excellent
@@ -106,7 +106,7 @@ Strong tool use (Toolathlon 54.6%), terminal operations (Terminal-Bench 75.1%), 
 
 Native computer use (75% OSWorld) is the standout. Can interact with GUIs via screenshots + mouse/keyboard + Playwright. This directly maps to browser-based UAT. Stronger vision understanding than Sonnet for visual regression detection.
 
-**Concern:** Playwright MCP integration with GPT-5.4's computer use needs validation in Panopticon.
+**Concern:** Playwright MCP integration with GPT-5.4's computer use needs validation in Overdeck.
 
 #### `convoy:security-reviewer`
 **Current default:** Claude Opus 4.6 | **GPT-5.4 fit:** Moderate-Good
@@ -179,7 +179,7 @@ Too expensive and too slow for interactive CLI use. Mini or Nano are better fits
 
 ## Critical Issue: Tool Behavior Bug
 
-GitHub issue #13773 documents that GPT-5.4 ignores built-in tools (shell, apply_patch) when custom function tools are present. This is **directly relevant to Panopticon** — our agents use both MCP tools and built-in Claude Code tools simultaneously. Must verify whether this bug manifests in Panopticon's tool configuration before deploying GPT-5.4 for any work type.
+GitHub issue #13773 documents that GPT-5.4 ignores built-in tools (shell, apply_patch) when custom function tools are present. This is **directly relevant to Overdeck** — our agents use both MCP tools and built-in Claude Code tools simultaneously. Must verify whether this bug manifests in Overdeck's tool configuration before deploying GPT-5.4 for any work type.
 
 ---
 
@@ -196,7 +196,7 @@ GitHub issue #13773 documents that GPT-5.4 ignores built-in tools (shell, apply_
 
 ## Integration Notes
 
-- OpenAI is already a configured provider in Panopticon
+- OpenAI is already a configured provider in Overdeck
 - Model ID: `gpt-5.4`
 - Available via OpenAI API and CLIProxyAPI sidecar (Codex subscription)
 - **Must investigate tool behavior bug (#13773) before deployment**

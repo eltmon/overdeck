@@ -1,6 +1,6 @@
-# Panopticon — Marketing Copy Bank
+# Overdeck — Marketing Copy Bank
 
-> **What this is:** copy-paste-ready marketing material covering all of Panopticon's
+> **What this is:** copy-paste-ready marketing material covering all of Overdeck's
 > functionality. Grab a tagline, a boilerplate paragraph, a feature blurb, or a social
 > snippet and drop it straight into a landing page, README, deck, tweet, or email.
 >
@@ -17,7 +17,7 @@
 
 ## 1. The one-liner
 
-**Panopticon is the IDE for the agent era.**
+**Overdeck is the IDE for the agent era.**
 
 Pick the register that fits the surface:
 
@@ -32,7 +32,7 @@ Pick the register that fits the surface:
 
 ## 2. The positioning statement
 
-> IDEs were built for humans who **type** code. Panopticon is built for humans who
+> IDEs were built for humans who **type** code. Overdeck is built for humans who
 > **direct** code.
 
 Command Deck is a live development environment where you spawn agents, watch them work,
@@ -52,16 +52,16 @@ spectrum and slide along it without changing tools.
 ## 3. Elevator pitches (three lengths)
 
 **15 words**
-Panopticon is a live cockpit for directing AI coding agents — watch them work, review, ship.
+Overdeck is a live cockpit for directing AI coding agents — watch them work, review, ship.
 
 **50 words**
-Panopticon is the IDE for the agent era. Spawn coding agents, watch every diff land in
+Overdeck is the IDE for the agent era. Spawn coding agents, watch every diff land in
 real time, steer them mid-task, hot-swap models, and fork conversations to explore. When
 the code looks right, a built-in specialist pipeline runs review, tests, and merge — so
 you ship without switching tabs.
 
 **100 words**
-IDEs were built for humans who type code. Panopticon is built for humans who direct it.
+IDEs were built for humans who type code. Overdeck is built for humans who direct it.
 Command Deck is a live development surface where you spawn AI agents and watch them code
 in real time — every file change appears inline, no waiting for a PR. Talk to an agent to
 course-correct, hot-swap from Sonnet to Opus to Kimi mid-task, branch the conversation to
@@ -81,7 +81,7 @@ Lead with the benefit, prove it with the feature.
 
 - **The right model for every phase.**
   Opus plans the architecture, Kimi or Sonnet writes the code, Haiku handles quick
-  commands. Panopticon routes automatically across six providers — or you override with
+  commands. Overdeck routes automatically across six providers — or you override with
   two clicks when you know better.
 
 - **Context that outlasts the conversation.**
@@ -306,7 +306,7 @@ autonomous pipeline across dozens of issues.
 
 ---
 
-## 7. Differentiators ("why Panopticon")
+## 7. Differentiators ("why Overdeck")
 
 Use these when the reader is comparing against a plain terminal agent, a chat IDE plugin,
 or a hosted autonomous-agent service.
@@ -329,10 +329,10 @@ or a hosted autonomous-agent service.
 The "run agents in parallel in worktrees and review the diffs" feature set is now
 **table stakes** — Conductor, Sculptor, Vibe Kanban, Claude Squad, Cursor 2.0, and
 OpenAI Codex all ship it, and several companies that shipped *only* that have already
-shut down. Panopticon's defensible layer is everything *after* the diff: the automated
+shut down. Overdeck's defensible layer is everything *after* the diff: the automated
 pipeline, the gates, the routing, and the autonomy loop. Use these head-to-heads:
 
-| They ship | Panopticon ships |
+| They ship | Overdeck ships |
 |:---|:---|
 | **Conductor** ($22M Series A, Mar 2026): parallel Claude Code/Codex agents on a Mac; a human reviews and merges every diff | The same cockpit **plus the assembly line**: automated review convoy → tests → per-step inspection → browser UAT → merge train. The human's only job is the final Merge click |
 | **Devin / Cognition** ($1B raise at ~$26B, May 2026): autonomous cloud engineer, usage tiers up to $500/mo | Autonomy that's **yours**: open source, local-first, BYO models and subscriptions, full per-issue cost visibility |
@@ -359,7 +359,7 @@ Full competitor profiles, funding history, and category analysis:
 |:---|:---|:---|
 | **Solo builder / indie hacker** | Wants leverage without losing control | "Direct a team of agents from one screen — and still review every diff." |
 | **Tech lead / staff eng** | Wants throughput across many issues | "Run an autonomous pipeline across dozens of issues; click Merge when it's right." |
-| **AI-tooling enthusiast** | Already lives in Claude Code / Codex | "Keep your agent and your skills — Panopticon is the cockpit around them." |
+| **AI-tooling enthusiast** | Already lives in Claude Code / Codex | "Keep your agent and your skills — Overdeck is the cockpit around them." |
 | **Pragmatic skeptic** | Burned by 'autonomous' hype | "Watch every change land, roll back when it drifts. You're always in the loop." |
 | **Cost-conscious team** | Token spend is real money | "Per-issue cost tracking and model routing so Opus only runs where Opus earns its price." |
 
@@ -377,21 +377,21 @@ Use these as the credibility strip. Update the numbers as they grow.
 - **5 specialist agents** in the automated quality pipeline
 - **Hundreds of issues** completed through the full pipeline
 - **7,000+ commits, ~275K lines of TypeScript, 280+ test files** — built by one person
-  directing agents through Panopticon itself
-- **Self-hosting proof:** Panopticon is built using Panopticon, in production, every day —
+  directing agents through Overdeck itself
+- **Self-hosting proof:** Overdeck is built using Overdeck, in production, every day —
   765+ commits in the last 10 weeks alone were written by agents working through the
   pipeline, across four production projects.
 
 ---
 
-## 10. Boilerplate ("About Panopticon")
+## 10. Boilerplate ("About Overdeck")
 
 **Short (1 sentence)**
-Panopticon is the IDE for the agent era — a live development environment for spawning,
+Overdeck is the IDE for the agent era — a live development environment for spawning,
 directing, and shipping the work of AI coding agents.
 
 **Medium (1 paragraph)**
-Panopticon is an open-source, local-first development environment for directing AI coding
+Overdeck is an open-source, local-first development environment for directing AI coding
 agents. Its live Command Deck lets you watch agents code in real time, review diffs inline,
 steer them mid-task, and hot-swap models across six providers — then hand finished work to
 a built-in specialist pipeline that runs code review, tests, and merge automatically. It
@@ -399,13 +399,13 @@ works with Claude Code, Codex, Cursor, and Gemini CLI, and tracks work from GitH
 GitLab, and Rally.
 
 **Long (boilerplate footer)**
-Panopticon is the IDE for the agent era. Where traditional IDEs were built for humans who
-type code, Panopticon is built for humans who direct it. Its Command Deck is a live cockpit
+Overdeck is the IDE for the agent era. Where traditional IDEs were built for humans who
+type code, Overdeck is built for humans who direct it. Its Command Deck is a live cockpit
 where you spawn AI agents, watch every file change land in real time, talk to agents to
 course-correct, swap the model behind them when the task shifts, and branch conversations
 to explore alternatives — all without losing context. When implementation looks right, five
 specialist agents handle code review, testing, inspection, browser UAT, and merge, so you
-ship without ever switching to a separate CI tab. Panopticon is open source (MIT),
+ship without ever switching to a separate CI tab. Overdeck is open source (MIT),
 local-first, and model-agnostic, with capability-based routing across Anthropic, OpenAI,
 Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
 
@@ -435,15 +435,15 @@ Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
 ## 12. Social snippets (ready to post)
 
 **X / Twitter (≤280)**
-- IDEs were built for people who type code. Panopticon is built for people who *direct* it. Spawn agents, watch every diff land live, hot-swap models mid-task, then let the pipeline review + test + merge. `npx @overdeck/cli` ⌁ open source.
+- IDEs were built for people who type code. Overdeck is built for people who *direct* it. Spawn agents, watch every diff land live, hot-swap models mid-task, then let the pipeline review + test + merge. `npx @overdeck/cli` ⌁ open source.
 - Stop babysitting one agent in a terminal. Command Deck gives you a live cockpit: inline diffs, model hot-swap, conversation forking, checkpoints, and an automated review→test→merge pipeline. The IDE for the agent era.
 - New: fork a conversation to try a different approach, keep the original, compare both. Because "undo" should work on agents too. 🧵
 
 **LinkedIn (opening line)**
-- Most "AI coding" tools give you a chat box. Panopticon gives you a cockpit — live diffs, six-provider model routing, and a built-in review/test/merge pipeline — so you direct a fleet of agents instead of babysitting one.
+- Most "AI coding" tools give you a chat box. Overdeck gives you a cockpit — live diffs, six-provider model routing, and a built-in review/test/merge pipeline — so you direct a fleet of agents instead of babysitting one.
 
 **Hacker News (Show HN title)**
-- Show HN: Panopticon — a live IDE for directing AI coding agents (open source)
+- Show HN: Overdeck — a live IDE for directing AI coding agents (open source)
 
 **Tagline pool (for chips, banners, sticker copy)**
 - The IDE for the agent era
@@ -457,7 +457,7 @@ Google, Kimi, MiniMax, and OpenRouter. Get started with `npx @overdeck/cli`.
 ## 13. FAQ-style copy
 
 **Q: How is this different from using Claude Code (or Codex) directly?**
-Panopticon wraps your agent in a cockpit. You keep the harness you like — and gain live
+Overdeck wraps your agent in a cockpit. You keep the harness you like — and gain live
 diffs, model hot-swap, conversation forking, checkpoints, cost tracking, and an automated
 review→test→merge pipeline around it.
 

@@ -200,14 +200,14 @@ program
 
 program
   .command('init')
-  .description('Initialize Panopticon (~/.panopticon/)')
+  .description('Initialize Overdeck (~/.panopticon/)')
   .action(initCommand);
 
 program
   .command('sync')
   .description('Sync skills/agents to ~/.claude/ and render the context layers')
   .option('--dry-run', 'Show what would be synced')
-  .option('--force', 'Overwrite files modified since Panopticon installed them')
+  .option('--force', 'Overwrite files modified since Overdeck installed them')
   .option('--diff', 'Show diff for modified files')
   .option('--backup-only', 'Only create backup')
   .action(syncCommand);
@@ -643,7 +643,7 @@ program
       }
     }
 
-    console.log(chalk.bold('Starting Panopticon...\n'));
+    console.log(chalk.bold('Starting Overdeck...\n'));
 
     // Refuse to start a detached production dashboard on top of a running
     // interactive `pan dev` session — they would fight over the same ports.
@@ -726,12 +726,12 @@ program
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
-        const { generatePanopticonTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } = await import('../lib/traefik.js');
+        const { generateOverdeckTraefikConfigSync, ensureProjectCertsSync, generateTlsConfigSync, cleanupStaleTlsSectionsSync } = await import('../lib/traefik.js');
 
         // Clean stale tls: sections from older config files
         cleanupStaleTlsSectionsSync();
 
-        if (generatePanopticonTraefikConfigSync()) {
+        if (generateOverdeckTraefikConfigSync()) {
           console.log(chalk.dim('  Regenerated Traefik config from template'));
         }
 
@@ -848,13 +848,13 @@ program
           '/usr/local/bin/panopticon',
           '/opt/panopticon/panopticon',
         );
-        // Glob-style: $HOME/Applications/Panopticon*.AppImage
+        // Glob-style: $HOME/Applications/Overdeck*.AppImage
         try {
           const appsDir = join(home, 'Applications');
           const { readdirSync } = require('fs') as typeof import('fs');
           if (existsSync(appsDir)) {
             const appImages = readdirSync(appsDir).filter(
-              (f: string) => f.startsWith('Panopticon') && f.endsWith('.AppImage'),
+              (f: string) => f.startsWith('Overdeck') && f.endsWith('.AppImage'),
             );
             for (const f of appImages) candidates.push(join(appsDir, f));
           }
@@ -863,12 +863,12 @@ program
         }
       } else if (process.platform === 'darwin') {
         candidates.push(
-          '/Applications/Panopticon.app/Contents/MacOS/Panopticon',
-          join(home, 'Applications', 'Panopticon.app', 'Contents', 'MacOS', 'Panopticon'),
+          '/Applications/Overdeck.app/Contents/MacOS/Overdeck',
+          join(home, 'Applications', 'Overdeck.app', 'Contents', 'MacOS', 'Overdeck'),
         );
       } else if (process.platform === 'win32') {
         const localApp = process.env.LOCALAPPDATA || '';
-        candidates.push(join(localApp, 'Programs', 'panopticon', 'Panopticon.exe'));
+        candidates.push(join(localApp, 'Programs', 'panopticon', 'Overdeck.exe'));
       }
 
       return candidates.find((p) => existsSync(p)) ?? null;
@@ -950,7 +950,7 @@ program
     }
 
     if (electronAppPath) {
-      console.log(chalk.dim(`\nLaunching Panopticon desktop app...`));
+      console.log(chalk.dim(`\nLaunching Overdeck desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
       const electronEnv = applyBootGateEnv({ ...process.env }, options);
@@ -1122,7 +1122,7 @@ program
     const { readFileSync, existsSync } = await import('fs');
     const { parse } = await import('@iarna/toml');
 
-    console.log(chalk.bold('Stopping Panopticon...\n'));
+    console.log(chalk.bold('Stopping Overdeck...\n'));
 
     // Stop smee-client webhook relay
     try {
@@ -1252,7 +1252,7 @@ program
 
 program
   .command('reload')
-  .description('Build Panopticon, then restart the dashboard only after the build succeeds')
+  .description('Build Overdeck, then restart the dashboard only after the build succeeds')
   .option('--skip-build', 'Skip npm run build and restart the existing bundle')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 30000)')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
@@ -1279,7 +1279,7 @@ program
 function registerProjectCommands(command: Command): void {
   command
     .command('add <path>')
-    .description('Register a project with Panopticon')
+    .description('Register a project with Overdeck')
     .option('--name <name>', 'Project name')
     .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
     .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
@@ -1318,7 +1318,7 @@ registerProjectCommands(projects);
 // Health command
 program
   .command('health')
-  .description('Show runtime health of Panopticon services')
+  .description('Show runtime health of Overdeck services')
   .action(systemHealthCommand);
 
 // Doctor command
@@ -1338,7 +1338,7 @@ program
 // Update command
 program
   .command('update')
-  .description('Update Panopticon to latest version')
+  .description('Update Overdeck to latest version')
   .option('--check', 'Only check for updates, don\'t install')
   .option('--force', 'Force update even if on latest')
   .action(updateCommand);
@@ -1366,7 +1366,7 @@ program
     const nodeVersion = process.versions.node;
     const major = parseInt(nodeVersion.split('.')[0]!, 10);
     if (major < 22) {
-      console.error(chalk.red(`Error: Panopticon dashboard requires Node.js 22 or later.`));
+      console.error(chalk.red(`Error: Overdeck dashboard requires Node.js 22 or later.`));
       console.error(chalk.dim(`You are running Node.js ${nodeVersion}.`));
       console.error('');
       console.error('Install Node 22:');
@@ -1390,7 +1390,7 @@ program
       process.exit(1);
     }
 
-    console.log(chalk.bold('Panopticon Dashboard'));
+    console.log(chalk.bold('Overdeck Dashboard'));
     console.log(chalk.dim(`Starting server on port ${port} (Node ${nodeVersion})...`));
 
     const server = spawn(process.execPath, [bundledServer], {

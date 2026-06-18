@@ -1,4 +1,4 @@
-# Panopticon API Surface — Map & Overlap Audit
+# Overdeck API Surface — Map & Overlap Audit
 
 **Authored 2026-06-16.** First-ever inventory of the API surface, organized by **activity** (not by
 route module) to expose where the *same thing is reachable through multiple doors*. This is the

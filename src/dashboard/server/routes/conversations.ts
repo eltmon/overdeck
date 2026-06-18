@@ -151,7 +151,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getPanopticonHome } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir, packageRoot, getOverdeckHome } from '../../../lib/paths.js';
 import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
 import { getEventStore } from '../event-store.js';
 import {
@@ -279,7 +279,7 @@ async function terminatePids(pids: number[]): Promise<void> {
 }
 
 export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
-  const launcherScript = join(getPanopticonHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
+  const launcherScript = join(getOverdeckHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
   const sessionId = conv.claudeSessionId?.trim();
   const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
   // PAN-1798: never let conversation cmdline matching catch the shared tmux
@@ -772,7 +772,7 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
  * The dashboard chat panel uses this to render Pi conversation history.
  */
 async function resolvePiSessionFile(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(getPanopticonHome(), 'agents', tmuxSession, 'sessions');
+  const sessionDir = join(getOverdeckHome(), 'agents', tmuxSession, 'sessions');
   if (!existsSync(sessionDir)) return null;
   try {
     const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
@@ -787,7 +787,7 @@ async function resolvePiSessionFile(tmuxSession: string): Promise<string | null>
 
 /**
  * Detect whether a session file path is a Codex rollout JSONL. Codex writes
- * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Panopticon the per-agent
+ * under $CODEX_HOME/sessions/.../rollout-*.jsonl; in Overdeck the per-agent
  * CODEX_HOME lives at .../agents/<id>/codex-home, so the path also satisfies
  * {@link isPiSessionFile} — codex must therefore be tested first.
  */
@@ -982,7 +982,7 @@ export async function handleConversationMessage(
     );
   }
 
-  // Panopticon-native compaction writes Claude-format JSONL records. It must
+  // Overdeck-native compaction writes Claude-format JSONL records. It must
   // only run on Claude Code conversations — running it on a Pi conversation
   // would corrupt the Pi transcript (P0, 2026-05-14). For Pi, let `/compact`
   // pass through to Pi's own compaction.
@@ -1259,7 +1259,7 @@ function resolvePtySupervisorScriptPath(): string {
 }
 
 function getPtySupervisorSocketPath(agentId: string): string {
-  return join(getPanopticonHome(), 'sockets', `pty-${agentId}.sock`);
+  return join(getOverdeckHome(), 'sockets', `pty-${agentId}.sock`);
 }
 
 async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PTY_SUPERVISOR_SOCKET_WAIT_MS): Promise<void> {
@@ -1360,7 +1360,7 @@ void backfillConversationModels().catch((err: unknown) => {
  */
 // ─── Compaction helpers ───────────────────────────────────────────────────────
 //
-// Dashboard-owned compaction is Panopticon-native. We append the compact
+// Dashboard-owned compaction is Overdeck-native. We append the compact
 // boundary and continuation summary directly to the JSONL so subsequent
 // `--resume` calls load only the summarized context forward.
 
@@ -1416,7 +1416,7 @@ export async function spawnConversationSession(
   harness: RuntimeName = 'claude-code',
   plainFork = false,
 ): Promise<void> {
-  const stateDir = join(getPanopticonHome(), 'conversations', tmuxSession);
+  const stateDir = join(getOverdeckHome(), 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
 
   // PAN-1596: clear any stale ready.json before launch so waitForReadySignal()
@@ -1519,7 +1519,7 @@ export async function spawnConversationSession(
       //   full-access → approval_policy=never + sandbox_mode=danger-full-access
       // This is the Codex analog of preTrustDirectory(cwd) below, which only
       // pre-accepts Claude Code trust.
-      const codexHome = join(getPanopticonHome(), 'agents', tmuxSession, 'codex-home');
+      const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home');
       const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
       const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
       const codexSandboxMode =
@@ -1535,7 +1535,7 @@ export async function spawnConversationSession(
         approvalsReviewer: codexApprovalsReviewer,
       });
       const resumeSessionId = resume
-        ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getPanopticonHome(), 'agents') })
+        ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getOverdeckHome(), 'agents') })
           .then((rollout) => rollout ? extractThreadIdFromRollout(rollout) ?? undefined : undefined)
         : undefined;
       codexFields = {

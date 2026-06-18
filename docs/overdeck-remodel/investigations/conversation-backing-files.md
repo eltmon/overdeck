@@ -21,7 +21,7 @@ resolves to it, and a write-side audit proving the Transcript layer is read-only
 
 - **Backing session file (transcript)** — the harness-owned JSONL the coding
   agent appends to as the conversation runs. Claude Code, pi, codex, and
-  kimi-via-CLIProxy each use a different on-disk shape. **Sacred:** Panopticon
+  kimi-via-CLIProxy each use a different on-disk shape. **Sacred:** Overdeck
   must read these but never mutate or delete them, and they are never committed
   to git (they live under `~/.claude/` and `~/.panopticon/agents/`, both outside
   any repo).
@@ -29,7 +29,7 @@ resolves to it, and a write-side audit proving the Transcript layer is read-only
   file. The canonical pointer is `claude_session_id` (claude-code); for pi/codex
   the locator is the conversation's `tmux_session` (= agent id) + `harness`,
   which name the per-agent directory the harness writes into.
-- **Metadata** — Panopticon-authored intent that exists **only** in the DB row
+- **Metadata** — Overdeck-authored intent that exists **only** in the DB row
   (or the `favorites` table): `name`, `title`/`title_source`, `cwd`/`issue_id`
   binding, `model`/`effort`/`harness`, `archived_at`, lineage edges, favorites.
   Not in the JSONL, not in git → the PAN-1937 export target.
@@ -149,7 +149,7 @@ path; and `smart-compaction.ts` imports only `readFile`/`rm` (the `rm` is a
 `mkdtemp` cleanup, not the source) and **returns summary text, never appending to
 the source** (`smart-compaction.ts:3,82` read-only; `generateSmartSummary` →
 `{ summary }`). The harness appending to **its own** JSONL as the agent runs is
-the normal flow and out of scope — we hunt **Panopticon** code mutating an
+the normal flow and out of scope — we hunt **Overdeck** code mutating an
 **existing** backing file in place.
 
 Six hits. Adjudication:
@@ -160,7 +160,7 @@ Six hits. Adjudication:
 | 2 | `session-format-converter.ts:223,248,288` `writeFile(targetSessionFile, …)` | **NEW** `randomUUID()` files (codex rollout / pi session / claude session) for **harness switching**. Source read read-only (`readFile(opts.sourceSessionFile)`, line 190). | ✅ **Compliant.** Creates a new transcript in the target harness's shape; source preserved. |
 | 3 | `deacon.ts:5617` `rmSync(sessionFile)` | **NOT a transcript.** `sessionFile` here = `~/.panopticon/agents/<id>/session.id` — a tiny **pointer file** holding the resume UUID, deleted on signature-corruption recovery so `--resume` won't reattach the corrupted session. The sacred JSONL is untouched. | ✅ **Compliant** (misleading variable name). |
 | 4 | `teardown-workspace.ts:302` `appendFile(projJsonl, …)` | **NOT a transcript.** `projJsonl` = `.beads/issues.jsonl` (the bd issue tracker), merging workspace beads into the project root. Unrelated to conversation transcripts. | ✅ **Out of scope.** |
-| 5 | **`conversation-compaction.ts:164`** `appendFile(sessionFile, …)` | **The LIVE existing claude backing JSONL.** Appends a Panopticon-authored `compact_boundary` system entry + an `isCompactSummary` user message **in place** into the conversation's own `~/.claude/projects/**/<uuid>.jsonl`. | ⚠️ **IN-PLACE MUTATION of a backing file** — see below. |
+| 5 | **`conversation-compaction.ts:164`** `appendFile(sessionFile, …)` | **The LIVE existing claude backing JSONL.** Appends a Overdeck-authored `compact_boundary` system entry + an `isCompactSummary` user message **in place** into the conversation's own `~/.claude/projects/**/<uuid>.jsonl`. | ⚠️ **IN-PLACE MUTATION of a backing file** — see below. |
 
 ### 3.1 The one in-place mutation — `conversation-compaction.ts:164` (FLAGGED)
 
@@ -174,7 +174,7 @@ and the pre-respawn path `conversations.ts:2954`).
 
 This is an **append, not a truncate/overwrite/delete** — existing bytes are
 preserved and the file remains a valid claude transcript — but it is still
-Panopticon **writing into a backing file it does not own**, which the operator's
+Overdeck **writing into a backing file it does not own**, which the operator's
 sacred-file model says must never happen.
 
 **Two mitigations already in the code:**
@@ -189,7 +189,7 @@ sacred-file model says must never happen.
 
 **Tension to resolve in the remodel.** This append-in-place predates / coexists
 with the **fork** approach (`summary-fork.ts`, `session-format-converter.ts`),
-which Panopticon's own memory (PAN-1781: *"`claude --resume` bypasses injected
+which Overdeck's own memory (PAN-1781: *"`claude --resume` bypasses injected
 compact boundaries ~50% → fresh-session seeding, never boundary-JSON tweaks"*)
 records as the **correct** pattern — write a NEW session file, never tweak the
 boundary JSON of the live one. The corrected sacred-file model (§5) says the
@@ -298,7 +298,7 @@ an existing backing transcript for write/append/truncate/delete. Today this hold
 for every path **except** `compactConversationNative` (`conversation-compaction.ts:164`),
 which the remodel should convert to the fork pattern (new session file) so the
 invariant is total and mechanically enforceable. Backing files are append-only by
-their owning harness; Panopticon's only legitimate write is *creating a new file*.
+their owning harness; Overdeck's only legitimate write is *creating a new file*.
 
 ### 5.3 The Transcript service is read-only across harness shapes
 

@@ -40,7 +40,7 @@ The scope was deliberately narrowed at replan to the two surfaces the issue was 
 
 ---
 
-## PAN-1203 — Panopticon docs RAG
+## PAN-1203 — Overdeck docs RAG
 
 This plan is the most internally coherent of the four. Wave 1 dependency on `docs-config` blocking five downstreams is appropriate. The main gaps are around hook composition and the embedding-model build dependency.
 
@@ -84,7 +84,7 @@ The most ambitious of the four (17 beads, 4 subsystems). Several beads have corr
 ### HIGH
 
 - **`briefing-writer.ac1`** "approximately 500ms debounce" — name a concrete value (`DEBOUNCE_MS = 500`) and require it be exported as a constant so the test can import it. "Approximately" + magic numbers is a CLAUDE.md anti-pattern.
-- **`registry-classification.ac1`** says the classifier "does not blocking user-visible issue creation on failure" — good intent, but `pan issue create` is synchronous CLI today. Specify whether the classifier runs in-process (and fails open) or via a queued worker (and lags by N seconds). Also: the cost mention "~$0.001 per issue" in the PRD assumes Haiku, but Panopticon's config policy is *no `--model`* (CLAUDE.md). The bead should resolve via `agents.classification.model` config key, not hardcode Haiku.
+- **`registry-classification.ac1`** says the classifier "does not blocking user-visible issue creation on failure" — good intent, but `pan issue create` is synchronous CLI today. Specify whether the classifier runs in-process (and fails open) or via a queued worker (and lags by N seconds). Also: the cost mention "~$0.001 per issue" in the PRD assumes Haiku, but Overdeck's config policy is *no `--model`* (CLAUDE.md). The bead should resolve via `agents.classification.model` config key, not hardcode Haiku.
 - **`home-route-shell.ac2`** moves `/` to Home and `/pipeline` to Pipeline. This is a routing breaking change — every external bookmark + every dashboard skill reference to `/` currently expects the existing default. Add an AC: "All in-repo references to the prior default route are updated, and dashboard-issued links continue to resolve."
 - **`compliance-stop-audit` depends on a Stop hook that emits turn-level data**. The current Stop hook at `sync-sources/hooks/stop-hook` emits agent-level events, not full turn records with `toolCalls[0]`. The bead has no AC that says "Stop hook payload contract must expose `lastUserMessage` and `toolCalls`." Add an AC; otherwise the implementer will discover the gap mid-bead.
 - **No test bead for the briefing wrapper file content** — only `briefing-assembler.ac5` snapshots output. Add an integration test that spawns a Claude Code session and inspects `--append-system-prompt-file` arguments via the launcher generator's test surface.

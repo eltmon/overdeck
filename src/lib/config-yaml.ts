@@ -64,7 +64,7 @@ export interface ShadowConfig {
 export type TmuxConfigMode = 'managed' | 'inherit-user';
 
 export interface TmuxConfig {
-  /** Whether Panopticon uses its own tmux server/config or inherits the user's tmux config */
+  /** Whether Overdeck uses its own tmux server/config or inherits the user's tmux config */
   config_mode?: TmuxConfigMode;
 }
 
@@ -199,7 +199,7 @@ function mergeRemoteConfig(result: NormalizedConfig, config: YamlConfig | null):
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
 
 export interface ConversationsConfig {
-  /** Model used for Panopticon-native conversation compaction */
+  /** Model used for Overdeck-native conversation compaction */
   compaction_model?: ModelId;
   /** How typed /compact in the conversation composer is handled */
   manual_compact_mode?: ManualCompactMode;
@@ -562,7 +562,7 @@ export interface YamlConfig {
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
 
-  /** Panopticon docs RAG configuration */
+  /** Overdeck docs RAG configuration */
   docs?: DocsConfig;
 
   /** Semantic conversation search configuration (Phase 2 palette) */
@@ -825,7 +825,7 @@ export interface NormalizedConfig {
     };
   };
 
-  /** Panopticon docs RAG behavior */
+  /** Overdeck docs RAG behavior */
   docs: NormalizedDocsConfig;
 
   /** Semantic conversation search configuration (Phase 2 palette) */

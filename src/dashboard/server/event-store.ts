@@ -17,7 +17,7 @@
 import { EventEmitter } from 'node:events';
 import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { getPanopticonHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
@@ -127,7 +127,7 @@ declare const Bun: unknown;
  * Under Node: uses the shared getDatabase() which applies migrations.
  */
 export async function openEventDb(): Promise<DbAdapter> {
-  const home = getPanopticonHome();
+  const home = getOverdeckHome();
   if (!existsSync(home)) {
     await mkdir(home, { recursive: true });
   }

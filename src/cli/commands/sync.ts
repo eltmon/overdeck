@@ -15,7 +15,7 @@ import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinksSync, migrateSyncTargetsSync } from '../../lib/config-migration.js';
 import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
-import { migratePanopticonToPanSync } from '../../lib/workspace-manager.js';
+import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 
@@ -153,20 +153,20 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   const syncMigration = migrateSyncTargetsSync();
   if (syncMigration.migrated) {
     if (syncMigration.hadNonClaudeTargets) {
-      console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Panopticon now syncs to Claude Code only).'));
+      console.log(chalk.yellow('Config updated: removed non-Claude sync targets (Overdeck now syncs to Claude Code only).'));
     }
   }
 
-  // Run one-time migration: remove Panopticon-managed symlinks from legacy runtime dirs
+  // Run one-time migration: remove Overdeck-managed symlinks from legacy runtime dirs
   const cleanupResult = cleanupLegacyRuntimeSymlinksSync();
   if (cleanupResult.cleaned.length > 0) {
     console.log(chalk.dim(`Removed ${cleanupResult.total} legacy runtime symlink(s): ${cleanupResult.cleaned.join(', ')}`));
   }
 
-  // One-time migration: remove Panopticon symlinks from ~/.claude/ (devroot replaces this)
+  // One-time migration: remove Overdeck symlinks from ~/.claude/ (devroot replaces this)
   const migration = migrateStalePersonalContentSync();
   if (migration.removedSymlinks.length > 0) {
-    console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Panopticon symlink(s) from ~/.claude/`));
+    console.log(chalk.cyan(`Migrated: removed ${migration.removedSymlinks.length} Overdeck symlink(s) from ~/.claude/`));
     if (migration.preservedUserContent.length > 0) {
       console.log(chalk.dim(`  Preserved ${migration.preservedUserContent.length} user-created item(s)`));
     }
@@ -240,7 +240,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (result.conflicts.length > 0 && !options.force) {
     spinner.warn(`Synced ${totalSynced} items to ~/.claude/, ${result.conflicts.length} user-modified (skipped)`);
     console.log('');
-    console.log(chalk.yellow('Modified since Panopticon installed:'));
+    console.log(chalk.yellow('Modified since Overdeck installed:'));
     for (const name of result.conflicts) {
       console.log(chalk.dim(`  - ${name}`));
     }
@@ -275,7 +275,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // point at the backup taken before the first injection.
   if (ctx.firstInjections.length > 0) {
     console.log(
-      chalk.cyan('\n  ℹ Panopticon added a managed region to existing context file(s):'),
+      chalk.cyan('\n  ℹ Overdeck added a managed region to existing context file(s):'),
     );
     for (const fi of ctx.firstInjections) {
       console.log(`    • ${fi.file}`);
@@ -376,7 +376,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // Enforce Panopticon-managed MCP server defaults: Playwright --isolated
+  // Enforce Overdeck-managed MCP server defaults: Playwright --isolated
   // flag (prevents stale zoom/profile state) and the off-the-shelf Excalidraw
   // MCP server (backs the /excalidraw skill). Both helpers are idempotent and
   // mutate the parsed config in place; we only write back if anything changed.
@@ -405,7 +405,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     if (!existsSync(config.path)) continue;
 
     // Migrate .panopticon/ subdirs → .pan/
-    const migResult = migratePanopticonToPanSync(config.path);
+    const migResult = migrateOverdeckToPanSync(config.path);
     if (migResult.migrated.length > 0) {
       console.log(chalk.cyan(`Migrated .panopticon/ → .pan/ in ${config.name}: ${migResult.migrated.join(', ')}`));
     }

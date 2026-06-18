@@ -172,7 +172,7 @@ In `buildPlanningPrompt()`, provide the agent with discoverable references:
 - Include the issue URL from the `PlanningIssue` object
 - Tell the agent to include these in `plan.references`
 
-### Step 6: Update all Panopticon documentation with vBRIEF references
+### Step 6: Update all Overdeck documentation with vBRIEF references
 
 **docs/VBRIEF.md** — Add the new fields to the documentation with examples.
 
@@ -180,7 +180,7 @@ In `buildPlanningPrompt()`, provide the agent with discoverable references:
 ```
 ## vBRIEF Plan Format
 
-Panopticon uses vBRIEF v0.5 for machine-readable work plans.
+Overdeck uses vBRIEF v0.5 for machine-readable work plans.
 See [docs/VBRIEF.md](docs/VBRIEF.md) for the full spec reference.
 
 - Canonical spec: https://github.com/deftai/vBRIEF (by Deft.co)
@@ -214,7 +214,7 @@ Also ensure the README references:
 
 The `complete-planning` endpoint (`src/dashboard/server/routes/issues.ts`) should automatically copy planning artifacts to `docs/prds/active/` so they're committed to the repo. Currently agents are told to do this manually but many skip it.
 
-**On complete-planning, Panopticon itself should copy:**
+**On complete-planning, Overdeck itself should copy:**
 
 1. `.planning/STATE.md` → `docs/prds/active/<ISSUE-ID>-plan.md`
 2. `.planning/plan.vbrief.json` → `docs/prds/active/<ISSUE-ID>-plan.vbrief.json`
@@ -379,6 +379,6 @@ tests/frontend/VBriefViewer.test.tsx
 - `plan.sequence` starts at 1 and increments on every write — useful for conflict detection
 - `vBRIEFInfo.author` is the tool (`"panopticon-cli/0.6.0"`), `plan.author` is the agent (`"agent:claude-opus-4-6"`)
 - `items[].completed` is set when status transitions to `completed` — not cleared if status reverts
-- `references` is populated by the planning agent, not Panopticon itself (agent has context about what it referenced)
+- `references` is populated by the planning agent, not Overdeck itself (agent has context about what it referenced)
 - Artifact copying in complete-planning is idempotent — won't overwrite if files already exist in docs/prds/active/
 - PRD discovery in start-planning searches both `planned/` and `active/` directories

@@ -12,7 +12,7 @@ const execAsync = promisify(exec);
 /**
  * Idle workspace-stack reaper (PAN-1817).
  *
- * Every Panopticon workspace brings up a 3-container stack: `dev` (the VS Code
+ * Every Overdeck workspace brings up a 3-container stack: `dev` (the VS Code
  * attach target), `frontend` (Vite), and `server` (a full dashboard). The agent
  * itself runs on the HOST tmux server, not inside any of these containers — the
  * `server`/`frontend` pair is only a development-time read/UI peer for that one

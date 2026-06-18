@@ -1,6 +1,6 @@
 /**
  * Overdeck door for discovered_sessions — the index of all Claude Code JSONL
- * sessions found on disk, inside and outside Panopticon.
+ * sessions found on disk, inside and outside Overdeck.
  *
  * Public API mirrors the old database/discovered-sessions-db.ts to keep
  * consumers unchanged. All reads/writes go through getOverdeckDatabaseSync().

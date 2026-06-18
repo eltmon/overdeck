@@ -1,7 +1,7 @@
 /**
  * Per-conversation UI state — local-only, persisted to localStorage.
  *
- * Mirrors t3code's uiStateStore pattern but scoped to Panopticon's
+ * Mirrors t3code's uiStateStore pattern but scoped to Overdeck's
  * conversation view.  No server sync: this is purely client chrome.
  */
 

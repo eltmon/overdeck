@@ -35,7 +35,7 @@ export function getShellRcFileSync(shell: Shell): string | null {
 }
 
 const ALIAS_LINE = 'alias pan="panopticon"';
-const ALIAS_MARKER = '# Panopticon CLI alias';
+const ALIAS_MARKER = '# Overdeck CLI alias';
 
 export function hasAliasSync(rcFile: string): boolean {
   if (!existsSync(rcFile)) return false;

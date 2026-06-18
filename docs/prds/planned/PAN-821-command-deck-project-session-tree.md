@@ -34,7 +34,7 @@ Selecting any session opens the right pane: **conversation view of its JSONL by 
 
 ## The Information Problem
 
-Each issue in Panopticon accumulates a significant amount of data across its lifecycle. The design must account for all of it without overwhelming the conversation-first view. Here's the full inventory and where each piece lives in the new layout:
+Each issue in Overdeck accumulates a significant amount of data across its lifecycle. The design must account for all of it without overwhelming the conversation-first view. Here's the full inventory and where each piece lives in the new layout:
 
 ### Information available per issue
 

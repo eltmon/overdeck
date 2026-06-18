@@ -70,7 +70,7 @@ export function ChannelPermissionDialog({
           </div>
 
           <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
-            This decision applies only to this pending Claude permission prompt. Panopticon can currently send
+            This decision applies only to this pending Claude permission prompt. Overdeck can currently send
             only allow or deny for channel permissions.
           </div>
         </div>

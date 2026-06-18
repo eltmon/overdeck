@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find a Panopticon conversation by ID, list recent, or inspect session content.
+"""Find a Overdeck conversation by ID, list recent, or inspect session content.
 
 Usage:
     conv-find.py <conv_id>             # Find conversation by numeric ID
@@ -66,7 +66,7 @@ def resolve_session_file(info: dict[str, Any]) -> tuple[str | None, str]:
 
 def get_db():
     if not os.path.exists(DB_PATH):
-        print(f"Error: Panopticon database not found at {DB_PATH}", file=sys.stderr)
+        print(f"Error: Overdeck database not found at {DB_PATH}", file=sys.stderr)
         sys.exit(1)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -369,7 +369,7 @@ def print_detailed_summary(summary: dict[str, Any] | None) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Find Panopticon conversations")
+    parser = argparse.ArgumentParser(description="Find Overdeck conversations")
     parser.add_argument("conv_id", nargs="?", type=int, help="Conversation ID to look up")
     parser.add_argument("--recent", nargs="?", const=20, type=int, help="List N recent conversations")
     parser.add_argument("--search", type=str, help="Search by title/cwd/model")

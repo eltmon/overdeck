@@ -1,6 +1,6 @@
 # Testing Guide
 
-How to run tests and write new ones for Panopticon.
+How to run tests and write new ones for Overdeck.
 
 ## Test Suites
 
@@ -73,7 +73,7 @@ vi.mock('fs', () => ({
 
 ### Playwright MCP
 
-The Panopticon dashboard can be tested interactively using the Playwright MCP server (configured in `~/.claude/mcp.json`). This provides browser automation tools for navigation, clicking, form filling, and screenshots.
+The Overdeck dashboard can be tested interactively using the Playwright MCP server (configured in `~/.claude/mcp.json`). This provides browser automation tools for navigation, clicking, form filling, and screenshots.
 
 ### `data-testid` Convention
 

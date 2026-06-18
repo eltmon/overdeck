@@ -1,6 +1,6 @@
 import { mkdir } from 'fs/promises';
 import { dirname, join, resolve, relative, isAbsolute } from 'path';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 const SAFE_SEGMENT = /^[A-Za-z0-9._-]{1,128}$/;
 
@@ -12,7 +12,7 @@ export function assertMemorySafeSegment(value: string, field: string): string {
 }
 
 export function resolveMemoryBase(): string {
-  return resolve(getPanopticonHome(), 'memory');
+  return resolve(getOverdeckHome(), 'memory');
 }
 
 export function assertUnderMemoryBase(path: string): string {

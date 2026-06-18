@@ -44,7 +44,7 @@ export async function showAction(id: string, opts: { json?: boolean }): Promise<
   field('Output tokens', session.tokenOutput);
   field('Est. cost', session.estimatedCost > 0 ? `$${session.estimatedCost.toFixed(6)}` : '—');
   field('Tools used', session.toolsUsed.join(', ') || '—');
-  field('Panopticon', yn(session.panopticonManaged));
+  field('Overdeck', yn(session.panopticonManaged));
   if (session.panIssueId) field('Issue ID', session.panIssueId);
 
   console.log();

@@ -1,4 +1,4 @@
-# pan-workspace: Docker image for Panopticon remote workspaces on Fly.io
+# pan-workspace: Docker image for Overdeck remote workspaces on Fly.io
 #
 # Provides a complete development environment with:
 # - Node.js 22 + pnpm
@@ -36,7 +36,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Install pnpm
 RUN npm install -g pnpm
 
-# Install Bun (Panopticon projects use bun install for workspace deps)
+# Install Bun (Overdeck projects use bun install for workspace deps)
 RUN curl -fsSL https://bun.sh/install | bash
 ENV BUN_INSTALL="/root/.bun"
 ENV PATH="$BUN_INSTALL/bin:$PATH"

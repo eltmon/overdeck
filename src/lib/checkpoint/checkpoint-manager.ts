@@ -36,7 +36,7 @@ function assertSafeAgentId(agentId: string): void {
     throw new Error(`Unsafe agentId for checkpoint ref: ${agentId}`)
   }
 }
-const CHECKPOINT_AUTHOR_NAME = 'Panopticon'
+const CHECKPOINT_AUTHOR_NAME = 'Overdeck'
 const CHECKPOINT_AUTHOR_EMAIL = 'panopticon@users.noreply.github.com'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

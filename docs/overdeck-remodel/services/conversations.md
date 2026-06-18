@@ -37,7 +37,7 @@
 - **Backing session file (transcript)** — the harness-owned JSONL the coding
   agent appends to as the conversation runs. Claude Code, pi, codex, and
   kimi-via-CLIProxy each use a different on-disk shape (backing-files §2).
-  **Sacred:** Panopticon reads these, never mutates/deletes them, never commits
+  **Sacred:** Overdeck reads these, never mutates/deletes them, never commits
   them to git. They live under `~/.claude/projects/` and `~/.panopticon/agents/`,
   both outside any repo.
 - **Pointer** — the field(s) that locate a backing file: `claude_session_id`
@@ -308,7 +308,7 @@ stream → **recomposed** (Conversations + Agents).
    `compactConversationNative` → `appendFile(sessionFile, …)` appends a
    `compact_boundary` + `isCompactSummary` entry **into the live claude JSONL**
    (backing-files §3.1). It is claude-only-gated and append-only, but it still
-   writes a file Panopticon does not own — the **lone violator** of the sacred
+   writes a file Overdeck does not own — the **lone violator** of the sacred
    invariant. **It converts to the fork primitive** (`ConversationWriter.forkNewFile`):
    write a NEW session file seeded from the compact boundary (exactly PAN-1781's
    "fresh-session seeding, never boundary-JSON tweaks"), register a

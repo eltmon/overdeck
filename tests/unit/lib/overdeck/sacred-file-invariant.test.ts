@@ -42,7 +42,7 @@ describe('sacred-file invariant — conversation transcripts (FR-6 static)', () 
 
 describe('sacred-file invariant — memory observations (FR-6 runtime)', () => {
   let testHome: string;
-  const savedPanopticonHome = process.env.OVERDECK_HOME;
+  const savedOverdeckHome = process.env.OVERDECK_HOME;
 
   beforeEach(async () => {
     testHome = await mkdtemp(join(tmpdir(), 'pan-g4-sacred-'));
@@ -50,8 +50,8 @@ describe('sacred-file invariant — memory observations (FR-6 runtime)', () => {
   });
 
   afterEach(async () => {
-    if (savedPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-    else process.env.OVERDECK_HOME = savedPanopticonHome;
+    if (savedOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = savedOverdeckHome;
     await rm(testHome, { recursive: true, force: true });
   });
 

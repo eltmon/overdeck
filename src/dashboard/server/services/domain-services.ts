@@ -253,7 +253,7 @@ export const EventStoreServiceLive = Layer.effect(
     });
 
     // PAN-1635: bridge Claude-native compaction to the conversation "compacting"
-    // flag. Only the Panopticon-native path emits conversation.compacting_changed
+    // flag. Only the Overdeck-native path emits conversation.compacting_changed
     // directly; a built-in Claude Code /compact is invisible to it. But the
     // PreCompact hook emits activity{tool:"compact"} and PostCompact emits
     // activity{idle} for *both* paths, so mirror that signal here. This gives the

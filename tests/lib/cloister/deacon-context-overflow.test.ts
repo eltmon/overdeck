@@ -3,7 +3,7 @@
  *
  * A 400 "input exceeds the context window" cannot be retried by continuing
  * (it re-sends the same oversized context). The deacon recovers by sending
- * Panopticon-side compact respawn; once the respawn settles and the overflow
+ * Overdeck-side compact respawn; once the respawn settles and the overflow
  * clears, the recovery state is cleared. Non-agent harness compactions still get
  * a resume nudge. A loop guard escalates to `stuck` if compact respawns never
  * clear the overflow.
@@ -144,7 +144,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     stuckOverflowNativeRecoveryState.clear();
   });
 
-  it('(a) detects overflow at an idle prompt → Panopticon-side compacts via resumeAgent (never /compact) and records attempt 1', async () => {
+  it('(a) detects overflow at an idle prompt → Overdeck-side compacts via resumeAgent (never /compact) and records attempt 1', async () => {
     mockCapturePane.mockResolvedValue(pane('working...', OVERFLOW_LINE));
 
     const actions = await checkApiErrorAgents();

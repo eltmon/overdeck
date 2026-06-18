@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 /**
  * Compute live queue depth.
@@ -47,14 +47,14 @@ export interface SpecialistHandoff {
  * Specialist handoff log file path
  */
 function getSpecialistHandoffLogFile(): string {
-  return join(getPanopticonHome(), 'logs', 'specialist-handoffs.jsonl');
+  return join(getOverdeckHome(), 'logs', 'specialist-handoffs.jsonl');
 }
 
 /**
  * Ensure log directory exists
  */
 function ensureLogDir(): void {
-  const logDir = join(getPanopticonHome(), 'logs');
+  const logDir = join(getOverdeckHome(), 'logs');
   if (!existsSync(logDir)) {
     mkdirSync(logDir, { recursive: true });
   }

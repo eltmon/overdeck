@@ -213,7 +213,7 @@ describe('SystemHealthPill', () => {
 
     expect(screen.getByText('System health')).toBeInTheDocument();
     expect(screen.getByText('Top consumers')).toBeInTheDocument();
-    expect(screen.getByText('Panopticon')).toBeInTheDocument();
+    expect(screen.getByText('Overdeck')).toBeInTheDocument();
     expect(screen.getByText(/Overcommit 40.0%/)).toBeInTheDocument();
     expect(screen.getByText('Remove')).toBeInTheDocument();
     expect(screen.getAllByText('Kill').length).toBeGreaterThan(0);

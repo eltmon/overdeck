@@ -11,19 +11,19 @@
 
 **FOR IMMEDIATE RELEASE**
 
-### Panopticon Launches Universal Context System: Every Agent, Every Harness, Always Briefed
+### Overdeck Launches Universal Context System: Every Agent, Every Harness, Always Briefed
 
-*No more cold starts. Live session briefings, on-demand documentation retrieval, layered configuration distribution, and shareable HTML artifacts ship together in Panopticon 0.6.*
+*No more cold starts. Live session briefings, on-demand documentation retrieval, layered configuration distribution, and shareable HTML artifacts ship together in Overdeck 0.6.*
 
-**SEATTLE — June 21, 2026 —** Today Panopticon ships the **Universal Context System** — four connected capabilities that end the cold-start problem for AI coding agents. Whether a developer is using Claude Code, Pi, or any future harness, every agent now arrives briefed on what's happening across the system, with on-demand access to Panopticon's own documentation, and the ability to publish its work as inspectable HTML artifacts shareable with humans and other agents.
+**SEATTLE — June 21, 2026 —** Today Overdeck ships the **Universal Context System** — four connected capabilities that end the cold-start problem for AI coding agents. Whether a developer is using Claude Code, Pi, or any future harness, every agent now arrives briefed on what's happening across the system, with on-demand access to Overdeck's own documentation, and the ability to publish its work as inspectable HTML artifacts shareable with humans and other agents.
 
-"We were rewriting the same context briefing every session," said **Edward Becker, creator of Panopticon**. "Now the orchestrator owns the briefing. Every agent that lands in a workspace already knows what the last session did, what its siblings are doing, and how to use the project's own conventions. The Home tab is the dashboard's new front door — one glance and you see everything in motion."
+"We were rewriting the same context briefing every session," said **Edward Becker, creator of Overdeck**. "Now the orchestrator owns the briefing. Every agent that lands in a workspace already knows what the last session did, what its siblings are doing, and how to use the project's own conventions. The Home tab is the dashboard's new front door — one glance and you see everything in motion."
 
 The Universal Context System has four parts that ship together:
 
 **1. Hybrid Context Distribution.** A layered model (global / project / workspace) replaces the legacy `sync.devroot` convention. Single canonical markdown sources render to harness-specific files via `{{#harness:claude}}` / `{{#harness:pi}}` templating. Projects can now live anywhere on disk — register them with `pan projects add <path>` instead of being forced under `~/Projects/`.
 
-**2. Panopticon Documentation RAG.** Every install ships a prebuilt FTS5 + embedding index of Panopticon's own docs. When an agent's prompt mentions concepts like *"pan sync"*, *"workspace"*, or *"cloister"*, a UserPromptSubmit hook injects the top-k most relevant doc snippets — no first-run indexing cost, no model dependency at install, no token blowout (per-conversation cap, per-injection cap, telemetry for tuning).
+**2. Overdeck Documentation RAG.** Every install ships a prebuilt FTS5 + embedding index of Overdeck's own docs. When an agent's prompt mentions concepts like *"pan sync"*, *"workspace"*, or *"cloister"*, a UserPromptSubmit hook injects the top-k most relevant doc snippets — no first-run indexing cost, no model dependency at install, no token blowout (per-conversation cap, per-injection cap, telemetry for tuning).
 
 **3. Home Tab + Live Session Briefing.** The dashboard's new landing route surfaces running agents, paused gates, recent merges, failed verifications, and a time-bucketed activity feed across every workspace. The same content writes to `~/.panopticon/session-context.md` on every state change (debounced 500ms), and every harness session injects the file at start. A UserPromptSubmit hook re-injects when the file is newer than session start — so context stays live, not stale. Includes a knowledge registry (LLM-classified on issue creation) showing which workspace owns which feature, and an advisory compliance audit hook that nudges agents toward memory-first behavior when past-tense triggers appear in user prompts.
 
@@ -39,7 +39,7 @@ Source: https://github.com/eltmon/panopticon-cli
 
 ## External FAQ
 
-### What changes for an existing Panopticon user?
+### What changes for an existing Overdeck user?
 
 `pan install` migrates `~/Projects/.claude/{skills,agents,CLAUDE.md}` to `~/.panopticon/context/global/`. Existing projects under `~/Projects/` are auto-registered with the new project system. Existing workspaces continue to work; the new briefing file injects automatically on the next session start. No code changes required in your projects.
 
@@ -77,7 +77,7 @@ The docs index ships inside the npm package. Memory and briefing are local SQLit
 
 ### Why ship all four together instead of incrementally?
 
-They're coupled at the user-experience level. Shipping context distribution without the briefing leaves users with a layered config they can't see. Shipping the briefing without docs RAG means agents still guess at how to use Panopticon. Shipping artifacts without the briefing means there's no entry point on the Home tab to discover them. The four go together; users get one coherent capability rather than four half-features.
+They're coupled at the user-experience level. Shipping context distribution without the briefing leaves users with a layered config they can't see. Shipping the briefing without docs RAG means agents still guess at how to use Overdeck. Shipping artifacts without the briefing means there's no entry point on the Home tab to discover them. The four go together; users get one coherent capability rather than four half-features.
 
 ### What's the parallelization strategy?
 
@@ -93,7 +93,7 @@ The epic is failure-isolated:
 
 ### Why GPT-5.5 across the board instead of Claude Opus?
 
-Cost. The four issues together are roughly 50–80 beads of work. Opus on that scope is multiple hundreds of dollars; GPT-5.5 is a fraction. We've shown comparable correctness on Panopticon work of similar shape via Cloister telemetry. Sub-roles that need precision (`work.sub.inspect` = haiku for tight loops; security-review sub-role = expensive) keep their configured assignments rather than being force-overridden.
+Cost. The four issues together are roughly 50–80 beads of work. Opus on that scope is multiple hundreds of dollars; GPT-5.5 is a fraction. We've shown comparable correctness on Overdeck work of similar shape via Cloister telemetry. Sub-roles that need precision (`work.sub.inspect` = haiku for tight loops; security-review sub-role = expensive) keep their configured assignments rather than being force-overridden.
 
 ### How does this differ from Subspace?
 
@@ -109,7 +109,7 @@ Five things:
 
 - Cross-harness beyond Claude Code + Pi (Codex / Cursor / Gemini follow in v2).
 - Enforcing-mode compliance audit (advisory only in v1).
-- Cross-repo docs RAG (Panopticon's own docs only).
+- Cross-repo docs RAG (Overdeck's own docs only).
 - Embedding model swaps without index rebuild.
 - Dashboard inline-editing of the briefing template (CLI editing only in v1).
 - Per-user briefing personalization (v1 is per-machine).
@@ -120,7 +120,7 @@ Five things:
 Three KPIs over the first 30 days post-launch:
 
 1. **Cold-start friction:** median time from agent spawn to first non-discovery tool call. Target: 50% reduction vs current baseline.
-2. **Docs RAG hit rate:** proportion of *"how do I X in Panopticon"* prompts where the retrieved docs were rated relevant by the agent's first follow-up. Target: ≥ 70% relevance.
+2. **Docs RAG hit rate:** proportion of *"how do I X in Overdeck"* prompts where the retrieved docs were rated relevant by the agent's first follow-up. Target: ≥ 70% relevance.
 3. **Compliance miss rate:** observations logged where past-tense triggers fired but `pan memory search` was skipped. Trending down month-over-month.
 
 ### What's the rollback plan?
@@ -146,7 +146,7 @@ User-explicit override of the standing humans-only-merge rule. The orchestration
 - `pan sync` no longer references `sync.devroot`
 - `~/.panopticon/context/global.md` round-trips to `~/.claude/CLAUDE.md` and Pi's equivalent
 - A newly-spawned agent in any registered project receives the live session-context briefing
-- Asking an agent *"how do I X in Panopticon?"* triggers docs-RAG injection
+- Asking an agent *"how do I X in Overdeck?"* triggers docs-RAG injection
 - An agent can produce an HTML artifact, validate it, publish it, and the dashboard renders the workspace-record card linking to it
 - Compliance audit hook fires when past-tense triggers match without a preceding `pan memory search`; observations logged
 

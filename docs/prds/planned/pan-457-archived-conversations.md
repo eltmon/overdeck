@@ -1,11 +1,11 @@
 ## Vision
 
-A single **Archived Conversations** page in the Panopticon dashboard that unifies two worlds:
+A single **Archived Conversations** page in the Overdeck dashboard that unifies two worlds:
 
-1. **Panopticon-archived conversations** — sessions Panopticon spawned and later archived (existing `conversations` table with `archived_at`)
+1. **Overdeck-archived conversations** — sessions Overdeck spawned and later archived (existing `conversations` table with `archived_at`)
 2. **All other Claude Code JSONL sessions on the system** — ad-hoc `claude` runs, sessions from other tools, debugging sessions, exploratory chats — anything found under `~/.claude/projects/`
 
-Both are presented in one searchable, filterable, browsable view, and **clicking any session opens the same T3Code-style conversation viewer** (PAN-451), regardless of whether Panopticon managed it.
+Both are presented in one searchable, filterable, browsable view, and **clicking any session opens the same T3Code-style conversation viewer** (PAN-451), regardless of whether Overdeck managed it.
 
 This is the "single pane of glass" deliverable: every Claude Code interaction on this machine, surfaced and searchable, with a polished reader.
 
@@ -14,9 +14,9 @@ This is the "single pane of glass" deliverable: every Claude Code interaction on
 This issue covers everything required for the page to work end-to-end:
 
 - Discovery + indexing of all JSONL sessions (managed and unmanaged)
-- A unified `archived_conversations` view that joins Panopticon-archived rows with discovered external rows
+- A unified `archived_conversations` view that joins Overdeck-archived rows with discovered external rows
 - A new **Archived Conversations** page in the dashboard with search, filters, facets
-- Reusing the T3Code-style conversation viewer (PAN-451) as the detail-view renderer for any session — Panopticon-managed or not
+- Reusing the T3Code-style conversation viewer (PAN-451) as the detail-view renderer for any session — Overdeck-managed or not
 - Tiered LLM enrichment, full-text search, and optional vector embeddings
 - Settings UI for embedding provider configuration
 - CLI parity for everything in the UI
@@ -443,9 +443,9 @@ API keys live in **`~/.panopticon.env`**, NEVER `config.yaml` (config may be in 
 
 ### Row badges (`source` field)
 
-- ⚓ **Managed-Archived** — Panopticon-archived, links to issue + agent
-- 🟢 **Managed-Active** — Panopticon-managed, not yet archived
-- 📄 **Discovered** — found via JSONL scan, no Panopticon link
+- ⚓ **Managed-Archived** — Overdeck-archived, links to issue + agent
+- 🟢 **Managed-Active** — Overdeck-managed, not yet archived
+- 📄 **Discovered** — found via JSONL scan, no Overdeck link
 
 Click any row → opens **ConversationViewer** (PAN-451 component) in a side panel or modal — same renderer for all three sources.
 

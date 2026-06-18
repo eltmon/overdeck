@@ -1,6 +1,6 @@
 ---
 name: pan-workspace-config
-description: Configure Panopticon workspace settings for repos, services, DNS, Docker, and templates.
+description: Configure Overdeck workspace settings for repos, services, DNS, Docker, and templates.
 ---
 
 # Pan Workspace Config
@@ -108,7 +108,7 @@ projects:
 
 ## Service Templates
 
-Panopticon provides built-in templates for common frameworks. Use these to avoid boilerplate:
+Overdeck provides built-in templates for common frameworks. Use these to avoid boilerplate:
 
 ### Frontend Frameworks
 

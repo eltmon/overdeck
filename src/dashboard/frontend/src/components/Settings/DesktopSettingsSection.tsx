@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 
 // ─── Bridge types (re-exported for convenience) ───────────────────────────────
 
-type DesktopSettings = PanopticonBridgeDesktopSettings;
+type DesktopSettings = OverdeckBridgeDesktopSettings;
 type NotificationEventType = keyof DesktopSettings['notifications'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -209,7 +209,7 @@ export function DesktopSettingsSection() {
               checked={settings.autoStart.enabled}
               onChange={(v) => void updateSetting('autoStart.enabled', v)}
               label="Launch at login"
-              description="Start Panopticon automatically when you log in"
+              description="Start Overdeck automatically when you log in"
             />
             <div className="pt-3">
               <p className="text-xs text-muted-foreground mb-3">

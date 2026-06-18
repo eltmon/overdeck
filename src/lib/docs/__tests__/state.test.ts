@@ -50,7 +50,7 @@ describe('docs prompt state', () => {
   });
 
   it('matches configured trigger patterns and ignores invalid regexes', () => {
-    expect(matchDocsTrigger('How does Panopticon sync docs?', gateConfig().trigger)).toContain('panopticon');
+    expect(matchDocsTrigger('How does Overdeck sync docs?', gateConfig().trigger)).toContain('panopticon');
     expect(matchDocsTrigger('tell me about docs', { regexes: ['[', 'docs'], caseSensitive: false })).toEqual(['docs']);
     expect(matchDocsTrigger('PANOPTICON', { regexes: ['panopticon'], caseSensitive: true })).toEqual([]);
   });

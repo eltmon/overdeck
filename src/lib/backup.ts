@@ -51,7 +51,7 @@ export function createBackupSync(sourceDirs: string[]): BackupInfo {
  * path, or null when the source does not exist.
  *
  * Used to snapshot a hand-authored CLAUDE.md / AGENTS.md the first time
- * `pan sync` injects a Panopticon-managed region — a safety net for the one
+ * `pan sync` injects a Overdeck-managed region — a safety net for the one
  * write that touches pre-existing content. Pass a shared `timestamp` to group
  * several files from the same sync run under one backup dir.
  */

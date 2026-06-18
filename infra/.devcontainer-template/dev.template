@@ -14,7 +14,7 @@ export COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"
 
 case "${1:-help}" in
   up|all)
-    echo "Starting Panopticon Dashboard containers..."
+    echo "Starting Overdeck Dashboard containers..."
     docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d frontend server
 
     # Wait for services to be ready

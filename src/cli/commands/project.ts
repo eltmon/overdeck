@@ -19,7 +19,7 @@ import { ensureProjectLayer } from '../../lib/context-layers/index.js';
 const BUNDLED_HOOKS_DIR = SYNC_SOURCES.gitHooks;
 
 /**
- * Install Panopticon git hooks in a directory
+ * Install Overdeck git hooks in a directory
  * Returns number of hooks installed
  */
 function installGitHooks(gitDir: string): number {

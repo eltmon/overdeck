@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Install Panopticon git hooks in a project's repos
+# Install Overdeck git hooks in a project's repos
 # Usage: ./install-git-hooks.sh /path/to/project
 #
 # For poly-repos, this will find all .git directories and install hooks in each.
@@ -17,7 +17,7 @@ if [ ! -d "$TARGET_DIR" ]; then
     exit 1
 fi
 
-echo "Installing Panopticon git hooks in: $TARGET_DIR"
+echo "Installing Overdeck git hooks in: $TARGET_DIR"
 echo ""
 
 # Find all .git directories (not files - those are worktrees)

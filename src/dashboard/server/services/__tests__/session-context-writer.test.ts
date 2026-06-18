@@ -77,7 +77,7 @@ describe('session context writer', () => {
     expect(mkdir).toHaveBeenCalledWith('/tmp/pan-home', { recursive: true })
     expect(writeFile).toHaveBeenCalledTimes(1)
     expect(writeFile.mock.calls[0]?.[0]).toBe('/tmp/pan-home/session-context.md')
-    expect(writeFile.mock.calls[0]?.[1]).toContain('# Working Inside Panopticon')
+    expect(writeFile.mock.calls[0]?.[1]).toContain('# Working Inside Overdeck')
     expect(writeFile.mock.calls[0]?.[1]).toContain('Running agents: 1')
     expect(writeFile.mock.calls[0]?.[1]).toContain('live-briefing')
 

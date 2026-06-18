@@ -12,10 +12,10 @@ import { join, dirname } from 'path';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import type { ReviewStatus } from './review-status.js';
 import { FsError } from './errors.js';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 function defaultStatusFile(): string {
-  return join(getPanopticonHome(), 'review-status.json');
+  return join(getOverdeckHome(), 'review-status.json');
 }
 
 export function loadReviewStatusesSync(filePath = defaultStatusFile()): Record<string, ReviewStatus> {

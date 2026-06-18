@@ -2,7 +2,7 @@
  * Scanner orchestrator (PAN-457).
  *
  * Walks ~/.claude/projects/ to discover JSONL session files, parses metadata,
- * correlates with Panopticon conversations, and upserts into discovered_sessions.
+ * correlates with Overdeck conversations, and upserts into discovered_sessions.
  *
  * Three scan modes:
  *   targeted — only sessions whose resolved workspace is under the given dirs
@@ -185,7 +185,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     return result;
   }
 
-  // 3. Build correlation map (Panopticon-managed detection)
+  // 3. Build correlation map (Overdeck-managed detection)
   const allPaths = filteredFiles.map((f) => f.jsonlPath);
   const correlationMap = buildCorrelationMapSync(allPaths);
 

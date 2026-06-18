@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const originalCwd = process.cwd();
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 let projectRoot: string;
 let testHome: string;
 
@@ -21,8 +21,8 @@ describe('async yaml config loading', () => {
 
   afterEach(() => {
     process.chdir(originalCwd);
-    if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-    else process.env.OVERDECK_HOME = originalPanopticonHome;
+    if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalOverdeckHome;
     rmSync(projectRoot, { recursive: true, force: true });
     rmSync(testHome, { recursive: true, force: true });
   });

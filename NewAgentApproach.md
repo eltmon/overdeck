@@ -1,4 +1,4 @@
-# Panopticon — Naming & Filepath Conventions Reference
+# Overdeck — Naming & Filepath Conventions Reference
 
 > **Superseded by [PAN-1908](./.pan/drafts/PAN-1908.md).** This file was compiled as a
 > pre-PAN-1908 conventions snapshot and is no longer the live source of truth for agent
@@ -20,7 +20,7 @@ agent id == the state-dir name.** Get the prefix table right and the rest follow
 
 - **Socket:** all agents live on the `panopticon` socket — always
   `tmux -L panopticon …`. The default socket (`/tmp/tmux-1000/default`) is unused
-  by Panopticon; `tmux list-sessions` with no `-L` will say "no server running".
+  by Overdeck; `tmux list-sessions` with no `-L` will say "no server running".
 - **The session name IS the agent id.** Liveness = "does a session with this name
   exist?" — this is the source of truth, **not** `state.json.status` (which drifts).
 
@@ -65,7 +65,7 @@ roles/handoff.md  handoff-external.md  handoff-external-pi.md
 - Review **sub-roles** are `roles/review-<subRole>.md`, inlined into convoy spawn
   messages (never loaded via Claude's `--agent` flag).
 - `.claude/agents/` and `.claude/skills/` are **sync targets, deliberately empty**
-  in this repo — Panopticon ships no ambient subagents.
+  in this repo — Overdeck ships no ambient subagents.
 
 ---
 

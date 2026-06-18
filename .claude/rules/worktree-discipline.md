@@ -3,7 +3,7 @@ scope: universal
 ---
 ### Worktree discipline — never `checkout` inside a workspace
 
-Panopticon workspaces are git worktrees on a feature branch named `feature/<issue-id-lowercase>`. A worktree is just a directory whose HEAD is checked out to that branch — it does NOT lock you to the branch. If HEAD drifts to `main` or becomes detached, subsequent commits land on the wrong branch.
+Overdeck workspaces are git worktrees on a feature branch named `feature/<issue-id-lowercase>`. A worktree is just a directory whose HEAD is checked out to that branch — it does NOT lock you to the branch. If HEAD drifts to `main` or becomes detached, subsequent commits land on the wrong branch.
 
 **Rules:**
 

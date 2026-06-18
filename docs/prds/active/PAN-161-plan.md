@@ -2,7 +2,7 @@
 
 ## Overview
 
-Building **Mission Control** - a unified monitoring view that becomes the new default landing page for Panopticon, replacing the current Kanban board as the primary entry point. Additionally implementing **Shadow Engineering** - a groundbreaking mode for teams transitioning to AI-assisted development.
+Building **Mission Control** - a unified monitoring view that becomes the new default landing page for Overdeck, replacing the current Kanban board as the primary entry point. Additionally implementing **Shadow Engineering** - a groundbreaking mode for teams transitioning to AI-assisted development.
 
 ## Vision
 

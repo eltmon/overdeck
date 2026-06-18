@@ -9,7 +9,7 @@
 
 ## Problem
 
-Panopticon agents today produce only text — diffs, markdown summaries, CLI output. Sometimes the best work product is visual and interactive:
+Overdeck agents today produce only text — diffs, markdown summaries, CLI output. Sometimes the best work product is visual and interactive:
 
 - Side-by-side comparison of three options
 - A dashboard showing test coverage trends

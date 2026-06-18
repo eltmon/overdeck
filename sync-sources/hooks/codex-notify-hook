@@ -15,7 +15,7 @@ const { homedir } = require('node:os');
 const { writeFileSync, mkdirSync, existsSync } = require('node:fs');
 
 const agentId = process.env.OVERDECK_AGENT_ID;
-if (!agentId) process.exit(0); // Not a Panopticon-managed agent
+if (!agentId) process.exit(0); // Not a Overdeck-managed agent
 
 // Read event JSON from stdin (Codex delivers via stdin by default).
 let eventData = {};

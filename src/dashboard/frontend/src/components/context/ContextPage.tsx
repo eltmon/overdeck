@@ -212,7 +212,7 @@ export function ContextPage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Context</p>
           <h1 className="mt-1 text-lg font-semibold">Layer editor</h1>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Edit the context markdown Panopticon injects into coding-agent sessions.
+            Edit the context markdown Overdeck injects into coding-agent sessions.
           </p>
         </div>
 
@@ -302,7 +302,7 @@ export function ContextPage() {
                       : target.hasUserContent
                         ? 'Has your own content — preserved outside the managed region.'
                         : target.hasManagedRegion
-                          ? 'Managed by Panopticon (no other content).'
+                          ? 'Managed by Overdeck (no other content).'
                           : 'Exists — a managed region is added on next sync.'}
                   </div>
                 </li>

@@ -129,7 +129,7 @@ export interface CreateRemoteWorkspaceOptions {
   );
 
   // Step 5: Configure Claude Code on the VM (onboarding-complete marker +
-  // ~/.claude/settings.json honoring the user's Panopticon permission mode).
+  // ~/.claude/settings.json honoring the user's Overdeck permission mode).
   if (options.spinner) {
     options.spinner.text = 'Configuring Claude Code on VM...';
   }

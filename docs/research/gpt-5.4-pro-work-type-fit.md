@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates OpenAI's GPT-5.4 Pro against Panopticon's 23 work types. Pro is the premium variant — same base model as standard GPT-5.4 but with maximum inference-time compute allocation. It is NOT a different architecture.
+Evaluates OpenAI's GPT-5.4 Pro against Overdeck's 23 work types. Pro is the premium variant — same base model as standard GPT-5.4 but with maximum inference-time compute allocation. It is NOT a different architecture.
 
 ## Model Profile
 
@@ -88,17 +88,17 @@ Pro shares benchmarks with standard GPT-5.4 (same base model). The one Pro-speci
 
 ### The Honest Answer
 
-**GPT-5.4 Pro is not a good fit for any Panopticon work type.**
+**GPT-5.4 Pro is not a good fit for any Overdeck work type.**
 
 The reasoning:
 
 1. **Cost:** At $30/$180, a single implementation session could cost $50-200+. An entire issue lifecycle (planning → implementation → review → test → merge) could exceed $500. This is 10-50x what the same work costs with our current routing.
 
-2. **Latency:** 205s TTFT means every tool call starts with a 3+ minute wait. In an agentic loop with 50+ tool calls, this alone adds hours of wall-clock time. Panopticon agents need sub-10s TTFT for practical throughput.
+2. **Latency:** 205s TTFT means every tool call starts with a 3+ minute wait. In an agentic loop with 50+ tool calls, this alone adds hours of wall-clock time. Overdeck agents need sub-10s TTFT for practical throughput.
 
-3. **Marginal quality gain:** The benchmarks are identical to standard GPT-5.4. Pro's value is in reliability and reasoning depth on the hardest edge cases — but Panopticon's bead-based architecture already constrains scope per step, reducing the need for maximum reasoning depth.
+3. **Marginal quality gain:** The benchmarks are identical to standard GPT-5.4. Pro's value is in reliability and reasoning depth on the hardest edge cases — but Overdeck's bead-based architecture already constrains scope per step, reducing the need for maximum reasoning depth.
 
-4. **No structured outputs:** Panopticon uses structured output for vBRIEF plans, bead status, and review verdicts. Pro doesn't support this.
+4. **No structured outputs:** Overdeck uses structured output for vBRIEF plans, bead status, and review verdicts. Pro doesn't support this.
 
 ### Exception: One-Shot High-Stakes Analysis
 
@@ -111,20 +111,20 @@ In both cases, Claude Opus 4.6 at $15/$75 provides nearly the same quality at ha
 
 ### Do Not Route
 
-All 23 work types. Pro's cost-per-value is worse than Standard GPT-5.4 for every Panopticon use case. Standard gives you the same benchmarks at 1/12th the cost.
+All 23 work types. Pro's cost-per-value is worse than Standard GPT-5.4 for every Overdeck use case. Standard gives you the same benchmarks at 1/12th the cost.
 
 ---
 
 ## When Would Pro Make Sense?
 
-Outside of Panopticon's agent workflow, Pro has a niche:
+Outside of Overdeck's agent workflow, Pro has a niche:
 
 1. **Enterprise legal/medical/financial analysis** — single high-stakes queries where a wrong answer costs $10K+
 2. **Persistent web research** — BrowseComp 89.3% (Pro-specific) for deep multi-round web investigation
 3. **One-shot complex reasoning** — problems requiring maximum depth where latency doesn't matter
 4. **Benchmark submissions** — when you need the absolute best score and cost is irrelevant
 
-None of these map to Panopticon's agentic workflow architecture.
+None of these map to Overdeck's agentic workflow architecture.
 
 ---
 
@@ -136,7 +136,7 @@ None of these map to Panopticon's agentic workflow architecture.
 
 ## Integration Notes
 
-- Not recommended for integration into Panopticon's routing
+- Not recommended for integration into Overdeck's routing
 - If needed for one-off research tasks: Model ID `gpt-5.4-pro`, available via OpenAI API
 - Do NOT add to `model-capabilities.ts` — it would never be selected by the smart selector and its presence would add confusion
 - If a user explicitly requests Pro, route through OpenRouter as a manual override

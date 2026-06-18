@@ -261,7 +261,7 @@ function getHeavyProcesses(claudePids: Set<number>): HeavyProcess[] {
       name = 'Cursor IDE';
       detail = '';
     } else if (cmd.includes('node') && cmd.includes('server.js')) {
-      name = 'Panopticon dashboard';
+      name = 'Overdeck dashboard';
       detail = '';
     } else if (cmd.includes('node')) {
       name = 'Node.js';
@@ -419,7 +419,7 @@ function printReport(report: ResourcesReport): void {
   // Orphans (the real bug signal)
   if (report.orphans.length > 0) {
     console.log(chalk.bold.red('\n ⚠ Orphaned Processes\n'));
-    console.log(chalk.red('  These Claude processes are NOT tracked by Panopticon:'));
+    console.log(chalk.red('  These Claude processes are NOT tracked by Overdeck:'));
     console.log(chalk.dim('  PID        Model                RAM     TTY       CWD'));
     console.log(chalk.dim('  ' + '─'.repeat(70)));
     for (const o of report.orphans) {

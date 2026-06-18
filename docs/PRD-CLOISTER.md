@@ -4,7 +4,7 @@
 
 ## Overview
 
-Cloister is Panopticon's agent monitoring and emergency control system. Named after the TARDIS's emergency alarm, Cloister watches over all running agents, detects stuck or failing agents, and provides emergency stop capabilities.
+Cloister is Overdeck's agent monitoring and emergency control system. Named after the TARDIS's emergency alarm, Cloister watches over all running agents, detects stuck or failing agents, and provides emergency stop capabilities.
 
 ## Goals
 
@@ -806,7 +806,7 @@ model_selection:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Panopticon Dashboard                      │
+│                    Overdeck Dashboard                      │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │                    Cloister Service                    │  │
 │  │  ┌───────────┐ ┌───────────┐ ┌─────────┐ ┌─────────┐  │  │
@@ -1042,7 +1042,7 @@ function getHeartbeat(agentId: string): Heartbeat {
 
 ### Setting Up Active Heartbeats
 
-When spawning an agent, Panopticon can:
+When spawning an agent, Overdeck can:
 
 1. **Set environment variable** for agent ID:
    ```bash
@@ -1091,7 +1091,7 @@ auto_actions:
   kill_on_stuck: false  # Manual by default for safety
 
 startup:
-  auto_start: true  # Start Cloister when Panopticon starts
+  auto_start: true  # Start Cloister when Overdeck starts
 ```
 
 ## Dashboard UI

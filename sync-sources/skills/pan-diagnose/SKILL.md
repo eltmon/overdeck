@@ -1,6 +1,6 @@
 ---
 name: pan-diagnose
-description: Troubleshoot common Panopticon issues
+description: Troubleshoot common Overdeck issues
 triggers:
   - pan diagnose
   - troubleshoot panopticon
@@ -18,7 +18,7 @@ allowed-tools:
 
 ## Overview
 
-This skill helps diagnose and fix common issues with Panopticon installation, configuration, and operation.
+This skill helps diagnose and fix common issues with Overdeck installation, configuration, and operation.
 
 ## Issue Categories
 

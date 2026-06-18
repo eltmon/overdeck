@@ -3726,7 +3726,7 @@
 .chatMarkdown th { background: var(--accent); font-weight: 600; }
 
 /* Streamdown ships Tailwind class names from its package; keep the flagged
-   renderer visually tied to Panopticon's theme tokens even when those external
+   renderer visually tied to Overdeck's theme tokens even when those external
    class strings are not part of our Tailwind content scan. */
 .chatMarkdown [data-streamdown="heading-1"],
 .chatMarkdown [data-streamdown="heading-2"],

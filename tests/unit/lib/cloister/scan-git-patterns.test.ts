@@ -29,7 +29,7 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
 vi.mock('../../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/panopticon-scan-git-test',
   packageRoot: '/tmp/panopticon-scan-git-test',
-  getPanopticonHome: () => '/tmp/panopticon-scan-git-test',
+  getOverdeckHome: () => '/tmp/panopticon-scan-git-test',
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({

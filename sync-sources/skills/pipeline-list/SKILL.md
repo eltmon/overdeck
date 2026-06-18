@@ -1,7 +1,7 @@
 ---
 name: pipeline-list
 description: >
-  List the issues in the Panopticon pipeline, grouped by phase
+  List the issues in the Overdeck pipeline, grouped by phase
   (Ship · Review · Work · Plan) with their TITLES — the on-demand text form of
   what the dashboard shows. Two views: the default "resource" view mirrors the
   Command Deck project tree (issues with a live workspace/branch/agent/PR right

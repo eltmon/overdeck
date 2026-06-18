@@ -6,7 +6,7 @@
 
 ## Problem
 
-Panopticon only sees conversations it spawned. Ad-hoc `claude` sessions started in a terminal —
+Overdeck only sees conversations it spawned. Ad-hoc `claude` sessions started in a terminal —
 debugging, exploration, quick fixes — are invisible. The user has hundreds of such sessions in
 `~/.claude/projects/` with no way to search, review, or correlate cost.
 
@@ -26,7 +26,7 @@ dashboard all ship.
 
 ### 2. Table model — new `discovered_sessions` table, separate from `conversations`
 The existing `conversations` table (PAN-416) is lifecycle-aware (active/ended, tmux_session,
-title, archived_at). It tracks Panopticon-spawned sessions only.
+title, archived_at). It tracks Overdeck-spawned sessions only.
 
 `discovered_sessions` is a different shape: an immutable index row per JSONL file on disk.
 Linked back via `panopticon_managed`, `pan_issue_id`, `pan_agent_id` columns populated during
@@ -55,7 +55,7 @@ no native deps, no sqlite-vec extension. Brute-force cosine is fast enough at ex
 (thousands of sessions, <10ms for 5K sessions × 1536 dims).
 
 ### 6. Enrichment execution — reuse `model-fallback.ts` routing
-Enrichment workers call the existing Panopticon model router. This automatically respects
+Enrichment workers call the existing Overdeck model router. This automatically respects
 provider disabled state (dashboard UX toggle), fallback chains, and logs to `cost_events`.
 Level 1 → Haiku tier, Level 2 → Sonnet tier, Level 3 → user-specified model.
 

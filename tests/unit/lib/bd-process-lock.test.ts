@@ -15,7 +15,7 @@ import {
   withBdProcessLock,
 } from '../../../src/lib/bd-process-lock.js';
 
-const originalPanopticonHome = process.env.OVERDECK_HOME;
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testRoot: string;
 let panopticonHome: string;
 let workspacePath: string;
@@ -79,10 +79,10 @@ describe('bd process lock', () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    if (originalPanopticonHome === undefined) {
+    if (originalOverdeckHome === undefined) {
       delete process.env.OVERDECK_HOME;
     } else {
-      process.env.OVERDECK_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalOverdeckHome;
     }
     rmSync(testRoot, { recursive: true, force: true });
     vi.restoreAllMocks();

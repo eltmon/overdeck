@@ -4,7 +4,7 @@ import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
 import { join } from 'path';
 import chalk from 'chalk';
-import { getPanopticonHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 import { getAgentStateSync } from '../../lib/agents.js';
 
 const execFileAsync = promisify(execFile);
@@ -163,7 +163,7 @@ export function collectWorkspaceReapCandidatesFromInspect(
 
 function collectActiveAgentIssueIds(): Set<string> {
   const activeIssues = new Set<string>();
-  const agentsDir = join(getPanopticonHome(), 'agents');
+  const agentsDir = join(getOverdeckHome(), 'agents');
   if (!existsSync(agentsDir)) return activeIssues;
 
   for (const dir of readdirSync(agentsDir)) {

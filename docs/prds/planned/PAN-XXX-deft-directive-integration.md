@@ -4,19 +4,19 @@
 
 ### Press Release
 
-**Panopticon CLI Ships One-Command AI Development Framework Integration**
+**Overdeck CLI Ships One-Command AI Development Framework Integration**
 
 *May 2026 — Portland, OR*
 
-Today, Panopticon CLI announced full integration with Deft Directive, the open-source layered standards framework for AI-assisted software development. A single `pan install` command now bootstraps both multi-agent orchestration AND comprehensive coding standards — eliminating the gap between "AI agents can write code" and "AI agents write code that meets your standards."
+Today, Overdeck CLI announced full integration with Deft Directive, the open-source layered standards framework for AI-assisted software development. A single `pan install` command now bootstraps both multi-agent orchestration AND comprehensive coding standards — eliminating the gap between "AI agents can write code" and "AI agents write code that meets your standards."
 
-The integration replaces Panopticon's 6-state canonical model with Deft's 9-state vBRIEF lifecycle. Issues flow through `draft → proposed → approved → pending → running → blocked → completed → failed → cancelled` — each transition enforced by deterministic scripts, not agent judgment. The kanban board gains a "Ready" column and distinguishes `blocked` from `running`, `failed` from `completed`.
+The integration replaces Overdeck's 6-state canonical model with Deft's 9-state vBRIEF lifecycle. Issues flow through `draft → proposed → approved → pending → running → blocked → completed → failed → cancelled` — each transition enforced by deterministic scripts, not agent judgment. The kanban board gains a "Ready" column and distinguishes `blocked` from `running`, `failed` from `completed`.
 
 Every agent session now loads a layered rule hierarchy: personal preferences (USER.md), project identity and standards (PROJECT-DEFINITION.vbrief.json), language-specific conventions (typescript.md, python.md), and framework defaults — all overridable, all version-controlled. Planning agents use structured interview strategies instead of freeform exploration, producing specs with traceable acceptance criteria.
 
-"When an agent says 'I'm done,' that's a claim," said Edward Becker, creator of Panopticon. "When `task check` passes — lint, test, branch policy, vbrief lifecycle validation — that's proof."
+"When an agent says 'I'm done,' that's a claim," said Edward Becker, creator of Overdeck. "When `task check` passes — lint, test, branch policy, vbrief lifecycle validation — that's proof."
 
-Available in Panopticon CLI v0.6.0. Existing projects migrate with `pan migrate --deft`.
+Available in Overdeck CLI v0.6.0. Existing projects migrate with `pan migrate --deft`.
 
 ---
 
@@ -25,8 +25,8 @@ Available in Panopticon CLI v0.6.0. Existing projects migrate with `pan migrate 
 **Q: What is Deft Directive?**
 A: An open-source framework that defines how AI coding agents should behave — layered rules, vBRIEF lifecycle management, deterministic quality gates via Taskfile, and skills for setup/build/swarm/review/release. GitHub: github.com/deftai/directive
 
-**Q: Do I need to learn Deft to use Panopticon?**
-A: No. `pan install` bootstraps everything. PROJECT-DEFINITION.vbrief.json is generated from your existing project. Language standards are auto-detected. You interact with Panopticon commands; Deft runs under the hood.
+**Q: Do I need to learn Deft to use Overdeck?**
+A: No. `pan install` bootstraps everything. PROJECT-DEFINITION.vbrief.json is generated from your existing project. Language standards are auto-detected. You interact with Overdeck commands; Deft runs under the hood.
 
 **Q: What happened to the old kanban states?**
 A: The 6 canonical states (backlog, todo, in_progress, in_review, done, canceled) become 9 vBRIEF statuses. The kanban gains a "Ready" column and better terminal-state granularity (completed vs. failed). The mapping from tracker states (Linear, GitHub, etc.) still works — it just targets a richer canonical model.
@@ -37,7 +37,7 @@ A: Currently agents get a task and CLAUDE.md. With Deft, they get a layered stac
 **Q: What about planning?**
 A: Planning agents currently do freeform exploration. With Deft, they run structured strategies — interview (one focused question per turn, sizing gate, spec generation) or speckit (5-phase specification for complex scopes). Plans become reproducible.
 
-**Q: Can I still use Panopticon without Deft?**
+**Q: Can I still use Overdeck without Deft?**
 A: Yes. `pan install --no-deft` skips it. The old state model remains available via `OVERDECK_LEGACY_STATES=true`.
 
 **Q: What about my existing projects?**
@@ -49,7 +49,7 @@ A: `pan migrate --deft` creates `vbrief/` lifecycle folders, generates PROJECT-D
 
 ### No Standards Enforcement
 
-Panopticon orchestrates agents but doesn't enforce coding standards. Agents spawn without knowing the project's language conventions, testing requirements, branching strategy, or quality gates. Standards live scattered across CLAUDE.md files, prompt templates, and memory — monolithic, not layered, not overridable per-project.
+Overdeck orchestrates agents but doesn't enforce coding standards. Agents spawn without knowing the project's language conventions, testing requirements, branching strategy, or quality gates. Standards live scattered across CLAUDE.md files, prompt templates, and memory — monolithic, not layered, not overridable per-project.
 
 ### Coarse State Model
 
@@ -68,7 +68,7 @@ Planning agents do freeform codebase exploration. The quality and structure of p
 
 ### Separate Standards Framework
 
-Deft Directive solves the standards problem but lives separately. The two systems share vBRIEF as a language but Panopticon uses v0.5, Deft uses v0.6, and the lifecycle folder structure isn't implemented in Panopticon.
+Deft Directive solves the standards problem but lives separately. The two systems share vBRIEF as a language but Overdeck uses v0.5, Deft uses v0.6, and the lifecycle folder structure isn't implemented in Overdeck.
 
 ---
 
@@ -139,9 +139,9 @@ vbrief/
 
 `plan.status` inside each scope vBRIEF is the source of truth. Folder location is a convenience view. When status changes, the file moves to the matching folder via deterministic `task scope:*` commands.
 
-**Integration with Panopticon's existing flow:**
+**Integration with Overdeck's existing flow:**
 
-| Panopticon action | vBRIEF lifecycle effect |
+| Overdeck action | vBRIEF lifecycle effect |
 |---|---|
 | Issue filed / `pan refine` | Creates scope vBRIEF in `proposed/` |
 | `pan plan <id>` | Moves vBRIEF from `proposed/` → `pending/` → `active/` (activates) |
@@ -156,11 +156,11 @@ After existing prereq checks (Node 22, Docker, tmux, Git), `pan install` adds:
 
 1. **Clone Deft** — `git clone https://github.com/deftai/directive.git` into `<project>/deft/` (or shared cache at `~/.panopticon/deft/`)
 2. **Write AGENTS.md** — Deft's agent entry point, wired into project root (idempotent)
-3. **Generate USER.md** — Once globally, at `~/.config/deft/USER.md`. Captures: depth preference (technical/middle/non-technical), strategy, coverage target, custom rules. Panopticon runs the interview; Deft's setup skill doesn't need to.
+3. **Generate USER.md** — Once globally, at `~/.config/deft/USER.md`. Captures: depth preference (technical/middle/non-technical), strategy, coverage target, custom rules. Overdeck runs the interview; Deft's setup skill doesn't need to.
 4. **Generate PROJECT-DEFINITION.vbrief.json** — Per-project. Inferred from build files (package.json, go.mod, etc.) + `projects.yaml`. Captures: project name, type, languages, tech stack, coverage target, branching policy, project-specific rules.
 5. **Create `vbrief/` folders** — 5 lifecycle subdirectories
 6. **Install git hooks** — `git config core.hooksPath .githooks` (idempotent, from Deft's `task setup`)
-7. **Sync Deft skills** — Copy `deft/skills/*/SKILL.md` into `~/.panopticon/skills/` with `deft-` prefix (avoids namespace collision with Panopticon skills)
+7. **Sync Deft skills** — Copy `deft/skills/*/SKILL.md` into `~/.panopticon/skills/` with `deft-` prefix (avoids namespace collision with Overdeck skills)
 8. **Add Taskfile.yml** — Include Deft's Taskfile in project root for `task check`, `task scope:*`, etc.
 
 **Skip with**: `pan install --no-deft`
@@ -189,20 +189,20 @@ main.md                       ← Deft framework defaults (LOWEST)
 | Memory files (preferences) | USER.md | User depth, strategy preferences |
 | Cloister verification config | Taskfile.yml (`task check`) | Coverage ≥85%, branch policy |
 
-**CLAUDE.md stays** for Panopticon-specific operational rules (tmux messaging, JSONL protection, postMerge idempotency guards). AGENTS.md and CLAUDE.md coexist — different purposes:
+**CLAUDE.md stays** for Overdeck-specific operational rules (tmux messaging, JSONL protection, postMerge idempotency guards). AGENTS.md and CLAUDE.md coexist — different purposes:
 - AGENTS.md = how AI agents should write code (standards, conventions, quality)
-- CLAUDE.md = how Panopticon operates (infrastructure, safety, architecture)
+- CLAUDE.md = how Overdeck operates (infrastructure, safety, architecture)
 
 **Prompt assembly** (`src/lib/cloister/prompt-assembly.ts`):
 
-When Panopticon spawns any agent, it reads the Deft hierarchy and assembles context:
+When Overdeck spawns any agent, it reads the Deft hierarchy and assembles context:
 
 1. Read AGENTS.md (Deft entry point)
 2. Read USER.md (personal preferences)
 3. Read PROJECT-DEFINITION.vbrief.json (project rules, stack)
 4. Auto-detect language files from project (e.g., TypeScript project → include `typescript.md`)
 5. Read scope vBRIEF (work item narratives, acceptance criteria)
-6. Append Panopticon-specific CLAUDE.md rules
+6. Append Overdeck-specific CLAUDE.md rules
 
 This replaces the current ad-hoc prompt construction with structured, overridable layers.
 
@@ -225,7 +225,7 @@ Currently runs `typecheck → lint → test` from `projects.yaml`. Expands to:
 ```
 task check (if Deft is installed)
   → includes: lint, test, coverage, branch policy, vbrief validation
-  → PLUS Panopticon's own AC gate (getVBriefACStatus)
+  → PLUS Overdeck's own AC gate (getVBriefACStatus)
 ```
 
 Falls back to existing `typecheck → lint → test` if Deft is not installed.
@@ -249,7 +249,7 @@ The planning agent still writes STATE.md and plan.vbrief.json — but the plan q
 
 ### 7. Swarm Integration
 
-Deft's `deft-directive-swarm` skill describes parallel agent coordination. Panopticon already runs parallel agents. The integration:
+Deft's `deft-directive-swarm` skill describes parallel agent coordination. Overdeck already runs parallel agents. The integration:
 
 - `pan swarm <issue-ids...>` becomes a first-class command
 - Deft's **file-overlap audit** prevents two agents from touching the same files (currently not enforced)
@@ -259,12 +259,12 @@ Deft's `deft-directive-swarm` skill describes parallel agent coordination. Panop
 
 ### 8. Issue Ingestion and Reconciliation
 
-Deft has `task issue:ingest` and `task reconcile:issues`. Panopticon needs TypeScript equivalents:
+Deft has `task issue:ingest` and `task reconcile:issues`. Overdeck needs TypeScript equivalents:
 
 - **Ingest**: Pull issues from tracker → create scope vBRIEFs in `proposed/`. `pan refine` triggers this. Each vBRIEF gets a `references` array linking back to the tracker issue.
 - **Reconcile**: Scan all vBRIEFs with tracker references → report stale, externally closed, or unlinked items. Runs during `pan sync` or on demand.
 
-This gives Panopticon a local, structured representation of tracker issues that persists across sessions — not just an API cache.
+This gives Overdeck a local, structured representation of tracker issues that persists across sessions — not just an API cache.
 
 ---
 
@@ -362,6 +362,6 @@ This gives Panopticon a local, structured representation of tracker issues that 
 - Drag-drop between columns triggers correct lifecycle transitions
 - Agent prompts include USER.md + PROJECT-DEFINITION + language files
 - `task check` runs as part of verification gate (when Deft installed)
-- Existing Panopticon tests pass
+- Existing Overdeck tests pass
 - `pan migrate --deft` converts existing projects without data loss
 - `pan install --no-deft` skips Deft entirely, old behavior preserved

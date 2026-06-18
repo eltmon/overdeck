@@ -2,7 +2,7 @@
  * Shared activity logger — emits activity.entry events to the SQLite event store.
  *
  * Replaces flat-file logActivity() in the ship-role merge path and provides a unified
- * activity logging API for all Panopticon components (roles, cloister, dashboard).
+ * activity logging API for all Overdeck components (roles, cloister, dashboard).
  *
  * Activity entries are persisted to the event store and flow through:
  *   event store → PubSub → WebSocket → EventRouter → Zustand store → ActivityPanel

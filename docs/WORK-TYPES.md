@@ -1,16 +1,16 @@
-# Panopticon Work Types
+# Overdeck Work Types
 
-Reference for the job settings Panopticon uses for model routing.
+Reference for the job settings Overdeck uses for model routing.
 
-This document is about **routed work types and model-selection slots**, not the high-level roster of Panopticon runtime agents. Use [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) if you want the newcomer-friendly map of what kinds of agents exist.
+This document is about **routed work types and model-selection slots**, not the high-level roster of Overdeck runtime agents. Use [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) if you want the newcomer-friendly map of what kinds of agents exist.
 
-A work type is a routing slot for one kind of job inside the system. Some work types line up with runtime agents, some line up with helper jobs, and some line up with parallel review lanes or CLI contexts. They all matter for model selection, but they are **not** all members of the main Panopticon runtime agent roster.
+A work type is a routing slot for one kind of job inside the system. Some work types line up with runtime agents, some line up with helper jobs, and some line up with parallel review lanes or CLI contexts. They all matter for model selection, but they are **not** all members of the main Overdeck runtime agent roster.
 
 Each work type is a routable job slot. You can override any of these IDs in `models.overrides` inside `~/.panopticon/config.yaml` or `.pan.yaml`.
 
 ## Overview
 
-- Panopticon currently routes **23 router-backed work types**
+- Overdeck currently routes **23 router-backed work types**
 - Work types are grouped by workflow role, not by provider
 - Capability-based selection picks defaults automatically
 - Overrides let you pin any one work type to any supported model
@@ -88,7 +88,7 @@ These are smaller helper jobs spawned for focused tasks.
 
 Review work types are routing slots for **parallel review lanes**, not additional members of the main runtime agent roster.
 
-A parallel review fans out into multiple review lenses simultaneously, then combines those results into a final synthesis step. These entries matter because you can route each lane to a different model, but they should be understood as configuration slots inside the review system rather than standalone Panopticon runtime agents.
+A parallel review fans out into multiple review lenses simultaneously, then combines those results into a final synthesis step. These entries matter because you can route each lane to a different model, but they should be understood as configuration slots inside the review system rather than standalone Overdeck runtime agents.
 
 | Work type | When it runs | Typical default | Why you might override it |
 |-----------|--------------|-----------------|---------------------------|
@@ -102,7 +102,7 @@ A parallel review fans out into multiple review lenses simultaneously, then comb
 
 - Security and synthesis are the review slots most worth upgrading.
 - Performance review is often a good place to save cost if you already trust your benchmark/test loop.
-- If you are trying to understand the main Panopticon workflow, read review lane entries as model configuration slots, not as part of the core runtime agent inventory.
+- If you are trying to understand the main Overdeck workflow, read review lane entries as model configuration slots, not as part of the core runtime agent inventory.
 
 ---
 
@@ -124,7 +124,7 @@ The planning phase is separate from the issue-agent implementation loop.
 
 ## CLI Modes
 
-These control Panopticon’s direct user-facing CLI interactions.
+These control Overdeck’s direct user-facing CLI interactions.
 
 | Work type | When it runs | Typical default | Why you might override it |
 |-----------|--------------|-----------------|---------------------------|

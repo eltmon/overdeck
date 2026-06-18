@@ -1,10 +1,10 @@
-# Panopticon Development SOP
+# Overdeck Development SOP
 
-This SOP covers local dashboard startup, restart, and triage for Panopticon development.
+This SOP covers local dashboard startup, restart, and triage for Overdeck development.
 
 ## Post-reboot startup
 
-Use `pan up` after a reboot or when you want the normal local Panopticon stack.
+Use `pan up` after a reboot or when you want the normal local Overdeck stack.
 
 ```bash
 pan up

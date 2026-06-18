@@ -2,7 +2,7 @@
 
 ## Vision
 
-Work agents that legitimately need to modify Panopticon's own agent machinery
+Work agents that legitimately need to modify Overdeck's own agent machinery
 (`.claude/skills/...`, occasionally `.claude/agents/...`, etc.) can do so
 without being trapped in a permission-dialog-dismissal loop, while the safety
 guard against recursive self-modification remains intact for unscoped paths.
@@ -70,7 +70,7 @@ self-modify paths the implementation will touch. Examples:
 - "modifies `.claude/skills/pan-tts/`"
 - "modifies `.claude/skills/pipeline-status/`"
 
-On `pan start <issue>`, Panopticon reads those declarations and
+On `pan start <issue>`, Overdeck reads those declarations and
 writes corresponding `allow` entries into the workspace's
 `.claude/settings.local.json`:
 
@@ -98,7 +98,7 @@ they hit the prompt as before. The point is to make declared paths
 flow without interruption while keeping undeclared paths gated.
 
 The allow-list lives in the workspace's `settings.local.json` (already
-the file `injectPanopticonInfraDeny` writes), so it's per-workspace
+the file `injectOverdeckInfraDeny` writes), so it's per-workspace
 and disappears when the workspace is torn down.
 
 ### B. Outbound-write suppression during prompt display
@@ -153,7 +153,7 @@ clears automatically (PAN-1030's existing behavior).
   the changeset it intends and writes `selfModifyPaths` if any
   match the regex. Encode this expectation in `roles/plan.md`
   (post-PAN-1048) or the planning prompt today.
-- **`pan start` flow** — `injectPanopticonInfraDeny` already writes
+- **`pan start` flow** — `injectOverdeckInfraDeny` already writes
   `.claude/settings.local.json`. Extend it to also read
   `selfModifyPaths` from the workspace vBRIEF and merge a
   corresponding `allow` block. Idempotent across re-spawn.
@@ -198,7 +198,7 @@ clears automatically (PAN-1030's existing behavior).
 - [ ] vBRIEF schema accepts an optional `selfModifyPaths: string[]`
       field with validation that limits entries to
       `^\.claude/skills/[a-z0-9-]+(/.*)?$`.
-- [ ] `injectPanopticonInfraDeny` (or its successor) merges
+- [ ] `injectOverdeckInfraDeny` (or its successor) merges
       `Edit(<path>/**)` and `Write(<path>/**)` allow entries for each
       declared path.
 - [ ] Re-running `pan start` is idempotent: allow-list entries are

@@ -1,5 +1,5 @@
 /**
- * `pan docs` — Panopticon documentation RAG retriever (PAN-1203).
+ * `pan docs` — Overdeck documentation RAG retriever (PAN-1203).
  *
  * Subcommands:
  *   query     Query the docs index for relevant snippets
@@ -25,7 +25,7 @@ export interface DocsQueryOptions {
 }
 
 export function createDocsCommand(): Command {
-  const docs = new Command('docs').description('Panopticon documentation RAG (PAN-1203)');
+  const docs = new Command('docs').description('Overdeck documentation RAG (PAN-1203)');
 
   docs
     .command('query <text>')

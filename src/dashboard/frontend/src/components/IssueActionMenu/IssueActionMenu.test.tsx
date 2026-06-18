@@ -22,7 +22,7 @@ function issue(overrides: Partial<Issue> = {}): Issue {
     url: 'https://example.test/PAN-1',
     createdAt: '2026-05-23T00:00:00.000Z',
     updatedAt: '2026-05-23T00:00:00.000Z',
-    project: { id: 'pan', name: 'Panopticon', color: '#fff' },
+    project: { id: 'pan', name: 'Overdeck', color: '#fff' },
     ...overrides,
   };
 }

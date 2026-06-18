@@ -2,7 +2,7 @@
 
 Research date: 2026-04-17
 
-Evaluates Google's Gemini 3.1 Flash-Lite Preview against Panopticon's 23 work types. This is the smallest, cheapest, and fastest model in Google's Gemini 3.x family. Notably derived from **Pro** (not Flash) architecture.
+Evaluates Google's Gemini 3.1 Flash-Lite Preview against Overdeck's 23 work types. This is the smallest, cheapest, and fastest model in Google's Gemini 3.x family. Notably derived from **Pro** (not Flash) architecture.
 
 ## Model Profile
 
@@ -124,7 +124,7 @@ All other work types. Flash-Lite's Intelligence Index of 34, hallucination rate,
 
 ---
 
-## Flash-Lite's Niche in Panopticon
+## Flash-Lite's Niche in Overdeck
 
 Flash-Lite is best understood as **infrastructure, not an agent model.** Its optimal uses are:
 
@@ -133,7 +133,7 @@ Flash-Lite is best understood as **infrastructure, not an agent model.** Its opt
 3. **Multimodal preprocessing** — extract text from screenshots/videos before passing to a smarter model
 4. **Batch data extraction** — at $0.125/$0.75 (batch pricing), process thousands of structured extractions cheaply
 
-For Panopticon's agent work types, **GPT-5.4 Nano is the better budget model** — smarter (Index 44 vs 34), better tool use, similar pricing, and lower hallucination risk. Flash-Lite wins only when raw throughput matters more than accuracy.
+For Overdeck's agent work types, **GPT-5.4 Nano is the better budget model** — smarter (Index 44 vs 34), better tool use, similar pricing, and lower hallucination risk. Flash-Lite wins only when raw throughput matters more than accuracy.
 
 ---
 
@@ -148,7 +148,7 @@ For Panopticon's agent work types, **GPT-5.4 Nano is the better budget model** �
 
 ## Integration Notes
 
-- Google already configured as provider in Panopticon
+- Google already configured as provider in Overdeck
 - Model ID: `gemini-3.1-flash-lite-preview`
 - Available via Google AI API (API key)
 - Suggested capability scores: code-generation 68, code-review 58, debugging 62, planning 52, documentation 50, testing 66, security 52, performance 58, synthesis 54, speed 98, context-length 85 (nominal 1M but effective retrieval much lower)

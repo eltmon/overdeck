@@ -9,7 +9,7 @@
 
 ## Problem
 
-Panopticon is a bundled local client/server app — every user runs the dashboard on their own
+Overdeck is a bundled local client/server app — every user runs the dashboard on their own
 localhost, and the conversation data, the Claude Code JSONL session, and the tmux session all
 live on that one machine behind that user's NAT. There is no way for two people on a refinement
 call to look at the same conversation, watch the same investigation unfold, or collaboratively
@@ -17,14 +17,14 @@ shape a prompt. The natural model — "give somebody a link" — does not work: 
 at a machine the recipient cannot route to.
 
 The killer use case: a refinement call where one person drives a codebase investigation in
-Panopticon and the rest of the team watches live, suggests prompts, and collaboratively converges
+Overdeck and the rest of the team watches live, suggests prompts, and collaboratively converges
 on the right next step.
 
 ## Goal
 
-Let a Panopticon host share **one conversation** with other Panopticon users via a
+Let a Overdeck host share **one conversation** with other Overdeck users via a
 `panopticon-cli.com/s/<id>` link. Viewers render that conversation live in their own local
-Panopticon dashboard. Delivered as:
+Overdeck dashboard. Delivered as:
 
 1. A new **signaling service** deployed at `panopticon-cli.com` (WebRTC handshake, GitHub OAuth, TURN).
 2. A **host-side WebRTC transport** in the dashboard server, hub for N viewers.
@@ -128,7 +128,7 @@ The viewer side uses **browser-native `RTCPeerConnection`** — no dependency ei
 
 - **Host** — the machine that owns the conversation + tmux session. Its dashboard **server** is
   the WebRTC hub: one `RTCPeerConnection` per viewer. Source of truth.
-- **Viewer** — runs their own Panopticon. The **browser** frontend holds one `RTCPeerConnection`
+- **Viewer** — runs their own Overdeck. The **browser** frontend holds one `RTCPeerConnection`
   to the host server and renders the shared conversation. The viewer's local server is a thin
   bootstrap only (receives the join intent, opens the frontend route).
 - **Signaling service** (`panopticon-cli.com`) — new deployable. WebRTC handshake relay, GitHub
@@ -167,7 +167,7 @@ subscriber alongside the existing raw-WebSocket clients.
 
 A new deployable workspace: **`services/signaling-service/`** (Bun workspace; Node 22 runtime).
 
-**Hosting:** deploy to `panopticon-cli.com` behind TLS. Recommended target: **Fly.io** (Panopticon
+**Hosting:** deploy to `panopticon-cli.com` behind TLS. Recommended target: **Fly.io** (Overdeck
 already has Fly tooling and the `pan-fly` skill). `coturn` runs as a companion Fly app or VM. Final
 infra placement is an ops decision to confirm at Phase 1 kickoff.
 
@@ -249,7 +249,7 @@ There is no fixed-duration link expiry — link lifetime = conversation lifetime
 - The **host verifies this JWT** against the signaling service's published JWKS. The host does
   *not* perform OAuth itself for viewers — it trusts the signaling service's signed identity
   assertion. This is why a viewer's claimed GitHub identity is trustworthy in the lobby.
-- **Host identity:** the host is a participant too (shown in presence). The host's Panopticon
+- **Host identity:** the host is a participant too (shown in presence). The host's Overdeck
   performs a one-time GitHub **device-flow** OAuth the first time it shares; the resulting identity
   is cached at `~/.panopticon/github-identity.json`. No repeated logins.
 
@@ -292,7 +292,7 @@ it cannot make the host stream content to an un-admitted peer.
 
 On a host **process restart** within the reconnect window, the host's in-memory set is gone; it
 re-reads the admitted + block lists from the signaling service room state to resume. That is a
-narrow, documented trust window on a Panopticon-operated service, and only membership metadata
+narrow, documented trust window on a Overdeck-operated service, and only membership metadata
 (never content) is involved.
 
 ---
@@ -362,7 +362,7 @@ default — content is encrypted in transit end to end.
 
 Conversation events cross the channel in a wire format defined **specifically for sharing** — not
 the internal `PanRpcGroup` / `ChatMessage` types. Host and viewer run independently-updated
-Panopticon versions; coupling the wire format to an internal type would break rendering on version
+Overdeck versions; coupling the wire format to an internal type would break rendering on version
 skew. The wire format is an explicit allow-list of fields permitted to cross the host→viewer
 boundary. It lives in `packages/contracts/src/sharing.ts` and is exported from `@overdeck/contracts`.
 
@@ -416,7 +416,7 @@ interface DraftPayload {
 The host maps its internal `ChatMessage` (`packages/contracts/src/rpc.ts`) to `SharedMessage` at
 the transport boundary; the viewer renders `SharedMessage` directly. Version negotiation: on
 connect, host and viewer exchange `v`; a viewer on an older wire version renders best-effort and
-shows a "host is on a newer Panopticon" notice rather than breaking.
+shows a "host is on a newer Overdeck" notice rather than breaking.
 
 ---
 
@@ -500,7 +500,7 @@ All join paths funnel through the same host-approval lobby.
   `POST /api/sessions` (via the host's dashboard server) and surfaces the `/s/<shortCode>` link +
   a participant/lobby management panel.
 - **Viewer:** open the link in a browser → GitHub OAuth on `panopticon-cli.com` → **localhost-detect**:
-  the share page probes for a running local Panopticon at `localhost:<port>` and POSTs the join
+  the share page probes for a running local Overdeck at `localhost:<port>` and POSTs the join
   intent there → the local dashboard opens `/#/shared/<roomId>` → lobby.
   A `pan://` protocol handler was considered and rejected (OS-level registration is finicky
   cross-platform).
@@ -515,11 +515,11 @@ All join paths funnel through the same host-approval lobby.
 
 ### Cold start
 
-A viewer who clicks the **browser** link with no local Panopticon running cannot be auto-helped by
+A viewer who clicks the **browser** link with no local Overdeck running cannot be auto-helped by
 the share page — a web page cannot spawn a local process. The page detects "no localhost" and
 instructs the user to run `pan join <link-or-code>`. **`pan join` auto-starts the local dashboard
 if it is not already running**, then proceeds to the lobby — so the CLI is the cold-start recovery
-path for an installed-but-not-running viewer. A viewer with **no Panopticon installed at all** must
+path for an installed-but-not-running viewer. A viewer with **no Overdeck installed at all** must
 install it first; a hosted read-only web view for the truly-uninstalled case is a possible
 followup (it would put conversation content on `panopticon-cli.com`, breaking the no-content
 guarantee) and is out of scope for v0.
@@ -674,7 +674,7 @@ shipped artifact.
 - Sharing kanban / inspector / other dashboard panels — v2+
 - Multi-conversation sharing in one link — v2+
 - Rich **collaborative markdown editing** for prompt drafts (CRDT, gist-backed) — separate issue (PAN-659 lineage); may require the `gist` OAuth scope
-- **Hosted read-only web view** for viewers with no Panopticon installed — different privacy model
+- **Hosted read-only web view** for viewers with no Overdeck installed — different privacy model
 - Voice / video — never (use Zoom/Meet alongside)
 - Persisting signaling-service room state across redeploys — v0 accepts in-flight shares ending on deploy
 

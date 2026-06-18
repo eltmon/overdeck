@@ -1,4 +1,4 @@
-# Multi-stage build for Panopticon Dashboard
+# Multi-stage build for Overdeck Dashboard
 FROM node:20-alpine AS base
 
 # Install dependencies for both frontend and server

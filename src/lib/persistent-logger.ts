@@ -13,14 +13,14 @@ import { appendFileSync, mkdirSync } from 'fs';
 import { appendFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 
 function logsDir(): string {
-  return join(getPanopticonHome(), 'logs');
+  return join(getOverdeckHome(), 'logs');
 }
 
 function agentDir(agentId: string): string {
-  return join(getPanopticonHome(), 'agents', agentId);
+  return join(getOverdeckHome(), 'agents', agentId);
 }
 
 function ensureLogsDir(): void {

@@ -11,7 +11,7 @@
 
 import { homedir } from 'node:os';
 import { Effect, Layer, Context } from 'effect';
-import { loadPanopticonEnvSync } from '../../lib/env-loader.js';
+import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
 
 // ─── Config shape ──────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ export interface ServerConfigShape {
   readonly anthropicApiKey: string | null;
   /** Dashboard base URL for self-referencing links */
   readonly dashboardUrl: string;
-  /** Panopticon home directory */
+  /** Overdeck home directory */
   readonly panopticonHome: string;
 
   /** Typed error: get Linear API key or fail */
@@ -60,7 +60,7 @@ export const ServerConfigLayer = Layer.effect(
   ServerConfig,
   Effect.sync((): ServerConfigShape => {
     // Load .panopticon.env (idempotent)
-    loadPanopticonEnvSync();
+    loadOverdeckEnvSync();
 
     const portStr = process.env['API_PORT'] ?? process.env['PORT'] ?? '3011';
     const port = parseInt(portStr, 10);

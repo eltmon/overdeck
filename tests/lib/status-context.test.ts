@@ -9,9 +9,9 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 import { readContextPercent } from '../../src/cli/commands/status.js';
-import { getPanopticonHome } from '../../src/lib/paths.js';
+import { getOverdeckHome } from '../../src/lib/paths.js';
 
-const AGENTS_DIR = join(getPanopticonHome(), 'agents');
+const AGENTS_DIR = join(getOverdeckHome(), 'agents');
 const TEST_PREFIX = 'test-ctx-pan232';
 
 function agentDir(id: string): string {

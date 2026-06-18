@@ -106,7 +106,7 @@ export function buildObservationPrompt(input: ExtractObservationInput): string {
     .join('\n\n');
 
   return [
-    'Extract one durable Panopticon activity observation from this compressed agent turn.',
+    'Extract one durable Overdeck activity observation from this compressed agent turn.',
     'Lead with outcomes: say what changed, what decision was made, or what blocker appeared.',
     'If the turn is pure discussion or contains no concrete work/status change, set actionStatus to null.',
     `Prefer these domain tags when applicable: ${MEMORY_DOMAIN_TAGS.join(', ')}.`,

@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Agents running via Panopticon have full shell access to the host system. When an agent reads issue comments from GitHub/Linear, raw untrusted text enters the agent's instruction context via `getTrackerContext()` in `src/lib/cloister/work-agent-prompt.ts:168-289`. A malicious comment can instruct the agent to execute arbitrary commands — exfiltrating SSH keys, deleting files, installing backdoors, or anything the host user can do.
+Agents running via Overdeck have full shell access to the host system. When an agent reads issue comments from GitHub/Linear, raw untrusted text enters the agent's instruction context via `getTrackerContext()` in `src/lib/cloister/work-agent-prompt.ts:168-289`. A malicious comment can instruct the agent to execute arbitrary commands — exfiltrating SSH keys, deleting files, installing backdoors, or anything the host user can do.
 
 This is not theoretical. Indirect prompt injection via external content is a well-documented LLM vulnerability. The attack surface exists **today** (agents poll comments at spawn and on resume) and would widen significantly with PAN-501 (real-time webhook delivery).
 
@@ -222,7 +222,7 @@ for (const result of results) {
 }
 
 if (results.some(r => r.action === 'quarantine')) {
-  lines.push('_Some comments were quarantined for review. Check the Panopticon dashboard._');
+  lines.push('_Some comments were quarantined for review. Check the Overdeck dashboard._');
 }
 ```
 

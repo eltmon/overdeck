@@ -1,4 +1,4 @@
-# Panopticon Product Vision
+# Overdeck Product Vision
 
 **Deployment model roadmap and architectural principles.**
 
@@ -6,7 +6,7 @@
 
 ## Current State (2026)
 
-Panopticon runs as a **single-developer local Electron app** on individual developer machines. The dashboard, SQLite database, agent orchestration, and git worktrees all live on the same machine. Fly.io is used only for AI agent workspaces (to offload RAM, CPU, and disk), not for hosting the dashboard itself.
+Overdeck runs as a **single-developer local Electron app** on individual developer machines. The dashboard, SQLite database, agent orchestration, and git worktrees all live on the same machine. Fly.io is used only for AI agent workspaces (to offload RAM, CPU, and disk), not for hosting the dashboard itself.
 
 ### Why local-first?
 - Source code never leaves the developer's machine.
@@ -19,7 +19,7 @@ Panopticon runs as a **single-developer local Electron app** on individual devel
 ## Vision Roadmap
 
 ### Phase 1 — Shared Instance
-A single Panopticon instance used by a development team.
+A single Overdeck instance used by a development team.
 
 - One long-running dashboard on a team server or shared VM.
 - Agents still execute in isolated per-developer Fly.io workspaces.
@@ -32,12 +32,12 @@ A single Panopticon instance used by a development team.
 - File-system paths (`~/.panopticon/`, workspace directories) need to be configurable per deployment.
 
 ### Phase 2 — Multi-Tenant SaaS
-A fully hosted Panopticon service.
+A fully hosted Overdeck service.
 
-- Dashboard, database, and workspace provisioning are all managed by Panopticon Inc.
+- Dashboard, database, and workspace provisioning are all managed by Overdeck Inc.
 - Full tenant isolation (auth, billing, data boundaries).
 - Webhooks received directly — no smee.io relay.
-- Workspaces may run on Panopticon-managed infrastructure or connect to customer VPCs.
+- Workspaces may run on Overdeck-managed infrastructure or connect to customer VPCs.
 
 **Implications for infrastructure decisions:**
 - All paths, secrets, and service endpoints must be injectable via configuration.
@@ -58,7 +58,7 @@ When making infrastructure decisions (webhooks, networking, auth, storage), pref
 | **Database** | SQLite (single process) | PostgreSQL (concurrent) |
 | **Webhooks** | smee.io relay | Direct delivery |
 | **Auth** | None (local-only) | OAuth / SSO |
-| **Workspace infra** | Fly.io (personal account) | Panopticon-managed or BYOC |
+| **Workspace infra** | Fly.io (personal account) | Overdeck-managed or BYOC |
 | **File storage** | `~/.panopticon/` | S3-compatible object store |
 | **Config** | `projects.yaml` + env vars | Tenant-scoped config API |
 

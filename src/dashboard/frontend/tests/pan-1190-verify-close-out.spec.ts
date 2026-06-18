@@ -13,7 +13,7 @@ const baseIssue = {
   url: `https://example.test/issues/${ISSUE_ID}`,
   createdAt: '2026-05-18T00:00:00.000Z',
   updatedAt: '2026-05-18T00:00:00.000Z',
-  project: { id: 'panopticon', name: 'Panopticon', color: '#a855f7' },
+  project: { id: 'panopticon', name: 'Overdeck', color: '#a855f7' },
   source: 'github',
 };
 

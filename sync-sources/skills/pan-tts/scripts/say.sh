@@ -27,7 +27,7 @@ except OSError:
     token = ""
 token = token or os.environ.get("QWEN_TTS_AUTH_TOKEN", "").strip()
 if token:
-    headers["X-Panopticon-TTS-Token"] = token
+    headers["X-Overdeck-TTS-Token"] = token
 body = json.dumps({"text": text}).encode("utf-8")
 req = urllib.request.Request(endpoint, data=body, headers=headers)
 try:

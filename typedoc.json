@@ -14,7 +14,7 @@
   "excludeInternal": true,
   "includeVersion": true,
   "readme": "README.md",
-  "name": "Panopticon API Documentation",
+  "name": "Overdeck API Documentation",
   "navigationLinks": {
     "GitHub": "https://github.com/eltmon/panopticon-cli",
     "npm": "https://www.npmjs.com/package/panopticon-cli"

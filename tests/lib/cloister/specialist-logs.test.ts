@@ -22,7 +22,7 @@ import {
 } from '../../../src/lib/cloister/specialist-logs.js';
 
 describe('specialist-logs', () => {
-  const originalPanopticonHome = process.env.OVERDECK_HOME;
+  const originalOverdeckHome = process.env.OVERDECK_HOME;
   let testDir: string;
 
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe('specialist-logs', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    process.env.OVERDECK_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalOverdeckHome;
   });
 
   describe('generateRunId', () => {

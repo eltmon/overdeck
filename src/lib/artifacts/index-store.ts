@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ArtifactLifecycleState, ArtifactMetadata } from '@overdeck/contracts';
 import { openDatabase, type SqliteDatabase } from '../database/driver.js';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 export interface ArtifactIndexOptions {
   dbPath?: string;
@@ -61,7 +61,7 @@ interface ArtifactRow {
 const SLUG_PATTERN = /^[A-Za-z0-9_-]{8}$/;
 
 export function getArtifactsDir(): string {
-  return join(getPanopticonHome(), 'artifacts');
+  return join(getOverdeckHome(), 'artifacts');
 }
 
 export function getArtifactIndexPath(): string {

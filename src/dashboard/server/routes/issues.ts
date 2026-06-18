@@ -419,7 +419,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
-async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Panopticon'): Promise<string[]> {
+async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Overdeck'): Promise<string[]> {
   const githubCheck = isGitHubIssue(issueId);
   if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
     return ['No GitHub PR to close'];
@@ -537,7 +537,7 @@ async function runDestructiveIssueLifecycle(
 
   cleanupLog.push(...await closeIssuePullRequest(
     id,
-    mode === 'cancel' ? 'Canceled via Panopticon' : 'Reset to Todo via Panopticon',
+    mode === 'cancel' ? 'Canceled via Overdeck' : 'Reset to Todo via Overdeck',
   ));
 
   const { resetToTodo, cancelIssueWorkflow } = await import('../../../lib/lifecycle/index.js');
@@ -2455,11 +2455,11 @@ const postIssueCopySettingsRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
     }
 
-    const { copyPanopticonSettingsToWorkspaceSync } = yield* Effect.promise(() =>
+    const { copyOverdeckSettingsToWorkspaceSync } = yield* Effect.promise(() =>
       import('../../../lib/workspace-manager.js')
     );
 
-    const result = copyPanopticonSettingsToWorkspaceSync(workspacePath);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspacePath);
     return jsonResponse({
       success: result.errors.length === 0 || result.copied.length > 0,
       copied: result.copied.map(p => p.replace(workspacePath + '/', '')),
@@ -3659,7 +3659,7 @@ export async function fetchIssueDiscussions(
     prRepo = githubCheck.repo;
   } else {
     // Try the project-resolved repo (Linear-tracked issues whose project maps
-    // to a GitHub repo — common for Panopticon).
+    // to a GitHub repo — common for Overdeck).
     const issuePrefix = extractPrefixSync(issueId);
     const projectKey = issuePrefix ?? issueId.split('-')[0] ?? '';
     const ghConfig = getGitHubConfig();

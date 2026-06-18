@@ -1,11 +1,11 @@
 ---
 title: Context Layers
-description: How Panopticon distributes rules and guidance to every harness — CLAUDE.md, AGENTS.md, and the layered context system
+description: How Overdeck distributes rules and guidance to every harness — CLAUDE.md, AGENTS.md, and the layered context system
 ---
 
 # Context Layers
 
-Panopticon distributes context — engineering rules, project guidance, machine
+Overdeck distributes context — engineering rules, project guidance, machine
 quirks — to the coding-agent harnesses it drives through a layered system.
 You author small canonical markdown files; `pan sync` renders them into the
 files each harness actually reads.
@@ -38,7 +38,7 @@ alone routes the content:
 | You say | Applies to | Destination |
 | --- | --- | --- |
 | "add a **universal rule**: …" | every machine, every project | `sync-sources/rules/<name>.md`, `scope: universal` |
-| "add a **dev rule**: …" | Panopticon development only | `sync-sources/rules/<name>.md`, `scope: dev` |
+| "add a **dev rule**: …" | Overdeck development only | `sync-sources/rules/<name>.md`, `scope: dev` |
 | "add a **project rule**: …" | one project | `<root>/.pan/context/project.md` |
 | "add a **machine rule**: …" | one machine | `~/.panopticon/context/global.md` |
 
@@ -46,12 +46,12 @@ After any of them: `pan sync`, and the change reaches new sessions.
 
 ## Bundled rules
 
-Panopticon ships engineering rules inside the package under
+Overdeck ships engineering rules inside the package under
 `sync-sources/rules/`. Each rule carries a `scope:` frontmatter key:
 
 - `scope: universal` — folded into every machine's rendered global context;
 - `scope: dev` — folded in only on a panopticon-cli source checkout, for rules
-  about developing Panopticon itself.
+  about developing Overdeck itself.
 
 Rules ship with `pan install` and refresh on every `pan sync`.
 
@@ -64,10 +64,10 @@ harness; spawn-time plumbing delivers it:
 | Harness | Rendered artifact | How the harness receives it |
 | --- | --- | --- |
 | **Claude Code** | managed region of `~/.claude/CLAUDE.md` | Claude Code natively reads `~/.claude/CLAUDE.md` at session start |
-| **Codex** | `~/.panopticon/context/codex-global.md` | At spawn, Panopticon seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
-| **Pi** | `~/.panopticon/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Panopticon deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
+| **Codex** | `~/.panopticon/context/codex-global.md` | At spawn, Overdeck seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
+| **Pi** | `~/.panopticon/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
 
-The `pi-global.md` / `codex-global.md` files are **Panopticon-owned render
+The `pi-global.md` / `codex-global.md` files are **Overdeck-owned render
 artifacts** — the harnesses do not know about them. They exist so the global
 layer has a stable, inspectable rendered form per harness.
 

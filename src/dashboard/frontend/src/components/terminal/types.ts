@@ -3,11 +3,11 @@
  * portion) for PAN-1561. Kept verbatim so upstream t3code fixes merge cleanly.
  *
  * Seam vs upstream: t3code brands `ThreadId` via @t3tools/contracts; here it is
- * a plain string (a Panopticon project-deck / conversation key). See PAN-1536
+ * a plain string (a Overdeck project-deck / conversation key). See PAN-1536
  * for the contract-consolidation follow-up.
  */
 
-/** A terminal "scope" key (Panopticon: the project deck key). */
+/** A terminal "scope" key (Overdeck: the project deck key). */
 export type ThreadId = string;
 
 /** Default terminal drawer height in pixels. */

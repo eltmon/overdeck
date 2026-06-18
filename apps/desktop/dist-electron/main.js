@@ -128,8 +128,8 @@ function createTrayIcon(status) {
 	return electron.nativeImage.createFromBuffer(Buffer.from(svg));
 }
 function buildTooltip(agentCount, attentionCount, lastActivity) {
-	if (getDesktopSettings().tray.tooltipDetail === "minimal") return `Panopticon — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
-	const lines = ["Panopticon"];
+	if (getDesktopSettings().tray.tooltipDetail === "minimal") return `Overdeck — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
+	const lines = ["Overdeck"];
 	lines.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""} running`);
 	if (attentionCount > 0) lines.push(`⚠ ${attentionCount} need${attentionCount !== 1 ? "" : "s"} attention`);
 	if (lastActivity) lines.push(`Last: ${lastActivity}`);
@@ -192,7 +192,7 @@ async function refreshTrayStatus() {
 function createTray() {
 	if (tray) return;
 	tray = new electron.Tray(createTrayIcon("idle"));
-	tray.setToolTip("Panopticon");
+	tray.setToolTip("Overdeck");
 	tray.setContextMenu(buildContextMenu());
 	tray.on("click", () => showOrCreateWindow());
 	pollTimer = setInterval(() => void refreshTrayStatus(), 5e3);
@@ -528,10 +528,10 @@ function getUpdateStatus() {
 //#endregion
 //#region src/menu.ts
 /**
-* Application menu bar for the Panopticon desktop app.
+* Application menu bar for the Overdeck desktop app.
 *
 * Standard Electron menus: File, Edit, View, Window, Help
-* Plus a Panopticon menu with all orchestration actions.
+* Plus a Overdeck menu with all orchestration actions.
 *
 * macOS: app name menu with About, Settings, Services etc.
 * Linux/Windows: Settings in File menu.
@@ -550,7 +550,7 @@ let updateDownloaded = false;
 function rebuildMenu() {
 	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
 	electron.Menu.setApplicationMenu(menu);
-	const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+	const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
 	if (panopticonMenu?.submenu) panopticonMenu.submenu.on("menu-will-show", () => {
 		fetchActiveWorkspaces().then((workspaces) => {
 			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
@@ -614,7 +614,7 @@ function buildMenuTemplate() {
 	});
 	template.push({ role: "windowMenu" });
 	template.push({
-		label: "Panopticon",
+		label: "Overdeck",
 		submenu: [
 			{
 				label: "Start Cloister",
@@ -659,7 +659,7 @@ function buildMenuTemplate() {
 			},
 			{ type: "separator" },
 			{
-				label: "Panopticon on GitHub",
+				label: "Overdeck on GitHub",
 				click: () => void electron.shell.openExternal("https://github.com/eltmon/panopticon-cli")
 			},
 			{
@@ -682,7 +682,7 @@ function buildMenuTemplate() {
 function configureApplicationMenu() {
 	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
 	electron.Menu.setApplicationMenu(menu);
-	const panopticonMenu = menu.items.find((item) => item.label === "Panopticon");
+	const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
 	if (panopticonMenu?.submenu) panopticonMenu.submenu.on("menu-will-show", () => {
 		fetchActiveWorkspaces().then((workspaces) => {
 			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
@@ -699,7 +699,7 @@ function configureApplicationMenu() {
 //#endregion
 //#region src/notifications.ts
 /**
-* Native desktop notifications for Panopticon events.
+* Native desktop notifications for Overdeck events.
 *
 * Event types and their default enabled state (all configurable in Settings):
 *   inputNeeded   — Agent needs user input (default: on)
@@ -740,7 +740,7 @@ function initializeNotifications() {
 //#endregion
 //#region src/autostart.ts
 /**
-* Auto-start nag flow for the Panopticon desktop app.
+* Auto-start nag flow for the Overdeck desktop app.
 *
 * Flow:
 *   Launch 1:   Full explanation dialog (warm, inviting)
@@ -775,9 +775,9 @@ function showFirstLaunchDialog() {
 	setTimeout(() => {
 		electron.dialog.showMessageBox({
 			type: "info",
-			title: "Start Panopticon automatically?",
+			title: "Start Overdeck automatically?",
 			message: "Keep an eye on your agents — even when you forget to open the app.",
-			detail: "Panopticon can start automatically when you log in, so you never miss an agent asking for help or a merge that's ready to ship.\n\nYou can change this at any time in Settings → Desktop → Auto-start.",
+			detail: "Overdeck can start automatically when you log in, so you never miss an agent asking for help or a merge that's ready to ship.\n\nYou can change this at any time in Settings → Desktop → Auto-start.",
 			buttons: ["Enable Auto-start", "Not Yet"],
 			defaultId: 0,
 			cancelId: 1
@@ -862,7 +862,7 @@ function registerDesktopProtocol() {
 //#region src/main.ts
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
-const APP_DISPLAY_NAME = isDevelopment ? "Panopticon (Dev)" : "Panopticon";
+const APP_DISPLAY_NAME = isDevelopment ? "Overdeck (Dev)" : "Overdeck";
 const APP_ID = "com.panopticon.app";
 const LINUX_WM_CLASS = isDevelopment ? "panopticon-dev" : "panopticon";
 const DESKTOP_SCHEME = "panopticon";

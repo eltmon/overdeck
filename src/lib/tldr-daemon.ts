@@ -193,7 +193,7 @@ export interface TldrDaemonStatus {
  * Live daemon state derived from the tldr-owned pidfile.
  *
  * The `tldr` binary writes its PID to <workspace>/.tldr/daemon.pid on start
- * and removes it on stop. That file is the single source of truth — Panopticon
+ * and removes it on stop. That file is the single source of truth — Overdeck
  * does not maintain its own state file (PAN-1132: writing our own state with a
  * fallback to the CLI's process.pid caused the file to be reaped the moment the
  * CLI exited, making running daemons report as stopped).

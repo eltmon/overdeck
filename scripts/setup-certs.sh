@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup local HTTPS certificates for Panopticon using mkcert
+# Setup local HTTPS certificates for Overdeck using mkcert
 # This script generates trusted certificates for *.pan.localhost
 
 set -e
@@ -13,7 +13,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo "Setting up local HTTPS certificates for Panopticon..."
+echo "Setting up local HTTPS certificates for Overdeck..."
 
 # Check if mkcert is installed
 if ! command -v mkcert &> /dev/null; then

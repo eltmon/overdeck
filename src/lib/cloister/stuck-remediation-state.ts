@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 export type StuckRemediationStage = 0 | 1 | 2 | 3;
 
@@ -11,7 +11,7 @@ export interface StuckRemediationState {
 }
 
 function agentStateDir(agentId: string): string {
-  return join(getPanopticonHome(), 'agents', agentId);
+  return join(getOverdeckHome(), 'agents', agentId);
 }
 
 function statePath(agentId: string): string {

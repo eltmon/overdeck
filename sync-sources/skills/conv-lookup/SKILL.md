@@ -1,6 +1,6 @@
 ---
 name: conv-lookup
-description: Find, review, read, inspect, summarize, or compare Panopticon conversations. Use when the user references a pan.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. Maps conversation IDs to Claude Code JSONL session files and parses session content. Read-only.
+description: Find, review, read, inspect, summarize, or compare Overdeck conversations. Use when the user references a pan.localhost/conv/<id> URL, a conversation ID (e.g. "conv 371", "conversation 108"), a fuzzy reference ("that GPT conversation", "the last Sonnet session"), or asks to review/read/look at/check/summarize/compare conversations. Maps conversation IDs to Claude Code JSONL session files and parses session content. Read-only.
 triggers:
   - review conversation
   - read conversation
@@ -20,7 +20,7 @@ triggers:
 
 # Conversation Lookup
 
-Use this skill whenever the user references a Panopticon conversation — by `pan.localhost/conv/<id>` URL, numeric id, conversation name, or a fuzzy reference like "that GPT conversation". Handles single-conversation review, recent-conversation listing, search, and side-by-side comparison.
+Use this skill whenever the user references a Overdeck conversation — by `pan.localhost/conv/<id>` URL, numeric id, conversation name, or a fuzzy reference like "that GPT conversation". Handles single-conversation review, recent-conversation listing, search, and side-by-side comparison.
 
 ## When to use
 
@@ -50,14 +50,14 @@ same way.
 
 ## How it works
 
-Every Panopticon conversation is tracked in the SQLite database at `~/.panopticon/panopticon.db` in the `conversations` table. Use the first-class CLI resolver to map a conversation ID to its Claude Code JSONL transcript:
+Every Overdeck conversation is tracked in the SQLite database at `~/.panopticon/panopticon.db` in the `conversations` table. Use the first-class CLI resolver to map a conversation ID to its Claude Code JSONL transcript:
 
 ```bash
 pan conv jsonl <id>        # alias: pan conv transcript <id>
 pan conv jsonl --json <id>
 ```
 
-`pan conv jsonl` is the canonical resolver. It reads the conversation's `claude_session_id` + `cwd`, resolves through the shared Panopticon transcript-path helper, preserves the one-level `~/.claude/projects/*/<session-id>.jsonl` fallback, and reports one of:
+`pan conv jsonl` is the canonical resolver. It reads the conversation's `claude_session_id` + `cwd`, resolves through the shared Overdeck transcript-path helper, preserves the one-level `~/.claude/projects/*/<session-id>.jsonl` fallback, and reports one of:
 
 - `ok` — path exists on disk
 - `expired` — Claude session id is known, but the JSONL is not present on disk
@@ -202,7 +202,7 @@ for line in path.read_text().splitlines():
 
 The `conversations` table has these useful columns:
 - `id` — numeric conversation ID (the number in `/conv/<id>`)
-- `name` — Panopticon-generated name (e.g., `20260412-4175`)
+- `name` — Overdeck-generated name (e.g., `20260412-4175`)
 - `status` — `active` or `ended`
 - `cwd` — working directory when spawned
 - `issue_id` — associated issue (null for manual convs)
@@ -241,5 +241,5 @@ Typical use cases: "how did GPT-5.4 handle this vs Sonnet?", "compare conv 365 a
 
 ## See Also
 
-- `unarchive-conversation` — restore an archived Panopticon conversation to active state (write operation; use this if the conversation you're reviewing is archived and you want it live in Mission Control)
+- `unarchive-conversation` — restore an archived Overdeck conversation to active state (write operation; use this if the conversation you're reviewing is archived and you want it live in Mission Control)
 - `pan show <id>` — inspect agent state for *issue* work (different scope — agents working on issues, not user conversations)

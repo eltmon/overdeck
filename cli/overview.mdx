@@ -1,13 +1,13 @@
 ---
 title: CLI Overview
-description: Introduction to Panopticon's command-line interface
+description: Introduction to Overdeck's command-line interface
 ---
 
 import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # CLI Overview
 
-The Panopticon CLI (`pan`) provides a comprehensive set of commands for managing agents, workspaces, and multi-project orchestration.
+The Overdeck CLI (`pan`) provides a comprehensive set of commands for managing agents, workspaces, and multi-project orchestration.
 
 Every CLI command has a counterpart in the dashboard, where the same agents, conversations, and workflow are managed visually. The Command Deck below shows a live agent: the project and conversation sidebar on the left, the issue tree, the agent's turn-by-turn tool calls and reasoning in the center, and a Needs-you / Project / Global awareness rail on the right.
 
@@ -23,7 +23,7 @@ Every CLI command has a counterpart in the dashboard, where the same agents, con
 
 ## Philosophy
 
-The Panopticon CLI is designed around a few key principles:
+The Overdeck CLI is designed around a few key principles:
 
 1. **Agent-centric** - Commands focus on spawning, monitoring, and controlling AI agents
 2. **Workspace isolation** - Each issue gets its own git worktree workspace
@@ -32,7 +32,7 @@ The Panopticon CLI is designed around a few key principles:
 
 ## Command Structure
 
-Panopticon commands are organized into logical groups:
+Overdeck commands are organized into logical groups:
 
 | Group | Purpose | Examples |
 |-------|---------|----------|
@@ -48,7 +48,7 @@ Panopticon commands are organized into logical groups:
 ## Installation & Setup
 
 ```bash
-# Install Panopticon globally
+# Install Overdeck globally
 npm install -g @overdeck/cli
 
 # Run first-time setup
@@ -115,7 +115,7 @@ man pan              # If installed via package manager
 | Flag | Description |
 |------|-------------|
 | `--help` | Show help for any command |
-| `--version` | Show Panopticon version |
+| `--version` | Show Overdeck version |
 | `--verbose` | Enable verbose output |
 
 ### Issue identifiers
@@ -128,7 +128,7 @@ Commands accept various issue identifier formats:
 
 ## Configuration
 
-Panopticon stores configuration in:
+Overdeck stores configuration in:
 
 - `~/.panopticon.env` - API keys and tokens
 - `~/.panopticon/projects.yaml` - Registered projects

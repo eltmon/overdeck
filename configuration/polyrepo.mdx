@@ -5,7 +5,7 @@ description: Multi-repository workspace management
 
 # Polyrepo Configuration
 
-Panopticon supports projects with multiple git repositories (like separate frontend/backend repos). Configure workspace settings directly in `projects.yaml` to manage polyrepo workspaces.
+Overdeck supports projects with multiple git repositories (like separate frontend/backend repos). Configure workspace settings directly in `projects.yaml` to manage polyrepo workspaces.
 
 ## Overview
 
@@ -141,7 +141,7 @@ projects:
 
 ## Service Templates
 
-Panopticon provides built-in templates for common frameworks. Use these to avoid boilerplate:
+Overdeck provides built-in templates for common frameworks. Use these to avoid boilerplate:
 
 | Template | Start Command | Port |
 |----------|--------------|------|
@@ -169,7 +169,7 @@ See `/pan-workspace-config` skill for complete documentation.
 
 ## What Your Project Needs to Provide
 
-Panopticon is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
+Overdeck is an orchestration layer - it manages workspaces, agents, and workflows, but **your project repository provides the actual templates and configuration**.
 
 Projects can be as simple as just a git repo (for worktree-only workspaces) or as complex as a full polyrepo with Docker, Traefik, and database seeding.
 
@@ -188,7 +188,7 @@ your-project/
 └── ...
 ```
 
-**Docker Compose templates** should use placeholders that Panopticon will replace:
+**Docker Compose templates** should use placeholders that Overdeck will replace:
 
 ```yaml
 # docker-compose.devcontainer.yml.template
@@ -304,7 +304,7 @@ projects:
     # No workspace config needed - uses git worktrees
 ```
 
-Panopticon creates workspaces as git worktrees. Docker, HTTPS, and seeding are opt-in.
+Overdeck creates workspaces as git worktrees. Docker, HTTPS, and seeding are opt-in.
 
 ## Container Configuration Tips
 
@@ -360,7 +360,7 @@ the repo being merged matches the gate's `path` field.
 
 ### How it works
 
-When a polyrepo merge runs, Panopticon computes the relative path from the project root to the
+When a polyrepo merge runs, Overdeck computes the relative path from the project root to the
 sub-repo being merged (e.g., `frontend` or `backend`). It then filters the configured quality gates
 to only those whose `path` field matches that relative path.
 

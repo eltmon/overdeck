@@ -1,6 +1,6 @@
-# Panopticon Desktop App
+# Overdeck Desktop App
 
-The Electron-based desktop app wraps the Panopticon dashboard in a native window with system tray integration, native notifications, and automatic server embedding.
+The Electron-based desktop app wraps the Overdeck dashboard in a native window with system tray integration, native notifications, and automatic server embedding.
 
 ---
 
@@ -11,8 +11,8 @@ The Electron-based desktop app wraps the Panopticon dashboard in a native window
 Download the `.AppImage` from the releases page and make it executable:
 
 ```bash
-chmod +x Panopticon-*.AppImage
-./Panopticon-*.AppImage
+chmod +x Overdeck-*.AppImage
+./Overdeck-*.AppImage
 ```
 
 Or place it in `~/Applications/` so `pan up` detects and launches it automatically.
@@ -21,7 +21,7 @@ You can also install to `~/.local/bin/panopticon` for system-wide detection.
 
 ### macOS (DMG)
 
-Open the `.dmg`, drag `Panopticon.app` to `/Applications/`, then launch it. `pan up` will detect and open it automatically if present at `/Applications/Panopticon.app`.
+Open the `.dmg`, drag `Overdeck.app` to `/Applications/`, then launch it. `pan up` will detect and open it automatically if present at `/Applications/Overdeck.app`.
 
 ---
 
@@ -86,11 +86,11 @@ Clicking a notification brings the dashboard window to focus.
 
 ## Auto-Start
 
-Enable **Launch at login** in **Settings → Desktop App → Auto-start** to have Panopticon start automatically when you log in.
+Enable **Launch at login** in **Settings → Desktop App → Auto-start** to have Overdeck start automatically when you log in.
 
 ### Nag Flow
 
-If auto-start is not configured, Panopticon gently prompts you to enable it:
+If auto-start is not configured, Overdeck gently prompts you to enable it:
 
 - **First launch**: Native system dialog asking if you want to enable auto-start
 - **Launches 2–5**: In-app toast notification with an "Enable" action button
@@ -115,13 +115,13 @@ Press `Cmd+K` (macOS) or `Ctrl+K` (Linux/Windows) to open the command palette fr
 
 Type to filter. Press `Enter` to execute, `Escape` to close.
 
-The palette is also accessible from the desktop app's **Panopticon** menu bar menu.
+The palette is also accessible from the desktop app's **Overdeck** menu bar menu.
 
 ---
 
 ## Menu Bar (macOS)
 
-The macOS menu bar includes a **Panopticon** menu with:
+The macOS menu bar includes a **Overdeck** menu with:
 
 - Start/Stop Cloister
 - Emergency Stop
@@ -136,7 +136,7 @@ Menu actions dispatch to the renderer via IPC, which the frontend handles via `p
 
 The **Settings** page includes a **Desktop App** section when running inside the Electron app. This section is automatically hidden in browser mode (when `window.panopticonBridge` is absent).
 
-Settings are persisted to `$userData/desktop-settings.json` (e.g., `~/.config/Panopticon/desktop-settings.json` on Linux, `~/Library/Application Support/Panopticon/desktop-settings.json` on macOS).
+Settings are persisted to `$userData/desktop-settings.json` (e.g., `~/.config/Overdeck/desktop-settings.json` on Linux, `~/Library/Application Support/Overdeck/desktop-settings.json` on macOS).
 
 ---
 

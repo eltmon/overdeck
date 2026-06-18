@@ -16,7 +16,7 @@ export const QWEN_TTS_STATE_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.json');
 export const QWEN_TTS_START_LOCK_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.start.lock');
 export const QWEN_TTS_MANUAL_STOP_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.manual-stop');
 export const QWEN_TTS_AUTH_TOKEN_PATH = join(OVERDECK_HOME, 'secrets', 'qwen-tts.token');
-export const QWEN_TTS_AUTH_HEADER = 'X-Panopticon-TTS-Token';
+export const QWEN_TTS_AUTH_HEADER = 'X-Overdeck-TTS-Token';
 export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
 const GPU_MEMORY_CACHE_TTL_MS = 30_000;
 const DEFAULT_TTS_DAEMON_STARTUP_GRACE_MS = 30 * 60_000;
@@ -678,7 +678,7 @@ async function hasCudaGpu(): Promise<boolean> {
   await mkdir(configDir, { recursive: true });
   const unitPath = join(configDir, 'panopticon-qwen-tts.service');
   const panBinary = process.env.OVERDECK_PAN_BINARY ?? process.argv[1] ?? 'pan';
-  const content = `[Unit]\nDescription=Panopticon Qwen TTS daemon\nAfter=default.target\n\n[Service]\nType=simple\nExecStart=${panBinary} tts start --foreground\nRestart=on-failure\nRestartSec=10\n\n[Install]\nWantedBy=default.target\n`;
+  const content = `[Unit]\nDescription=Overdeck Qwen TTS daemon\nAfter=default.target\n\n[Service]\nType=simple\nExecStart=${panBinary} tts start --foreground\nRestart=on-failure\nRestartSec=10\n\n[Install]\nWantedBy=default.target\n`;
   await writeFile(unitPath, content, 'utf8');
   return unitPath;
 }async function ttsDaemonInstallStatePromise(): Promise<{ venvDir: string; installed: boolean }> {

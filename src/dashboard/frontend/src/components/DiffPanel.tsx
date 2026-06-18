@@ -1,6 +1,6 @@
 /**
  * Diff panel — full diff viewer with turn navigation, unified/split views.
- * Adapted from T3Code's DiffPanel.tsx for Panopticon's routing and state.
+ * Adapted from T3Code's DiffPanel.tsx for Overdeck's routing and state.
  */
 
 import { parsePatchFiles } from '@pierre/diffs'
@@ -197,7 +197,7 @@ function formatShortTimestamp(iso: string): string {
   }
 }
 
-// ─── URL helpers (Panopticon uses window.history directly) ────────────────────
+// ─── URL helpers (Overdeck uses window.history directly) ────────────────────
 
 function readDiffParamsFromUrl(): { diff?: string; diffTurnId?: string; diffFilePath?: string } {
   return parseDiffRouteSearch(

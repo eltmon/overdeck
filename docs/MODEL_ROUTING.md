@@ -1,6 +1,6 @@
 # Model Routing
 
-Panopticon routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Panopticon workflow (e.g., `issue-agent:implementation`, `review:security`). Every time a workflow step needs to call an LLM, Panopticon looks up which model is assigned to that step's work type.
+Overdeck routes LLM models by **work type**. A work type is a canonical routing identifier that represents a specific job slot in the Overdeck workflow (e.g., `issue-agent:implementation`, `review:security`). Every time a workflow step needs to call an LLM, Overdeck looks up which model is assigned to that step's work type.
 
 ## Terminology
 
@@ -8,7 +8,7 @@ Panopticon routes LLM models by **work type**. A work type is a canonical routin
 |------|---------------|---------|
 | **Work Type** | Internal routing identifier for a model assignment | `issue-agent:implementation`, `specialist-review-agent` |
 | **Override** | Explicit per-work-type model assignment set by you | You assign `kimi-k2.5` to the Implementation phase |
-| **Smart Selection** | Capability-based automatic model selection when no override exists | Panopticon picks the best model for code generation automatically |
+| **Smart Selection** | Capability-based automatic model selection when no override exists | Overdeck picks the best model for code generation automatically |
 | **Provider** | LLM API provider | Anthropic, OpenAI, Google, Kimi, MiniMax, Z.AI, OpenRouter |
 | **Favorite** | A model you've starred in the OpenRouter catalog so it's available for assignment | `qwen/qwen3.6-plus` |
 
@@ -16,7 +16,7 @@ Panopticon routes LLM models by **work type**. A work type is a canonical routin
 
 ## How Model Resolution Works
 
-When Panopticon needs to make an LLM call, it resolves the model through this chain:
+When Overdeck needs to make an LLM call, it resolves the model through this chain:
 
 1. **User Override** — If you've explicitly assigned a model to this work type via the dashboard, use it
 2. **Smart Selection** — If no override exists, score all enabled provider models against the work type's capability requirements (code-generation, reasoning, speed, etc.) and pick the best match
@@ -27,7 +27,7 @@ When Panopticon needs to make an LLM call, it resolves the model through this ch
 
 ## Available Providers
 
-Panopticon supports seven LLM providers:
+Overdeck supports seven LLM providers:
 
 | Provider | Auth Method | Notes |
 |----------|-------------|-------|
@@ -101,7 +101,7 @@ Model assignments are configured in **Settings → Model Assignments**. This sec
 
 ### Resetting to Smart Selection
 
-If you want Panopticon to automatically pick the best model:
+If you want Overdeck to automatically pick the best model:
 1. Click **Remove Override** in the model modal, or
 2. Click **Reset all to smart selection** in the summary bar at the bottom of the section
 

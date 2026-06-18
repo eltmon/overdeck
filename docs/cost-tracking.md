@@ -48,7 +48,7 @@ When workspaces are cleaned up after merge (git worktree removed), the Claude se
 
 ## Session-to-Agent Mapping
 
-The core attribution problem: given a transcript file `<uuid>.jsonl`, which Panopticon agent created it?
+The core attribution problem: given a transcript file `<uuid>.jsonl`, which Overdeck agent created it?
 
 ### Where the Mapping Is Stored
 
@@ -117,7 +117,7 @@ The `request_id` unique index is the primary dedup mechanism. Each Claude API re
 ```sql
 CREATE TABLE processed_sessions (
     session_id      TEXT PRIMARY KEY,     -- Claude Code session UUID
-    agent_id        TEXT,                 -- Panopticon agent that owns this session
+    agent_id        TEXT,                 -- Overdeck agent that owns this session
     issue_id        TEXT,                 -- Issue this session is attributed to
     transcript_path TEXT,                 -- Full path to the .jsonl file
     byte_offset     INTEGER NOT NULL DEFAULT 0,  -- Bytes consumed so far

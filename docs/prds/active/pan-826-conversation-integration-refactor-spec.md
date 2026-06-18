@@ -108,7 +108,7 @@ Files: `src/lib/tmux.ts` (verification helpers), `src/dashboard/server/routes/co
 - Align CSS class names: `.chat-markdown`, `.chat-markdown-codeblock`, `.chat-markdown-copy-button`, `.chat-markdown-shiki`.
 - Keep our existing `tone` system (already matches T3Code).
 - Reference: `/home/eltmon/Projects/t3code/apps/web/src/components/chat/`.
-- No Panopticon feature is removed or downgraded to match T3Code; alignment is structural only.
+- No Overdeck feature is removed or downgraded to match T3Code; alignment is structural only.
 
 ### Should Have
 

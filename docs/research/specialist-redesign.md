@@ -88,7 +88,7 @@ Five concepts, one design.
 
 ### 4.1 vBRIEF Plan schema as the SQLite substrate
 
-**Steal:** use vBRIEF v0.6 verbatim as the database schema. Panopticon's rows serialize directly to valid vBRIEF.
+**Steal:** use vBRIEF v0.6 verbatim as the database schema. Overdeck's rows serialize directly to valid vBRIEF.
 
 Keeps:
 - `id`, `uid`, `sequence`, `changeLog` — audit trail free
@@ -107,7 +107,7 @@ Keeps:
 
 Everything we currently hang off ad-hoc DB columns (queue name, specialist name, status, attempts) collapses into vBRIEF.
 
-**Interop bonus:** Panopticon-as-deft-engine story becomes trivial. We don't translate to/from vBRIEF at the edge; we *are* vBRIEF at the core.
+**Interop bonus:** Overdeck-as-deft-engine story becomes trivial. We don't translate to/from vBRIEF at the edge; we *are* vBRIEF at the core.
 
 ### 4.2 File-overlap audit as scheduler primitive (replaces busy check)
 
@@ -207,13 +207,13 @@ Unifies runtime:
 - **Remote worker** → channel wrapped around ws connection to remote runner
 - Scheduler sees one abstraction: "assign PlanItem → runtime → OPEN_CHANNEL"
 
-xumux is v0.1.0-draft. We would be early adopter. Aligned with the Panopticon-as-deft-engine story (Jonathan's discussion).
+xumux is v0.1.0-draft. We would be early adopter. Aligned with the Overdeck-as-deft-engine story (Jonathan's discussion).
 
 ---
 
 ## 5. The unified design in one sentence
 
-**Panopticon is a vBRIEF Plan executor over xumux channels, scheduled by file-overlap audit, with capability-detected workers and bounded-loop specialists.**
+**Overdeck is a vBRIEF Plan executor over xumux channels, scheduled by file-overlap audit, with capability-detected workers and bounded-loop specialists.**
 
 Each layer kills a specific current-architecture problem:
 
@@ -241,7 +241,7 @@ Each layer kills a specific current-architecture problem:
 
 ## 7. Risks & open questions
 
-- **vBRIEF v0.6 is draft.** If deft churns the spec, we either pin or track. Tracking is consistent with the Jonathan/engine pitch. Pin with explicit extension field for Panopticon-specific data.
+- **vBRIEF v0.6 is draft.** If deft churns the spec, we either pin or track. Tracking is consistent with the Jonathan/engine pitch. Pin with explicit extension field for Overdeck-specific data.
 - **xumux v0.1.0-draft** — same tradeoff, same recommendation (track, contribute upstream).
 - **Migration is pause-the-world.** User wants "stop everything else, do it all at once in place." With live workspaces and 60 skills depending on the current shape, we need a hard cutover plan: flag-day, ledger-replay into new schema, new runtime parallel until parity, switch.
 - **Subagent vs tmux tradeoffs** — which roles benefit from in-process subagent isolation (review, analysis) vs need their own process (long work, user-observable)? Capability chain must resolve runtime, not just model.
@@ -257,7 +257,7 @@ Each layer kills a specific current-architecture problem:
 
 The PRD that grows from this research should produce:
 
-1. SQLite schema aligned to vBRIEF Plan/PlanItem/Edge (verbatim column names, `extensions` column for Panopticon-specific data)
+1. SQLite schema aligned to vBRIEF Plan/PlanItem/Edge (verbatim column names, `extensions` column for Overdeck-specific data)
 2. Unified `resolveAgent(context)` API with explicit capability chain + resolution trace surfaced to dashboard
 3. File-overlap scheduler using `ports` declared in Workflow Profile
 4. xumux channel registry replacing tmux-session-name registry

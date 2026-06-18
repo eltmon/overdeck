@@ -15,19 +15,19 @@ import {
 } from '../tts-voices.js';
 
 let tempHome: string;
-let previousPanopticonHome: string | undefined;
+let previousOverdeckHome: string | undefined;
 
 beforeEach(async () => {
-  previousPanopticonHome = process.env.OVERDECK_HOME;
+  previousOverdeckHome = process.env.OVERDECK_HOME;
   tempHome = await mkdtemp(join(tmpdir(), 'pan-tts-voices-'));
   process.env.OVERDECK_HOME = tempHome;
 });
 
 afterEach(async () => {
-  if (previousPanopticonHome === undefined) {
+  if (previousOverdeckHome === undefined) {
     delete process.env.OVERDECK_HOME;
   } else {
-    process.env.OVERDECK_HOME = previousPanopticonHome;
+    process.env.OVERDECK_HOME = previousOverdeckHome;
   }
   await rm(tempHome, { recursive: true, force: true });
 });

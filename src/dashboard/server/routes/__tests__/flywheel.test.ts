@@ -378,7 +378,7 @@ describe('flywheel auto-merge routes', () => {
       readyForMerge: true,
       prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1486',
     }),
-    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Panopticon CLI' }) as never,
+    resolveProject: () => ({ projectKey: 'panopticon-cli', projectPath: process.cwd(), projectName: 'Overdeck CLI' }) as never,
     ...overrides,
   });
 

@@ -1593,7 +1593,7 @@
           "phase": "5"
         },
         "narrative": {
-          "Action": "Update scripts/git-hooks/ and any Panopticon-installed shell aliases (shipped via 'pan sync') so they invoke the new verbs. Grep scripts/ for legacy invocations."
+          "Action": "Update scripts/git-hooks/ and any Overdeck-installed shell aliases (shipped via 'pan sync') so they invoke the new verbs. Grep scripts/ for legacy invocations."
         },
         "subItems": [
           {

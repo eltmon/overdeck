@@ -4,11 +4,11 @@
 
 ## Attribution
 
-Several patterns in this PRD are adapted from the [Deft Directive](https://github.com/visionik/deft) (MIT license, Copyright 2025-2026 Jonathan Taylor). Deft is a standards/guidelines framework for AI-assisted development. We're incorporating its best ideas into Panopticon's runtime orchestration layer where they complement our existing specialist pipeline and context management.
+Several patterns in this PRD are adapted from the [Deft Directive](https://github.com/visionik/deft) (MIT license, Copyright 2025-2026 Jonathan Taylor). Deft is a standards/guidelines framework for AI-assisted development. We're incorporating its best ideas into Overdeck's runtime orchestration layer where they complement our existing specialist pipeline and context management.
 
 ## Problem
 
-Five gaps in Panopticon's current implementation:
+Five gaps in Overdeck's current implementation:
 
 1. **Stub blindness** — The verification gate (`verification-gate.ts`) checks typecheck/lint/test but doesn't scan for incomplete implementations. The review convoy checks correctness/security/performance but doesn't detect TODO placeholders, `return null` stubs, or `pass` bodies. Agents mark work "done" with half-baked code.
 
@@ -239,7 +239,7 @@ Add relevance tags to skill manifest:
 
 - **Modifying beads internals** — Beads is an external tool (`bd`). We work with its output, not its internals.
 - **vBRIEF format adoption** — Deft's vBRIEF is tightly coupled to their framework. Our checkpoint.json serves the same purpose without the dependency.
-- **Discuss strategy as a formal Panopticon phase** — Decision locking captures the valuable part (preventing re-debate) without adding a new pipeline stage.
+- **Discuss strategy as a formal Overdeck phase** — Decision locking captures the valuable part (preventing re-debate) without adding a new pipeline stage.
 - **Fractal summaries as a general system** — The feedback rollup captures the specific case where this matters most. General-purpose summarization is over-engineered for current needs.
 
 ## Success Criteria

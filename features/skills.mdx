@@ -7,14 +7,14 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 # Skills System
 
-Panopticon's skills system provides reusable workflows and best practices for AI agents.
+Overdeck's skills system provides reusable workflows and best practices for AI agents.
 
-The dashboard's **Skills** page lists every skill side by side per harness — here `Panopticon (108)` and `Claude (123)` — with each skill's on-disk path, internal `name`, and a sync indicator linking to its `SKILL.md`. It's the quickest way to confirm a skill landed where the agent (or the conversation you're driving) can invoke it.
+The dashboard's **Skills** page lists every skill side by side per harness — here `Overdeck (108)` and `Claude (123)` — with each skill's on-disk path, internal `name`, and a sync indicator linking to its `SKILL.md`. It's the quickest way to confirm a skill landed where the agent (or the conversation you're driving) can invoke it.
 
 <ThemedImage
   light="/images/dashboard/skills-light.png"
   dark="/images/dashboard/skills-dark.png"
-  alt="Skills page: per-harness columns (Panopticon and Claude) listing each skill's path, name, and SKILL.md sync status, with an activity feed on the right"
+  alt="Skills page: per-harness columns (Overdeck and Claude) listing each skill's path, name, and SKILL.md sync status, with an activity feed on the right"
 />
 
 ## What Are Skills
@@ -30,7 +30,7 @@ Skills eliminate the need to repeatedly explain how to do common tasks. Instead 
 
 ## Built-In Skills
 
-Panopticon ships with 70+ built-in skills organized by category:
+Overdeck ships with 70+ built-in skills organized by category:
 
 ### Development Workflows
 
@@ -56,11 +56,11 @@ Panopticon ships with 70+ built-in skills organized by category:
 | `refactor-radar` | Detects systemic issues causing AI confusion |
 | `session-health` | Detect and clean up stuck sessions |
 
-### Panopticon Operations (pan-*)
+### Overdeck Operations (pan-*)
 
 | Skill | Description |
 |-------|-------------|
-| `pan-help` | Show all Panopticon commands |
+| `pan-help` | Show all Overdeck commands |
 | `pan-up` | Start dashboard and services |
 | `pan-down` | Stop dashboard and services |
 | `pan-status` | Show running agents |
@@ -82,7 +82,7 @@ Panopticon ships with 70+ built-in skills organized by category:
 | `pan-docker` | Docker operations |
 | `pan-network` | Network diagnostics |
 | `pan-config` | Configuration management |
-| `pan-restart` | Safely restart Panopticon dashboard and services |
+| `pan-restart` | Safely restart Overdeck dashboard and services |
 | `pan-code-review` | Orchestrate parallel code review (3 reviewers + synthesis) |
 | `pan-convoy-synthesis` | Synthesize convoy coordination |
 | `pan-subagent-creator` | Create specialized subagents |
@@ -90,7 +90,7 @@ Panopticon ships with 70+ built-in skills organized by category:
 | `pan-reopen` | Reopen completed issue for re-work |
 | `pan-oversee` | Supervise agent through full work lifecycle |
 | `pan-sync-main` | Sync latest main into workspace feature branch |
-| `pan-docs` | Search Panopticon documentation |
+| `pan-docs` | Search Overdeck documentation |
 | `pan-tldr` | Token-efficient codebase analysis |
 
 ### Utilities
@@ -223,7 +223,7 @@ The `pan sync` command:
 
 ## Subagents
 
-Panopticon includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
+Overdeck includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
 
 ### Code Review Subagents
 

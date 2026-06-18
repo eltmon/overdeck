@@ -7,7 +7,7 @@
 
 ## Overview
 
-Remote Workspaces allows Panopticon to offload Docker containers and Claude agents to exe.dev VMs, freeing local machine resources. Instead of running postgres, redis, frontend, backend, and agents locally, everything runs on remote VMs with persistent storage.
+Remote Workspaces allows Overdeck to offload Docker containers and Claude agents to exe.dev VMs, freeing local machine resources. Instead of running postgres, redis, frontend, backend, and agents locally, everything runs on remote VMs with persistent storage.
 
 ## Problem Statement
 
@@ -43,7 +43,7 @@ Remote Workspaces allows Panopticon to offload Docker containers and Claude agen
 ┌────────────────────────────────────────────────────────────────┐
 │  Local Machine (Thin Client)                                   │
 │  ┌──────────────────────────────────────────────────────────┐ │
-│  │ Panopticon Dashboard                                      │ │
+│  │ Overdeck Dashboard                                      │ │
 │  │ - Orchestrates remote VMs via SSH/API                     │ │
 │  │ - Displays agent status, logs                             │ │
 │  │ - Proxies to remote services for browser access           │ │
@@ -101,7 +101,7 @@ One dedicated VM runs shared services to reduce per-workspace memory:
 | PostgreSQL | All workspaces share, separate DBs | ~150MB | `myn_min667`, `myn_min668`, etc. |
 | Redis | All workspaces share, separate DB numbers | ~50MB | DB 0, 1, 2, ... per workspace |
 | Traefik | Routes `*.exe.dev` to workspace VMs | ~50MB | Docker provider |
-| Panopticon API | Central coordination (optional) | ~100MB | WebSocket hub |
+| Overdeck API | Central coordination (optional) | ~100MB | WebSocket hub |
 
 **Total: ~350-500MB** (vs ~200MB per workspace if duplicated)
 
@@ -483,11 +483,11 @@ pan remote resources
 
 ### SSH for All Git Operations
 
-**Panopticon uses SSH for all git operations.** This is an opinionated decision:
+**Overdeck uses SSH for all git operations.** This is an opinionated decision:
 
 - HTTPS requires interactive credentials or platform-specific credential helpers
 - SSH keys work consistently across local machines, remote VMs, and CI
-- Panopticon automatically converts HTTPS URLs to SSH format when cloning on remote VMs
+- Overdeck automatically converts HTTPS URLs to SSH format when cloning on remote VMs
 
 Example conversion:
 ```
@@ -497,7 +497,7 @@ https://gitlab.com/owner/repo.git → git@gitlab.com:owner/repo.git
 
 ### SSH Key Configuration
 
-Panopticon checks for SSH keys in this order:
+Overdeck checks for SSH keys in this order:
 
 1. `~/.panopticon/ssh/exe-dev-key` (panopticon-specific, recommended)
 2. `~/.ssh/id_ed25519` (standard Ed25519 key)
@@ -545,7 +545,7 @@ ssh exe.dev help
 
 ### Claude Code Bypass Permissions (Automatic)
 
-Remote agents run with `--dangerously-skip-permissions` which requires accepting a one-time warning, and Claude Code has an onboarding flow for new users. Panopticon automatically configures both on new VMs by creating `~/.claude.json` with:
+Remote agents run with `--dangerously-skip-permissions` which requires accepting a one-time warning, and Claude Code has an onboarding flow for new users. Overdeck automatically configures both on new VMs by creating `~/.claude.json` with:
 
 ```json
 {
@@ -563,7 +563,7 @@ ssh <vm-name>.exe.xyz 'echo "{\"bypassPermissionsModeAccepted\": true, \"hasComp
 
 ### Credential Syncing (Automatic)
 
-Panopticon automatically syncs credentials from your local macOS machine to remote VMs before spawning agents. This ensures agents have fresh authentication tokens even after OAuth tokens expire.
+Overdeck automatically syncs credentials from your local macOS machine to remote VMs before spawning agents. This ensures agents have fresh authentication tokens even after OAuth tokens expire.
 
 **Credentials synced:**
 
@@ -1011,7 +1011,7 @@ The following documentation must be updated as part of this feature:
 
 ## Success Metrics
 
-1. **Memory freed** - Local machine uses <500MB for Panopticon
+1. **Memory freed** - Local machine uses <500MB for Overdeck
 2. **Concurrent workspaces** - Support 10+ without degradation
 3. **Agent reliability** - Agents run for hours without local machine issues
 4. **Developer experience** - <5s latency for common operations
@@ -1077,5 +1077,5 @@ exe cp <vm>:/path local-file
 
 - [exe.dev Documentation](https://exe.dev/docs)
 - [exe.dev Pricing](https://exe.dev/pricing)
-- [Panopticon PRD](./PRD.md)
+- [Overdeck PRD](./PRD.md)
 - [Cloister Agent Framework](./PRD-CLOISTER.md)

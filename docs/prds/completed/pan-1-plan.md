@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Panopticon currently supports Linear (primary) and GitHub Issues (secondary). Enterprise teams using Rally need similar integration to leverage Panopticon's multi-agent orchestration capabilities.
+Overdeck currently supports Linear (primary) and GitHub Issues (secondary). Enterprise teams using Rally need similar integration to leverage Overdeck's multi-agent orchestration capabilities.
 
 ## Decisions Made
 
@@ -18,7 +18,7 @@ Panopticon currently supports Linear (primary) and GitHub Issues (secondary). En
 
 ## State Mapping
 
-| Rally State | Panopticon State |
+| Rally State | Overdeck State |
 |-------------|------------------|
 | Defined | open |
 | In-Progress | in_progress |

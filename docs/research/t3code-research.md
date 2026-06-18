@@ -151,15 +151,15 @@ btca add -n svelte-dev https://github.com/sveltejs/svelte.dev
 btca resources
 ```
 
-This is essentially what the Panopticon `Explore` subagent does manually — but as a first-class CLI skill the agent can invoke during work.
+This is essentially what the Overdeck `Explore` subagent does manually — but as a first-class CLI skill the agent can invoke during work.
 
 ---
 
-## Comparison to Panopticon
+## Comparison to Overdeck
 
-### What t3code has that Panopticon lacks
+### What t3code has that Overdeck lacks
 
-| Feature | t3code | Panopticon |
+| Feature | t3code | Overdeck |
 |---|---|---|
 | Desktop app (Electron) | Yes — DMG, AppImage, installer | No |
 | Zero-install (`npx t3@alpha`) | Yes | No |
@@ -177,9 +177,9 @@ This is essentially what the Panopticon `Explore` subagent does manually — but
 | Project script runner (keybindings) | Yes | No |
 | Distributable releases / CI | Yes — GitHub Releases | No |
 
-### What Panopticon has that t3code lacks
+### What Overdeck has that t3code lacks
 
-| Feature | Panopticon | t3code |
+| Feature | Overdeck | t3code |
 |---|---|---|
 | Multi-agent orchestration | Yes — convoys, parallel agents | No — single agent per thread |
 | Specialist pipeline | Yes — review → test → merge | No |
@@ -193,9 +193,9 @@ This is essentially what the Panopticon `Explore` subagent does manually — but
 
 ### Summary
 
-t3code is a polished single-agent chat UI solving the "I want a nice interface for Codex/Claude" problem. Panopticon is solving the "I want AI to autonomously work through issues end-to-end" problem. They overlap mainly in the dashboard/UI layer.
+t3code is a polished single-agent chat UI solving the "I want a nice interface for Codex/Claude" problem. Overdeck is solving the "I want AI to autonomously work through issues end-to-end" problem. They overlap mainly in the dashboard/UI layer.
 
-t3code's architecture is significantly more rigorous than Panopticon's in the contracts and type-safety dimension. Its Effect-based server is a stronger foundation than Panopticon's current Socket.io approach.
+t3code's architecture is significantly more rigorous than Overdeck's in the contracts and type-safety dimension. Its Effect-based server is a stronger foundation than Overdeck's current Socket.io approach.
 
 ---
 
@@ -204,10 +204,10 @@ t3code's architecture is significantly more rigorous than Panopticon's in the co
 ### High priority
 
 **1. Supervised mode**
-A per-action approval UI is a major trust and safety feature that enterprise users or cautious devs will want. In Panopticon this maps to: when an agent wants to run a destructive command (rm, force push, db migration), pause and surface an approval prompt in Mission Control. Codex's `approvalPolicy: on-request` is the right model. Implement as a new workspace state + Mission Control notification + approve/deny buttons.
+A per-action approval UI is a major trust and safety feature that enterprise users or cautious devs will want. In Overdeck this maps to: when an agent wants to run a destructive command (rm, force push, db migration), pause and surface an approval prompt in Mission Control. Codex's `approvalPolicy: on-request` is the right model. Implement as a new workspace state + Mission Control notification + approve/deny buttons.
 
 **2. Auth token on dashboard**
-`pan up --auth-token <token>` is trivial to add and unlocks remote access. Without it the dashboard is localhost-only. Panopticon workspaces already run on remote servers in some setups (exe.dev) — auth on the dashboard socket is a real gap.
+`pan up --auth-token <token>` is trivial to add and unlocks remote access. Without it the dashboard is localhost-only. Overdeck workspaces already run on remote servers in some setups (exe.dev) — auth on the dashboard socket is a real gap.
 
 **3. Thread/conversation history**
 Workspaces close after merge and all conversation context is gone. Even just storing the final conversation log (JSON) associated with the issue would be useful for debugging and auditing. SQLite via Effect's `@effect/sql-sqlite-bun` is a clean model to follow.
@@ -221,7 +221,7 @@ Embedding xterm.js into Mission Control would let users interact with tmux sessi
 A `pan ask -r <project> -q "..."` skill that runs a subagent against a project and returns just the answer. Useful for plan agents that need to understand a codebase without bloating their context window with full file reads.
 
 **6. Multi-instance dev isolation**
-`PAN_DEV_INSTANCE=feature-xyz` that shifts dashboard + all service ports together. Useful for dogfooding Panopticon changes while it's also running in prod.
+`PAN_DEV_INSTANCE=feature-xyz` that shifts dashboard + all service ports together. Useful for dogfooding Overdeck changes while it's also running in prod.
 
 ### Low priority / nice to have
 

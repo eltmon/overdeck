@@ -42,7 +42,7 @@ export function LowCostModePill({ onOpenSettings }: { onOpenSettings?: () => voi
         requestSettingsSection('background-ai');
         onOpenSettings?.();
       }}
-      title="Background AI (titles, memory, enrichment, narration) is off to save cost. Memory in particular is one of Panopticon's most valuable features — click to choose what runs."
+      title="Background AI (titles, memory, enrichment, narration) is off to save cost. Memory in particular is one of Overdeck's most valuable features — click to choose what runs."
       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >
       <Gauge className="h-3.5 w-3.5" aria-hidden="true" />

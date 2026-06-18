@@ -1,6 +1,6 @@
 ---
 name: pan-up
-description: "pan up — start the Panopticon dashboard (Node 22, port 3011)"
+description: "pan up — start the Overdeck dashboard (Node 22, port 3011)"
 triggers:
   - start panopticon
   - start dashboard
@@ -11,11 +11,11 @@ allowed-tools:
   - Read
 ---
 
-# Start Panopticon Services
+# Start Overdeck Services
 
 ## Overview
 
-`pan up` starts the Panopticon dashboard server (and Traefik if enabled). The
+`pan up` starts the Overdeck dashboard server (and Traefik if enabled). The
 server is a single Node 22 process running the pre-built
 `dist/dashboard/server.js` — it serves the API, the WebSocket endpoints, and
 the built frontend all on **port 3011**. With Traefik enabled, the dashboard
@@ -27,7 +27,7 @@ first (or use `/pan-reload`, which builds then restarts).
 
 ## When to Use
 
-- User wants to start the Panopticon dashboard
+- User wants to start the Overdeck dashboard
 - User wants to launch services after reboot
 - User needs to restart services after configuration changes
 

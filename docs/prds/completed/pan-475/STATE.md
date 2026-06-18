@@ -4,7 +4,7 @@
 
 ## Problem
 
-Panopticon's merge workflow operates locally via `git merge` for local workspaces, bypassing GitHub PRs entirely. This causes:
+Overdeck's merge workflow operates locally via `git merge` for local workspaces, bypassing GitHub PRs entirely. This causes:
 
 1. **Incomplete work reaches main uncaught** — PAN-470 shipped with 4/13 route files unwrapped because no PR review existed
 2. **Hotfixes on main get wiped** — merge agent's `git restore .` destroys uncommitted working-tree fixes (happened twice in one session)

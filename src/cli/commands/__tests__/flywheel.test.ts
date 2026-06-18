@@ -186,7 +186,7 @@ async function createReportRepo(root: string): Promise<string> {
   await writeFile(join(repoDir, 'docs', '.placeholder'), '', 'utf8');
   await git(repoDir, ['init']);
   await git(repoDir, ['add', 'docs/.placeholder']);
-  await git(repoDir, ['-c', 'user.name=Panopticon Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs: seed repo']);
+  await git(repoDir, ['-c', 'user.name=Overdeck Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs: seed repo']);
   return repoDir;
 }
 
@@ -226,9 +226,9 @@ describe('flywheel CLI commands', () => {
     process.exitCode = undefined;
     process.env.OVERDECK_HOME = tempDir;
     process.env.OVERDECK_DASHBOARD_URL = 'http://dashboard.test';
-    vi.stubEnv('GIT_AUTHOR_NAME', 'Panopticon Test');
+    vi.stubEnv('GIT_AUTHOR_NAME', 'Overdeck Test');
     vi.stubEnv('GIT_AUTHOR_EMAIL', 'test@example.com');
-    vi.stubEnv('GIT_COMMITTER_NAME', 'Panopticon Test');
+    vi.stubEnv('GIT_COMMITTER_NAME', 'Overdeck Test');
     vi.stubEnv('GIT_COMMITTER_EMAIL', 'test@example.com');
     flywheelLifecycleMocks.paused = false;
     flywheelLifecycleMocks.activeRunId = null;

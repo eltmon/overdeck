@@ -3,9 +3,9 @@ scope: universal
 ---
 ### Work agents run through `pan` — never the Claude Code `Agent` tool
 
-Spawn work agents only through the Panopticon CLI — `pan start <id>`, `pan swarm <id>`, `pan plan <id>`. NEVER spawn a *work* agent via Claude Code's `Agent`/subagent tool.
+Spawn work agents only through the Overdeck CLI — `pan start <id>`, `pan swarm <id>`, `pan plan <id>`. NEVER spawn a *work* agent via Claude Code's `Agent`/subagent tool.
 
-**Why:** `pan`-spawned agents are registered with Panopticon — a `~/.panopticon/agents/agent-<id>/state.json` carrying `issueId`, a tmux session on the `panopticon` socket, and (for swarms) a swarm-runtime entry. The dashboard's resource-discovery service nests them under their issue with openable terminals, and the review/test/ship pipeline can manage them.
+**Why:** `pan`-spawned agents are registered with Overdeck — a `~/.panopticon/agents/agent-<id>/state.json` carrying `issueId`, a tmux session on the `panopticon` socket, and (for swarms) a swarm-runtime entry. The dashboard's resource-discovery service nests them under their issue with openable terminals, and the review/test/ship pipeline can manage them.
 
 Agents spawned via the `Agent` tool run as ephemeral subagents inside the caller's session — no state file, no `issueId`, no `panopticon`-socket session. The dashboard cannot discover them; they cannot be paused, resumed, reviewed, merged, or recovered through the pipeline.
 

@@ -1,6 +1,6 @@
 ---
 name: pan-fly
-description: Fly.io operations for Panopticon remote workspaces and deployed app instances. Use when users ask about Fly.io setup, remote workspaces, machine status, SSH/exec access, tunneling, or deploying/debugging Fly-hosted services.
+description: Fly.io operations for Overdeck remote workspaces and deployed app instances. Use when users ask about Fly.io setup, remote workspaces, machine status, SSH/exec access, tunneling, or deploying/debugging Fly-hosted services.
 triggers:
   - fly.io
   - fly remote workspace
@@ -14,14 +14,14 @@ allowed-tools:
   - Read
 ---
 
-# Fly.io Operations for Panopticon
+# Fly.io Operations for Overdeck
 
-Use this skill when the task involves Fly.io-backed Panopticon remote workspaces or Fly-hosted application instances.
+Use this skill when the task involves Fly.io-backed Overdeck remote workspaces or Fly-hosted application instances.
 
 ## What This Covers
 
 - `pan remote setup` / `pan remote status`
-- Fly-backed remote workspaces created by Panopticon
+- Fly-backed remote workspaces created by Overdeck
 - Fly Machines lifecycle: create, inspect, start, stop, destroy
 - SSH/exec into Fly machines
 - Port proxy/tunneling with `fly proxy`
@@ -30,15 +30,15 @@ Use this skill when the task involves Fly.io-backed Panopticon remote workspaces
 
 ## First Principles
 
-1. Prefer **Panopticon commands** for Panopticon-managed remote workspaces.
-2. Use **Fly CLI/API** when Panopticon does not expose the needed detail.
+1. Prefer **Overdeck commands** for Overdeck-managed remote workspaces.
+2. Use **Fly CLI/API** when Overdeck does not expose the needed detail.
 3. For deployed app version checks, prefer **non-destructive verification**:
    - public health/bootstrap/version endpoints
    - `fly ssh console` + read-only inspection
    - status/metadata commands
 4. Never perform destructive Fly actions unless the user explicitly asked.
 
-## Panopticon Remote Workspace Workflow
+## Overdeck Remote Workspace Workflow
 
 ### Initial setup
 
@@ -157,7 +157,7 @@ If needed:
 - `FLY_API_TOKEN`
 - `fly auth login`
 
-### Remote unavailable in Panopticon
+### Remote unavailable in Overdeck
 
 Run:
 
@@ -190,7 +190,7 @@ fly logs -a <app>
 - Never delete machines, apps, or volumes unless explicitly requested.
 - Never deploy or restart just to inspect version/state.
 - Prefer additive diagnosis: status, logs, health endpoints, bootstrap JSON, SSH read-only commands.
-- For Panopticon-managed remote workspaces, do not bypass Panopticon when a Panopticon command exists.
+- For Overdeck-managed remote workspaces, do not bypass Overdeck when a Overdeck command exists.
 
 ## Related References
 

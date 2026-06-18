@@ -1,6 +1,6 @@
-# Panopticon Release Guide
+# Overdeck Release Guide
 
-Panopticon ships from `main`, but `main` is the active development branch — not the stable channel by itself.
+Overdeck ships from `main`, but `main` is the active development branch — not the stable channel by itself.
 
 A release only happens when you intentionally cut and push a tag.
 
@@ -9,13 +9,13 @@ A release only happens when you intentionally cut and push a tag.
 - Do day-to-day work on `main`
 - Commit freely, including intermediate or in-progress commits
 - Treat **tags** as the promotion point from active development to something publishable
-- Do **not** use GitFlow or a long-lived `develop` branch for normal Panopticon work
+- Do **not** use GitFlow or a long-lived `develop` branch for normal Overdeck work
 
 ## Release channels
 
 ### Stable
 
-Use stable releases when Panopticon feels good enough to publish for normal installs.
+Use stable releases when Overdeck feels good enough to publish for normal installs.
 
 - Tag format: `vX.Y.Z`
 - npm dist-tag: `latest`
@@ -68,7 +68,7 @@ pan release canary
 pan release canary --version 0.8.0-canary.1
 ```
 
-When `--version` is omitted, Panopticon infers the next version from `package.json`:
+When `--version` is omitted, Overdeck infers the next version from `package.json`:
 - stable: next patch release (for example `0.7.0` → `0.7.1`)
 - canary: next canary release (for example `0.7.0` → `0.7.1-canary.1`, `0.7.1-canary.1` → `0.7.1-canary.2`)
 

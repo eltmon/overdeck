@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-Build the convoy runtime that enables Panopticon to orchestrate multiple AI agents working in parallel. This unlocks the existing but unused convoy templates (`code-review`, `planning`, `triage`, `health-monitor`) and fixes the broken review workflow that currently can't spawn specialized sub-agents.
+Build the convoy runtime that enables Overdeck to orchestrate multiple AI agents working in parallel. This unlocks the existing but unused convoy templates (`code-review`, `planning`, `triage`, `health-monitor`) and fixes the broken review workflow that currently can't spawn specialized sub-agents.
 
 ---
 
@@ -321,7 +321,7 @@ Replace with `pan convoy start code-review` workflow.
 ```markdown
 ## Convoys: Multi-Agent Orchestration
 
-Convoys enable Panopticon to run multiple AI agents in parallel for complex tasks
+Convoys enable Overdeck to run multiple AI agents in parallel for complex tasks
 like code review. Instead of a single agent doing everything, specialized agents
 focus on specific concerns and a synthesis agent combines their findings.
 

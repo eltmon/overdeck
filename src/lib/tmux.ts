@@ -6,7 +6,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'node:crypto';
 import { Effect } from 'effect';
-import { getPanopticonHome } from './paths.js';
+import { getOverdeckHome } from './paths.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { TmuxError } from './errors.js';
@@ -26,13 +26,13 @@ const MANAGED_TMUX_SERVER_UNIT = 'panopticon-tmux-server';
 const SERVER_ALIVE_POLL_MS = 50;
 const SERVER_ALIVE_TIMEOUT_MS = 5000;
 const MANAGED_TMUX_CONFIG_CONTENT = [
-  '# Panopticon-managed tmux config',
-  '# Keep this minimal and include only behavior Panopticon intentionally depends on.',
+  '# Overdeck-managed tmux config',
+  '# Keep this minimal and include only behavior Overdeck intentionally depends on.',
   '# PAN-1798: keep the server alive at zero sessions so a dedicated, cleanly-named',
   '# server process can be founded ahead of any agent spawn and persist between them.',
   'set -g exit-empty off',
   'set -g mouse on',
-  '# Panopticon owns the browser-facing context menu. Prevent tmux defaults',
+  '# Overdeck owns the browser-facing context menu. Prevent tmux defaults',
   '# from opening a competing right-click menu inside managed sessions.',
   'unbind-key -T root MouseDown3Pane',
   'unbind-key -T root M-MouseDown3Pane',
@@ -53,11 +53,11 @@ let tmuxContextPrepared = false;
  * This helps debug mysterious messages appearing in agent prompts.
  */
 function getSendKeysLogFile(): string {
-  return join(getPanopticonHome(), 'logs', 'sendkeys.jsonl');
+  return join(getOverdeckHome(), 'logs', 'sendkeys.jsonl');
 }
 
 function getTmuxDir(): string {
-  return join(getPanopticonHome(), 'tmux');
+  return join(getOverdeckHome(), 'tmux');
 }
 
 export function getManagedTmuxConfigPath(): string {
@@ -69,7 +69,7 @@ export function getManagedTmuxSocketName(): string {
 }
 
 function ensureLogDir(): void {
-  const logDir = join(getPanopticonHome(), 'logs');
+  const logDir = join(getOverdeckHome(), 'logs');
   if (!existsSync(logDir)) {
     mkdirSync(logDir, { recursive: true });
   }
@@ -176,7 +176,7 @@ function warnIfServerInTmuxSpawnScopeSync(): void {
     `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} lives in a per-spawn scope. ` +
       `Cgroup: ${cgroup.trim().replace(/\n/g, ' ')}. ` +
       `Killing the founding session/agent may destroy the entire shared server. ` +
-      `Restart Panopticon to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
+      `Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
   );
 }
 
@@ -197,7 +197,7 @@ function warnIfServerCmdlineIsDirtySync(): void {
     `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} has a dirty cmdline ` +
       `founded by a client new-session: ${cmdline.slice(0, 240)}. ` +
       `Conversation/agent teardown that matches cmdlines may destroy the entire shared server. ` +
-      `Restart Panopticon to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
+      `Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
   );
 }
 
@@ -210,7 +210,7 @@ function warnIfServerCmdlineIsDirtySync(): void {
  * Must be invoked before any `new-session` and at `pan up` time. Waits for the
  * socket to answer before returning.
  */
-export function ensurePanopticonTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void {
+export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void {
   // PAN-1824: never run the managed-server founding under a test runner — it
   // targets the real user-level socket/unit (defeating per-test socket
   // isolation, PAN-1808) and on hosts where the server cannot come up it
@@ -278,15 +278,15 @@ export function ensurePanopticonTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): voi
 }
 
 /**
- * Async variant of ensurePanopticonTmuxServerSync. Effect-spawn paths use this
+ * Async variant of ensureOverdeckTmuxServerSync. Effect-spawn paths use this
  * so server preflight does not block the event loop. Founding itself is still
  * sync (it is rare, fast, and uses the same single path for both variants).
  */
-export async function ensurePanopticonTmuxServerAsync(cleanEnv: NodeJS.ProcessEnv): Promise<void> {
+export async function ensureOverdeckTmuxServerAsync(cleanEnv: NodeJS.ProcessEnv): Promise<void> {
   // Delegate to the sync helper: it already waits for the socket and runs the
   // founder guard. This keeps async tests that mock execFile but not
   // execFileSync from accidentally looping on a never-started mocked server.
-  ensurePanopticonTmuxServerSync(cleanEnv);
+  ensureOverdeckTmuxServerSync(cleanEnv);
 }
 
 function reloadManagedTmuxConfigSync(): void {
@@ -296,7 +296,7 @@ function reloadManagedTmuxConfigSync(): void {
     // every session spawned by the server inherits the parent's env — and tmux
     // -e can only override, not unset, so stale vars leak through.
     const cleanEnv = buildChildEnvSync();
-    ensurePanopticonTmuxServerSync(cleanEnv);
+    ensureOverdeckTmuxServerSync(cleanEnv);
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
@@ -308,7 +308,7 @@ function reloadManagedTmuxConfigSync(): void {
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
     const cleanEnv = buildChildEnvSync();
-    await ensurePanopticonTmuxServerAsync(cleanEnv);
+    await ensureOverdeckTmuxServerAsync(cleanEnv);
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
@@ -547,7 +547,7 @@ export function createSessionSync(
 ): void {
   // PAN-1798: every spawn path must ensure the shared server lives in its
   // dedicated unit before creating a session, so no client becomes the founder.
-  ensurePanopticonTmuxServerSync(buildChildEnvSync());
+  ensureOverdeckTmuxServerSync(buildChildEnvSync());
   if (initialCommand && (initialCommand.includes('`') || initialCommand.includes('\n') || initialCommand.length > 500)) {
     tmuxExecSync(buildNewSessionArgs(name, cwd, undefined, options));
     execSync('sleep 0.5');
@@ -973,7 +973,7 @@ export const createSession = (
     try: async () => {
       // PAN-1798: every spawn path must ensure the shared server lives in its
       // dedicated unit before creating a session, so no client becomes the founder.
-      await ensurePanopticonTmuxServerAsync(buildChildEnvSync());
+      await ensureOverdeckTmuxServerAsync(buildChildEnvSync());
       await tmuxExecAsync(buildNewSessionArgs(name, cwd, initialCommand, options), { encoding: 'utf-8' });
       // Stamp the initial window's background with the dashboard theme so tmux
       // answers OSC 11 background queries even with no client attached. Claude

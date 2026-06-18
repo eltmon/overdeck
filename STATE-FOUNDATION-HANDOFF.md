@@ -87,7 +87,7 @@ durably** (Option 1). Beads: `emit-only` (use `emitOnly()` not `appendAsync()` i
 → **Merge independently** whenever green.
 
 **PAN-1922** (`agent-pan-1922`, 5 beads) — Decision locked: **hybrid split by ownership** —
-Panopticon's own verdicts (review-convoy synthesis + test pass/fail) restore from the **per-issue git
+Overdeck's own verdicts (review-convoy synthesis + test pass/fail) restore from the **per-issue git
 record**; **PR-owned merge-state** (mergeable, CI) is **re-derived live from GitHub**. Beads:
 `restore-core` (`restoreReviewStatusFromRecords()` rebuilds `review_status` from the record),
 `blocker-refresh` (`refreshMergeStateFromGitHub()`), `restore-cli` (`pan admin db restore-verdicts`),

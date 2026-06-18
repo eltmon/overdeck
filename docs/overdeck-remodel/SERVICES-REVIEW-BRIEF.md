@@ -7,7 +7,7 @@ door), writer (write door), and HttpApi/RPC controller designed for each domain.
 
 ## Context recap (and one important recalibration)
 
-Overdeck collapses Panopticon's drift-prone data layer into **one resolver + one
+Overdeck collapses Overdeck's drift-prone data layer into **one resolver + one
 writer per domain**, with controllers delegating to them and nothing else touching
 a store. **The bar is functional parity:** keep every piece of functionality the
 system has today, minus the redundant/wrong ways it currently does each thing. The

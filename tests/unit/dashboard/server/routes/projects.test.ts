@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
 import { join } from 'node:path';
-import { getPanopticonHome } from '../../../../../src/lib/paths.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
@@ -139,15 +139,15 @@ describe('fetchProjectSessionTree', () => {
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/continue.json',
-      join(getPanopticonHome(), 'agents', 'agent-pan-539'),
-      join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json'),
+      join(getOverdeckHome(), 'agents', 'agent-pan-539'),
+      join(getOverdeckHome(), 'agents', 'agent-pan-539', 'state.json'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-821', isDirectory: () => true },
       { name: 'feature-pan-539', isDirectory: () => true },
     ]);
     (readFile as any).mockImplementation((p: string) => {
-      if (p === join(getPanopticonHome(), 'agents', 'agent-pan-539', 'state.json')) {
+      if (p === join(getOverdeckHome(), 'agents', 'agent-pan-539', 'state.json')) {
         return Promise.resolve(JSON.stringify({
           model: 'gpt-4',
           startedAt: '2026-01-01T00:00:00Z',
@@ -194,15 +194,15 @@ describe('fetchProjectSessionTree', () => {
     (listProjectsSync as any).mockReturnValue([
       {
         key: 'panopticon-cli',
-        config: { name: 'Panopticon CLI', path: '/tmp/panopticon-cli' },
+        config: { name: 'Overdeck CLI', path: '/tmp/panopticon-cli' },
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
     mockAccess(new Set());
     (readdir as any).mockResolvedValue([]);
 
-    const result = await fetchProjectSessionTree('Panopticon CLI');
-    expect(result).toEqual({ projectKey: 'Panopticon CLI', features: [] });
+    const result = await fetchProjectSessionTree('Overdeck CLI');
+    expect(result).toEqual({ projectKey: 'Overdeck CLI', features: [] });
   });
 
   it('resolves feature title from main-side .pan/specs/ via findSpecByIssue', async () => {

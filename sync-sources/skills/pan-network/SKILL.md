@@ -166,7 +166,7 @@ templates/traefik/
 ├── docker-compose.yml
 ├── traefik.yml           # Static config
 ├── dynamic/
-│   ├── panopticon.yml    # Panopticon dashboard routing
+│   ├── panopticon.yml    # Overdeck dashboard routing
 │   └── workspace.yml.template  # Template for workspaces
 └── certs/
     ├── _wildcard.pan.localhost.pem
@@ -219,7 +219,7 @@ networks:
 
 ### Using Provided Certs
 
-Panopticon includes pre-generated wildcard certs for `*.pan.localhost`:
+Overdeck includes pre-generated wildcard certs for `*.pan.localhost`:
 - Valid for development only
 - Auto-trusted by most browsers for localhost
 
@@ -316,5 +316,5 @@ curl -k https://pan.localhost/health
 ## Related Skills
 
 - `/pan:docker` - Docker template selection
-- `/pan:up` - Start Panopticon services
-- `/pan:down` - Stop Panopticon services
+- `/pan:up` - Start Overdeck services
+- `/pan:down` - Stop Overdeck services

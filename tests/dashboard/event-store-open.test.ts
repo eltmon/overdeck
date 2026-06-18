@@ -5,7 +5,7 @@
  * fs/promises (was previously sync mkdirSync). These tests verify the async
  * home-dir creation path using a redirected OVERDECK_HOME env var.
  *
- * getPanopticonHome() reads process.env.OVERDECK_HOME on each call, so
+ * getOverdeckHome() reads process.env.OVERDECK_HOME on each call, so
  * vi.stubEnv() is sufficient — no module reset needed.
  *
  * Under Node (Vitest runtime), openEventDb() delegates DB open to getDatabase()

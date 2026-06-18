@@ -13,7 +13,7 @@ unit tests in `__tests__/panopticon-bridge.test.ts` and
 - `claude` on PATH and authenticated against an Anthropic provider
   (`claude --version` returns cleanly; `claude /login` already done).
 - `bun` on PATH (the bridge runs under Bun; see CLAUDE.md → Project Structure).
-- Panopticon dashboard running locally (`pan up`).
+- Overdeck dashboard running locally (`pan up`).
 - A work-eligible issue with a workspace already created (e.g. `pan plan`
   followed by `pan start`). Native workspace, not Docker.
 

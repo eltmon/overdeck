@@ -579,7 +579,7 @@ function cloneDoc(doc: VBriefDocument): VBriefDocument {
 }
 
 /**
- * Apply a Panopticon-native task operation to the vBRIEF itself. This is the
+ * Apply a Overdeck-native task operation to the vBRIEF itself. This is the
  * single mutation authority for swarm task status: Beads can mirror state during
  * migration, but the plan document wins and receives the sequence bump.
  */

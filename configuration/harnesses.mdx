@@ -13,7 +13,7 @@ independently per spawn.
 
 <Info>
 **Supported today:** `claude-code` (default) and `pi`. For the wider field of
-coding-agent harnesses Panopticon could adopt next — and how each one handles
+coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
 
@@ -26,14 +26,14 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 
 ### Claude Code (default)
 
-- Shipped by Anthropic; Panopticon installs no special integration — drop in
+- Shipped by Anthropic; Overdeck installs no special integration — drop in
   `claude` and run.
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 
 ### Pi (alternative)
 
-- Adds RPC mode (`pi --mode rpc`) so Panopticon can write structured commands to
+- Adds RPC mode (`pi --mode rpc`) so Overdeck can write structured commands to
   Pi's stdin via a named pipe (`mkfifo` at `~/.panopticon/agents/<agentId>/rpc.in`).
 - Vendored extension at `packages/pi-extension/` reports lifecycle events:
   `session_start` writes a `ready.json`, `tool_execution_end` updates a
@@ -55,7 +55,7 @@ pan doctor --strict        # exits non-zero if Pi is missing (good for CI)
 ```
 
 `pan doctor` also checks that `packages/pi-extension/dist/index.js` exists in the
-Panopticon workspace. If it doesn't, run:
+Overdeck workspace. If it doesn't, run:
 
 ```bash
 cd packages/pi-extension && npm run build
@@ -64,23 +64,23 @@ cd packages/pi-extension && npm run build
 The minimum supported Pi version is pinned in `src/cli/commands/doctor.ts`
 (`SUPPORTED_PI_VERSION_MIN`); upgrade Pi if `pan doctor` reports it as too old.
 
-After installing Pi, run `pan sync` once. Panopticon writes
+After installing Pi, run `pan sync` once. Overdeck writes
 `~/.pi/agent/settings.json` with a `skills` array pointing at `~/.claude/skills`
 so Pi loads the same skill tree Claude Code does. Existing keys in
 `settings.json` are preserved.
 
 ### Provider authentication
 
-Panopticon bridges configured API keys into Pi's environment at launch time,
+Overdeck bridges configured API keys into Pi's environment at launch time,
 so you do **not** need to configure auth separately in Pi for most providers.
 When you spawn a Pi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
-or DashScope model, Panopticon injects the native provider env var
+or DashScope model, Overdeck injects the native provider env var
 (`KIMI_API_KEY`, `MINIMAX_API_KEY`, etc.) automatically from your dashboard
 Settings or `~/.panopticon.env`.
 
 Providers that rely on OAuth / subscription auth (Anthropic, OpenAI Codex)
 still require you to log in through Pi directly (`/login` inside a Pi session)
-or via Panopticon's dedicated subscription flows (Claude Code OAuth, Codex
+or via Overdeck's dedicated subscription flows (Claude Code OAuth, Codex
 CLIProxy auth).
 
 ## Where you pick the harness
@@ -99,10 +99,10 @@ review agent on the same PR, and vice versa.
 
 ### Switching harness on a live conversation (experimental)
 
-Changing harnesses on an already-running conversation is best-effort. Panopticon
+Changing harnesses on an already-running conversation is best-effort. Overdeck
 attempts to convert the transcript into the new harness format, but that
 converter is intentionally unsupported and may lose fidelity. If conversion or
-resume fails, Panopticon falls back to starting a fresh session with the selected
+resume fails, Overdeck falls back to starting a fresh session with the selected
 harness and model.
 
 Use this as an escape hatch, not a support promise. If the converted transcript
@@ -119,7 +119,7 @@ configured more specifically.
 <ThemedImage
   light="/images/dashboard/settings-light.png"
   dark="/images/dashboard/settings-dark.png"
-  alt="Panopticon Settings page showing per-role model routing, tracker API keys, and project configuration"
+  alt="Overdeck Settings page showing per-role model routing, tracker API keys, and project configuration"
 />
 
 The Settings page is also where you wire up tracker API keys and project
@@ -156,7 +156,7 @@ rather than failing the whole pipeline.
 ### Auth mode is exclusive
 
 Anthropic auth is exclusively subscription **or** API key, never both. If you log
-into the Claude Code subscription, Panopticon ignores any `ANTHROPIC_API_KEY` in
+into the Claude Code subscription, Overdeck ignores any `ANTHROPIC_API_KEY` in
 the environment. Set one or the other, not both.
 
 ## Troubleshooting
@@ -234,5 +234,5 @@ difference today.
   harnesses and their extensibility mechanisms
 - [Template Conversations](/reference/template-conversations) — proposal for
   loading curated skill bundles into a single conversation
-- [Skills System](/features/skills) — how Panopticon distributes skills across
+- [Skills System](/features/skills) — how Overdeck distributes skills across
   harnesses

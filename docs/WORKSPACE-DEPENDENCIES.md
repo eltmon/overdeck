@@ -1,6 +1,6 @@
 # Workspace Dependency Isolation
 
-**How Panopticon workspaces manage Node.js dependencies independently from the host and from each other.**
+**How Overdeck workspaces manage Node.js dependencies independently from the host and from each other.**
 
 ---
 
@@ -62,7 +62,7 @@ Determines which command runs during workspace creation and before verification 
 - `npm` → `npm install`
 - `pnpm` → `pnpm install`
 
-If omitted, Panopticon auto-detects from lock files (`bun.lock` → bun, `package-lock.json` → npm, `pnpm-lock.yaml` → pnpm).
+If omitted, Overdeck auto-detects from lock files (`bun.lock` → bun, `package-lock.json` → npm, `pnpm-lock.yaml` → pnpm).
 
 ### `workspace_packages`
 
@@ -159,7 +159,7 @@ When `pan workspace create` runs (or when the planning dialog creates a workspac
 1. **Create git worktree** — `git fetch origin && git worktree add`
 2. **Install dependencies** — `bun install` in the worktree root
 3. **Build workspace packages** — e.g., `cd packages/contracts && npm run build`
-4. **Install skills & templates** — Panopticon skills, CLAUDE.md, project templates
+4. **Install skills & templates** — Overdeck skills, CLAUDE.md, project templates
 5. **Start Docker containers** (if `--docker` flag) — runs init service which installs deps independently
 
 Steps 2-3 ensure the worktree has its own `node_modules` with correct workspace package resolution before any agent or quality gate runs.
@@ -192,7 +192,7 @@ When workspaces are removed (close-out, deep-wipe):
 
 ## For Other Projects
 
-This dependency isolation model applies to any Panopticon-managed project:
+This dependency isolation model applies to any Overdeck-managed project:
 
 1. Set `package_manager` in `projects.yaml` to match your project
 2. If you have local workspace packages, list them in `workspace_packages`

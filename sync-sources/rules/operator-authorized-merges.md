@@ -2,9 +2,9 @@
 scope: dev
 ---
 
-### Operator-authorized merges and the recoverability principle (Panopticon dev only)
+### Operator-authorized merges and the recoverability principle (Overdeck dev only)
 
-Panopticon development sometimes runs **operator-authorized pipeline-bypass
+Overdeck development sometimes runs **operator-authorized pipeline-bypass
 work**: an orchestrating conversation supervises implementation outside the
 normal review pipeline (e.g. when the change modifies the pipeline's own
 prompts or machinery), reviews the result itself, and lands it. For that flow:
@@ -37,5 +37,5 @@ prompts or machinery), reviews the result itself, and lands it. For that flow:
 **What this rule does NOT change:** the normal pipeline posture. Work agents
 in feature workspaces still never merge to main — `pan done` → review →
 human MERGE remains the default path. This rule covers only the explicitly
-operator-directed bypass mode, and only on Panopticon development machines
+operator-directed bypass mode, and only on Overdeck development machines
 (`scope: dev`).

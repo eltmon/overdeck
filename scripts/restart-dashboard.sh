@@ -1,5 +1,5 @@
 #!/bin/bash
-# Restart Panopticon dashboard cleanly
+# Restart Overdeck dashboard cleanly
 # Usage: ./restart-dashboard.sh
 
 set -e

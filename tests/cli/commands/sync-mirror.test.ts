@@ -26,7 +26,7 @@ const mockSyncStatusline = vi.fn().mockReturnValue({ synced: [], errors: [] });
 const mockListProjects = vi.fn().mockReturnValue([]);
 const mockCleanupLegacyRuntimeSymlinks = vi.fn().mockReturnValue({ cleaned: [], total: 0 });
 const mockMigrateSyncTargets = vi.fn().mockReturnValue({ migrated: [], skipped: [] });
-const mockMigratePanopticonToPan = vi.fn().mockReturnValue({ migrated: [], skipped: [], errors: [] });
+const mockMigrateOverdeckToPan = vi.fn().mockReturnValue({ migrated: [], skipped: [], errors: [] });
 const mockRunMultiToolSync = vi.fn().mockReturnValue([]);
 const mockResolveAlsoSyncTools = vi.fn().mockReturnValue([]);
 const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
@@ -80,8 +80,8 @@ vi.mock('../../../src/lib/config-migration.js', () => ({
 }));
 
 vi.mock('../../../src/lib/workspace-manager.js', () => ({
-  migratePanopticonToPan: mockMigratePanopticonToPan,
-  migratePanopticonToPanSync: mockMigratePanopticonToPan,
+  migrateOverdeckToPan: mockMigrateOverdeckToPan,
+  migrateOverdeckToPanSync: mockMigrateOverdeckToPan,
 }));
 
 vi.mock('../../../src/lib/multi-tool-sync.js', () => ({

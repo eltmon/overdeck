@@ -3,7 +3,7 @@ import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
 
-const realPanopticonHome = resolve(homedir(), '.panopticon');
+const realOverdeckHome = resolve(homedir(), '.panopticon');
 const allowedRealHomeWrites = new Set<string>();
 
 function pathString(value: unknown): string | null {
@@ -18,12 +18,12 @@ function blockedRealHomeTarget(value: unknown): string | null {
   if (!rawPath) return null;
   const resolved = resolve(rawPath);
   if (allowedRealHomeWrites.has(resolved)) return null;
-  return resolved === realPanopticonHome || resolved.startsWith(`${realPanopticonHome}${sep}`)
+  return resolved === realOverdeckHome || resolved.startsWith(`${realOverdeckHome}${sep}`)
     ? resolved
     : null;
 }
 
-function assertNotRealPanopticonHome(targets: unknown[]): void {
+function assertNotRealOverdeckHome(targets: unknown[]): void {
   for (const target of targets) {
     const blocked = blockedRealHomeTarget(target);
     if (blocked) {
@@ -32,20 +32,20 @@ function assertNotRealPanopticonHome(targets: unknown[]): void {
   }
 }
 
-function allowRealPanopticonHomeWriteForTest(path: string): void {
+function allowRealOverdeckHomeWriteForTest(path: string): void {
   allowedRealHomeWrites.add(resolve(path));
 }
 
 (globalThis as typeof globalThis & {
-  allowRealPanopticonHomeWriteForTest?: typeof allowRealPanopticonHomeWriteForTest;
-}).allowRealPanopticonHomeWriteForTest = allowRealPanopticonHomeWriteForTest;
+  allowRealOverdeckHomeWriteForTest?: typeof allowRealOverdeckHomeWriteForTest;
+}).allowRealOverdeckHomeWriteForTest = allowRealOverdeckHomeWriteForTest;
 
 function guarded<T extends (...args: never[]) => unknown>(
   original: T,
   pathArgIndexes: number[],
 ): T {
   return function guardedFsWrite(this: unknown, ...args: unknown[]) {
-    assertNotRealPanopticonHome(pathArgIndexes.map(index => args[index]));
+    assertNotRealOverdeckHome(pathArgIndexes.map(index => args[index]));
     return Reflect.apply(original, this, args);
   } as T;
 }
@@ -56,7 +56,7 @@ function guardedPromise<T extends (...args: never[]) => Promise<unknown>>(
 ): T {
   return function guardedPromiseFsWrite(this: unknown, ...args: unknown[]) {
     try {
-      assertNotRealPanopticonHome(pathArgIndexes.map(index => args[index]));
+      assertNotRealOverdeckHome(pathArgIndexes.map(index => args[index]));
     } catch (error) {
       return Promise.reject(error);
     }

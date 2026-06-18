@@ -63,7 +63,7 @@ describe('main.ts startup fix regression (PAN-446)', () => {
 
   it('mkdir(OVERDECK_HOME) before CacheService construction fixes the startup failure', async () => {
     // This mirrors src/dashboard/server/main.ts:31-32 exactly:
-    //   await mkdir(getPanopticonHome(), { recursive: true });
+    //   await mkdir(getOverdeckHome(), { recursive: true });
     // Without this line the test above throws; with it, CacheService succeeds.
     const { mkdir } = await import('node:fs/promises');
     await mkdir(panopticonHome, { recursive: true });

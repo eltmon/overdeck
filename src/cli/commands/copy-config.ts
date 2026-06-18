@@ -1,7 +1,7 @@
 /**
  * CLI Command: pan copy-config
  *
- * Copies configuration from the installed Panopticon (~/.panopticon/)
+ * Copies configuration from the installed Overdeck (~/.panopticon/)
  * into the current workspace and optionally into global user settings.
  */
 
@@ -10,7 +10,7 @@ import ora from 'ora';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { getPanopticonHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 
 interface CopyConfigOptions {
   toGlobal?: boolean;
@@ -25,7 +25,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
   console.log(chalk.bold.cyan('═══════════════════════════════════════════════════════════'));
   console.log('');
 
-  const sourceDir = getPanopticonHome();
+  const sourceDir = getOverdeckHome();
   const workspaceDir = process.cwd();
   const workspaceConfigDir = join(workspaceDir, '.panopticon');
 
@@ -44,7 +44,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
 
   if (!existsSync(sourceConfigYaml)) {
     console.log(chalk.yellow('⚠ No config.yaml found in ~/.panopticon/'));
-    console.log(chalk.dim('  Initialize Panopticon first with: pan init'));
+    console.log(chalk.dim('  Initialize Overdeck first with: pan init'));
     console.log('');
     process.exit(1);
   }

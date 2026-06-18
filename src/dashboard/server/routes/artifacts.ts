@@ -14,7 +14,7 @@ import {
   resolveArtifactThumbnailUrl,
   type ArtifactThumbnailRenderer,
 } from '../../../lib/artifacts/thumbnails.js';
-import { getPanopticonHome } from '../../../lib/paths.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -80,7 +80,7 @@ function isArtifactHost(headers: HeaderMap, baseDomain?: string): boolean {
 }
 
 function getPublishedSnapshotPath(slug: string): string {
-  return join(getPanopticonHome(), 'artifacts', 'snapshots', slug, 'index.html');
+  return join(getOverdeckHome(), 'artifacts', 'snapshots', slug, 'index.html');
 }
 
 function resolveArtifactUrls(slug: string, baseDomain?: string) {

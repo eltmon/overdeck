@@ -122,7 +122,7 @@ temp/
 .playwright-mcp/
 .playwright-mcp/
 
-# Panopticon runtime artifacts (ephemeral, not tracked)
+# Overdeck runtime artifacts (ephemeral, not tracked)
 .pan/events/
 .pan/convoy/
 .pan/prompts/
@@ -132,8 +132,8 @@ temp/
 .pan/followup-issues.txt
 .pan/spec.vbrief.json
 .pan/agent-mcp.json
-# Machine-local Panopticon config (config.yaml, projects.yaml, settings.json) —
-# copied into workspaces by copyPanopticonSettingsToWorkspaceSync, never committed.
+# Machine-local Overdeck config (config.yaml, projects.yaml, settings.json) —
+# copied into workspaces by copyOverdeckSettingsToWorkspaceSync, never committed.
 .panopticon/
 # Spec-writer crash debris — the writer should self-clean these on dead-PID detection.
 # Tracking them lets stale locks contaminate fresh worktrees.

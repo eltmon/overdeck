@@ -346,7 +346,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               <Eye className="w-5 h-5 text-primary shrink-0" />
               {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
               <span className="text-base font-semibold text-foreground font-display truncate">
-                Panopticon
+                Overdeck
               </span>
               {versionData?.version && (
                 <span className="text-[10px] text-muted-foreground font-normal">v{versionData.version}</span>
@@ -589,7 +589,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                       onClick={() => rebuildMutation.mutate()}
                       disabled={rebuildMutation.isPending}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
-                      title={rebuildMutation.isPending ? 'Building...' : 'Rebuild Panopticon (npm run build)'}
+                      title={rebuildMutation.isPending ? 'Building...' : 'Rebuild Overdeck (npm run build)'}
                       data-testid="sidebar-rebuild"
                     >
                       {rebuildMutation.isPending

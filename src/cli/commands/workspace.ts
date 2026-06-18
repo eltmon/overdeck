@@ -25,7 +25,7 @@ import {
   createWorkspace as createWorkspaceFromConfig,
   removeWorkspace as removeWorkspaceFromConfig,
   addReposToWorkspace,
-  copyPanopticonSettingsToWorkspaceSync,
+  copyOverdeckSettingsToWorkspaceSync,
 } from '../../lib/workspace-manager.js';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
@@ -291,7 +291,7 @@ export function registerWorkspaceCommands(program: Command): void {
 
   workspace
     .command('use-config <issueId>')
-    .description('Copy installed Panopticon config into workspace (makes it user settings)')
+    .description('Copy installed Overdeck config into workspace (makes it user settings)')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(useConfigCommand);
 
@@ -1216,7 +1216,7 @@ with open(path, "w") as f:
     await Effect.runPromise(fly.ssh(vmName, `echo '${patchBase64}' | base64 -d | python3`));
 
     // Write ~/.claude/settings.json on the remote VM honoring the user's
-    // Panopticon permission mode. defaultMode here is what `claude` uses when
+    // Overdeck permission mode. defaultMode here is what `claude` uses when
     // an invocation omits --permission-mode; hardcoding 'bypassPermissions'
     // would silently escalate any unflagged claude invocation on the VM
     // (interactive shells, future helper scripts) even when the user chose Auto.
@@ -1491,7 +1491,7 @@ interface UseConfigOptions {
 }
 
 async function useConfigCommand(issueId: string, options: UseConfigOptions): Promise<void> {
-  const spinner = ora('Copying Panopticon config to workspace...').start();
+  const spinner = ora('Copying Overdeck config to workspace...').start();
 
   try {
     const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -1521,7 +1521,7 @@ async function useConfigCommand(issueId: string, options: UseConfigOptions): Pro
     }
 
     spinner.text = 'Copying config...';
-    const result = copyPanopticonSettingsToWorkspaceSync(workspacePath);
+    const result = copyOverdeckSettingsToWorkspaceSync(workspacePath);
 
     if (result.errors.length > 0) {
       spinner.warn('Config copied with errors');
@@ -1529,7 +1529,7 @@ async function useConfigCommand(issueId: string, options: UseConfigOptions): Pro
         console.log(chalk.yellow(`  ⚠ ${error}`));
       }
     } else {
-      spinner.succeed('Panopticon config copied to workspace');
+      spinner.succeed('Overdeck config copied to workspace');
     }
 
     if (result.copied.length > 0) {

@@ -1,7 +1,7 @@
 /**
  * DNS Management
  *
- * Centralized DNS entry management for Panopticon.
+ * Centralized DNS entry management for Overdeck.
  * Supports three sync methods:
  * - wsl2hosts: WSL2 → Windows hosts file sync via PowerShell scheduled task
  * - hosts_file: Direct /etc/hosts manipulation with managed block markers
@@ -90,7 +90,7 @@ export function removeWsl2HostEntry(hostname: string): boolean {
 
 export async function syncDnsToWindows(): Promise<boolean> {
   try {
-    await execAsync('powershell.exe -Command "Start-ScheduledTask -TaskName \'PanopticonWsl2HostsSync\'"');
+    await execAsync('powershell.exe -Command "Start-ScheduledTask -TaskName \'OverdeckWsl2HostsSync\'"');
     return true;
   } catch {
     // Fall back to legacy task name
@@ -249,7 +249,7 @@ export function removeDnsEntry(method: DnsSyncMethod, hostname: string): boolean
 }
 
 /**
- * Ensure the base Panopticon domain is resolvable.
+ * Ensure the base Overdeck domain is resolvable.
  * Called during `pan install` and `pan up`.
  */
 export function ensureBaseDomain(method: DnsSyncMethod, domain: string = 'pan.localhost'): boolean {

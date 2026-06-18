@@ -4,7 +4,7 @@
 
 ## Problem Statement
 
-Panopticon is running beads v0.62.0 (released 2026-03-22). Latest upstream is v1.0.2 (released 2026-04-15) — 8 releases behind. Our beads skill is v0.43.0, severely outdated. Agents are making repeated `bd` command mistakes due to stale documentation, wasting tokens and producing incorrect results.
+Overdeck is running beads v0.62.0 (released 2026-03-22). Latest upstream is v1.0.2 (released 2026-04-15) — 8 releases behind. Our beads skill is v0.43.0, severely outdated. Agents are making repeated `bd` command mistakes due to stale documentation, wasting tokens and producing incorrect results.
 
 ### Agent Mistake Patterns (from transcript audit)
 
@@ -24,7 +24,7 @@ Panopticon is running beads v0.62.0 (released 2026-03-22). Latest upstream is v1
 | Skill version | v1.0.0 (new major) | Breaking changes from v0.43.0 warrant major bump |
 | Gate integration | Phase 2 (after upgrade) | Requires custom type registration and framework changes |
 | Batch integration | Phase 1 (with upgrade) | Low risk, high value for bulk operations |
-| Rules audit | Phase 3 (post-upgrade) | New feature, needs validation in Panopticon context |
+| Rules audit | Phase 3 (post-upgrade) | New feature, needs validation in Overdeck context |
 | Backward compat | Verify `.beads/` databases open cleanly | v1.0.2 uses Dolt under the hood; schema may have evolved |
 | `bd claim` handling | Remove all references, add red warning | Command never existed; `bd update <id> --claim` is correct |
 | Sync semantics | Standardize on `bd sync` | `AGENTS.md` currently says `bd dolt push` in one place and `bd sync` in another |
@@ -100,7 +100,7 @@ EOF
 
 **Benefits:** Atomic (all succeed or all roll back), one DOLT_COMMIT, faster than N separate calls.
 
-**Panopticon use case:** `done-preflight.ts` currently loops over beads and closes them one-by-one. `bd batch` can close all beads for an issue atomically.
+**Overdeck use case:** `done-preflight.ts` currently loops over beads and closes them one-by-one. `bd batch` can close all beads for an issue atomically.
 
 ### 4. `bd rules audit/compact` Mechanics
 
@@ -116,7 +116,7 @@ bd rules compact --auto           # Merge related rules automatically
 bd rules compact --dry-run        # Preview
 ```
 
-**Panopticon use case:** Run during `pan sync` to catch conflicting agent instructions (e.g., one rule says "use `bd claim`", another says "use `bd update --claim`").
+**Overdeck use case:** Run during `pan sync` to catch conflicting agent instructions (e.g., one rule says "use `bd claim`", another says "use `bd update --claim`").
 
 ### 5. Skill/Doc Issues Catalog
 
@@ -134,7 +134,7 @@ bd rules compact --dry-run        # Preview
 ### Current Beads Integration Points
 
 ```
-Panopticon Framework
+Overdeck Framework
 ├── CLI
 │   └── pan admin beads          → bd admin compact --days N
 │   └── pan install              → installs bd (currently v0.62.0)
@@ -155,7 +155,7 @@ Panopticon Framework
 ### Proposed New Integration Points
 
 ```
-Panopticon Framework (Post-Upgrade)
+Overdeck Framework (Post-Upgrade)
 ├── CLI
 │   └── pan admin beads          → bd admin compact --days N
 │   └── pan install              → installs bd v1.0.2+
@@ -189,7 +189,7 @@ Panopticon Framework (Post-Upgrade)
 | `templates/claude-md/sections/beads.md` | Add blocker guidance (`bd dep tree` before close); mention `bd batch` for bulk ops; clarify `bd sync` |
 | `AGENTS.md` | Standardize on `bd sync` (remove `bd dolt push`); add gate quick-ref; add batch quick-ref |
 
-### Panopticon Framework Code
+### Overdeck Framework Code
 
 | File | Changes |
 |------|---------|
@@ -231,7 +231,7 @@ Phase 2: Update skills and documentation
 └─────────────────────────────────────────────────────────────┘
                               │
                               v
-Phase 3: Update Panopticon framework code
+Phase 3: Update Overdeck framework code
 ┌─────────────────────────────────────────────────────────────┐
 │ 3a. Refactor done-preflight.ts to use bd batch                │
 │ 3b. Add pan admin beads doctor subcommand                     │
@@ -286,7 +286,7 @@ Phase 5: Optional gate integration (Phase 2+)
 - [ ] `skills/beads/SKILL.md` updated to v1.0.0 with corrected commands
 - [ ] `ASYNC_GATES.md` documents correct gate creation (`bd create --type gate`)
 - [ ] `BATCH.md` and `RULES.md` created and synced
-- [ ] No references to `bd claim`, `bd move`, or `bd refile` in any Panopticon skill/doc
+- [ ] No references to `bd claim`, `bd move`, or `bd refile` in any Overdeck skill/doc
 - [ ] `done-preflight.ts` uses `bd batch` for bulk close
 - [ ] `pan admin beads doctor` runs `bd doctor --fix`
 - [ ] `AGENTS.md` and `templates/claude-md/sections/beads.md` standardized on `bd sync`
@@ -332,7 +332,7 @@ Phase 5: Optional gate integration (Phase 2+)
 - Issue: https://github.com/eltmon/panopticon-cli/issues/812
 - Beads repo: https://github.com/gastownhall/beads
 - Current beads skill: `skills/beads/SKILL.md`
-- Panopticon beads guide: `skills/beads-panopticon-guide/SKILL.md`
+- Overdeck beads guide: `skills/beads-panopticon-guide/SKILL.md`
 - ASYNC_GATES.md: `skills/beads/resources/ASYNC_GATES.md`
 - done-preflight.ts: `src/lib/work/done-preflight.ts`
 - beads CLI command: `src/cli/commands/beads.ts`

@@ -17,7 +17,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, unlink
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { execSync } from 'child_process';
-import { getPanopticonHome } from '../../../src/lib/paths.js';
+import { getOverdeckHome } from '../../../src/lib/paths.js';
 
 // ── Module-level mocks ──────────────────────────────────────────────────────
 
@@ -118,7 +118,7 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 // ── Test constants ──────────────────────────────────────────────────────────
 
-const REVIEW_STATUS_FILE = join(getPanopticonHome(), 'review-status.json');
+const REVIEW_STATUS_FILE = join(getOverdeckHome(), 'review-status.json');
 const ISSUE_ID = 'PAN-714-CI-TEST';
 // Status entry that represents a CI check failure (review + test passed, but
 // the merge blocked due to "failing required checks")
@@ -134,7 +134,7 @@ const CI_FAILED_STATUS = {
 };
 
 function writeStatusFile(statuses: Record<string, unknown>): void {
-  mkdirSync(getPanopticonHome(), { recursive: true });
+  mkdirSync(getOverdeckHome(), { recursive: true });
   writeFileSync(REVIEW_STATUS_FILE, JSON.stringify(statuses, null, 2), 'utf-8');
 }
 

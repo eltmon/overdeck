@@ -13,7 +13,7 @@
 ## Background
 
 Many tests build `~/.panopticon` paths from `homedir()` directly instead of the override-aware
-`getPanopticonHome()`, so they write the developer's **real** state. A crash, OOM-kill, or parallel
+`getOverdeckHome()`, so they write the developer's **real** state. A crash, OOM-kill, or parallel
 race leaves the non-crash-safe `afterEach` restore unrun and the real state corrupted. The blast
 radius spans review-status, **agent state**, shadow-state, and more.
 
@@ -32,22 +32,22 @@ FS ops — `grep` reproducible):
 | `tests/lib/config-migration.test.ts` | `skills/` | mkdir/rm/write |
 
 **Verified production-side root** (modules that hardcode `join(homedir(), '.panopticon', …)` rather
-than `getPanopticonHome()`, so a test calling them writes real home regardless of test-local fixes):
+than `getOverdeckHome()`, so a test calling them writes real home regardless of test-local fixes):
 `src/lib/review-status-json.ts`, `src/lib/shadow-utils.ts`, `src/lib/smee.ts`, `src/lib/env-loader.ts`,
 `src/lib/config-migration.ts`, `src/lib/workspace-manager.ts`, `src/lib/runtimes/codex.ts`,
 `src/lib/runtimes/pi.ts`, `src/lib/session-format-converter.ts`, `src/lib/test-runner.ts`.
 
-The seam already exists: `src/lib/paths.ts` (search `getPanopticonHome`) — `process.env.OVERDECK_HOME
+The seam already exists: `src/lib/paths.ts` (search `getOverdeckHome`) — `process.env.OVERDECK_HOME
 || join(homedir(), '.panopticon')`. Note `paths.ts` *also* exports a top-level `const OVERDECK_HOME`
 evaluated **at import time** (search `export const OVERDECK_HOME`); modules that capture that const
-will NOT see a `OVERDECK_HOME` set after import — only `getPanopticonHome()` is dynamic. This
+will NOT see a `OVERDECK_HOME` set after import — only `getOverdeckHome()` is dynamic. This
 matters for both the fix and the test-setup ordering.
 
 ---
 
 ## Glossary
 
-- **`OVERDECK_HOME`** — env var relocating all Panopticon state; read by `getPanopticonHome()`.
+- **`OVERDECK_HOME`** — env var relocating all Overdeck state; read by `getOverdeckHome()`.
 - **Runtime write-guard** — a `fs`/`fs/promises` wrapper installed in test setup that throws if a
   write targets the **real** `${homedir()}/.panopticon`. The hard, mechanism-agnostic enforcement.
 - **Per-worker home** — each Vitest worker gets its own `OVERDECK_HOME` subtree (keyed by
@@ -58,7 +58,7 @@ matters for both the fix and the test-setup ordering.
 ## Requirements
 
 - **FR-1** — `src/lib/review-status-json.ts` (and the other state modules it is reasonable to fix in
-  this pass) resolve their path from `getPanopticonHome()`, not `homedir()`.
+  this pass) resolve their path from `getOverdeckHome()`, not `homedir()`.
 - **FR-2** — **No test reads or writes the developer's real `~/.panopticon`.** Enforced by a runtime
   write-guard, not only by inspection.
 - **FR-3** — Each Vitest worker runs against its own throwaway `OVERDECK_HOME` subtree; the real
@@ -84,19 +84,19 @@ Replace with a dynamic resolver and use it as each function's default arg (searc
 `filePath = DEFAULT_STATUS_FILE`):
 
 ```ts
-import { getPanopticonHome } from './paths.js';
-function defaultStatusFile(): string { return join(getPanopticonHome(), 'review-status.json'); }
+import { getOverdeckHome } from './paths.js';
+function defaultStatusFile(): string { return join(getOverdeckHome(), 'review-status.json'); }
 // … each fn: (…, filePath = defaultStatusFile())
 ```
 
 Remove the unused `homedir` import and the const. **Also** convert the same hardcoded pattern in the
 production modules the offender tests call transitively — at minimum `src/lib/shadow-utils.ts`
-(shadow-state path) — to `getPanopticonHome()`, since WI-2's guard will otherwise fire on
+(shadow-state path) — to `getOverdeckHome()`, since WI-2's guard will otherwise fire on
 shadow-state tests. (The non-state modules — `smee.ts`, runtimes, etc. — are out of scope unless the
 guard surfaces them; list any it does as follow-ups rather than expanding this PR unboundedly.)
 
 Note `src/lib/review-status.ts` keeps a `DEFAULT_STATUS_FILE` from `homedir()` only as a **comparison
-sentinel** (the JSON path is rejected there); converting it to `getPanopticonHome()` is harmless
+sentinel** (the JSON path is rejected there); converting it to `getOverdeckHome()` is harmless
 cleanup but not required for correctness — do it only if the guard flags it.
 
 ### WI-2 — Runtime fs write-guard (hard enforcement) (FR-2)
@@ -126,7 +126,7 @@ issues the write — the property a static grep cannot guarantee.
   `mkdirSync` it. Because `paths.ts` evaluates its `OVERDECK_HOME` const at import, the setupFile
   MUST run before any state module is imported — verify Vitest setupFile ordering and that no
   offender imports a state module at top-of-file before setup. Where a module captured the const too
-  early, prefer `getPanopticonHome()` (WI-1) so the value is read dynamically.
+  early, prefer `getOverdeckHome()` (WI-1) so the value is read dynamically.
 
 Decision: **per-worker** (not one home for the whole run) so parallel workers cannot pollute each
 other's state — this is the cross-file-pollution dimension a single shared home would leave open.
@@ -134,7 +134,7 @@ other's state — this is the cross-file-pollution dimension a single shared hom
 ### WI-4 — Fix the surfaced offenders (FR-4)
 
 For each test in the inventory, replace `join(homedir(), '.panopticon', …)` with
-`join(getPanopticonHome(), …)` (import from `src/lib/paths.js`). With WI-2+WI-3 these land in the
+`join(getOverdeckHome(), …)` (import from `src/lib/paths.js`). With WI-2+WI-3 these land in the
 per-worker temp home; the existing backup/restore dances become unnecessary (may stay, now harmless).
 Re-anchored locations for the primary review-status offender, `tests/lib/cloister/deacon-ci-retry.test.ts`
 (verified current): `REVIEW_STATUS_FILE` at `:101`; `writeStatusFile` builds `join(homedir(), '.panopticon')`
@@ -155,7 +155,7 @@ guard (cheap, catches obvious regressions at author time); WI-2 is the authorita
 ## Acceptance criteria (1:1 with work items)
 
 - **AC-1 (WI-1)** — `grep -n "homedir" src/lib/review-status-json.ts` returns nothing; it imports
-  `getPanopticonHome`. `shadow-utils.ts` shadow-state path uses `getPanopticonHome()`.
+  `getOverdeckHome`. `shadow-utils.ts` shadow-state path uses `getOverdeckHome()`.
 - **AC-2 (WI-2)** — A test that intentionally writes `${homedir()}/.panopticon/pan-test-guard` **fails**
   under the guard. The guard covers the sync + promise write APIs listed.
 - **AC-3 (WI-3)** — Inside a test, `process.env.OVERDECK_HOME` points to a `pan-test-root-*/worker-*`

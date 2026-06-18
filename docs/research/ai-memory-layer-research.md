@@ -1,4 +1,4 @@
-# AI Memory Layer Research: mem0 and Adoption Strategy for Panopticon
+# AI Memory Layer Research: mem0 and Adoption Strategy for Overdeck
 
 **Date**: 2026-03-02
 **Status**: Research Complete
@@ -135,11 +135,11 @@ The open-source code is **fully functional** with zero feature gating. The paid 
 
 ---
 
-## 6. Panopticon Adoption Analysis
+## 6. Overdeck Adoption Analysis
 
 ### The Gap Today
 
-Panopticon has **zero semantic memory**. Agent knowledge dies with workspace teardown:
+Overdeck has **zero semantic memory**. Agent knowledge dies with workspace teardown:
 
 | What Exists | What It Is | Limitation |
 |-------------|-----------|------------|
@@ -153,7 +153,7 @@ Panopticon has **zero semantic memory**. Agent knowledge dies with workspace tea
 
 ### Proposed: Project-Scoped Agent Memory
 
-Each Panopticon **project** gets a semantic memory store. Agents read from and write to it. Knowledge accumulates across issues.
+Each Overdeck **project** gets a semantic memory store. Agents read from and write to it. Knowledge accumulates across issues.
 
 #### Storage Options
 
@@ -223,7 +223,7 @@ During `buildWorkAgentPrompt()`, add new context layer. Embed current issue desc
 
 #### Git Distribution
 
-The hard constraint: Panopticon shares everything via git.
+The hard constraint: Overdeck shares everything via git.
 
 - **Markdown memories**: Native to git, zero friction
 - **JSONL export**: Git-trackable, embed at `docs/memory/`, agents on remote VMs get it via git pull

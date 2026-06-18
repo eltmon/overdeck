@@ -1,4 +1,4 @@
-# Panopticon CLI Backlog Triage Report
+# Overdeck CLI Backlog Triage Report
 
 **Date:** 2026-04-30
 **Version:** 0.8.1
@@ -15,7 +15,7 @@ These have verified fixes on `main` — the work is done, the issue was never cl
 
 | # | Title | Evidence |
 |---|-------|----------|
-| **2** | Port full /work-plan workflow to Panopticon CLI | Full planning pipeline shipped (vBRIEF, DAG, `pan plan`, planning agents) |
+| **2** | Port full /work-plan workflow to Overdeck CLI | Full planning pipeline shipped (vBRIEF, DAG, `pan plan`, planning agents) |
 | **133** | Deacon idle/lazy detection false positives | Lazy detection code deleted in commit `239d2ca1b` |
 | **250** | PLANNING_PROMPT.md contaminates work agent | `strip-planning-from-branch.ts` isolates planning artifacts (commit `f7f0375bf`) |
 | **501** | Integrate smee.io for local GitHub webhook delivery | Integrated into `pan up`/`pan down`/`pan doctor`; `src/lib/smee.ts` exists |
@@ -75,7 +75,7 @@ These have verified fixes on `main` — the work is done, the issue was never cl
 | # | Title | Reason |
 |---|-------|--------|
 | **268** | Create MYN project-specific Claude Code rules | MYN-specific; belongs in Linear as MIN-xxx |
-| **707** | Add MCP tool to assign schedules to MYN chores | MYN product work, not Panopticon |
+| **707** | Add MCP tool to assign schedules to MYN chores | MYN product work, not Overdeck |
 
 ### Roll Into Other Issues (2)
 

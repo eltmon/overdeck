@@ -14,7 +14,7 @@
 
 ## The disease, and the cure
 
-Every recurring state and pipeline bug in Panopticon traces to one disease: a
+Every recurring state and pipeline bug in Overdeck traces to one disease: a
 single fact gets written from many places, and no one owns it. When a dozen call
 sites can each set an issue's status, they drift. One path forgets to emit an
 event; another fires a mirror-write and never checks whether it landed; a third

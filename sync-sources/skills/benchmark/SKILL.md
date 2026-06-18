@@ -1,7 +1,7 @@
 ---
 name: benchmark
 description: >
-  Create a benchmark issue to test Panopticon's agent pipeline. Creates a GitHub issue
+  Create a benchmark issue to test Overdeck's agent pipeline. Creates a GitHub issue
   from a stored template with a scenario label for A/B comparison of models and approaches.
 triggers:
   - benchmark
@@ -19,13 +19,13 @@ allowed-tools:
 ## Overview
 
 Creates a GitHub issue from the QuantumLlama benchmark template, appended with a scenario
-description for A/B testing. The normal Panopticon pipeline (workspace creation, agent work,
+description for A/B testing. The normal Overdeck pipeline (workspace creation, agent work,
 review, test) then exercises the full system. Results (cost, tokens, quality) are tracked
 per-workspace for comparison across runs.
 
 ## When to Use
 
-- User wants to benchmark Panopticon's agent pipeline
+- User wants to benchmark Overdeck's agent pipeline
 - User wants to compare model performance (e.g., Opus vs Sonnet vs OpenAI)
 - User wants to measure token consumption and cost for a feature implementation
 - User says `/benchmark <scenario description>`
@@ -99,7 +99,7 @@ To run the benchmark:
 
 - **Never merge** benchmark branches — they exist only for measurement
 - Each run creates a separate issue + workspace, making A/B comparison straightforward
-- Cost and token data are tracked automatically by Panopticon per-workspace
+- Cost and token data are tracked automatically by Overdeck per-workspace
 - Clean up old benchmark workspaces with `pan workspace delete` when done comparing
 - The spec file at `benchmarks/specs/quantumllama.md` is referenced in the issue body —
   the agent reads it during implementation

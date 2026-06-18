@@ -1,4 +1,4 @@
-# Panopticon Dev Container Template
+# Overdeck Dev Container Template
 
 > ⚠️ **WORKSPACE CONTAINERS ONLY** - This is for isolated workspace testing, NOT the main dashboard.
 >
@@ -60,7 +60,7 @@ cd workspaces/feature-pan-xxx/
 ./dev rebuild   # Rebuild from scratch
 ```
 
-### Via Panopticon CLI
+### Via Overdeck CLI
 
 ```bash
 # Create workspace with Docker containers
@@ -78,7 +78,7 @@ open https://feature-pan-103.pan.localhost
 ## Requirements
 
 - Docker
-- Panopticon Traefik running (`~/.panopticon/traefik/`)
+- Overdeck Traefik running (`~/.panopticon/traefik/`)
 - `panopticon` Docker network created
 - Wildcard certs for `*.pan.localhost`
 

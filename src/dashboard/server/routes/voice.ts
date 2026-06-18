@@ -2,7 +2,7 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { getPanopticonHome } from '../../../lib/paths.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -51,7 +51,7 @@ const readJsonBody = Effect.gen(function* () {
 });
 
 function voiceSettingsPath(): string {
-  return join(getPanopticonHome(), 'voice-settings.json');
+  return join(getOverdeckHome(), 'voice-settings.json');
 }
 
 function isVoiceSettings(value: unknown): value is VoiceSettings {

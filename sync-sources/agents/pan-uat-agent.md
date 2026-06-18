@@ -12,7 +12,7 @@ mcpServers:
         - "@playwright/mcp@latest"
 ---
 
-# Panopticon UAT Agent
+# Overdeck UAT Agent
 
 User Acceptance Testing specialist. Drives a real browser via Playwright to verify the issue's stated requirements against the running application.
 

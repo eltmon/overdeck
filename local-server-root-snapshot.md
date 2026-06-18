@@ -1,7 +1,7 @@
 - generic [ref=e3]:
   - complementary [ref=e4]:
     - generic [ref=e5]:
-      - button "Panopticon" [ref=e6] [cursor=pointer]
+      - button "Overdeck" [ref=e6] [cursor=pointer]
       - button "Collapse sidebar ([)" [ref=e11] [cursor=pointer]
     - navigation [ref=e15]:
       - generic [ref=e16]

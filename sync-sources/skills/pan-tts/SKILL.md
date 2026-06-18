@@ -15,21 +15,21 @@ allowed-tools:
   - Write
 ---
 
-# pan-tts — Panopticon Activity TTS
+# pan-tts — Overdeck Activity TTS
 
 **Status: built into the dashboard when `tts.enabled=true`; external sidecar optional.**
 
 ## What It Is
 
-Panopticon has built-in dashboard TTS playback for `activity.tts` events when `tts.enabled=true` in `~/.panopticon/config.yaml`. The dashboard server resolves the configured voice and POSTs directly to the local Qwen3-TTS daemon, so no external subscriber is needed for the normal local-dashboard path.
+Overdeck has built-in dashboard TTS playback for `activity.tts` events when `tts.enabled=true` in `~/.panopticon/config.yaml`. The dashboard server resolves the configured voice and POSTs directly to the local Qwen3-TTS daemon, so no external subscriber is needed for the normal local-dashboard path.
 
-`pan-tts` remains an **optional** external sidecar for users who want SSE-based TTS on a different machine or want to consume Panopticon's public event stream independently.
+`pan-tts` remains an **optional** external sidecar for users who want SSE-based TTS on a different machine or want to consume Overdeck's public event stream independently.
 
 The TTS pipeline has three independent components:
 
 1. **Dashboard playback service** — subscribes to internal `activity.tts` events, resolves `tts.voice` / `tts.statusVoice` / `tts.voiceMap`, and forwards utterances to the daemon when dashboard TTS is enabled.
 2. **Qwen3-TTS HTTP daemon** (`skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
-3. **Optional SSE subscriber** (`~/Projects/pan-tts/`) — connects to Panopticon's `/events/stream`, formats condensed utterances, and forwards them to the daemon for external playback.
+3. **Optional SSE subscriber** (`~/Projects/pan-tts/`) — connects to Overdeck's `/events/stream`, formats condensed utterances, and forwards them to the daemon for external playback.
 
 ## Architecture
 
@@ -92,7 +92,7 @@ This ensures short utterances (e.g. "PAN-1024 ready for merge") are never trunca
 
 **Source:** `~/Projects/pan-tts/src/pan_tts/`
 
-The subscriber is a small Python project that connects to Panopticon's SSE feed and speaks activity entries.
+The subscriber is a small Python project that connects to Overdeck's SSE feed and speaks activity entries.
 
 ### Configuration
 
@@ -135,7 +135,7 @@ A `pan-tts.service` unit template lives at `~/Projects/pan-tts/systemd/pan-tts.s
 
 ## Ad-Hoc Speak and CLI Smoke Test
 
-For Panopticon's configured system voice, use the built-in CLI smoke test:
+For Overdeck's configured system voice, use the built-in CLI smoke test:
 
 ```bash
 pan tts test
@@ -149,7 +149,7 @@ pan tts voices map reviewStatus.passed "Vivian Voice"
 
 `pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). On a fresh install with no saved system voice, the smoke test uses the daemon's default preset (`Vivian`, override via `QWEN_TTS_VOICE`) so the audio path can be verified before creating a voice library.
 
-The skill also bundles `scripts/say.sh` for one-off utterances that bypass Panopticon voice settings:
+The skill also bundles `scripts/say.sh` for one-off utterances that bypass Overdeck voice settings:
 
 ```bash
 ./scripts/say.sh "Build is green, ready for review."

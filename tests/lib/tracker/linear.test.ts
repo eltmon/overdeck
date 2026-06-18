@@ -321,7 +321,7 @@ describe('LinearTracker', () => {
         body: 'Test comment',
       });
       expect(comment.body).toBe('Test comment');
-      expect(comment.author).toBe('Panopticon');
+      expect(comment.author).toBe('Overdeck');
     });
   });
 

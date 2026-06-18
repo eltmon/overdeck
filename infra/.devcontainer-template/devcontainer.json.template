@@ -1,5 +1,5 @@
 {
-  "name": "Panopticon {{FEATURE_FOLDER}}",
+  "name": "Overdeck {{FEATURE_FOLDER}}",
   "dockerComposeFile": [
     "docker-compose.devcontainer.yml"
   ],

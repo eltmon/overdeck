@@ -2,11 +2,11 @@ import { homedir } from 'os';
 import { join, sep } from 'path';
 import { existsSync } from 'fs';
 
-// Panopticon home directory (can be overridden for testing)
+// Overdeck home directory (can be overridden for testing)
 export const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
 
 /** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
-export function getPanopticonHome(): string {
+export function getOverdeckHome(): string {
   return process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
 }
 
@@ -24,7 +24,7 @@ export const LOGS_DIR = join(OVERDECK_HOME, 'logs');
 export const HANDOFFS_DIR = join(OVERDECK_HOME, 'handoffs');
 
 export function getHandoffsDir(): string {
-  return join(getPanopticonHome(), 'handoffs');
+  return join(getOverdeckHome(), 'handoffs');
 }
 
 // Traefik directories
@@ -89,7 +89,7 @@ export function resolvePackageRootForDir(dir: string): string {
 export const packageRoot = resolvePackageRootForDir(currentDir);
 
 /**
- * Root of Panopticon's own bundled sync sources (PAN-1201).
+ * Root of Overdeck's own bundled sync sources (PAN-1201).
  *
  * Everything `pan sync` distributes from the package itself lives under this
  * single explicit top-level directory — skills, dev-skills, agents, rules,
@@ -117,7 +117,7 @@ export const SYNC_SOURCES = {
   claudeMdSections: join(SYNC_SOURCES_ROOT, 'templates', 'claude-md', 'sections'),
 } as const;
 
-// Cache directories (where Panopticon keeps its copy of distributed content)
+// Cache directories (where Overdeck keeps its copy of distributed content)
 export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.panopticon/skills/
 export const CACHE_AGENTS_DIR = join(OVERDECK_HOME, 'agent-definitions');  // separate from agent state
 export const CACHE_RULES_DIR = join(OVERDECK_HOME, 'rules');
@@ -151,7 +151,7 @@ export interface DocsPaths {
 }
 
 export function getDocsPaths(overrides: DocsPathOverrides = {}): DocsPaths {
-  const docsDir = overrides.docsDir ?? join(overrides.panopticonHome ?? getPanopticonHome(), 'docs');
+  const docsDir = overrides.docsDir ?? join(overrides.panopticonHome ?? getOverdeckHome(), 'docs');
   return {
     docsDir,
     indexPath: overrides.indexPath ?? join(docsDir, 'index.sqlite'),

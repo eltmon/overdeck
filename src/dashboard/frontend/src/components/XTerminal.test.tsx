@@ -312,7 +312,7 @@ describe('XTerminal', () => {
     });
   });
 
-  it('shows the Panopticon context menu on right-click', async () => {
+  it('shows the Overdeck context menu on right-click', async () => {
     const { container } = render(<XTerminal sessionName="test-session" />);
 
     await waitFor(() => {

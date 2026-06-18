@@ -32,13 +32,13 @@ const mockGetHooksDir = vi.mocked(getCavemanHooksDir);
 let testBase: string;
 let workspaceDir: string;
 let hooksDir: string;
-let originalPanopticonHome: string | undefined;
+let originalOverdeckHome: string | undefined;
 
 beforeEach(() => {
   testBase = join(tmpdir(), `caveman-ws-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   workspaceDir = join(testBase, 'workspace');
   hooksDir = join(testBase, 'hooks');
-  originalPanopticonHome = process.env.OVERDECK_HOME;
+  originalOverdeckHome = process.env.OVERDECK_HOME;
   process.env.OVERDECK_HOME = join(testBase, 'pan-home');
   mkdirSync(workspaceDir, { recursive: true });
   mkdirSync(hooksDir, { recursive: true });
@@ -46,8 +46,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
-  else process.env.OVERDECK_HOME = originalPanopticonHome;
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
   rmSync(testBase, { recursive: true, force: true });
   vi.restoreAllMocks();
 });

@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.6.0",
-    "description": "Plan for PAN-457: Conversation discovery \u2014 index sessions inside and outside Panopticon"
+    "description": "Plan for PAN-457: Conversation discovery \u2014 index sessions inside and outside Overdeck"
   },
   "plan": {
     "id": "pan-457",
-    "title": "Conversation discovery \u2014 index sessions inside and outside Panopticon",
+    "title": "Conversation discovery \u2014 index sessions inside and outside Overdeck",
     "status": "completed",
     "uid": "11a0ca78-86d3-4568-9fe8-a99ad5d0eb16",
     "author": "agent:claude-opus-4-6",
@@ -31,8 +31,8 @@
       "dashboard"
     ],
     "narratives": {
-      "Problem": "Panopticon only sees conversations it spawned. Ad-hoc `claude` sessions started from a terminal \u2014 debugging, exploration, one-off fixes \u2014 are invisible. The user has hundreds of such JSONL sessions under ~/.claude/projects with no way to search, review, correlate cost, or learn from them.",
-      "Proposal": "Add a `conversations` subsystem: a new discovered_sessions SQLite table indexed from ~/.claude/projects JSONLs via a scripted (zero-LLM) scanner with adaptive parallelism; three-tier search (structured filters + SQLite FTS5 + optional vector embeddings); three-level user-initiated enrichment (quick/deep/custom-model) reusing Panopticon's model-fallback router; a Mission Control Conversations panel with faceted search and enrichment controls. All five phases ship in this issue."
+      "Problem": "Overdeck only sees conversations it spawned. Ad-hoc `claude` sessions started from a terminal \u2014 debugging, exploration, one-off fixes \u2014 are invisible. The user has hundreds of such JSONL sessions under ~/.claude/projects with no way to search, review, correlate cost, or learn from them.",
+      "Proposal": "Add a `conversations` subsystem: a new discovered_sessions SQLite table indexed from ~/.claude/projects JSONLs via a scripted (zero-LLM) scanner with adaptive parallelism; three-tier search (structured filters + SQLite FTS5 + optional vector embeddings); three-level user-initiated enrichment (quick/deep/custom-model) reusing Overdeck's model-fallback router; a Mission Control Conversations panel with faceted search and enrichment controls. All five phases ship in this issue."
     },
     "items": [
       {
@@ -276,7 +276,7 @@
           "issueLabel": "pan-457"
         },
         "narrative": {
-          "Action": "Create src/lib/conversations/scanner.ts and work-pool.ts. The scanner accepts { mode: 'targeted'|'watched'|'system', dirs?: string[], onProgress?: (p) => void } and emits progress events. Walks ~/.claude/projects/*/ for *.jsonl files (async readdir), filters by mode (targeted \u2192 under given dirs; watched \u2192 under config watchDirs; system \u2192 all). Uses a bounded promise work pool sized by system-probe. For each JSONL: stat for (size, mtime), skip if unchanged vs DB row, else parse async, resolve hash via hash-resolver, correlate against conversations + cost_events tables, insert/upsert into discovered_sessions. SQLite writes serialized through a batch queue. Build a correlator.ts helper that queries existing conversations.session_file and cost_events.session_id for Panopticon-managed detection."
+          "Action": "Create src/lib/conversations/scanner.ts and work-pool.ts. The scanner accepts { mode: 'targeted'|'watched'|'system', dirs?: string[], onProgress?: (p) => void } and emits progress events. Walks ~/.claude/projects/*/ for *.jsonl files (async readdir), filters by mode (targeted \u2192 under given dirs; watched \u2192 under config watchDirs; system \u2192 all). Uses a bounded promise work pool sized by system-probe. For each JSONL: stat for (size, mtime), skip if unchanged vs DB row, else parse async, resolve hash via hash-resolver, correlate against conversations + cost_events tables, insert/upsert into discovered_sessions. SQLite writes serialized through a batch queue. Build a correlator.ts helper that queries existing conversations.session_file and cost_events.session_id for Overdeck-managed detection."
         },
         "subItems": [
           {

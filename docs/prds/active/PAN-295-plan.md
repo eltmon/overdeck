@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add a Resources panel to the Panopticon dashboard providing a unified grid view of all Panopticon-managed infrastructure (containers, agents, specialists) with real-time resource monitoring via `docker stats`.
+Add a Resources panel to the Overdeck dashboard providing a unified grid view of all Overdeck-managed infrastructure (containers, agents, specialists) with real-time resource monitoring via `docker stats`.
 
 ## Decisions
 

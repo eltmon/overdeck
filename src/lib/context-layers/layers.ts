@@ -8,7 +8,7 @@
  *   project   — <projectRoot>/.pan/context/project.md
  *               Applies when CWD is under a registered project. Committed.
  *   workspace — <workspace>/.pan/context/workspace.md
- *               Auto-assembled by Panopticon at spawn time. Gitignored.
+ *               Auto-assembled by Overdeck at spawn time. Gitignored.
  *
  * The global layer lives under ~/.panopticon (per-machine). Project and
  * workspace layers live under the repo's `.pan/` dir — the convention
@@ -17,7 +17,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getPanopticonHome } from '../paths.js';
+import { getOverdeckHome } from '../paths.js';
 
 /** The three context layers, outermost to innermost. */
 export type ContextLayerKind = 'global' | 'project' | 'workspace';
@@ -38,7 +38,7 @@ export interface ContextLayer {
 
 /** `~/.panopticon/context` — the global layer directory. */
 export function globalContextDir(): string {
-  return join(getPanopticonHome(), 'context');
+  return join(getOverdeckHome(), 'context');
 }
 
 /** `~/.panopticon/context/global.md` — the global layer's canonical source. */
@@ -78,12 +78,12 @@ export function workspaceContextFile(workspacePath: string): string {
 
 /** `~/.panopticon/context/pi-global.md` — the rendered global layer for Pi. */
 export function piGlobalContextFile(): string {
-  return join(getPanopticonHome(), 'context', 'pi-global.md');
+  return join(getOverdeckHome(), 'context', 'pi-global.md');
 }
 
 /** `~/.panopticon/context/codex-global.md` — the rendered global layer for Codex. */
 export function codexGlobalContextFile(): string {
-  return join(getPanopticonHome(), 'context', 'codex-global.md');
+  return join(getOverdeckHome(), 'context', 'codex-global.md');
 }
 
 // ─── Starter templates ────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ on the disk in front of you. Nothing syncs it to your other machines.
 For content you want on **every** machine — engineering rules, coding
 standards, behavioral guidelines — add a **bundled rule**:
 \`sync-sources/rules/<name>.md\` in the panopticon-cli repo with
-\`scope: universal\` (or \`scope: dev\` for Panopticon-developer-only rules).
+\`scope: universal\` (or \`scope: dev\` for Overdeck-developer-only rules).
 It will ship with every \`pan install\` / \`pan sync\`. "Bundled rule",
 "global layer" (this file), "project layer", and "workspace layer" are the
 canonical placement terms — see the context-nomenclature bundled rule.

@@ -1,7 +1,7 @@
 ---
 name: pan-new-project
 description: >
-  Complete setup for registering a new project with Panopticon. Handles
+  Complete setup for registering a new project with Overdeck. Handles
   project registration, issue prefix, workspace config, trust setup,
   beads init, tracker config, and validates against working projects.
 triggers:
@@ -28,7 +28,7 @@ license: "MIT"
 
 **Trigger:** `/pan-new-project`
 
-Sets up a new project for Panopticon management. This is the ONLY correct
+Sets up a new project for Overdeck management. This is the ONLY correct
 way to add a new project. Do NOT just run `pan project add` alone — it
 creates a skeleton entry that breaks planning agents, workspace creation,
 issue routing, and beads.
@@ -194,7 +194,7 @@ git config beads.role agent
 ```
 
 This prevents the `"beads.role not configured"` warning on every `bd` command.
-New worktrees inherit this automatically since Panopticon now sets it during
+New worktrees inherit this automatically since Overdeck now sets it during
 workspace creation (`workspace-manager.ts` and `worktree.ts`).
 
 ### Step 6: Create workspaces/ Directory

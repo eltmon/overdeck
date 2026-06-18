@@ -1,6 +1,6 @@
 # Workspace Containers
 
-Panopticon workspaces are host git worktrees with an optional Docker Compose stack for project services. The host remains the orchestrator: agents, tmux sessions, Cloister, and Deacon state live on the host, while the workspace stack provides project-local init, frontend, and server services.
+Overdeck workspaces are host git worktrees with an optional Docker Compose stack for project services. The host remains the orchestrator: agents, tmux sessions, Cloister, and Deacon state live on the host, while the workspace stack provides project-local init, frontend, and server services.
 
 ## Compose contract
 

@@ -26,8 +26,8 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
   '.pan/spec.vbrief.json',
   '.claude/rules/',
   '.claude/skills/',
-  // PAN-1899: machine-local Panopticon config copied into every workspace by
-  // copyPanopticonSettingsToWorkspaceSync (config.yaml, projects.yaml,
+  // PAN-1899: machine-local Overdeck config copied into every workspace by
+  // copyOverdeckSettingsToWorkspaceSync (config.yaml, projects.yaml,
   // settings.json). It diverges from main constantly and must never enter a
   // feature branch — that was the source of the recurring projects.yaml sync
   // conflict.
@@ -266,7 +266,7 @@ const _completedPostMerge = new Set<string>();
 const _postMergeInFlight = new Map<string, Promise<void>>();
 
 // PAN-1531: dropLingeringPreMergeStashes removed. The pre-merge stash kind
-// is no longer created by Panopticon, so there's nothing for the post-merge
+// is no longer created by Overdeck, so there's nothing for the post-merge
 // lifecycle to clean up. Pre-existing pre-merge:* residue in refs/stash is
 // expected and inert.
 

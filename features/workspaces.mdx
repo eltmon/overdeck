@@ -170,7 +170,7 @@ pan workspace create MIN-123 --docker
 1. Creates git worktree at `{project}/workspaces/feature-min-123/`
 2. Checks out feature branch `feature/min-123-*`
 3. Optionally starts Docker containers
-4. Registers workspace in Panopticon registry
+4. Registers workspace in Overdeck registry
 
 ### 2. Usage
 
@@ -196,7 +196,7 @@ pan workspace destroy MIN-123 --force
 2. Checks for uncommitted changes (unless --force)
 3. Removes git worktree
 4. Cleans up planning artifacts
-5. Unregisters from Panopticon
+5. Unregisters from Overdeck
 
 ## Main Project Branch Convention
 
@@ -222,7 +222,7 @@ cd workspaces/feature-min-123
 
 ### Git Hooks for Branch Protection
 
-Panopticon provides git hooks to enforce the main branch convention. These hooks are automatically installed:
+Overdeck provides git hooks to enforce the main branch convention. These hooks are automatically installed:
 
 - **On `pan project add`** - Hooks installed when registering project
 - **On `pan sync`** - Hooks updated in all registered projects
@@ -300,7 +300,7 @@ pan workspace create MIN-999-hotfix
 **Branch Naming:**
 - Follow convention: `feature/{issue-id}-{description}`
 - Example: `feature/min-123-add-login`
-- Panopticon auto-generates appropriate names
+- Overdeck auto-generates appropriate names
 
 **Docker Usage:**
 - Use unique container names via project naming
@@ -314,7 +314,7 @@ pan workspace create MIN-999-hotfix
 
 ## Remote Workspaces (Fly.io)
 
-Panopticon supports remote workspace execution via Fly.io Machines. Remote workspaces provide cloud-hosted agent environments without local resource constraints.
+Overdeck supports remote workspace execution via Fly.io Machines. Remote workspaces provide cloud-hosted agent environments without local resource constraints.
 
 ### Why Remote Workspaces?
 

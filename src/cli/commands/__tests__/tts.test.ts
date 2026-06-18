@@ -308,7 +308,7 @@ describe('pan tts test', () => {
     expect(result).toEqual({ ok: true, url: 'http://127.0.0.1:8787/speak' });
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', {
       method: 'POST',
-      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Panopticon-TTS-Token': expect.any(String) }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Overdeck-TTS-Token': expect.any(String) }),
       body: JSON.stringify({ text: DEFAULT_TTS_TEST_TEXT, voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     });
   });
@@ -330,7 +330,7 @@ describe('pan tts test', () => {
     expect(findVoiceByIdMock).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', {
       method: 'POST',
-      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Panopticon-TTS-Token': expect.any(String) }),
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Overdeck-TTS-Token': expect.any(String) }),
       body: JSON.stringify({ text: DEFAULT_TTS_TEST_TEXT, voice: 'Vivian', instruct: '', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     });
   });

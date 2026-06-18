@@ -50,7 +50,7 @@ Do NOT leave any decisions for the implementation agent. Every architectural cho
 cd <project>
 pan workspace <issue-id>   # Creates workspaces/feature-<id>/ with feature branch
 
-# Then create the canonical Panopticon workspace directory
+# Then create the canonical Overdeck workspace directory
 mkdir -p workspaces/feature-<issue-id-lowercase>/.pan
 ```
 

@@ -1,4 +1,4 @@
-# PAN-800 — shared library sourced by all Panopticon hook scripts.
+# PAN-800 — shared library sourced by all Overdeck hook scripts.
 #
 # Provides:
 #   pan_resolve_agent_id     — sets AGENT_ID, returns 1 if cannot attribute

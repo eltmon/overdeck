@@ -1,4 +1,4 @@
-# Panopticon CLI - Development Guidelines
+# Overdeck CLI - Development Guidelines
 
 > **Note:** Universal and dev-scope engineering rules — async tmux, no execSync in server, fake timers for retry tests, worktree discipline, work-agents-via-pan, stash discipline, dashboard-Node22-only, single-deacon invariant, no-destructive-requests, file-path references, Karpathy rules — live in [`sync-sources/rules/`](sync-sources/rules/) and are folded into `~/.claude/CLAUDE.md` automatically via `pan sync`. This file holds **project-specific** guidance that doesn't apply outside this repo.
 
@@ -27,7 +27,7 @@ This means:
 
 ## CRITICAL: Never Do Agent Work — Fix the System
 
-**When an agent produces bad results (incomplete work, wrong output, passing with known issues), NEVER fix the output yourself. Fix the Panopticon system that allowed the bad result.**
+**When an agent produces bad results (incomplete work, wrong output, passing with known issues), NEVER fix the output yourself. Fix the Overdeck system that allowed the bad result.**
 
 This means:
 - Review agent passes with known issues → Fix the review agent prompt or acceptance criteria so it BLOCKS instead of passing
@@ -62,7 +62,7 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 
 ## Commit and Push When Working on Main
 
-When working directly on `main` (not in a Panopticon workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
+When working directly on `main` (not in a Overdeck workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
 
 ## CRITICAL: Releases Go Through `pan release stable` — Never Manual
 
@@ -95,13 +95,13 @@ git push origin v0.9.4
 
 ## Harnesses
 
-Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Overdeck supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
 
-See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Panopticon could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
+See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
-## Panopticon Agent Taxonomy
+## Overdeck Agent Taxonomy
 
-Panopticon's issue pipeline is expressed as four spawned **roles** plus a server-side merge handoff:
+Overdeck's issue pipeline is expressed as four spawned **roles** plus a server-side merge handoff:
 
 | Role | Purpose | Instruction source |
 | --- | --- | --- |
@@ -114,14 +114,14 @@ Shipping is server-side: `rebaseFeatureBranch()` prepares branches and PAN-1650'
 
 Sub-roles are configuration slots under a role, not standalone pipeline stages. All sub-roles today are delivered as **harness-agnostic prompt templates** that the orchestrator inlines into spawn messages:
 
-- **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — Panopticon reads `roles/review-<subRole>.md` and inlines the body into each convoy spawn message. Never loaded via Claude's `--agent` flag, never synced into project workspaces.
+- **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — Overdeck reads `roles/review-<subRole>.md` and inlines the body into each convoy spawn message. Never loaded via Claude's `--agent` flag, never synced into project workspaces.
 - **`work.inspect` / `work.inspect-deep`** — same shape: the inspection prompt is workflow-injected, not auto-discovered.
 
-`.claude/agents/` is **deliberately empty** in this repo. The directory exists in worktrees only as a sync target for the Claude Code harness, but Panopticon ships no ambient subagents there. Two reasons: (1) ambient subagents leak into every Claude Code session and can fire at moments the workflow doesn't intend; (2) ambient subagent definitions can hardcode model assumptions (e.g. `model: haiku`) that break on non-Anthropic-routed agents (CLIProxy → gpt-5.5), since the harness doesn't always thread provider routing through to the subagent call. When a role needs codebase exploration or general-purpose subagent work, it uses Claude Code's built-in subagent types (`Explore`, `general-purpose`), which inherit the parent's model and routing context properly.
+`.claude/agents/` is **deliberately empty** in this repo. The directory exists in worktrees only as a sync target for the Claude Code harness, but Overdeck ships no ambient subagents there. Two reasons: (1) ambient subagents leak into every Claude Code session and can fire at moments the workflow doesn't intend; (2) ambient subagent definitions can hardcode model assumptions (e.g. `model: haiku`) that break on non-Anthropic-routed agents (CLIProxy → gpt-5.5), since the harness doesn't always thread provider routing through to the subagent call. When a role needs codebase exploration or general-purpose subagent work, it uses Claude Code's built-in subagent types (`Explore`, `general-purpose`), which inherit the parent's model and routing context properly.
 
 `.claude/skills/` is also a workspace sync target, not a source of truth — same gitignore policy (PAN-1090).
 
-The full mental model — Role vs Claude subagent vs Panopticon pipeline agent — lives in [docs/ROLES.md](docs/ROLES.md). For review specifically, see [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md).
+The full mental model — Role vs Claude subagent vs Overdeck pipeline agent — lives in [docs/ROLES.md](docs/ROLES.md). For review specifically, see [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md).
 
 Legacy specialist wake/session/queue machinery has been removed. Use `spawnRun(issueId, role, opts)` and lifecycle state transitions instead of waking named specialists.
 
@@ -138,7 +138,7 @@ See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, s
 
 ## Planning Modes
 
-Panopticon supports two planning modes:
+Overdeck supports two planning modes:
 
 ### Interactive (default)
 ```bash
@@ -202,7 +202,7 @@ nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktre
 
 ## tmux Socket — CRITICAL
 
-**Panopticon agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon` when inspecting agent sessions:
+**Overdeck agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon` when inspecting agent sessions:
 
 ```bash
 # List all agent sessions
@@ -418,7 +418,7 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives (e.g., a team's own `docs/prds/` if they keep one for narrative archival) also survive; the Panopticon-managed PRD draft at `<projectRoot>/.pan/drafts/<issue>.md` survives too. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
+**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives (e.g., a team's own `docs/prds/` if they keep one for narrative archival) also survive; the Overdeck-managed PRD draft at `<projectRoot>/.pan/drafts/<issue>.md` survives too. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -465,12 +465,12 @@ When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm 
 
 ## vBRIEF Plans & Lifecycle
 
-Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
+Overdeck uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 
 - **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
 - **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
-- **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
+- **Overdeck docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
 ### The four-artifact model (PAN-1124: single-spec-on-main)
 
@@ -510,7 +510,7 @@ draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► acti
 PAN-967 unified everything under `.pan/`. The following are gone or read-only legacy:
 
 - `.planning/plan.vbrief.json` — **DELETED.** Replaced by `.pan/spec.vbrief.json`.
-- `docs/prds/planned/`, `docs/prds/active/` — no longer a Panopticon convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Panopticon does not read or write it.
+- `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
 - `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
 
 If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.

@@ -343,7 +343,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             onChange={(e) => onChange('managed', e.target.checked ? true : undefined)}
             className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-0"
           />
-          <span className="text-xs text-gray-400">Panopticon-managed</span>
+          <span className="text-xs text-gray-400">Overdeck-managed</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">

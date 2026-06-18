@@ -356,9 +356,9 @@ In the planning dialog, show a "Principles" step before the vBRIEF plan:
 
 ### 5.1 What It Is
 
-Map Panopticon's existing specialist stages to Deft's 4-tier verification model:
+Map Overdeck's existing specialist stages to Deft's 4-tier verification model:
 
-| Tier | Type | Panopticon Specialist | What it verifies |
+| Tier | Type | Overdeck Specialist | What it verifies |
 |------|------|----------------------|------------------|
 | 1 | Static | **inspect-agent** | Files exist, exports present, imports wired, no stubs |
 | 2 | Command | **test-agent** | Tests pass, build succeeds, lint clean |

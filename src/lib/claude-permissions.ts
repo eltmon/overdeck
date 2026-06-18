@@ -1,7 +1,7 @@
 /**
  * Single source of truth for the permission flags we pass to spawned Claude Code processes.
  *
- * Background: every Panopticon spawn site historically hardcoded
+ * Background: every Overdeck spawn site historically hardcoded
  * `--dangerously-skip-permissions --permission-mode bypassPermissions`. This module
  * centralizes that decision so the mode can be switched per-deployment via config or
  * per-invocation via the `--yolo` flag / `PAN_YOLO` env var.
@@ -98,7 +98,7 @@ export function bypassPrefixForAgentFlagSync(_mode?: ClaudePermissionMode): stri
 }
 
 /**
- * Shape of `~/.claude/settings.json` that Panopticon writes onto provisioned
+ * Shape of `~/.claude/settings.json` that Overdeck writes onto provisioned
  * Claude Code installations (local first-time setup AND remote Fly VMs).
  *
  * The `permissions.defaultMode` field is what `claude` falls back to when

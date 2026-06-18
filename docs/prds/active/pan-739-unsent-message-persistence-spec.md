@@ -8,7 +8,7 @@ This is a real data-loss bug from the user's perspective. The user already expre
 
 The root problem is that the UI currently treats the Claude JSONL transcript as the only durable conversation history, while optimistic prompts exist only in ephemeral frontend state. When a prompt never reaches the JSONL, there is no durable local record of what the user tried to send.
 
-Panopticon needs a first-class local-history layer for unsent and failed prompts so the conversation view can represent reality accurately:
+Overdeck needs a first-class local-history layer for unsent and failed prompts so the conversation view can represent reality accurately:
 - persisted remote history from the Claude session JSONL,
 - plus local pending/failed user prompts that have not yet been accepted into that remote history.
 
@@ -51,13 +51,13 @@ From the user's perspective, sending a prompt should have three visible states:
 2. **Failed** — if delivery fails, the prompt stays in place and clearly shows that it was not sent, along with the error if available.
 3. **Sent / persisted** — once the prompt appears in the Claude-backed transcript, the local pending/failed version disappears and the normal persisted message remains.
 
-The key UX rule is simple: once Panopticon shows a prompt in the conversation, it must not vanish because of transport failure.
+The key UX rule is simple: once Overdeck shows a prompt in the conversation, it must not vanish because of transport failure.
 
-For failed prompts, the user should be able to recover without retyping. At minimum, Panopticon should keep the text visible and recoverable. Ideally, it should provide direct retry/edit actions in the same message row.
+For failed prompts, the user should be able to recover without retyping. At minimum, Overdeck should keep the text visible and recoverable. Ideally, it should provide direct retry/edit actions in the same message row.
 
 ### Technical Approach
 
-Panopticon should treat conversation history as the merge of two sources:
+Overdeck should treat conversation history as the merge of two sources:
 
 1. **Remote accepted history** — messages parsed from the Claude session JSONL.
 2. **Local outbox history** — prompts the user attempted to send that are still pending or failed locally.
@@ -75,7 +75,7 @@ Add a local persistence layer for conversation prompt submissions with enough me
 - last error text,
 - reconciliation marker or correlation mechanism.
 
-SQLite is the preferred home because Panopticon already persists conversation metadata there and this state must outlive component remounts and normal frontend refreshes.
+SQLite is the preferred home because Overdeck already persists conversation metadata there and this state must outlive component remounts and normal frontend refreshes.
 
 #### Unified conversation API
 
@@ -106,7 +106,7 @@ A failure in either path must leave the user with a recoverable local record of 
 - The system must not duplicate successfully persisted user messages after reconciliation.
 - The conversation timeline should stay understandable even while local and remote histories diverge temporarily.
 - Error handling must preserve user text first; transport correctness comes second.
-- The design should fit Panopticon's existing conversation architecture without introducing speculative frontend/backend rewrites outside this feature.
+- The design should fit Overdeck's existing conversation architecture without introducing speculative frontend/backend rewrites outside this feature.
 
 ## References
 
