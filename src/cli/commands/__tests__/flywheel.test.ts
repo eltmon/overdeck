@@ -44,7 +44,7 @@ vi.mock('../../../lib/cloister/flywheel.js', () => ({
   spawnFlywheel: flywheelLifecycleMocks.spawnFlywheel,
 }));
 
-vi.mock('../../../lib/database/app-settings.js', () => ({
+vi.mock('../../../lib/overdeck/control-settings.js', () => ({
   FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY: 'flywheel.auto_pickup_backlog',
   FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY: 'flywheel.require_uat_before_merge',
   getFlywheelActiveRunId: () => flywheelLifecycleMocks.activeRunId,
