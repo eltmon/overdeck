@@ -295,6 +295,15 @@ export function getAllActiveQueues(): Array<{
   }));
 }
 
+/** Drop-in for resetProcessingToQueued() from merge-queue-db.ts. */
+export function resetProcessingToQueued(): number {
+  const db = getOverdeckDatabaseSync();
+  const result = db.prepare(
+    "UPDATE merge_queue SET status = 'queued', started_at = NULL WHERE status = 'processing'",
+  ).run();
+  return result.changes;
+}
+
 // ── UAT Generations ───────────────────────────────────────────────────────────
 
 export type {

@@ -27,7 +27,7 @@ import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
 export const overdeckEvents = sqliteTable('events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
   type: text('type').notNull(),
-  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp_ms' }).notNull(),
   payload: text('payload', { mode: 'json' }).$type<unknown | null>(),
 });
 

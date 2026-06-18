@@ -553,7 +553,7 @@ void reconcileStaleGitHubBlockers()
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
 try {
-  const { resetProcessingToQueued } = await import('../../lib/database/merge-queue-db.js');
+  const { resetProcessingToQueued } = await import('../../lib/overdeck/merge-sync.js');
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
     console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);

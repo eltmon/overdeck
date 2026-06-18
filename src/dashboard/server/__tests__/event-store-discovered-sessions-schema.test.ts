@@ -30,7 +30,8 @@ afterEach(async () => {
 
 describe('event-store database startup schema', () => {
   it('opens the event-store database with events table and overdeck.db with discovered-session tables', async () => {
-    // event-store (panopticon.db carve-out — PAN-1957) — should have events, NOT discovered_sessions
+    // event-store now opens overdeck.db, so events and discovered-session tables
+    // live in the same migrated database.
     const { openEventDb } = await import('../event-store.js');
     const eventDb = await openEventDb();
     const eventTables = eventDb
@@ -38,7 +39,7 @@ describe('event-store database startup schema', () => {
       .all() as Array<{ name: string }>;
     const eventTableNames = eventTables.map((t) => t.name);
     expect(eventTableNames).toContain('events');
-    expect(eventTableNames).not.toContain('discovered_sessions');
+    expect(eventTableNames).toContain('discovered_sessions');
 
     // overdeck.db — should have discovered_sessions, sessions_fts, session_embeddings
     // ensureDiscoveredSessionsSchema() creates the FTS virtual tables (not in migration SQL).
