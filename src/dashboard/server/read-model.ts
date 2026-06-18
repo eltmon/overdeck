@@ -13,7 +13,6 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect, Layer, Context } from 'effect';
 import { getSharedDb } from './event-store.js';
-import { getDatabase } from '../../lib/database/index.js';
 import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@panctl/contracts';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import {
@@ -27,7 +26,7 @@ import {
 import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEventSync } from '../../lib/persistent-logger.js';
-import { listAllAgents } from '../../lib/database/agents-db.js';
+import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
 import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
 
@@ -150,7 +149,7 @@ export function pruneAgentsForReadSource(
 ): { agentsById: Record<string, AgentSnapshot>; prunedCount: number } {
   const closedIssueIds = getClosedIssueIdsForReadSource(issues);
   // PAN-1908: authoritative membership is the SQLite agents table, not state.json.
-  const liveAgentIds = new Set(listAllAgents().map(a => a.id));
+  const liveAgentIds = new Set(listOverdeckAgentStatesSync().map(a => a.id));
   const nextAgentsById: Record<string, AgentSnapshot> = {};
   let prunedCount = 0;
 
@@ -522,13 +521,13 @@ export const ReadModelServiceLive = Layer.effect(
       // reconstructCache still runs for reviewStatusByIssueId (which reads
       // git-backed per-issue records, NOT panopticon.db SQLite cache tables)
       // and for its side effects (agent-backfill sync, checkpoint cleanup).
-      const { reconstructCache } = yield* Effect.promise(() =>
+      const { reconstructCacheAuto } = yield* Effect.promise(() =>
         import('../../lib/reconstruct/reconstruct-cache.js'),
       );
 
       const [overdeckAgents, result] = yield* Effect.all([
         agentsResolver.list({}),
-        Effect.promise(() => reconstructCache(getDatabase())),
+        Effect.promise(() => reconstructCacheAuto()),
       ]);
 
       const agentsById: Record<string, AgentSnapshot> = Object.fromEntries(
