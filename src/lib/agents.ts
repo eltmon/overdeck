@@ -29,14 +29,11 @@ import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
-import {
-  readIssueRecordSync,
-  resolveProjectForIssue,
-  writeAgentHarnessModelSync,
-} from './pan-dir/record.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
 import { getOverdeckAgentStateSync, listOverdeckAgentStatesSync, saveOverdeckAgentStateSync } from './overdeck/agent-state-sync.js';
+import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from './overdeck/agent-record-sync.js';
+import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from './overdeck/agent-rollback-state.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -964,7 +961,7 @@ export function getAgentDir(agentId: string): string {
 }
 
 export function getAgentStateFilePath(agentId: string): string {
-  return join(getAgentDir(agentId), 'state.json');
+  return getRollbackAgentStatePath(agentId);
 }
 
 function isRole(value: unknown): value is Role {
@@ -1037,22 +1034,15 @@ export function getAgentStateSync(agentId: string): AgentState | null {
   const overdeckState = getOverdeckAgentStateSync(normalizedId);
   if (overdeckState) return cleanAgentState(overdeckState);
 
-  const stateFile = join(getAgentDir(normalizedId), 'state.json');
-  if (!existsSync(stateFile)) return null;
-
-  const content = readFileSync(stateFile, 'utf8');
-  const state = parseAgentState(content, normalizedId);
+  const state = readRollbackAgentStateSync(normalizedId, parseAgentState);
   if (!state) return null;
 
   // PAN-1919: harness/model are no longer sourced from state.json. Merge from
   // the per-issue git-tracked record so cross-machine pickup works.
   if (state.issueId) {
-    const project = resolveProjectForIssue(state.issueId);
-    if (project) {
-      const record = readIssueRecordSync(project, state.issueId);
-      if (record?.harness) state.harness = record.harness;
-      if (record?.model) state.model = record.model;
-    }
+    const record = readAgentHarnessModelRecordSync(state.issueId);
+    if (record?.harness) state.harness = record.harness;
+    if (record?.model) state.model = record.model;
   }
 
   return state;
@@ -1075,12 +1065,7 @@ function prepareAgentStateForSave(state: AgentState): AgentState {
 }
 
 export function writeAgentStateJsonSync(state: AgentState): void {
-  const dir = getAgentDir(state.id);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, 'state.json'),
-    JSON.stringify(cleanAgentState(state), null, 2)
-  );
+  writeRollbackAgentStateSync(state, (clean) => JSON.stringify(cleanAgentState(clean), null, 2));
 }
 
 export function saveAgentStateSync(state: AgentState): void {
@@ -1097,13 +1082,10 @@ export function saveAgentStateSync(state: AgentState): void {
   // they travel with the branch. Done synchronously at save time; auto-commit
   // is suppressed here because spawn paths explicitly queue the commit.
   if (state.issueId && state.harness && state.model) {
-    const project = resolveProjectForIssue(state.issueId);
-    if (project) {
-      try {
-        writeAgentHarnessModelSync(project, state.issueId, state.harness, state.model);
-      } catch (err) {
-        console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
-      }
+    try {
+      writeAgentHarnessModelRecordSync(state.issueId, state.harness, state.model);
+    } catch (err) {
+      console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
     }
   }
 
@@ -1114,7 +1096,7 @@ export function saveAgentStateSync(state: AgentState): void {
 
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
-  const stateFile = join(dir, 'state.json');
+  const stateFile = getRollbackAgentStatePath(state.id);
 
   return Effect.gen(function* () {
     yield* Effect.tryPromise({
@@ -1144,16 +1126,10 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
 
     // PAN-1919: mirror harness/model into the per-issue git-tracked record.
     if (state.harness && state.model) {
-      const project = resolveProjectForIssue(state.issueId);
-      if (project) {
-        const writeAgentHarnessModel = yield* Effect.promise(() =>
-          import('./pan-dir/record.js').then((m) => m.writeAgentHarnessModel)
-        );
-        yield* Effect.tryPromise({
-          try: () => writeAgentHarnessModel(project, state.issueId, state.harness!, state.model!),
-          catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
-        });
-      }
+      yield* Effect.try({
+        try: () => writeAgentHarnessModelRecordSync(state.issueId, state.harness!, state.model!),
+        catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
+      });
     }
 
     if (oldStatus && oldStatus !== state.status) {
@@ -3984,7 +3960,7 @@ async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
       if (!stat.isDirectory()) return;
 
       const agentId = normalizeAgentId(entry);
-      const stateFile = join(dirPath, 'state.json');
+      const stateFile = getRollbackAgentStatePath(agentId);
       let raw: { role?: unknown };
       try {
         const contents = await fsp.readFile(stateFile, 'utf8');

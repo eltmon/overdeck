@@ -30,6 +30,7 @@ import { Effect } from 'effect';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir, getPanopticonHome } from '../../../lib/paths.js';
 import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
+import { readRollbackAgentHarnessFromDir } from '../../../lib/overdeck/agent-rollback-state.js';
 
 export interface ResolveJsonlPathOptions {
   /** Override the ~/.panopticon/agents directory (test hook). */
@@ -156,14 +157,7 @@ export async function resolveAgentHarness(
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
   if (opts.agentsDirOverride) {
-    const stateRaw = await readOptional(join(opts.agentsDirOverride, agentId, 'state.json'));
-    if (!stateRaw) return null;
-    try {
-      const state = JSON.parse(stateRaw) as { harness?: unknown };
-      return typeof state.harness === 'string' ? state.harness : null;
-    } catch {
-      return null;
-    }
+    return readRollbackAgentHarnessFromDir(opts.agentsDirOverride, agentId);
   }
   return getAgentStateSync(agentId)?.harness ?? null;
 }

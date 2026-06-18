@@ -29,7 +29,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
-import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
+import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { getPanopticonHome } from '../../../lib/paths.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -376,7 +376,7 @@ async function resolveFeatureTitle(
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
-      const entry = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
+      const entry = await Effect.runPromise(findSpecByIssueThroughOverdeck(projectPath, issueId));
       if (entry) {
         const specContent = await readOptional(entry.path);
         if (specContent) {

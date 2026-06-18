@@ -28,29 +28,12 @@ EXCLUDES=(
   ':!*.md'
   ':!scripts/create-overdeck-db.ts'
   ':!scripts/drizzle-node-sqlite-smoke.ts'
-  # Compatibility bridge — intentional state.json read/write for rollback
-  ':!src/lib/agents.ts'
   # True boundary-owners: own their permanent-plane or domain data directly
   ':!src/lib/vbrief/**'
   ':!src/lib/reconstruct/**'
   ':!src/lib/costs/**'
   ':!src/lib/conversations/**'
   ':!src/lib/database/agent-backfill.ts'
-  # Deferred migration — needs new AgentState fields (location, autoSpawnOnFinalize)
-  ':!src/lib/planning/**'
-  # Deferred migration — reads getDatabase() or pan-dir for legacy SQLite / pipeline record queries
-  ':!src/lib/git-activity.ts'
-  ':!src/lib/cloister/service.ts'
-  ':!src/lib/review-status.ts'
-  ':!src/lib/memory/checkpoints.ts'
-  # Deferred migration — routes using non-standard state.json fields (location, vmName, lastPing)
-  ':!src/dashboard/server/routes/issues.ts'
-  ':!src/dashboard/server/routes/misc.ts'
-  ':!src/dashboard/server/routes/projects.ts'
-  # Deferred migration — CLI tools with bulk-scan or custom state shapes (DoctorAgentState, autoSpawnOnFinalize)
-  ':!src/cli/commands/db.ts'
-  ':!src/cli/commands/doctor.ts'
-  ':!src/cli/commands/plan-finalize.ts'
 )
 
 comment_filter() {
