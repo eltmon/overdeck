@@ -10,6 +10,14 @@ const mocks = vi.hoisted(() => ({
   listSessionNamesSync: vi.fn(),
 }));
 
+// Track overdeck-test-db handles per test so afterEach can clean them up.
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  saveOverdeckAgentStateSync,
+  type OverdeckTestDb,
+} from '../../helpers/overdeck-test-db.js';
+
 // Mock dependencies
 vi.mock('execa', () => ({
   execa: vi.fn().mockResolvedValue({ stdout: '', exitCode: 0 }),
@@ -48,9 +56,15 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 const tempDirs: string[] = [];
+let odb: OverdeckTestDb | null = null;
 
 function makeAgentsDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pan-doctor-agents-'));
+  // Overdeck (PAN-1938): the doctor test seeds agent state into overdeck.db
+  // via saveOverdeckAgentStateSync, and getAgentStateSync reads overdeck first.
+  // The agentsDir parameter still must point at a real directory under
+  // PANOPTICON_HOME so readDoctorAgentStates' readdirSync can enumerate it.
+  const dir = odb ? join(odb.home, 'agents') : mkdtempSync(join(tmpdir(), 'pan-doctor-agents-'));
+  mkdirSync(dir, { recursive: true });
   tempDirs.push(dir);
   return dir;
 }
@@ -58,18 +72,37 @@ function makeAgentsDir(): string {
 function writeAgentState(agentsDir: string, agentId: string, state: object): void {
   const agentDir = join(agentsDir, agentId);
   mkdirSync(agentDir, { recursive: true });
+  // Mirror the on-disk state.json (read by the rollback layer fallback) AND
+  // persist the same record into overdeck.db so getAgentStateSync resolves
+  // the agent on the first lookup (the overdeck door is the source of truth
+  // post-PAN-1938).
   writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state), 'utf8');
+  if (odb) {
+    saveOverdeckAgentStateSync(state as Parameters<typeof saveOverdeckAgentStateSync>[0]);
+  }
 }
 
 describe('doctor command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(existsSync).mockImplementation((path) => {
-      if (typeof path === 'string' && path.includes('pan-doctor-agents-')) {
+      // Pass through real fs.existsSync for paths the overdeck test fixture
+      // needs to see as missing/present (the fresh temp home has no
+      // overdeck.db until setupOverdeckTestDb creates it).
+      if (typeof path !== 'string') return true;
+      if (path.includes('pan-overdeck-test-') || path.endsWith('/overdeck.db')) {
+        const realFs = require('fs');
+        return realFs.existsSync(path);
+      }
+      if (path.includes('pan-doctor-agents-')) {
+        return true;
+      }
+      if (odb && path.includes(odb.home)) {
         return true;
       }
       return true;
     });
+    odb = setupOverdeckTestDb();
     mocks.cleanupClosedIssueAgentDirectories.mockReturnValue(Effect.succeed({
       removed: [],
       protected: [],
@@ -81,6 +114,10 @@ describe('doctor command', () => {
   });
 
   afterEach(() => {
+    if (odb) {
+      teardownOverdeckTestDb(odb);
+      odb = null;
+    }
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -215,6 +252,8 @@ describe('doctor command', () => {
       writeAgentState(agentsDir, 'agent-pan-1419', {
         id: 'agent-pan-1419',
         issueId: 'PAN-1419',
+        role: 'work',
+        workspace: '/tmp/test-workspace',
         status: 'running',
         startedAt: '2026-05-23T00:00:00.000Z',
       });
@@ -243,6 +282,8 @@ describe('doctor command', () => {
       writeAgentState(agentsDir, 'agent-pan-1419', {
         id: 'agent-pan-1419',
         issueId: 'PAN-1419',
+        role: 'work',
+        workspace: '/tmp/test-workspace',
         status: 'running',
         startedAt: '2026-05-23T00:00:00.000Z',
       });
