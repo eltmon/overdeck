@@ -33,7 +33,7 @@ describe('concurrency governor — config + counting', () => {
     vi.resetModules();
     vi.doUnmock('../../../src/lib/cloister/config.js');
     vi.doUnmock('../../../src/lib/agents.js');
-    vi.doUnmock('../../../src/lib/database/agents-db.js');
+    vi.doUnmock('../../../src/lib/overdeck/agents.js');
   });
 
   it('falls back to safe defaults when config omits/garbles concurrency', async () => {
@@ -53,7 +53,7 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [],
     }));
-    vi.doMock('../../../src/lib/database/agents-db.js', () => ({
+    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
       countAgentsByStatus: (status: string) => {
         if (status !== 'running') return {};
         return {

@@ -58,7 +58,7 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   loadReviewStatuses: vi.fn().mockReturnValue({}),
 }));
 
-vi.mock('../../../src/lib/database/review-status-db.js', () => ({
+vi.mock('../../../src/lib/overdeck/review-status-sync.js', () => ({
   markWorkspaceStuck: (...args: unknown[]) => mockMarkWorkspaceStuck(...args),
   clearWorkspaceStuck: (...args: unknown[]) => mockClearWorkspaceStuck(...args),
 }));
