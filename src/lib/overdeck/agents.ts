@@ -797,14 +797,6 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
 
   const cols = OVERDECK_AGENT_COLUMNS.join(', ');
   const placeholders = OVERDECK_AGENT_COLUMNS.map(() => '?').join(', ');
-  const issueIdIdx = OVERDECK_AGENT_COLUMNS.indexOf('issue_id');
-  // agents.issue_id has a FOREIGN KEY → issues(id). On a fresh overdeck.db
-  // (e.g. immediately after the cutover) the issues table is empty, so ensure
-  // the parent issue row exists before inserting the agent or the insert fails
-  // with "FOREIGN KEY constraint failed" (PAN-1938 cutover fix).
-  const ensureIssue = db.prepare(
-    `INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, 'working', ?)`,
-  );
   const upsert = db.prepare(
     `INSERT OR REPLACE INTO agents (${cols}) VALUES (${placeholders})`,
   );
@@ -841,9 +833,7 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
         markedStopped++;
       }
 
-      const row = agentStateToOverdeckRow(state);
-      ensureIssue.run(row[issueIdIdx], Date.now());
-      upsert.run(...row);
+      upsert.run(...agentStateToOverdeckRow(state));
       processed++;
 
       if (options?.verbose) {
