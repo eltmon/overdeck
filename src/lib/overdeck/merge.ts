@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus, Forge } from './infra.js';
+import { Db, EventBus, Forge, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
@@ -870,4 +870,132 @@ export const MergeApi = HttpApiGroup.make('merge')
     success: UatGeneration,
     error:   Schema.Union([UatGenerationNotFound, UatNotPromotable]),
   }));
+
+// ── Sync helpers for merge-queue (used by synchronous call sites) ────────────
+
+export interface MergeQueueEntry {
+  id: number;
+  projectKey: string;
+  issueId: string;
+  position: number;
+  queuedAt: string;
+  startedAt: string | null;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+}
+
+function overdeckDb() {
+  return getOverdeckDatabaseSync();
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/** Enqueue an issue for merge. Returns the queue position. */
+export function enqueueMerge(projectKey: string, issueId: string): number {
+  const db = overdeckDb();
+  const normalized = issueId.toUpperCase();
+  const existing = db.prepare(
+    `SELECT position FROM merge_queue WHERE issue_id = ? AND status IN ('queued', 'processing')`,
+  ).get(normalized) as { position: number } | undefined;
+  if (existing) return existing.position;
+
+  const maxRow = db.prepare(
+    `SELECT COALESCE(MAX(position), 0) AS max_pos FROM merge_queue WHERE project_key = ? AND status IN ('queued', 'processing')`,
+  ).get(projectKey) as { max_pos: number };
+  const position = maxRow.max_pos + 1;
+
+  db.prepare(
+    `INSERT INTO merge_queue (project_key, issue_id, position, queued_at, status) VALUES (?, ?, ?, ?, 'queued')`,
+  ).run(projectKey, normalized, position, nowIso());
+  return position;
+}
+
+/** Mark a queued merge as processing (currently being merged). */
+export function markMergeProcessing(projectKey: string, issueId: string): void {
+  overdeckDb().prepare(
+    `UPDATE merge_queue SET status = 'processing', started_at = ? WHERE issue_id = ? AND status = 'queued'`,
+  ).run(nowIso(), issueId.toUpperCase());
+}
+
+/** Get the currently processing merge for a project, or null. */
+export function getCurrentMerge(projectKey: string): string | null {
+  const row = overdeckDb().prepare(
+    `SELECT issue_id FROM merge_queue WHERE project_key = ? AND status = 'processing' ORDER BY position ASC LIMIT 1`,
+  ).get(projectKey) as { issue_id: string } | undefined;
+  return row?.issue_id ?? null;
+}
+
+/** Advance the queue for a project after the current issue completes. */
+export function dequeueMerge(projectKey: string, completedIssueId?: string): string | null {
+  const db = overdeckDb();
+  if (completedIssueId) {
+    db.prepare(`DELETE FROM merge_queue WHERE project_key = ? AND issue_id = ?`).run(
+      projectKey,
+      completedIssueId.toUpperCase(),
+    );
+  }
+  const next = db.prepare(
+    `SELECT issue_id FROM merge_queue WHERE project_key = ? AND status = 'queued' ORDER BY position ASC LIMIT 1`,
+  ).get(projectKey) as { issue_id: string } | undefined;
+  return next?.issue_id ?? null;
+}
+
+/** Get the full queue for a project. */
+export function getQueueForProject(projectKey: string): MergeQueueEntry[] {
+  const rows = overdeckDb().prepare(
+    `SELECT id, project_key, issue_id, position, queued_at, started_at, status
+     FROM merge_queue
+     WHERE project_key = ? AND status IN ('queued', 'processing')
+     ORDER BY position ASC`,
+  ).all(projectKey) as Array<{
+    id: number; project_key: string; issue_id: string; position: number;
+    queued_at: string; started_at: string | null; status: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    projectKey: r.project_key,
+    issueId: r.issue_id,
+    position: r.position,
+    queuedAt: r.queued_at,
+    startedAt: r.started_at,
+    status: r.status as MergeQueueEntry['status'],
+  }));
+}
+
+/** Get all active queues across all projects. */
+export function getAllActiveQueues(): Array<{
+  projectKey: string;
+  current: string | null;
+  queue: string[];
+  queueLength: number;
+}> {
+  const rows = overdeckDb().prepare(
+    `SELECT project_key, issue_id, status
+     FROM merge_queue
+     WHERE status IN ('queued', 'processing')
+     ORDER BY project_key, position ASC`,
+  ).all() as Array<{ project_key: string; issue_id: string; status: string }>;
+
+  const byProject = new Map<string, { current: string | null; queue: string[] }>();
+  for (const row of rows) {
+    let entry = byProject.get(row.project_key);
+    if (!entry) {
+      entry = { current: null, queue: [] };
+      byProject.set(row.project_key, entry);
+    }
+    if (row.status === 'processing') {
+      entry.current = row.issue_id;
+    } else {
+      entry.queue.push(row.issue_id);
+    }
+  }
+
+  return [...byProject.entries()].map(([projectKey, data]) => ({
+    projectKey,
+    current: data.current,
+    queue: data.queue,
+    queueLength: data.queue.length,
+  }));
+}
 
