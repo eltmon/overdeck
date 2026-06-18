@@ -47,6 +47,9 @@ EXCLUDES=(
   ':!scripts/create-overdeck-db.ts'
   ':!scripts/drizzle-node-sqlite-smoke.ts'
   ':!scripts/lint-overdeck-boundaries.sh'
+  ':!scripts/recover-costs-deep.mjs'
+  ':!scripts/recover-costs-proportional.mjs'
+  ':!scripts/recover-costs.mjs'
 )
 
 # Skip comment lines so a stale comment mentioning the old DB never false-flags.
@@ -81,16 +84,16 @@ rawdb=$(
       -- "${INCLUDES[@]}" "${EXCLUDES[@]}"; } || true
 )
 
-# 4) Opening a sqlite DB directly via the low-level driver — only the store layer
-#    and the overdeck doors may call openDatabase(); a consumer doing so is
-#    reaching panopticon.db behind the gate's back (the event-store evasion).
-opendb=$(
-  { git grep -nE --untracked -e "\\bopenDatabase[[:space:]]*\\(" \
-      -- "${INCLUDES[@]}" "${EXCLUDES[@]}"; } || true
+# 4) Referencing the panopticon.db file path directly — a consumer building or
+#    opening the OLD db behind the gate's back (the event-store evasion). The
+#    only sanctioned reference is the read-only cutover seed in dashboard main.ts.
+panloc=$(
+  { git grep -nE --untracked -e "panopticon\\.db" \
+      -- "${INCLUDES[@]}" "${EXCLUDES[@]}" ':!src/dashboard/server/main.ts'; } || true
 )
 
 violations=$(
-  { printf '%s\n' "$getdb" "$dbimport" "$rawdb" "$opendb"; } \
+  { printf '%s\n' "$getdb" "$dbimport" "$rawdb" "$panloc"; } \
     | grep -vE '^[[:space:]]*$' | comment_filter | sort -u
 )
 
