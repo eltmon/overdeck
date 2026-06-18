@@ -4,21 +4,19 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-// Mock the DB module so checkCostLimits reads from controllable fakes
-// rather than requiring a real SQLite database.
-vi.mock('../../src/lib/database/cost-events-db.js', () => ({
-  getAgentRollup:       vi.fn(() => []),
-  getDailyTrends:       vi.fn(() => []),
-  getCostForIssueFromDb: vi.fn(() => null),
-  recordMemoryExtractionSpend: vi.fn(),
-  invalidateMemorySpendCache:  vi.fn(),
+// Mock the overdeck cost-sync door so checkCostLimits reads from controllable
+// fakes rather than requiring a real SQLite database.
+vi.mock('../../src/lib/overdeck/cost-sync.js', () => ({
+  getAgentRollup:          vi.fn(() => []),
+  getDailyTrendsSync:      vi.fn(() => []),
+  getCostForIssueSync:     vi.fn(() => null),
 }));
 
 import {
   getAgentRollup,
-  getDailyTrends,
-  getCostForIssueFromDb,
-} from '../../src/lib/database/cost-events-db.js';
+  getDailyTrendsSync as getDailyTrends,
+  getCostForIssueSync as getCostForIssueFromDb,
+} from '../../src/lib/overdeck/cost-sync.js';
 import {
   recordCostSync,
   checkCostLimits,
