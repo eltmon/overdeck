@@ -84,7 +84,15 @@ vi.mock('../database/agents-db.js', () => ({
 }));
 vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), generateInstallationToken: vi.fn(), configureWorkspaceForBot: vi.fn() }));
 vi.mock('../workspace-manager.js', () => ({ preTrustDirectory: vi.fn() }));
-vi.mock('../paths.js', () => ({
+// The production code checks overdeck first; return null so getAgentStateSync
+// falls through to the fs-mocked state.json path.
+vi.mock('../overdeck/agent-state-sync.js', () => ({
+  getOverdeckAgentStateSync: vi.fn(() => null),
+  listOverdeckAgentStatesSync: vi.fn(() => []),
+  saveOverdeckAgentStateSync: vi.fn(),
+}));
+vi.mock('../paths.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../paths.js')>()),
   AGENTS_DIR: '/tmp/test/agents',
   COSTS_DIR: '/tmp/test-costs',
   getPanopticonHome: () => '/tmp/test',
@@ -92,6 +100,7 @@ vi.mock('../paths.js', () => ({
 
 import { getAgentStateSync, listRunningAgentsSync, resolveAgentTargetSync } from '../agents.js';
 import { listAllAgents } from '../database/agents-db.js';
+import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 
 describe('agent ID normalization (PAN-871)', () => {
   beforeEach(() => {
@@ -106,7 +115,8 @@ describe('agent ID normalization (PAN-871)', () => {
   });
 
   it('marks tmux active using the canonical agent-pan session id', () => {
-    vi.mocked(listAllAgents).mockReturnValue([
+    // listRunningAgentsSync now reads from overdeck (not agents-db)
+    vi.mocked(listOverdeckAgentStatesSync).mockReturnValue([
       {
         id: 'agent-pan-871',
         issueId: 'PAN-871',
@@ -115,44 +125,8 @@ describe('agent ID normalization (PAN-871)', () => {
         workspace: '/tmp/workspace',
         harness: 'claude-code',
         model: 'claude-sonnet-4-6',
-        branch: null,
-        sessionId: null,
         startedAt: '2026-04-27T00:00:00.000Z',
-        lastActivity: null,
-        lastResumeAt: null,
-        stoppedAt: null,
-        stoppedByUser: false,
-        stoppedByPause: false,
-        kickoffDelivered: false,
-        hostOverride: false,
-        costSoFar: null,
-        phase: null,
-        workType: null,
-        paused: false,
-        pausedReason: null,
-        pausedAt: null,
-        troubled: false,
-        troubledAt: null,
-        consecutiveFailures: null,
-        firstFailureInRunAt: null,
-        lastFailureAt: null,
-        lastFailureReason: null,
-        lastFailureNextRetryAt: null,
-        flywheelRunId: null,
-        roleRunHead: null,
-        reviewSubRole: null,
-        reviewRunId: null,
-        reviewSynthesisAgentId: null,
-        reviewOutputPath: null,
-        reviewDeadlineAt: null,
-        reviewMonitorSignaled: null,
-        reviewRetryAttempt: null,
-        inspectSubRole: null,
-        deliveryMethod: null,
-        supervisorEnabled: false,
-        channelsEnabled: false,
-        updatedAt: '2026-04-27T00:00:00.000Z',
-      },
+      } as import('../agents.js').AgentState,
     ]);
 
     const agents = listRunningAgentsSync();
@@ -163,7 +137,8 @@ describe('agent ID normalization (PAN-871)', () => {
   });
 
   it('resolves issue IDs to the single registered strike agent when no work agent exists', async () => {
-    vi.mocked(listAllAgents).mockReturnValue([
+    // resolveAgentTargetSync uses listOverdeckAgentStatesSync (not agents-db)
+    vi.mocked(listOverdeckAgentStatesSync).mockReturnValue([
       {
         id: 'strike-pan-1820',
         issueId: 'PAN-1820',
@@ -172,44 +147,8 @@ describe('agent ID normalization (PAN-871)', () => {
         workspace: '/tmp/workspace',
         harness: 'codex',
         model: 'gpt-5',
-        branch: null,
-        sessionId: null,
         startedAt: '2026-06-13T00:00:00.000Z',
-        lastActivity: null,
-        lastResumeAt: null,
-        stoppedAt: null,
-        stoppedByUser: false,
-        stoppedByPause: false,
-        kickoffDelivered: false,
-        hostOverride: false,
-        costSoFar: null,
-        phase: null,
-        workType: null,
-        paused: false,
-        pausedReason: null,
-        pausedAt: null,
-        troubled: false,
-        troubledAt: null,
-        consecutiveFailures: null,
-        firstFailureInRunAt: null,
-        lastFailureAt: null,
-        lastFailureReason: null,
-        lastFailureNextRetryAt: null,
-        flywheelRunId: null,
-        roleRunHead: null,
-        reviewSubRole: null,
-        reviewRunId: null,
-        reviewSynthesisAgentId: null,
-        reviewOutputPath: null,
-        reviewDeadlineAt: null,
-        reviewMonitorSignaled: null,
-        reviewRetryAttempt: null,
-        inspectSubRole: null,
-        deliveryMethod: null,
-        supervisorEnabled: false,
-        channelsEnabled: false,
-        updatedAt: '2026-06-13T00:00:00.000Z',
-      },
+      } as import('../agents.js').AgentState,
     ]);
 
     expect(resolveAgentTargetSync('PAN-1820')).toBe('strike-pan-1820');
