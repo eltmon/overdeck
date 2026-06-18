@@ -1,5 +1,5 @@
 /**
- * Build script for preparing the `panctl` npm package for publishing.
+ * Build script for preparing the `overdeck` npm package for publishing.
  *
  * This script:
  *   1. Builds the Electron main/preload bundles via tsdown.

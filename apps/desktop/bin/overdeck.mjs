@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * panctl launcher — invoked via `npx @overdeck/desktop` or `panctl` after installing `@overdeck/desktop` globally.
+ * overdeck launcher — invoked via `npx @overdeck/desktop` or `overdeck` after installing `@overdeck/desktop` globally.
  *
  * Responsibilities:
  *   1. Verify Node 22+ is running (Electron bundles Node 22).
@@ -28,7 +28,7 @@ function checkNodeVersion() {
   const [major] = process.versions.node.split(".").map(Number);
   if (major < 22) {
     console.error(
-      `[panctl] Node.js 22 or later is required (found ${process.versions.node}).`
+      `[overdeck] Node.js 22 or later is required (found ${process.versions.node}).`
     );
     console.error("  Update Node.js: https://nodejs.org");
     process.exit(1);
@@ -39,7 +39,7 @@ function checkNodeVersion() {
 function checkServerBundle() {
   const serverPath = join(packageDir, "server", "server.js");
   if (!existsSync(serverPath)) {
-    console.error("[panctl] Dashboard server bundle not found.");
+    console.error("[overdeck] Dashboard server bundle not found.");
     console.error(`  Expected: ${serverPath}`);
     console.error("  This package may not have been built correctly.");
     console.error("  Try reinstalling: npm install -g @overdeck/desktop");
@@ -56,7 +56,7 @@ function resolveElectron() {
     // The `electron` package exports its binary path as its module value.
     return require("electron");
   } catch {
-    console.error("[panctl] electron package not found.");
+    console.error("[overdeck] electron package not found.");
     console.error("  Try reinstalling: npm install -g @overdeck/desktop");
     process.exit(1);
   }
@@ -81,7 +81,7 @@ function launch() {
   });
 
   child.on("error", (err) => {
-    console.error("[panctl] Failed to start:", err.message);
+    console.error("[overdeck] Failed to start:", err.message);
     process.exit(1);
   });
 

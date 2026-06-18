@@ -225,7 +225,7 @@ img { display: block; max-width: 100%; }
 }
 .btn-ghost:hover { color: #60a5fa; }
 
-/* ─── Copy Button (npx panctl) ────────────────────────────────────────────── */
+/* ─── Copy Button (npx overdeck) ────────────────────────────────────────────── */
 .copy-btn {
   display: inline-flex;
   align-items: center;

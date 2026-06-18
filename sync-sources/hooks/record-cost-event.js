@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 import { createRequire } from "node:module";
-import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
-import { exec, execFileSync } from "child_process";
+import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
+import { exec, execFile, execFileSync } from "child_process";
 import { dirname, join, sep } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
-import { readFileSync as readFileSync$1, readdirSync, statSync as statSync$1 } from "node:fs";
-import { join as join$1 } from "node:path";
-import { execFileSync as execFileSync$1 } from "node:child_process";
+import * as NFS from "node:fs";
+import { existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, writeFileSync as writeFileSync$1 } from "node:fs";
+import * as Path from "node:path";
+import { dirname as dirname$1, isAbsolute, join as join$1 } from "node:path";
+import { readFile } from "node:fs/promises";
+import * as OS from "node:os";
+import * as NodeChildProcess from "node:child_process";
+import * as Crypto from "node:crypto";
+import * as NodeUrl from "node:url";
+import { mkdir, writeFile } from "fs/promises";
 import { promisify } from "util";
 //#region \0rolldown/runtime.js
 var __commonJSMin = (cb, mod) => () => (mod || (cb((mod = { exports: {} }).exports, mod), cb = null), mod.exports);
@@ -232,6 +239,46 @@ const identity = (a) => a;
 */
 const constant = (value) => () => value;
 /**
+* Returns `true` when called.
+*
+* **When to use**
+*
+* Use when an API expects a thunk and every invocation should return `true`.
+*
+* **Example** (Returning true from a thunk)
+*
+* ```ts
+* import { Function } from "effect"
+* import * as assert from "node:assert"
+*
+* assert.deepStrictEqual(Function.constTrue(), true)
+* ```
+*
+* @category constants
+* @since 2.0.0
+*/
+const constTrue = /* @__PURE__ */ constant(true);
+/**
+* Returns `false` when called.
+*
+* **When to use**
+*
+* Use when an API expects a thunk and every invocation should return `false`.
+*
+* **Example** (Returning false from a thunk)
+*
+* ```ts
+* import { Function } from "effect"
+* import * as assert from "node:assert"
+*
+* assert.deepStrictEqual(Function.constFalse(), false)
+* ```
+*
+* @category constants
+* @since 2.0.0
+*/
+const constFalse = /* @__PURE__ */ constant(false);
+/**
 * Returns `undefined` when called.
 *
 * **When to use**
@@ -273,6 +320,9 @@ const constUndefined = /* @__PURE__ */ constant(void 0);
 * @since 2.0.0
 */
 const constVoid = constUndefined;
+function pipe(a, ...args) {
+	return pipeArguments(a, args);
+}
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/equal.js
 /** @internal */
@@ -361,6 +411,38 @@ const byReferenceInstances = /* @__PURE__ */ new WeakSet();
 * @since 2.0.0
 */
 /**
+* Checks whether a value is a `number`.
+*
+* **When to use**
+*
+* Use when you need to guard an `unknown` value as a number.
+*
+* **Details**
+*
+* - Uses `typeof input === "number"`.
+* - Does not exclude `NaN` or `Infinity`.
+*
+* **Example** (Guard number)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const data: unknown = 42
+*
+* if (Predicate.isNumber(data)) {
+*   console.log(data + 1)
+* }
+* ```
+*
+* @see {@link isBigInt}
+* @see {@link isString}
+* @category guards
+* @since 2.0.0
+*/
+function isNumber(input) {
+	return typeof input === "number";
+}
+/**
 * Checks whether a value is a `function`.
 *
 * **When to use**
@@ -389,6 +471,95 @@ const byReferenceInstances = /* @__PURE__ */ new WeakSet();
 */
 function isFunction(input) {
 	return typeof input === "function";
+}
+/**
+* Checks whether a value is `undefined`.
+*
+* **When to use**
+*
+* Use when you need a guard for optional values.
+*
+* **Details**
+*
+* - Uses `input === undefined`.
+*
+* **Example** (Guard undefined)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const data: unknown = undefined
+*
+* console.log(Predicate.isUndefined(data))
+* ```
+*
+* @see {@link isNotUndefined}
+* @see {@link isNullish}
+* @category guards
+* @since 2.0.0
+*/
+function isUndefined(input) {
+	return input === void 0;
+}
+/**
+* Checks whether a value is not `undefined`.
+*
+* **When to use**
+*
+* Use when you want to filter out `undefined` while preserving other falsy values.
+*
+* **Details**
+*
+* - Returns a refinement that excludes `undefined`.
+*
+* **Example** (Filter undefined)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const values = [1, undefined, 2]
+* const defined = values.filter(Predicate.isNotUndefined)
+*
+* console.log(defined)
+* ```
+*
+* @see {@link isUndefined}
+* @see {@link isNotNullish}
+* @category guards
+* @since 2.0.0
+*/
+function isNotUndefined(input) {
+	return input !== void 0;
+}
+/**
+* Checks whether a value is not `null`.
+*
+* **When to use**
+*
+* Use when you want to filter out `null` while preserving other falsy values.
+*
+* **Details**
+*
+* - Returns a refinement that excludes `null`.
+*
+* **Example** (Filter null)
+*
+* ```ts
+* import { Predicate } from "effect"
+*
+* const values = [1, null, 2]
+* const nonNull = values.filter(Predicate.isNotNull)
+*
+* console.log(nonNull)
+* ```
+*
+* @see {@link isNull}
+* @see {@link isNotNullish}
+* @category guards
+* @since 2.0.0
+*/
+function isNotNull$1(input) {
+	return input !== null;
 }
 /**
 * Checks whether a value is an `object` in the JavaScript sense (objects, arrays, functions).
@@ -995,7 +1166,7 @@ function withVisitedTracking$1(obj, fn) {
 * @since 2.0.0
 */
 const symbol = "~effect/interfaces/Equal";
-function equals() {
+function equals$1() {
 	if (arguments.length === 1) return (self) => compareBoth(self, arguments[0]);
 	return compareBoth(arguments[0], arguments[1]);
 }
@@ -1191,7 +1362,7 @@ const isEqual = (u) => hasProperty(u, symbol);
 * @category instances
 * @since 4.0.0
 */
-const asEquivalence = () => equals;
+const asEquivalence = () => equals$1;
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/array.js
 /**
@@ -1514,8 +1685,143 @@ function safeToString(input) {
 		return "[toString threw]";
 	}
 }
+/**
+* Stringifies a value to JSON safely, silently dropping circular references.
+*
+* **When to use**
+*
+* Use when you need valid JSON output (unlike {@link format}).
+* - The input may contain circular references and you want them silently
+*   omitted rather than throwing a `TypeError`.
+*
+* **Details**
+*
+* - Uses `JSON.stringify` internally with a replacer that tracks the
+*   current object ancestry.
+* - Circular references are replaced with `undefined` (omitted from
+*   output).
+* - `Redactable` values are automatically redacted before serialization.
+* - Types not supported by JSON (`BigInt`, `Symbol`, `undefined`,
+*   functions) follow standard `JSON.stringify` behavior (omitted or
+*   `null` in arrays).
+* - `space` — indentation unit (number of spaces, or a string like
+*   `"\t"`). Defaults to `0` (compact).
+*
+* **Example** (Compact JSON)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* console.log(Formatter.formatJson({ name: "Alice", age: 30 }))
+* // {"name":"Alice","age":30}
+* ```
+*
+* **Example** (Circular reference handling)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* const obj: any = { name: "test" }
+* obj.self = obj
+* console.log(Formatter.formatJson(obj))
+* // {"name":"test"}
+* ```
+*
+* **Example** (Pretty-printed JSON)
+*
+* ```ts
+* import { Formatter } from "effect"
+*
+* console.log(Formatter.formatJson({ name: "Alice", age: 30 }, { space: 2 }))
+* // {
+* //   "name": "Alice",
+* //   "age": 30
+* // }
+* ```
+*
+* @see {@link format}
+* @see {@link Formatter}
+* @category serialization
+* @since 4.0.0
+*/
+function formatJson(input, options) {
+	const ancestors = [];
+	return JSON.stringify(input, function(_key, value) {
+		const redacted = redact(value);
+		if (typeof redacted !== "object" || redacted === null) return redacted;
+		while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) ancestors.pop();
+		if (ancestors.includes(redacted)) return;
+		ancestors.push(redacted);
+		return redacted;
+	}, options?.space);
+}
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Inspectable.js
+/**
+* Inspection protocol for stable string, JSON, and Node.js representations.
+*
+* This module is the small bridge used by Effect data types to explain
+* themselves in logs, REPLs, test failures, and JSON-like diagnostics. Implement
+* `Inspectable` or extend {@link Class} when a value should expose one
+* representation to `toString`, `toJSON`, and Node's `util.inspect`; use
+* {@link toJson} and {@link toStringUnknown} when formatting values supplied by
+* user code.
+*
+* ## Mental model
+*
+* Inspectable values choose their own JSON representation. {@link BaseProto}
+* and {@link Class} derive `toString()` from that representation with the
+* formatter and expose the same value through {@link NodeInspectSymbol}.
+* {@link toJson} is defensive: it calls zero-argument `toJSON` methods,
+* recurses through arrays, returns `"[toJSON threw]"` if a custom serializer
+* fails, and applies redaction to other values.
+*
+* ## Common tasks
+*
+* - Extend {@link Class} for classes that only need to define `toJSON`.
+* - Reuse {@link BaseProto} for object prototypes that should share standard
+*   inspection behavior.
+* - Format unknown diagnostic values with {@link toStringUnknown}.
+* - Implement {@link NodeInspectSymbol} when integrating directly with
+*   Node.js inspection.
+*
+* ## Gotchas
+*
+* `toJson` is meant for inspection, not canonical persistence. It catches
+* `toJSON` failures, does not deeply traverse arbitrary objects, and may
+* replace redactable values according to current redaction behavior. Keep
+* custom `toJSON` implementations side-effect free so logging and debugging do
+* not change program state.
+*
+* **Example** (Creating inspectable values)
+*
+* ```ts
+* import { Inspectable } from "effect"
+*
+* class User extends Inspectable.Class {
+*   constructor(
+*     readonly id: number,
+*     readonly name: string
+*   ) {
+*     super()
+*   }
+*
+*   toJSON() {
+*     return {
+*       _tag: "User",
+*       id: this.id,
+*       name: this.name,
+*     }
+*   }
+* }
+*
+* const user = new User(1, "Alice")
+* console.log(user.toString())
+* console.log(user[Inspectable.NodeInspectSymbol]())
+* ```
+*
+* @since 2.0.0
+*/
 /**
 * Defines the symbol used by Node.js for custom object inspection.
 *
@@ -1578,6 +1884,77 @@ const toJson = (input) => {
 		return "[toJSON threw]";
 	}
 	return redact(input);
+};
+/**
+* Converts an unknown value to a string for diagnostics.
+*
+* **When to use**
+*
+* Use to produce a diagnostic string from a value whose runtime type is unknown.
+*
+* **Details**
+*
+* Strings are returned unchanged. Objects are formatted as JSON using the
+* provided whitespace setting when possible, and values that cannot be
+* formatted are converted with `String`.
+*
+* @category converting
+* @since 2.0.0
+*/
+const toStringUnknown = (u, whitespace = 2) => {
+	if (typeof u === "string") return u;
+	try {
+		return typeof u === "object" ? formatJson(u, { space: whitespace }) : String(u);
+	} catch {
+		return String(u);
+	}
+};
+/**
+* A base prototype object that implements the {@link Inspectable} interface.
+*
+* **When to use**
+*
+* Use as a prototype for plain objects that should share standard inspectable behavior.
+*
+* **Details**
+*
+* This object provides default implementations for the {@link Inspectable} methods.
+* It can be used as a prototype for objects that want to be inspectable,
+* or as a mixin to add inspection capabilities to existing objects.
+*
+* **Example** (Using the base inspectable prototype)
+*
+* ```ts
+* import { Inspectable } from "effect"
+*
+* // Use as prototype
+* const myObject = Object.create(Inspectable.BaseProto)
+* myObject.name = "example"
+* myObject.value = 42
+*
+* console.log(myObject.toString()) // Pretty printed representation
+*
+* // Or extend in a constructor
+* function MyClass(this: any, name: string) {
+*   this.name = name
+* }
+* MyClass.prototype = Object.create(Inspectable.BaseProto)
+* MyClass.prototype.constructor = MyClass
+* ```
+*
+* @category prototypes
+* @since 2.0.0
+*/
+const BaseProto = {
+	toJSON() {
+		return toJson(this);
+	},
+	[NodeInspectSymbol]() {
+		return this.toJSON();
+	},
+	toString() {
+		return format(this.toJSON());
+	}
 };
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js
@@ -1759,7 +2136,7 @@ var CauseImpl = class {
 		return this.toJSON();
 	}
 	[symbol](that) {
-		return isCause(that) && this.reasons.length === that.reasons.length && this.reasons.every((e, i) => equals(e, that.reasons[i]));
+		return isCause(that) && this.reasons.length === that.reasons.length && this.reasons.every((e, i) => equals$1(e, that.reasons[i]));
 	}
 	[symbol$1]() {
 		return array(this.reasons);
@@ -1821,12 +2198,16 @@ var Fail = class extends ReasonBase {
 		};
 	}
 	[symbol](that) {
-		return isFailReason(that) && equals(this.error, that.error) && equals(this.annotations, that.annotations);
+		return isFailReason(that) && equals$1(this.error, that.error) && equals$1(this.annotations, that.annotations);
 	}
 	[symbol$1]() {
 		return combine(string(this._tag))(combine(hash(this.error))(hash(this.annotations)));
 	}
 };
+/** @internal */
+const causeFromReasons = (reasons) => new CauseImpl(reasons);
+/** @internal */
+const causeEmpty = /* @__PURE__ */ new CauseImpl([]);
 /** @internal */
 const causeFail = (error) => new CauseImpl([new Fail(error)]);
 /** @internal */
@@ -1846,7 +2227,7 @@ var Die = class extends ReasonBase {
 		};
 	}
 	[symbol](that) {
-		return isDieReason(that) && equals(this.defect, that.defect) && equals(this.annotations, that.annotations);
+		return isDieReason(that) && equals$1(this.defect, that.defect) && equals$1(this.annotations, that.annotations);
 	}
 	[symbol$1]() {
 		return combine(string(this._tag))(combine(hash(this.defect))(hash(this.annotations)));
@@ -1906,7 +2287,7 @@ const makeExit = (options) => {
 			};
 		},
 		[symbol](that) {
-			return isExit(that) && that._tag === this._tag && equals(this[args], that[args]);
+			return isExit(that) && that._tag === this._tag && equals$1(this[args], that[args]);
 		},
 		[symbol$1]() {
 			return combine(string(options.op), hash(this[args]));
@@ -1929,6 +2310,8 @@ const exitSucceed = /* @__PURE__ */ makeExit({
 });
 /** @internal */
 const StackTraceKey = { key: "effect/Cause/StackTrace" };
+/** @internal */
+const InterruptorStackTrace$1 = { key: "effect/Cause/InterruptorStackTrace" };
 /** @internal */
 const exitFailCause = /* @__PURE__ */ makeExit({
 	op: "Failure",
@@ -1970,7 +2353,7 @@ const YieldableError = /* @__PURE__ */ function() {
 	return YieldableError;
 }();
 /** @internal */
-const Error$1 = /* @__PURE__ */ function() {
+const Error$2 = /* @__PURE__ */ function() {
 	const plainArgsSymbol = /* @__PURE__ */ Symbol.for("effect/Data/Error/plainArgs");
 	return class Base extends YieldableError {
 		constructor(args) {
@@ -1993,18 +2376,113 @@ const Error$1 = /* @__PURE__ */ function() {
 }();
 /** @internal */
 const TaggedError$1 = (tag) => {
-	class Base extends Error$1 {
+	class Base extends Error$2 {
 		_tag = tag;
 	}
 	Base.prototype.name = tag;
 	return Base;
 };
 TaggedError$1("NoSuchElementError");
+/** @internal */
+const DoneTypeId = "~effect/Cause/Done";
+/** @internal */
+const isDone$2 = (u) => hasProperty(u, DoneTypeId);
+const DoneVoid = {
+	[DoneTypeId]: DoneTypeId,
+	_tag: "Done",
+	value: void 0
+};
+/** @internal */
+const Done$1 = (value) => {
+	if (value === void 0) return DoneVoid;
+	return {
+		[DoneTypeId]: DoneTypeId,
+		_tag: "Done",
+		value
+	};
+};
+const doneVoid = /* @__PURE__ */ exitFail(DoneVoid);
+/** @internal */
+const done$2 = (value) => {
+	if (value === void 0) return doneVoid;
+	return exitFail(Done$1(value));
+};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/option.js
+/**
+* @since 2.0.0
+*/
+const TypeId$15 = "~effect/data/Option";
+const CommonProto$1 = {
+	[TypeId$15]: { _A: (_) => _ },
+	...PipeInspectableProto,
+	[Symbol.iterator]() {
+		return new SingleShotGen(this);
+	}
+};
+const SomeProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto$1), {
+	_tag: "Some",
+	_op: "Some",
+	[symbol](that) {
+		return isOption(that) && isSome(that) && equals$1(this.value, that.value);
+	},
+	[symbol$1]() {
+		return combine(hash(this._tag))(hash(this.value));
+	},
+	toString() {
+		return `some(${format(this.value)})`;
+	},
+	toJSON() {
+		return {
+			_id: "Option",
+			_tag: this._tag,
+			value: toJson(this.value)
+		};
+	}
+});
+Object.defineProperty(SomeProto, "valueOrUndefined", { get() {
+	return this.value;
+} });
+const NoneHash = /* @__PURE__ */ hash("None");
+const NoneProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create(CommonProto$1), {
+	_tag: "None",
+	_op: "None",
+	valueOrUndefined: void 0,
+	[symbol](that) {
+		return isOption(that) && isNone$1(that);
+	},
+	[symbol$1]() {
+		return NoneHash;
+	},
+	toString() {
+		return `none()`;
+	},
+	toJSON() {
+		return {
+			_id: "Option",
+			_tag: this._tag
+		};
+	}
+});
+/** @internal */
+const isOption = (input) => hasProperty(input, TypeId$15);
+/** @internal */
+const isNone$1 = (fa) => fa._tag === "None";
+/** @internal */
+const isSome = (fa) => fa._tag === "Some";
+/** @internal */
+const none$1 = /* @__PURE__ */ Object.create(NoneProto);
+/** @internal */
+const some$1 = (value) => {
+	const a = Object.create(SomeProto);
+	a.value = value;
+	return a;
+};
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/result.js
-const TypeId$1 = "~effect/data/Result";
+const TypeId$14 = "~effect/data/Result";
 const CommonProto = {
-	[TypeId$1]: {
+	[TypeId$14]: {
 		/* v8 ignore next 2 */
 		_A: (_) => _,
 		_E: (_) => _
@@ -2018,7 +2496,7 @@ const SuccessProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create
 	_tag: "Success",
 	_op: "Success",
 	[symbol](that) {
-		return isResult(that) && isSuccess(that) && equals(this.success, that.success);
+		return isResult(that) && isSuccess(that) && equals$1(this.success, that.success);
 	},
 	[symbol$1]() {
 		return combine(hash(this._tag))(hash(this.success));
@@ -2038,7 +2516,7 @@ const FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create
 	_tag: "Failure",
 	_op: "Failure",
 	[symbol](that) {
-		return isResult(that) && isFailure$1(that) && equals(this.failure, that.failure);
+		return isResult(that) && isFailure$1(that) && equals$1(this.failure, that.failure);
 	},
 	[symbol$1]() {
 		return combine(hash(this._tag))(hash(this.failure));
@@ -2055,23 +2533,495 @@ const FailureProto = /* @__PURE__ */ Object.assign(/* @__PURE__ */ Object.create
 	}
 });
 /** @internal */
-const isResult = (input) => hasProperty(input, TypeId$1);
+const isResult = (input) => hasProperty(input, TypeId$14);
 /** @internal */
 const isFailure$1 = (result) => result._tag === "Failure";
 /** @internal */
 const isSuccess = (result) => result._tag === "Success";
 /** @internal */
-const fail$2 = (failure) => {
+const fail$5 = (failure) => {
 	const a = Object.create(FailureProto);
 	a.failure = failure;
 	return a;
 };
 /** @internal */
-const succeed$3 = (success) => {
+const succeed$5 = (success) => {
 	const a = Object.create(SuccessProto);
 	a.success = success;
 	return a;
 };
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Order.js
+/**
+* The `Order` module defines total orderings: pure comparison functions that
+* decide whether one value is less than, equal to, or greater than another. An
+* `Order<A>` returns a normalized {@link Ordering} (`-1`, `0`, or `1`), making
+* it suitable for sorting, finding minimum and maximum values, range checks, and
+* building ordered data structures.
+*
+* **Mental model**
+*
+* - An {@link Order} is a comparator with laws: totality, antisymmetry, and
+*   transitivity. If those laws do not hold, sorting and range operations can
+*   produce surprising results.
+* - `-1` means the left value comes before the right value, `0` means they are
+*   equal for this ordering, and `1` means the left value comes after the right
+*   value.
+* - Primitive orders such as {@link Number}, {@link String}, {@link Boolean},
+*   {@link BigInt}, and {@link Date} are building blocks.
+* - Use {@link mapInput} to compare larger values by a field or derived key.
+* - Use {@link combine} or {@link combineAll} for tie-breaking, where the first
+*   non-zero comparison result wins.
+*
+* **Common tasks**
+*
+* - Create a custom order from a comparison function with {@link make}.
+* - Sort or compare using built-in orders such as {@link Number} and
+*   {@link String}.
+* - Compare records and tuples with {@link Struct} and {@link Tuple}.
+* - Compare arrays lexicographically with {@link Array}.
+* - Convert an order into predicates with {@link isLessThan},
+*   {@link isGreaterThan}, {@link isLessThanOrEqualTo}, and
+*   {@link isGreaterThanOrEqualTo}.
+* - Select boundaries with {@link min}, {@link max}, {@link clamp}, and
+*   {@link isBetween}.
+*
+* **Gotchas**
+*
+* - {@link make} returns `0` immediately when `self === that`; the custom
+*   comparison function is not called for identical references.
+* - {@link Number} treats all `NaN` values as equal to each other and less than
+*   every non-`NaN` number.
+* - {@link Array} compares elements first and length second. {@link Tuple}
+*   compares a fixed number of positions.
+* - {@link Struct} compares fields in the key order of the object passed to it,
+*   so put the highest-priority fields first.
+* - {@link min} and {@link max} return the first argument when two values
+*   compare as equal.
+*
+* **Example** (Sorting by multiple fields)
+*
+* ```ts
+* import { Array, Order } from "effect"
+*
+* interface User {
+*   readonly name: string
+*   readonly age: number
+* }
+*
+* const byAge = Order.mapInput(Order.Number, (user: User) => user.age)
+* const byName = Order.mapInput(Order.String, (user: User) => user.name)
+* const byAgeThenName = Order.combine(byAge, byName)
+*
+* const users = [
+*   { name: "Charlie", age: 30 },
+*   { name: "Bob", age: 25 },
+*   { name: "Alice", age: 30 }
+* ]
+*
+* const sorted = Array.sort(users, byAgeThenName)
+* console.log(sorted.map((user) => user.name))
+* // ["Bob", "Alice", "Charlie"]
+* ```
+*
+* **See also**
+*
+* - {@link Ordering} for the normalized comparison result type.
+* - `Equivalence` for equality without less-than or greater-than.
+* - {@link Reducer} for combining orders with reducer-style APIs.
+*
+* @since 2.0.0
+*/
+/**
+* Creates a new `Order` instance from a comparison function.
+*
+* **When to use**
+*
+* Use when when creating a custom order for a type that doesn't have a built-in order
+* - When you need fine-grained control over comparison logic
+* - When implementing orders for complex types
+*
+* **Details**
+*
+* - Uses reference equality (`===`) as a shortcut: if `self === that`, returns `0` without calling the comparison function
+* - The comparison function should return `-1`, `0`, or `1` based on the comparison result
+* - The returned order satisfies total ordering laws if the comparison function does
+*
+* **Example** (Creating an Order)
+*
+* ```ts
+* import { Order } from "effect"
+*
+* const byAge = Order.make<{ name: string; age: number }>((self, that) => {
+*   if (self.age < that.age) return -1
+*   if (self.age > that.age) return 1
+*   return 0
+* })
+*
+* console.log(byAge({ name: "Alice", age: 30 }, { name: "Bob", age: 25 })) // 1
+* console.log(byAge({ name: "Alice", age: 25 }, { name: "Bob", age: 30 })) // -1
+* ```
+*
+* @see {@link mapInput} to transform an order by mapping the input type
+* @see {@link combine} to combine multiple orders
+* @category constructors
+* @since 2.0.0
+*/
+function make$9(compare) {
+	return (self, that) => self === that ? 0 : compare(self, that);
+}
+/**
+* Order instance for numbers that compares them numerically.
+*
+* **When to use**
+*
+* Use when when comparing numbers for sorting or searching
+* - As a base for creating orders on types containing numbers
+* - When implementing numeric comparisons in data structures
+*
+* **Details**
+*
+* - `0` is considered equal to `-0`
+* - All `NaN` values are considered equal to each other
+* - Any `NaN` is considered less than any non-NaN number
+* - Uses standard numeric comparison for all other values
+*
+* **Example** (Number Ordering)
+*
+* ```ts
+* import { Order } from "effect"
+*
+* console.log(Order.Number(1, 1)) // 0
+* console.log(Order.Number(1, 2)) // -1
+* console.log(Order.Number(2, 1)) // 1
+*
+* console.log(Order.Number(0, -0)) // 0
+* console.log(Order.Number(NaN, 1)) // -1
+* ```
+*
+* @see {@link mapInput} to compare objects by a number property
+* @see {@link BigInt} for bigint comparisons
+* @category instances
+* @since 4.0.0
+*/
+const Number$1 = /* @__PURE__ */ make$9((self, that) => {
+	if (globalThis.Number.isNaN(self) && globalThis.Number.isNaN(that)) return 0;
+	if (globalThis.Number.isNaN(self)) return -1;
+	if (globalThis.Number.isNaN(that)) return 1;
+	return self < that ? -1 : 1;
+});
+/**
+* Transforms an `Order` on type `A` into an `Order` on type `B` by providing a function that
+* maps values of type `B` to values of type `A`.
+*
+* **When to use**
+*
+* Use when when you have an order for a property type and want to compare objects by that property
+* - When extracting a comparable value from a complex type
+* - When creating orders for types that contain comparable values
+*
+* **Details**
+*
+* - Applies the mapping function to both values before comparison
+* - The mapping function should be pure and not have side effects
+* - Preserves the ordering properties of the original order
+*
+* **Example** (Mapping Input)
+*
+* ```ts
+* import { Order } from "effect"
+*
+* const byLength = Order.mapInput(Order.Number, (s: string) => s.length)
+*
+* console.log(byLength("a", "bb")) // -1
+* console.log(byLength("bb", "a")) // 1
+* console.log(byLength("aa", "bb")) // 0
+* ```
+*
+* @see {@link combine} to combine mapped orders for multi-criteria comparison
+* @see {@link Struct} to create orders for structs with multiple fields
+* @category mapping
+* @since 2.0.0
+*/
+const mapInput = /* @__PURE__ */ dual(2, (self, f) => make$9((b1, b2) => self(f(b1), f(b2))));
+/**
+* Checks whether one value is strictly greater than another according to the given order.
+*
+* **When to use**
+*
+* Use when when you need a boolean predicate instead of an ordering result
+* - When checking if a value is greater than another in conditional logic
+* - When implementing range checks or comparisons
+*
+* **Details**
+*
+* - Returns `true` if the order returns `1` (first value is greater than second)
+* - Returns `false` for equal or lesser values
+* - Supports curried and uncurried call styles
+*
+* **Example** (Greater Than)
+*
+* ```ts
+* import { Order } from "effect"
+*
+* const isGreaterThanNumber = Order.isGreaterThan(Order.Number)
+*
+* console.log(isGreaterThanNumber(2, 1)) // true
+* console.log(isGreaterThanNumber(1, 2)) // false
+* console.log(isGreaterThanNumber(1, 1)) // false
+* ```
+*
+* @see {@link isGreaterThanOrEqualTo} for non-strict greater than or equal
+* @see {@link isLessThan} for strict less than
+* @category predicates
+* @since 4.0.0
+*/
+const isGreaterThan = (O) => dual(2, (self, that) => O(self, that) === 1);
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Option.js
+/**
+* Creates an `Option` representing the absence of a value.
+*
+* **When to use**
+*
+* Use to represent a missing or uninitialized value, such as returning "no
+* result" from a function.
+*
+* **Details**
+*
+* - Returns `Option<never>`, which is a subtype of `Option<A>` for any `A`
+* - Always returns the same singleton instance
+*
+* **Example** (Creating an empty Option)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* //      ┌─── Option<never>
+* //      ▼
+* const noValue = Option.none()
+*
+* console.log(noValue)
+* // Output: { _id: 'Option', _tag: 'None' }
+* ```
+*
+* @see {@link some} for the opposite operation.
+*
+* @category constructors
+* @since 2.0.0
+*/
+const none = () => none$1;
+/**
+* Wraps the given value into an `Option` to represent its presence.
+*
+* **When to use**
+*
+* Use to wrap a known-present value as `Option`
+* - Returning a successful result from a partial function
+*
+* **Details**
+*
+* - Always returns `Some<A>`
+* - Does not filter `null` or `undefined`; use {@link fromNullishOr} for that
+*
+* **Example** (Wrapping a value)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* //      ┌─── Option<number>
+* //      ▼
+* const value = Option.some(1)
+*
+* console.log(value)
+* // Output: { _id: 'Option', _tag: 'Some', value: 1 }
+* ```
+*
+* @see {@link none} for the opposite operation.
+*
+* @category constructors
+* @since 2.0.0
+*/
+const some = some$1;
+/**
+* Checks whether an `Option` is `None` (absent).
+*
+* **When to use**
+*
+* Use when branching on absence before accessing `.value`
+*
+* **Details**
+*
+* - Acts as a type guard, narrowing to `None<A>`
+*
+* **Example** (Checking for None)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* console.log(Option.isNone(Option.some(1)))
+* // Output: false
+*
+* console.log(Option.isNone(Option.none()))
+* // Output: true
+* ```
+*
+* @see {@link isSome} for the opposite check.
+*
+* @category guards
+* @since 2.0.0
+*/
+const isNone = isNone$1;
+/**
+* Pattern-matches on an `Option`, handling both `None` and `Some` cases.
+*
+* **When to use**
+*
+* Use when exhaustively handling both branches in one expression
+* - Transforming an `Option` into a plain value
+*
+* **Details**
+*
+* - If `None`, calls `onNone` and returns its result
+* - If `Some`, calls `onSome` with the value and returns its result
+* - Supports the `dual` API (data-last and data-first)
+*
+* **Example** (Matching on an Option)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* const message = Option.match(Option.some(1), {
+*   onNone: () => "Option is empty",
+*   onSome: (value) => `Option has a value: ${value}`
+* })
+*
+* console.log(message)
+* // Output: "Option has a value: 1"
+* ```
+*
+* @see {@link getOrElse} for unwrapping with a default
+*
+* @category Pattern matching
+* @since 2.0.0
+*/
+const match$1 = /* @__PURE__ */ dual(2, (self, { onNone, onSome }) => isNone(self) ? onNone() : onSome(self.value));
+/**
+* Extracts the value from a `Some`, or evaluates a fallback thunk on `None`.
+*
+* **When to use**
+*
+* Use when providing a default value for an absent `Option`
+* - Unwrapping with lazy evaluation of the fallback
+*
+* **Details**
+*
+* - `Some` → returns the inner value
+* - `None` → calls `onNone()` and returns its result
+* - `onNone` is only called when needed (lazy)
+*
+* **Example** (Unwrapping with a fallback)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* console.log(Option.some(1).pipe(Option.getOrElse(() => 0)))
+* // Output: 1
+*
+* console.log(Option.none().pipe(Option.getOrElse(() => 0)))
+* // Output: 0
+* ```
+*
+* @see {@link getOrNull} to fall back to `null`
+* @see {@link getOrUndefined} to fall back to `undefined`
+* @see {@link getOrThrow} to throw on `None`
+*
+* @category getters
+* @since 2.0.0
+*/
+const getOrElse$1 = /* @__PURE__ */ dual(2, (self, onNone) => isNone(self) ? onNone() : self.value);
+/**
+* Converts a nullable value (`null` or `undefined`) into an `Option`.
+*
+* **When to use**
+*
+* Use when bridging from nullable APIs to `Option`
+* - Wrapping values that may be `null` or `undefined`
+*
+* **Details**
+*
+* - `null` or `undefined` → `None`
+* - Any other value → `Some` (typed as `NonNullable<A>`)
+*
+* **Example** (From nullable values)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* console.log(Option.fromNullishOr(undefined))
+* // Output: { _id: 'Option', _tag: 'None' }
+*
+* console.log(Option.fromNullishOr(null))
+* // Output: { _id: 'Option', _tag: 'None' }
+*
+* console.log(Option.fromNullishOr(1))
+* // Output: { _id: 'Option', _tag: 'Some', value: 1 }
+* ```
+*
+* @see {@link fromNullOr} to only treat `null` as absent
+* @see {@link fromUndefinedOr} to only treat `undefined` as absent
+* @see {@link liftNullishOr} to lift a nullable-returning function
+*
+* @category converting
+* @since 4.0.0
+*/
+const fromNullishOr = (a) => a == null ? none() : some(a);
+/**
+* Applies a function that returns an `Option` to the value of a `Some`,
+* flattening the result. Returns `None` if the input is `None`.
+*
+* **When to use**
+*
+* Use when chaining dependent optional computations where each step may return
+* `None`.
+*
+* **Details**
+*
+* - `Some` → applies `f` to the value and returns its `Option` result
+* - `None` → returns `None` without calling `f`
+* - Equivalent to `map` followed by {@link flatten}
+*
+* **Example** (Chaining optional lookups)
+*
+* ```ts
+* import { Option } from "effect"
+*
+* interface User {
+*   readonly name: string
+*   readonly address: Option.Option<{ readonly street: Option.Option<string> }>
+* }
+*
+* const user: User = {
+*   name: "John",
+*   address: Option.some({ street: Option.some("123 Main St") })
+* }
+*
+* const street = user.address.pipe(
+*   Option.flatMap((addr) => addr.street)
+* )
+*
+* console.log(street)
+* // Output: { _id: 'Option', _tag: 'Some', value: '123 Main St' }
+* ```
+*
+* @see {@link map} when `f` returns a plain value
+* @see {@link andThen} for a more flexible variant
+* @see {@link flatten} to unwrap a nested `Option<Option<A>>`
+*
+* @category sequencing
+* @since 2.0.0
+*/
+const flatMap$2 = /* @__PURE__ */ dual(2, (self, f) => isNone(self) ? none() : f(self.value));
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Result.js
 /**
@@ -2099,7 +3049,7 @@ const succeed$3 = (success) => {
 * @category constructors
 * @since 4.0.0
 */
-const succeed$2 = succeed$3;
+const succeed$4 = succeed$5;
 /**
 * Creates a `Result` holding a `Failure` value.
 *
@@ -2128,7 +3078,7 @@ const succeed$2 = succeed$3;
 * @category constructors
 * @since 4.0.0
 */
-const fail$1 = fail$2;
+const fail$4 = fail$5;
 /**
 * Checks whether a `Result` is a `Failure`.
 *
@@ -2454,7 +3404,51 @@ const unionWith = /* @__PURE__ */ dual(3, (self, that, isEquivalent) => {
 * @category elements
 * @since 2.0.0
 */
-const union = /* @__PURE__ */ dual(2, (self, that) => unionWith(self, that, asEquivalence()));
+const union$1 = /* @__PURE__ */ dual(2, (self, that) => unionWith(self, that, asEquivalence()));
+/**
+* Wraps a single value in a `NonEmptyArray`.
+*
+* **Example** (Creating a single-element array)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.of(1)) // [1]
+* ```
+*
+* @see {@link make} — create from multiple values
+* @see {@link empty} — create an empty array
+*
+* @category constructors
+* @since 2.0.0
+*/
+const of = (a) => [a];
+/**
+* Transforms each element using a function, returning a new array.
+*
+* **When to use**
+*
+* Use to transform each element independently while preserving the array shape.
+*
+* **Details**
+*
+* - The function receives `(element, index)`.
+* - Preserves `NonEmptyArray` in the return type.
+*
+* **Example** (Doubling values)
+*
+* ```ts
+* import { Array } from "effect"
+*
+* console.log(Array.map([1, 2, 3], (x) => x * 2)) // [2, 4, 6]
+* ```
+*
+* @see {@link flatMap} — map and flatten
+*
+* @category mapping
+* @since 2.0.0
+*/
+const map$5 = /* @__PURE__ */ dual(2, (self, f) => self.map(f));
 /**
 * Removes duplicates using a custom equivalence, preserving the order of the
 * first occurrence.
@@ -2614,7 +3608,7 @@ const ServiceProto = {
 		return self;
 	},
 	context(self) {
-		return make(this, self);
+		return make$8(this, self);
 	},
 	use(f) {
 		return withFiber((fiber) => f(get(fiber.context, this)));
@@ -2624,7 +3618,7 @@ const ServiceProto = {
 	}
 };
 const ReferenceTypeId = "~effect/Context/Reference";
-const TypeId = "~effect/Context";
+const TypeId$13 = "~effect/Context";
 /**
 * Creates a `Context` from an existing service map without validating or
 * copying it.
@@ -2651,15 +3645,15 @@ const TypeId = "~effect/Context";
 * @category constructors
 * @since 4.0.0
 */
-const makeUnsafe = (mapUnsafe) => {
-	const self = Object.create(Proto);
+const makeUnsafe$3 = (mapUnsafe) => {
+	const self = Object.create(Proto$1);
 	self.mapUnsafe = mapUnsafe;
 	self.mutable = false;
 	return self;
 };
-const Proto = {
+const Proto$1 = {
 	...PipeInspectableProto,
-	[TypeId]: { _Services: (_) => _ },
+	[TypeId$13]: { _Services: (_) => _ },
 	toJSON() {
 		return {
 			_id: "Context",
@@ -2671,7 +3665,7 @@ const Proto = {
 	},
 	[symbol](that) {
 		if (!isContext(that) || this.mapUnsafe.size !== that.mapUnsafe.size) return false;
-		for (const k of this.mapUnsafe.keys()) if (!that.mapUnsafe.has(k) || !equals(this.mapUnsafe.get(k), that.mapUnsafe.get(k))) return false;
+		for (const k of this.mapUnsafe.keys()) if (!that.mapUnsafe.has(k) || !equals$1(this.mapUnsafe.get(k), that.mapUnsafe.get(k))) return false;
 		return true;
 	},
 	[symbol$1]() {
@@ -2711,7 +3705,28 @@ const Proto = {
 * @category guards
 * @since 2.0.0
 */
-const isContext = (u) => hasProperty(u, TypeId);
+const isContext = (u) => hasProperty(u, TypeId$13);
+/**
+* Checks whether the provided argument is a `Reference`.
+*
+* **Example** (Checking for references)
+*
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const LoggerRef = Context.Reference("Logger", {
+*   defaultValue: () => ({ log: (msg: string) => console.log(msg) })
+* })
+*
+* assert.strictEqual(Context.isReference(LoggerRef), true)
+* assert.strictEqual(Context.isReference(Context.Service("Key")), false)
+* ```
+*
+* @category guards
+* @since 3.11.0
+*/
+const isReference = (u) => hasProperty(u, ReferenceTypeId);
 /**
 * Returns an empty `Context`.
 *
@@ -2727,8 +3742,8 @@ const isContext = (u) => hasProperty(u, TypeId);
 * @category constructors
 * @since 2.0.0
 */
-const empty = () => emptyContext;
-const emptyContext = /* @__PURE__ */ makeUnsafe(/* @__PURE__ */ new Map());
+const empty$2 = () => emptyContext;
+const emptyContext = /* @__PURE__ */ makeUnsafe$3(/* @__PURE__ */ new Map());
 /**
 * Creates a new `Context` with a single service associated to the key.
 *
@@ -2748,7 +3763,7 @@ const emptyContext = /* @__PURE__ */ makeUnsafe(/* @__PURE__ */ new Map());
 * @category constructors
 * @since 2.0.0
 */
-const make = (key, service) => makeUnsafe(new Map([[key.key, service]]));
+const make$8 = (key, service) => makeUnsafe$3(new Map([[key.key, service]]));
 /**
 * Adds a service to a given `Context`.
 *
@@ -2791,6 +3806,103 @@ const add = /* @__PURE__ */ dual(3, (self, key, service) => withMapUnsafe(self, 
 	map.set(key.key, service);
 }));
 /**
+* Gets the service for a key, or evaluates the fallback when a non-reference
+* key is absent.
+*
+* **When to use**
+*
+* Use when you want a fallback value for a missing regular
+* service. Use `getOption` when you need to distinguish presence from absence.
+*
+* **Details**
+*
+* If the key is a `Context.Reference` and no override is stored in the
+* context, its cached default value is returned instead of the fallback.
+*
+* **Gotchas**
+*
+* The fallback is not evaluated for missing `Context.Reference` keys because
+* references resolve to their default value.
+*
+* **Example** (Falling back for missing services)
+*
+* ```ts
+* import { Context } from "effect"
+*
+* const Logger = Context.Service<{ log: (msg: string) => void }>("Logger")
+* const Database = Context.Service<{ query: (sql: string) => string }>(
+*   "Database"
+* )
+*
+* const context = Context.make(Logger, {
+*   log: (msg: string) => console.log(msg)
+* })
+*
+* const logger = Context.getOrElse(context, Logger, () => ({ log: () => {} }))
+* const database = Context.getOrElse(
+*   context,
+*   Database,
+*   () => ({ query: () => "fallback" })
+* )
+*
+* console.log(logger === Context.get(context, Logger)) // true
+* console.log(database.query("SELECT 1")) // "fallback"
+* ```
+*
+* @see {@link getOption} for returning `Option.none` when a non-reference key is missing
+*
+* @category getters
+* @since 3.7.0
+*/
+const getOrElse = /* @__PURE__ */ dual(3, (self, key, orElse) => {
+	if (self.mapUnsafe.has(key.key)) return self.mapUnsafe.get(key.key);
+	return isReference(key) ? getDefaultValue(key) : orElse();
+});
+/**
+* Gets the service for a key, throwing if an absent non-reference key cannot be
+* resolved.
+*
+* **When to use**
+*
+* Use when the context type cannot prove that the service is present. Use
+* `get` when the service requirement is tracked in the context type, or
+* `getOption` when absence is expected.
+*
+* **Details**
+*
+* If the key is a `Context.Reference` and no override is stored in the
+* context, its cached default value is returned. For absent non-reference keys,
+* this function throws a runtime error.
+*
+* **Example** (Getting services unsafely)
+*
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+* const Timeout = Context.Service<{ TIMEOUT: number }>("Timeout")
+*
+* const context = Context.make(Port, { PORT: 8080 })
+*
+* assert.deepStrictEqual(Context.getUnsafe(context, Port), { PORT: 8080 })
+* assert.throws(() => Context.getUnsafe(context, Timeout))
+* ```
+*
+* @see {@link get} for type-checked service access
+* @see {@link getOption} for optional service access
+*
+* @category unsafe
+* @since 4.0.0
+*/
+const getUnsafe = /* @__PURE__ */ dual(2, (self, service) => {
+	if (!self.mapUnsafe.has(service.key)) {
+		if (ReferenceTypeId in service) return getDefaultValue(service);
+		throw serviceNotFoundError(service);
+	}
+	return self.mapUnsafe.get(service.key);
+});
+/**
 * Gets a service from the context that corresponds to the given key.
 *
 * **When to use**
@@ -2821,13 +3933,7 @@ const add = /* @__PURE__ */ dual(3, (self, key, service) => withMapUnsafe(self, 
 * @category getters
 * @since 2.0.0
 */
-const get = /* @__PURE__ */ dual(2, (self, service) => {
-	if (!self.mapUnsafe.has(service.key)) {
-		if (ReferenceTypeId in service) return getDefaultValue(service);
-		throw serviceNotFoundError(service);
-	}
-	return self.mapUnsafe.get(service.key);
-});
+const get = getUnsafe;
 /**
 * Gets the value for a `Context.Reference`, returning its cached default when
 * the context does not contain an override.
@@ -2894,6 +4000,140 @@ const serviceNotFoundError = (service) => {
 	}
 	return error;
 };
+/**
+* Gets the service for a key safely wrapped in an `Option`.
+*
+* **When to use**
+*
+* Use when service absence is expected and should be represented
+* as data. Use `getOrElse` when you want to provide a fallback value directly.
+*
+* **Details**
+*
+* Returns `Option.some` when the service is stored in the context. If the key
+* is a `Context.Reference` and no override is stored, returns `Option.some` of
+* the cached default value. Missing non-reference keys return `Option.none`.
+*
+* **Example** (Getting optional services)
+*
+* ```ts
+* import { Context, Option } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+* const Timeout = Context.Service<{ TIMEOUT: number }>("Timeout")
+*
+* const context = Context.make(Port, { PORT: 8080 })
+*
+* assert.deepStrictEqual(
+*   Context.getOption(context, Port),
+*   Option.some({ PORT: 8080 })
+* )
+* assert.deepStrictEqual(Context.getOption(context, Timeout), Option.none())
+* ```
+*
+* @see {@link getOrElse} for returning a fallback value directly
+*
+* @category getters
+* @since 2.0.0
+*/
+const getOption = /* @__PURE__ */ dual(2, (self, service) => {
+	if (self.mapUnsafe.has(service.key)) return some(self.mapUnsafe.get(service.key));
+	return isReference(service) ? some(getDefaultValue(service)) : none();
+});
+/**
+* Merges two `Context`s into one.
+*
+* **When to use**
+*
+* Use when combining two contexts. Use `mergeAll` when combining a
+* variadic list of contexts.
+*
+* **Details**
+*
+* When both contexts contain the same service key, the service from `that`
+* overrides the service from `self`.
+*
+* **Example** (Merging two contexts)
+*
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+* const Timeout = Context.Service<{ TIMEOUT: number }>("Timeout")
+*
+* const firstContext = Context.make(Port, { PORT: 8080 })
+* const secondContext = Context.make(Timeout, { TIMEOUT: 5000 })
+*
+* const context = Context.merge(firstContext, secondContext)
+*
+* assert.deepStrictEqual(Context.get(context, Port), { PORT: 8080 })
+* assert.deepStrictEqual(Context.get(context, Timeout), { TIMEOUT: 5000 })
+* ```
+*
+* @see {@link mergeAll} for merging more than two contexts at once
+*
+* @category combining
+* @since 2.0.0
+*/
+const merge$3 = /* @__PURE__ */ dual(2, (self, that) => {
+	if (self.mapUnsafe.size === 0) return that;
+	if (that.mapUnsafe.size === 0) return self;
+	return withMapUnsafe(self, (map) => {
+		that.mapUnsafe.forEach((value, key) => map.set(key, value));
+	});
+});
+/**
+* Merges any number of `Context`s into one.
+*
+* **When to use**
+*
+* Use when the number of contexts is variadic. Use `merge` when
+* combining exactly two contexts.
+*
+* **Details**
+*
+* When multiple contexts contain the same service key, the service from the
+* last context with that key is kept.
+*
+* **Example** (Merging multiple contexts)
+*
+* ```ts
+* import { Context } from "effect"
+* import * as assert from "node:assert"
+*
+* const Port = Context.Service<{ PORT: number }>("Port")
+* const Timeout = Context.Service<{ TIMEOUT: number }>("Timeout")
+* const Host = Context.Service<{ HOST: string }>("Host")
+*
+* const firstContext = Context.make(Port, { PORT: 8080 })
+* const secondContext = Context.make(Timeout, { TIMEOUT: 5000 })
+* const thirdContext = Context.make(Host, { HOST: "localhost" })
+*
+* const context = Context.mergeAll(
+*   firstContext,
+*   secondContext,
+*   thirdContext
+* )
+*
+* assert.deepStrictEqual(Context.get(context, Port), { PORT: 8080 })
+* assert.deepStrictEqual(Context.get(context, Timeout), { TIMEOUT: 5000 })
+* assert.deepStrictEqual(Context.get(context, Host), { HOST: "localhost" })
+* ```
+*
+* @see {@link merge} for merging two contexts
+*
+* @category combining
+* @since 3.12.0
+*/
+const mergeAll$1 = (...ctxs) => {
+	const map = /* @__PURE__ */ new Map();
+	for (let i = 0; i < ctxs.length; i++) ctxs[i].mapUnsafe.forEach((value, key) => {
+		map.set(key, value);
+	});
+	return makeUnsafe$3(map);
+};
 const withMapUnsafe = (self, f) => {
 	if (self.mutable) {
 		f(self.mapUnsafe);
@@ -2901,7 +4141,7 @@ const withMapUnsafe = (self, f) => {
 	}
 	const map = new Map(self.mapUnsafe);
 	f(map);
-	return makeUnsafe(map);
+	return makeUnsafe$3(map);
 };
 /**
 * Creates a context key with a default value.
@@ -2947,6 +4187,521 @@ const withMapUnsafe = (self, f) => {
 * @since 3.11.0
 */
 const Reference = Service;
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Duration.js
+const TypeId$12 = "~effect/time/Duration";
+const bigint0 = /* @__PURE__ */ BigInt(0);
+const bigint1e3 = /* @__PURE__ */ BigInt(1e3);
+const bigint1e6 = /* @__PURE__ */ BigInt(1e6);
+const DURATION_REGEXP = /^(-?\d+(?:\.\d+)?)\s+(nanos?|micros?|millis?|seconds?|minutes?|hours?|days?|weeks?)$/;
+/**
+* Decodes a `Duration.Input` into a `Duration`.
+*
+* **Gotchas**
+*
+* If the input is not a valid `Duration.Input`, it throws an error.
+*
+* **Example** (Decoding duration inputs)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration1 = Duration.fromInputUnsafe(1000) // 1000 milliseconds
+* const duration2 = Duration.fromInputUnsafe("5 seconds")
+* const duration3 = Duration.fromInputUnsafe("Infinity")
+* const duration4 = Duration.fromInputUnsafe([2, 500_000_000]) // 2 seconds and 500ms
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromInputUnsafe = (input) => {
+	switch (typeof input) {
+		case "number": return millis(input);
+		case "bigint": return nanos(input);
+		case "string": {
+			if (input === "Infinity") return infinity;
+			if (input === "-Infinity") return negativeInfinity;
+			const match = DURATION_REGEXP.exec(input);
+			if (!match) break;
+			const [_, valueStr, unit] = match;
+			const value = Number(valueStr);
+			switch (unit) {
+				case "nano":
+				case "nanos": return nanos(BigInt(valueStr));
+				case "micro":
+				case "micros": return micros(BigInt(valueStr));
+				case "milli":
+				case "millis": return millis(value);
+				case "second":
+				case "seconds": return seconds(value);
+				case "minute":
+				case "minutes": return minutes(value);
+				case "hour":
+				case "hours": return hours(value);
+				case "day":
+				case "days": return days(value);
+				case "week":
+				case "weeks": return weeks(value);
+			}
+			break;
+		}
+		case "object": {
+			if (input === null) break;
+			if (TypeId$12 in input) return input;
+			if (Array.isArray(input)) {
+				if (input.length !== 2 || !input.every(isNumber)) return invalid(input);
+				if (Number.isNaN(input[0]) || Number.isNaN(input[1])) return zero;
+				if (input[0] === -Infinity || input[1] === -Infinity) return negativeInfinity;
+				if (input[0] === Infinity || input[1] === Infinity) return infinity;
+				return make$7(BigInt(Math.round(input[0] * 1e9)) + BigInt(Math.round(input[1])));
+			}
+			const obj = input;
+			let millis = 0;
+			if (obj.weeks) millis += obj.weeks * 6048e5;
+			if (obj.days) millis += obj.days * 864e5;
+			if (obj.hours) millis += obj.hours * 36e5;
+			if (obj.minutes) millis += obj.minutes * 6e4;
+			if (obj.seconds) millis += obj.seconds * 1e3;
+			if (obj.milliseconds) millis += obj.milliseconds;
+			if (!obj.microseconds && !obj.nanoseconds) return make$7(millis);
+			let nanos = BigInt(millis) * bigint1e6;
+			if (obj.microseconds) nanos += BigInt(obj.microseconds) * bigint1e3;
+			if (obj.nanoseconds) nanos += BigInt(obj.nanoseconds);
+			return make$7(nanos);
+		}
+	}
+	return invalid(input);
+};
+const invalid = (input) => {
+	throw new Error(`Invalid Input: ${input}`);
+};
+const zeroDurationValue = {
+	_tag: "Millis",
+	millis: 0
+};
+const infinityDurationValue = { _tag: "Infinity" };
+const negativeInfinityDurationValue = { _tag: "NegativeInfinity" };
+const DurationProto = {
+	[TypeId$12]: TypeId$12,
+	[symbol$1]() {
+		return structure(this.value);
+	},
+	[symbol](that) {
+		return isDuration(that) && equals(this, that);
+	},
+	toString() {
+		switch (this.value._tag) {
+			case "Infinity": return "Infinity";
+			case "NegativeInfinity": return "-Infinity";
+			case "Nanos": return `${this.value.nanos} nanos`;
+			case "Millis": return `${this.value.millis} millis`;
+		}
+	},
+	toJSON() {
+		switch (this.value._tag) {
+			case "Millis": return {
+				_id: "Duration",
+				_tag: "Millis",
+				millis: this.value.millis
+			};
+			case "Nanos": return {
+				_id: "Duration",
+				_tag: "Nanos",
+				nanos: String(this.value.nanos)
+			};
+			case "Infinity": return {
+				_id: "Duration",
+				_tag: "Infinity"
+			};
+			case "NegativeInfinity": return {
+				_id: "Duration",
+				_tag: "NegativeInfinity"
+			};
+		}
+	},
+	[NodeInspectSymbol]() {
+		return this.toJSON();
+	},
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+const make$7 = (input) => {
+	const duration = Object.create(DurationProto);
+	if (typeof input === "number") if (isNaN(input) || input === 0 || Object.is(input, -0)) duration.value = zeroDurationValue;
+	else if (!Number.isFinite(input)) duration.value = input > 0 ? infinityDurationValue : negativeInfinityDurationValue;
+	else if (!Number.isInteger(input)) duration.value = {
+		_tag: "Nanos",
+		nanos: BigInt(Math.round(input * 1e6))
+	};
+	else duration.value = {
+		_tag: "Millis",
+		millis: input
+	};
+	else if (input === bigint0) duration.value = zeroDurationValue;
+	else duration.value = {
+		_tag: "Nanos",
+		nanos: input
+	};
+	return duration;
+};
+/**
+* Checks whether a value is a Duration.
+*
+* **Example** (Checking for durations)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* console.log(Duration.isDuration(Duration.seconds(1))) // true
+* console.log(Duration.isDuration(1000)) // false
+* ```
+*
+* @category guards
+* @since 2.0.0
+*/
+const isDuration = (u) => hasProperty(u, TypeId$12);
+/**
+* A Duration representing zero time.
+*
+* **Example** (Using the zero duration)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* console.log(Duration.toMillis(Duration.zero)) // 0
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const zero = /* @__PURE__ */ make$7(0);
+/**
+* A Duration representing infinite time.
+*
+* **Example** (Using infinite duration)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* console.log(Duration.toMillis(Duration.infinity)) // Infinity
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const infinity = /* @__PURE__ */ make$7(Infinity);
+/**
+* A Duration representing negative infinite time.
+*
+* **Example** (Using negative infinite duration)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* console.log(Duration.toMillis(Duration.negativeInfinity)) // -Infinity
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const negativeInfinity = /* @__PURE__ */ make$7(-Infinity);
+/**
+* Creates a Duration from nanoseconds.
+*
+* **Example** (Creating durations from nanoseconds)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.nanos(BigInt(500_000_000))
+* console.log(Duration.toMillis(duration)) // 500
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const nanos = (nanos) => make$7(nanos);
+/**
+* Creates a Duration from microseconds.
+*
+* **Example** (Creating durations from microseconds)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.micros(BigInt(500_000))
+* console.log(Duration.toMillis(duration)) // 500
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const micros = (micros) => make$7(micros * bigint1e3);
+/**
+* Creates a Duration from milliseconds.
+*
+* **Example** (Creating durations from milliseconds)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.millis(1000)
+* console.log(Duration.toMillis(duration)) // 1000
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const millis = (millis) => make$7(millis);
+/**
+* Creates a Duration from seconds.
+*
+* **Example** (Creating durations from seconds)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.seconds(30)
+* console.log(Duration.toMillis(duration)) // 30000
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const seconds = (seconds) => make$7(seconds * 1e3);
+/**
+* Creates a Duration from minutes.
+*
+* **Example** (Creating durations from minutes)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.minutes(5)
+* console.log(Duration.toMillis(duration)) // 300000
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const minutes = (minutes) => make$7(minutes * 6e4);
+/**
+* Creates a Duration from hours.
+*
+* **Example** (Creating durations from hours)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.hours(2)
+* console.log(Duration.toMillis(duration)) // 7200000
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const hours = (hours) => make$7(hours * 36e5);
+/**
+* Creates a Duration from days.
+*
+* **Example** (Creating durations from days)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.days(1)
+* console.log(Duration.toMillis(duration)) // 86400000
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const days = (days) => make$7(days * 864e5);
+/**
+* Creates a Duration from weeks.
+*
+* **Example** (Creating durations from weeks)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.weeks(1)
+* console.log(Duration.toMillis(duration)) // 604800000
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const weeks = (weeks) => make$7(weeks * 6048e5);
+/**
+* Converts a Duration to milliseconds.
+*
+* **Example** (Converting durations to milliseconds)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* console.log(Duration.toMillis(Duration.seconds(5))) // 5000
+* console.log(Duration.toMillis(Duration.minutes(2))) // 120000
+* ```
+*
+* @category getters
+* @since 2.0.0
+*/
+const toMillis = (self) => match(fromInputUnsafe(self), {
+	onMillis: identity,
+	onNanos: (nanos) => Number(nanos) / 1e6,
+	onInfinity: () => Infinity,
+	onNegativeInfinity: () => -Infinity
+});
+/**
+* Gets the duration in nanoseconds as a bigint, throwing for infinite durations.
+*
+* **Gotchas**
+*
+* If the duration is infinite, it throws an error.
+*
+* **Example** (Reading nanoseconds unsafely)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const duration = Duration.seconds(2)
+* const nanos = Duration.toNanosUnsafe(duration)
+* console.log(nanos) // 2000000000n
+*
+* // Duration.toNanosUnsafe(Duration.infinity)
+* // throws Error: "Cannot convert infinite duration to nanos"
+* ```
+*
+* @category getters
+* @since 4.0.0
+*/
+const toNanosUnsafe = (input) => {
+	const self = fromInputUnsafe(input);
+	switch (self.value._tag) {
+		case "Infinity":
+		case "NegativeInfinity": throw new Error("Cannot convert infinite duration to nanos");
+		case "Nanos": return self.value.nanos;
+		case "Millis": return BigInt(Math.round(self.value.millis * 1e6));
+	}
+};
+/**
+* Pattern matches on the representation of a `Duration`.
+*
+* **Details**
+*
+* Provide handlers for millisecond-backed values, nanosecond-backed values,
+* and positive infinity. Use `onNegativeInfinity` to handle negative infinity
+* separately; otherwise negative infinity is handled by `onInfinity`.
+*
+* **Example** (Pattern matching on duration representations)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const result = Duration.match(Duration.seconds(5), {
+*   onMillis: (millis) => `${millis} milliseconds`,
+*   onNanos: (nanos) => `${nanos} nanoseconds`,
+*   onInfinity: () => "infinite"
+* })
+* console.log(result) // "5000 milliseconds"
+* ```
+*
+* @category pattern matching
+* @since 2.0.0
+*/
+const match = /* @__PURE__ */ dual(2, (self, options) => {
+	switch (self.value._tag) {
+		case "Millis": return options.onMillis(self.value.millis);
+		case "Nanos": return options.onNanos(self.value.nanos);
+		case "Infinity": return options.onInfinity();
+		case "NegativeInfinity": return (options.onNegativeInfinity ?? options.onInfinity)();
+	}
+});
+/**
+* Pattern matches on two `Duration`s, providing handlers that receive both values.
+*
+* **Example** (Pattern matching on duration pairs)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const sum = Duration.matchPair(Duration.seconds(3), Duration.seconds(2), {
+*   onMillis: (a, b) => a + b,
+*   onNanos: (a, b) => Number(a + b),
+*   onInfinity: () => Infinity
+* })
+* console.log(sum) // 5000
+* ```
+*
+* @category pattern matching
+* @since 4.0.0
+*/
+const matchPair = /* @__PURE__ */ dual(3, (self, that, options) => {
+	if (self.value._tag === "Infinity" || self.value._tag === "NegativeInfinity" || that.value._tag === "Infinity" || that.value._tag === "NegativeInfinity") return options.onInfinity(self, that);
+	if (self.value._tag === "Millis") return that.value._tag === "Millis" ? options.onMillis(self.value.millis, that.value.millis) : options.onNanos(toNanosUnsafe(self), that.value.nanos);
+	else return options.onNanos(self.value.nanos, toNanosUnsafe(that));
+});
+/**
+* Provides an `Equivalence` instance for comparing `Duration` values.
+*
+* **Example** (Comparing durations for equivalence)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const isEqual = Duration.Equivalence(Duration.seconds(5), Duration.millis(5000))
+* console.log(isEqual) // true
+* ```
+*
+* @category instances
+* @since 2.0.0
+*/
+const Equivalence = (self, that) => matchPair(self, that, {
+	onMillis: (self, that) => self === that,
+	onNanos: (self, that) => self === that,
+	onInfinity: (self, that) => self.value._tag === that.value._tag
+});
+/**
+* Checks whether two Durations are equal.
+*
+* **Example** (Checking duration equality)
+*
+* ```ts
+* import { Duration } from "effect"
+*
+* const isEqual = Duration.equals(Duration.seconds(5), Duration.millis(5000))
+* console.log(isEqual) // true
+* ```
+*
+* @category predicates
+* @since 2.0.0
+*/
+const equals = /* @__PURE__ */ dual(2, (self, that) => Equivalence(self, that));
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Filter.js
+/**
+* Composes two filters sequentially, passing the successful output of the first
+* filter to the second.
+*
+* **Details**
+*
+* If either filter fails, the returned filter fails with the original input
+* instead of the intermediate failure value.
+*
+* @category combinators
+* @since 4.0.0
+*/
+const composePassthrough = /* @__PURE__ */ dual(2, (left, right) => (input) => {
+	const leftOut = left(input);
+	if (isFailure(leftOut)) return fail$4(input);
+	const rightOut = right(leftOut.success);
+	if (isFailure(rightOut)) return fail$4(input);
+	return rightOut;
+});
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Scheduler.js
 /**
@@ -3238,11 +4993,17 @@ const FiberRuntimeMetricsKey = "effect/observability/Metric/FiberRuntimeMetricsK
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/references.js
 /** @internal */
+const CurrentConcurrency = /* @__PURE__ */ Reference("effect/References/CurrentConcurrency", { defaultValue: () => "unbounded" });
+/** @internal */
 const CurrentStackFrame = /* @__PURE__ */ Reference("effect/References/CurrentStackFrame", { defaultValue: constUndefined });
+/** @internal */
+const CurrentLogAnnotations = /* @__PURE__ */ Reference("effect/References/CurrentLogAnnotations", { defaultValue: () => ({}) });
 /** @internal */
 const CurrentLogLevel = /* @__PURE__ */ Reference("effect/References/CurrentLogLevel", { defaultValue: () => "Info" });
 /** @internal */
 const MinimumLogLevel = /* @__PURE__ */ Reference("effect/References/MinimumLogLevel", { defaultValue: () => "Info" });
+/** @internal */
+const CurrentLogSpans = /* @__PURE__ */ Reference("effect/References/CurrentLogSpans", { defaultValue: () => [] });
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js
 /** @internal */
@@ -3271,19 +5032,26 @@ var Interrupt = class extends ReasonBase {
 /** @internal */
 const causeInterrupt = (fiberId) => new CauseImpl([new Interrupt(fiberId)]);
 /** @internal */
-const findError = (self) => {
+const findFail = (self) => {
+	const reason = self.reasons.find(isFailReason);
+	return reason ? succeed$4(reason) : fail$4(self);
+};
+/** @internal */
+const findError$1 = (self) => {
 	for (let i = 0; i < self.reasons.length; i++) {
 		const reason = self.reasons[i];
-		if (reason._tag === "Fail") return succeed$2(reason.error);
+		if (reason._tag === "Fail") return succeed$4(reason.error);
 	}
-	return fail$1(self);
+	return fail$4(self);
 };
+/** @internal */
+const hasInterrupts = (self) => self.reasons.some(isInterruptReason);
 /** @internal */
 const causeCombine = /* @__PURE__ */ dual(2, (self, that) => {
 	if (self.reasons.length === 0) return that;
 	else if (that.reasons.length === 0) return self;
-	const newCause = new CauseImpl(union(self.reasons, that.reasons));
-	return equals(self, newCause) ? self : newCause;
+	const newCause = new CauseImpl(union$1(self.reasons, that.reasons));
+	return equals$1(self, newCause) ? self : newCause;
 });
 /** @internal */
 const causePartition = (self) => {
@@ -3304,12 +5072,118 @@ const causeSquash = (self) => {
 	return new globalThis.Error("Empty cause");
 };
 /** @internal */
+const causePrettyErrors = (self) => {
+	const errors = [];
+	const interrupts = [];
+	if (self.reasons.length === 0) return errors;
+	const prevStackLimit = Error.stackTraceLimit;
+	Error.stackTraceLimit = 1;
+	for (const failure of self.reasons) {
+		if (failure._tag === "Interrupt") {
+			interrupts.push(failure);
+			continue;
+		}
+		errors.push(causePrettyError(failure._tag === "Die" ? failure.defect : failure.error, failure.annotations));
+	}
+	if (errors.length === 0) {
+		const cause = /* @__PURE__ */ new Error("The fiber was interrupted by:");
+		cause.name = "InterruptCause";
+		cause.stack = interruptCauseStack(cause, interrupts);
+		const error = new globalThis.Error("All fibers interrupted without error", { cause });
+		error.name = "InterruptError";
+		error.stack = `${error.name}: ${error.message}`;
+		errors.push(causePrettyError(error, interrupts[0].annotations));
+	}
+	Error.stackTraceLimit = prevStackLimit;
+	return errors;
+};
+/** @internal */
+const causePrettyError = (original, annotations) => {
+	const kind = typeof original;
+	let error;
+	if (original && kind === "object") {
+		error = new globalThis.Error(causePrettyMessage(original), { cause: original.cause ? causePrettyError(original.cause) : void 0 });
+		if (typeof original.name === "string") error.name = original.name;
+		if (typeof original.stack === "string") error.stack = cleanErrorStack(original.stack, error, annotations);
+		else {
+			const stack = `${error.name}: ${error.message}`;
+			error.stack = annotations ? addStackAnnotations(stack, annotations) : stack;
+		}
+		for (const key of Object.keys(original)) if (!(key in error)) error[key] = original[key];
+	} else error = new globalThis.Error(!original ? `Unknown error: ${original}` : kind === "string" ? original : formatJson(original));
+	return error;
+};
+const causePrettyMessage = (u) => {
+	if (typeof u.message === "string") return u.message;
+	else if (typeof u.toString === "function" && u.toString !== Object.prototype.toString && u.toString !== Array.prototype.toString) try {
+		return u.toString();
+	} catch {}
+	return formatJson(u);
+};
+const locationRegExp = /\((.*)\)/g;
+const cleanErrorStack = (stack, error, annotations) => {
+	const message = `${error.name}: ${error.message}`;
+	const lines = (stack.startsWith(message) ? stack.slice(message.length) : stack).split("\n");
+	const out = [message];
+	for (let i = 1; i < lines.length; i++) {
+		if (/(?:Generator\.next|~effect\/Effect)/.test(lines[i])) break;
+		out.push(lines[i]);
+	}
+	return annotations ? addStackAnnotations(out.join("\n"), annotations) : out.join("\n");
+};
+const addStackAnnotations = (stack, annotations) => {
+	const frame = annotations?.get(StackTraceKey.key);
+	if (frame) stack = `${stack}\n${currentStackTrace(frame)}`;
+	return stack;
+};
+const interruptCauseStack = (error, interrupts) => {
+	const out = [`${error.name}: ${error.message}`];
+	for (const current of interrupts) {
+		const fiberId = current.fiberId !== void 0 ? `#${current.fiberId}` : "unknown";
+		const frame = current.annotations.get(InterruptorStackTrace$1.key);
+		out.push(`    at fiber (${fiberId})`);
+		if (frame) out.push(currentStackTrace(frame));
+	}
+	return out.join("\n");
+};
+const currentStackTrace = (frame) => {
+	const out = [];
+	let current = frame;
+	let i = 0;
+	while (current && i < 10) {
+		const stack = current.stack();
+		if (stack) {
+			const locationMatchAll = stack.matchAll(locationRegExp);
+			let match = false;
+			for (const [, location] of locationMatchAll) {
+				match = true;
+				out.push(`    at ${current.name} (${location})`);
+			}
+			if (!match) out.push(`    at ${current.name} (${stack.replace(/^at /, "")})`);
+		} else out.push(`    at ${current.name}`);
+		current = current.parent;
+		i++;
+	}
+	return out.join("\n");
+};
+/** @internal */
+const causePretty = (cause) => causePrettyErrors(cause).map((e) => e.cause ? `${e.stack} {\n${renderErrorCause(e.cause, "  ")}\n}` : e.stack).join("\n");
+const renderErrorCause = (cause, prefix) => {
+	const lines = cause.stack.split("\n");
+	let stack = `${prefix}[cause]: ${lines[0]}`;
+	for (let i = 1, len = lines.length; i < len; i++) stack += `\n${prefix}${lines[i]}`;
+	if (cause.cause) stack += ` {\n${renderErrorCause(cause.cause, `${prefix}  `)}\n${prefix}}`;
+	return stack;
+};
+/** @internal */
 const FiberTypeId = `~effect/Fiber/dev`;
 const fiberVariance = {
 	_A: identity,
 	_E: identity
 };
 const fiberIdStore = { id: 0 };
+/** @internal */
+const getCurrentFiber = () => globalThis[currentFiberTypeId];
 /** @internal */
 var FiberImpl = class {
 	constructor(context, interruptible = true) {
@@ -3370,10 +5244,10 @@ var FiberImpl = class {
 	interruptUnsafe(fiberId, annotations) {
 		if (this._exit) return;
 		let cause = causeInterrupt(fiberId);
-		if (this.currentStackFrame) cause = causeAnnotate(cause, make(StackTraceKey, this.currentStackFrame));
+		if (this.currentStackFrame) cause = causeAnnotate(cause, make$8(StackTraceKey, this.currentStackFrame));
 		if (annotations) cause = causeAnnotate(cause, annotations);
 		this._interruptedCause = this._interruptedCause ? causeCombine(this._interruptedCause, cause) : cause;
-		if (this.interruptible) this.evaluate(failCause(this._interruptedCause));
+		if (this.interruptible) this.evaluate(failCause$3(this._interruptedCause));
 	}
 	pollUnsafe() {
 		return this._exit;
@@ -3388,7 +5262,7 @@ var FiberImpl = class {
 		const exit = this.runLoop(effect);
 		if (exit === Yield) return;
 		const interruptChildren = fiberMiddleware.interruptChildren && fiberMiddleware.interruptChildren(this);
-		if (interruptChildren !== void 0) return this.evaluate(flatMap(interruptChildren, () => exit));
+		if (interruptChildren !== void 0) return this.evaluate(flatMap$1(interruptChildren, () => exit));
 		this._exit = exit;
 		this.runtimeMetrics?.recordFiberEnd(this.context, this._exit);
 		for (let i = 0; i < this._observers.length; i++) this._observers[i](exit);
@@ -3407,7 +5281,7 @@ var FiberImpl = class {
 				if (!yielding && !this.currentPreventYield && this.currentScheduler.shouldYield(this)) {
 					yielding = true;
 					const prev = current;
-					current = flatMap(yieldNow, () => prev);
+					current = flatMap$1(yieldNow, () => prev);
 				}
 				current = this.currentTracerContext ? this.currentTracerContext(current, this) : current[evaluate](this);
 				if (currentLoop !== this.currentLoopCount) return Yield;
@@ -3471,14 +5345,77 @@ var FiberImpl = class {
 	}
 };
 const fiberMiddleware = { interruptChildren: void 0 };
+const fiberStackAnnotations = (fiber) => {
+	if (!fiber.currentStackFrame) return void 0;
+	const annotations = /* @__PURE__ */ new Map();
+	annotations.set(StackTraceKey.key, fiber.currentStackFrame);
+	return makeUnsafe$3(annotations);
+};
 /** @internal */
-const succeed$1 = exitSucceed;
+const fiberAwait = (self) => {
+	const impl = self;
+	if (impl._exit) return succeed$3(impl._exit);
+	return callback$2((resume) => {
+		if (impl._exit) return resume(succeed$3(impl._exit));
+		return sync$1(self.addObserver((exit) => resume(succeed$3(exit))));
+	});
+};
 /** @internal */
-const failCause = exitFailCause;
+const fiberAwaitAll = (self) => callback$2((resume) => {
+	const iter = self[Symbol.iterator]();
+	const exits = [];
+	let cancel = void 0;
+	function loop() {
+		let result = iter.next();
+		while (!result.done) {
+			if (result.value._exit) {
+				exits.push(result.value._exit);
+				result = iter.next();
+				continue;
+			}
+			cancel = result.value.addObserver((exit) => {
+				exits.push(exit);
+				loop();
+			});
+			return;
+		}
+		resume(succeed$3(exits));
+	}
+	loop();
+	return sync$1(() => cancel?.());
+});
 /** @internal */
-const fail = exitFail;
+const fiberInterrupt = (self) => withFiber((fiber) => fiberInterruptAs(self, fiber.id));
 /** @internal */
-const suspend = /* @__PURE__ */ makePrimitive({
+const fiberInterruptAs = /* @__PURE__ */ dual((args) => hasProperty(args[0], FiberTypeId), (self, fiberId, annotations) => withFiber((parent) => {
+	let ann = fiberStackAnnotations(parent);
+	ann = ann && annotations ? merge$3(ann, annotations) : ann ?? annotations;
+	self.interruptUnsafe(fiberId, ann);
+	return asVoid$1(fiberAwait(self));
+}));
+/** @internal */
+const fiberInterruptAll = (fibers) => withFiber((parent) => {
+	const annotations = fiberStackAnnotations(parent);
+	for (const fiber of fibers) fiber.interruptUnsafe(parent.id, annotations);
+	return asVoid$1(fiberAwaitAll(fibers));
+});
+/** @internal */
+const succeed$3 = exitSucceed;
+/** @internal */
+const failCause$3 = exitFailCause;
+/** @internal */
+const fail$3 = exitFail;
+/** @internal */
+const sync$1 = /* @__PURE__ */ makePrimitive({
+	op: "Sync",
+	[evaluate](fiber) {
+		const value = this[args]();
+		const cont = fiber.getCont(contA);
+		return cont ? cont[contA](value, fiber) : fiber.yieldWith(exitSucceed(value));
+	}
+});
+/** @internal */
+const suspend$3 = /* @__PURE__ */ makePrimitive({
 	op: "Suspend",
 	[evaluate](_fiber) {
 		return this[args]();
@@ -3499,17 +5436,155 @@ const yieldNow = /* @__PURE__ */ (/* @__PURE__ */ makePrimitive({
 	}
 }))(0);
 /** @internal */
-const void_$1 = /* @__PURE__ */ succeed$1(void 0);
+const die$1 = (defect) => exitDie(defect);
 /** @internal */
-const try_$1 = (options) => suspend(() => {
+const void_$1 = /* @__PURE__ */ succeed$3(void 0);
+/** @internal */
+const try_$1 = (options) => suspend$3(() => {
 	try {
-		return succeed$1(internalCall(options.try));
+		return succeed$3(internalCall(options.try));
 	} catch (err) {
-		return fail(internalCall(() => options.catch(err)));
+		return fail$3(internalCall(() => options.catch(err)));
 	}
 });
 /** @internal */
-const flatMap = /* @__PURE__ */ dual(2, (self, f) => {
+const promise$1 = (evaluate) => callbackOptions(function(resume, signal) {
+	internalCall(() => evaluate(signal)).then((a) => resume(succeed$3(a)), (e) => resume(die$1(e)));
+}, evaluate.length !== 0);
+/** @internal */
+const tryPromise$1 = (options) => {
+	const f = typeof options === "function" ? options : options.try;
+	const catcher = typeof options === "function" ? (cause) => new UnknownError$1(cause, "An error occurred in Effect.tryPromise") : options.catch;
+	return callbackOptions(function(resume, signal) {
+		try {
+			internalCall(() => f(signal)).then((a) => resume(succeed$3(a)), (e) => resume(fail$3(internalCall(() => catcher(e)))));
+		} catch (err) {
+			resume(fail$3(internalCall(() => catcher(err))));
+		}
+	}, eval.length !== 0);
+};
+/** @internal */
+const withFiberId = (f) => withFiber((fiber) => f(fiber.id));
+const callbackOptions = /* @__PURE__ */ makePrimitive({
+	op: "Async",
+	single: false,
+	[evaluate](fiber) {
+		const register = internalCall(() => this[args][0].bind(fiber.currentScheduler));
+		let resumed = false;
+		let yielded = false;
+		const controller = this[args][1] ? new AbortController() : void 0;
+		const onCancel = register((effect) => {
+			if (resumed) return;
+			resumed = true;
+			if (yielded) fiber.evaluate(effect);
+			else yielded = effect;
+		}, controller?.signal);
+		if (yielded !== false) return yielded;
+		yielded = true;
+		fiber._yielded = () => {
+			resumed = true;
+		};
+		if (controller === void 0 && onCancel === void 0) return Yield;
+		fiber._stack.push(asyncFinalizer(() => {
+			resumed = true;
+			controller?.abort();
+			return onCancel ?? exitVoid;
+		}));
+		return Yield;
+	}
+});
+const asyncFinalizer = /* @__PURE__ */ makePrimitive({
+	op: "AsyncFinalizer",
+	[contAll](fiber) {
+		if (fiber.interruptible) {
+			fiber.interruptible = false;
+			fiber._stack.push(setInterruptibleTrue);
+		}
+	},
+	[contE](cause, _fiber) {
+		return hasInterrupts(cause) ? flatMap$1(this[args](), () => failCause$3(cause)) : failCause$3(cause);
+	}
+});
+/** @internal */
+const callback$2 = (register) => callbackOptions(register, register.length >= 2);
+/** @internal */
+const gen$1 = (...args) => suspend$3(() => fromIteratorUnsafe(args.length === 1 ? args[0]() : args[1].call(args[0].self)));
+/** @internal */
+const fnUntraced$1 = (body, ...pipeables) => {
+	const fn = pipeables.length === 0 ? function() {
+		return suspend$3(() => fromIteratorUnsafe(body.apply(this, arguments)));
+	} : function() {
+		let effect = suspend$3(() => fromIteratorUnsafe(body.apply(this, arguments)));
+		for (let i = 0; i < pipeables.length; i++) effect = pipeables[i](effect, ...arguments);
+		return effect;
+	};
+	return defineFunctionLength(body.length, fn);
+};
+const defineFunctionLength = (length, fn) => Object.defineProperty(fn, "length", {
+	value: length,
+	configurable: true
+});
+const fromIteratorUnsafe = /* @__PURE__ */ makePrimitive({
+	op: "Iterator",
+	single: false,
+	[contA](value, fiber) {
+		const iter = this[args][0];
+		while (true) {
+			const state = iter.next(value);
+			if (state.done) return succeed$3(state.value);
+			if (!effectIsExit(state.value)) {
+				fiber._stack.push(this);
+				return state.value;
+			} else if (state.value._tag === "Failure") return state.value;
+			value = state.value.value;
+		}
+	},
+	[evaluate](fiber) {
+		return this[contA](this[args][1], fiber);
+	}
+});
+/** @internal */
+const as$1 = /* @__PURE__ */ dual(2, (self, value) => {
+	const b = succeed$3(value);
+	return flatMap$1(self, (_) => b);
+});
+/** @internal */
+const andThen$1 = /* @__PURE__ */ dual(2, (self, f) => flatMap$1(self, (a) => isEffect(f) ? f : internalCall(() => f(a))));
+/** @internal */
+const tap$1 = /* @__PURE__ */ dual(2, (self, f) => flatMap$1(self, (a) => as$1(isEffect(f) ? f : internalCall(() => f(a)), a)));
+/** @internal */
+const asVoid$1 = (self) => flatMap$1(self, (_) => exitVoid);
+/** @internal */
+const raceAllFirst = (all, options) => withFiber((parent) => callback$2((resume) => {
+	let done = false;
+	const fibers = /* @__PURE__ */ new Set();
+	const onExit = (exit) => {
+		done = true;
+		resume(fibers.size === 0 ? exit : flatMap$1(uninterruptible(fiberInterruptAll(fibers)), () => exit));
+	};
+	let i = 0;
+	for (const effect of all) {
+		if (done) break;
+		const index = i++;
+		const fiber = forkUnsafe$1(parent, effect, true, true, false);
+		fibers.add(fiber);
+		fiber.addObserver((exit) => {
+			fibers.delete(fiber);
+			const isWinner = !done;
+			onExit(exit);
+			if (isWinner && options?.onWinner) options.onWinner({
+				fiber,
+				index,
+				parentFiber: parent
+			});
+		});
+	}
+	return fiberInterruptAll(fibers);
+}));
+/** @internal */
+const raceFirst$1 = /* @__PURE__ */ dual((args) => isEffect(args[1]), (self, that, options) => raceAllFirst([self, that], options));
+/** @internal */
+const flatMap$1 = /* @__PURE__ */ dual(2, (self, f) => {
 	const onSuccess = Object.create(OnSuccessProto);
 	onSuccess[args] = self;
 	onSuccess[contA] = f.length !== 1 ? (a) => f(a) : f;
@@ -3525,9 +5600,59 @@ const OnSuccessProto = /* @__PURE__ */ makePrimitiveProto({
 /** @internal */
 const effectIsExit = (effect) => ExitTypeId in effect;
 /** @internal */
+const map$4 = /* @__PURE__ */ dual(2, (self, f) => flatMap$1(self, (a) => succeed$3(internalCall(() => f(a)))));
+/** @internal */
+const exitInterrupt$1 = (fiberId) => exitFailCause(causeInterrupt(fiberId));
+/** @internal */
+const exitIsSuccess = (self) => self._tag === "Success";
+/** @internal */
+const exitFilterCause = (self) => self._tag === "Failure" ? succeed$4(self.cause) : fail$4(self);
+/** @internal */
 const exitVoid = /* @__PURE__ */ exitSucceed(void 0);
 /** @internal */
-const catchCause = /* @__PURE__ */ dual(2, (self, f) => {
+const exitZipRight = /* @__PURE__ */ dual(2, (self, that) => exitIsSuccess(self) ? that : self);
+/** @internal */
+const exitAsVoidAll = (exits) => {
+	const failures = [];
+	for (const exit of exits) if (exit._tag === "Failure") failures.push(...exit.cause.reasons);
+	return failures.length === 0 ? exitVoid : exitFailCause(causeFromReasons(failures));
+};
+/** @internal */
+const serviceOption$1 = (service) => withFiber((fiber) => succeed$3(getOption(fiber.context, service)));
+/** @internal */
+const updateContext = /* @__PURE__ */ dual(2, (self, f) => withFiber((fiber) => {
+	const prevContext = fiber.context;
+	const nextContext = f(prevContext);
+	if (prevContext === nextContext) return self;
+	fiber.setContext(nextContext);
+	return onExitPrimitive(self, () => {
+		fiber.setContext(prevContext);
+	});
+}));
+/** @internal */
+const contextWith = (f) => withFiber((fiber) => f(fiber.context));
+/** @internal */
+const provideContext = /* @__PURE__ */ dual(2, (self, context) => {
+	if (effectIsExit(self)) return self;
+	return updateContext(self, merge$3(context));
+});
+/** @internal */
+const provideService = function() {
+	if (arguments.length === 1) return dual(2, (self, impl) => provideServiceImpl(self, arguments[0], impl));
+	return dual(3, (self, service, impl) => provideServiceImpl(self, service, impl)).apply(this, arguments);
+};
+const provideServiceImpl = (self, service, implementation) => updateContext(self, (s) => {
+	if (s.mapUnsafe.get(service.key) === implementation) return s;
+	return add(s, service, implementation);
+});
+/** @internal */
+const forever$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => whileLoop$1({
+	while: constTrue,
+	body: constant(options?.disableYield ? self : flatMap$1(self, (_) => yieldNow)),
+	step: constVoid
+}));
+/** @internal */
+const catchCause$1 = /* @__PURE__ */ dual(2, (self, f) => {
 	const onFailure = Object.create(OnFailureProto);
 	onFailure[args] = self;
 	onFailure[contE] = f.length !== 1 ? (cause) => f(cause) : f;
@@ -3541,16 +5666,418 @@ const OnFailureProto = /* @__PURE__ */ makePrimitiveProto({
 	}
 });
 /** @internal */
-const catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate, f, orElse) => catchCause(self, (cause) => {
-	const error = findError(cause);
-	if (isFailure(error)) return failCause(error.failure);
-	if (!predicate(error.success)) return orElse ? internalCall(() => orElse(error.success)) : failCause(cause);
+const catchCauseFilter = /* @__PURE__ */ dual(3, (self, filter, f) => catchCause$1(self, (cause) => {
+	const eb = filter(cause);
+	return isFailure(eb) ? failCause$3(eb.failure) : internalCall(() => f(eb.success, cause));
+}));
+/** @internal */
+const catch_$1 = /* @__PURE__ */ dual(2, (self, f) => catchCauseFilter(self, findError$1, (e) => f(e)));
+/** @internal */
+const catchIf = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, predicate, f, orElse) => catchCause$1(self, (cause) => {
+	const error = findError$1(cause);
+	if (isFailure(error)) return failCause$3(error.failure);
+	if (!predicate(error.success)) return orElse ? internalCall(() => orElse(error.success)) : failCause$3(cause);
 	return internalCall(() => f(error.success));
 }));
 /** @internal */
 const catchTag$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, k, f, orElse) => {
 	return catchIf(self, Array.isArray(k) ? (e) => hasProperty(e, "_tag") && k.includes(e._tag) : isTagged(k), f, orElse);
 });
+/** @internal */
+const orDie$1 = (self) => catch_$1(self, die$1);
+/** @internal */
+const ignore$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => {
+	if (!options?.log) return matchEffect$2(self, {
+		onFailure: (_) => void_$1,
+		onSuccess: (_) => void_$1
+	});
+	const logEffect = logWithLevel(options.log === true ? void 0 : options.log);
+	return matchCauseEffect(self, {
+		onFailure(cause) {
+			const failure = findFail(cause);
+			return isFailure(failure) ? failCause$3(failure.failure) : options.message === void 0 ? logEffect(cause) : logEffect(options.message, cause);
+		},
+		onSuccess: (_) => void_$1
+	});
+});
+/** @internal */
+const matchCauseEffect = /* @__PURE__ */ dual(2, (self, options) => {
+	const primitive = Object.create(OnSuccessAndFailureProto);
+	primitive[args] = self;
+	primitive[contA] = options.onSuccess.length !== 1 ? (a) => options.onSuccess(a) : options.onSuccess;
+	primitive[contE] = options.onFailure.length !== 1 ? (cause) => options.onFailure(cause) : options.onFailure;
+	return primitive;
+});
+const OnSuccessAndFailureProto = /* @__PURE__ */ makePrimitiveProto({
+	op: "OnSuccessAndFailure",
+	[evaluate](fiber) {
+		fiber._stack.push(this);
+		return this[args];
+	}
+});
+/** @internal */
+const matchEffect$2 = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffect(self, {
+	onFailure: (cause) => {
+		const fail = cause.reasons.find(isFailReason);
+		return fail ? internalCall(() => options.onFailure(fail.error)) : failCause$3(cause);
+	},
+	onSuccess: options.onSuccess
+}));
+/** @internal */
+const exit = (self) => effectIsExit(self) ? exitSucceed(self) : exitPrimitive(self);
+const exitPrimitive = /* @__PURE__ */ makePrimitive({
+	op: "Exit",
+	[evaluate](fiber) {
+		fiber._stack.push(this);
+		return this[args];
+	},
+	[contA](value, _, exit) {
+		return succeed$3(exit ?? exitSucceed(value));
+	},
+	[contE](cause, _, exit) {
+		return succeed$3(exit ?? exitFailCause(cause));
+	}
+});
+/** @internal */
+const timeoutOrElse$1 = /* @__PURE__ */ dual(2, (self, options) => raceFirst$1(self, flatMap$1(sleep(options.duration), options.orElse)));
+/** @internal */
+const ScopeTypeId = "~effect/Scope";
+/** @internal */
+const ScopeCloseableTypeId = "~effect/Scope/Closeable";
+/** @internal */
+const scopeTag = /* @__PURE__ */ Service("effect/Scope");
+/** @internal */
+const scopeClose = (self, exit_) => suspend$3(() => scopeCloseUnsafe(self, exit_) ?? void_$1);
+/** @internal */
+const scopeCloseUnsafe = (self, exit_) => {
+	if (self.state._tag === "Closed") return;
+	const closed = {
+		_tag: "Closed",
+		exit: exit_
+	};
+	if (self.state._tag === "Empty") {
+		self.state = closed;
+		return;
+	}
+	const { finalizers } = self.state;
+	self.state = closed;
+	if (finalizers.size === 0) return;
+	else if (finalizers.size === 1) return finalizers.values().next().value(exit_);
+	return scopeCloseFinalizers(self, finalizers, exit_);
+};
+const scopeCloseFinalizers = /* @__PURE__ */ fnUntraced$1(function* (self, finalizers, exit_) {
+	let exits = [];
+	const fibers = [];
+	const arr = Array.from(finalizers.values());
+	const parent = getCurrentFiber();
+	for (let i = arr.length - 1; i >= 0; i--) {
+		const finalizer = arr[i];
+		if (self.strategy === "sequential") exits.push(yield* exit(finalizer(exit_)));
+		else fibers.push(forkUnsafe$1(parent, finalizer(exit_), true, true, "inherit"));
+	}
+	if (fibers.length > 0) exits = yield* fiberAwaitAll(fibers);
+	return yield* exitAsVoidAll(exits);
+});
+/** @internal */
+const scopeForkUnsafe = (scope, finalizerStrategy) => {
+	const newScope = scopeMakeUnsafe(finalizerStrategy);
+	if (scope.state._tag === "Closed") {
+		newScope.state = scope.state;
+		return newScope;
+	}
+	const key = {};
+	scopeAddFinalizerUnsafe(scope, key, (exit) => scopeClose(newScope, exit));
+	scopeAddFinalizerUnsafe(newScope, key, (_) => sync$1(() => scopeRemoveFinalizerUnsafe(scope, key)));
+	return newScope;
+};
+/** @internal */
+const scopeAddFinalizerExit = (scope, finalizer) => {
+	return suspend$3(() => {
+		if (scope.state._tag === "Closed") return finalizer(scope.state.exit);
+		scopeAddFinalizerUnsafe(scope, {}, finalizer);
+		return void_$1;
+	});
+};
+/** @internal */
+const scopeAddFinalizer = (scope, finalizer) => scopeAddFinalizerExit(scope, constant(finalizer));
+/** @internal */
+const scopeAddFinalizerUnsafe = (scope, key, finalizer) => {
+	if (scope.state._tag === "Empty") scope.state = {
+		_tag: "Open",
+		finalizers: new Map([[key, finalizer]])
+	};
+	else if (scope.state._tag === "Open") scope.state.finalizers.set(key, finalizer);
+};
+/** @internal */
+const scopeRemoveFinalizerUnsafe = (scope, key) => {
+	if (scope.state._tag === "Open") scope.state.finalizers.delete(key);
+};
+/** @internal */
+const scopeMakeUnsafe = (finalizerStrategy = "sequential") => ({
+	[ScopeCloseableTypeId]: ScopeCloseableTypeId,
+	[ScopeTypeId]: ScopeTypeId,
+	strategy: finalizerStrategy,
+	state: constScopeEmpty
+});
+const constScopeEmpty = { _tag: "Empty" };
+/** @internal */
+const scope = scopeTag;
+/** @internal */
+const provideScope = /* @__PURE__ */ provideService(scopeTag);
+/** @internal */
+const scoped$1 = (self) => withFiber((fiber) => {
+	const prev = fiber.context;
+	const scope = scopeMakeUnsafe();
+	fiber.setContext(add(fiber.context, scopeTag, scope));
+	return onExitPrimitive(self, (exit) => {
+		fiber.setContext(prev);
+		return scopeCloseUnsafe(scope, exit);
+	});
+});
+/** @internal */
+const scopedWith$1 = (f) => suspend$3(() => {
+	const scope = scopeMakeUnsafe();
+	return onExit$1(f(scope), (exit) => suspend$3(() => scopeCloseUnsafe(scope, exit) ?? void_$1));
+});
+/** @internal */
+const acquireRelease$1 = (acquire, release, options) => contextWith((context) => uninterruptibleMask((restore) => flatMap$1(scope, (scope) => tap$1(options?.interruptible ? restore(acquire) : acquire, (a) => scopeAddFinalizerExit(scope, (exit) => provideContext(release(a, exit), context))))));
+/** @internal */
+const onExitPrimitive = /* @__PURE__ */ makePrimitive({
+	op: "OnExit",
+	single: false,
+	[evaluate](fiber) {
+		fiber._stack.push(this);
+		return this[args][0];
+	},
+	[contAll](fiber) {
+		if (fiber.interruptible && this[args][2] !== true) {
+			fiber._stack.push(setInterruptibleTrue);
+			fiber.interruptible = false;
+		}
+	},
+	[contA](value, _, exit) {
+		exit ??= exitSucceed(value);
+		const eff = this[args][1](exit);
+		return eff ? flatMap$1(eff, (_) => exit) : exit;
+	},
+	[contE](cause, _, exit) {
+		exit ??= exitFailCause(cause);
+		const eff = this[args][1](exit);
+		return eff ? flatMap$1(eff, (_) => exit) : exit;
+	}
+});
+/** @internal */
+const onExit$1 = /* @__PURE__ */ dual(2, onExitPrimitive);
+/** @internal */
+const onExitFilter = /* @__PURE__ */ dual(3, (self, filter, f) => onExit$1(self, (exit) => {
+	const b = filter(exit);
+	return isFailure(b) ? void_$1 : f(b.success, exit);
+}));
+/** @internal */
+const onError$1 = /* @__PURE__ */ dual(2, (self, f) => onExitFilter(self, exitFilterCause, f));
+/** @internal */
+const uninterruptible = (self) => withFiber((fiber) => {
+	if (!fiber.interruptible) return self;
+	fiber.interruptible = false;
+	fiber._stack.push(setInterruptibleTrue);
+	return self;
+});
+const setInterruptible = /* @__PURE__ */ makePrimitive({
+	op: "SetInterruptible",
+	[contAll](fiber) {
+		fiber.interruptible = this[args];
+		if (fiber._interruptedCause && fiber.interruptible) return () => failCause$3(fiber._interruptedCause);
+	}
+});
+const setInterruptibleTrue = /* @__PURE__ */ setInterruptible(true);
+const setInterruptibleFalse = /* @__PURE__ */ setInterruptible(false);
+/** @internal */
+const interruptible = (self) => withFiber((fiber) => {
+	if (fiber.interruptible) return self;
+	fiber.interruptible = true;
+	fiber._stack.push(setInterruptibleFalse);
+	if (fiber._interruptedCause) return failCause$3(fiber._interruptedCause);
+	return self;
+});
+/** @internal */
+const uninterruptibleMask = (f) => withFiber((fiber) => {
+	if (!fiber.interruptible) return f(identity);
+	fiber.interruptible = false;
+	fiber._stack.push(setInterruptibleTrue);
+	return f(interruptible);
+});
+/** @internal */
+const whileLoop$1 = /* @__PURE__ */ makePrimitive({
+	op: "While",
+	[contA](value, fiber) {
+		this[args].step(value);
+		if (this[args].while()) {
+			fiber._stack.push(this);
+			return this[args].body();
+		}
+		return exitVoid;
+	},
+	[evaluate](fiber) {
+		if (this[args].while()) {
+			fiber._stack.push(this);
+			return this[args].body();
+		}
+		return exitVoid;
+	}
+});
+/** @internal */
+const forEach$2 = /* @__PURE__ */ dual((args) => typeof args[1] === "function", (iterable, f, options) => withFiber((parent) => {
+	const concurrencyOption = options?.concurrency === "inherit" ? parent.getRef(CurrentConcurrency) : options?.concurrency ?? 1;
+	const concurrency = concurrencyOption === "unbounded" ? Number.POSITIVE_INFINITY : Math.max(1, concurrencyOption);
+	if (concurrency === 1) return forEachSequential(iterable, f, options);
+	const items = fromIterable(iterable);
+	let length = items.length;
+	if (length === 0) return options?.discard ? void_$1 : succeed$3([]);
+	const out = options?.discard ? void 0 : new Array(length);
+	const eff = forEachConcurrent({
+		f,
+		out
+	}, items, { concurrency });
+	return eff ? as$1(eff, out) : succeed$3(out);
+}));
+const forEachSequential = (iterable, f, options) => suspend$3(() => {
+	const out = options?.discard ? void 0 : [];
+	const iterator = iterable[Symbol.iterator]();
+	let state = iterator.next();
+	let index = 0;
+	return as$1(whileLoop$1({
+		while: () => !state.done,
+		body: () => f(state.value, index++),
+		step: (b) => {
+			if (out) out.push(b);
+			state = iterator.next();
+		}
+	}), out);
+});
+const iterateEagerImpl = (options) => {
+	const onItem = options.onItem;
+	const step = options.step;
+	return (state, items, opts) => {
+		let index = opts?.start ?? 0;
+		const end = opts?.end ?? items.length;
+		const concurrency = opts?.concurrency ?? 1;
+		let done = false;
+		let parentFiber;
+		let fibers;
+		let resume;
+		let interrupted = false;
+		let terminal;
+		let effect;
+		const go = () => {
+			let paused = false;
+			for (; !terminal && index < end; index++) {
+				const item = items[index];
+				const eff = effect ?? onItem(state, item, index);
+				if (effectIsExit(eff)) {
+					terminal = step(state, item, eff, index);
+					if (terminal) break;
+				} else if (concurrency === 1) return flatMap$1(exit(eff), (exit) => {
+					terminal = step(state, item, exit, index);
+					index++;
+					return terminal ?? go() ?? void_$1;
+				});
+				else if (!parentFiber) return callback$2((cb) => {
+					parentFiber = getCurrentFiber();
+					effect = eff;
+					resume = cb;
+					const result = go();
+					if (result) return cb(result);
+					return suspend$3(() => {
+						terminal = exitVoid;
+						interrupted = true;
+						return fibers ? fiberInterruptAll(fibers) : void_$1;
+					});
+				});
+				else {
+					effect = void 0;
+					const fiber = forkUnsafe$1(parentFiber, eff, true, true, "inherit");
+					if (fiber._exit) {
+						terminal = step(state, item, fiber._exit, index);
+						if (terminal) break;
+						continue;
+					}
+					if (fibers) fibers.add(fiber);
+					else fibers = new Set([fiber]);
+					const currentIndex = index;
+					fiber.addObserver((exit) => {
+						fibers.delete(fiber);
+						if (terminal) {
+							if (!interrupted && exit._tag === "Failure") for (const reason of exit.cause.reasons) if (reason._tag === "Interrupt") continue;
+							else if (terminal._tag === "Failure") terminal.cause.reasons.push(reason);
+							else terminal = exitFailCause(causeFromReasons([reason]));
+						} else {
+							const result = step(state, item, exit, currentIndex);
+							if (result) {
+								terminal = result._tag === "Failure" ? exitFailCause(causeFromReasons(result.cause.reasons.slice())) : result;
+								go();
+							}
+						}
+						if (paused) {
+							const eff = go();
+							if (eff) resume(eff);
+						} else if (done && fibers.size === 0) resume(terminal ?? void_$1);
+					});
+					if (fibers.size < concurrency) continue;
+					paused = true;
+					index++;
+					return;
+				}
+			}
+			done = true;
+			if (terminal) {
+				if (fibers && fibers.size > 0) {
+					const annotations = fiberStackAnnotations(parentFiber);
+					fibers.forEach((f) => f.interruptUnsafe(parentFiber.id, annotations));
+					return;
+				}
+				if (resume || terminal._tag === "Failure") return terminal;
+			} else if (resume) {
+				if (!fibers) return exitVoid;
+				else if (fibers.size === 0) resume(void_$1);
+			}
+		};
+		return go();
+	};
+};
+const forEachConcurrent = /* @__PURE__ */ iterateEagerImpl({
+	onItem(state, item, index) {
+		return state.f(item, index);
+	},
+	step(state, _, exit, index) {
+		if (exit._tag === "Failure") return exit;
+		else if (state.out) state.out[index] = exit.value;
+	}
+});
+/** @internal */
+const forkUnsafe$1 = (parent, effect, immediate = false, daemon = false, uninterruptible = false) => {
+	const interruptible = uninterruptible === "inherit" ? parent.interruptible : !uninterruptible;
+	const child = new FiberImpl(parent.context, interruptible);
+	if (immediate) child.evaluate(effect);
+	else parent.currentDispatcher.scheduleTask(() => child.evaluate(effect), 0);
+	if (!daemon && !child._exit) {
+		parent.children().add(child);
+		child.addObserver(() => parent._children.delete(child));
+	}
+	return child;
+};
+/** @internal */
+const forkIn$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, scope, options) => withFiber((parent) => {
+	const fiber = forkUnsafe$1(parent, self, options?.startImmediately, true, options?.uninterruptible);
+	if (!fiber._exit) if (scope.state._tag !== "Closed") {
+		const key = {};
+		const finalizer = () => withFiberId((interruptor) => interruptor === fiber.id ? void_$1 : fiberInterrupt(fiber));
+		scopeAddFinalizerUnsafe(scope, key, finalizer);
+		fiber.addObserver(() => scopeRemoveFinalizerUnsafe(scope, key));
+	} else fiber.interruptUnsafe(parent.id, fiberStackAnnotations(parent));
+	return succeed$3(fiber);
+}));
+/** @internal */
+const forkScoped$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, options) => flatMap$1(scope, (scope) => forkIn$1(self, scope, options)));
 /** @internal */
 const runForkWith = (context) => (effect, options) => {
 	const fiber = new FiberImpl(options?.scheduler ? add(context, Scheduler, options.scheduler) : context, options?.uninterruptible !== true);
@@ -3565,6 +6092,8 @@ const runForkWith = (context) => (effect, options) => {
 	if (options?.onFiberStart) options.onFiberStart(fiber);
 	return fiber;
 };
+/** @internal */
+const runFork$1 = /* @__PURE__ */ runForkWith(/* @__PURE__ */ empty$2());
 /** @internal */
 const runSyncExitWith = (context) => {
 	const runFork = runForkWith(context);
@@ -3585,7 +6114,97 @@ const runSyncWith = (context) => {
 	};
 };
 /** @internal */
-const runSync$1 = /* @__PURE__ */ runSyncWith(/* @__PURE__ */ empty());
+const runSync$1 = /* @__PURE__ */ runSyncWith(/* @__PURE__ */ empty$2());
+const succeedTrue = /* @__PURE__ */ succeed$3(true);
+const succeedFalse = /* @__PURE__ */ succeed$3(false);
+var Latch = class {
+	waiters = [];
+	scheduled = false;
+	isOpen;
+	constructor(isOpen) {
+		this.isOpen = isOpen;
+	}
+	scheduleUnsafe(fiber) {
+		if (this.scheduled || this.waiters.length === 0) return succeedTrue;
+		this.scheduled = true;
+		fiber.currentDispatcher.scheduleTask(this.flushWaiters, 0);
+		return succeedTrue;
+	}
+	flushWaiters = () => {
+		this.scheduled = false;
+		const waiters = this.waiters;
+		this.waiters = [];
+		for (let i = 0; i < waiters.length; i++) waiters[i](exitVoid);
+	};
+	open = /* @__PURE__ */ withFiber((fiber) => {
+		if (this.isOpen) return succeedFalse;
+		this.isOpen = true;
+		return this.scheduleUnsafe(fiber);
+	});
+	release = /* @__PURE__ */ withFiber((fiber) => this.isOpen ? succeedFalse : this.scheduleUnsafe(fiber));
+	openUnsafe() {
+		if (this.isOpen) return false;
+		this.isOpen = true;
+		this.flushWaiters();
+		return true;
+	}
+	await = /* @__PURE__ */ callback$2((resume) => {
+		if (this.isOpen) return resume(void_$1);
+		this.waiters.push(resume);
+		return sync$1(() => {
+			const index = this.waiters.indexOf(resume);
+			if (index !== -1) this.waiters.splice(index, 1);
+		});
+	});
+	closeUnsafe() {
+		if (!this.isOpen) return false;
+		this.isOpen = false;
+		return true;
+	}
+	close = /* @__PURE__ */ sync$1(() => this.closeUnsafe());
+	whenOpen = (self) => flatMap$1(this.await, () => self);
+};
+/** @internal */
+const makeLatchUnsafe = (open) => new Latch(open ?? false);
+/** @internal */
+const ClockRef = /* @__PURE__ */ Reference("effect/Clock", { defaultValue: () => new ClockImpl() });
+const MAX_TIMER_MILLIS = 2 ** 31 - 1;
+var ClockImpl = class {
+	currentTimeMillisUnsafe() {
+		return Date.now();
+	}
+	currentTimeMillis = /* @__PURE__ */ sync$1(() => this.currentTimeMillisUnsafe());
+	currentTimeNanosUnsafe() {
+		return processOrPerformanceNow();
+	}
+	currentTimeNanos = /* @__PURE__ */ sync$1(() => this.currentTimeNanosUnsafe());
+	sleep(duration) {
+		const millis = toMillis(duration);
+		if (millis <= 0) return yieldNow;
+		return callback$2((resume) => {
+			if (millis > MAX_TIMER_MILLIS) return;
+			const handle = setTimeout(() => resume(void_$1), millis);
+			return sync$1(() => clearTimeout(handle));
+		});
+	}
+};
+const performanceNowNanos = /* @__PURE__ */ function() {
+	const bigint1e6 = /* @__PURE__ */ BigInt(1e6);
+	if (typeof performance === "undefined" || typeof performance.now === "undefined") return () => BigInt(Date.now()) * bigint1e6;
+	else if (typeof performance.timeOrigin === "number" && performance.timeOrigin === 0) return () => BigInt(Math.round(performance.now() * 1e6));
+	const origin = /* @__PURE__ */ BigInt(/* @__PURE__ */ Date.now()) * bigint1e6 - /* @__PURE__ */ BigInt(/* @__PURE__ */ Math.round(/* @__PURE__ */ performance.now() * 1e6));
+	return () => origin + BigInt(Math.round(performance.now() * 1e6));
+}();
+const processOrPerformanceNow = /* @__PURE__ */ function() {
+	const processHrtime = typeof process === "object" && "hrtime" in process && typeof process.hrtime.bigint === "function" ? process.hrtime : void 0;
+	if (!processHrtime) return performanceNowNanos;
+	const origin = /* @__PURE__ */ performanceNowNanos() - /* @__PURE__ */ processHrtime.bigint();
+	return () => origin + processHrtime.bigint();
+}();
+/** @internal */
+const clockWith = (f) => withFiber((fiber) => f(fiber.getRef(ClockRef)));
+/** @internal */
+const sleep = (duration) => clockWith((clock) => clock.sleep(fromInputUnsafe(duration)));
 TaggedError$1("TimeoutError");
 TaggedError$1("IllegalArgumentError");
 TaggedError$1("ExceededCapacityError");
@@ -3601,7 +6220,100 @@ var AsyncFiberError = class extends TaggedError$1("AsyncFiberError") {
 		});
 	}
 };
-TaggedError$1("UnknownError");
+/** @internal */
+const UnknownErrorTypeId = "~effect/Cause/UnknownError";
+/** @internal */
+var UnknownError$1 = class extends TaggedError$1("UnknownError") {
+	[UnknownErrorTypeId] = UnknownErrorTypeId;
+	constructor(cause, message) {
+		super({
+			message,
+			cause
+		});
+	}
+};
+/** @internal */
+const ConsoleRef = /* @__PURE__ */ Reference("effect/Console/CurrentConsole", { defaultValue: () => globalThis.console });
+/** @internal */
+const logLevelToOrder = (level) => {
+	switch (level) {
+		case "All": return Number.MIN_SAFE_INTEGER;
+		case "Fatal": return 5e4;
+		case "Error": return 4e4;
+		case "Warn": return 3e4;
+		case "Info": return 2e4;
+		case "Debug": return 1e4;
+		case "Trace": return 0;
+		case "None": return Number.MAX_SAFE_INTEGER;
+	}
+};
+/** @internal */
+const isLogLevelGreaterThan = /* @__PURE__ */ isGreaterThan(/* @__PURE__ */ mapInput(Number$1, logLevelToOrder));
+/** @internal */
+const CurrentLoggers = /* @__PURE__ */ Reference("effect/Loggers/CurrentLoggers", { defaultValue: () => new Set([defaultLogger, tracerLogger]) });
+/** @internal */
+const LogToStderr = /* @__PURE__ */ Reference("effect/Logger/LogToStderr", { defaultValue: constFalse });
+const LoggerProto = {
+	["~effect/Logger"]: {
+		_Message: identity,
+		_Output: identity
+	},
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+/** @internal */
+const loggerMake = (log) => {
+	const self = Object.create(LoggerProto);
+	self.log = log;
+	return self;
+};
+/**
+* Sanitize a given string by replacing spaces, equal signs, and double quotes
+* with underscores.
+*
+* @internal
+*/
+const formatLabel = (key) => key.replace(/[\s="]/g, "_");
+/**
+* Formats a log span into a `<label>=<value>ms` string.
+*
+* @internal
+*/
+const formatLogSpan = (self, now) => {
+	return `${formatLabel(self[0])}=${now - self[1]}ms`;
+};
+/** @internal */
+const logWithLevel = (level) => (...message) => {
+	let cause = void 0;
+	for (let i = 0, len = message.length; i < len; i++) {
+		const msg = message[i];
+		if (isCause(msg)) {
+			if (cause) message.splice(i, 1);
+			else message = message.slice(0, i).concat(message.slice(i + 1));
+			cause = cause ? causeFromReasons(cause.reasons.concat(msg.reasons)) : msg;
+			i--;
+		}
+	}
+	if (cause === void 0) cause = causeEmpty;
+	return withFiber((fiber) => {
+		const logLevel = level ?? fiber.currentLogLevel;
+		if (isLogLevelGreaterThan(fiber.minimumLogLevel, logLevel)) return void_$1;
+		const clock = fiber.getRef(ClockRef);
+		const loggers = fiber.getRef(CurrentLoggers);
+		if (loggers.size > 0) {
+			const date = new Date(clock.currentTimeMillisUnsafe());
+			for (const logger of loggers) logger.log({
+				cause,
+				fiber,
+				date,
+				logLevel,
+				message
+			});
+		}
+		return void_$1;
+	});
+};
 const colors = {
 	bold: "1",
 	red: "31",
@@ -3615,9 +6327,1201 @@ const colors = {
 	bgBrightRed: "101"
 };
 colors.gray, colors.blue, colors.green, colors.yellow, colors.red, colors.bgBrightRed, colors.black;
+const defaultDateFormat = (date) => `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}.${date.getMilliseconds().toString().padStart(3, "0")}`;
 const hasProcessStdout = typeof process === "object" && process !== null && typeof process.stdout === "object" && process.stdout !== null;
 hasProcessStdout && process.stdout.isTTY;
 hasProcessStdout || "Deno" in globalThis;
+/** @internal */
+const defaultLogger = /* @__PURE__ */ loggerMake(({ cause, date, fiber, logLevel, message }) => {
+	const message_ = Array.isArray(message) ? message.slice() : [message];
+	if (cause.reasons.length > 0) message_.push(causePretty(cause));
+	const now = date.getTime();
+	const spans = fiber.getRef(CurrentLogSpans);
+	let spanString = "";
+	for (const span of spans) spanString += ` ${formatLogSpan(span, now)}`;
+	const annotations = fiber.getRef(CurrentLogAnnotations);
+	if (Object.keys(annotations).length > 0) message_.push(annotations);
+	const console = fiber.getRef(ConsoleRef);
+	(fiber.getRef(LogToStderr) ? console.error : console.log)(`[${defaultDateFormat(date)}] ${logLevel.toUpperCase()} (#${fiber.id})${spanString}:`, ...message_);
+});
+/** @internal */
+const tracerLogger = /* @__PURE__ */ loggerMake(({ cause, fiber, logLevel, message }) => {
+	const clock = fiber.getRef(ClockRef);
+	const annotations = fiber.getRef(CurrentLogAnnotations);
+	const span = fiber.currentSpan;
+	if (span === void 0 || span._tag === "ExternalSpan") return;
+	const attributes = {};
+	for (const [key, value] of Object.entries(annotations)) attributes[key] = value;
+	attributes["effect.fiberId"] = fiber.id;
+	attributes["effect.logLevel"] = logLevel.toUpperCase();
+	if (cause.reasons.length > 0) attributes["effect.cause"] = causePretty(cause);
+	span.event(toStringUnknown(Array.isArray(message) && message.length === 1 ? message[0] : message), clock.currentTimeNanosUnsafe(), attributes);
+});
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Cause.js
+/**
+* Structured representation of how an Effect can fail.
+*
+* A `Cause<E>` holds a flat array of `Reason` values, where each reason is one of:
+*
+* - **Fail** — a typed, expected error `E` (created by `Effect.fail`)
+* - **Die** — an untyped defect (`unknown`) from `Effect.die` or uncaught throws
+* - **Interrupt** — a fiber interruption, optionally carrying the interrupting fiber's ID
+*
+* ## Mental model
+*
+* - A `Cause` is always flat: concurrent and sequential failures are stored together
+*   in `cause.reasons` (a `ReadonlyArray<Reason<E>>`).
+* - Each `Reason` carries an `annotations` map with tracing metadata (stack frames, spans).
+* - An empty `reasons` array means the computation succeeded or the cause was empty
+*   ({@link empty}).
+* - `Cause` implements `Equal`, so two causes with identical reasons compare as equal.
+*
+* ## Common tasks
+*
+* | Intent | API |
+* |--------|-----|
+* | Create a cause | {@link fail}, {@link die}, {@link interrupt}, {@link fromReasons} |
+* | Test for reason types | {@link hasFails}, {@link hasDies}, {@link hasInterrupts} |
+* | Extract the first error/defect | {@link findError}, {@link findDefect}, {@link findFail}, {@link findDie} |
+* | Iterate over reasons manually | `cause.reasons.filter(Cause.isFailReason)` |
+* | Combine two causes | {@link combine} |
+* | Transform errors | {@link map} |
+* | Collapse to a single thrown value | {@link squash} |
+* | Render for logging | {@link pretty}, {@link prettyErrors} |
+* | Attach/read tracing metadata | {@link annotate}, {@link annotations}, {@link reasonAnnotations} |
+*
+* ## Gotchas
+*
+* - `findError`/`findDefect` return `Result.fail` (not `Option.none`) when no match is
+*   found. Use {@link findErrorOption} if you need an `Option`.
+* - `squash` picks the first `Fail` error, then the first `Die` defect, then falls back
+*   to a generic "interrupted" / "empty" error. It is lossy — use `prettyErrors` or
+*   iterate `reasons` directly when you need all failures.
+* - The module also exports several built-in error classes (`NoSuchElementError`,
+*   `TimeoutError`, `IllegalArgumentError`, `ExceededCapacityError`, `UnknownError`)
+*   and the `Done` completion signal. These all implement `YieldableError` and can be
+*   yielded directly inside `Effect.gen`.
+*
+* **Example** (inspecting a concurrent failure)
+*
+* ```ts
+* import { Cause, Effect } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const cause = yield* Effect.sandbox(
+*     Effect.all([
+*       Effect.fail("err1"),
+*       Effect.die("defect"),
+*       Effect.fail("err2")
+*     ], { concurrency: "unbounded" })
+*   ).pipe(Effect.flip)
+*
+*   const errors = cause.reasons
+*     .filter(Cause.isFailReason)
+*     .map((r) => r.error)
+*     .sort()
+*
+*   const defects = cause.reasons
+*     .filter(Cause.isDieReason)
+*     .map((r) => String(r.defect))
+*     .sort()
+*
+*   console.log(errors.join(",")) // "err1,err2"
+*   console.log(defects.join(",")) // "defect"
+* })
+*
+* Effect.runPromise(program)
+* ```
+*
+* @since 2.0.0
+*/
+/**
+* Creates a `Cause` containing a single `Fail` reason with the
+* given typed error.
+*
+* **When to use**
+*
+* Use to construct a cause from an expected typed error.
+*
+* **Example** (creating a fail cause)
+*
+* ```ts
+* import { Cause } from "effect"
+*
+* const cause = Cause.fail("Something went wrong")
+* console.log(cause.reasons.length) // 1
+* console.log(Cause.isFailReason(cause.reasons[0])) // true
+* ```
+*
+* @see {@link die} — for untyped defects
+* @see {@link interrupt} — for fiber interruptions
+*
+* @category constructors
+* @since 2.0.0
+*/
+const fail$2 = causeFail;
+/**
+* Returns a `Result` whose success value is the first typed error value `E`
+* from a `Fail` reason in the cause. If the cause has no `Fail` reason,
+* the failure value is the original cause narrowed to `Cause<never>`, because
+* it contains no typed error reasons.
+*
+* **When to use**
+*
+* Use when you use {@link findFail} if you need the full `Fail` reason (including
+* annotations). Use {@link findErrorOption} if you prefer an `Option`.
+*
+* **Example** (extracting the first error value)
+*
+* ```ts
+* import { Cause, Result } from "effect"
+*
+* const result = Cause.findError(Cause.fail("error"))
+* if (!Result.isFailure(result)) {
+*   console.log(result.success) // "error"
+* }
+* ```
+*
+* @see {@link findFail} — extract the full `Fail` reason
+* @see {@link findErrorOption} — `Option`-based variant
+*
+* @category filtering
+* @since 4.0.0
+*/
+const findError = findError$1;
+/**
+* Checks whether an arbitrary value is a `Done` signal.
+*
+* **Example** (runtime type check)
+*
+* ```ts
+* import { Cause } from "effect"
+*
+* console.log(Cause.isDone(Cause.Done())) // true
+* console.log(Cause.isDone("not done"))   // false
+* ```
+*
+* @category guards
+* @since 4.0.0
+*/
+const isDone$1 = isDone$2;
+/**
+* Creates a `Done` signal with an optional value.
+*
+* **When to use**
+*
+* Use when you need the completion signal value itself. Use {@link done}
+* when you need an `Effect` that fails with the signal.
+*
+* @see {@link done} — create a failing `Effect` with `Done`
+*
+* @category constructors
+* @since 4.0.0
+*/
+const Done = Done$1;
+/**
+* Creates an Effect that fails with a `Done` error. Shorthand for
+* `Effect.fail(Cause.Done(value))`.
+*
+* **When to use**
+*
+* Use when you use this in effect workflows that model stream or queue completion through
+* the error channel.
+*
+* **Example** (failing with Done)
+*
+* ```ts
+* import { Cause, Effect } from "effect"
+*
+* const program = Cause.done("finished")
+*
+* Effect.runPromiseExit(program).then((exit) => {
+*   console.log(exit._tag) // "Failure"
+* })
+* ```
+*
+* @see {@link Done} — create the signal value without an Effect
+*
+* @category constructors
+* @since 4.0.0
+*/
+const done$1 = done$2;
+/**
+* Constructs an `UnknownError`. The first argument is the original
+* cause (stored in `Error.cause`); the second is an optional human-readable
+* message.
+*
+* **Example** (creating an UnknownError)
+*
+* ```ts
+* import { Cause } from "effect"
+*
+* const error = new Cause.UnknownError({ raw: true }, "Unexpected value")
+* console.log(error.message) // "Unexpected value"
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const UnknownError = UnknownError$1;
+Service()("effect/Cause/StackTrace");
+Service()("effect/Cause/InterruptorStackTrace");
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Exit.js
+/**
+* Creates a successful Exit containing the given value.
+*
+* **When to use**
+*
+* Use to wrap a known success value into an Exit
+* - Use when constructing test data or returning explicit results
+*
+* **Details**
+*
+* Returns a `Success<A>` with the provided value. Does not perform any
+* computation.
+*
+* **Example** (Creating a successful Exit)
+*
+* ```ts
+* import { Exit } from "effect"
+*
+* const exit = Exit.succeed(42)
+* console.log(Exit.isSuccess(exit)) // true
+* ```
+*
+* @see {@link fail} to create a failed Exit
+* @see {@link void_ void} for a pre-allocated success with no value
+*
+* @category constructors
+* @since 2.0.0
+*/
+const succeed$2 = exitSucceed;
+/**
+* Creates a failed Exit from a Cause.
+*
+* **When to use**
+*
+* Use when you already have a `Cause<E>` and want to wrap it in an Exit
+* - Use for advanced error handling where you need full control over the Cause structure
+*
+* **Details**
+*
+* Returns a `Failure<never, E>`. If you only have an error value, use
+* {@link fail} instead.
+*
+* **Example** (Creating a failed Exit from a Cause)
+*
+* ```ts
+* import { Cause, Exit } from "effect"
+*
+* const cause = Cause.fail("Something went wrong")
+* const exit = Exit.failCause(cause)
+* console.log(Exit.isFailure(exit)) // true
+* ```
+*
+* @see {@link fail} to create a Failure from a plain error value
+* @see {@link die} to create a Failure from a defect
+*
+* @category constructors
+* @since 2.0.0
+*/
+const failCause$2 = exitFailCause;
+/**
+* Creates a failed Exit from a typed error value.
+*
+* **When to use**
+*
+* Use when you need expected, recoverable failures
+*
+* **Details**
+*
+* - The error is wrapped in a `Cause.Fail` internally
+*
+* Returns a `Failure<never, E>`.
+*
+* **Example** (Creating a failed Exit)
+*
+* ```ts
+* import { Exit } from "effect"
+*
+* const exit = Exit.fail("Something went wrong")
+* console.log(Exit.isFailure(exit)) // true
+* ```
+*
+* @see {@link succeed} to create a successful Exit
+* @see {@link die} to create a Failure from an unexpected defect
+* @see {@link failCause} to create a Failure from a full Cause
+*
+* @category constructors
+* @since 2.0.0
+*/
+const fail$1 = exitFail;
+const DeferredProto = {
+	["~effect/Deferred"]: {
+		_A: identity,
+		_E: identity
+	},
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+/**
+* Creates an empty `Deferred` synchronously outside the `Effect` runtime.
+*
+* **When to use**
+*
+* Use to allocate a `Deferred` synchronously when direct allocation outside
+* `Effect` is required.
+*
+* **Example** (Creating a Deferred unsafely)
+*
+* ```ts
+* import { Deferred } from "effect"
+*
+* const deferred = Deferred.makeUnsafe<number>()
+* console.log(deferred)
+* ```
+*
+* @category unsafe
+* @since 4.0.0
+*/
+const makeUnsafe$2 = () => {
+	const self = Object.create(DeferredProto);
+	self.resumes = void 0;
+	self.effect = void 0;
+	return self;
+};
+const _await = (self) => callback$2((resume) => {
+	if (self.effect) return resume(self.effect);
+	self.resumes ??= [];
+	self.resumes.push(resume);
+	return sync$1(() => {
+		const index = self.resumes.indexOf(resume);
+		self.resumes.splice(index, 1);
+	});
+});
+/**
+* Completes the `Deferred` with the specified `Exit` value, which will be
+* propagated to all fibers waiting on the value of the `Deferred`.
+*
+* **When to use**
+*
+* Use to complete a `Deferred` from an already computed `Exit`.
+*
+* **Details**
+*
+* The returned effect succeeds with `true` when this call completed the
+* `Deferred`, or `false` if it was already completed.
+*
+* **Example** (Completing a Deferred with an Exit)
+*
+* ```ts
+* import { Deferred, Effect, Exit } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const deferred = yield* Deferred.make<number>()
+*   yield* Deferred.done(deferred, Exit.succeed(42))
+*
+*   const value = yield* Deferred.await(deferred)
+*   console.log(value) // 42
+* })
+* ```
+*
+* @see {@link complete} for completing from an effect and memoizing its result
+* @see {@link completeWith} for storing an effect directly
+* @see {@link succeed} for completing with a success value
+* @see {@link failCause} for completing with a failure cause
+*
+* @category utils
+* @since 2.0.0
+*/
+const done = /* @__PURE__ */ dual(2, (self, effect) => sync$1(() => doneUnsafe(self, effect)));
+/**
+* Returns `true` if this `Deferred` has already been completed with a value or
+* an error, `false` otherwise.
+*
+* **When to use**
+*
+* Use to check completion status inside an `Effect` workflow.
+*
+* **Example** (Checking Deferred completion)
+*
+* ```ts
+* import { Deferred, Effect } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const deferred = yield* Deferred.make<number>()
+*   const beforeCompletion = yield* Deferred.isDone(deferred)
+*   console.log(beforeCompletion) // false
+*
+*   yield* Deferred.succeed(deferred, 42)
+*   const afterCompletion = yield* Deferred.isDone(deferred)
+*   console.log(afterCompletion) // true
+* })
+* ```
+*
+* @category getters
+* @since 2.0.0
+*/
+const isDone = (self) => sync$1(() => isDoneUnsafe(self));
+/**
+* Returns whether this `Deferred` has already been completed synchronously.
+*
+* **When to use**
+*
+* Use to check `Deferred` completion synchronously in code that cannot return
+* an `Effect`, such as low-level integration code.
+*
+* @see {@link isDone} for checking completion inside `Effect`
+* @see {@link poll} for reading the completed effect when available
+*
+* @category getters
+* @since 4.0.0
+*/
+const isDoneUnsafe = (self) => self.effect !== void 0;
+/**
+* Attempts to complete the `Deferred` synchronously with the specified
+* completion effect.
+*
+* **When to use**
+*
+* Use to complete a `Deferred` synchronously in low-level code that already has
+* the completion effect.
+*
+* **Details**
+*
+* This mutates the `Deferred` directly and should be reserved for low-level
+* code; prefer the effectful completion APIs when possible. Returns `true` if
+* this call completed the `Deferred`, or `false` if it was already completed.
+*
+* **Example** (Completing a Deferred unsafely)
+*
+* ```ts
+* import { Deferred, Effect } from "effect"
+*
+* const deferred = Deferred.makeUnsafe<number>()
+* const success = Deferred.doneUnsafe(deferred, Effect.succeed(42))
+* console.log(success) // true
+* ```
+*
+* @category unsafe
+* @since 4.0.0
+*/
+const doneUnsafe = (self, effect) => {
+	if (self.effect) return false;
+	self.effect = effect;
+	if (self.resumes) {
+		for (let i = 0; i < self.resumes.length; i++) self.resumes[i](effect);
+		self.resumes = void 0;
+	}
+	return true;
+};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Scope.js
+/**
+* The `Scope` module manages resource lifetimes by collecting finalizers and
+* running them when a scope is closed. It is the low-level mechanism behind
+* scoped resource acquisition: acquire work registers cleanup with the current
+* scope, and closing the scope releases those resources with the same `Exit`
+* that ended the scoped workflow.
+*
+* Scopes are useful when code needs explicit control over a lifetime boundary,
+* for example when building services, sharing a resource across multiple
+* effects, or wiring lower-level infrastructure. Most application code can use
+* higher-level scoped APIs, but this module exposes the primitives those APIs
+* are built from.
+*
+* **Mental model**
+*
+* - A {@link Scope} is a mutable lifetime boundary that can accept finalizers
+*   while open and run them when closed
+* - A {@link Closeable} scope can be closed explicitly with {@link close} or
+*   automatically around an effect with {@link use}
+* - Sequential scopes run finalizers one after another in reverse registration
+*   order; parallel scopes run registered finalizers concurrently
+* - {@link addFinalizer} registers cleanup that ignores the closing exit, while
+*   {@link addFinalizerExit} registers cleanup that can inspect it
+* - {@link fork} creates a child scope whose lifetime is connected to a parent
+*   scope
+*
+* **Common tasks**
+*
+* - Create scopes with {@link make} or the lower-level {@link makeUnsafe}
+* - Provide an existing scope to an effect with {@link provide}
+* - Register cleanup with {@link addFinalizer} or {@link addFinalizerExit}
+* - Create child scopes with {@link fork} or {@link forkUnsafe}
+* - Close scopes with {@link close}, or run and close with {@link use}
+*
+* **Gotchas**
+*
+* - Closing a scope is itself an `Effect`; finalizers run only when that effect
+*   is executed
+* - Adding a finalizer to an already closed scope runs the finalizer
+*   immediately with the stored exit value
+* - The unsafe constructors and closing helpers are for low-level integration;
+*   prefer the effectful APIs when ordinary Effect code can express the
+*   lifetime
+*
+* @since 2.0.0
+*/
+/**
+* Creates a new `Scope` synchronously without wrapping it in an `Effect`.
+* This is useful when you need a scope immediately but should be used with caution
+* as it doesn't provide the same safety guarantees as the `Effect`-wrapped version.
+*
+* **Example** (Creating a scope synchronously)
+*
+* ```ts
+* import { Console, Effect, Exit, Scope } from "effect"
+*
+* // Create a scope immediately
+* const scope = Scope.makeUnsafe("sequential")
+*
+* // Use it in an Effect program
+* const program = Effect.gen(function*() {
+*   yield* Scope.addFinalizer(scope, Console.log("Cleanup"))
+*   yield* Scope.close(scope, Exit.void)
+* })
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const makeUnsafe$1 = scopeMakeUnsafe;
+/**
+* Provides a concrete `Scope` to an effect.
+*
+* **When to use**
+*
+* Use to run an effect that requires `Scope` with a scope managed by the
+* caller.
+*
+* **Details**
+*
+* Providing the scope removes the `Scope` requirement from the effect context.
+*
+* **Example** (Providing a scope)
+*
+* ```ts
+* import { Console, Effect, Scope } from "effect"
+*
+* // An effect that requires a Scope
+* const program = Effect.gen(function*() {
+*   const scope = yield* Scope.Scope
+*   yield* Scope.addFinalizer(scope, Console.log("Cleanup"))
+*   yield* Console.log("Working...")
+* })
+*
+* // Provide a scope to the program
+* const withScope = Effect.gen(function*() {
+*   const scope = yield* Scope.make()
+*   yield* Scope.provide(scope)(program)
+* })
+* ```
+*
+* @category combinators
+* @since 4.0.0
+*/
+const provide$1 = provideScope;
+/**
+* Registers a finalizer effect on a scope.
+*
+* **Details**
+*
+* If the scope is open, the finalizer runs when the scope closes, regardless of
+* whether the scope closes successfully or with an error. If the scope is
+* already closed, the finalizer runs immediately.
+*
+* **Example** (Adding finalizers)
+*
+* ```ts
+* import { Console, Effect, Exit, Scope } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const scope = yield* Scope.make()
+*
+*   // Add simple finalizers
+*   yield* Scope.addFinalizer(scope, Console.log("Cleanup task 1"))
+*   yield* Scope.addFinalizer(scope, Console.log("Cleanup task 2"))
+*   yield* Scope.addFinalizer(scope, Effect.log("Cleanup task 3"))
+*
+*   // Do some work
+*   yield* Console.log("Doing work...")
+*
+*   // Close the scope
+*   yield* Scope.close(scope, Exit.void)
+* })
+* ```
+*
+* @category combinators
+* @since 2.0.0
+*/
+const addFinalizer = scopeAddFinalizer;
+/**
+* Creates a closeable child scope synchronously and registers it with a parent scope.
+*
+* **Details**
+*
+* Closing the parent closes the child with the same exit value, and closing the
+* child detaches it from the parent. The optional finalizer strategy configures
+* the child scope and defaults to `"sequential"` when omitted.
+*
+* **Example** (Creating a child scope synchronously)
+*
+* ```ts
+* import { Console, Effect, Exit, Scope } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const parentScope = Scope.makeUnsafe("sequential")
+*   const childScope = Scope.forkUnsafe(parentScope, "parallel")
+*
+*   // Add finalizers to both scopes
+*   yield* Scope.addFinalizer(parentScope, Console.log("Parent cleanup"))
+*   yield* Scope.addFinalizer(childScope, Console.log("Child cleanup"))
+*
+*   // Close child first, then parent
+*   yield* Scope.close(childScope, Exit.void)
+*   yield* Scope.close(parentScope, Exit.void)
+* })
+* ```
+*
+* @category combinators
+* @since 4.0.0
+*/
+const forkUnsafe = scopeForkUnsafe;
+/**
+* Closes a scope and runs its registered finalizers.
+*
+* **When to use**
+*
+* Use to close a scope manually with a specific exit value.
+*
+* **Details**
+*
+* Finalizers run in the scope's configured order and receive the supplied
+* `Exit`.
+*
+* **Example** (Running scope finalizers)
+*
+* ```ts
+* import { Console, Effect, Exit, Scope } from "effect"
+*
+* const resourceManagement = Effect.gen(function*() {
+*   const scope = yield* Scope.make("sequential")
+*
+*   // Add multiple finalizers
+*   yield* Scope.addFinalizer(scope, Console.log("Close database connection"))
+*   yield* Scope.addFinalizer(scope, Console.log("Close file handle"))
+*   yield* Scope.addFinalizer(scope, Console.log("Release memory"))
+*
+*   // Do some work...
+*   yield* Console.log("Performing operations...")
+*
+*   // Close scope - finalizers run in reverse order of registration
+*   yield* Scope.close(scope, Exit.succeed("Success!"))
+*   // Output: "Release memory", "Close file handle", "Close database connection"
+* })
+* ```
+*
+* @category combinators
+* @since 2.0.0
+*/
+const close = scopeClose;
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Layer.js
+const TypeId$10 = "~effect/Layer";
+const MemoMapTypeId = "~effect/Layer/MemoMap";
+const memoMapReuse = (entry, scope) => {
+	entry.observers++;
+	return andThen$1(scopeAddFinalizerExit(scope, (exit) => entry.finalizer(exit)), entry.effect);
+};
+const LayerProto = {
+	[TypeId$10]: {
+		_ROut: identity,
+		_E: identity,
+		_RIn: identity
+	},
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+const fromBuildUnsafe = (build) => {
+	const self = Object.create(LayerProto);
+	self.build = build;
+	return self;
+};
+/**
+* Constructs a `Layer` from a function that uses a `MemoMap` and `Scope` to
+* build the layer.
+*
+* **Details**
+*
+* The function receives a `MemoMap` for memoization and a `Scope` for resource management.
+* A child scope is created, and if the build fails, the child scope is closed.
+*
+* **Example** (Constructing a layer from a build function)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* const databaseLayer = Layer.fromBuild(() =>
+*   Effect.sync(() =>
+*     Context.make(Database, {
+*       query: (sql: string) => Effect.succeed("result")
+*     })
+*   )
+* )
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromBuild = (build) => fromBuildUnsafe((memoMap, scope) => {
+	const layerScope = forkUnsafe(scope);
+	return onExit$1(build(memoMap, layerScope), (exit) => exit._tag === "Failure" ? close(layerScope, exit) : void_$1);
+});
+/**
+* Constructs a `Layer` from a function that uses a `MemoMap` and `Scope` to
+* build the layer, with automatic memoization.
+*
+* **Details**
+*
+* This is similar to `fromBuild` but provides automatic memoization of the layer construction.
+* The layer will be memoized based on the provided `MemoMap`.
+*
+* **Example** (Memoizing layer construction)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* const databaseLayer = Layer.fromBuildMemo(() =>
+*   Effect.sync(() =>
+*     Context.make(Database, {
+*       query: (sql: string) => Effect.succeed("result")
+*     })
+*   )
+* )
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromBuildMemo = (build) => {
+	const self = fromBuild((memoMap, scope) => memoMap.getOrElseMemoize(self, scope, build));
+	return self;
+};
+const memoMapBuild = (memoMap, layer, scope, build) => {
+	const layerScope = makeUnsafe$1();
+	const deferred = makeUnsafe$2();
+	const entry = {
+		observers: 1,
+		effect: _await(deferred),
+		finalizer: (exit) => suspend$3(() => {
+			entry.observers--;
+			if (entry.observers === 0) {
+				memoMap.map.delete(layer);
+				return close(layerScope, exit);
+			}
+			return void_$1;
+		})
+	};
+	memoMap.map.set(layer, entry);
+	return scopeAddFinalizerExit(scope, entry.finalizer).pipe(flatMap$1(() => build(memoMap, layerScope)), onExit$1((exit) => {
+		entry.effect = exit;
+		return done(deferred, exit);
+	}));
+};
+var MemoMapImpl = class {
+	get [MemoMapTypeId]() {
+		return MemoMapTypeId;
+	}
+	parent;
+	constructor(parent) {
+		this.parent = parent;
+	}
+	map = /* @__PURE__ */ new Map();
+	get(layer, scope) {
+		const local = this.map.get(layer);
+		if (local) return memoMapReuse(local, scope);
+		return this.parent?.get(layer, scope);
+	}
+	getOrElseMemoize(layer, scope, build) {
+		const existing = this.get(layer, scope);
+		if (existing) return existing;
+		return memoMapBuild(this, layer, scope, build);
+	}
+};
+/**
+* Constructs a `MemoMap` synchronously so it can be used to build additional layers.
+*
+* **Example** (Creating a memo map unsafely)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* // Create a memo map for manual layer building
+* const program = Effect.gen(function*() {
+*   const memoMap = Layer.makeMemoMapUnsafe()
+*   const scope = yield* Effect.scope
+*
+*   const dbLayer = Layer.succeed(Database, {
+*     query: Effect.fn("Database.query")((sql: string) => Effect.succeed("result"))
+*   })
+*   const context = yield* Layer.buildWithMemoMap(dbLayer, memoMap, scope)
+*
+*   return Context.get(context, Database)
+* })
+* ```
+*
+* @category memo map
+* @since 4.0.0
+*/
+const makeMemoMapUnsafe = () => new MemoMapImpl();
+(class extends Service()("effect/Layer/CurrentMemoMap") {
+	static getOrCreate = /* @__PURE__ */ getOrElse(this, makeMemoMapUnsafe);
+});
+/**
+* Constructs a layer that provides a single service from an already available
+* value.
+*
+* **When to use**
+*
+* Use when the service implementation is already constructed and does
+* not need effectful acquisition. Use `sync` when the service should be created
+* lazily during layer construction.
+*
+* **Example** (Creating a layer from a service implementation)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* const DatabaseLive = Layer.succeed(Database, {
+*   query: Effect.fn("Database.query")((sql: string) => Effect.succeed(`Query result: ${sql}`))
+* })
+* ```
+*
+* @see {@link sync} for constructing layers from lazy values
+*
+* @category constructors
+* @since 2.0.0
+*/
+const succeed$1 = function() {
+	if (arguments.length === 1) return (resource) => succeedContext(make$8(arguments[0], resource));
+	return succeedContext(make$8(arguments[0], arguments[1]));
+};
+/**
+* Constructs a layer that provides all services in an already available
+* `Context`.
+*
+* **When to use**
+*
+* Use when you already have a `Context` or need to provide
+* multiple services at once. Use `succeed` when you only need to provide one
+* service value.
+*
+* **Details**
+*
+* This is a more general version of `succeed` that allows you to provide
+* multiple services at once through a `Context`.
+*
+* **Example** (Providing multiple services from a context)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* class Logger extends Context.Service<Logger, {
+*   readonly log: (msg: string) => Effect.Effect<void>
+* }>()("Logger") {}
+*
+* const context = Context.make(Database, {
+*   query: Effect.fn("Database.query")((sql: string) => Effect.succeed("result"))
+* }).pipe(
+*   Context.add(Logger, {
+*     log: (msg: string) => Effect.sync(() => console.log(msg))
+*   })
+* )
+*
+* const layer = Layer.succeedContext(context)
+* ```
+*
+* @see {@link succeed} for providing a single service from a value
+*
+* @category constructors
+* @since 2.0.0
+*/
+const succeedContext = (context) => fromBuildUnsafe(constant(succeed$3(context)));
+/**
+* Constructs a layer from an effect that produces a single service.
+*
+* **When to use**
+*
+* Use when constructing the service requires effects, dependencies, or
+* scoped resource acquisition. Use `effectContext` when the effect produces
+* multiple services in a `Context`, and `effectDiscard` when construction work
+* should provide no services.
+*
+* **Details**
+*
+* This allows you to create a `Layer` from an `Effect` that produces a service.
+* The `Effect` is executed in the scope of the layer, allowing for proper
+* resource management.
+*
+* **Example** (Creating a layer from an effect)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* const layer = Layer.effect(Database,
+*   Effect.sync(() => ({
+*     query: (sql: string) => Effect.succeed(`Query: ${sql}`)
+*   }))
+* )
+* ```
+*
+* @see {@link effectContext} for effectfully providing multiple services
+* @see {@link effectDiscard} for running construction work without providing services
+*
+* @category constructors
+* @since 2.0.0
+*/
+const effect = function() {
+	if (arguments.length === 1) return (effect) => effectImpl(arguments[0], effect);
+	return effectImpl(arguments[0], arguments[1]);
+};
+const effectImpl = (service, effect) => effectContext(map$4(effect, (value) => make$8(service, value)));
+/**
+* Constructs a layer from an effect that produces all services in a `Context`.
+*
+* **When to use**
+*
+* Use when effectful construction needs to provide multiple
+* services at once. Use `effect` when the effect produces one service value.
+*
+* **Details**
+*
+* This allows you to create a `Layer` from an effectful computation that
+* returns multiple services. The `Effect` is executed in the scope of the
+* layer.
+*
+* **Example** (Creating a layer from an effectful context)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<
+*   Database,
+*   { readonly query: (sql: string) => Effect.Effect<string> }
+* >()("Database") {}
+*
+* const layer = Layer.effectContext(
+*   Effect.succeed(Context.make(Database, {
+*     query: (sql: string) => Effect.succeed(`Query: ${sql}`)
+*   }))
+* )
+* ```
+*
+* @see {@link effect} for effectfully providing a single service
+*
+* @category constructors
+* @since 2.0.0
+*/
+const effectContext = (effect) => fromBuildMemo((_, scope) => provide$1(effect, scope));
+const mergeAllEffect = (layers, memoMap, scope) => {
+	const parentScope = forkUnsafe(scope, "parallel");
+	return forEach$2(layers, (layer) => layer.build(memoMap, forkUnsafe(parentScope, "sequential")), { concurrency: layers.length }).pipe(map$4((context) => mergeAll$1(...context)));
+};
+/**
+* Combines all the provided layers concurrently, creating a new layer with
+* merged input, error, and output types.
+*
+* **When to use**
+*
+* Use when you need to combine multiple independent layers.
+*
+* **Details**
+*
+* All layers are built concurrently, and their outputs are merged into a single layer.
+*
+* If multiple merged layers depend on the same layer value, that dependency is
+* shared by default. Reuse a named layer value when you want services to share
+* the same resource, such as one database pool.
+*
+* **Example** (Merging independent layers)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* class Logger extends Context.Service<Logger, {
+*   readonly log: (msg: string) => Effect.Effect<void>
+* }>()("Logger") {}
+*
+* const dbLayer = Layer.succeed(Database, {
+*   query: Effect.fn("Database.query")((sql: string) => Effect.succeed("result"))
+* })
+* const loggerLayer = Layer.succeed(Logger, {
+*   log: Effect.fn("Logger.log")((msg: string) => Effect.sync(() => console.log(msg)))
+* })
+*
+* const mergedLayer = Layer.mergeAll(dbLayer, loggerLayer)
+* ```
+*
+* @see {@link merge} for merging one layer with another layer or array
+*
+* @category zipping
+* @since 2.0.0
+*/
+const mergeAll = (...layers) => fromBuild((memoMap, scope) => mergeAllEffect(layers, memoMap, scope));
+const provideWith = (self, that, f) => fromBuild((memoMap, scope) => flatMap$1(Array.isArray(that) ? mergeAllEffect(that, memoMap, scope) : that.build(memoMap, scope), (context) => self.build(memoMap, scope).pipe(provideContext(context), map$4((merged) => f(merged, context)))));
+/**
+* Feeds the output services of the dependency layer into the requirements of
+* this layer, returning a layer that only provides the services from this layer.
+*
+* **When to use**
+*
+* Use when the dependency layer is an implementation detail of the
+* layer being built and should not be exposed to callers. Use `provideMerge`
+* when callers should also receive the dependency services.
+*
+* **Details**
+*
+* In `serviceLayer.pipe(Layer.provide(dependencyLayer))`, the dependency layer is
+* built first and is used to satisfy the requirements of `serviceLayer`.
+*
+* **Example** (Providing layer dependencies)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* class UserService extends Context.Service<UserService, {
+*   readonly getUser: (id: string) => Effect.Effect<{
+*     id: string
+*     name: string
+*   }>
+* }>()("UserService") {}
+*
+* class Logger extends Context.Service<Logger, {
+*   readonly log: (msg: string) => Effect.Effect<void>
+* }>()("Logger") {}
+*
+* // Create dependency layers
+* const databaseLayer = Layer.succeed(Database, {
+*   query: Effect.fn("Database.query")((sql: string) => Effect.succeed(`DB: ${sql}`))
+* })
+*
+* const loggerLayer = Layer.succeed(Logger, {
+*   log: Effect.fn("Logger.log")((msg: string) => Effect.sync(() => console.log(`[LOG] ${msg}`)))
+* })
+*
+* // UserService depends on Database and Logger
+* const userServiceLayer = Layer.effect(UserService, Effect.gen(function*() {
+*   const database = yield* Database
+*   const logger = yield* Logger
+*
+*   return {
+*     getUser: Effect.fn("UserService.getUser")(function*(id: string) {
+*         yield* logger.log(`Looking up user ${id}`)
+*         const result = yield* database.query(
+*           `SELECT * FROM users WHERE id = ${id}`
+*         )
+*         return { id, name: result }
+*       })
+*   }
+* }))
+*
+* // Provide dependencies to UserService layer
+* const userServiceWithDependencies = userServiceLayer.pipe(
+*   Layer.provide(Layer.mergeAll(databaseLayer, loggerLayer))
+* )
+*
+* // Now UserService layer has no dependencies
+* const program = Effect.gen(function*() {
+*   const userService = yield* UserService
+*   return yield* userService.getUser("123")
+* }).pipe(
+*   Effect.provide(userServiceWithDependencies)
+* )
+* ```
+*
+* @see {@link provideMerge} for retaining the dependency services
+*
+* @category utils
+* @since 2.0.0
+*/
+const provide = /* @__PURE__ */ dual(2, (self, that) => provideWith(self, that, identity));
+/**
+* Provides a base class for yieldable errors.
+*
+* **When to use**
+*
+* Use when defining yieldable errors that do **not** need tag-based
+* discrimination. If you need tag-based recovery, use {@link TaggedError}.
+*
+* **Details**
+*
+* Extends `Cause.YieldableError`, so instances can be yielded inside
+* `Effect.gen` to fail the enclosing effect. Fields are passed as a single
+* object; when there are no fields the argument is optional. If a `message`
+* field is provided, it becomes the error's `.message`.
+*
+* **Example** (Defining a yieldable error)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class NetworkError extends Data.Error<{
+*   readonly code: number
+*   readonly message: string
+* }> {}
+*
+* const program = Effect.gen(function*() {
+*   return yield* new NetworkError({ code: 500, message: "timeout" })
+* })
+*
+* // The effect fails with a NetworkError
+* Effect.runSync(Effect.exit(program))
+* ```
+*
+* @see {@link TaggedError} — adds a `_tag` for `Effect.catchTag`
+* @see {@link Class} — non-error data class
+*
+* @category constructors
+* @since 2.0.0
+*/
+const Error$1 = Error$2;
 /**
 * Creates a tagged error class with a `_tag` discriminator.
 *
@@ -3664,7 +7568,394 @@ hasProcessStdout || "Deno" in globalThis;
 */
 const TaggedError = TaggedError$1;
 //#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Pull.js
+/**
+* The `Pull` module provides the low-level pull-step abstraction used by
+* stream-like consumers. A `Pull<A, E, Done, R>` is an `Effect` that can
+* produce one value of type `A`, fail with an ordinary error `E`, or signal
+* end-of-input with a `Cause.Done<Done>` value.
+*
+* **Mental model**
+*
+* - `Pull` is an `Effect` with a distinguished completion signal in the error channel
+* - ordinary failures and completion are both represented by `Cause`, but can be separated with the helpers in this module
+* - the `Done` value can carry leftover state or a final value needed by a downstream consumer
+* - `Pull` is useful when repeatedly evaluating an effect until it either produces values, fails, or reports that no more input is available
+*
+* **Common tasks**
+*
+* - Extract type parameters from a pull: {@link Success}, {@link Error}, {@link Leftover}, {@link Services}
+* - Detect and filter completion: {@link isDoneCause}, {@link filterDone}, {@link filterNoDone}
+* - Recover from completion while preserving ordinary failures: {@link catchDone}
+* - Convert done causes to successful exits: {@link doneExitFromCause}
+* - Handle all outcomes explicitly: {@link matchEffect}
+*
+* **Gotchas**
+*
+* - `Cause.Done` is not an ordinary failure; use this module's helpers before treating a pull failure as an error
+* - `Done` lives in the error channel, so generic `Effect` error handling can catch it unless you filter it deliberately
+* - `Pull` is a low-level primitive; most user-facing stream workflows should prefer higher-level stream APIs when available
+*
+* @since 4.0.0
+*/
+/**
+* Handles `Cause.Done` failures in an effect while leaving ordinary failures
+* in the error channel.
+*
+* **When to use**
+*
+* Use to recover from a `Cause.Done` completion signal in an effect, such as
+* turning a pull leftover value into a successful recovery effect while
+* preserving ordinary failures.
+*
+* **Details**
+*
+* The handler receives the done leftover value and may recover with a new
+* effect. Non-done errors are preserved.
+*
+* @see {@link matchEffect} for handling success, ordinary failure, and done outcomes explicitly
+* @see {@link filterDoneLeftover} for extracting a done leftover from an existing `Cause`
+*
+* @category Done
+* @since 4.0.0
+*/
+const catchDone = /* @__PURE__ */ dual(2, (effect, f) => catchCauseFilter(effect, filterDoneLeftover, (l) => f(l)));
+/**
+* Checks whether a Cause contains any done errors.
+*
+* **When to use**
+*
+* Use to test a whole pull failure cause for normal completion when you only
+* need a boolean branch and do not need the done payload.
+*
+* @see {@link isDoneFailure} for checking a single `Cause.Reason`
+* @see {@link filterDone} for extracting the `Cause.Done` value from a `Cause`
+* @see {@link filterNoDone} for selecting causes with no done failures
+*
+* @category Done
+* @since 4.0.0
+*/
+const isDoneCause = (cause) => cause.reasons.some(isDoneFailure);
+/**
+* Checks whether a `Cause.Reason` is a `Fail` reason whose error is a
+* `Cause.Done` signal.
+*
+* **When to use**
+*
+* Use as a predicate when traversing `cause.reasons` and you need to identify
+* done completion reasons before handling ordinary failures.
+*
+* @see {@link isDoneCause} for checking an entire `Cause` for any done reason
+* @see {@link filterDone} for extracting the `Cause.Done` value from a `Cause`
+*
+* @category Done
+* @since 4.0.0
+*/
+const isDoneFailure = (failure) => failure._tag === "Fail" && isDone$1(failure.error);
+/**
+* Finds a `Cause.Done` failure in a `Cause`.
+*
+* **When to use**
+*
+* Use to separate `Cause.Done` completion from ordinary causes while preserving
+* the typed done value.
+*
+* **Details**
+*
+* Returns a successful `Result` with the `Cause.Done` value when one is
+* present, otherwise returns a failed `Result` containing the non-done cause.
+*
+* @category Done
+* @since 4.0.0
+*/
+const filterDone = /* @__PURE__ */ composePassthrough(findError, (e) => isDone$1(e) ? succeed$4(e) : fail$4(e));
+/**
+* Filters a Cause to extract the leftover value from done errors.
+*
+* **When to use**
+*
+* Use to extract only the leftover value carried by a `Cause.Done` completion
+* signal.
+*
+* @category Done
+* @since 4.0.0
+*/
+const filterDoneLeftover = /* @__PURE__ */ composePassthrough(findError, (e) => isDone$1(e) ? succeed$4(e.value) : fail$4(e));
+/**
+* Converts a `Cause` into an `Exit`, treating `Cause.Done` as successful
+* completion.
+*
+* **When to use**
+*
+* Use to produce an `Exit` for finalizing a low-level pull workflow when a
+* `Cause.Done` signal should be treated as success and any remaining cause
+* should fail.
+*
+* **Details**
+*
+* If the cause contains a done value, that leftover becomes the successful
+* value. Otherwise the non-done cause becomes the failure cause.
+*
+* @see {@link filterDone} for extracting the done signal without converting the cause to an `Exit`
+* @see {@link matchEffect} for handling `Pull` success, failure, and done outcomes directly
+*
+* @category Done
+* @since 4.0.0
+*/
+const doneExitFromCause = (cause) => {
+	const halt = filterDone(cause);
+	return !isFailure(halt) ? succeed$2(halt.success.value) : failCause$2(halt.failure);
+};
+/**
+* Pattern matches on a Pull, handling success, failure, and done cases.
+*
+* **When to use**
+*
+* Use to handle all three `Pull` outcomes with effectful handlers.
+*
+* **Example** (Matching Pull outcomes)
+*
+* ```ts
+* import { Cause, Effect, Pull } from "effect"
+*
+* const pull = Cause.done("stream ended")
+*
+* const result = Pull.matchEffect(pull, {
+*   onSuccess: (value) => Effect.succeed(`Got value: ${value}`),
+*   onFailure: (cause) => Effect.succeed(`Got error: ${cause}`),
+*   onDone: (leftover) => Effect.succeed(`Stream halted with: ${leftover}`)
+* })
+* ```
+*
+* @category pattern matching
+* @since 4.0.0
+*/
+const matchEffect$1 = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffect(self, {
+	onSuccess: options.onSuccess,
+	onFailure: (cause) => {
+		const halt = filterDone(cause);
+		return !isFailure(halt) ? options.onDone(halt.success.value) : options.onFailure(halt.failure);
+	}
+}));
+//#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Effect.js
+/**
+* Executes an effectful operation for each element in an `Iterable`.
+*
+* **When to use**
+*
+* Use to traverse an iterable with an effectful function while preserving
+* element order in the collected results.
+*
+* **Details**
+*
+* The `forEach` function applies a provided operation to each element in the
+* iterable, producing a new effect that returns an array of results.
+*
+* If any effect fails, the iteration stops immediately (short-circuiting), and
+* the error is propagated.
+*
+* Concurrency:
+*
+* The `concurrency` option controls how many operations are performed
+* concurrently. By default, the operations are performed sequentially.
+*
+* Discarding Results:
+*
+* If the `discard` option is set to `true`, the intermediate results are not
+* collected, and the final result of the operation is `void`.
+*
+* **Example** (Mapping over an iterable with effects)
+*
+* ```ts
+* import { Console, Effect } from "effect"
+*
+* const result = Effect.forEach(
+*   [1, 2, 3, 4, 5],
+*   (n, index) =>
+*     Console.log(`Currently at index ${index}`).pipe(Effect.as(n * 2))
+* )
+*
+* Effect.runPromise(result).then(console.log)
+* // Output:
+* // Currently at index 0
+* // Currently at index 1
+* // Currently at index 2
+* // Currently at index 3
+* // Currently at index 4
+* // [ 2, 4, 6, 8, 10 ]
+* ```
+*
+* **Example** (Running effects without collecting results)
+*
+* ```ts
+* import { Console, Effect } from "effect"
+*
+* // Apply effects but discard the results
+* const result = Effect.forEach(
+*   [1, 2, 3, 4, 5],
+*   (n, index) =>
+*     Console.log(`Currently at index ${index}`).pipe(Effect.as(n * 2)),
+*   { discard: true }
+* )
+*
+* Effect.runPromise(result).then(console.log)
+* // Output:
+* // Currently at index 0
+* // Currently at index 1
+* // Currently at index 2
+* // Currently at index 3
+* // Currently at index 4
+* // undefined
+* ```
+*
+* @see {@link all} for combining multiple effects into one.
+* @category collecting
+* @since 2.0.0
+*/
+const forEach$1 = forEach$2;
+/**
+* Executes a body effect repeatedly while a condition holds true.
+*
+* **Example** (Repeating an effectful loop)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* let counter = 0
+*
+* const program = Effect.whileLoop({
+*   while: () => counter < 5,
+*   body: () => Effect.sync(() => ++counter),
+*   step: (n) => console.log(`Current count: ${n}`)
+* })
+*
+* Effect.runPromise(program)
+* // Output:
+* // Current count: 1
+* // Current count: 2
+* // Current count: 3
+* // Current count: 4
+* // Current count: 5
+* ```
+*
+* @category collecting
+* @since 2.0.0
+*/
+const whileLoop = whileLoop$1;
+/**
+* Creates an `Effect` that represents an asynchronous computation guaranteed to
+* succeed.
+*
+* **When to use**
+*
+* Use to convert a `Promise` into an `Effect` when the async operation is
+* guaranteed to succeed and will not reject.
+*
+* **Details**
+*
+* An optional `AbortSignal` can be provided to allow for interruption of the
+* wrapped `Promise` API.
+*
+* **Gotchas**
+*
+* The `Promise` must not reject. If it rejects, the rejection is treated as a
+* defect, not as a typed failure. Use `tryPromise` when rejection is expected.
+*
+* Interruption aborts the provided `AbortSignal`, but the underlying
+* asynchronous operation only stops if it observes that signal.
+*
+* **Example** (Wrapping a non-rejecting Promise)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const delay = (message: string) =>
+*   Effect.promise<string>(
+*     () =>
+*       new Promise((resolve) => {
+*         setTimeout(() => {
+*           resolve(message)
+*         }, 2000)
+*       })
+*   )
+*
+* //      ┌─── Effect<string, never, never>
+* //      ▼
+* const program = delay("Async operation completed successfully!")
+* ```
+*
+* @see {@link tryPromise} for a version that can handle failures.
+* @category creating effects
+* @since 2.0.0
+*/
+const promise = promise$1;
+/**
+* Creates an `Effect` that represents an asynchronous computation that might
+* fail.
+*
+* **When to use**
+*
+* Use when you need to perform asynchronous operations that might fail, such
+* as fetching data from an API, and want thrown exceptions or rejected promises
+* captured as Effect errors.
+*
+* **Details**
+*
+* Error Handling:
+*
+* There are two ways to handle errors with `tryPromise`:
+*
+* 1. If you don't provide a `catch` function, the error is caught and the
+*    effect fails with an `UnknownError`.
+* 2. If you provide a `catch` function, the error is caught and the `catch`
+*    function maps it to an error of type `E`.
+*
+* Interruptions:
+*
+* An optional `AbortSignal` can be provided to allow for interruption of the
+* wrapped `Promise` API.
+*
+* **Example** (Wrapping a fetch request that may fail)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const getTodo = (id: number) =>
+*   // Will catch any errors and propagate them as UnknownError
+*   Effect.tryPromise(() =>
+*     fetch(`https://jsonplaceholder.typicode.com/todos/${id}`)
+*   )
+*
+* //      ┌─── Effect<Response, UnknownError, never>
+* //      ▼
+* const program = getTodo(1)
+* ```
+*
+* **Example** (Mapping Promise rejections to a tagged error)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class TodoFetchError extends Data.TaggedError("TodoFetchError")<{ readonly cause: unknown }> {}
+*
+* const getTodo = (id: number) =>
+*   Effect.tryPromise({
+*     try: () => fetch(`https://jsonplaceholder.typicode.com/todos/${id}`),
+*     // remap the error
+*     catch: (cause) => new TodoFetchError({ cause })
+*   })
+*
+* //      ┌─── Effect<Response, TodoFetchError, never>
+* //      ▼
+* const program = getTodo(1)
+* ```
+*
+* @see {@link promise} if the effectful computation is asynchronous and does not throw errors.
+* @category creating effects
+* @since 2.0.0
+*/
+const tryPromise = tryPromise$1;
 /**
 * Creates an `Effect` that always succeeds with a given value.
 *
@@ -3689,9 +7980,618 @@ const TaggedError = TaggedError$1;
 * @category creating effects
 * @since 2.0.0
 */
-const succeed = succeed$1;
+const succeed = succeed$3;
+/**
+* Creates an `Effect` lazily, delaying construction until it is needed.
+*
+* **When to use**
+*
+* Use when you need to defer the evaluation of an effect until it is required. This is particularly useful for optimizing expensive computations, managing circular dependencies, or resolving type inference issues.
+*
+* **Details**
+*
+* `suspend` takes a thunk that represents the effect and wraps it in a suspended effect. This means the effect will not be created until it is explicitly needed, which is helpful in various scenarios:
+* - **Lazy Evaluation**: Helps optimize performance by deferring computations, especially when the effect might not be needed, or when its computation is expensive. This also ensures that any side effects or scoped captures are re-executed on each invocation.
+* - **Handling Circular Dependencies**: Useful in managing circular dependencies, such as recursive functions that need to avoid eager evaluation to prevent stack overflow.
+* - **Unifying Return Types**: Can help TypeScript unify return types in situations where multiple branches of logic return different effects, simplifying type inference.
+*
+* **Example** (Lazily evaluating side effects)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* let i = 0
+*
+* const bad = Effect.succeed(i++)
+*
+* const good = Effect.suspend(() => Effect.succeed(i++))
+*
+* console.log(Effect.runSync(bad)) // Output: 0
+* console.log(Effect.runSync(bad)) // Output: 0
+*
+* console.log(Effect.runSync(good)) // Output: 1
+* console.log(Effect.runSync(good)) // Output: 2
+* ```
+*
+* **Example** (Suspending recursive Fibonacci evaluation)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const blowsUp = (n: number): Effect.Effect<number> =>
+*   n < 2
+*     ? Effect.succeed(1)
+*     : Effect.zipWith(blowsUp(n - 1), blowsUp(n - 2), (a, b) => a + b)
+*
+* // console.log(Effect.runSync(blowsUp(32)))
+* // crash: JavaScript heap out of memory
+*
+* const allGood = (n: number): Effect.Effect<number> =>
+*   n < 2
+*     ? Effect.succeed(1)
+*     : Effect.zipWith(
+*         Effect.suspend(() => allGood(n - 1)),
+*         Effect.suspend(() => allGood(n - 2)),
+*         (a, b) => a + b
+*       )
+*
+* console.log(Effect.runSync(allGood(32)))
+* // Output: 3524578
+* ```
+*
+* **Example** (Helping TypeScript infer recursive effect types)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* //   Without suspend, TypeScript may struggle with type inference.
+* //   Inferred type:
+* //     (a: number, b: number) =>
+* //       Effect<never, Error, never> | Effect<number, never, never>
+* const withoutSuspend = (a: number, b: number) =>
+*   b === 0
+*     ? Effect.fail(new Error("Cannot divide by zero"))
+*     : Effect.succeed(a / b)
+*
+* //   Using suspend to unify return types.
+* //   Inferred type:
+* //     (a: number, b: number) => Effect<number, Error, never>
+* const withSuspend = (a: number, b: number) =>
+*   Effect.suspend(() =>
+*     b === 0
+*       ? Effect.fail(new Error("Cannot divide by zero"))
+*       : Effect.succeed(a / b)
+*   )
+* ```
+*
+* @category creating effects
+* @since 2.0.0
+*/
+const suspend$2 = suspend$3;
+/**
+* Creates an `Effect` that represents a synchronous side-effectful computation.
+*
+* **When to use**
+*
+* Use when you are sure the operation will not fail.
+*
+* **Details**
+*
+* The provided function is evaluated lazily when the effect runs.
+*
+* **Gotchas**
+*
+* The function must not throw. If it throws, the thrown value is treated as a
+* defect, not as a typed failure. Use `try` when throwing is expected.
+*
+* **Example** (Capturing synchronous logging in an Effect)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const log = (message: string) =>
+*   Effect.sync(() => {
+*     console.log(message) // side effect
+*   })
+*
+* //      ┌─── Effect<void, never, never>
+* //      ▼
+* const program = log("Hello, World!")
+* ```
+*
+* @see {@link try_ | try} for a version that can handle failures.
+* @category creating effects
+* @since 2.0.0
+*/
+const sync = sync$1;
 const void_ = void_$1;
+/**
+* Creates an `Effect` from a callback-based asynchronous API.
+*
+* **When to use**
+*
+* Use when integrating APIs that complete through callbacks
+* instead of returning a `Promise`.
+*
+* **Details**
+*
+* The registration function receives a `resume` callback and, when requested,
+* an `AbortSignal`. Call `resume` at most once with the effect that should
+* complete the fiber; later calls are ignored. Return an optional cleanup
+* effect from the registration function to run if the fiber is interrupted.
+*
+* **Example** (Integrating callback APIs)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const delay = (ms: number) =>
+*   Effect.callback<void>((resume) => {
+*     const timeoutId = setTimeout(() => {
+*       resume(Effect.void)
+*     }, ms)
+*     // Cleanup function for interruption
+*     return Effect.sync(() => clearTimeout(timeoutId))
+*   })
+*
+* const program = delay(1000)
+* ```
+*
+* @category creating effects
+* @since 4.0.0
+*/
+const callback$1 = callback$2;
+/**
+* Provides a way to write effectful code using generator functions, simplifying
+* control flow and error handling.
+*
+* **When to use**
+*
+* Use when `gen` allows you to write code that looks and behaves like synchronous
+* code, but it can handle asynchronous tasks, errors, and complex control flow
+* (like loops and conditions). It helps make asynchronous code more readable
+* and easier to manage.
+*
+* The generator functions work similarly to `async/await` but with more
+* explicit control over the execution of effects. You can `yield*` values from
+* effects and return the final result at the end.
+*
+* **Example** (Sequencing effects with generators)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class DiscountRateError extends Data.TaggedError("DiscountRateError")<{}> {}
+*
+* const addServiceCharge = (amount: number) => amount + 1
+*
+* const applyDiscount = (
+*   total: number,
+*   discountRate: number
+* ): Effect.Effect<number, DiscountRateError> =>
+*   discountRate === 0
+*     ? Effect.fail(new DiscountRateError())
+*     : Effect.succeed(total - (total * discountRate) / 100)
+*
+* const fetchTransactionAmount = Effect.promise(() => Promise.resolve(100))
+*
+* const fetchDiscountRate = Effect.promise(() => Promise.resolve(5))
+*
+* export const program = Effect.gen(function*() {
+*   const transactionAmount = yield* fetchTransactionAmount
+*   const discountRate = yield* fetchDiscountRate
+*   const discountedAmount = yield* applyDiscount(
+*     transactionAmount,
+*     discountRate
+*   )
+*   const finalAmount = addServiceCharge(discountedAmount)
+*   return `Final amount to charge: ${finalAmount}`
+* })
+* ```
+*
+* @category creating effects
+* @since 2.0.0
+*/
+const gen = gen$1;
+/**
+* Creates an `Effect` that represents a recoverable error.
+*
+* **When to use**
+*
+* Use to explicitly signal an error in an `Effect`. The error
+* will keep propagating unless it is handled. You can handle the error with
+* functions like {@link catchTag} or {@link catchTags}.
+*
+* **Example** (Creating a failed effect)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class OperationFailedError extends Data.TaggedError("OperationFailedError")<{}> {}
+*
+* //      ┌─── Effect<never, OperationFailedError, never>
+* //      ▼
+* const failure = Effect.fail(
+*   new OperationFailedError()
+* )
+* ```
+*
+* @see {@link succeed} to create an effect that represents a successful value.
+* @category creating effects
+* @since 2.0.0
+*/
+const fail = fail$3;
+/**
+* Creates an `Effect` that represents a failure with a specific `Cause`.
+*
+* **Details**
+*
+* This function allows you to create effects that fail with complex error
+* structures, including multiple errors, defects, interruptions, and more.
+*
+* **Example** (Failing with a full Cause)
+*
+* ```ts
+* import { Cause, Effect } from "effect"
+*
+* const program = Effect.failCause(
+*   Cause.fail("Network error")
+* )
+*
+* Effect.runPromiseExit(program).then(console.log)
+* // Output: { _id: 'Exit', _tag: 'Failure', cause: ... }
+* ```
+*
+* @category creating effects
+* @since 2.0.0
+*/
+const failCause$1 = failCause$3;
+/**
+* Creates an effect that terminates a fiber with a specified error.
+*
+* **When to use**
+*
+* Use when encountering unexpected conditions in your code that should
+* not be handled as regular errors but instead represent unrecoverable defects.
+*
+* **Details**
+*
+* The `die` function is used to signal a defect, which represents a critical
+* and unexpected error in the code. When invoked, it produces an effect that
+* does not handle the error and instead terminates the fiber.
+*
+* The error channel of the resulting effect is of type `never`, indicating that
+* it cannot recover from this failure.
+*
+* **Example** (Failing when division by zero)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const divide = (a: number, b: number) =>
+*   b === 0
+*     ? Effect.die(new Error("Cannot divide by zero"))
+*     : Effect.succeed(a / b)
+*
+* //      ┌─── Effect<number, never, never>
+* //      ▼
+* const program = divide(1, 0)
+*
+* Effect.runPromise(program).catch(console.error)
+* // Output:
+* // (FiberFailure) Error: Cannot divide by zero
+* //   ...stack trace...
+* ```
+*
+* @category creating effects
+* @since 2.0.0
+*/
+const die = die$1;
 const try_ = try_$1;
+/**
+* Chains effects to produce new `Effect` instances, useful for combining
+* operations that depend on previous results.
+*
+* **When to use**
+*
+* Use when you need to chain multiple effects, ensuring that each
+* step produces a new `Effect` while flattening any nested effects that may
+* occur.
+*
+* **Details**
+*
+* `flatMap` lets you sequence effects so that the result of one effect can be
+* used in the next step. It is similar to `flatMap` used with arrays but works
+* specifically with `Effect` instances, allowing you to avoid deeply nested
+* effect structures.
+*
+* Since effects are immutable, `flatMap` always returns a new effect instead of
+* changing the original one.
+*
+* **Example** (Syntax)
+*
+* ```ts
+* import { Effect, pipe } from "effect"
+*
+* const myEffect = Effect.succeed(1)
+* const transformation = (n: number) => Effect.succeed(n + 1)
+*
+* const flatMappedWithPipe = pipe(myEffect, Effect.flatMap(transformation))
+* const flatMappedWithDataFirst = Effect.flatMap(myEffect, transformation)
+* const flatMappedWithMethod = myEffect.pipe(Effect.flatMap(transformation))
+* ```
+*
+* **Example** (Sequencing dependent effects)
+*
+* ```ts
+* import { Data, Effect, pipe } from "effect"
+*
+* class DiscountRateError extends Data.TaggedError("DiscountRateError")<{}> {}
+*
+* // Function to apply a discount safely to a transaction amount
+* const applyDiscount = (
+*   total: number,
+*   discountRate: number
+* ): Effect.Effect<number, DiscountRateError> =>
+*   discountRate === 0
+*     ? Effect.fail(new DiscountRateError())
+*     : Effect.succeed(total - (total * discountRate) / 100)
+*
+* // Simulated asynchronous task to fetch a transaction amount from database
+* const fetchTransactionAmount = Effect.promise(() => Promise.resolve(100))
+*
+* // Chaining the fetch and discount application using `flatMap`
+* const finalAmount = pipe(
+*   fetchTransactionAmount,
+*   Effect.flatMap((amount) => applyDiscount(amount, 5))
+* )
+*
+* Effect.runPromise(finalAmount).then(console.log)
+* // Output: 95
+* ```
+*
+* @see {@link tap} for a version that ignores the result of the effect.
+* @category sequencing
+* @since 2.0.0
+*/
+const flatMap = flatMap$1;
+/**
+* Runs this effect and then runs another effect, optionally using the first
+* effect's success value to choose the next effect.
+*
+* **When to use**
+*
+* Use when one effect must run after another and the second effect
+* may depend on the first effect's success value.
+*
+* **Details**
+*
+* When the second argument is an `Effect`, the first success value is discarded
+* and the returned effect produces the second effect's value. When the second
+* argument is a function, it receives the first success value and must return
+* the next `Effect`.
+*
+* Failures or requirements from either effect are preserved in the returned
+* effect.
+*
+* **Example** (Syntax)
+*
+* ```ts
+* import { Effect, pipe } from "effect"
+*
+* const myEffect = Effect.succeed(1)
+* const anotherEffect = Effect.succeed("done")
+*
+* const transformedWithPipe = pipe(myEffect, Effect.andThen(anotherEffect))
+* const transformedWithDataFirst = Effect.andThen(myEffect, anotherEffect)
+* const transformedWithMethod = myEffect.pipe(Effect.andThen(anotherEffect))
+* ```
+*
+* **Example** (Sequencing a discount calculation after fetching a total)
+*
+* ```ts
+* import { Data, Effect, pipe } from "effect"
+*
+* class DiscountRateError extends Data.TaggedError("DiscountRateError")<{}> {}
+*
+* // Function to apply a discount safely to a transaction amount
+* const applyDiscount = (
+*   total: number,
+*   discountRate: number
+* ): Effect.Effect<number, DiscountRateError> =>
+*   discountRate === 0
+*     ? Effect.fail(new DiscountRateError())
+*     : Effect.succeed(total - (total * discountRate) / 100)
+*
+* // Simulated asynchronous task to fetch a transaction amount from database
+* const fetchTransactionAmount = Effect.promise(() => Promise.resolve(100))
+*
+* // Using Effect.map and Effect.flatMap
+* const result1 = pipe(
+*   fetchTransactionAmount,
+*   Effect.map((amount) => amount * 2),
+*   Effect.flatMap((amount) => applyDiscount(amount, 5))
+* )
+*
+* Effect.runPromise(result1).then(console.log)
+* // Output: 190
+*
+* // Using Effect.andThen
+* const result2 = pipe(
+*   fetchTransactionAmount,
+*   Effect.andThen((amount) => Effect.succeed(amount * 2)),
+*   Effect.andThen((amount) => applyDiscount(amount, 5))
+* )
+*
+* Effect.runPromise(result2).then(console.log)
+* // Output: 190
+* ```
+*
+* @category sequencing
+* @since 2.0.0
+*/
+const andThen = andThen$1;
+/**
+* Runs a side effect with the result of an effect without changing the original
+* value.
+*
+* **When to use**
+*
+* Use when you want to perform a side effect, like logging or tracking,
+* without modifying the main value. This is useful when you need to observe or
+* record an action but want the original value to be passed to the next step.
+*
+* **Details**
+*
+* `tap` works similarly to `flatMap`, but it ignores the result of the function
+* passed to it. The value from the previous effect remains available for the
+* next part of the chain. Note that if the side effect fails, the entire chain
+* will fail too.
+*
+* **Example** (Logging a step in a pipeline)
+*
+* ```ts
+* import { Console, Data, Effect, pipe } from "effect"
+*
+* class DiscountRateError extends Data.TaggedError("DiscountRateError")<{}> {}
+*
+* // Function to apply a discount safely to a transaction amount
+* const applyDiscount = (
+*   total: number,
+*   discountRate: number
+* ): Effect.Effect<number, DiscountRateError> =>
+*   discountRate === 0
+*     ? Effect.fail(new DiscountRateError())
+*     : Effect.succeed(total - (total * discountRate) / 100)
+*
+* // Simulated asynchronous task to fetch a transaction amount from database
+* const fetchTransactionAmount = Effect.promise(() => Promise.resolve(100))
+*
+* const finalAmount = pipe(
+*   fetchTransactionAmount,
+*   // Log the fetched transaction amount
+*   Effect.tap((amount) => Console.log(`Apply a discount to: ${amount}`)),
+*   // `amount` is still available!
+*   Effect.flatMap((amount) => applyDiscount(amount, 5))
+* )
+*
+* Effect.runPromise(finalAmount).then(console.log)
+* // Output:
+* // Apply a discount to: 100
+* // 95
+* ```
+*
+* @category sequencing
+* @since 2.0.0
+*/
+const tap = tap$1;
+/**
+* Transforms the value inside an effect by applying a function to it.
+*
+* **When to use**
+*
+* Use to transform an effect's success value with a function that returns a
+* plain value, producing a new effect without changing the original effect's
+* typed error or context requirements.
+*
+* **Details**
+*
+* `map` takes a function and applies it to the value contained within an
+* effect, creating a new effect with the transformed value.
+*
+* It's important to note that effects are immutable, meaning that the original
+* effect is not modified. Instead, a new effect is returned with the updated
+* value.
+*
+* **Example** (Syntax)
+*
+* ```ts
+* import { Effect, pipe } from "effect"
+*
+* const myEffect = Effect.succeed(1)
+* const transformation = (n: number) => n + 1
+*
+* const mappedWithPipe = pipe(myEffect, Effect.map(transformation))
+* const mappedWithDataFirst = Effect.map(myEffect, transformation)
+* const mappedWithMethod = myEffect.pipe(Effect.map(transformation))
+* ```
+*
+* **Example** (Adding a service charge)
+*
+* ```ts
+* import { Effect, pipe } from "effect"
+*
+* const addServiceCharge = (amount: number) => amount + 1
+*
+* const fetchTransactionAmount = Effect.promise(() => Promise.resolve(100))
+*
+* const finalAmount = pipe(
+*   fetchTransactionAmount,
+*   Effect.map(addServiceCharge)
+* )
+*
+* Effect.runPromise(finalAmount).then(console.log)
+* // Output: 101
+* ```
+*
+* @see {@link mapError} for a version that operates on the error channel.
+* @see {@link mapBoth} for a version that operates on both channels.
+* @see {@link flatMap} or {@link andThen} for a version that can return a new effect.
+* @category mapping
+* @since 2.0.0
+*/
+const map$3 = map$4;
+/**
+* Replaces the value inside an effect with a constant value.
+*
+* **When to use**
+*
+* Use to replace a successful value with a constant while preserving failures
+* and requirements.
+*
+* **Details**
+*
+* `as` allows you to ignore the original value inside an effect and
+* replace it with a new constant value.
+*
+* **Example** (Replacing a success value)
+*
+* ```ts
+* import { Effect, pipe } from "effect"
+*
+* // Replaces the value 5 with the constant "new value"
+* const program = pipe(Effect.succeed(5), Effect.as("new value"))
+*
+* Effect.runPromise(program).then(console.log)
+* // Output: "new value"
+* ```
+*
+* @see {@link map} for deriving the replacement value from the success value
+* @see {@link asVoid} for replacing the success value with `void`
+*
+* @category mapping
+* @since 2.0.0
+*/
+const as = as$1;
+/**
+* Maps the success value of an `Effect` to `void`, preserving failures.
+*
+* **Example** (Discarding success values)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const program = Effect.asVoid(Effect.succeed(42))
+*
+* Effect.runPromise(program).then(console.log)
+* // undefined (void)
+* ```
+*
+* @category mapping
+* @since 2.0.0
+*/
+const asVoid = asVoid$1;
+const catch_ = catch_$1;
 /**
 * Catches and handles specific errors by their `_tag` field, which is used as a
 * discriminator.
@@ -3737,6 +8637,635 @@ const try_ = try_$1;
 * @since 2.0.0
 */
 const catchTag = catchTag$1;
+/**
+* Handles both recoverable and unrecoverable errors by providing a recovery
+* effect.
+*
+* **When to use**
+*
+* Use when recovery needs the full `Cause`, including recoverable failures,
+* defects, and interruptions, instead of only the typed error value.
+*
+* **Details**
+*
+* When to Recover from Defects:
+*
+* Defects are unexpected errors that typically shouldn't be recovered from, as
+* they often indicate serious issues. However, in some cases, such as
+* dynamically loaded plugins, controlled recovery might be needed.
+*
+* **Example** (Recovering from full failure causes)
+*
+* ```ts
+* import { Cause, Console, Effect } from "effect"
+*
+* // An effect that might fail in different ways
+* const program = Effect.die("Something went wrong")
+*
+* // Recover from any cause (including defects)
+* const recovered = Effect.catchCause(program, (cause) => {
+*   if (Cause.hasDies(cause)) {
+*     return Console.log("Caught defect").pipe(
+*       Effect.as("Recovered from defect")
+*     )
+*   }
+*   return Effect.succeed("Unknown error")
+* })
+* ```
+*
+* @category error handling
+* @since 4.0.0
+*/
+const catchCause = catchCause$1;
+/**
+* Converts typed failures from the error channel into defects, removing the
+* error type from the returned effect.
+*
+* **When to use**
+*
+* Use when a typed failure represents an unrecoverable bug or invalid
+* state and should not be handled as a recoverable error.
+*
+* **Example** (Converting typed failures into defects)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class DivideByZeroError extends Data.TaggedError("DivideByZeroError")<{}> {}
+*
+* const divide = (a: number, b: number) =>
+*   b === 0
+*     ? Effect.fail(new DivideByZeroError())
+*     : Effect.succeed(a / b)
+*
+* //      ┌─── Effect<number, never, never>
+* //      ▼
+* const program = Effect.orDie(divide(1, 0))
+*
+* Effect.runPromise(program).catch(console.error)
+* // Output:
+* // (FiberFailure) DivideByZeroError
+* //   ...stack trace...
+* ```
+*
+* @category converting failures to defects
+* @since 2.0.0
+*/
+const orDie = orDie$1;
+/**
+* Discards both the success and failure values of an effect.
+*
+* **When to use**
+*
+* Use when an effect should run for its side effects while both success and
+* failure values are discarded.
+*
+* Use the `log` option to emit the full {@link Cause} when the effect fails,
+* and `message` to prepend a custom log message.
+*
+* **Example** (Discarding success and failure values)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* //      ┌─── Effect<number, string, never>
+* //      ▼
+* const task = Effect.fail("Uh oh!").pipe(Effect.as(5))
+*
+* //      ┌─── Effect<void, never, never>
+* //      ▼
+* const program = task.pipe(Effect.ignore)
+* ```
+*
+* **Example** (Logging failures while ignoring results)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const task = Effect.fail("Uh oh!")
+*
+* const program = task.pipe(Effect.ignore({ log: true }))
+* const programWarn = task.pipe(Effect.ignore({ log: "Warn", message: "Ignoring task failure" }))
+* ```
+*
+* @category error handling
+* @since 2.0.0
+*/
+const ignore = ignore$1;
+/**
+* Applies a timeout to an effect, with a fallback effect executed if the timeout is reached.
+*
+* **When to use**
+*
+* Use when a timeout should switch to a fallback effect. Use
+* `timeout` when a timeout should fail the effect, and `timeoutOption` when a
+* timeout should become `Option.none`.
+*
+* **Details**
+*
+* The fallback effect is created lazily by `orElse` and may introduce its own
+* success, failure, and requirement types.
+*
+* **Gotchas**
+*
+* If the timeout wins, the source effect is interrupted before the fallback is
+* run.
+*
+* **Example** (Falling back on timeout)
+*
+* ```ts
+* import { Console, Effect } from "effect"
+*
+* const slowQuery = Effect.gen(function*() {
+*   yield* Console.log("Starting database query...")
+*   yield* Effect.sleep("5 seconds")
+*   return "Database result"
+* })
+*
+* // Use cached data as fallback when timeout is reached
+* const program = Effect.timeoutOrElse(slowQuery, {
+*   duration: "2 seconds",
+*   orElse: () =>
+*     Effect.gen(function*() {
+*       yield* Console.log("Query timed out, using cached data")
+*       return "Cached result"
+*     })
+* })
+*
+* Effect.runPromise(program).then(console.log)
+* // Output:
+* // Starting database query...
+* // Query timed out, using cached data
+* // Cached result
+* ```
+*
+* @see {@link timeout} for failing with a `TimeoutException`.
+* @see {@link timeoutOption} for returning `Option.none` on timeout.
+*
+* @category delays & timeouts
+* @since 4.0.0
+*/
+const timeoutOrElse = timeoutOrElse$1;
+/**
+* Races two effects and returns the result of the first one to complete, whether
+* it succeeds or fails.
+*
+* **Details**
+*
+* The losing effect is interrupted, and `onWinner` can observe the winning fiber.
+*
+* **Example** (Observing the winning fiber)
+*
+* ```ts
+* import { Console, Duration, Effect } from "effect"
+*
+* const fastFail = Effect.delay(Effect.fail("fast-fail"), Duration.millis(10))
+* const slowSuccess = Effect.delay(Effect.succeed("slow-success"), Duration.millis(50))
+*
+* const program = Effect.gen(function*() {
+*   const message = yield* Effect.match(Effect.raceFirst(fastFail, slowSuccess), {
+*     onFailure: (error) => `failed: ${error}`,
+*     onSuccess: (value) => `succeeded: ${value}`
+*   })
+*   yield* Console.log(message)
+* })
+*
+* Effect.runPromise(program)
+* // Output: failed: fast-fail
+* ```
+*
+* @category racing
+* @since 2.0.0
+*/
+const raceFirst = raceFirst$1;
+/**
+* Handles both success and failure by running effectful handlers.
+*
+* **When to use**
+*
+* Use when the failure or success branch must run additional effects.
+*
+* **Details**
+*
+* Use `matchEffect` when either branch needs to return an `Effect`, such as
+* performing logging, recovery, notification, or other effectful work. The
+* returned effect succeeds or fails according to the handler that is run.
+*
+* **Example** (Matching success and failure with effectful handlers)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class ExampleError extends Data.TaggedError("ExampleError")<{ readonly message: string }> {}
+*
+* const success: Effect.Effect<number, ExampleError> = Effect.succeed(42)
+* const failure: Effect.Effect<number, ExampleError> = Effect.fail(
+*   new ExampleError({ message: "Uh oh!" })
+* )
+*
+* const program1 = Effect.matchEffect(success, {
+*   onFailure: (error) =>
+*     Effect.succeed(`failure: ${error.message}`).pipe(
+*       Effect.tap(Effect.log)
+*     ),
+*   onSuccess: (value) =>
+*     Effect.succeed(`success: ${value}`).pipe(Effect.tap(Effect.log))
+* })
+*
+* console.log(Effect.runSync(program1))
+* // Output:
+* // timestamp=... level=INFO fiber=#0 message="success: 42"
+* // success: 42
+*
+* const program2 = Effect.matchEffect(failure, {
+*   onFailure: (error) =>
+*     Effect.succeed(`failure: ${error.message}`).pipe(
+*       Effect.tap(Effect.log)
+*     ),
+*   onSuccess: (value) =>
+*     Effect.succeed(`success: ${value}`).pipe(Effect.tap(Effect.log))
+* })
+*
+* console.log(Effect.runSync(program2))
+* // Output:
+* // timestamp=... level=INFO fiber=#1 message="failure: Uh oh!"
+* // failure: Uh oh!
+* ```
+*
+* @see {@link match} if you don't need side effects and only want to handle the
+* result or failure.
+* @category pattern matching
+* @since 2.0.0
+*/
+const matchEffect = matchEffect$2;
+/**
+* Optionally accesses a service from the environment.
+*
+* **When to use**
+*
+* Use to read an optional dependency from the current context without making
+* that dependency part of the effect's required environment.
+*
+* **Details**
+*
+* This function attempts to access a service from the environment. If the
+* service is available, it returns `Some(service)`. If the service is not
+* available, it returns `None`. Unlike `service`, this function does not
+* require the service to be present in the environment.
+*
+* **Example** (Accessing an optional service)
+*
+* ```ts
+* import { Context, Effect, Option } from "effect"
+*
+* // Define a service key
+* const Logger = Context.Service<{
+*   log: (msg: string) => void
+* }>("Logger")
+*
+* // Use serviceOption to optionally access the logger
+* const program = Effect.gen(function*() {
+*   const maybeLogger = yield* Effect.serviceOption(Logger)
+*
+*   if (Option.isSome(maybeLogger)) {
+*     maybeLogger.value.log("Service is available")
+*   } else {
+*     console.log("Service not available")
+*   }
+* })
+* ```
+*
+* @category context
+* @since 2.0.0
+*/
+const serviceOption = serviceOption$1;
+/**
+* Runs an effect with a scope that closes when the effect completes.
+*
+* **When to use**
+*
+* Use to acquire scoped resources for the duration of a single workflow.
+*
+* **Details**
+*
+* Finalizers for resources acquired inside the workflow run as soon as the
+* workflow completes, whether by success, failure, or interruption.
+*
+* **Example** (Running a scoped acquisition)
+*
+* ```ts
+* import { Console, Effect } from "effect"
+*
+* const resource = Effect.acquireRelease(
+*   Console.log("Acquiring resource").pipe(Effect.as("resource")),
+*   () => Console.log("Releasing resource")
+* )
+*
+* const program = Effect.scoped(
+*   Effect.gen(function*() {
+*     const res = yield* resource
+*     yield* Console.log(`Using ${res}`)
+*     return res
+*   })
+* )
+*
+* Effect.runFork(program)
+* // Output: "Acquiring resource"
+* // Output: "Using resource"
+* // Output: "Releasing resource"
+* ```
+*
+* @category resource management
+* @since 2.0.0
+*/
+const scoped = scoped$1;
+/**
+* Creates a scoped effect by providing access to the scope.
+*
+* **Example** (Working with an explicit scope)
+*
+* ```ts
+* import { Console, Effect, Scope } from "effect"
+*
+* const program = Effect.scopedWith((scope) =>
+*   Effect.gen(function*() {
+*     yield* Console.log("Inside scoped context")
+*
+*     // Manually add a finalizer to the scope
+*     yield* Scope.addFinalizer(scope, Console.log("Manual finalizer"))
+*
+*     // Create a scoped resource
+*     const resource = yield* Effect.scoped(
+*       Effect.acquireRelease(
+*         Console.log("Acquiring resource").pipe(Effect.as("resource")),
+*         () => Console.log("Releasing resource")
+*       )
+*     )
+*
+*     return resource
+*   })
+* )
+*
+* Effect.runPromise(program).then(console.log)
+* // Output:
+* // Inside scoped context
+* // Acquiring resource
+* // resource
+* // Releasing resource
+* // Manual finalizer
+* ```
+*
+* @category resource management
+* @since 3.11.0
+*/
+const scopedWith = scopedWith$1;
+/**
+* Constructs a scoped resource from an acquisition effect and a release
+* finalizer.
+*
+* **When to use**
+*
+* Use to acquire a scoped resource with an explicit release finalizer.
+*
+* **Details**
+*
+* If acquisition succeeds, the release finalizer is added to the current scope
+* and is guaranteed to run when that scope closes. The finalizer receives the
+* `Exit` value used to close the scope.
+*
+* By default, acquisition is protected by an uninterruptible region. Pass
+* `{ interruptible: true }` to allow the acquisition effect to be interrupted.
+*
+* **Example** (Acquiring and releasing a resource)
+*
+* ```ts
+* import { Console, Effect, Exit } from "effect"
+*
+* // Simulate a resource that needs cleanup
+* interface FileHandle {
+*   readonly path: string
+*   readonly content: string
+* }
+*
+* // Acquire a file handle
+* const acquire = Effect.gen(function*() {
+*   yield* Console.log("Opening file")
+*   return { path: "/tmp/file.txt", content: "file content" }
+* })
+*
+* // Release the file handle
+* const release = (handle: FileHandle, exit: Exit.Exit<unknown, unknown>) =>
+*   Console.log(
+*     `Closing file ${handle.path} with exit: ${
+*       Exit.isSuccess(exit) ? "success" : "failure"
+*     }`
+*   )
+*
+* // Create a scoped resource
+* const resource = Effect.acquireRelease(acquire, release)
+*
+* // Use the resource within a scope
+* const program = Effect.scoped(
+*   Effect.gen(function*() {
+*     const handle = yield* resource
+*     yield* Console.log(`Using file: ${handle.path}`)
+*     return handle.content
+*   })
+* )
+* ```
+*
+* @see {@link acquireDisposable} for resources that implement JavaScript disposal protocols
+* @see {@link acquireUseRelease} for bracketing acquire, use, and release in one effect
+*
+* @category resource management
+* @since 2.0.0
+*/
+const acquireRelease = acquireRelease$1;
+/**
+* Runs the specified effect if this effect fails, providing the error to the
+* effect if it exists. The provided effect will not be interrupted.
+*
+* **Example** (Running cleanup on failure)
+*
+* ```ts
+* import { Cause, Console, Data, Effect } from "effect"
+*
+* class TaskError extends Data.TaggedError("TaskError")<{ readonly message: string }> {}
+*
+* const task = Effect.fail(new TaskError({ message: "Something went wrong" }))
+*
+* const program = Effect.onError(
+*   task,
+*   (cause) => Console.log(`Cleanup on error: ${Cause.squash(cause)}`)
+* )
+*
+* Effect.runPromise(program).catch(console.error)
+* // Output:
+* // Cleanup on error: TaskError: Something went wrong
+* // TaskError: Something went wrong
+* ```
+*
+* @category resource management
+* @since 2.0.0
+*/
+const onError = onError$1;
+/**
+* Ensures that a cleanup function runs whether this effect succeeds, fails, or
+* is interrupted.
+*
+* **Example** (Observing every exit)
+*
+* ```ts
+* import { Console, Effect, Exit } from "effect"
+*
+* const task = Effect.succeed(42)
+*
+* const program = Effect.onExit(task, (exit) =>
+*   Console.log(
+*     Exit.isSuccess(exit)
+*       ? `Task succeeded with: ${exit.value}`
+*       : `Task failed: ${Exit.isFailure(exit) ? exit.cause : "interrupted"}`
+*   ))
+*
+* Effect.runPromise(program).then(console.log)
+* // Output:
+* // Task succeeded with: 42
+* // 42
+* ```
+*
+* @category resource management
+* @since 2.0.0
+*/
+const onExit = onExit$1;
+/**
+* Repeats this effect forever (until the first error).
+*
+* **Example** (Repeating forever)
+*
+* ```ts
+* import { Console, Effect, Fiber } from "effect"
+*
+* const task = Effect.gen(function*() {
+*   yield* Console.log("Task running...")
+*   yield* Effect.sleep("1 second")
+* })
+*
+* // This will run forever, printing every second
+* const program = task.pipe(Effect.forever)
+*
+* // This will run forever, without yielding every iteration
+* const programNoYield = task.pipe(Effect.forever({ disableYield: true }))
+*
+* // Run for 5 seconds then interrupt
+* const timedProgram = Effect.gen(function*() {
+*   const fiber = yield* Effect.forkChild(program)
+*   yield* Effect.sleep("5 seconds")
+*   yield* Fiber.interrupt(fiber)
+* })
+* ```
+*
+* @category repetition / recursion
+* @since 2.0.0
+*/
+const forever = forever$1;
+/**
+* Forks the effect in the specified scope. The fiber will be interrupted
+* when the scope is closed.
+*
+* **Example** (Forking into a supplied scope)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const task = Effect.gen(function*() {
+*   yield* Effect.sleep("10 seconds")
+*   return "completed"
+* })
+*
+* const program = Effect.scoped(
+*   Effect.gen(function*() {
+*     const scope = yield* Effect.scope
+*     const fiber = yield* Effect.forkIn(task, scope)
+*     yield* Effect.sleep("1 second")
+*     // Fiber will be interrupted when scope closes
+*     return "done"
+*   })
+* )
+* ```
+*
+* @category supervision & fibers
+* @since 2.0.0
+*/
+const forkIn = forkIn$1;
+/**
+* Forks the fiber in a `Scope`, interrupting it when the scope is closed.
+*
+* **Example** (Forking into the current scope)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const backgroundTask = Effect.gen(function*() {
+*   yield* Effect.sleep("5 seconds")
+*   yield* Effect.log("Background task completed")
+*   return "result"
+* })
+*
+* const program = Effect.scoped(
+*   Effect.gen(function*() {
+*     const fiber = yield* backgroundTask.pipe(Effect.forkScoped)
+*
+*     // or fork a fiber that starts immediately:
+*     yield* backgroundTask.pipe(Effect.forkScoped({ startImmediately: true }))
+*
+*     yield* Effect.log("Task forked in scope")
+*     yield* Effect.sleep("1 second")
+*
+*     // Fiber will be interrupted when scope closes
+*     return "scope completed"
+*   })
+* )
+* ```
+*
+* @category supervision & fibers
+* @since 2.0.0
+*/
+const forkScoped = forkScoped$1;
+/**
+* Runs an effect in the background, returning a fiber that can
+* be observed or interrupted.
+*
+* **When to use**
+*
+* Use when an effect should start in the background and return a fiber that can
+* be observed or interrupted. Prefer this when you do not need a `Promise` or
+* synchronous result.
+*
+* **Example** (Running an effect in the background)
+*
+* ```ts
+* import { Console, Effect, Fiber, Schedule } from "effect"
+*
+* //      ┌─── Effect<number, never, never>
+* //      ▼
+* const program = Effect.repeat(
+*   Console.log("running..."),
+*   Schedule.spaced("200 millis")
+* )
+*
+* //      ┌─── RuntimeFiber<number, never>
+* //      ▼
+* const fiber = Effect.runFork(program)
+*
+* setTimeout(() => {
+*   Effect.runFork(Fiber.interrupt(fiber))
+* }, 500)
+* ```
+*
+* @category running effects
+* @since 2.0.0
+*/
+const runFork = runFork$1;
 /**
 * Executes an effect synchronously and returns its success value.
 *
@@ -3798,7 +9327,3215 @@ const catchTag = catchTag$1;
 * @since 2.0.0
 */
 const runSync = runSync$1;
+/**
+* Creates an Effect-returning function without tracing.
+*
+* **Details**
+*
+* `Effect.fnUntraced` also acts as a `pipe` function, so you can append transforms after the body.
+*
+* **Example** (Defining untraced effect functions)
+*
+* ```ts
+* import { Console, Effect } from "effect"
+*
+* const greet = Effect.fnUntraced(function* (name: string) {
+*   yield* Console.log(`Hello, ${name}`)
+*   return name.length
+* })
+*
+* Effect.runFork(greet("Ada"))
+* ```
+*
+* @category functions
+* @since 3.12.0
+*/
+const fnUntraced = fnUntraced$1;
 Service()("effect/Effect/Transaction");
+/**
+* Converts an error-first callback API into a function that returns an
+* `Effect`.
+*
+* **Details**
+*
+* The original function is called with the supplied arguments plus a final
+* callback. A non-null callback error fails the returned effect, while a
+* successful callback value becomes the effect success. Use `onError` to map
+* callback errors and `onSyncError` to turn synchronous throws into typed
+* failures; otherwise synchronous throws become defects.
+*
+* **Example** (Converting callbacks to effects)
+*
+* ```ts
+* import { Effect } from "effect"
+* import * as fs from "fs"
+*
+* // Convert Node.js readFile to an Effect
+* const readFile = Effect.effectify(fs.readFile)
+*
+* // Use the effectified function
+* const program = readFile("package.json", "utf8")
+*
+* Effect.runPromise(program).then(console.log)
+* // Output: contents of package.json
+* ```
+*
+* **Example** (Mapping callback errors to typed failures)
+*
+* ```ts
+* import { Effect } from "effect"
+* import * as fs from "fs"
+*
+* const readFile = Effect.effectify(
+*   fs.readFile,
+*   (error, args) => new Error(`Failed to read file ${args[0]}: ${error.message}`)
+* )
+*
+* const program = readFile("nonexistent.txt", "utf8")
+*
+* Effect.runPromiseExit(program).then(console.log)
+* // Output: Exit.failure with custom error message
+* ```
+*
+* @category effectify
+* @since 4.0.0
+*/
+const effectify = (fn, onError, onSyncError) => (...args) => callback$1((resume) => {
+	try {
+		fn(...args, (err, result) => {
+			if (err) resume(fail(onError ? onError(err, args) : err));
+			else resume(succeed(result));
+		});
+	} catch (err) {
+		resume(onSyncError ? fail(onSyncError(err, args)) : die(err));
+	}
+});
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Brand.js
+/**
+* Returns a `Constructor` that **does not apply any runtime checks** and just
+* returns the provided value.
+*
+* **When to use**
+*
+* Use to create nominal types that allow distinguishing between two values
+* of the same type but with different meanings. If you also want to perform
+* some validation, see {@link make} or {@link check}.
+*
+* @category constructors
+* @since 2.0.0
+*/
+function nominal() {
+	return Object.assign((input) => input, {
+		option: (input) => some(input),
+		result: (input) => succeed$4(input),
+		is: (_) => true
+	});
+}
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Latch.js
+/**
+* Creates a `Latch` synchronously, outside of `Effect`.
+*
+* **When to use**
+*
+* Use when synchronous allocation is required outside an Effect workflow.
+*
+* **Details**
+*
+* The latch starts closed by default; pass `true` to create it open.
+*
+* **Example** (Creating a latch unsafely)
+*
+* ```ts
+* import { Effect, Latch } from "effect"
+*
+* const latch = Latch.makeUnsafe(false)
+*
+* const waiter = Effect.gen(function*() {
+*   yield* Effect.log("Waiting for latch to open...")
+*   yield* latch.await
+*   yield* Effect.log("Latch opened! Continuing...")
+* })
+*
+* const opener = Effect.gen(function*() {
+*   yield* Effect.sleep("2 seconds")
+*   yield* Effect.log("Opening latch...")
+*   yield* latch.open
+* })
+*
+* const program = Effect.all([waiter, opener])
+* ```
+*
+* @see {@link make} for creating a latch inside Effect code
+*
+* @category constructors
+* @since 4.0.0
+*/
+const makeUnsafe = makeLatchUnsafe;
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/MutableList.js
+/**
+* Defines the unique symbol used to represent an empty result when taking elements from a MutableList.
+* This symbol is returned by `take` when the list is empty, allowing for safe type checking.
+*
+* **When to use**
+*
+* Use to detect that `take` returned no element before handling the result as a
+* list item.
+*
+* **Example** (Checking for empty results)
+*
+* ```ts
+* import { MutableList } from "effect"
+*
+* const list = MutableList.make<string>()
+*
+* // Take from empty list returns Empty symbol
+* const result = MutableList.take(list)
+* console.log(result === MutableList.Empty) // true
+*
+* // Safe pattern for checking emptiness
+* const processNext = (queue: MutableList.MutableList<string>) => {
+*   const item = MutableList.take(queue)
+*   if (item === MutableList.Empty) {
+*     console.log("Queue is empty")
+*     return null
+*   }
+*   return item.toUpperCase()
+* }
+*
+* // Compare with other empty results
+* MutableList.append(list, "hello")
+* const next = MutableList.take(list)
+* console.log(next !== MutableList.Empty) // true, got "hello"
+*
+* const empty = MutableList.take(list)
+* console.log(empty === MutableList.Empty) // true, list is empty
+* ```
+*
+* @category symbols
+* @since 4.0.0
+*/
+const Empty = /* @__PURE__ */ Symbol.for("effect/MutableList/Empty");
+/**
+* Creates an empty MutableList.
+*
+* **Example** (Creating an empty mutable list)
+*
+* ```ts
+* import { MutableList } from "effect"
+*
+* const list = MutableList.make<string>()
+*
+* // Add elements
+* MutableList.append(list, "first")
+* MutableList.append(list, "second")
+* MutableList.prepend(list, "beginning")
+*
+* console.log(list.length) // 3
+*
+* // Take elements in FIFO order (from head)
+* console.log(MutableList.take(list)) // "beginning"
+* console.log(MutableList.take(list)) // "first"
+* console.log(MutableList.take(list)) // "second"
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const make$6 = () => ({
+	head: void 0,
+	tail: void 0,
+	length: 0
+});
+const emptyBucket = () => ({
+	array: [],
+	mutable: true,
+	offset: 0,
+	next: void 0
+});
+/**
+* Appends an element to the end of the MutableList.
+* This operation is optimized for high-frequency usage.
+*
+* **Example** (Appending elements)
+*
+* ```ts
+* import { MutableList } from "effect"
+*
+* const list = MutableList.make<number>()
+*
+* // Append elements one by one
+* MutableList.append(list, 1)
+* MutableList.append(list, 2)
+* MutableList.append(list, 3)
+*
+* console.log(list.length) // 3
+*
+* // Elements are taken from head (FIFO)
+* console.log(MutableList.take(list)) // 1
+* console.log(MutableList.take(list)) // 2
+* console.log(MutableList.take(list)) // 3
+*
+* // High-throughput usage
+* for (let i = 0; i < 10000; i++) {
+*   MutableList.append(list, i)
+* }
+* ```
+*
+* @category mutations
+* @since 2.0.0
+*/
+const append = (self, message) => {
+	if (!self.tail) self.head = self.tail = emptyBucket();
+	else if (!self.tail.mutable) {
+		self.tail.next = emptyBucket();
+		self.tail = self.tail.next;
+	}
+	self.tail.array.push(message);
+	self.length++;
+};
+/**
+* Removes all elements from the MutableList, resetting it to an empty state.
+* This operation is highly optimized and releases all internal memory.
+*
+* **Example** (Clearing a mutable list)
+*
+* ```ts
+* import { MutableList } from "effect"
+*
+* const list = MutableList.make<number>()
+* MutableList.appendAll(list, [1, 2, 3, 4, 5])
+*
+* console.log(list.length) // 5
+*
+* // Clear all elements
+* MutableList.clear(list)
+*
+* console.log(list.length) // 0
+* console.log(MutableList.take(list)) // Empty
+*
+* // Can still use the list after clearing
+* MutableList.append(list, 42)
+* console.log(list.length) // 1
+*
+* // Useful for resetting queues or buffers
+* function resetBuffer<T>(buffer: MutableList.MutableList<T>) {
+*   MutableList.clear(buffer)
+*   console.log("Buffer cleared and ready for reuse")
+* }
+* ```
+*
+* @category mutations
+* @since 4.0.0
+*/
+const clear = (self) => {
+	self.head = self.tail = void 0;
+	self.length = 0;
+};
+/**
+* Takes up to N elements from the beginning of the MutableList and returns them as an array.
+* The taken elements are removed from the list. This operation is optimized for performance
+* and includes zero-copy optimizations when possible.
+*
+* **Example** (Taking batches)
+*
+* ```ts
+* import { MutableList } from "effect"
+*
+* const list = MutableList.make<number>()
+* MutableList.appendAll(list, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+*
+* console.log(list.length) // 10
+*
+* // Take first 3 elements
+* const first3 = MutableList.takeN(list, 3)
+* console.log(first3) // [1, 2, 3]
+* console.log(list.length) // 7
+*
+* // Take more than available
+* const remaining = MutableList.takeN(list, 20)
+* console.log(remaining) // [4, 5, 6, 7, 8, 9, 10]
+* console.log(list.length) // 0
+*
+* // Take from empty list
+* const empty = MutableList.takeN(list, 5)
+* console.log(empty) // []
+*
+* // Batch processing pattern
+* const queue = MutableList.make<string>()
+* MutableList.appendAll(queue, ["task1", "task2", "task3", "task4", "task5"])
+*
+* while (queue.length > 0) {
+*   const batch = MutableList.takeN(queue, 2) // Process 2 at a time
+*   console.log("Processing batch:", batch)
+* }
+* ```
+*
+* @category elements
+* @since 4.0.0
+*/
+const takeN = (self, n) => {
+	if (n <= 0 || !self.head) return [];
+	n = Math.min(n, self.length);
+	if (n === self.length && self.head?.offset === 0 && !self.head.next) {
+		const array = self.head.array;
+		clear(self);
+		return array;
+	}
+	const array = new Array(n);
+	let index = 0;
+	let chunk = self.head;
+	while (chunk) {
+		while (chunk.offset < chunk.array.length) {
+			array[index++] = chunk.array[chunk.offset];
+			if (chunk.mutable) chunk.array[chunk.offset] = void 0;
+			chunk.offset++;
+			if (index === n) {
+				self.head = chunk;
+				self.length -= n;
+				if (self.length === 0) clear(self);
+				return array;
+			}
+		}
+		chunk = chunk.next;
+	}
+	clear(self);
+	return array;
+};
+/**
+* Takes a single element from the beginning of the MutableList.
+* Returns the element if available, or the Empty symbol if the list is empty.
+* The taken element is removed from the list.
+*
+* **Example** (Taking one element)
+*
+* ```ts
+* import { MutableList } from "effect"
+*
+* const list = MutableList.make<string>()
+* MutableList.appendAll(list, ["first", "second", "third"])
+*
+* // Take elements one by one
+* console.log(MutableList.take(list)) // "first"
+* console.log(list.length) // 2
+*
+* console.log(MutableList.take(list)) // "second"
+* console.log(MutableList.take(list)) // "third"
+* console.log(list.length) // 0
+*
+* // Take from empty list
+* console.log(MutableList.take(list)) // Empty symbol
+*
+* // Check for empty using the Empty symbol
+* const result = MutableList.take(list)
+* if (result === MutableList.Empty) {
+*   console.log("List is empty")
+* } else {
+*   console.log("Got element:", result)
+* }
+*
+* // Consumer pattern
+* function processNext<T>(
+*   queue: MutableList.MutableList<T>,
+*   processor: (item: T) => void
+* ): boolean {
+*   const item = MutableList.take(queue)
+*   if (item !== MutableList.Empty) {
+*     processor(item)
+*     return true
+*   }
+*   return false
+* }
+* ```
+*
+* @category elements
+* @since 4.0.0
+*/
+const take$1 = (self) => {
+	if (!self.head) return Empty;
+	const message = self.head.array[self.head.offset];
+	if (self.head.mutable) self.head.array[self.head.offset] = void 0;
+	self.head.offset++;
+	self.length--;
+	if (self.head.offset === self.head.array.length) if (self.head.next) self.head = self.head.next;
+	else clear(self);
+	return message;
+};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/MutableRef.js
+const TypeId$9 = "~effect/MutableRef";
+const MutableRefProto = {
+	[TypeId$9]: TypeId$9,
+	...PipeInspectableProto,
+	toJSON() {
+		return {
+			_id: "MutableRef",
+			current: toJson(this.current)
+		};
+	}
+};
+/**
+* Creates a new MutableRef with the specified initial value.
+*
+* **When to use**
+*
+* Use to create a synchronous mutable reference initialized with a value.
+*
+* **Example** (Creating mutable refs)
+*
+* ```ts
+* import { MutableRef } from "effect"
+*
+* // Create a counter reference
+* const counter = MutableRef.make(0)
+* console.log(MutableRef.get(counter)) // 0
+*
+* // Create a configuration reference
+* const config = MutableRef.make({ debug: false, timeout: 5000 })
+* console.log(MutableRef.get(config)) // { debug: false, timeout: 5000 }
+*
+* // Create a string reference
+* const status = MutableRef.make("idle")
+* MutableRef.set(status, "running")
+* console.log(MutableRef.get(status)) // "running"
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const make$5 = (value) => {
+	const ref = Object.create(MutableRefProto);
+	ref.current = value;
+	return ref;
+};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Queue.js
+const TypeId$8 = "~effect/Queue";
+const EnqueueTypeId = "~effect/Queue/Enqueue";
+const DequeueTypeId = "~effect/Queue/Dequeue";
+const variance = {
+	_A: identity,
+	_E: identity
+};
+const QueueProto = {
+	[TypeId$8]: variance,
+	[EnqueueTypeId]: variance,
+	[DequeueTypeId]: variance,
+	...PipeInspectableProto,
+	toJSON() {
+		return {
+			_id: "effect/Queue",
+			state: this.state._tag,
+			size: sizeUnsafe(this)
+		};
+	}
+};
+/**
+* Creates a `Queue` with optional capacity and overflow strategy.
+*
+* **Details**
+*
+* By default the queue is unbounded and uses the `"suspend"` strategy. Provide
+* `capacity` for a bounded queue and choose `"suspend"`, `"dropping"`, or
+* `"sliding"` to control what happens when the queue is full. The returned
+* queue can be offered to, taken from, failed, ended, interrupted, or shut down.
+*
+* **Example** (Creating queues)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* Effect.gen(function*() {
+*   const queue = yield* Queue.make<number, string | Cause.Done>()
+*
+*   // add messages to the queue
+*   yield* Queue.offer(queue, 1)
+*   yield* Queue.offer(queue, 2)
+*   yield* Queue.offerAll(queue, [3, 4, 5])
+*
+*   // take messages from the queue
+*   const messages = yield* Queue.takeAll(queue)
+*   console.log(messages) // [1, 2, 3, 4, 5]
+*
+*   // signal that the queue is done
+*   yield* Queue.end(queue)
+*   const done = yield* Effect.flip(Queue.take(queue))
+*   console.log(Cause.isDone(done)) // true
+*
+*   // signal that another queue has failed
+*   const failedQueue = yield* Queue.make<number, string>()
+*   const failed = yield* Queue.fail(failedQueue, "boom")
+*   console.log(failed) // true
+* })
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const make$4 = (options) => withFiber((fiber) => {
+	const self = Object.create(QueueProto);
+	self.dispatcher = fiber.currentDispatcher;
+	self.capacity = options?.capacity ?? Number.POSITIVE_INFINITY;
+	self.strategy = options?.strategy ?? "suspend";
+	self.messages = make$6();
+	self.scheduleRunning = false;
+	self.state = {
+		_tag: "Open",
+		takers: /* @__PURE__ */ new Set(),
+		offers: /* @__PURE__ */ new Set(),
+		awaiters: /* @__PURE__ */ new Set()
+	};
+	return succeed$3(self);
+});
+/**
+* Creates a bounded queue with the specified capacity that uses backpressure strategy.
+*
+* **Details**
+*
+* When the queue reaches capacity, producers will be suspended until space becomes available.
+* This ensures all messages are processed but may slow down producers.
+*
+* **Example** (Creating bounded queues)
+*
+* ```ts
+* import { Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<string>(5)
+*
+*   // This will succeed as queue has capacity
+*   yield* Queue.offer(queue, "first")
+*   yield* Queue.offer(queue, "second")
+*
+*   const size = yield* Queue.size(queue)
+*   console.log(size) // 2
+* })
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const bounded = (capacity) => make$4({ capacity });
+/**
+* Creates an unbounded queue that can grow to any size without blocking producers.
+*
+* **When to use**
+*
+* Use when producers should never be blocked; unbounded queues never apply backpressure, so producers
+* can always add messages successfully. This is useful when you want to prioritize
+* producer throughput over memory usage control.
+*
+* **Example** (Creating unbounded queues)
+*
+* ```ts
+* import { Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.unbounded<string>()
+*
+*   // Producers can always add messages without blocking
+*   yield* Queue.offer(queue, "message1")
+*   yield* Queue.offer(queue, "message2")
+*   yield* Queue.offerAll(queue, ["message3", "message4", "message5"])
+*
+*   // Check current size
+*   const size = yield* Queue.size(queue)
+*   console.log(size) // 5
+*
+*   // Take all messages
+*   const messages = yield* Queue.takeAll(queue)
+*   console.log(messages) // ["message1", "message2", "message3", "message4", "message5"]
+* })
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const unbounded = () => make$4();
+/**
+* Adds a message to the queue. Returns `false` if the queue is done.
+*
+* **Details**
+*
+* For bounded queues, this operation may suspend if the queue is at capacity,
+* depending on the backpressure strategy. For dropping/sliding queues, it may
+* return false or succeed immediately by dropping/sliding existing messages.
+*
+* **Example** (Offering a value)
+*
+* ```ts
+* import { Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number>(3)
+*
+*   // Successfully add messages to queue
+*   const success1 = yield* Queue.offer(queue, 1)
+*   const success2 = yield* Queue.offer(queue, 2)
+*   console.log(success1, success2) // true, true
+*
+*   // Queue state
+*   const size = yield* Queue.size(queue)
+*   console.log(size) // 2
+* })
+* ```
+*
+* @category Offering
+* @since 2.0.0
+*/
+const offer = (self, message) => suspend$3(() => {
+	if (self.state._tag !== "Open") return exitFalse;
+	else if (self.messages.length >= self.capacity) switch (self.strategy) {
+		case "dropping": return exitFalse;
+		case "suspend":
+			if (self.capacity <= 0 && self.state.takers.size > 0) {
+				append(self.messages, message);
+				releaseTakers(self);
+				return exitTrue;
+			}
+			return offerRemainingSingle(self, message);
+		case "sliding":
+			take$1(self.messages);
+			append(self.messages, message);
+			return exitTrue;
+	}
+	append(self.messages, message);
+	scheduleReleaseTaker(self);
+	return exitTrue;
+});
+/**
+* Adds a message to the queue synchronously. Returns `false` if the queue is done.
+*
+* **Gotchas**
+*
+* This is an unsafe operation that directly modifies the queue without Effect wrapping.
+* Use this only when you're certain about the synchronous nature of the operation.
+*
+* **Example** (Offering a value synchronously)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* // Create a queue effect and extract the queue for unsafe operations
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number>(3)
+*
+*   // Add messages synchronously using unsafe API
+*   const success1 = Queue.offerUnsafe(queue, 1)
+*   const success2 = Queue.offerUnsafe(queue, 2)
+*   console.log(success1, success2) // true, true
+*
+*   // Check current size
+*   const size = Queue.sizeUnsafe(queue)
+*   console.log(size) // 2
+* })
+* ```
+*
+* @category Offering
+* @since 4.0.0
+*/
+const offerUnsafe = (self, message) => {
+	if (self.state._tag !== "Open") return false;
+	else if (self.messages.length >= self.capacity) {
+		if (self.strategy === "sliding") {
+			take$1(self.messages);
+			append(self.messages, message);
+			return true;
+		} else if (self.capacity <= 0 && self.state.takers.size > 0) {
+			append(self.messages, message);
+			releaseTakers(self);
+			return true;
+		}
+		return false;
+	}
+	append(self.messages, message);
+	scheduleReleaseTaker(self);
+	return true;
+};
+/**
+* Fails the queue with a cause. If the queue is already done, `false` is
+* returned.
+*
+* **Example** (Failing queues with a cause)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number, string>(10)
+*
+*   // Create a cause and fail the queue
+*   const cause = Cause.fail("Queue processing failed")
+*   const failed = yield* Queue.failCause(queue, cause)
+*   console.log(failed) // true
+*
+*   // The queue is now done with the specified failure cause
+*   console.log(queue.state._tag) // "Done"
+* })
+* ```
+*
+* @category Completion
+* @since 4.0.0
+*/
+const failCause = /* @__PURE__ */ dual(2, (self, cause) => sync$1(() => failCauseUnsafe(self, cause)));
+/**
+* Fails the queue with a cause synchronously. If the queue is already done, `false` is
+* returned.
+*
+* **Gotchas**
+*
+* This is an unsafe operation that directly modifies the queue without Effect wrapping.
+*
+* **Example** (Failing queues with a cause synchronously)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number, string>(10)
+*
+*   // Create a cause and fail the queue synchronously
+*   const cause = Cause.fail("Processing error")
+*   const failed = Queue.failCauseUnsafe(queue, cause)
+*   console.log(failed) // true
+*
+*   // The queue is now done with the specified failure cause
+*   console.log(queue.state._tag) // "Done"
+* })
+* ```
+*
+* @category Completion
+* @since 4.0.0
+*/
+const failCauseUnsafe = (self, cause) => {
+	if (self.state._tag !== "Open") return false;
+	const fail = exitZipRight(exitFailCause(cause), exitFailDone);
+	if (self.state.offers.size === 0 && self.messages.length === 0) {
+		finalize(self, fail);
+		return true;
+	}
+	self.state = {
+		...self.state,
+		_tag: "Closing",
+		exit: fail
+	};
+	return true;
+};
+/**
+* Signals queue completion synchronously.
+*
+* **When to use**
+*
+* Use when implementing low-level queue integrations that must complete a queue
+* without wrapping the operation in `Effect`.
+*
+* **Details**
+*
+* Returns `false` if the queue is already done.
+*
+* **Gotchas**
+*
+* This is an unsafe operation that directly modifies the queue without Effect wrapping.
+*
+* **Example** (Ending queues synchronously)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* // Create a queue and use unsafe operations
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number, Cause.Done>(10)
+*
+*   // Add some messages
+*   Queue.offerUnsafe(queue, 1)
+*   Queue.offerUnsafe(queue, 2)
+*
+*   // End the queue synchronously
+*   const ended = Queue.endUnsafe(queue)
+*   console.log(ended) // true
+*
+*   // Existing messages can still be consumed while the queue is closing
+*   console.log(queue.state._tag) // "Closing"
+*
+*   Queue.takeUnsafe(queue)
+*   Queue.takeUnsafe(queue)
+*
+*   // After buffered messages are consumed, the queue is done
+*   console.log(queue.state._tag) // "Done"
+* })
+* ```
+*
+* @category Completion
+* @since 4.0.0
+*/
+const endUnsafe = (self) => failCauseUnsafe(self, causeFail(Done$1()));
+/**
+* Shuts down the queue immediately, discarding buffered messages and resuming
+* pending operations.
+*
+* **Details**
+*
+* The operation is idempotent and returns `true`, including when the queue has
+* already been shut down or completed.
+*
+* **Example** (Shutting down queues)
+*
+* ```ts
+* import { Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number>(2)
+*
+*   // Add messages
+*   yield* Queue.offer(queue, 1)
+*   yield* Queue.offer(queue, 2)
+*
+*   // Shutdown clears buffered messages and prevents further offers
+*   const wasShutdown = yield* Queue.shutdown(queue)
+*   console.log(wasShutdown) // true
+*
+*   // Queue is now done and cleared
+*   const size = yield* Queue.size(queue)
+*   console.log(size) // 0
+* })
+* ```
+*
+* @category Completion
+* @since 2.0.0
+*/
+const shutdown = (self) => sync$1(() => {
+	if (self.state._tag === "Done") return true;
+	clear(self.messages);
+	const offers = self.state.offers;
+	finalize(self, self.state._tag === "Open" ? exitInterrupt : self.state.exit);
+	if (offers.size > 0) {
+		for (const entry of offers) if (entry._tag === "Single") entry.resume(exitFalse);
+		else entry.resume(exitSucceed(entry.remaining.slice(entry.offset)));
+		offers.clear();
+	}
+	return true;
+});
+/**
+* Takes all currently available messages, waiting until at least one message
+* is available when the queue is empty.
+*
+* **Details**
+*
+* Returns a non-empty array. If the queue completes or fails before a message
+* can be taken, the effect fails with the queue's terminal error.
+*
+* **Example** (Taking all available values)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number, Cause.Done>(5)
+*
+*   // Add several messages
+*   yield* Queue.offerAll(queue, [1, 2, 3, 4, 5])
+*
+*   // Take all available messages
+*   const messages1 = yield* Queue.takeAll(queue)
+*   console.log(messages1) // [1, 2, 3, 4, 5]
+* })
+* ```
+*
+* @category Taking
+* @since 2.0.0
+*/
+const takeAll = (self) => takeBetween(self, 1, Number.POSITIVE_INFINITY);
+/**
+* Takes between `min` and `max` messages from the queue.
+*
+* **Details**
+*
+* The operation waits when fewer than the required minimum messages are
+* available. It returns at most `max` messages. If the queue completes or fails
+* before the minimum can be satisfied, the effect fails with the queue's
+* terminal error.
+*
+* **Example** (Taking a bounded batch of values)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number>(10)
+*
+*   // Add several messages
+*   yield* Queue.offerAll(queue, [1, 2, 3, 4, 5, 6, 7, 8])
+*
+*   // Take between 2 and 5 messages
+*   const batch1 = yield* Queue.takeBetween(queue, 2, 5)
+*   console.log(batch1) // [1, 2, 3, 4, 5] - took 5 (up to max)
+*
+*   // Take between 1 and 10 messages (but only 3 remain)
+*   const batch2 = yield* Queue.takeBetween(queue, 1, 10)
+*   console.log(batch2) // [6, 7, 8] - took 3 (all remaining)
+*
+*   // No more messages available, will wait or return done
+*   // const batch3 = yield* Queue.takeBetween(queue, 1, 3)
+* })
+* ```
+*
+* @category Taking
+* @since 2.0.0
+*/
+const takeBetween = (self, min, max) => suspend$3(() => takeBetweenUnsafe(self, min, max) ?? andThen$1(awaitTake(self), takeBetween(self, 1, max)));
+/**
+* Takes a single message from the queue, or wait for a message to be
+* available.
+*
+* **Details**
+*
+* If the queue is done, it will fail with `Done`. If the
+* queue fails, the Effect will fail with the error.
+*
+* **Example** (Taking one value)
+*
+* ```ts
+* import { Cause, Effect, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<string, Cause.Done>(3)
+*
+*   // Add some messages
+*   yield* Queue.offer(queue, "first")
+*   yield* Queue.offer(queue, "second")
+*
+*   // Take messages one by one
+*   const msg1 = yield* Queue.take(queue)
+*   const msg2 = yield* Queue.take(queue)
+*   console.log(msg1, msg2) // "first", "second"
+*
+*   // End the queue
+*   yield* Queue.end(queue)
+*
+*   // Taking from an ended queue fails with Done
+*   const result = yield* Effect.match(Queue.take(queue), {
+*     onFailure: (error: Cause.Done) => true,
+*     onSuccess: (value: string) => false
+*   })
+*   console.log("Queue ended:", result) // true
+* })
+* ```
+*
+* @category Taking
+* @since 2.0.0
+*/
+const take = (self) => suspend$3(() => takeUnsafe(self) ?? andThen$1(awaitTake(self), take(self)));
+/**
+* Attempts to take one message from the queue synchronously.
+*
+* **Details**
+*
+* Returns an `Exit` for an immediately available message or for the queue's
+* terminal state. Returns `undefined` when no message is immediately available.
+* This operation does not wait or register a taker.
+*
+* **Example** (Taking one value synchronously)
+*
+* ```ts
+* import { Effect, Queue } from "effect"
+*
+* // Create a queue and use unsafe operations
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number>(10)
+*
+*   // Add some messages
+*   Queue.offerUnsafe(queue, 1)
+*   Queue.offerUnsafe(queue, 2)
+*
+*   // Take a message synchronously
+*   const result1 = Queue.takeUnsafe(queue)
+*   console.log(result1) // Success(1) or Exit containing value 1
+*
+*   const result2 = Queue.takeUnsafe(queue)
+*   console.log(result2) // Success(2)
+*
+*   // No more messages - returns undefined
+*   const result3 = Queue.takeUnsafe(queue)
+*   console.log(result3) // undefined
+* })
+* ```
+*
+* @category Taking
+* @since 4.0.0
+*/
+const takeUnsafe = (self) => {
+	if (self.state._tag === "Done") return self.state.exit;
+	if (self.messages.length > 0) {
+		const message = take$1(self.messages);
+		releaseCapacity(self);
+		return exitSucceed(message);
+	} else if (self.capacity <= 0 && self.state.offers.size > 0) {
+		self.capacity = 1;
+		releaseCapacity(self);
+		self.capacity = 0;
+		const message = take$1(self.messages);
+		releaseCapacity(self);
+		return exitSucceed(message);
+	}
+};
+/**
+* Returns the current number of buffered messages in the queue synchronously.
+*
+* **Details**
+*
+* Completed queues report a size of `0`. This unsafe operation reads the queue
+* state directly without Effect wrapping.
+*
+* **Example** (Checking queue size synchronously)
+*
+* ```ts
+* import { Cause, Effect, Option, Queue } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.bounded<number, Cause.Done>(10)
+*
+*   // Check size of empty queue
+*   const size1 = Queue.sizeUnsafe(queue)
+*   console.log(size1) // 0
+*
+*   // Add some messages
+*   Queue.offerUnsafe(queue, 1)
+*   Queue.offerUnsafe(queue, 2)
+*   Queue.offerUnsafe(queue, 3)
+*
+*   // Check size after adding messages
+*   const size2 = Queue.sizeUnsafe(queue)
+*   console.log(size2) // 3
+*
+*   // End the queue
+*   Queue.endUnsafe(queue)
+*
+*   // Size of ended queue is 0
+*   const size3 = Queue.sizeUnsafe(queue)
+*   console.log(size3) // 0
+* })
+* ```
+*
+* @category Size
+* @since 4.0.0
+*/
+const sizeUnsafe = (self) => self.state._tag === "Done" ? 0 : self.messages.length;
+const exitFalse = /* @__PURE__ */ exitSucceed(false);
+const exitTrue = /* @__PURE__ */ exitSucceed(true);
+const exitFailDone = /* @__PURE__ */ exitFail(/* @__PURE__ */ Done$1());
+const exitInterrupt = /* @__PURE__ */ exitInterrupt$1();
+const releaseTakers = (self) => {
+	self.scheduleRunning = false;
+	if (self.state._tag === "Done" || self.state.takers.size === 0) return;
+	for (const taker of self.state.takers) {
+		self.state.takers.delete(taker);
+		taker(exitVoid);
+		if (self.messages.length === 0) break;
+	}
+};
+const scheduleReleaseTaker = (self) => {
+	if (self.scheduleRunning || self.state._tag === "Done" || self.state.takers.size === 0) return;
+	self.scheduleRunning = true;
+	self.dispatcher.scheduleTask(() => releaseTakers(self), 0);
+};
+const takeBetweenUnsafe = (self, min, max) => {
+	if (self.state._tag === "Done") return self.state.exit;
+	else if (max <= 0 || min <= 0) return exitSucceed([]);
+	else if (self.capacity <= 0 && self.state.offers.size > 0) {
+		self.capacity = 1;
+		releaseCapacity(self);
+		self.capacity = 0;
+		const messages = [take$1(self.messages)];
+		releaseCapacity(self);
+		return exitSucceed(messages);
+	}
+	min = Math.min(min, self.capacity || 1);
+	if (min <= self.messages.length) {
+		const messages = takeN(self.messages, max);
+		releaseCapacity(self);
+		return exitSucceed(messages);
+	}
+};
+const offerRemainingSingle = (self, message) => {
+	return callback$2((resume) => {
+		if (self.state._tag !== "Open") return resume(exitFalse);
+		const entry = {
+			_tag: "Single",
+			message,
+			resume
+		};
+		self.state.offers.add(entry);
+		return sync$1(() => {
+			if (self.state._tag === "Open") self.state.offers.delete(entry);
+		});
+	});
+};
+const releaseCapacity = (self) => {
+	if (self.state._tag === "Done") return isDoneCause(self.state.exit.cause);
+	else if (self.state.offers.size === 0) {
+		if (self.state._tag === "Closing" && self.messages.length === 0) {
+			finalize(self, self.state.exit);
+			return isDoneCause(self.state.exit.cause);
+		}
+		return false;
+	}
+	let n = self.capacity - self.messages.length;
+	for (const entry of self.state.offers) if (n === 0) break;
+	else if (entry._tag === "Single") {
+		append(self.messages, entry.message);
+		n--;
+		entry.resume(exitTrue);
+		self.state.offers.delete(entry);
+	} else {
+		for (; entry.offset < entry.remaining.length; entry.offset++) {
+			if (n === 0) return false;
+			append(self.messages, entry.remaining[entry.offset]);
+			n--;
+		}
+		entry.resume(exitSucceed([]));
+		self.state.offers.delete(entry);
+	}
+	return false;
+};
+const awaitTake = (self) => callback$2((resume) => {
+	if (self.state._tag === "Done") return resume(self.state.exit);
+	self.state.takers.add(resume);
+	return sync$1(() => {
+		if (self.state._tag !== "Done") self.state.takers.delete(resume);
+	});
+});
+const finalize = (self, exit) => {
+	if (self.state._tag === "Done") return;
+	const openState = self.state;
+	self.state = {
+		_tag: "Done",
+		exit
+	};
+	for (const taker of openState.takers) taker(exit);
+	openState.takers.clear();
+	for (const awaiter of openState.awaiters) awaiter(exit);
+	openState.awaiters.clear();
+};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Channel.js
+/**
+* The `Channel` module provides the low-level stream processing primitive used
+* to build Effect streams, sinks, and stream operators.
+*
+* A `Channel<OutElem, OutErr, OutDone, InElem, InErr, InDone, Env>` describes a
+* scoped process that can read elements from an upstream input, emit elements
+* downstream, fail with a typed error, or complete with a typed done value.
+* Most application code works with higher-level stream APIs; channels are for
+* implementing reusable streaming primitives, adapting pull-based sources, and
+* controlling how input, output, errors, final values, and resources compose.
+*
+* **Mental model**
+*
+* - `OutElem`, `OutErr`, and `OutDone` describe the values, failures, and final
+*   value produced by the channel.
+* - `InElem`, `InErr`, and `InDone` describe the upstream protocol consumed by
+*   the channel when it is piped after another channel.
+* - `Env` is the Effect environment required while the channel is interpreted.
+* - Constructors such as {@link fromArray}, {@link fromIterable},
+*   {@link fromEffect}, {@link succeed}, and {@link fail} create sources.
+* - Combinators such as {@link map}, {@link mapEffect}, {@link flatMap}, and
+*   {@link pipeTo} transform, sequence, and connect channels.
+* - Execution functions such as {@link runCollect} and {@link runDrain}
+*   interpret channels that no longer require upstream input.
+*
+* **Common tasks**
+*
+* - Build finite sources from values, arrays, iterables, queues, pub/sub
+*   subscriptions, effects, or pulls.
+* - Transform output elements with pure or effectful functions.
+* - Connect channels with {@link pipeTo} when one channel's output protocol
+*   should become another channel's input protocol.
+* - Sequence dependent channels with {@link flatMap}, or concatenate channels
+*   with {@link concat}.
+* - Manage channel-scoped resources with {@link acquireRelease} and
+*   {@link ensuring}.
+* - Bridge to lower-level pull loops with {@link toPull} and {@link fromPull}.
+*
+* **Example** (Collecting transformed output)
+*
+* ```ts
+* import { Channel, Effect } from "effect"
+*
+* const program = Channel.fromArray([1, 2, 3]).pipe(
+*   Channel.map((n) => n * 2),
+*   Channel.runCollect
+* )
+*
+* Effect.runPromise(program).then(console.log)
+* ```
+*
+* **Gotchas**
+*
+* - A channel's done value is distinct from its emitted elements; use
+*   done-focused APIs when the final value matters.
+* - `pipeTo` connects the output side of the left channel to the input side of
+*   the right channel, so type errors usually mean those protocols do not line
+*   up.
+* - Resource finalizers run when the channel scope closes, not when a channel
+*   value is merely constructed.
+* - Prefer stream and sink APIs unless you are implementing lower-level
+*   streaming behavior.
+*
+* **See also**
+*
+* - {@link Channel} for the type parameters and variance of channel values.
+* - {@link pipeTo} for wiring one channel into another.
+* - {@link runCollect}, {@link runDrain}, and {@link runDone} for common
+*   execution modes.
+*
+* @since 2.0.0
+*/
+/**
+* Runtime identifier stored on `Channel` values and used by `isChannel` to
+* recognize them.
+*
+* @category type IDs
+* @since 4.0.0
+*/
+const TypeId$7 = "~effect/Channel";
+/**
+* Checks whether a value is a `Channel`.
+*
+* **Example** (Checking for channels)
+*
+* ```ts
+* import { Channel } from "effect"
+*
+* const channel = Channel.succeed(42)
+* console.log(Channel.isChannel(channel)) // true
+* console.log(Channel.isChannel("not a channel")) // false
+* ```
+*
+* @category guards
+* @since 3.5.4
+*/
+const isChannel = (u) => hasProperty(u, TypeId$7);
+const ChannelProto = {
+	[TypeId$7]: {
+		_Env: identity,
+		_InErr: identity,
+		_InElem: identity,
+		_OutErr: identity,
+		_OutElem: identity
+	},
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+/**
+* Creates a `Channel` from a transformation function that operates on upstream pulls.
+*
+* **Example** (Creating channels from transforms)
+*
+* ```ts
+* import { Channel, Effect } from "effect"
+*
+* const channel = Channel.fromTransform((upstream, scope) =>
+*   Effect.succeed(upstream)
+* )
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromTransform$1 = (transform) => {
+	const self = Object.create(ChannelProto);
+	self.transform = (upstream, scope) => catchCause(transform(upstream, scope), (cause) => succeed(failCause$1(cause)));
+	return self;
+};
+/**
+* Transforms a Channel by applying a function to its Pull implementation.
+*
+* **Example** (Transforming pull behavior)
+*
+* ```ts
+* import { Channel, Effect } from "effect"
+*
+* // Transform a channel by modifying its pull behavior
+* const originalChannel = Channel.fromIterable([1, 2, 3])
+*
+* const transformedChannel = Channel.transformPull(
+*   originalChannel,
+*   (pull, scope) =>
+*     Effect.succeed(
+*       Effect.map(pull, (value) => value * 2)
+*     )
+* )
+* // Outputs: 2, 4, 6
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const transformPull$1 = (self, f) => fromTransform$1((upstream, scope) => flatMap(toTransform(self)(upstream, scope), (pull) => f(pull, scope)));
+/**
+* Creates a `Channel` from an `Effect` that produces a `Pull`.
+*
+* **Example** (Creating channels from pulls)
+*
+* ```ts
+* import { Channel, Effect } from "effect"
+*
+* const channel = Channel.fromPull(
+*   Effect.succeed(Effect.succeed(42))
+* )
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromPull$1 = (effect) => fromTransform$1((_, __) => effect);
+/**
+* Creates a `Channel` from a transformation function that operates on upstream
+* pulls, but also provides a forked scope that closes when the resulting
+* Channel completes.
+*
+* **When to use**
+*
+* Use when building channels that require scoped resource lifecycle management,
+* providing both the channel scope and a forked scope that automatically closes
+* when the channel completes.
+*
+* @see {@link fromTransform} for a simpler transformation without a forked scope
+* @category constructors
+* @since 4.0.0
+*/
+const fromTransformBracket = (f) => fromTransform$1(fnUntraced(function* (upstream, scope) {
+	const closableScope = forkUnsafe(scope);
+	const onCause = (cause) => close(closableScope, doneExitFromCause(cause));
+	return onError(yield* onError(f(upstream, scope, closableScope), onCause), onCause);
+}));
+/**
+* Converts a `Channel` back to its underlying transformation function.
+*
+* **Example** (Extracting channel transforms)
+*
+* ```ts
+* import { Channel } from "effect"
+*
+* const channel = Channel.succeed(42)
+* const transform = Channel.toTransform(channel)
+* // transform can now be used directly
+* ```
+*
+* @category destructors
+* @since 4.0.0
+*/
+const toTransform = (channel) => channel.transform;
+const asyncQueue = (scope, f, options) => make$4({
+	capacity: options?.bufferSize,
+	strategy: options?.strategy
+}).pipe(tap((queue) => addFinalizer(scope, shutdown(queue))), tap((queue) => forkIn(provide$1(f(queue), scope), scope)));
+/**
+* Creates a `Channel` that interacts with a callback function using a queue, emitting arrays.
+*
+* **Example** (Creating array channels from callbacks)
+*
+* ```ts
+* import { Channel, Effect, Queue } from "effect"
+*
+* const channel = Channel.callbackArray<number>(Effect.fn(function*(queue) {
+*   yield* Queue.offer(queue, 1)
+*   yield* Queue.offer(queue, 2)
+* }))
+* // Emits arrays of numbers instead of individual numbers
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const callbackArray = (f, options) => fromTransform$1((_, scope) => map$3(asyncQueue(scope, f, options), takeAll));
+/**
+* Creates a `Channel` that lazily evaluates to another channel.
+*
+* **Example** (Suspending channel creation)
+*
+* ```ts
+* import { Channel } from "effect"
+*
+* const channel = Channel.suspend(() => Channel.succeed(42))
+* // The inner channel is not created until the suspended channel is run
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const suspend$1 = (evaluate) => fromTransform$1((upstream, scope) => suspend$2(() => toTransform(evaluate())(upstream, scope)));
+/**
+* Represents a `Channel` that emits no elements.
+*
+* **Example** (Using empty channels)
+*
+* ```ts
+* import { Channel } from "effect"
+*
+* // Create an empty channel
+* const emptyChannel = Channel.empty
+*
+* // Use empty channel in composition
+* const combined = Channel.concatWith(emptyChannel, () => Channel.succeed(42))
+* // Will immediately provide the second channel's output
+*
+* // Empty channel can be used as a no-op in conditional logic
+* const conditionalChannel = (shouldEmit: boolean) =>
+*   shouldEmit ? Channel.succeed("data") : Channel.empty
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const empty$1 = /* @__PURE__ */ fromPull$1(/* @__PURE__ */ succeed(/* @__PURE__ */ done$1()));
+/**
+* Creates a channel from a queue that emits arrays of elements.
+*
+* **Example** (Creating batched channels from queues)
+*
+* ```ts
+* import { Channel, Data, Effect, Queue } from "effect"
+*
+* class ProcessingError extends Data.TaggedError("ProcessingError")<{
+*   readonly stage: string
+* }> {}
+*
+* const program = Effect.gen(function*() {
+*   // Create a queue for batch processing
+*   const queue = yield* Queue.bounded<number, ProcessingError>(100)
+*
+*   // Fill queue with data
+*   yield* Queue.offerAll(queue, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+*
+*   // Create a channel that reads arrays from the queue
+*   const arrayChannel = Channel.fromQueueArray(queue)
+*
+*   // This will emit non-empty arrays of elements instead of individual items
+*   // Useful for batch processing scenarios
+*   return arrayChannel
+* })
+*
+* // High-throughput processing example
+* const batchProcessor = Effect.gen(function*() {
+*   const dataQueue = yield* Queue.dropping<string, ProcessingError>(1000)
+*   const batchChannel = Channel.fromQueueArray(dataQueue)
+*
+*   // Process data in batches for better performance
+*   return Channel.map(
+*     batchChannel,
+*     (batch) => batch.map((item) => item.toUpperCase())
+*   )
+* })
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromQueueArray = (queue) => fromPull$1(succeed(takeAll(queue)));
+/**
+* Maps the output of this channel using the specified function.
+*
+* **Example** (Mapping channel output)
+*
+* ```ts
+* import { Channel, Data } from "effect"
+*
+* class TransformError extends Data.TaggedError("TransformError")<{
+*   readonly reason: string
+* }> {}
+*
+* // Basic mapping of channel values
+* const numbersChannel = Channel.fromIterable([1, 2, 3, 4, 5])
+* const doubledChannel = Channel.map(numbersChannel, (n) => n * 2)
+* // Outputs: 2, 4, 6, 8, 10
+*
+* // Transform string data
+* const wordsChannel = Channel.fromIterable(["hello", "world", "effect"])
+* const upperCaseChannel = Channel.map(wordsChannel, (word) => word.toUpperCase())
+* // Outputs: "HELLO", "WORLD", "EFFECT"
+*
+* // Complex object transformation
+* type User = { id: number; name: string }
+* type UserDisplay = { displayName: string; isActive: boolean }
+*
+* const usersChannel = Channel.fromIterable([
+*   { id: 1, name: "Alice" },
+*   { id: 2, name: "Bob" }
+* ])
+* const displayChannel = Channel.map(usersChannel, (user): UserDisplay => ({
+*   displayName: `User: ${user.name}`,
+*   isActive: true
+* }))
+* ```
+*
+* @category sequencing
+* @since 2.0.0
+*/
+const map$2 = /* @__PURE__ */ dual(2, (self, f) => transformPull$1(self, (pull) => sync(() => {
+	let i = 0;
+	return map$3(pull, (o) => f(o, i++));
+})));
+/**
+* Maps the done value of this channel using the specified function.
+*
+* @category sequencing
+* @since 4.0.0
+*/
+const mapDone = /* @__PURE__ */ dual(2, (self, f) => mapDoneEffect(self, (o) => succeed(f(o))));
+/**
+* Maps the done value of this channel using the specified effectful function.
+*
+* @category sequencing
+* @since 4.0.0
+*/
+const mapDoneEffect = /* @__PURE__ */ dual(2, (self, f) => transformPull$1(self, (pull) => succeed(catchDone(pull, (done) => flatMap(f(done), done$1)))));
+/**
+* Returns a new channel, which is the merge of this channel and the specified
+* channel.
+*
+* **Example** (Merging channels)
+*
+* ```ts
+* import { Channel, Data } from "effect"
+*
+* class MergeError extends Data.TaggedError("MergeError")<{
+*   readonly source: string
+* }> {}
+*
+* // Create two channels
+* const leftChannel = Channel.fromIterable([1, 2, 3])
+* const rightChannel = Channel.fromIterable(["a", "b", "c"])
+*
+* // Merge them with "either" halt strategy
+* const mergedChannel = Channel.merge(leftChannel, rightChannel, {
+*   haltStrategy: "either"
+* })
+*
+* // Outputs elements from both channels concurrently
+* // Order may vary: 1, "a", 2, "b", 3, "c"
+* ```
+*
+* @category utils
+* @since 4.0.0
+*/
+const merge$2 = /* @__PURE__ */ dual((args) => isChannel(args[0]) && isChannel(args[1]), (left, right, options) => fromTransformBracket(fnUntraced(function* (upstream, _scope, forkedScope) {
+	const strategy = options?.haltStrategy ?? "both";
+	const queue = yield* bounded(0);
+	yield* addFinalizer(forkedScope, shutdown(queue));
+	let done = 0;
+	function onExit(side, cause) {
+		done++;
+		if (!isDoneCause(cause)) return failCause(queue, cause);
+		switch (strategy) {
+			case "both": return done === 2 ? failCause(queue, cause) : void_;
+			case "left":
+			case "right": return side === strategy ? failCause(queue, cause) : void_;
+			case "either": return failCause(queue, cause);
+		}
+	}
+	const runSide = (side, channel, scope) => toTransform(channel)(upstream, scope).pipe(flatMap((pull) => pull.pipe(flatMap((value) => offer(queue, value)), forever)), onError((cause) => andThen(close(scope, doneExitFromCause(cause)), onExit(side, cause))), forkIn(forkedScope));
+	yield* runSide("left", left, forkUnsafe(forkedScope));
+	yield* runSide("right", right, forkUnsafe(forkedScope));
+	return take(queue);
+})));
+/**
+* Splits upstream string chunks into lines, recognizing `\n`, `\r\n`, and
+* standalone `\r` as line terminators. The behavior matches
+* `String.linesIterator` regardless of how the input is chunked.
+*
+* **Details**
+*
+* A line terminator at the very end of the stream does **not** produce a
+* trailing empty line (consistent with `String.linesIterator`). Conversely,
+* if the stream ends without a terminator the final partial line is still
+* emitted.
+*
+* **Example** (Splitting string chunks into lines)
+*
+* ```ts
+* import { Effect, Stream } from "effect"
+*
+* Effect.runPromise(Effect.gen(function*() {
+*   const result = yield* Stream.runCollect(
+*     Stream.splitLines(Stream.make("hel", "lo\r\nwor", "ld\n"))
+*   )
+*   console.log(result)
+*   // [ 'hello', 'world' ]
+* }))
+* ```
+*
+* @category String manipulation
+* @since 2.0.0
+*/
+const splitLines$1 = () => fromTransform$1((upstream, _scope) => sync(() => {
+	let stringBuilder = "";
+	let midCRLF = false;
+	let done = none();
+	function splitLinesArray(chunk) {
+		const chunkBuilder = [];
+		function pushLine(segment) {
+			if (stringBuilder.length === 0) chunkBuilder.push(segment);
+			else {
+				chunkBuilder.push(stringBuilder + segment);
+				stringBuilder = "";
+			}
+		}
+		for (let i = 0; i < chunk.length; i++) {
+			const str = chunk[i];
+			if (str.length !== 0) {
+				let from = 0;
+				let indexOfCR = str.indexOf("\r");
+				let indexOfLF = str.indexOf("\n");
+				if (midCRLF) {
+					if (indexOfLF === 0) {
+						pushLine("");
+						from = 1;
+						indexOfLF = str.indexOf("\n", from);
+					} else pushLine("");
+					midCRLF = false;
+				}
+				while (indexOfCR !== -1 || indexOfLF !== -1) if (indexOfCR === -1 || indexOfLF !== -1 && indexOfLF < indexOfCR) {
+					pushLine(str.substring(from, indexOfLF));
+					from = indexOfLF + 1;
+					indexOfLF = str.indexOf("\n", from);
+				} else if (str.length === indexOfCR + 1) {
+					midCRLF = true;
+					indexOfCR = -1;
+				} else {
+					pushLine(str.substring(from, indexOfCR));
+					from = indexOfCR + (indexOfLF === indexOfCR + 1 ? 2 : 1);
+					indexOfCR = str.indexOf("\r", from);
+					indexOfLF = str.indexOf("\n", from);
+				}
+				stringBuilder = stringBuilder + str.substring(from, str.length - (midCRLF ? 1 : 0));
+			}
+		}
+		return isReadonlyArrayNonEmpty(chunkBuilder) ? chunkBuilder : null;
+	}
+	const pullOrFlush = suspend$2(() => {
+		if (done._tag === "Some") return done$1(done.value);
+		return matchEffect$1(upstream, {
+			onSuccess: loop,
+			onFailure: failCause$1,
+			onDone: (leftover) => {
+				done = some(leftover);
+				if (stringBuilder.length > 0 || midCRLF) {
+					const last = stringBuilder;
+					stringBuilder = "";
+					midCRLF = false;
+					return succeed([last]);
+				}
+				return done$1(leftover);
+			}
+		});
+	});
+	function loop(chunk) {
+		const lines = splitLinesArray(chunk);
+		return lines !== null ? succeed(lines) : pullOrFlush;
+	}
+	return pullOrFlush;
+}));
+/**
+* Returns a new channel that pipes the output of this channel into the
+* specified channel. The returned channel has the input type of this channel,
+* and the output type of the specified channel, terminating with the value of
+* the specified channel.
+*
+* **Example** (Piping one channel into another)
+*
+* ```ts
+* import { Channel, Data } from "effect"
+*
+* class PipeError extends Data.TaggedError("PipeError")<{
+*   readonly stage: string
+* }> {}
+*
+* // Create source and transform channels
+* const sourceChannel = Channel.fromIterable([1, 2, 3])
+* const transformChannel = Channel.map(sourceChannel, (n: number) => n * 2)
+*
+* // Pipe the source into the transform
+* const pipedChannel = Channel.pipeTo(sourceChannel, transformChannel)
+*
+* // Outputs: 2, 4, 6
+* ```
+*
+* @category utils
+* @since 2.0.0
+*/
+const pipeTo = /* @__PURE__ */ dual(2, (self, that) => fromTransform$1((upstream, scope) => flatMap(toTransform(self)(upstream, scope), (upstream) => toTransform(that)(upstream, scope))));
+/**
+* Constructs a `Channel` from a scoped effect that will result in a
+* `Channel` if successful.
+*
+* **Example** (Unwrapping channel effects)
+*
+* ```ts
+* import { Channel, Data, Effect } from "effect"
+*
+* class UnwrapError extends Data.TaggedError("UnwrapError")<{
+*   readonly reason: string
+* }> {}
+*
+* // Create an effect that produces a channel
+* const channelEffect = Effect.succeed(
+*   Channel.fromIterable([1, 2, 3])
+* )
+*
+* // Unwrap the effect to get the channel
+* const unwrappedChannel = Channel.unwrap(channelEffect)
+*
+* // The resulting channel outputs: 1, 2, 3
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const unwrap$2 = (channel) => fromTransform$1((upstream, scope) => {
+	let pull;
+	return succeed(suspend$2(() => {
+		if (pull) return pull;
+		return channel.pipe(provide$1(scope), flatMap((channel) => toTransform(channel)(upstream, scope)), flatMap((pull_) => pull = pull_));
+	}));
+});
+const runWith = (self, f, onHalt) => suspend$2(() => {
+	const scope = makeUnsafe$1();
+	return catchDone(flatMap(toTransform(self)(done$1(), scope), f), onHalt ? onHalt : succeed).pipe(onExit((exit) => close(scope, exit)));
+});
+/**
+* Runs a channel and folds over all output elements with an accumulator.
+*
+* **Example** (Folding channel output)
+*
+* ```ts
+* import { Channel, Data } from "effect"
+*
+* class FoldError extends Data.TaggedError("FoldError")<{
+*   readonly operation: string
+* }> {}
+*
+* // Create a channel with numbers
+* const numbersChannel = Channel.fromIterable([1, 2, 3, 4, 5])
+*
+* // Fold to calculate sum
+* const sumEffect = Channel.runFold(numbersChannel, () => 0, (acc, n) => acc + n)
+*
+* // Effect.runSync(sumEffect) // Returns: 15
+* ```
+*
+* @category execution
+* @since 4.0.0
+*/
+const runFold = /* @__PURE__ */ dual(3, (self, initial, f) => suspend$2(() => {
+	let state = initial();
+	return runWith(self, (pull) => whileLoop({
+		while: constTrue,
+		body: () => pull,
+		step: (value) => {
+			state = f(state, value);
+		}
+	}), () => succeed(state));
+}));
+/**
+* Converts a channel to a Pull within an existing scope.
+*
+* **Example** (Converting channels to scoped pulls)
+*
+* ```ts
+* import { Channel, Data, Effect, Scope } from "effect"
+*
+* class ScopedPullError extends Data.TaggedError("ScopedPullError")<{
+*   readonly reason: string
+* }> {}
+*
+* // Create a channel
+* const numbersChannel = Channel.fromIterable([1, 2, 3])
+*
+* // Convert to Pull with explicit scope
+* const scopedPullEffect = Effect.gen(function*() {
+*   const scope = yield* Scope.make()
+*   const pull = yield* Channel.toPullScoped(numbersChannel, scope)
+*   return pull
+* })
+* ```
+*
+* @category destructors
+* @since 4.0.0
+*/
+const toPullScoped = (self, scope) => toTransform(self)(done$1(), scope);
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/PlatformError.js
+/**
+* The `PlatformError` module defines the normalized error model used by
+* platform APIs when adapting host operations into Effect programs. It gives
+* callers a stable `PlatformError` wrapper whose `reason` is either a
+* `BadArgument`, for invalid inputs rejected before an operation runs, or a
+* `SystemError`, for failures reported by the host platform or operating
+* system.
+*
+* Use this module when implementing or consuming platform services such as
+* file systems, terminal access, sockets, or other environment-specific APIs.
+* `SystemError` intentionally groups many low-level failures into a small set
+* of portable tags like `NotFound`, `PermissionDenied`, and `TimedOut`, while
+* still preserving operation details such as the module, method, syscall, path
+* or descriptor, description, and original cause when available.
+*
+* **Common tasks**
+*
+* - Create platform failures from system operations with {@link systemError}
+* - Report rejected caller input with {@link badArgument}
+* - Inspect the underlying reason via {@link PlatformError.reason}
+* - Match normalized system failures with {@link SystemErrorTag}
+*
+* **Gotchas**
+*
+* - `PlatformError` is a wrapper; inspect `reason` to distinguish
+*   `BadArgument` from `SystemError`
+* - `SystemErrorTag` values are normalized categories, not necessarily raw
+*   platform error codes
+* - The original cause is preserved when provided, but portable handling
+*   should rely on the normalized fields
+*
+* @since 4.0.0
+*/
+const TypeId$6 = "~effect/platform/PlatformError";
+/**
+* Error data for an invalid argument passed to a platform API.
+*
+* **When to use**
+*
+* Use when a platform API rejects caller input before performing the underlying
+* operation and callers need invalid-argument reason data directly.
+*
+* **Details**
+*
+* The error records the module and method that rejected the argument, with an
+* optional description and cause. It is usually wrapped in `PlatformError`.
+*
+* @see {@link badArgument} for creating a wrapped `PlatformError` whose reason is `BadArgument`
+* @see {@link SystemError} for failures reported by the host platform or operating system
+* @see {@link PlatformError} for the wrapper used by most platform APIs
+*
+* @category models
+* @since 4.0.0
+*/
+var BadArgument = class extends TaggedError("BadArgument") {
+	/**
+	* Formats the module, method, and optional description that rejected the argument.
+	*
+	* **When to use**
+	*
+	* Use to read the formatted error message for a rejected platform argument.
+	*
+	* @since 4.0.0
+	*/
+	get message() {
+		return `${this.module}.${this.method}${this.description ? `: ${this.description}` : ""}`;
+	}
+};
+/**
+* Error data for a platform or system operation failure.
+*
+* **When to use**
+*
+* Use as the reason data for failures reported by a host platform or operating
+* system when you need a normalized system error tag plus operation details.
+*
+* **Details**
+*
+* The error records a normalized `_tag`, the module and method that failed,
+* and optional details such as the syscall, path or descriptor, description,
+* and original cause. It is usually wrapped in `PlatformError`.
+*
+* @see {@link systemError} for creating the usual `PlatformError` wrapper from this reason data
+* @see {@link BadArgument} for platform API failures caused by rejected caller input before an operation runs
+* @see {@link SystemErrorTag} for the normalized tag values stored in `_tag`
+*
+* @category models
+* @since 4.0.0
+*/
+var SystemError = class extends Error$1 {
+	/**
+	* Formats the normalized system error tag with operation and path details.
+	*
+	* **When to use**
+	*
+	* Use to read the formatted error message for a normalized system failure.
+	*
+	* @since 4.0.0
+	*/
+	get message() {
+		return `${this._tag}: ${this.module}.${this.method}${this.pathOrDescriptor !== void 0 ? ` (${this.pathOrDescriptor})` : ""}${this.description ? `: ${this.description}` : ""}`;
+	}
+};
+/**
+* Tagged error used by platform APIs to report either invalid arguments or
+* system-level failures.
+*
+* **When to use**
+*
+* Use as the shared error type for platform APIs that expose invalid arguments
+* and host or operating-system failures through a single `Effect` error
+* channel.
+*
+* **Details**
+*
+* The `reason` field contains the underlying `BadArgument` or `SystemError`.
+* When that reason has a cause, the cause is preserved on the wrapper.
+*
+* @see {@link BadArgument} for invalid inputs rejected before an operation runs
+* @see {@link SystemError} for failures reported by the host platform or operating system
+* @see {@link badArgument} for creating this wrapper from rejected caller input
+* @see {@link systemError} for creating this wrapper from a host or operating-system failure
+*
+* @category models
+* @since 4.0.0
+*/
+var PlatformError = class extends TaggedError("PlatformError") {
+	constructor(reason) {
+		if ("cause" in reason) super({
+			reason,
+			cause: reason.cause
+		});
+		else super({ reason });
+	}
+	/**
+	* Marks this value as a platform error wrapper for runtime guards.
+	*
+	* **When to use**
+	*
+	* Use to identify `PlatformError` values through their runtime type marker.
+	*
+	* @since 4.0.0
+	*/
+	[TypeId$6] = TypeId$6;
+	get message() {
+		return this.reason.message;
+	}
+};
+/**
+* Creates a `PlatformError` whose reason is a `SystemError`.
+*
+* **When to use**
+*
+* Use to adapt an operating-system or platform failure into the normalized
+* platform error model.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const systemError = (options) => new PlatformError(new SystemError(options));
+/**
+* Creates a `PlatformError` whose reason is a `BadArgument`.
+*
+* **When to use**
+*
+* Use to report a platform API rejecting caller input before performing the
+* underlying operation.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const badArgument = (options) => new PlatformError(new BadArgument(options));
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/stream.js
+const TypeId$5 = "~effect/Stream";
+const streamVariance = {
+	_R: identity,
+	_E: identity,
+	_A: identity
+};
+const StreamProto = {
+	[TypeId$5]: streamVariance,
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+/** @internal */
+const fromChannel$2 = (channel) => {
+	const self = Object.create(StreamProto);
+	self.channel = channel;
+	return self;
+};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Sink.js
+const TypeId$4 = "~effect/Sink";
+const endVoid = /* @__PURE__ */ succeed([void 0]);
+const sinkVariance = {
+	_A: identity,
+	_In: identity,
+	_L: identity,
+	_E: identity,
+	_R: identity
+};
+const SinkProto = {
+	[TypeId$4]: sinkVariance,
+	pipe() {
+		return pipeArguments(this, arguments);
+	}
+};
+/**
+* Checks whether a value is a Sink.
+*
+* **Example** (Checking for a sink)
+*
+* ```ts
+* import { Sink } from "effect"
+*
+* const sink = Sink.never
+* const notStream = { data: [1, 2, 3] }
+*
+* console.log(Sink.isSink(sink)) // true
+* console.log(Sink.isSink(notStream)) // false
+* ```
+*
+* @category guards
+* @since 4.0.0
+*/
+const isSink = (u) => hasProperty(u, TypeId$4);
+/**
+* Creates a sink from a `Channel`.
+*
+* **When to use**
+*
+* Use to create a `Sink` from a `Channel` that processes non-empty arrays of
+* input values.
+*
+* @see {@link toChannel} for converting a `Sink` back to a `Channel`
+* @category constructors
+* @since 2.0.0
+*/
+const fromChannel$1 = (channel) => fromTransform((upstream, scope) => toTransform(channel)(upstream, scope).pipe(flatMap(forever({ disableYield: true })), catchDone(succeed)));
+/**
+* Creates a `Sink` from a low-level transform function.
+*
+* **Details**
+*
+* The transform receives the upstream pull of non-empty input arrays and the
+* active scope, and returns an effect that completes with the sink's `End`
+* value.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromTransform = (transform) => {
+	const self = Object.create(SinkProto);
+	self.transform = transform;
+	return self;
+};
+/**
+* Creates a `Channel` from a Sink.
+*
+* **Example** (Converting a sink to a channel)
+*
+* ```ts
+* import { Sink } from "effect"
+*
+* // Create a sink and extract its channel
+* const sink = Sink.succeed(42)
+* const channel = Sink.toChannel(sink)
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const toChannel$1 = (self) => fromTransform$1((upstream, scope) => succeed(flatMap(self.transform(upstream, scope), done$1)));
+/**
+* Consumes and ignores all stream inputs.
+*
+* **When to use**
+*
+* Use to consume all upstream input and complete with void when the input
+* values and any aggregate result are not needed.
+*
+* @see {@link count} for consuming all input while returning the number of elements
+* @see {@link forEach} for consuming all input while running an effect for each element
+*
+* @category constructors
+* @since 2.0.0
+*/
+const drain = /* @__PURE__ */ fromTransform((upstream) => catchDone(forever(upstream, { disableYield: true }), () => endVoid));
+/**
+* A sink that executes the provided effectful function for every item fed
+* to it.
+*
+* **Example** (Running effects for each item)
+*
+* ```ts
+* import { Console, Effect, Sink, Stream } from "effect"
+*
+* // Create a sink that logs each item
+* const sink = Sink.forEach((item: number) => Console.log(`Processing: ${item}`))
+*
+* // Use it with a stream
+* const stream = Stream.make(1, 2, 3)
+* const program = Stream.run(stream, sink)
+*
+* Effect.runPromise(program)
+* // Output:
+* // Processing: 1
+* // Processing: 2
+* // Processing: 3
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const forEach = (f) => forEachArray(forEach$1((_) => f(_), { discard: true }));
+/**
+* A sink that executes the provided effectful function for every Chunk fed
+* to it.
+*
+* **Example** (Running effects for each chunk)
+*
+* ```ts
+* import { Console, Effect, Sink, Stream } from "effect"
+*
+* // Create a sink that processes chunks
+* const sink = Sink.forEachArray((chunk: ReadonlyArray<number>) =>
+*   Console.log(
+*     `Processing chunk of ${chunk.length} items: [${chunk.join(", ")}]`
+*   )
+* )
+*
+* // Use it with a stream
+* const stream = Stream.make(1, 2, 3, 4, 5)
+* const program = Stream.run(stream, sink)
+*
+* Effect.runPromise(program)
+* // Output: Processing chunk of 5 items: [1, 2, 3, 4, 5]
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const forEachArray = (f) => fromTransform((upstream) => upstream.pipe(flatMap(f), forever({ disableYield: true }), catchDone(() => endVoid)));
+/**
+* Creates a sink produced from a scoped effect.
+*
+* **Example** (Unwrapping a sink effect)
+*
+* ```ts
+* import { Console, Effect, Sink, Stream } from "effect"
+*
+* // Create a sink from an effect that produces a sink
+* const sinkEffect = Effect.succeed(
+*   Sink.forEach((item: number) => Console.log(`Item: ${item}`))
+* )
+* const sink = Sink.unwrap(sinkEffect)
+*
+* // Use it with a stream
+* const stream = Stream.make(1, 2, 3)
+* const program = Stream.run(stream, sink)
+*
+* Effect.runPromise(program)
+* // Output:
+* // Item: 1
+* // Item: 2
+* // Item: 3
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const unwrap$1 = (effect) => fromChannel$1(unwrap$2(map$3(effect, toChannel$1)));
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Stream.js
+/**
+* The `Stream` module describes effectful sequences that may emit many values
+* over time. A `Stream<A, E, R>` can produce zero or more `A` values, fail with
+* an `E`, and require services from `R`; the Effect runtime handles
+* backpressure, interruption, scopes, and finalizers while the stream is being
+* consumed.
+*
+* Streams are useful for files, sockets, queues, subscriptions, paginated APIs,
+* background jobs, and any workflow where values should be processed
+* incrementally instead of loaded into memory all at once.
+*
+* **Mental model**
+*
+* - A stream is a lazy description; it does not run until consumed with
+*   {@link run}, {@link runCollect}, {@link runForEach}, or another `run*`
+*   function.
+* - Pulling drives evaluation. Operators request values from upstream, and the
+*   runtime propagates demand instead of pushing unbounded data downstream.
+* - Values are batched internally as chunks for throughput, while user-facing
+*   combinators still work with individual elements unless they mention chunks.
+* - `A` is the element type, `E` is the failure type, and `R` is the required
+*   service context.
+* - Composition mirrors `Effect`: use `pipe`, {@link map}, {@link flatMap},
+*   error handling, resource operators, and service provisioning.
+*
+* **Common tasks**
+*
+* - Create streams from values, effects, and collections with {@link make},
+*   {@link fromEffect}, {@link fromIterable}, and {@link fromQueue}.
+* - Transform or select values with {@link map}, {@link mapEffect},
+*   {@link flatMap}, {@link filter}, and {@link filterMap}.
+* - Combine streams with {@link concat}, {@link merge}, {@link zip},
+*   {@link race}, and {@link interleave}.
+* - Control size and timing with {@link take}, {@link drop}, {@link debounce},
+*   {@link throttle}, {@link grouped}, and {@link groupedWithin}.
+* - Handle failures with {@link catchCause}, {@link catchIf},
+*   {@link mapError}, {@link retry}, and {@link withExecutionPlan}.
+* - Connect to other protocols with {@link fromReadableStream},
+*   {@link toReadableStream}, {@link fromAsyncIterable}, {@link toQueue}, and
+*   {@link runIntoQueue}.
+* - Consume streams with {@link runCollect}, {@link runForEach},
+*   {@link runFold}, {@link runDrain}, or a {@link Sink.Sink}.
+*
+* **Quickstart**
+*
+* **Example** (Transforming and collecting values)
+*
+* ```ts
+* import { Effect, Stream } from "effect"
+*
+* const program = Stream.make(1, 2, 3).pipe(
+*   Stream.map((n) => n * 2),
+*   Stream.runCollect
+* )
+*
+* Effect.runPromise(program).then(console.log)
+* // [2, 4, 6]
+* ```
+*
+* **Gotchas**
+*
+* - A stream is not a collection. Constructors and operators build a
+*   description; effects run each time the stream is consumed.
+* - {@link runCollect} stores every emitted value in memory. Prefer
+*   {@link runForEach}, {@link runFold}, or a streaming sink for large or
+*   infinite streams.
+* - Operators such as {@link merge}, {@link race}, {@link broadcast}, and
+*   {@link share} introduce concurrency, so interruption and finalizer timing
+*   can matter.
+* - Reusing the same stream value does not share execution by itself. Use
+*   {@link share}, {@link broadcast}, queues, or external state when multiple
+*   consumers must observe one running producer.
+*
+* **See also**
+*
+* - {@link Effect.Effect} for single-result effectful programs.
+* - {@link Sink.Sink} for reusable stream consumers.
+* - {@link Channel.Channel} for the lower-level primitive behind streams.
+* - {@link Queue.Queue} and {@link PubSub.PubSub} for coordinating producers
+*   and consumers.
+*
+* @since 2.0.0
+*/
+/**
+* Runtime identifier stored on `Stream` values and used by `isStream` to
+* recognize them.
+*
+* **Details**
+*
+* This marker is part of the runtime representation of `Stream` values. Prefer
+* `isStream` when narrowing unknown values.
+*
+* @see {@link isStream} for the public guard that checks this identifier
+*
+* @category type IDs
+* @since 4.0.0
+*/
+const TypeId$3 = "~effect/Stream";
+/**
+* Checks whether a value is a Stream.
+*
+* **Example** (Checking whether a value is a Stream)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const stream = Stream.make(1, 2, 3)
+*   const notStream = { data: [1, 2, 3] }
+*
+*   yield* Console.log(Stream.isStream(stream))
+*   // true
+*   yield* Console.log(Stream.isStream(notStream))
+*   // false
+* })
+*
+* Effect.runPromise(program)
+* ```
+*
+* @category guards
+* @since 4.0.0
+*/
+const isStream = (u) => hasProperty(u, TypeId$3);
+/**
+* Creates a stream from a array-emitting `Channel`.
+*
+* **Example** (Creating a stream from an array-emitting channel)
+*
+* ```ts
+* import { Channel, Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const channel = Channel.succeed([1, 2, 3] as const)
+*   const stream = Stream.fromChannel(channel)
+*   const result = yield* Stream.runCollect(stream)
+*   yield* Console.log(result)
+* })
+*
+* // Output: [ 1, 2, 3 ]
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const fromChannel = fromChannel$2;
+/**
+* Creates a stream from a pull effect, such as one produced by `Stream.toPull`.
+*
+* **Details**
+*
+* A pull effect yields chunks on demand and completes when the upstream stream ends.
+* See `Stream.toPull` for a matching producer.
+*
+* **Example** (Creating a stream from a pull effect)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const program = Effect.scoped(
+*   Effect.gen(function*() {
+*     const source = Stream.make(1, 2, 3)
+*     const pull = yield* Stream.toPull(source)
+*     const stream = Stream.fromPull(Effect.succeed(pull))
+*     const values = yield* Stream.runCollect(stream)
+*     yield* Console.log(values)
+*   })
+* )
+*
+* Effect.runPromise(program)
+* // Output: [1, 2, 3]
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const fromPull = (pull) => fromChannel(fromPull$1(pull));
+/**
+* Derives a stream by transforming its pull effect.
+*
+* **Example** (Transforming a pull effect)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const stream = Stream.make(1, 2, 3)
+*
+* const transformed = Stream.transformPull(stream, (pull) => Effect.succeed(pull))
+*
+* const program = Effect.gen(function*() {
+*   const values = yield* Stream.runCollect(transformed)
+*   yield* Console.log(values)
+* })
+*
+* Effect.runPromise(program)
+* // Output: [ 1, 2, 3 ]
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const transformPull = (self, f) => fromChannel(fromTransform$1((_, scope) => flatMap(toPullScoped(self.channel, scope), (pull) => f(pull, scope))));
+/**
+* Creates a channel from a stream.
+*
+* **Example** (Converting a stream to a channel)
+*
+* ```ts
+* import { Channel, Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const stream = Stream.make(1, 2, 3)
+*   const channel = Stream.toChannel(stream)
+*   const values = yield* Channel.runCollect(channel)
+*   yield* Console.log(values.flat())
+* })
+*
+* Effect.runPromise(program)
+* // Output: [ 1, 2, 3 ]
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const toChannel = (stream) => stream.channel;
+/**
+* Creates a stream from a callback that can emit values into a queue.
+*
+* **When to use**
+*
+* Use when you can use the `Queue` with the apis from the `Queue` module to emit
+* values to the stream or to signal the stream ending.
+*
+* By default it uses an "unbounded" buffer size.
+* You can customize the buffer size and strategy by passing an object as the
+* second argument with the `bufferSize` and `strategy` fields.
+*
+* **Example** (Creating a stream from a callback that can emit values into a queue)
+*
+* ```ts
+* import { Console, Effect, Queue, Stream } from "effect"
+*
+* const stream = Stream.callback<number>((queue) =>
+*   Effect.sync(() => {
+*     // Emit values to the stream
+*     Queue.offerUnsafe(queue, 1)
+*     Queue.offerUnsafe(queue, 2)
+*     Queue.offerUnsafe(queue, 3)
+*     // Signal completion
+*     Queue.endUnsafe(queue)
+*   })
+* )
+*
+* const program = Effect.gen(function*() {
+*   const values = yield* stream.pipe(Stream.runCollect)
+*   yield* Console.log(values)
+*   // [ 1, 2, 3 ]
+* })
+*
+* Effect.runPromise(program)
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const callback = (f, options) => fromChannel(callbackArray(f, options));
+/**
+* Creates an empty stream.
+*
+* **Example** (Creating an empty stream)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const values = yield* Stream.empty.pipe(Stream.runCollect)
+*   yield* Console.log(values)
+* })
+*
+* Effect.runPromise(program)
+* // []
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const empty = /* @__PURE__ */ fromChannel(empty$1);
+/**
+* Creates a lazily constructed stream.
+*
+* **Details**
+*
+* The stream factory is evaluated each time the stream is run.
+*
+* **Example** (Creating a lazily constructed stream)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const values = yield* Stream.suspend(() => Stream.make(1, 2, 3)).pipe(Stream.runCollect)
+*   yield* Console.log(values)
+* })
+*
+* Effect.runPromise(program)
+* // Output: [ 1, 2, 3 ]
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const suspend = (stream) => fromChannel(suspend$1(() => stream().channel));
+/**
+* Creates a stream that pulls values from a `Queue.Dequeue`.
+*
+* **Details**
+*
+* The stream emits non-empty batches of queued values and ends when the queue
+* fails with `Cause.Done`; other queue failures are propagated.
+*
+* **Example** (Creating a stream from a queue of values)
+*
+* ```ts
+* import { Console, Effect, Queue, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const queue = yield* Queue.unbounded<number>()
+*   yield* Queue.offer(queue, 1)
+*   yield* Queue.offer(queue, 2)
+*   yield* Queue.offer(queue, 3)
+*   yield* Queue.shutdown(queue)
+*
+*   const stream = Stream.fromQueue(queue)
+*   const values = yield* Stream.runCollect(stream)
+*   yield* Console.log(values)
+* })
+*
+* Effect.runPromise(program)
+* // Output: [ 1, 2, 3 ]
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const fromQueue = (queue) => fromChannel(fromQueueArray(queue));
+/**
+* Creates a stream produced from an `Effect`.
+*
+* **Example** (Unwrapping a stream effect)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const effect = Effect.succeed(Stream.make(1, 2, 3))
+*
+* const stream = Stream.unwrap(effect)
+*
+* const program = Effect.gen(function*() {
+*   const chunk = yield* Stream.runCollect(stream)
+*   yield* Console.log(chunk)
+* })
+* // [1, 2, 3]
+* ```
+*
+* @category constructors
+* @since 2.0.0
+*/
+const unwrap = (effect) => fromChannel(unwrap$2(map$3(effect, toChannel)));
+/**
+* Transforms the elements of this stream using the supplied function.
+*
+* **Example** (Mapping stream values)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const stream = Stream.fromArray([1, 2, 3]).pipe(Stream.map((n, i) => n + i))
+* const program = Stream.runCollect(stream).pipe(
+*   Effect.tap((values) => Console.log(values))
+* )
+*
+* Effect.runPromise(program)
+* // [ 1, 3, 5 ]
+* ```
+*
+* @category mapping
+* @since 2.0.0
+*/
+const map$1 = /* @__PURE__ */ dual(2, (self, f) => suspend(() => {
+	let i = 0;
+	return fromChannel(map$2(self.channel, map$5((o) => f(o, i++))));
+}));
+/**
+* Merges two streams, emitting elements from both as they arrive.
+*
+* **Details**
+*
+* By default, the merged stream ends when both streams end. Use
+* `haltStrategy` to change the termination behavior.
+*
+* **Example** (Merging stream values)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const fast = Stream.make(1, 2, 3)
+* const slow = Stream.fromEffect(Effect.delay(Effect.succeed(4), "50 millis"))
+*
+* const program = Effect.gen(function*() {
+*   const result = yield* Stream.runCollect(Stream.merge(fast, slow))
+*   yield* Console.log(result)
+* })
+*
+* Effect.runPromise(program)
+* // Output: [ 1, 2, 3, 4 ]
+* ```
+*
+* @category Merging
+* @since 2.0.0
+*/
+const merge$1 = /* @__PURE__ */ dual((args) => isStream(args[0]) && isStream(args[1]), (self, that, options) => fromChannel(merge$2(toChannel(self), toChannel(that), options)));
+/**
+* Applies a sink transducer to the stream and emits each sink result.
+*
+* **Example** (Transducing with a sink)
+*
+* ```ts
+* import { Console, Effect, Sink, Stream } from "effect"
+*
+* const program = Effect.gen(function* () {
+*   const result = yield* Stream.make(1, 2, 3, 4).pipe(
+*     Stream.transduce(Sink.take(2)),
+*     Stream.runCollect
+*   )
+*
+*   yield* Console.log(result)
+*   // Output: [ [ 1, 2 ], [ 3, 4 ] ]
+* })
+* ```
+*
+* @category Aggregation
+* @since 2.0.0
+*/
+const transduce = /* @__PURE__ */ dual(2, (self, sink) => transformPull(self, (upstream, scope) => sync(() => {
+	let done;
+	let leftover;
+	const upstreamWithLeftover = suspend$2(() => {
+		if (leftover !== void 0) {
+			const chunk = leftover;
+			leftover = void 0;
+			return succeed(chunk);
+		}
+		return upstream;
+	}).pipe(catch_((error) => {
+		done = fail$1(error);
+		return done$1();
+	}));
+	const pull = map$3(suspend$2(() => sink.transform(upstreamWithLeftover, scope)), ([value, leftover_]) => {
+		leftover = leftover_;
+		return of(value);
+	});
+	return suspend$2(() => done ? done : pull);
+})));
+/**
+* Decodes Uint8Array chunks into strings using TextDecoder with an optional encoding.
+*
+* **Example** (Decoding Uint8Array chunks into strings using TextDecoder with an optional encoding)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const encoder = new TextEncoder()
+* const stream = Stream.make(
+*   encoder.encode("Hello"),
+*   encoder.encode(" World")
+* )
+*
+* const program = Effect.gen(function*() {
+*   const decoded = yield* stream.pipe(
+*     Stream.decodeText,
+*     Stream.runCollect
+*   )
+*   yield* Console.log(decoded)
+* })
+*
+* Effect.runPromise(program)
+* // ["Hello", " World"]
+* ```
+*
+* @category encoding
+* @since 2.0.0
+*/
+const decodeText = /* @__PURE__ */ dual((args) => isStream(args[0]), (self, options) => suspend(() => {
+	const decoder = new TextDecoder(options?.encoding);
+	return map$1(self, (chunk) => decoder.decode(chunk, { stream: true }));
+}));
+/**
+* Splits a stream of strings into lines, handling `\n`, `\r`, and `\r\n` delimiters across chunks.
+*
+* **Example** (Splitting streamed text into lines)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* Effect.runPromise(Effect.gen(function* () {
+*   const lines = yield* Stream.runCollect(
+*     Stream.make("a\nb\r\n", "c\n").pipe(Stream.splitLines)
+*   )
+*   yield* Console.log(lines)
+* }))
+* // ["a", "b", "c"]
+* ```
+*
+* @category encoding
+* @since 2.0.0
+*/
+const splitLines = (self) => self.channel.pipe(pipeTo(splitLines$1()), fromChannel);
+/**
+* Runs a stream with a sink and returns the sink result.
+*
+* **Example** (Running a stream with a sink)
+*
+* ```ts
+* import { Console, Effect, Sink, Stream } from "effect"
+*
+* const program = Stream.run(Stream.make(1, 2, 3), Sink.sum)
+*
+* Effect.runPromise(Effect.flatMap(program, Console.log))
+* // 6
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const run = /* @__PURE__ */ dual(2, (self, sink) => scopedWith((scope) => toPullScoped(self.channel, scope).pipe(flatMap((upstream) => sink.transform(upstream, scope)), map$3(([a]) => a))));
+/**
+* Runs the stream and collects all elements into an array.
+*
+* **Example** (Collecting stream values)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const stream = Stream.make(1, 2, 3, 4, 5)
+*
+* const program = Effect.gen(function*() {
+*   const collected = yield* Stream.runCollect(stream)
+*   yield* Console.log(collected)
+* })
+*
+* Effect.runPromise(program)
+* // [1, 2, 3, 4, 5]
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const runCollect = (self) => runFold(self.channel, () => [], (acc, chunk) => {
+	for (let i = 0; i < chunk.length; i++) acc.push(chunk[i]);
+	return acc;
+});
+/**
+* Concatenates all emitted strings into a single string.
+*
+* **Example** (Joining strings from a stream)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const stream = Stream.make("Hello", " ", "World", "!")
+* const program = Effect.gen(function*() {
+*   const text = yield* Stream.mkString(stream)
+*   yield* Console.log(text)
+* })
+*
+* Effect.runPromise(program)
+* // Hello World!
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const mkString = (self) => runFold(self.channel, () => "", (acc, chunk) => acc + chunk.join(""));
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/FileSystem.js
+/**
+* Effect service for reading, writing, inspecting, and watching files.
+*
+* The `FileSystem` service is the portable boundary between Effect programs and
+* the host file system. Programs depend on the service from `effect/FileSystem`;
+* platform packages provide concrete layers at the edge. Operations return
+* `Effect`, `Stream`, or `Sink` values and report failures as `PlatformError`
+* instead of throwing.
+*
+* **Mental model**
+*
+* `FileSystem` is a capability, not a global singleton. Request it with
+* `yield* FileSystem.FileSystem` inside an effect, compose file work like any
+* other effect, and provide a platform or test implementation when the program
+* is run. Scoped operations such as `open`, `makeTempFileScoped`, and
+* `makeTempDirectoryScoped` bind resource cleanup to `Scope`.
+*
+* **Common tasks**
+*
+* - Create, copy, rename, remove, chmod, chown, link, and symlink paths.
+* - Read and write whole files as bytes or strings.
+* - Stream large files with `stream` and `sink`, using binary size helpers such
+*   as `KiB` and `MiB` for chunk sizes and offsets.
+* - Inspect metadata with `stat`, check accessibility with `access` or
+*   `exists`, and canonicalize paths with `realPath`.
+* - Watch files or directories with `watch` when the platform implementation
+*   supports it.
+*
+* **Example** (Write and clean up a temporary file)
+*
+* ```ts
+* import { Effect, FileSystem } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const fs = yield* FileSystem.FileSystem
+*
+*   const directory = yield* fs.makeTempDirectoryScoped()
+*   const path = `${directory}/message.txt`
+*
+*   yield* fs.writeFileString(path, "hello")
+*   return yield* fs.readFileString(path)
+* })
+* ```
+*
+* **Gotchas**
+*
+* Paths are interpreted by the provided implementation, so relative paths, case
+* sensitivity, permissions, links, and watch behavior are platform-dependent.
+* Size options are normalized to branded bigint byte counts; prefer the `Size`,
+* `KiB`, `MiB`, and related helpers for offsets, chunk sizes, and truncation
+* lengths. A program that uses this service still needs a concrete layer, such
+* as `NodeFileSystem.layer`, before it can access the real file system.
+*
+* @since 4.0.0
+*/
+const TypeId$2 = "~effect/platform/FileSystem";
+/**
+* Creates a `Size` from various numeric input types.
+*
+* **Details**
+*
+* Converts numbers, bigints, or existing Size values into a properly
+* branded Size type. This function handles the conversion and ensures
+* type safety for file size operations.
+*
+* **Example** (Converting size inputs)
+*
+* ```ts
+* import { Effect, FileSystem } from "effect"
+*
+* // From number
+* const size1 = FileSystem.Size(1024)
+* console.log(typeof size1) // "bigint"
+*
+* // From bigint
+* const size2 = FileSystem.Size(BigInt(2048))
+*
+* // From existing Size (identity)
+* const size3 = FileSystem.Size(size1)
+*
+* // Use in file operations
+* const readChunk = (path: string, chunkSize: number) =>
+*   Effect.gen(function*() {
+*     const fs = yield* FileSystem.FileSystem
+*     return fs.stream(path, {
+*       chunkSize: FileSystem.Size(chunkSize)
+*     })
+*   })
+* ```
+*
+* @category sizes
+* @since 4.0.0
+*/
+const Size = (bytes) => typeof bytes === "bigint" ? bytes : BigInt(bytes);
+const bigint1024 = /* @__PURE__ */ BigInt(1024);
+bigint1024 * bigint1024 * bigint1024 * bigint1024 * bigint1024;
+/**
+* Service tag for platform file-system operations.
+*
+* **When to use**
+*
+* Use to access or provide operations for files, directories, permissions,
+* streams, and sinks through the Effect context.
+*
+* **Details**
+*
+* This key is used to provide and access the FileSystem service in the Effect context.
+*
+* **Example** (Accessing and providing FileSystem)
+*
+* ```ts
+* import { Effect, FileSystem } from "effect"
+*
+* // Access the FileSystem service
+* const program = Effect.gen(function*() {
+*   const fs = yield* FileSystem.FileSystem
+*
+*   const exists = yield* fs.exists("./data.txt")
+*   if (exists) {
+*     const content = yield* fs.readFileString("./data.txt")
+*     yield* Effect.log("File content:", content)
+*   }
+* })
+*
+* // Provide a custom FileSystem implementation
+* declare const platformImpl: Omit<
+*   FileSystem.FileSystem,
+*   "exists" | "readFileString" | "stream" | "sink" | "writeFileString"
+* >
+* const customFs = FileSystem.make(platformImpl)
+*
+* const withCustomFs = Effect.provideService(
+*   program,
+*   FileSystem.FileSystem,
+*   customFs
+* )
+* ```
+*
+* @category tags
+* @since 4.0.0
+*/
+const FileSystem = /* @__PURE__ */ Service("effect/platform/FileSystem");
+/**
+* Creates a FileSystem implementation from a partial implementation.
+*
+* **When to use**
+*
+* Use to build a concrete `FileSystem` service from platform-specific core
+* operations while deriving the convenience methods that can be implemented
+* from them.
+*
+* **Details**
+*
+* This function takes a partial FileSystem implementation and automatically provides
+* default implementations for `exists`, `readFileString`, `stream`, `sink`, and
+* `writeFileString` methods based on the provided core methods.
+*
+* @see {@link makeNoop} for a testing stub that accepts method overrides without requiring a complete implementation
+* @see {@link layerNoop} for providing a no-op `FileSystem` as a `Layer` in tests
+*
+* @category constructors
+* @since 4.0.0
+*/
+const make$3 = (impl) => FileSystem.of({
+	...impl,
+	[TypeId$2]: TypeId$2,
+	exists: (path) => pipe(impl.access(path), as(true), catchTag("PlatformError", (e) => e.reason._tag === "NotFound" ? succeed(false) : fail(e))),
+	readFileString: (path, encoding) => flatMap(impl.readFile(path), (_) => try_({
+		try: () => new TextDecoder(encoding).decode(_),
+		catch: (cause) => badArgument({
+			module: "FileSystem",
+			method: "readFileString",
+			description: "invalid encoding",
+			cause
+		})
+	})),
+	stream: fnUntraced(function* (path, options) {
+		const file = yield* impl.open(path, { flag: "r" });
+		if (options?.offset) yield* file.seek(options.offset, "start");
+		const bytesToRead = options?.bytesToRead !== void 0 ? Size(options.bytesToRead) : void 0;
+		let totalBytesRead = BigInt(0);
+		const chunkSize = Size(options?.chunkSize ?? 64 * 1024);
+		const readChunk = file.readAlloc(chunkSize);
+		return fromPull(succeed(flatMap(suspend$2(() => {
+			if (bytesToRead !== void 0 && bytesToRead <= totalBytesRead) return done$1();
+			return bytesToRead !== void 0 && bytesToRead - totalBytesRead < chunkSize ? file.readAlloc(bytesToRead - totalBytesRead) : readChunk;
+		}), match$1({
+			onNone: () => done$1(),
+			onSome: (buf) => {
+				totalBytesRead += BigInt(buf.length);
+				return succeed(of(buf));
+			}
+		}))));
+	}, unwrap),
+	sink: (path, options) => pipe(impl.open(path, {
+		flag: "w",
+		...options
+	}), map$3((file) => forEach((_) => file.writeAll(_))), unwrap$1),
+	writeFileString: (path, data, options) => flatMap(try_({
+		try: () => new TextEncoder().encode(data),
+		catch: (cause) => badArgument({
+			module: "FileSystem",
+			method: "writeFileString",
+			description: "could not encode string",
+			cause
+		})
+	}), (_) => impl.writeFile(path, _, options))
+});
+/**
+* Runtime type identifier attached to `FileSystem.File` handles and used by
+* `isFile` to recognize them.
+*
+* **Details**
+*
+* This marker is part of the runtime representation of file handles. Prefer
+* `isFile` when narrowing unknown values.
+*
+* @see {@link File} for the open file handle shape that carries this marker
+* @see {@link isFile} for the public guard that checks this marker
+*
+* @category type IDs
+* @since 4.0.0
+*/
+const FileTypeId = "~effect/platform/FileSystem/File";
+/**
+* Creates a `File.Descriptor` from a number.
+*
+* **When to use**
+*
+* Use to brand an operating-system file descriptor number when implementing a
+* `FileSystem` that returns custom `File` handles.
+*
+* **Details**
+*
+* `File.Descriptor` is a branded integer handle used by operating systems to
+* identify open files.
+*
+* **Gotchas**
+*
+* This constructor is nominal and does not check that the number is an integer
+* or that it refers to an open file descriptor.
+*
+* @see {@link File.Descriptor} for the branded descriptor type produced by this constructor
+* @see {@link File} for file handles that expose a descriptor through `fd`
+*
+* @category constructors
+* @since 4.0.0
+*/
+const FileDescriptor = /* @__PURE__ */ nominal();
+/**
+* Service key for file system watch backend implementations.
+*
+* **Details**
+*
+* This service provides the low-level file watching capabilities that can be
+* implemented differently on various platforms (e.g., inotify on Linux,
+* FSEvents on macOS, etc.).
+*
+* **Example** (Providing a custom watch backend)
+*
+* ```ts
+* import { Effect, FileSystem, Option, Stream } from "effect"
+*
+* // Custom watch backend implementation
+* const customWatchBackend = {
+*   register: (path: string, stat: FileSystem.File.Info) => {
+*     // Implementation would depend on platform
+*     return Option.some(Stream.empty) // Placeholder implementation
+*   }
+* }
+*
+* // Provide custom watch backend
+* const program = Effect.gen(function*() {
+*   const fs = yield* FileSystem.FileSystem
+*
+*   // File watching will use the custom backend
+*   const watcher = fs.watch("./directory")
+* })
+*
+* const withCustomBackend = Effect.provideService(
+*   program,
+*   FileSystem.WatchBackend,
+*   customWatchBackend
+* )
+* ```
+*
+* @category file watcher
+* @since 4.0.0
+*/
+var WatchBackend = class extends Service()("effect/platform/FileSystem/WatchBackend") {};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Path.js
+/**
+* The `Path` module provides a platform path service for manipulating file
+* system paths through Effect's environment. It models path operations as a
+* replaceable service so programs can depend on path behavior without directly
+* coupling to a particular runtime implementation.
+*
+* **Mental model**
+*
+* - `Path.Path` is a `Context.Service` tag used to access the current path implementation
+* - The service offers familiar path operations such as joining, resolving, parsing, and formatting
+* - Most operations are pure string transformations and follow POSIX-style path semantics
+* - File URL conversions return `Effect`s because invalid paths or URLs can fail with `BadArgument`
+* - Custom implementations can be provided with `Layer.succeed` for alternate platforms or tests
+*
+* **Common tasks**
+*
+* - Combine path segments with `join` or turn segments into an absolute path with `resolve`
+* - Normalize `.` and `..` segments with `normalize`
+* - Inspect paths with `basename`, `dirname`, `extname`, and `isAbsolute`
+* - Convert between structured path parts and strings with `parse` and `format`
+* - Compute relative paths with `relative`
+* - Convert between file paths and `file:` URLs with `toFileUrl` and `fromFileUrl`
+*
+* **Gotchas**
+*
+* - Path strings are not checked against the file system; these operations only manipulate syntax
+* - `resolve` may consult the host current working directory when no absolute segment is supplied
+* - `fromFileUrl` only accepts valid `file:` URLs and rejects encoded path separators
+* - Use the service from the environment when writing portable Effect code instead of importing
+*   host-specific path APIs directly
+*
+* @since 4.0.0
+*/
+/**
+* Runtime type identifier used to mark implementations of the `Path` service.
+*
+* **Details**
+*
+* The marker is the exact string stored on `Path` service implementations.
+* Most code should depend on the `Path` service instead of inspecting this
+* value directly.
+*
+* @see {@link layer} for the built-in POSIX `Path` service layer
+*
+* @category type IDs
+* @since 4.0.0
+*/
+const TypeId$1 = "~effect/platform/Path";
+/**
+* Service tag for accessing the current `Path` implementation.
+*
+* **When to use**
+*
+* Use when an effect needs path operations supplied by its environment.
+*
+* **Example** (Providing a custom Path service)
+*
+* ```ts
+* import { Effect, Layer, Path } from "effect"
+*
+* // Create a custom path implementation
+* const customPath: Path.Path = {
+*   [Path.TypeId]: Path.TypeId,
+*   sep: "/",
+*   basename: (path: string, suffix?: string) => {
+*     const base = path.split("/").pop() || ""
+*     return suffix && base.endsWith(suffix)
+*       ? base.slice(0, -suffix.length)
+*       : base
+*   },
+*   dirname: (path: string) => path.split("/").slice(0, -1).join("/") || "/",
+*   extname: (path: string) => {
+*     const match = path.match(/\.[^.]*$/)
+*     return match ? match[0] : ""
+*   },
+*   format: (pathObject) => {
+*     const dir = pathObject.dir || ""
+*     const name = pathObject.name || ""
+*     const ext = pathObject.ext || ""
+*     return dir ? `${dir}/${name}${ext}` : `${name}${ext}`
+*   },
+*   fromFileUrl: (url: URL) => Effect.succeed(url.pathname),
+*   isAbsolute: (path: string) => path.startsWith("/"),
+*   join: (...paths: ReadonlyArray<string>) => paths.join("/"),
+*   normalize: (path: string) => path.replace(/\/+/g, "/"),
+*   parse: (path: string) => ({
+*     root: path.startsWith("/") ? "/" : "",
+*     dir: path.split("/").slice(0, -1).join("/") || "/",
+*     base: path.split("/").pop() || "",
+*     ext: path.match(/\.[^.]*$/)?.[0] || "",
+*     name: path.split("/").pop()?.replace(/\.[^.]*$/, "") || ""
+*   }),
+*   relative: (from: string, to: string) => to.replace(from, ""),
+*   resolve: (...pathSegments: ReadonlyArray<string>) => pathSegments.join("/"),
+*   toFileUrl: (path: string) => Effect.succeed(new URL(`file://${path}`)),
+*   toNamespacedPath: (path: string) => path
+* }
+*
+* // Provide the path service
+* const customPathLayer = Layer.succeed(Path.Path)(customPath)
+*
+* const program = Effect.gen(function*() {
+*   const path = yield* Path.Path
+*   const joined = path.join("home", "user", "file.txt")
+*   console.log(joined) // "home/user/file.txt"
+* })
+*
+* // Run with custom path implementation
+* const result = Effect.provide(program, customPathLayer)
+* ```
+*
+* @category tag
+* @since 4.0.0
+*/
+const Path$1 = /* @__PURE__ */ Service("effect/Path");
 //#endregion
 //#region ../../src/lib/paths.ts
 const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), ".overdeck");
@@ -3837,6 +12574,7 @@ function resolvePackageRootForDir(dir) {
 	if (dir.includes(nestedDistSegment)) return dir.slice(0, dir.indexOf(nestedDistSegment));
 	return dir.endsWith(`${sep}lib`) ? dirname(dirname(dir)) : dirname(dir);
 }
+const packageRoot = resolvePackageRootForDir(currentDir);
 /**
 * Root of Overdeck's own bundled sync sources (PAN-1201).
 *
@@ -3850,7 +12588,7 @@ function resolvePackageRootForDir(dir) {
 * silently rot while the maintained rules accumulated elsewhere (#1359):
 * nothing in the repo layout signalled which dirs were sync sources.
 */
-const SYNC_SOURCES_ROOT = join(resolvePackageRootForDir(currentDir), "sync-sources");
+const SYNC_SOURCES_ROOT = join(packageRoot, "sync-sources");
 join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
 join(OVERDECK_HOME, "agent-definitions");
 join(OVERDECK_HOME, "rules");
@@ -3863,30 +12601,14 @@ join(DOCS_DIR, "index.sqlite");
 join(DOCS_DIR, "budget-state.json");
 join(DOCS_DIR, "disable-state.json");
 join(DOCS_DIR, "telemetry.jsonl");
-/**
-* Encode a filesystem path to match Claude Code's project directory naming.
-*
-* Claude Code replaces ALL non-alphanumeric characters (except hyphens) with
-* hyphens when encoding the CWD into the project directory name under
-* ~/.claude/projects/. For example:
-*
-*   /Users/edward.becker/Projects → -Users-edward-becker-Projects
-*   /home/eltmon/Projects         → -home-eltmon-Projects
-*   /tmp/test_under.dot+plus@at   → -tmp-test-under-dot-plus-at
-*
-* This is critical for session file lookup — a mismatch means JSONL files
-* are never found and conversation messages appear permanently empty.
-*/
-function encodeClaudeProjectDir(cwdPath) {
-	return cwdPath.replace(/[^a-zA-Z0-9-]/g, "-");
-}
 TaggedError("VcsError");
 TaggedError("VcsTimeoutError");
 TaggedError("FsError");
 TaggedError("FsNotFoundError");
 TaggedError("GitError");
 TaggedError("MergeConflictError");
-TaggedError("TmuxError");
+/** A tmux command failed. */
+var TmuxError = class extends TaggedError("TmuxError") {};
 TaggedError("TrackerError");
 TaggedError("GitHubApiError");
 TaggedError("LinearApiError");
@@ -4199,6 +12921,4119 @@ function getPricingSync(provider, model) {
 }
 join(COSTS_DIR, "budgets.json");
 //#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/entity.js
+const entityKind = Symbol.for("drizzle:entityKind");
+function is(value, type) {
+	if (!value || typeof value !== "object") return false;
+	if (value instanceof type) return true;
+	if (!Object.prototype.hasOwnProperty.call(type, entityKind)) throw new Error(`Class "${type.name ?? "<unknown>"}" doesn't look like a Drizzle entity. If this is incorrect and the class is provided by Drizzle, please report this as a bug.`);
+	let cls = Object.getPrototypeOf(value).constructor;
+	if (cls) while (cls) {
+		if (entityKind in cls && cls[entityKind] === type[entityKind]) return true;
+		cls = Object.getPrototypeOf(cls);
+	}
+	return false;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/column.js
+var Column = class {
+	constructor(table, config) {
+		this.table = table;
+		this.config = config;
+		this.name = config.name;
+		this.keyAsName = config.keyAsName;
+		this.notNull = config.notNull;
+		this.default = config.default;
+		this.defaultFn = config.defaultFn;
+		this.onUpdateFn = config.onUpdateFn;
+		this.hasDefault = config.hasDefault;
+		this.primary = config.primaryKey;
+		this.isUnique = config.isUnique;
+		this.uniqueName = config.uniqueName;
+		this.uniqueType = config.uniqueType;
+		this.dataType = config.dataType;
+		this.columnType = config.columnType;
+		this.generated = config.generated;
+		this.generatedIdentity = config.generatedIdentity;
+	}
+	static [entityKind] = "Column";
+	name;
+	keyAsName;
+	primary;
+	notNull;
+	default;
+	defaultFn;
+	onUpdateFn;
+	hasDefault;
+	isUnique;
+	uniqueName;
+	uniqueType;
+	dataType;
+	columnType;
+	enumValues = void 0;
+	generated = void 0;
+	generatedIdentity = void 0;
+	config;
+	mapFromDriverValue(value) {
+		return value;
+	}
+	mapToDriverValue(value) {
+		return value;
+	}
+	shouldDisableInsert() {
+		return this.config.generated !== void 0 && this.config.generated.type !== "byDefault";
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/column-builder.js
+var ColumnBuilder = class {
+	static [entityKind] = "ColumnBuilder";
+	config;
+	constructor(name, dataType, columnType) {
+		this.config = {
+			name,
+			keyAsName: name === "",
+			notNull: false,
+			default: void 0,
+			hasDefault: false,
+			primaryKey: false,
+			isUnique: false,
+			uniqueName: void 0,
+			uniqueType: void 0,
+			dataType,
+			columnType,
+			generated: void 0
+		};
+	}
+	/**
+	* Changes the data type of the column. Commonly used with `json` columns. Also, useful for branded types.
+	*
+	* @example
+	* ```ts
+	* const users = pgTable('users', {
+	* 	id: integer('id').$type<UserId>().primaryKey(),
+	* 	details: json('details').$type<UserDetails>().notNull(),
+	* });
+	* ```
+	*/
+	$type() {
+		return this;
+	}
+	/**
+	* Adds a `not null` clause to the column definition.
+	*
+	* Affects the `select` model of the table - columns *without* `not null` will be nullable on select.
+	*/
+	notNull() {
+		this.config.notNull = true;
+		return this;
+	}
+	/**
+	* Adds a `default <value>` clause to the column definition.
+	*
+	* Affects the `insert` model of the table - columns *with* `default` are optional on insert.
+	*
+	* If you need to set a dynamic default value, use {@link $defaultFn} instead.
+	*/
+	default(value) {
+		this.config.default = value;
+		this.config.hasDefault = true;
+		return this;
+	}
+	/**
+	* Adds a dynamic default value to the column.
+	* The function will be called when the row is inserted, and the returned value will be used as the column value.
+	*
+	* **Note:** This value does not affect the `drizzle-kit` behavior, it is only used at runtime in `drizzle-orm`.
+	*/
+	$defaultFn(fn) {
+		this.config.defaultFn = fn;
+		this.config.hasDefault = true;
+		return this;
+	}
+	/**
+	* Alias for {@link $defaultFn}.
+	*/
+	$default = this.$defaultFn;
+	/**
+	* Adds a dynamic update value to the column.
+	* The function will be called when the row is updated, and the returned value will be used as the column value if none is provided.
+	* If no `default` (or `$defaultFn`) value is provided, the function will be called when the row is inserted as well, and the returned value will be used as the column value.
+	*
+	* **Note:** This value does not affect the `drizzle-kit` behavior, it is only used at runtime in `drizzle-orm`.
+	*/
+	$onUpdateFn(fn) {
+		this.config.onUpdateFn = fn;
+		this.config.hasDefault = true;
+		return this;
+	}
+	/**
+	* Alias for {@link $onUpdateFn}.
+	*/
+	$onUpdate = this.$onUpdateFn;
+	/**
+	* Adds a `primary key` clause to the column definition. This implicitly makes the column `not null`.
+	*
+	* In SQLite, `integer primary key` implicitly makes the column auto-incrementing.
+	*/
+	primaryKey() {
+		this.config.primaryKey = true;
+		this.config.notNull = true;
+		return this;
+	}
+	/** @internal Sets the name of the column to the key within the table definition if a name was not given. */
+	setName(name) {
+		if (this.config.name !== "") return;
+		this.config.name = name;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/table.utils.js
+const TableName = Symbol.for("drizzle:Name");
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/pg-core/columns/enum.js
+const isPgEnumSym = Symbol.for("drizzle:isPgEnum");
+function isPgEnum(obj) {
+	return !!obj && typeof obj === "function" && isPgEnumSym in obj && obj[isPgEnumSym] === true;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/subquery.js
+var Subquery = class {
+	static [entityKind] = "Subquery";
+	constructor(sql, fields, alias, isWith = false, usedTables = []) {
+		this._ = {
+			brand: "Subquery",
+			sql,
+			selectedFields: fields,
+			alias,
+			isWith,
+			usedTables
+		};
+	}
+};
+var WithSubquery = class extends Subquery {
+	static [entityKind] = "WithSubquery";
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/tracing.js
+const tracer = { startActiveSpan(name, fn) {
+	return fn();
+} };
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/view-common.js
+const ViewBaseConfig = Symbol.for("drizzle:ViewBaseConfig");
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/table.js
+const Schema$2 = Symbol.for("drizzle:Schema");
+const Columns = Symbol.for("drizzle:Columns");
+const ExtraConfigColumns = Symbol.for("drizzle:ExtraConfigColumns");
+const OriginalName = Symbol.for("drizzle:OriginalName");
+const BaseName = Symbol.for("drizzle:BaseName");
+const IsAlias = Symbol.for("drizzle:IsAlias");
+const ExtraConfigBuilder = Symbol.for("drizzle:ExtraConfigBuilder");
+const IsDrizzleTable = Symbol.for("drizzle:IsDrizzleTable");
+var Table = class {
+	static [entityKind] = "Table";
+	/** @internal */
+	static Symbol = {
+		Name: TableName,
+		Schema: Schema$2,
+		OriginalName,
+		Columns,
+		ExtraConfigColumns,
+		BaseName,
+		IsAlias,
+		ExtraConfigBuilder
+	};
+	/**
+	* @internal
+	* Can be changed if the table is aliased.
+	*/
+	[TableName];
+	/**
+	* @internal
+	* Used to store the original name of the table, before any aliasing.
+	*/
+	[OriginalName];
+	/** @internal */
+	[Schema$2];
+	/** @internal */
+	[Columns];
+	/** @internal */
+	[ExtraConfigColumns];
+	/**
+	*  @internal
+	* Used to store the table name before the transformation via the `tableCreator` functions.
+	*/
+	[BaseName];
+	/** @internal */
+	[IsAlias] = false;
+	/** @internal */
+	[IsDrizzleTable] = true;
+	/** @internal */
+	[ExtraConfigBuilder] = void 0;
+	constructor(name, schema, baseName) {
+		this[TableName] = this[OriginalName] = name;
+		this[Schema$2] = schema;
+		this[BaseName] = baseName;
+	}
+};
+function getTableName(table) {
+	return table[TableName];
+}
+function getTableUniqueName(table) {
+	return `${table[Schema$2] ?? "public"}.${table[TableName]}`;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sql/sql.js
+function isSQLWrapper(value) {
+	return value !== null && value !== void 0 && typeof value.getSQL === "function";
+}
+function mergeQueries(queries) {
+	const result = {
+		sql: "",
+		params: []
+	};
+	for (const query of queries) {
+		result.sql += query.sql;
+		result.params.push(...query.params);
+		if (query.typings?.length) {
+			if (!result.typings) result.typings = [];
+			result.typings.push(...query.typings);
+		}
+	}
+	return result;
+}
+var StringChunk = class {
+	static [entityKind] = "StringChunk";
+	value;
+	constructor(value) {
+		this.value = Array.isArray(value) ? value : [value];
+	}
+	getSQL() {
+		return new SQL([this]);
+	}
+};
+var SQL = class SQL {
+	constructor(queryChunks) {
+		this.queryChunks = queryChunks;
+		for (const chunk of queryChunks) if (is(chunk, Table)) {
+			const schemaName = chunk[Table.Symbol.Schema];
+			this.usedTables.push(schemaName === void 0 ? chunk[Table.Symbol.Name] : schemaName + "." + chunk[Table.Symbol.Name]);
+		}
+	}
+	static [entityKind] = "SQL";
+	/** @internal */
+	decoder = noopDecoder;
+	shouldInlineParams = false;
+	/** @internal */
+	usedTables = [];
+	append(query) {
+		this.queryChunks.push(...query.queryChunks);
+		return this;
+	}
+	toQuery(config) {
+		return tracer.startActiveSpan("drizzle.buildSQL", (span) => {
+			const query = this.buildQueryFromSourceParams(this.queryChunks, config);
+			span?.setAttributes({
+				"drizzle.query.text": query.sql,
+				"drizzle.query.params": JSON.stringify(query.params)
+			});
+			return query;
+		});
+	}
+	buildQueryFromSourceParams(chunks, _config) {
+		const config = Object.assign({}, _config, {
+			inlineParams: _config.inlineParams || this.shouldInlineParams,
+			paramStartIndex: _config.paramStartIndex || { value: 0 }
+		});
+		const { casing, escapeName, escapeParam, prepareTyping, inlineParams, paramStartIndex } = config;
+		return mergeQueries(chunks.map((chunk) => {
+			if (is(chunk, StringChunk)) return {
+				sql: chunk.value.join(""),
+				params: []
+			};
+			if (is(chunk, Name)) return {
+				sql: escapeName(chunk.value),
+				params: []
+			};
+			if (chunk === void 0) return {
+				sql: "",
+				params: []
+			};
+			if (Array.isArray(chunk)) {
+				const result = [new StringChunk("(")];
+				for (const [i, p] of chunk.entries()) {
+					result.push(p);
+					if (i < chunk.length - 1) result.push(new StringChunk(", "));
+				}
+				result.push(new StringChunk(")"));
+				return this.buildQueryFromSourceParams(result, config);
+			}
+			if (is(chunk, SQL)) return this.buildQueryFromSourceParams(chunk.queryChunks, {
+				...config,
+				inlineParams: inlineParams || chunk.shouldInlineParams
+			});
+			if (is(chunk, Table)) {
+				const schemaName = chunk[Table.Symbol.Schema];
+				const tableName = chunk[Table.Symbol.Name];
+				return {
+					sql: schemaName === void 0 || chunk[IsAlias] ? escapeName(tableName) : escapeName(schemaName) + "." + escapeName(tableName),
+					params: []
+				};
+			}
+			if (is(chunk, Column)) {
+				const columnName = casing.getColumnCasing(chunk);
+				if (_config.invokeSource === "indexes") return {
+					sql: escapeName(columnName),
+					params: []
+				};
+				const schemaName = chunk.table[Table.Symbol.Schema];
+				return {
+					sql: chunk.table[IsAlias] || schemaName === void 0 ? escapeName(chunk.table[Table.Symbol.Name]) + "." + escapeName(columnName) : escapeName(schemaName) + "." + escapeName(chunk.table[Table.Symbol.Name]) + "." + escapeName(columnName),
+					params: []
+				};
+			}
+			if (is(chunk, View)) {
+				const schemaName = chunk[ViewBaseConfig].schema;
+				const viewName = chunk[ViewBaseConfig].name;
+				return {
+					sql: schemaName === void 0 || chunk[ViewBaseConfig].isAlias ? escapeName(viewName) : escapeName(schemaName) + "." + escapeName(viewName),
+					params: []
+				};
+			}
+			if (is(chunk, Param)) {
+				if (is(chunk.value, Placeholder)) return {
+					sql: escapeParam(paramStartIndex.value++, chunk),
+					params: [chunk],
+					typings: ["none"]
+				};
+				const mappedValue = chunk.value === null ? null : chunk.encoder.mapToDriverValue(chunk.value);
+				if (is(mappedValue, SQL)) return this.buildQueryFromSourceParams([mappedValue], config);
+				if (inlineParams) return {
+					sql: this.mapInlineParam(mappedValue, config),
+					params: []
+				};
+				let typings = ["none"];
+				if (prepareTyping) typings = [prepareTyping(chunk.encoder)];
+				return {
+					sql: escapeParam(paramStartIndex.value++, mappedValue),
+					params: [mappedValue],
+					typings
+				};
+			}
+			if (is(chunk, Placeholder)) return {
+				sql: escapeParam(paramStartIndex.value++, chunk),
+				params: [chunk],
+				typings: ["none"]
+			};
+			if (is(chunk, SQL.Aliased) && chunk.fieldAlias !== void 0) return {
+				sql: escapeName(chunk.fieldAlias),
+				params: []
+			};
+			if (is(chunk, Subquery)) {
+				if (chunk._.isWith) return {
+					sql: escapeName(chunk._.alias),
+					params: []
+				};
+				return this.buildQueryFromSourceParams([
+					new StringChunk("("),
+					chunk._.sql,
+					new StringChunk(") "),
+					new Name(chunk._.alias)
+				], config);
+			}
+			if (isPgEnum(chunk)) {
+				if (chunk.schema) return {
+					sql: escapeName(chunk.schema) + "." + escapeName(chunk.enumName),
+					params: []
+				};
+				return {
+					sql: escapeName(chunk.enumName),
+					params: []
+				};
+			}
+			if (isSQLWrapper(chunk)) {
+				if (chunk.shouldOmitSQLParens?.()) return this.buildQueryFromSourceParams([chunk.getSQL()], config);
+				return this.buildQueryFromSourceParams([
+					new StringChunk("("),
+					chunk.getSQL(),
+					new StringChunk(")")
+				], config);
+			}
+			if (inlineParams) return {
+				sql: this.mapInlineParam(chunk, config),
+				params: []
+			};
+			return {
+				sql: escapeParam(paramStartIndex.value++, chunk),
+				params: [chunk],
+				typings: ["none"]
+			};
+		}));
+	}
+	mapInlineParam(chunk, { escapeString }) {
+		if (chunk === null) return "null";
+		if (typeof chunk === "number" || typeof chunk === "boolean") return chunk.toString();
+		if (typeof chunk === "string") return escapeString(chunk);
+		if (typeof chunk === "object") {
+			const mappedValueAsString = chunk.toString();
+			if (mappedValueAsString === "[object Object]") return escapeString(JSON.stringify(chunk));
+			return escapeString(mappedValueAsString);
+		}
+		throw new Error("Unexpected param value: " + chunk);
+	}
+	getSQL() {
+		return this;
+	}
+	as(alias) {
+		if (alias === void 0) return this;
+		return new SQL.Aliased(this, alias);
+	}
+	mapWith(decoder) {
+		this.decoder = typeof decoder === "function" ? { mapFromDriverValue: decoder } : decoder;
+		return this;
+	}
+	inlineParams() {
+		this.shouldInlineParams = true;
+		return this;
+	}
+	/**
+	* This method is used to conditionally include a part of the query.
+	*
+	* @param condition - Condition to check
+	* @returns itself if the condition is `true`, otherwise `undefined`
+	*/
+	if(condition) {
+		return condition ? this : void 0;
+	}
+};
+var Name = class {
+	constructor(value) {
+		this.value = value;
+	}
+	static [entityKind] = "Name";
+	brand;
+	getSQL() {
+		return new SQL([this]);
+	}
+};
+function isDriverValueEncoder(value) {
+	return typeof value === "object" && value !== null && "mapToDriverValue" in value && typeof value.mapToDriverValue === "function";
+}
+const noopDecoder = { mapFromDriverValue: (value) => value };
+const noopEncoder = { mapToDriverValue: (value) => value };
+({
+	...noopDecoder,
+	...noopEncoder
+});
+var Param = class {
+	/**
+	* @param value - Parameter value
+	* @param encoder - Encoder to convert the value to a driver parameter
+	*/
+	constructor(value, encoder = noopEncoder) {
+		this.value = value;
+		this.encoder = encoder;
+	}
+	static [entityKind] = "Param";
+	brand;
+	getSQL() {
+		return new SQL([this]);
+	}
+};
+function sql(strings, ...params) {
+	const queryChunks = [];
+	if (params.length > 0 || strings.length > 0 && strings[0] !== "") queryChunks.push(new StringChunk(strings[0]));
+	for (const [paramIndex, param2] of params.entries()) queryChunks.push(param2, new StringChunk(strings[paramIndex + 1]));
+	return new SQL(queryChunks);
+}
+((sql2) => {
+	function empty() {
+		return new SQL([]);
+	}
+	sql2.empty = empty;
+	function fromList(list) {
+		return new SQL(list);
+	}
+	sql2.fromList = fromList;
+	function raw(str) {
+		return new SQL([new StringChunk(str)]);
+	}
+	sql2.raw = raw;
+	function join(chunks, separator) {
+		const result = [];
+		for (const [i, chunk] of chunks.entries()) {
+			if (i > 0 && separator !== void 0) result.push(separator);
+			result.push(chunk);
+		}
+		return new SQL(result);
+	}
+	sql2.join = join;
+	function identifier(value) {
+		return new Name(value);
+	}
+	sql2.identifier = identifier;
+	function placeholder2(name2) {
+		return new Placeholder(name2);
+	}
+	sql2.placeholder = placeholder2;
+	function param2(value, encoder) {
+		return new Param(value, encoder);
+	}
+	sql2.param = param2;
+})(sql || (sql = {}));
+((SQL2) => {
+	class Aliased {
+		constructor(sql2, fieldAlias) {
+			this.sql = sql2;
+			this.fieldAlias = fieldAlias;
+		}
+		static [entityKind] = "SQL.Aliased";
+		/** @internal */
+		isSelectionField = false;
+		getSQL() {
+			return this.sql;
+		}
+		/** @internal */
+		clone() {
+			return new Aliased(this.sql, this.fieldAlias);
+		}
+	}
+	SQL2.Aliased = Aliased;
+})(SQL || (SQL = {}));
+var Placeholder = class {
+	constructor(name2) {
+		this.name = name2;
+	}
+	static [entityKind] = "Placeholder";
+	getSQL() {
+		return new SQL([this]);
+	}
+};
+function fillPlaceholders(params, values) {
+	return params.map((p) => {
+		if (is(p, Placeholder)) {
+			if (!(p.name in values)) throw new Error(`No value for placeholder "${p.name}" was provided`);
+			return values[p.name];
+		}
+		if (is(p, Param) && is(p.value, Placeholder)) {
+			if (!(p.value.name in values)) throw new Error(`No value for placeholder "${p.value.name}" was provided`);
+			return p.encoder.mapToDriverValue(values[p.value.name]);
+		}
+		return p;
+	});
+}
+const IsDrizzleView = Symbol.for("drizzle:IsDrizzleView");
+var View = class {
+	static [entityKind] = "View";
+	/** @internal */
+	[ViewBaseConfig];
+	/** @internal */
+	[IsDrizzleView] = true;
+	constructor({ name: name2, schema, selectedFields, query }) {
+		this[ViewBaseConfig] = {
+			name: name2,
+			originalName: name2,
+			schema,
+			selectedFields,
+			query,
+			isExisting: !query,
+			isAlias: false
+		};
+	}
+	getSQL() {
+		return new SQL([this]);
+	}
+};
+Column.prototype.getSQL = function() {
+	return new SQL([this]);
+};
+Table.prototype.getSQL = function() {
+	return new SQL([this]);
+};
+Subquery.prototype.getSQL = function() {
+	return new SQL([this]);
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/alias.js
+var ColumnAliasProxyHandler = class {
+	constructor(table) {
+		this.table = table;
+	}
+	static [entityKind] = "ColumnAliasProxyHandler";
+	get(columnObj, prop) {
+		if (prop === "table") return this.table;
+		return columnObj[prop];
+	}
+};
+var TableAliasProxyHandler = class {
+	constructor(alias, replaceOriginalName) {
+		this.alias = alias;
+		this.replaceOriginalName = replaceOriginalName;
+	}
+	static [entityKind] = "TableAliasProxyHandler";
+	get(target, prop) {
+		if (prop === Table.Symbol.IsAlias) return true;
+		if (prop === Table.Symbol.Name) return this.alias;
+		if (this.replaceOriginalName && prop === Table.Symbol.OriginalName) return this.alias;
+		if (prop === ViewBaseConfig) return {
+			...target[ViewBaseConfig],
+			name: this.alias,
+			isAlias: true
+		};
+		if (prop === Table.Symbol.Columns) {
+			const columns = target[Table.Symbol.Columns];
+			if (!columns) return columns;
+			const proxiedColumns = {};
+			Object.keys(columns).map((key) => {
+				proxiedColumns[key] = new Proxy(columns[key], new ColumnAliasProxyHandler(new Proxy(target, this)));
+			});
+			return proxiedColumns;
+		}
+		const value = target[prop];
+		if (is(value, Column)) return new Proxy(value, new ColumnAliasProxyHandler(new Proxy(target, this)));
+		return value;
+	}
+};
+function aliasedTable(table, tableAlias) {
+	return new Proxy(table, new TableAliasProxyHandler(tableAlias, false));
+}
+function aliasedTableColumn(column, tableAlias) {
+	return new Proxy(column, new ColumnAliasProxyHandler(new Proxy(column.table, new TableAliasProxyHandler(tableAlias, false))));
+}
+function mapColumnsInAliasedSQLToAlias(query, alias) {
+	return new SQL.Aliased(mapColumnsInSQLToAlias(query.sql, alias), query.fieldAlias);
+}
+function mapColumnsInSQLToAlias(query, alias) {
+	return sql.join(query.queryChunks.map((c) => {
+		if (is(c, Column)) return aliasedTableColumn(c, alias);
+		if (is(c, SQL)) return mapColumnsInSQLToAlias(c, alias);
+		if (is(c, SQL.Aliased)) return mapColumnsInAliasedSQLToAlias(c, alias);
+		return c;
+	}));
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/errors.js
+var DrizzleError = class extends Error {
+	static [entityKind] = "DrizzleError";
+	constructor({ message, cause }) {
+		super(message);
+		this.name = "DrizzleError";
+		this.cause = cause;
+	}
+};
+var DrizzleQueryError = class DrizzleQueryError extends Error {
+	constructor(query, params, cause) {
+		super(`Failed query: ${query}
+params: ${params}`);
+		this.query = query;
+		this.params = params;
+		this.cause = cause;
+		Error.captureStackTrace(this, DrizzleQueryError);
+		if (cause) this.cause = cause;
+	}
+};
+var TransactionRollbackError = class extends DrizzleError {
+	static [entityKind] = "TransactionRollbackError";
+	constructor() {
+		super({ message: "Rollback" });
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/logger.js
+var ConsoleLogWriter = class {
+	static [entityKind] = "ConsoleLogWriter";
+	write(message) {
+		console.log(message);
+	}
+};
+var DefaultLogger = class {
+	static [entityKind] = "DefaultLogger";
+	writer;
+	constructor(config) {
+		this.writer = config?.writer ?? new ConsoleLogWriter();
+	}
+	logQuery(query, params) {
+		const stringifiedParams = params.map((p) => {
+			try {
+				return JSON.stringify(p);
+			} catch {
+				return String(p);
+			}
+		});
+		const paramsStr = stringifiedParams.length ? ` -- params: [${stringifiedParams.join(", ")}]` : "";
+		this.writer.write(`Query: ${query}${paramsStr}`);
+	}
+};
+var NoopLogger = class {
+	static [entityKind] = "NoopLogger";
+	logQuery() {}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/query-promise.js
+var QueryPromise = class {
+	static [entityKind] = "QueryPromise";
+	[Symbol.toStringTag] = "QueryPromise";
+	catch(onRejected) {
+		return this.then(void 0, onRejected);
+	}
+	finally(onFinally) {
+		return this.then((value) => {
+			onFinally?.();
+			return value;
+		}, (reason) => {
+			onFinally?.();
+			throw reason;
+		});
+	}
+	then(onFulfilled, onRejected) {
+		return this.execute().then(onFulfilled, onRejected);
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/utils.js
+function mapResultRow(columns, row, joinsNotNullableMap) {
+	const nullifyMap = {};
+	const result = columns.reduce((result2, { path, field }, columnIndex) => {
+		let decoder;
+		if (is(field, Column)) decoder = field;
+		else if (is(field, SQL)) decoder = field.decoder;
+		else if (is(field, Subquery)) decoder = field._.sql.decoder;
+		else decoder = field.sql.decoder;
+		let node = result2;
+		for (const [pathChunkIndex, pathChunk] of path.entries()) if (pathChunkIndex < path.length - 1) {
+			if (!(pathChunk in node)) node[pathChunk] = {};
+			node = node[pathChunk];
+		} else {
+			const rawValue = row[columnIndex];
+			const value = node[pathChunk] = rawValue === null ? null : decoder.mapFromDriverValue(rawValue);
+			if (joinsNotNullableMap && is(field, Column) && path.length === 2) {
+				const objectName = path[0];
+				if (!(objectName in nullifyMap)) nullifyMap[objectName] = value === null ? getTableName(field.table) : false;
+				else if (typeof nullifyMap[objectName] === "string" && nullifyMap[objectName] !== getTableName(field.table)) nullifyMap[objectName] = false;
+			}
+		}
+		return result2;
+	}, {});
+	if (joinsNotNullableMap && Object.keys(nullifyMap).length > 0) {
+		for (const [objectName, tableName] of Object.entries(nullifyMap)) if (typeof tableName === "string" && !joinsNotNullableMap[tableName]) result[objectName] = null;
+	}
+	return result;
+}
+function orderSelectedFields(fields, pathPrefix) {
+	return Object.entries(fields).reduce((result, [name, field]) => {
+		if (typeof name !== "string") return result;
+		const newPath = pathPrefix ? [...pathPrefix, name] : [name];
+		if (is(field, Column) || is(field, SQL) || is(field, SQL.Aliased) || is(field, Subquery)) result.push({
+			path: newPath,
+			field
+		});
+		else if (is(field, Table)) result.push(...orderSelectedFields(field[Table.Symbol.Columns], newPath));
+		else result.push(...orderSelectedFields(field, newPath));
+		return result;
+	}, []);
+}
+function haveSameKeys(left, right) {
+	const leftKeys = Object.keys(left);
+	const rightKeys = Object.keys(right);
+	if (leftKeys.length !== rightKeys.length) return false;
+	for (const [index, key] of leftKeys.entries()) if (key !== rightKeys[index]) return false;
+	return true;
+}
+function mapUpdateSet(table, values) {
+	const entries = Object.entries(values).filter(([, value]) => value !== void 0).map(([key, value]) => {
+		if (is(value, SQL) || is(value, Column)) return [key, value];
+		else return [key, new Param(value, table[Table.Symbol.Columns][key])];
+	});
+	if (entries.length === 0) throw new Error("No values to set");
+	return Object.fromEntries(entries);
+}
+function applyMixins(baseClass, extendedClasses) {
+	for (const extendedClass of extendedClasses) for (const name of Object.getOwnPropertyNames(extendedClass.prototype)) {
+		if (name === "constructor") continue;
+		Object.defineProperty(baseClass.prototype, name, Object.getOwnPropertyDescriptor(extendedClass.prototype, name) || /* @__PURE__ */ Object.create(null));
+	}
+}
+function getTableColumns(table) {
+	return table[Table.Symbol.Columns];
+}
+function getTableLikeName(table) {
+	return is(table, Subquery) ? table._.alias : is(table, View) ? table[ViewBaseConfig].name : is(table, SQL) ? void 0 : table[Table.Symbol.IsAlias] ? table[Table.Symbol.Name] : table[Table.Symbol.BaseName];
+}
+function getColumnNameAndConfig(a, b) {
+	return {
+		name: typeof a === "string" && a.length > 0 ? a : "",
+		config: typeof a === "object" ? a : b
+	};
+}
+const textDecoder = typeof TextDecoder === "undefined" ? null : new TextDecoder();
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/pg-core/table.js
+const InlineForeignKeys$1 = Symbol.for("drizzle:PgInlineForeignKeys");
+const EnableRLS = Symbol.for("drizzle:EnableRLS");
+var PgTable = class extends Table {
+	static [entityKind] = "PgTable";
+	/** @internal */
+	static Symbol = Object.assign({}, Table.Symbol, {
+		InlineForeignKeys: InlineForeignKeys$1,
+		EnableRLS
+	});
+	/**@internal */
+	[InlineForeignKeys$1] = [];
+	/** @internal */
+	[EnableRLS] = false;
+	/** @internal */
+	[Table.Symbol.ExtraConfigBuilder] = void 0;
+	/** @internal */
+	[Table.Symbol.ExtraConfigColumns] = {};
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/pg-core/primary-keys.js
+var PrimaryKeyBuilder = class {
+	static [entityKind] = "PgPrimaryKeyBuilder";
+	/** @internal */
+	columns;
+	/** @internal */
+	name;
+	constructor(columns, name) {
+		this.columns = columns;
+		this.name = name;
+	}
+	/** @internal */
+	build(table) {
+		return new PrimaryKey(table, this.columns, this.name);
+	}
+};
+var PrimaryKey = class {
+	constructor(table, columns, name) {
+		this.table = table;
+		this.columns = columns;
+		this.name = name;
+	}
+	static [entityKind] = "PgPrimaryKey";
+	columns;
+	name;
+	getName() {
+		return this.name ?? `${this.table[PgTable.Symbol.Name]}_${this.columns.map((column) => column.name).join("_")}_pk`;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sql/expressions/conditions.js
+function bindIfParam(value, column) {
+	if (isDriverValueEncoder(column) && !isSQLWrapper(value) && !is(value, Param) && !is(value, Placeholder) && !is(value, Column) && !is(value, Table) && !is(value, View)) return new Param(value, column);
+	return value;
+}
+const eq = (left, right) => {
+	return sql`${left} = ${bindIfParam(right, left)}`;
+};
+const ne = (left, right) => {
+	return sql`${left} <> ${bindIfParam(right, left)}`;
+};
+function and(...unfilteredConditions) {
+	const conditions = unfilteredConditions.filter((c) => c !== void 0);
+	if (conditions.length === 0) return;
+	if (conditions.length === 1) return new SQL(conditions);
+	return new SQL([
+		new StringChunk("("),
+		sql.join(conditions, new StringChunk(" and ")),
+		new StringChunk(")")
+	]);
+}
+function or(...unfilteredConditions) {
+	const conditions = unfilteredConditions.filter((c) => c !== void 0);
+	if (conditions.length === 0) return;
+	if (conditions.length === 1) return new SQL(conditions);
+	return new SQL([
+		new StringChunk("("),
+		sql.join(conditions, new StringChunk(" or ")),
+		new StringChunk(")")
+	]);
+}
+function not(condition) {
+	return sql`not ${condition}`;
+}
+const gt = (left, right) => {
+	return sql`${left} > ${bindIfParam(right, left)}`;
+};
+const gte = (left, right) => {
+	return sql`${left} >= ${bindIfParam(right, left)}`;
+};
+const lt = (left, right) => {
+	return sql`${left} < ${bindIfParam(right, left)}`;
+};
+const lte = (left, right) => {
+	return sql`${left} <= ${bindIfParam(right, left)}`;
+};
+function inArray(column, values) {
+	if (Array.isArray(values)) {
+		if (values.length === 0) return sql`false`;
+		return sql`${column} in ${values.map((v) => bindIfParam(v, column))}`;
+	}
+	return sql`${column} in ${bindIfParam(values, column)}`;
+}
+function notInArray(column, values) {
+	if (Array.isArray(values)) {
+		if (values.length === 0) return sql`true`;
+		return sql`${column} not in ${values.map((v) => bindIfParam(v, column))}`;
+	}
+	return sql`${column} not in ${bindIfParam(values, column)}`;
+}
+function isNull$1(value) {
+	return sql`${value} is null`;
+}
+function isNotNull(value) {
+	return sql`${value} is not null`;
+}
+function exists(subquery) {
+	return sql`exists ${subquery}`;
+}
+function notExists(subquery) {
+	return sql`not exists ${subquery}`;
+}
+function between(column, min, max) {
+	return sql`${column} between ${bindIfParam(min, column)} and ${bindIfParam(max, column)}`;
+}
+function notBetween(column, min, max) {
+	return sql`${column} not between ${bindIfParam(min, column)} and ${bindIfParam(max, column)}`;
+}
+function like(column, value) {
+	return sql`${column} like ${value}`;
+}
+function notLike(column, value) {
+	return sql`${column} not like ${value}`;
+}
+function ilike(column, value) {
+	return sql`${column} ilike ${value}`;
+}
+function notIlike(column, value) {
+	return sql`${column} not ilike ${value}`;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sql/expressions/select.js
+function asc(column) {
+	return sql`${column} asc`;
+}
+function desc(column) {
+	return sql`${column} desc`;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/relations.js
+var Relation = class {
+	constructor(sourceTable, referencedTable, relationName) {
+		this.sourceTable = sourceTable;
+		this.referencedTable = referencedTable;
+		this.relationName = relationName;
+		this.referencedTableName = referencedTable[Table.Symbol.Name];
+	}
+	static [entityKind] = "Relation";
+	referencedTableName;
+	fieldName;
+};
+var Relations = class {
+	constructor(table, config) {
+		this.table = table;
+		this.config = config;
+	}
+	static [entityKind] = "Relations";
+};
+var One = class One extends Relation {
+	constructor(sourceTable, referencedTable, config, isNullable) {
+		super(sourceTable, referencedTable, config?.relationName);
+		this.config = config;
+		this.isNullable = isNullable;
+	}
+	static [entityKind] = "One";
+	withFieldName(fieldName) {
+		const relation = new One(this.sourceTable, this.referencedTable, this.config, this.isNullable);
+		relation.fieldName = fieldName;
+		return relation;
+	}
+};
+var Many = class Many extends Relation {
+	constructor(sourceTable, referencedTable, config) {
+		super(sourceTable, referencedTable, config?.relationName);
+		this.config = config;
+	}
+	static [entityKind] = "Many";
+	withFieldName(fieldName) {
+		const relation = new Many(this.sourceTable, this.referencedTable, this.config);
+		relation.fieldName = fieldName;
+		return relation;
+	}
+};
+function getOperators() {
+	return {
+		and,
+		between,
+		eq,
+		exists,
+		gt,
+		gte,
+		ilike,
+		inArray,
+		isNull: isNull$1,
+		isNotNull,
+		like,
+		lt,
+		lte,
+		ne,
+		not,
+		notBetween,
+		notExists,
+		notLike,
+		notIlike,
+		notInArray,
+		or,
+		sql
+	};
+}
+function getOrderByOperators() {
+	return {
+		sql,
+		asc,
+		desc
+	};
+}
+function extractTablesRelationalConfig(schema, configHelpers) {
+	if (Object.keys(schema).length === 1 && "default" in schema && !is(schema["default"], Table)) schema = schema["default"];
+	const tableNamesMap = {};
+	const relationsBuffer = {};
+	const tablesConfig = {};
+	for (const [key, value] of Object.entries(schema)) if (is(value, Table)) {
+		const dbName = getTableUniqueName(value);
+		const bufferedRelations = relationsBuffer[dbName];
+		tableNamesMap[dbName] = key;
+		tablesConfig[key] = {
+			tsName: key,
+			dbName: value[Table.Symbol.Name],
+			schema: value[Table.Symbol.Schema],
+			columns: value[Table.Symbol.Columns],
+			relations: bufferedRelations?.relations ?? {},
+			primaryKey: bufferedRelations?.primaryKey ?? []
+		};
+		for (const column of Object.values(value[Table.Symbol.Columns])) if (column.primary) tablesConfig[key].primaryKey.push(column);
+		const extraConfig = value[Table.Symbol.ExtraConfigBuilder]?.(value[Table.Symbol.ExtraConfigColumns]);
+		if (extraConfig) {
+			for (const configEntry of Object.values(extraConfig)) if (is(configEntry, PrimaryKeyBuilder)) tablesConfig[key].primaryKey.push(...configEntry.columns);
+		}
+	} else if (is(value, Relations)) {
+		const dbName = getTableUniqueName(value.table);
+		const tableName = tableNamesMap[dbName];
+		const relations2 = value.config(configHelpers(value.table));
+		let primaryKey;
+		for (const [relationName, relation] of Object.entries(relations2)) if (tableName) {
+			const tableConfig = tablesConfig[tableName];
+			tableConfig.relations[relationName] = relation;
+		} else {
+			if (!(dbName in relationsBuffer)) relationsBuffer[dbName] = {
+				relations: {},
+				primaryKey
+			};
+			relationsBuffer[dbName].relations[relationName] = relation;
+		}
+	}
+	return {
+		tables: tablesConfig,
+		tableNamesMap
+	};
+}
+function createOne(sourceTable) {
+	return function one(table, config) {
+		return new One(sourceTable, table, config, config?.fields.reduce((res, f) => res && f.notNull, true) ?? false);
+	};
+}
+function createMany(sourceTable) {
+	return function many(referencedTable, config) {
+		return new Many(sourceTable, referencedTable, config);
+	};
+}
+function normalizeRelation(schema, tableNamesMap, relation) {
+	if (is(relation, One) && relation.config) return {
+		fields: relation.config.fields,
+		references: relation.config.references
+	};
+	const referencedTableTsName = tableNamesMap[getTableUniqueName(relation.referencedTable)];
+	if (!referencedTableTsName) throw new Error(`Table "${relation.referencedTable[Table.Symbol.Name]}" not found in schema`);
+	const referencedTableConfig = schema[referencedTableTsName];
+	if (!referencedTableConfig) throw new Error(`Table "${referencedTableTsName}" not found in schema`);
+	const sourceTable = relation.sourceTable;
+	const sourceTableTsName = tableNamesMap[getTableUniqueName(sourceTable)];
+	if (!sourceTableTsName) throw new Error(`Table "${sourceTable[Table.Symbol.Name]}" not found in schema`);
+	const reverseRelations = [];
+	for (const referencedTableRelation of Object.values(referencedTableConfig.relations)) if (relation.relationName && relation !== referencedTableRelation && referencedTableRelation.relationName === relation.relationName || !relation.relationName && referencedTableRelation.referencedTable === relation.sourceTable) reverseRelations.push(referencedTableRelation);
+	if (reverseRelations.length > 1) throw relation.relationName ? /* @__PURE__ */ new Error(`There are multiple relations with name "${relation.relationName}" in table "${referencedTableTsName}"`) : /* @__PURE__ */ new Error(`There are multiple relations between "${referencedTableTsName}" and "${relation.sourceTable[Table.Symbol.Name]}". Please specify relation name`);
+	if (reverseRelations[0] && is(reverseRelations[0], One) && reverseRelations[0].config) return {
+		fields: reverseRelations[0].config.references,
+		references: reverseRelations[0].config.fields
+	};
+	throw new Error(`There is not enough information to infer relation "${sourceTableTsName}.${relation.fieldName}"`);
+}
+function createTableRelationsHelpers(sourceTable) {
+	return {
+		one: createOne(sourceTable),
+		many: createMany(sourceTable)
+	};
+}
+function mapRelationalRow(tablesConfig, tableConfig, row, buildQueryResultSelection, mapColumnValue = (value) => value) {
+	const result = {};
+	for (const [selectionItemIndex, selectionItem] of buildQueryResultSelection.entries()) if (selectionItem.isJson) {
+		const relation = tableConfig.relations[selectionItem.tsKey];
+		const rawSubRows = row[selectionItemIndex];
+		const subRows = typeof rawSubRows === "string" ? JSON.parse(rawSubRows) : rawSubRows;
+		result[selectionItem.tsKey] = is(relation, One) ? subRows && mapRelationalRow(tablesConfig, tablesConfig[selectionItem.relationTableTsKey], subRows, selectionItem.selection, mapColumnValue) : subRows.map((subRow) => mapRelationalRow(tablesConfig, tablesConfig[selectionItem.relationTableTsKey], subRow, selectionItem.selection, mapColumnValue));
+	} else {
+		const value = mapColumnValue(row[selectionItemIndex]);
+		const field = selectionItem.field;
+		let decoder;
+		if (is(field, Column)) decoder = field;
+		else if (is(field, SQL)) decoder = field.decoder;
+		else decoder = field.sql.decoder;
+		result[selectionItem.tsKey] = value === null ? null : decoder.mapFromDriverValue(value);
+	}
+	return result;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/selection-proxy.js
+var SelectionProxyHandler = class SelectionProxyHandler {
+	static [entityKind] = "SelectionProxyHandler";
+	config;
+	constructor(config) {
+		this.config = { ...config };
+	}
+	get(subquery, prop) {
+		if (prop === "_") return {
+			...subquery["_"],
+			selectedFields: new Proxy(subquery._.selectedFields, this)
+		};
+		if (prop === ViewBaseConfig) return {
+			...subquery[ViewBaseConfig],
+			selectedFields: new Proxy(subquery[ViewBaseConfig].selectedFields, this)
+		};
+		if (typeof prop === "symbol") return subquery[prop];
+		const value = (is(subquery, Subquery) ? subquery._.selectedFields : is(subquery, View) ? subquery[ViewBaseConfig].selectedFields : subquery)[prop];
+		if (is(value, SQL.Aliased)) {
+			if (this.config.sqlAliasedBehavior === "sql" && !value.isSelectionField) return value.sql;
+			const newValue = value.clone();
+			newValue.isSelectionField = true;
+			return newValue;
+		}
+		if (is(value, SQL)) {
+			if (this.config.sqlBehavior === "sql") return value;
+			throw new Error(`You tried to reference "${prop}" field from a subquery, which is a raw SQL field, but it doesn't have an alias declared. Please add an alias to the field using ".as('alias')" method.`);
+		}
+		if (is(value, Column)) {
+			if (this.config.alias) return new Proxy(value, new ColumnAliasProxyHandler(new Proxy(value.table, new TableAliasProxyHandler(this.config.alias, this.config.replaceOriginalName ?? false))));
+			return value;
+		}
+		if (typeof value !== "object" || value === null) return value;
+		return new Proxy(value, new SelectionProxyHandler(this.config));
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/foreign-keys.js
+var ForeignKeyBuilder = class {
+	static [entityKind] = "SQLiteForeignKeyBuilder";
+	/** @internal */
+	reference;
+	/** @internal */
+	_onUpdate;
+	/** @internal */
+	_onDelete;
+	constructor(config, actions) {
+		this.reference = () => {
+			const { name, columns, foreignColumns } = config();
+			return {
+				name,
+				columns,
+				foreignTable: foreignColumns[0].table,
+				foreignColumns
+			};
+		};
+		if (actions) {
+			this._onUpdate = actions.onUpdate;
+			this._onDelete = actions.onDelete;
+		}
+	}
+	onUpdate(action) {
+		this._onUpdate = action;
+		return this;
+	}
+	onDelete(action) {
+		this._onDelete = action;
+		return this;
+	}
+	/** @internal */
+	build(table) {
+		return new ForeignKey(table, this);
+	}
+};
+var ForeignKey = class {
+	constructor(table, builder) {
+		this.table = table;
+		this.reference = builder.reference;
+		this.onUpdate = builder._onUpdate;
+		this.onDelete = builder._onDelete;
+	}
+	static [entityKind] = "SQLiteForeignKey";
+	reference;
+	onUpdate;
+	onDelete;
+	getName() {
+		const { name, columns, foreignColumns } = this.reference();
+		const columnNames = columns.map((column) => column.name);
+		const foreignColumnNames = foreignColumns.map((column) => column.name);
+		const chunks = [
+			this.table[TableName],
+			...columnNames,
+			foreignColumns[0].table[TableName],
+			...foreignColumnNames
+		];
+		return name ?? `${chunks.join("_")}_fk`;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/unique-constraint.js
+function uniqueKeyName(table, columns) {
+	return `${table[TableName]}_${columns.join("_")}_unique`;
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/common.js
+var SQLiteColumnBuilder = class extends ColumnBuilder {
+	static [entityKind] = "SQLiteColumnBuilder";
+	foreignKeyConfigs = [];
+	references(ref, actions = {}) {
+		this.foreignKeyConfigs.push({
+			ref,
+			actions
+		});
+		return this;
+	}
+	unique(name) {
+		this.config.isUnique = true;
+		this.config.uniqueName = name;
+		return this;
+	}
+	generatedAlwaysAs(as, config) {
+		this.config.generated = {
+			as,
+			type: "always",
+			mode: config?.mode ?? "virtual"
+		};
+		return this;
+	}
+	/** @internal */
+	buildForeignKeys(column, table) {
+		return this.foreignKeyConfigs.map(({ ref, actions }) => {
+			return ((ref2, actions2) => {
+				const builder = new ForeignKeyBuilder(() => {
+					const foreignColumn = ref2();
+					return {
+						columns: [column],
+						foreignColumns: [foreignColumn]
+					};
+				});
+				if (actions2.onUpdate) builder.onUpdate(actions2.onUpdate);
+				if (actions2.onDelete) builder.onDelete(actions2.onDelete);
+				return builder.build(table);
+			})(ref, actions);
+		});
+	}
+};
+var SQLiteColumn = class extends Column {
+	constructor(table, config) {
+		if (!config.uniqueName) config.uniqueName = uniqueKeyName(table, [config.name]);
+		super(table, config);
+		this.table = table;
+	}
+	static [entityKind] = "SQLiteColumn";
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/blob.js
+var SQLiteBigIntBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteBigIntBuilder";
+	constructor(name) {
+		super(name, "bigint", "SQLiteBigInt");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteBigInt(table, this.config);
+	}
+};
+var SQLiteBigInt = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteBigInt";
+	getSQLType() {
+		return "blob";
+	}
+	mapFromDriverValue(value) {
+		if (typeof Buffer !== "undefined" && Buffer.from) {
+			const buf = Buffer.isBuffer(value) ? value : value instanceof ArrayBuffer ? Buffer.from(value) : value.buffer ? Buffer.from(value.buffer, value.byteOffset, value.byteLength) : Buffer.from(value);
+			return BigInt(buf.toString("utf8"));
+		}
+		return BigInt(textDecoder.decode(value));
+	}
+	mapToDriverValue(value) {
+		return Buffer.from(value.toString());
+	}
+};
+var SQLiteBlobJsonBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteBlobJsonBuilder";
+	constructor(name) {
+		super(name, "json", "SQLiteBlobJson");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteBlobJson(table, this.config);
+	}
+};
+var SQLiteBlobJson = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteBlobJson";
+	getSQLType() {
+		return "blob";
+	}
+	mapFromDriverValue(value) {
+		if (typeof Buffer !== "undefined" && Buffer.from) {
+			const buf = Buffer.isBuffer(value) ? value : value instanceof ArrayBuffer ? Buffer.from(value) : value.buffer ? Buffer.from(value.buffer, value.byteOffset, value.byteLength) : Buffer.from(value);
+			return JSON.parse(buf.toString("utf8"));
+		}
+		return JSON.parse(textDecoder.decode(value));
+	}
+	mapToDriverValue(value) {
+		return Buffer.from(JSON.stringify(value));
+	}
+};
+var SQLiteBlobBufferBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteBlobBufferBuilder";
+	constructor(name) {
+		super(name, "buffer", "SQLiteBlobBuffer");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteBlobBuffer(table, this.config);
+	}
+};
+var SQLiteBlobBuffer = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteBlobBuffer";
+	mapFromDriverValue(value) {
+		if (Buffer.isBuffer(value)) return value;
+		return Buffer.from(value);
+	}
+	getSQLType() {
+		return "blob";
+	}
+};
+function blob(a, b) {
+	const { name, config } = getColumnNameAndConfig(a, b);
+	if (config?.mode === "json") return new SQLiteBlobJsonBuilder(name);
+	if (config?.mode === "bigint") return new SQLiteBigIntBuilder(name);
+	return new SQLiteBlobBufferBuilder(name);
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/custom.js
+var SQLiteCustomColumnBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteCustomColumnBuilder";
+	constructor(name, fieldConfig, customTypeParams) {
+		super(name, "custom", "SQLiteCustomColumn");
+		this.config.fieldConfig = fieldConfig;
+		this.config.customTypeParams = customTypeParams;
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteCustomColumn(table, this.config);
+	}
+};
+var SQLiteCustomColumn = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteCustomColumn";
+	sqlName;
+	mapTo;
+	mapFrom;
+	constructor(table, config) {
+		super(table, config);
+		this.sqlName = config.customTypeParams.dataType(config.fieldConfig);
+		this.mapTo = config.customTypeParams.toDriver;
+		this.mapFrom = config.customTypeParams.fromDriver;
+	}
+	getSQLType() {
+		return this.sqlName;
+	}
+	mapFromDriverValue(value) {
+		return typeof this.mapFrom === "function" ? this.mapFrom(value) : value;
+	}
+	mapToDriverValue(value) {
+		return typeof this.mapTo === "function" ? this.mapTo(value) : value;
+	}
+};
+function customType(customTypeParams) {
+	return (a, b) => {
+		const { name, config } = getColumnNameAndConfig(a, b);
+		return new SQLiteCustomColumnBuilder(name, config, customTypeParams);
+	};
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/integer.js
+var SQLiteBaseIntegerBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteBaseIntegerBuilder";
+	constructor(name, dataType, columnType) {
+		super(name, dataType, columnType);
+		this.config.autoIncrement = false;
+	}
+	primaryKey(config) {
+		if (config?.autoIncrement) this.config.autoIncrement = true;
+		this.config.hasDefault = true;
+		return super.primaryKey();
+	}
+};
+var SQLiteBaseInteger = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteBaseInteger";
+	autoIncrement = this.config.autoIncrement;
+	getSQLType() {
+		return "integer";
+	}
+};
+var SQLiteIntegerBuilder = class extends SQLiteBaseIntegerBuilder {
+	static [entityKind] = "SQLiteIntegerBuilder";
+	constructor(name) {
+		super(name, "number", "SQLiteInteger");
+	}
+	build(table) {
+		return new SQLiteInteger(table, this.config);
+	}
+};
+var SQLiteInteger = class extends SQLiteBaseInteger {
+	static [entityKind] = "SQLiteInteger";
+};
+var SQLiteTimestampBuilder = class extends SQLiteBaseIntegerBuilder {
+	static [entityKind] = "SQLiteTimestampBuilder";
+	constructor(name, mode) {
+		super(name, "date", "SQLiteTimestamp");
+		this.config.mode = mode;
+	}
+	/**
+	* @deprecated Use `default()` with your own expression instead.
+	*
+	* Adds `DEFAULT (cast((julianday('now') - 2440587.5)*86400000 as integer))` to the column, which is the current epoch timestamp in milliseconds.
+	*/
+	defaultNow() {
+		return this.default(sql`(cast((julianday('now') - 2440587.5)*86400000 as integer))`);
+	}
+	build(table) {
+		return new SQLiteTimestamp(table, this.config);
+	}
+};
+var SQLiteTimestamp = class extends SQLiteBaseInteger {
+	static [entityKind] = "SQLiteTimestamp";
+	mode = this.config.mode;
+	mapFromDriverValue(value) {
+		if (this.config.mode === "timestamp") return /* @__PURE__ */ new Date(value * 1e3);
+		return new Date(value);
+	}
+	mapToDriverValue(value) {
+		const unix = value.getTime();
+		if (this.config.mode === "timestamp") return Math.floor(unix / 1e3);
+		return unix;
+	}
+};
+var SQLiteBooleanBuilder = class extends SQLiteBaseIntegerBuilder {
+	static [entityKind] = "SQLiteBooleanBuilder";
+	constructor(name, mode) {
+		super(name, "boolean", "SQLiteBoolean");
+		this.config.mode = mode;
+	}
+	build(table) {
+		return new SQLiteBoolean(table, this.config);
+	}
+};
+var SQLiteBoolean = class extends SQLiteBaseInteger {
+	static [entityKind] = "SQLiteBoolean";
+	mode = this.config.mode;
+	mapFromDriverValue(value) {
+		return Number(value) === 1;
+	}
+	mapToDriverValue(value) {
+		return value ? 1 : 0;
+	}
+};
+function integer(a, b) {
+	const { name, config } = getColumnNameAndConfig(a, b);
+	if (config?.mode === "timestamp" || config?.mode === "timestamp_ms") return new SQLiteTimestampBuilder(name, config.mode);
+	if (config?.mode === "boolean") return new SQLiteBooleanBuilder(name, config.mode);
+	return new SQLiteIntegerBuilder(name);
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/numeric.js
+var SQLiteNumericBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteNumericBuilder";
+	constructor(name) {
+		super(name, "string", "SQLiteNumeric");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteNumeric(table, this.config);
+	}
+};
+var SQLiteNumeric = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteNumeric";
+	mapFromDriverValue(value) {
+		if (typeof value === "string") return value;
+		return String(value);
+	}
+	getSQLType() {
+		return "numeric";
+	}
+};
+var SQLiteNumericNumberBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteNumericNumberBuilder";
+	constructor(name) {
+		super(name, "number", "SQLiteNumericNumber");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteNumericNumber(table, this.config);
+	}
+};
+var SQLiteNumericNumber = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteNumericNumber";
+	mapFromDriverValue(value) {
+		if (typeof value === "number") return value;
+		return Number(value);
+	}
+	mapToDriverValue = String;
+	getSQLType() {
+		return "numeric";
+	}
+};
+var SQLiteNumericBigIntBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteNumericBigIntBuilder";
+	constructor(name) {
+		super(name, "bigint", "SQLiteNumericBigInt");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteNumericBigInt(table, this.config);
+	}
+};
+var SQLiteNumericBigInt = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteNumericBigInt";
+	mapFromDriverValue = BigInt;
+	mapToDriverValue = String;
+	getSQLType() {
+		return "numeric";
+	}
+};
+function numeric(a, b) {
+	const { name, config } = getColumnNameAndConfig(a, b);
+	const mode = config?.mode;
+	return mode === "number" ? new SQLiteNumericNumberBuilder(name) : mode === "bigint" ? new SQLiteNumericBigIntBuilder(name) : new SQLiteNumericBuilder(name);
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/real.js
+var SQLiteRealBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteRealBuilder";
+	constructor(name) {
+		super(name, "number", "SQLiteReal");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteReal(table, this.config);
+	}
+};
+var SQLiteReal = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteReal";
+	getSQLType() {
+		return "real";
+	}
+};
+function real(name) {
+	return new SQLiteRealBuilder(name ?? "");
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/text.js
+var SQLiteTextBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteTextBuilder";
+	constructor(name, config) {
+		super(name, "string", "SQLiteText");
+		this.config.enumValues = config.enum;
+		this.config.length = config.length;
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteText(table, this.config);
+	}
+};
+var SQLiteText = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteText";
+	enumValues = this.config.enumValues;
+	length = this.config.length;
+	constructor(table, config) {
+		super(table, config);
+	}
+	getSQLType() {
+		return `text${this.config.length ? `(${this.config.length})` : ""}`;
+	}
+};
+var SQLiteTextJsonBuilder = class extends SQLiteColumnBuilder {
+	static [entityKind] = "SQLiteTextJsonBuilder";
+	constructor(name) {
+		super(name, "json", "SQLiteTextJson");
+	}
+	/** @internal */
+	build(table) {
+		return new SQLiteTextJson(table, this.config);
+	}
+};
+var SQLiteTextJson = class extends SQLiteColumn {
+	static [entityKind] = "SQLiteTextJson";
+	getSQLType() {
+		return "text";
+	}
+	mapFromDriverValue(value) {
+		return JSON.parse(value);
+	}
+	mapToDriverValue(value) {
+		return JSON.stringify(value);
+	}
+};
+function text(a, b = {}) {
+	const { name, config } = getColumnNameAndConfig(a, b);
+	if (config.mode === "json") return new SQLiteTextJsonBuilder(name);
+	return new SQLiteTextBuilder(name, config);
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/columns/all.js
+function getSQLiteColumnBuilders() {
+	return {
+		blob,
+		customType,
+		integer,
+		numeric,
+		real,
+		text
+	};
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/table.js
+const InlineForeignKeys = Symbol.for("drizzle:SQLiteInlineForeignKeys");
+var SQLiteTable = class extends Table {
+	static [entityKind] = "SQLiteTable";
+	/** @internal */
+	static Symbol = Object.assign({}, Table.Symbol, { InlineForeignKeys });
+	/** @internal */
+	[Table.Symbol.Columns];
+	/** @internal */
+	[InlineForeignKeys] = [];
+	/** @internal */
+	[Table.Symbol.ExtraConfigBuilder] = void 0;
+};
+function sqliteTableBase(name, columns, extraConfig, schema, baseName = name) {
+	const rawTable = new SQLiteTable(name, schema, baseName);
+	const parsedColumns = typeof columns === "function" ? columns(getSQLiteColumnBuilders()) : columns;
+	const builtColumns = Object.fromEntries(Object.entries(parsedColumns).map(([name2, colBuilderBase]) => {
+		const colBuilder = colBuilderBase;
+		colBuilder.setName(name2);
+		const column = colBuilder.build(rawTable);
+		rawTable[InlineForeignKeys].push(...colBuilder.buildForeignKeys(column, rawTable));
+		return [name2, column];
+	}));
+	const table = Object.assign(rawTable, builtColumns);
+	table[Table.Symbol.Columns] = builtColumns;
+	table[Table.Symbol.ExtraConfigColumns] = builtColumns;
+	if (extraConfig) table[SQLiteTable.Symbol.ExtraConfigBuilder] = extraConfig;
+	return table;
+}
+const sqliteTable = (name, columns, extraConfig) => {
+	return sqliteTableBase(name, columns, extraConfig);
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/utils.js
+function extractUsedTable(table) {
+	if (is(table, SQLiteTable)) return [`${table[Table.Symbol.BaseName]}`];
+	if (is(table, Subquery)) return table._.usedTables ?? [];
+	if (is(table, SQL)) return table.usedTables ?? [];
+	return [];
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/delete.js
+var SQLiteDeleteBase = class extends QueryPromise {
+	constructor(table, session, dialect, withList) {
+		super();
+		this.table = table;
+		this.session = session;
+		this.dialect = dialect;
+		this.config = {
+			table,
+			withList
+		};
+	}
+	static [entityKind] = "SQLiteDelete";
+	/** @internal */
+	config;
+	/**
+	* Adds a `where` clause to the query.
+	*
+	* Calling this method will delete only those rows that fulfill a specified condition.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/delete}
+	*
+	* @param where the `where` clause.
+	*
+	* @example
+	* You can use conditional operators and `sql function` to filter the rows to be deleted.
+	*
+	* ```ts
+	* // Delete all cars with green color
+	* db.delete(cars).where(eq(cars.color, 'green'));
+	* // or
+	* db.delete(cars).where(sql`${cars.color} = 'green'`)
+	* ```
+	*
+	* You can logically combine conditional operators with `and()` and `or()` operators:
+	*
+	* ```ts
+	* // Delete all BMW cars with a green color
+	* db.delete(cars).where(and(eq(cars.color, 'green'), eq(cars.brand, 'BMW')));
+	*
+	* // Delete all cars with the green or blue color
+	* db.delete(cars).where(or(eq(cars.color, 'green'), eq(cars.color, 'blue')));
+	* ```
+	*/
+	where(where) {
+		this.config.where = where;
+		return this;
+	}
+	orderBy(...columns) {
+		if (typeof columns[0] === "function") {
+			const orderBy = columns[0](new Proxy(this.config.table[Table.Symbol.Columns], new SelectionProxyHandler({
+				sqlAliasedBehavior: "alias",
+				sqlBehavior: "sql"
+			})));
+			const orderByArray = Array.isArray(orderBy) ? orderBy : [orderBy];
+			this.config.orderBy = orderByArray;
+		} else {
+			const orderByArray = columns;
+			this.config.orderBy = orderByArray;
+		}
+		return this;
+	}
+	limit(limit) {
+		this.config.limit = limit;
+		return this;
+	}
+	returning(fields = this.table[SQLiteTable.Symbol.Columns]) {
+		this.config.returning = orderSelectedFields(fields);
+		return this;
+	}
+	/** @internal */
+	getSQL() {
+		return this.dialect.buildDeleteQuery(this.config);
+	}
+	toSQL() {
+		const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
+		return rest;
+	}
+	/** @internal */
+	_prepare(isOneTimeQuery = true) {
+		return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](this.dialect.sqlToQuery(this.getSQL()), this.config.returning, this.config.returning ? "all" : "run", true, void 0, {
+			type: "delete",
+			tables: extractUsedTable(this.config.table)
+		});
+	}
+	prepare() {
+		return this._prepare(false);
+	}
+	run = (placeholderValues) => {
+		return this._prepare().run(placeholderValues);
+	};
+	all = (placeholderValues) => {
+		return this._prepare().all(placeholderValues);
+	};
+	get = (placeholderValues) => {
+		return this._prepare().get(placeholderValues);
+	};
+	values = (placeholderValues) => {
+		return this._prepare().values(placeholderValues);
+	};
+	async execute(placeholderValues) {
+		return this._prepare().execute(placeholderValues);
+	}
+	$dynamic() {
+		return this;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/casing.js
+function toSnakeCase(input) {
+	return (input.replace(/['\u2019]/g, "").match(/[\da-z]+|[A-Z]+(?![a-z])|[A-Z][\da-z]+/g) ?? []).map((word) => word.toLowerCase()).join("_");
+}
+function toCamelCase(input) {
+	return (input.replace(/['\u2019]/g, "").match(/[\da-z]+|[A-Z]+(?![a-z])|[A-Z][\da-z]+/g) ?? []).reduce((acc, word, i) => {
+		return acc + (i === 0 ? word.toLowerCase() : `${word[0].toUpperCase()}${word.slice(1)}`);
+	}, "");
+}
+function noopCase(input) {
+	return input;
+}
+var CasingCache = class {
+	static [entityKind] = "CasingCache";
+	/** @internal */
+	cache = {};
+	cachedTables = {};
+	convert;
+	constructor(casing) {
+		this.convert = casing === "snake_case" ? toSnakeCase : casing === "camelCase" ? toCamelCase : noopCase;
+	}
+	getColumnCasing(column) {
+		if (!column.keyAsName) return column.name;
+		const key = `${column.table[Table.Symbol.Schema] ?? "public"}.${column.table[Table.Symbol.OriginalName]}.${column.name}`;
+		if (!this.cache[key]) this.cacheTable(column.table);
+		return this.cache[key];
+	}
+	cacheTable(table) {
+		const tableKey = `${table[Table.Symbol.Schema] ?? "public"}.${table[Table.Symbol.OriginalName]}`;
+		if (!this.cachedTables[tableKey]) {
+			for (const column of Object.values(table[Table.Symbol.Columns])) {
+				const columnKey = `${tableKey}.${column.name}`;
+				this.cache[columnKey] = this.convert(column.name);
+			}
+			this.cachedTables[tableKey] = true;
+		}
+	}
+	clearCache() {
+		this.cache = {};
+		this.cachedTables = {};
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/view-base.js
+var SQLiteViewBase = class extends View {
+	static [entityKind] = "SQLiteViewBase";
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/dialect.js
+var SQLiteDialect = class {
+	static [entityKind] = "SQLiteDialect";
+	/** @internal */
+	casing;
+	constructor(config) {
+		this.casing = new CasingCache(config?.casing);
+	}
+	escapeName(name) {
+		return `"${name.replace(/"/g, "\"\"")}"`;
+	}
+	escapeParam(_num) {
+		return "?";
+	}
+	escapeString(str) {
+		return `'${str.replace(/'/g, "''")}'`;
+	}
+	buildWithCTE(queries) {
+		if (!queries?.length) return void 0;
+		const withSqlChunks = [sql`with `];
+		for (const [i, w] of queries.entries()) {
+			withSqlChunks.push(sql`${sql.identifier(w._.alias)} as (${w._.sql})`);
+			if (i < queries.length - 1) withSqlChunks.push(sql`, `);
+		}
+		withSqlChunks.push(sql` `);
+		return sql.join(withSqlChunks);
+	}
+	buildDeleteQuery({ table, where, returning, withList, limit, orderBy }) {
+		const withSql = this.buildWithCTE(withList);
+		const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
+		return sql`${withSql}delete from ${table}${where ? sql` where ${where}` : void 0}${returningSql}${this.buildOrderBy(orderBy)}${this.buildLimit(limit)}`;
+	}
+	buildUpdateSet(table, set) {
+		const tableColumns = table[Table.Symbol.Columns];
+		const columnNames = Object.keys(tableColumns).filter((colName) => set[colName] !== void 0 || tableColumns[colName]?.onUpdateFn !== void 0);
+		const setSize = columnNames.length;
+		return sql.join(columnNames.flatMap((colName, i) => {
+			const col = tableColumns[colName];
+			const onUpdateFnResult = col.onUpdateFn?.();
+			const value = set[colName] ?? (is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col));
+			const res = sql`${sql.identifier(this.casing.getColumnCasing(col))} = ${value}`;
+			if (i < setSize - 1) return [res, sql.raw(", ")];
+			return [res];
+		}));
+	}
+	buildUpdateQuery({ table, set, where, returning, withList, joins, from, limit, orderBy }) {
+		const withSql = this.buildWithCTE(withList);
+		const setSql = this.buildUpdateSet(table, set);
+		const fromSql = from && sql.join([sql.raw(" from "), this.buildFromTable(from)]);
+		const joinsSql = this.buildJoins(joins);
+		const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
+		return sql`${withSql}update ${table} set ${setSql}${fromSql}${joinsSql}${where ? sql` where ${where}` : void 0}${returningSql}${this.buildOrderBy(orderBy)}${this.buildLimit(limit)}`;
+	}
+	/**
+	* Builds selection SQL with provided fields/expressions
+	*
+	* Examples:
+	*
+	* `select <selection> from`
+	*
+	* `insert ... returning <selection>`
+	*
+	* If `isSingleTable` is true, then columns won't be prefixed with table name
+	*/
+	buildSelection(fields, { isSingleTable = false } = {}) {
+		const columnsLen = fields.length;
+		const chunks = fields.flatMap(({ field }, i) => {
+			const chunk = [];
+			if (is(field, SQL.Aliased) && field.isSelectionField) chunk.push(sql.identifier(field.fieldAlias));
+			else if (is(field, SQL.Aliased) || is(field, SQL)) {
+				const query = is(field, SQL.Aliased) ? field.sql : field;
+				if (isSingleTable) chunk.push(new SQL(query.queryChunks.map((c) => {
+					if (is(c, Column)) return sql.identifier(this.casing.getColumnCasing(c));
+					return c;
+				})));
+				else chunk.push(query);
+				if (is(field, SQL.Aliased)) chunk.push(sql` as ${sql.identifier(field.fieldAlias)}`);
+			} else if (is(field, Column)) {
+				const tableName = field.table[Table.Symbol.Name];
+				if (field.columnType === "SQLiteNumericBigInt") if (isSingleTable) chunk.push(sql`cast(${sql.identifier(this.casing.getColumnCasing(field))} as text)`);
+				else chunk.push(sql`cast(${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))} as text)`);
+				else if (isSingleTable) chunk.push(sql.identifier(this.casing.getColumnCasing(field)));
+				else chunk.push(sql`${sql.identifier(tableName)}.${sql.identifier(this.casing.getColumnCasing(field))}`);
+			} else if (is(field, Subquery)) {
+				const entries = Object.entries(field._.selectedFields);
+				if (entries.length === 1) {
+					const entry = entries[0][1];
+					const fieldDecoder = is(entry, SQL) ? entry.decoder : is(entry, Column) ? { mapFromDriverValue: (v) => entry.mapFromDriverValue(v) } : entry.sql.decoder;
+					if (fieldDecoder) field._.sql.decoder = fieldDecoder;
+				}
+				chunk.push(field);
+			}
+			if (i < columnsLen - 1) chunk.push(sql`, `);
+			return chunk;
+		});
+		return sql.join(chunks);
+	}
+	buildJoins(joins) {
+		if (!joins || joins.length === 0) return;
+		const joinsArray = [];
+		if (joins) for (const [index, joinMeta] of joins.entries()) {
+			if (index === 0) joinsArray.push(sql` `);
+			const table = joinMeta.table;
+			const onSql = joinMeta.on ? sql` on ${joinMeta.on}` : void 0;
+			if (is(table, SQLiteTable)) {
+				const tableName = table[SQLiteTable.Symbol.Name];
+				const tableSchema = table[SQLiteTable.Symbol.Schema];
+				const origTableName = table[SQLiteTable.Symbol.OriginalName];
+				const alias = tableName === origTableName ? void 0 : joinMeta.alias;
+				joinsArray.push(sql`${sql.raw(joinMeta.joinType)} join ${tableSchema ? sql`${sql.identifier(tableSchema)}.` : void 0}${sql.identifier(origTableName)}${alias && sql` ${sql.identifier(alias)}`}${onSql}`);
+			} else joinsArray.push(sql`${sql.raw(joinMeta.joinType)} join ${table}${onSql}`);
+			if (index < joins.length - 1) joinsArray.push(sql` `);
+		}
+		return sql.join(joinsArray);
+	}
+	buildLimit(limit) {
+		return typeof limit === "object" || typeof limit === "number" && limit >= 0 ? sql` limit ${limit}` : void 0;
+	}
+	buildOrderBy(orderBy) {
+		const orderByList = [];
+		if (orderBy) for (const [index, orderByValue] of orderBy.entries()) {
+			orderByList.push(orderByValue);
+			if (index < orderBy.length - 1) orderByList.push(sql`, `);
+		}
+		return orderByList.length > 0 ? sql` order by ${sql.join(orderByList)}` : void 0;
+	}
+	buildFromTable(table) {
+		if (is(table, Table) && table[Table.Symbol.IsAlias]) return sql`${sql`${sql.identifier(table[Table.Symbol.Schema] ?? "")}.`.if(table[Table.Symbol.Schema])}${sql.identifier(table[Table.Symbol.OriginalName])} ${sql.identifier(table[Table.Symbol.Name])}`;
+		return table;
+	}
+	buildSelectQuery({ withList, fields, fieldsFlat, where, having, table, joins, orderBy, groupBy, limit, offset, distinct, setOperators }) {
+		const fieldsList = fieldsFlat ?? orderSelectedFields(fields);
+		for (const f of fieldsList) if (is(f.field, Column) && getTableName(f.field.table) !== (is(table, Subquery) ? table._.alias : is(table, SQLiteViewBase) ? table[ViewBaseConfig].name : is(table, SQL) ? void 0 : getTableName(table)) && !((table2) => joins?.some(({ alias }) => alias === (table2[Table.Symbol.IsAlias] ? getTableName(table2) : table2[Table.Symbol.BaseName])))(f.field.table)) {
+			const tableName = getTableName(f.field.table);
+			throw new Error(`Your "${f.path.join("->")}" field references a column "${tableName}"."${f.field.name}", but the table "${tableName}" is not part of the query! Did you forget to join it?`);
+		}
+		const isSingleTable = !joins || joins.length === 0;
+		const withSql = this.buildWithCTE(withList);
+		const distinctSql = distinct ? sql` distinct` : void 0;
+		const selection = this.buildSelection(fieldsList, { isSingleTable });
+		const tableSql = this.buildFromTable(table);
+		const joinsSql = this.buildJoins(joins);
+		const whereSql = where ? sql` where ${where}` : void 0;
+		const havingSql = having ? sql` having ${having}` : void 0;
+		const groupByList = [];
+		if (groupBy) for (const [index, groupByValue] of groupBy.entries()) {
+			groupByList.push(groupByValue);
+			if (index < groupBy.length - 1) groupByList.push(sql`, `);
+		}
+		const finalQuery = sql`${withSql}select${distinctSql} ${selection} from ${tableSql}${joinsSql}${whereSql}${groupByList.length > 0 ? sql` group by ${sql.join(groupByList)}` : void 0}${havingSql}${this.buildOrderBy(orderBy)}${this.buildLimit(limit)}${offset ? sql` offset ${offset}` : void 0}`;
+		if (setOperators.length > 0) return this.buildSetOperations(finalQuery, setOperators);
+		return finalQuery;
+	}
+	buildSetOperations(leftSelect, setOperators) {
+		const [setOperator, ...rest] = setOperators;
+		if (!setOperator) throw new Error("Cannot pass undefined values to any set operator");
+		if (rest.length === 0) return this.buildSetOperationQuery({
+			leftSelect,
+			setOperator
+		});
+		return this.buildSetOperations(this.buildSetOperationQuery({
+			leftSelect,
+			setOperator
+		}), rest);
+	}
+	buildSetOperationQuery({ leftSelect, setOperator: { type, isAll, rightSelect, limit, orderBy, offset } }) {
+		const leftChunk = sql`${leftSelect.getSQL()} `;
+		const rightChunk = sql`${rightSelect.getSQL()}`;
+		let orderBySql;
+		if (orderBy && orderBy.length > 0) {
+			const orderByValues = [];
+			for (const singleOrderBy of orderBy) if (is(singleOrderBy, SQLiteColumn)) orderByValues.push(sql.identifier(singleOrderBy.name));
+			else if (is(singleOrderBy, SQL)) {
+				for (let i = 0; i < singleOrderBy.queryChunks.length; i++) {
+					const chunk = singleOrderBy.queryChunks[i];
+					if (is(chunk, SQLiteColumn)) singleOrderBy.queryChunks[i] = sql.identifier(this.casing.getColumnCasing(chunk));
+				}
+				orderByValues.push(sql`${singleOrderBy}`);
+			} else orderByValues.push(sql`${singleOrderBy}`);
+			orderBySql = sql` order by ${sql.join(orderByValues, sql`, `)}`;
+		}
+		const limitSql = typeof limit === "object" || typeof limit === "number" && limit >= 0 ? sql` limit ${limit}` : void 0;
+		const operatorChunk = sql.raw(`${type} ${isAll ? "all " : ""}`);
+		const offsetSql = offset ? sql` offset ${offset}` : void 0;
+		return sql`${leftChunk}${operatorChunk}${rightChunk}${orderBySql}${limitSql}${offsetSql}`;
+	}
+	buildInsertQuery({ table, values: valuesOrSelect, onConflict, returning, withList, select }) {
+		const valuesSqlList = [];
+		const columns = table[Table.Symbol.Columns];
+		const colEntries = Object.entries(columns).filter(([_, col]) => !col.shouldDisableInsert());
+		const insertOrder = colEntries.map(([, column]) => sql.identifier(this.casing.getColumnCasing(column)));
+		if (select) {
+			const select2 = valuesOrSelect;
+			if (is(select2, SQL)) valuesSqlList.push(select2);
+			else valuesSqlList.push(select2.getSQL());
+		} else {
+			const values = valuesOrSelect;
+			valuesSqlList.push(sql.raw("values "));
+			for (const [valueIndex, value] of values.entries()) {
+				const valueList = [];
+				for (const [fieldName, col] of colEntries) {
+					const colValue = value[fieldName];
+					if (colValue === void 0 || is(colValue, Param) && colValue.value === void 0) {
+						let defaultValue;
+						if (col.default !== null && col.default !== void 0) defaultValue = is(col.default, SQL) ? col.default : sql.param(col.default, col);
+						else if (col.defaultFn !== void 0) {
+							const defaultFnResult = col.defaultFn();
+							defaultValue = is(defaultFnResult, SQL) ? defaultFnResult : sql.param(defaultFnResult, col);
+						} else if (!col.default && col.onUpdateFn !== void 0) {
+							const onUpdateFnResult = col.onUpdateFn();
+							defaultValue = is(onUpdateFnResult, SQL) ? onUpdateFnResult : sql.param(onUpdateFnResult, col);
+						} else defaultValue = sql`null`;
+						valueList.push(defaultValue);
+					} else valueList.push(colValue);
+				}
+				valuesSqlList.push(valueList);
+				if (valueIndex < values.length - 1) valuesSqlList.push(sql`, `);
+			}
+		}
+		const withSql = this.buildWithCTE(withList);
+		const valuesSql = sql.join(valuesSqlList);
+		const returningSql = returning ? sql` returning ${this.buildSelection(returning, { isSingleTable: true })}` : void 0;
+		return sql`${withSql}insert into ${table} ${insertOrder} ${valuesSql}${onConflict?.length ? sql.join(onConflict) : void 0}${returningSql}`;
+	}
+	sqlToQuery(sql2, invokeSource) {
+		return sql2.toQuery({
+			casing: this.casing,
+			escapeName: this.escapeName,
+			escapeParam: this.escapeParam,
+			escapeString: this.escapeString,
+			invokeSource
+		});
+	}
+	buildRelationalQuery({ fullSchema, schema, tableNamesMap, table, tableConfig, queryConfig: config, tableAlias, nestedQueryRelation, joinOn }) {
+		let selection = [];
+		let limit, offset, orderBy = [], where;
+		const joins = [];
+		if (config === true) selection = Object.entries(tableConfig.columns).map(([key, value]) => ({
+			dbKey: value.name,
+			tsKey: key,
+			field: aliasedTableColumn(value, tableAlias),
+			relationTableTsKey: void 0,
+			isJson: false,
+			selection: []
+		}));
+		else {
+			const aliasedColumns = Object.fromEntries(Object.entries(tableConfig.columns).map(([key, value]) => [key, aliasedTableColumn(value, tableAlias)]));
+			if (config.where) {
+				const whereSql = typeof config.where === "function" ? config.where(aliasedColumns, getOperators()) : config.where;
+				where = whereSql && mapColumnsInSQLToAlias(whereSql, tableAlias);
+			}
+			const fieldsSelection = [];
+			let selectedColumns = [];
+			if (config.columns) {
+				let isIncludeMode = false;
+				for (const [field, value] of Object.entries(config.columns)) {
+					if (value === void 0) continue;
+					if (field in tableConfig.columns) {
+						if (!isIncludeMode && value === true) isIncludeMode = true;
+						selectedColumns.push(field);
+					}
+				}
+				if (selectedColumns.length > 0) selectedColumns = isIncludeMode ? selectedColumns.filter((c) => config.columns?.[c] === true) : Object.keys(tableConfig.columns).filter((key) => !selectedColumns.includes(key));
+			} else selectedColumns = Object.keys(tableConfig.columns);
+			for (const field of selectedColumns) {
+				const column = tableConfig.columns[field];
+				fieldsSelection.push({
+					tsKey: field,
+					value: column
+				});
+			}
+			let selectedRelations = [];
+			if (config.with) selectedRelations = Object.entries(config.with).filter((entry) => !!entry[1]).map(([tsKey, queryConfig]) => ({
+				tsKey,
+				queryConfig,
+				relation: tableConfig.relations[tsKey]
+			}));
+			let extras;
+			if (config.extras) {
+				extras = typeof config.extras === "function" ? config.extras(aliasedColumns, { sql }) : config.extras;
+				for (const [tsKey, value] of Object.entries(extras)) fieldsSelection.push({
+					tsKey,
+					value: mapColumnsInAliasedSQLToAlias(value, tableAlias)
+				});
+			}
+			for (const { tsKey, value } of fieldsSelection) selection.push({
+				dbKey: is(value, SQL.Aliased) ? value.fieldAlias : tableConfig.columns[tsKey].name,
+				tsKey,
+				field: is(value, Column) ? aliasedTableColumn(value, tableAlias) : value,
+				relationTableTsKey: void 0,
+				isJson: false,
+				selection: []
+			});
+			let orderByOrig = typeof config.orderBy === "function" ? config.orderBy(aliasedColumns, getOrderByOperators()) : config.orderBy ?? [];
+			if (!Array.isArray(orderByOrig)) orderByOrig = [orderByOrig];
+			orderBy = orderByOrig.map((orderByValue) => {
+				if (is(orderByValue, Column)) return aliasedTableColumn(orderByValue, tableAlias);
+				return mapColumnsInSQLToAlias(orderByValue, tableAlias);
+			});
+			limit = config.limit;
+			offset = config.offset;
+			for (const { tsKey: selectedRelationTsKey, queryConfig: selectedRelationConfigValue, relation } of selectedRelations) {
+				const normalizedRelation = normalizeRelation(schema, tableNamesMap, relation);
+				const relationTableTsName = tableNamesMap[getTableUniqueName(relation.referencedTable)];
+				const relationTableAlias = `${tableAlias}_${selectedRelationTsKey}`;
+				const joinOn2 = and(...normalizedRelation.fields.map((field2, i) => eq(aliasedTableColumn(normalizedRelation.references[i], relationTableAlias), aliasedTableColumn(field2, tableAlias))));
+				const builtRelation = this.buildRelationalQuery({
+					fullSchema,
+					schema,
+					tableNamesMap,
+					table: fullSchema[relationTableTsName],
+					tableConfig: schema[relationTableTsName],
+					queryConfig: is(relation, One) ? selectedRelationConfigValue === true ? { limit: 1 } : {
+						...selectedRelationConfigValue,
+						limit: 1
+					} : selectedRelationConfigValue,
+					tableAlias: relationTableAlias,
+					joinOn: joinOn2,
+					nestedQueryRelation: relation
+				});
+				const field = sql`(${builtRelation.sql})`.as(selectedRelationTsKey);
+				selection.push({
+					dbKey: selectedRelationTsKey,
+					tsKey: selectedRelationTsKey,
+					field,
+					relationTableTsKey: relationTableTsName,
+					isJson: true,
+					selection: builtRelation.selection
+				});
+			}
+		}
+		if (selection.length === 0) throw new DrizzleError({ message: `No fields selected for table "${tableConfig.tsName}" ("${tableAlias}"). You need to have at least one item in "columns", "with" or "extras". If you need to select all columns, omit the "columns" key or set it to undefined.` });
+		let result;
+		where = and(joinOn, where);
+		if (nestedQueryRelation) {
+			let field = sql`json_array(${sql.join(selection.map(({ field: field2 }) => is(field2, SQLiteColumn) ? sql.identifier(this.casing.getColumnCasing(field2)) : is(field2, SQL.Aliased) ? field2.sql : field2), sql`, `)})`;
+			if (is(nestedQueryRelation, Many)) field = sql`coalesce(json_group_array(${field}), json_array())`;
+			const nestedSelection = [{
+				dbKey: "data",
+				tsKey: "data",
+				field: field.as("data"),
+				isJson: true,
+				relationTableTsKey: tableConfig.tsName,
+				selection
+			}];
+			if (limit !== void 0 || offset !== void 0 || orderBy.length > 0) {
+				result = this.buildSelectQuery({
+					table: aliasedTable(table, tableAlias),
+					fields: {},
+					fieldsFlat: [{
+						path: [],
+						field: sql.raw("*")
+					}],
+					where,
+					limit,
+					offset,
+					orderBy,
+					setOperators: []
+				});
+				where = void 0;
+				limit = void 0;
+				offset = void 0;
+				orderBy = void 0;
+			} else result = aliasedTable(table, tableAlias);
+			result = this.buildSelectQuery({
+				table: is(result, SQLiteTable) ? result : new Subquery(result, {}, tableAlias),
+				fields: {},
+				fieldsFlat: nestedSelection.map(({ field: field2 }) => ({
+					path: [],
+					field: is(field2, Column) ? aliasedTableColumn(field2, tableAlias) : field2
+				})),
+				joins,
+				where,
+				limit,
+				offset,
+				orderBy,
+				setOperators: []
+			});
+		} else result = this.buildSelectQuery({
+			table: aliasedTable(table, tableAlias),
+			fields: {},
+			fieldsFlat: selection.map(({ field }) => ({
+				path: [],
+				field: is(field, Column) ? aliasedTableColumn(field, tableAlias) : field
+			})),
+			joins,
+			where,
+			limit,
+			offset,
+			orderBy,
+			setOperators: []
+		});
+		return {
+			tableTsKey: tableConfig.tsName,
+			sql: result,
+			selection
+		};
+	}
+};
+var SQLiteSyncDialect = class extends SQLiteDialect {
+	static [entityKind] = "SQLiteSyncDialect";
+	migrate(migrations, session, config) {
+		const migrationsTable = config === void 0 ? "__drizzle_migrations" : typeof config === "string" ? "__drizzle_migrations" : config.migrationsTable ?? "__drizzle_migrations";
+		const migrationTableCreate = sql`
+			CREATE TABLE IF NOT EXISTS ${sql.identifier(migrationsTable)} (
+				id SERIAL PRIMARY KEY,
+				hash text NOT NULL,
+				created_at numeric
+			)
+		`;
+		session.run(migrationTableCreate);
+		const lastDbMigration = session.values(sql`SELECT id, hash, created_at FROM ${sql.identifier(migrationsTable)} ORDER BY created_at DESC LIMIT 1`)[0] ?? void 0;
+		session.run(sql`BEGIN`);
+		try {
+			for (const migration of migrations) if (!lastDbMigration || Number(lastDbMigration[2]) < migration.folderMillis) {
+				for (const stmt of migration.sql) session.run(sql.raw(stmt));
+				session.run(sql`INSERT INTO ${sql.identifier(migrationsTable)} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`);
+			}
+			session.run(sql`COMMIT`);
+		} catch (e) {
+			session.run(sql`ROLLBACK`);
+			throw e;
+		}
+	}
+};
+var SQLiteAsyncDialect = class extends SQLiteDialect {
+	static [entityKind] = "SQLiteAsyncDialect";
+	async migrate(migrations, session, config) {
+		const migrationsTable = config === void 0 ? "__drizzle_migrations" : typeof config === "string" ? "__drizzle_migrations" : config.migrationsTable ?? "__drizzle_migrations";
+		const migrationTableCreate = sql`
+			CREATE TABLE IF NOT EXISTS ${sql.identifier(migrationsTable)} (
+				id SERIAL PRIMARY KEY,
+				hash text NOT NULL,
+				created_at numeric
+			)
+		`;
+		await session.run(migrationTableCreate);
+		const lastDbMigration = (await session.values(sql`SELECT id, hash, created_at FROM ${sql.identifier(migrationsTable)} ORDER BY created_at DESC LIMIT 1`))[0] ?? void 0;
+		await session.transaction(async (tx) => {
+			for (const migration of migrations) if (!lastDbMigration || Number(lastDbMigration[2]) < migration.folderMillis) {
+				for (const stmt of migration.sql) await tx.run(sql.raw(stmt));
+				await tx.run(sql`INSERT INTO ${sql.identifier(migrationsTable)} ("hash", "created_at") VALUES(${migration.hash}, ${migration.folderMillis})`);
+			}
+		});
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/query-builders/query-builder.js
+var TypedQueryBuilder = class {
+	static [entityKind] = "TypedQueryBuilder";
+	/** @internal */
+	getSelectedFields() {
+		return this._.selectedFields;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/select.js
+var SQLiteSelectBuilder = class {
+	static [entityKind] = "SQLiteSelectBuilder";
+	fields;
+	session;
+	dialect;
+	withList;
+	distinct;
+	constructor(config) {
+		this.fields = config.fields;
+		this.session = config.session;
+		this.dialect = config.dialect;
+		this.withList = config.withList;
+		this.distinct = config.distinct;
+	}
+	from(source) {
+		const isPartialSelect = !!this.fields;
+		let fields;
+		if (this.fields) fields = this.fields;
+		else if (is(source, Subquery)) fields = Object.fromEntries(Object.keys(source._.selectedFields).map((key) => [key, source[key]]));
+		else if (is(source, SQLiteViewBase)) fields = source[ViewBaseConfig].selectedFields;
+		else if (is(source, SQL)) fields = {};
+		else fields = getTableColumns(source);
+		return new SQLiteSelectBase({
+			table: source,
+			fields,
+			isPartialSelect,
+			session: this.session,
+			dialect: this.dialect,
+			withList: this.withList,
+			distinct: this.distinct
+		});
+	}
+};
+var SQLiteSelectQueryBuilderBase = class extends TypedQueryBuilder {
+	static [entityKind] = "SQLiteSelectQueryBuilder";
+	_;
+	/** @internal */
+	config;
+	joinsNotNullableMap;
+	tableName;
+	isPartialSelect;
+	session;
+	dialect;
+	cacheConfig = void 0;
+	usedTables = /* @__PURE__ */ new Set();
+	constructor({ table, fields, isPartialSelect, session, dialect, withList, distinct }) {
+		super();
+		this.config = {
+			withList,
+			table,
+			fields: { ...fields },
+			distinct,
+			setOperators: []
+		};
+		this.isPartialSelect = isPartialSelect;
+		this.session = session;
+		this.dialect = dialect;
+		this._ = {
+			selectedFields: fields,
+			config: this.config
+		};
+		this.tableName = getTableLikeName(table);
+		this.joinsNotNullableMap = typeof this.tableName === "string" ? { [this.tableName]: true } : {};
+		for (const item of extractUsedTable(table)) this.usedTables.add(item);
+	}
+	/** @internal */
+	getUsedTables() {
+		return [...this.usedTables];
+	}
+	createJoin(joinType) {
+		return (table, on) => {
+			const baseTableName = this.tableName;
+			const tableName = getTableLikeName(table);
+			for (const item of extractUsedTable(table)) this.usedTables.add(item);
+			if (typeof tableName === "string" && this.config.joins?.some((join) => join.alias === tableName)) throw new Error(`Alias "${tableName}" is already used in this query`);
+			if (!this.isPartialSelect) {
+				if (Object.keys(this.joinsNotNullableMap).length === 1 && typeof baseTableName === "string") this.config.fields = { [baseTableName]: this.config.fields };
+				if (typeof tableName === "string" && !is(table, SQL)) {
+					const selection = is(table, Subquery) ? table._.selectedFields : is(table, View) ? table[ViewBaseConfig].selectedFields : table[Table.Symbol.Columns];
+					this.config.fields[tableName] = selection;
+				}
+			}
+			if (typeof on === "function") on = on(new Proxy(this.config.fields, new SelectionProxyHandler({
+				sqlAliasedBehavior: "sql",
+				sqlBehavior: "sql"
+			})));
+			if (!this.config.joins) this.config.joins = [];
+			this.config.joins.push({
+				on,
+				table,
+				joinType,
+				alias: tableName
+			});
+			if (typeof tableName === "string") switch (joinType) {
+				case "left":
+					this.joinsNotNullableMap[tableName] = false;
+					break;
+				case "right":
+					this.joinsNotNullableMap = Object.fromEntries(Object.entries(this.joinsNotNullableMap).map(([key]) => [key, false]));
+					this.joinsNotNullableMap[tableName] = true;
+					break;
+				case "cross":
+				case "inner":
+					this.joinsNotNullableMap[tableName] = true;
+					break;
+				case "full":
+					this.joinsNotNullableMap = Object.fromEntries(Object.entries(this.joinsNotNullableMap).map(([key]) => [key, false]));
+					this.joinsNotNullableMap[tableName] = false;
+					break;
+			}
+			return this;
+		};
+	}
+	/**
+	* Executes a `left join` operation by adding another table to the current query.
+	*
+	* Calling this method associates each row of the table with the corresponding row from the joined table, if a match is found. If no matching row exists, it sets all columns of the joined table to null.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/joins#left-join}
+	*
+	* @param table the table to join.
+	* @param on the `on` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all users and their pets
+	* const usersWithPets: { user: User; pets: Pet | null; }[] = await db.select()
+	*   .from(users)
+	*   .leftJoin(pets, eq(users.id, pets.ownerId))
+	*
+	* // Select userId and petId
+	* const usersIdsAndPetIds: { userId: number; petId: number | null; }[] = await db.select({
+	*   userId: users.id,
+	*   petId: pets.id,
+	* })
+	*   .from(users)
+	*   .leftJoin(pets, eq(users.id, pets.ownerId))
+	* ```
+	*/
+	leftJoin = this.createJoin("left");
+	/**
+	* Executes a `right join` operation by adding another table to the current query.
+	*
+	* Calling this method associates each row of the joined table with the corresponding row from the main table, if a match is found. If no matching row exists, it sets all columns of the main table to null.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/joins#right-join}
+	*
+	* @param table the table to join.
+	* @param on the `on` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all users and their pets
+	* const usersWithPets: { user: User | null; pets: Pet; }[] = await db.select()
+	*   .from(users)
+	*   .rightJoin(pets, eq(users.id, pets.ownerId))
+	*
+	* // Select userId and petId
+	* const usersIdsAndPetIds: { userId: number | null; petId: number; }[] = await db.select({
+	*   userId: users.id,
+	*   petId: pets.id,
+	* })
+	*   .from(users)
+	*   .rightJoin(pets, eq(users.id, pets.ownerId))
+	* ```
+	*/
+	rightJoin = this.createJoin("right");
+	/**
+	* Executes an `inner join` operation, creating a new table by combining rows from two tables that have matching values.
+	*
+	* Calling this method retrieves rows that have corresponding entries in both joined tables. Rows without matching entries in either table are excluded, resulting in a table that includes only matching pairs.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/joins#inner-join}
+	*
+	* @param table the table to join.
+	* @param on the `on` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all users and their pets
+	* const usersWithPets: { user: User; pets: Pet; }[] = await db.select()
+	*   .from(users)
+	*   .innerJoin(pets, eq(users.id, pets.ownerId))
+	*
+	* // Select userId and petId
+	* const usersIdsAndPetIds: { userId: number; petId: number; }[] = await db.select({
+	*   userId: users.id,
+	*   petId: pets.id,
+	* })
+	*   .from(users)
+	*   .innerJoin(pets, eq(users.id, pets.ownerId))
+	* ```
+	*/
+	innerJoin = this.createJoin("inner");
+	/**
+	* Executes a `full join` operation by combining rows from two tables into a new table.
+	*
+	* Calling this method retrieves all rows from both main and joined tables, merging rows with matching values and filling in `null` for non-matching columns.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/joins#full-join}
+	*
+	* @param table the table to join.
+	* @param on the `on` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all users and their pets
+	* const usersWithPets: { user: User | null; pets: Pet | null; }[] = await db.select()
+	*   .from(users)
+	*   .fullJoin(pets, eq(users.id, pets.ownerId))
+	*
+	* // Select userId and petId
+	* const usersIdsAndPetIds: { userId: number | null; petId: number | null; }[] = await db.select({
+	*   userId: users.id,
+	*   petId: pets.id,
+	* })
+	*   .from(users)
+	*   .fullJoin(pets, eq(users.id, pets.ownerId))
+	* ```
+	*/
+	fullJoin = this.createJoin("full");
+	/**
+	* Executes a `cross join` operation by combining rows from two tables into a new table.
+	*
+	* Calling this method retrieves all rows from both main and joined tables, merging all rows from each table.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/joins#cross-join}
+	*
+	* @param table the table to join.
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all users, each user with every pet
+	* const usersWithPets: { user: User; pets: Pet; }[] = await db.select()
+	*   .from(users)
+	*   .crossJoin(pets)
+	*
+	* // Select userId and petId
+	* const usersIdsAndPetIds: { userId: number; petId: number; }[] = await db.select({
+	*   userId: users.id,
+	*   petId: pets.id,
+	* })
+	*   .from(users)
+	*   .crossJoin(pets)
+	* ```
+	*/
+	crossJoin = this.createJoin("cross");
+	createSetOperator(type, isAll) {
+		return (rightSelection) => {
+			const rightSelect = typeof rightSelection === "function" ? rightSelection(getSQLiteSetOperators()) : rightSelection;
+			if (!haveSameKeys(this.getSelectedFields(), rightSelect.getSelectedFields())) throw new Error("Set operator error (union / intersect / except): selected fields are not the same or are in a different order");
+			this.config.setOperators.push({
+				type,
+				isAll,
+				rightSelect
+			});
+			return this;
+		};
+	}
+	/**
+	* Adds `union` set operator to the query.
+	*
+	* Calling this method will combine the result sets of the `select` statements and remove any duplicate rows that appear across them.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/set-operations#union}
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all unique names from customers and users tables
+	* await db.select({ name: users.name })
+	*   .from(users)
+	*   .union(
+	*     db.select({ name: customers.name }).from(customers)
+	*   );
+	* // or
+	* import { union } from 'drizzle-orm/sqlite-core'
+	*
+	* await union(
+	*   db.select({ name: users.name }).from(users),
+	*   db.select({ name: customers.name }).from(customers)
+	* );
+	* ```
+	*/
+	union = this.createSetOperator("union", false);
+	/**
+	* Adds `union all` set operator to the query.
+	*
+	* Calling this method will combine the result-set of the `select` statements and keep all duplicate rows that appear across them.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/set-operations#union-all}
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all transaction ids from both online and in-store sales
+	* await db.select({ transaction: onlineSales.transactionId })
+	*   .from(onlineSales)
+	*   .unionAll(
+	*     db.select({ transaction: inStoreSales.transactionId }).from(inStoreSales)
+	*   );
+	* // or
+	* import { unionAll } from 'drizzle-orm/sqlite-core'
+	*
+	* await unionAll(
+	*   db.select({ transaction: onlineSales.transactionId }).from(onlineSales),
+	*   db.select({ transaction: inStoreSales.transactionId }).from(inStoreSales)
+	* );
+	* ```
+	*/
+	unionAll = this.createSetOperator("union", true);
+	/**
+	* Adds `intersect` set operator to the query.
+	*
+	* Calling this method will retain only the rows that are present in both result sets and eliminate duplicates.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/set-operations#intersect}
+	*
+	* @example
+	*
+	* ```ts
+	* // Select course names that are offered in both departments A and B
+	* await db.select({ courseName: depA.courseName })
+	*   .from(depA)
+	*   .intersect(
+	*     db.select({ courseName: depB.courseName }).from(depB)
+	*   );
+	* // or
+	* import { intersect } from 'drizzle-orm/sqlite-core'
+	*
+	* await intersect(
+	*   db.select({ courseName: depA.courseName }).from(depA),
+	*   db.select({ courseName: depB.courseName }).from(depB)
+	* );
+	* ```
+	*/
+	intersect = this.createSetOperator("intersect", false);
+	/**
+	* Adds `except` set operator to the query.
+	*
+	* Calling this method will retrieve all unique rows from the left query, except for the rows that are present in the result set of the right query.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/set-operations#except}
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all courses offered in department A but not in department B
+	* await db.select({ courseName: depA.courseName })
+	*   .from(depA)
+	*   .except(
+	*     db.select({ courseName: depB.courseName }).from(depB)
+	*   );
+	* // or
+	* import { except } from 'drizzle-orm/sqlite-core'
+	*
+	* await except(
+	*   db.select({ courseName: depA.courseName }).from(depA),
+	*   db.select({ courseName: depB.courseName }).from(depB)
+	* );
+	* ```
+	*/
+	except = this.createSetOperator("except", false);
+	/** @internal */
+	addSetOperators(setOperators) {
+		this.config.setOperators.push(...setOperators);
+		return this;
+	}
+	/**
+	* Adds a `where` clause to the query.
+	*
+	* Calling this method will select only those rows that fulfill a specified condition.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/select#filtering}
+	*
+	* @param where the `where` clause.
+	*
+	* @example
+	* You can use conditional operators and `sql function` to filter the rows to be selected.
+	*
+	* ```ts
+	* // Select all cars with green color
+	* await db.select().from(cars).where(eq(cars.color, 'green'));
+	* // or
+	* await db.select().from(cars).where(sql`${cars.color} = 'green'`)
+	* ```
+	*
+	* You can logically combine conditional operators with `and()` and `or()` operators:
+	*
+	* ```ts
+	* // Select all BMW cars with a green color
+	* await db.select().from(cars).where(and(eq(cars.color, 'green'), eq(cars.brand, 'BMW')));
+	*
+	* // Select all cars with the green or blue color
+	* await db.select().from(cars).where(or(eq(cars.color, 'green'), eq(cars.color, 'blue')));
+	* ```
+	*/
+	where(where) {
+		if (typeof where === "function") where = where(new Proxy(this.config.fields, new SelectionProxyHandler({
+			sqlAliasedBehavior: "sql",
+			sqlBehavior: "sql"
+		})));
+		this.config.where = where;
+		return this;
+	}
+	/**
+	* Adds a `having` clause to the query.
+	*
+	* Calling this method will select only those rows that fulfill a specified condition. It is typically used with aggregate functions to filter the aggregated data based on a specified condition.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/select#aggregations}
+	*
+	* @param having the `having` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Select all brands with more than one car
+	* await db.select({
+	* 	brand: cars.brand,
+	* 	count: sql<number>`cast(count(${cars.id}) as int)`,
+	* })
+	*   .from(cars)
+	*   .groupBy(cars.brand)
+	*   .having(({ count }) => gt(count, 1));
+	* ```
+	*/
+	having(having) {
+		if (typeof having === "function") having = having(new Proxy(this.config.fields, new SelectionProxyHandler({
+			sqlAliasedBehavior: "sql",
+			sqlBehavior: "sql"
+		})));
+		this.config.having = having;
+		return this;
+	}
+	groupBy(...columns) {
+		if (typeof columns[0] === "function") {
+			const groupBy = columns[0](new Proxy(this.config.fields, new SelectionProxyHandler({
+				sqlAliasedBehavior: "alias",
+				sqlBehavior: "sql"
+			})));
+			this.config.groupBy = Array.isArray(groupBy) ? groupBy : [groupBy];
+		} else this.config.groupBy = columns;
+		return this;
+	}
+	orderBy(...columns) {
+		if (typeof columns[0] === "function") {
+			const orderBy = columns[0](new Proxy(this.config.fields, new SelectionProxyHandler({
+				sqlAliasedBehavior: "alias",
+				sqlBehavior: "sql"
+			})));
+			const orderByArray = Array.isArray(orderBy) ? orderBy : [orderBy];
+			if (this.config.setOperators.length > 0) this.config.setOperators.at(-1).orderBy = orderByArray;
+			else this.config.orderBy = orderByArray;
+		} else {
+			const orderByArray = columns;
+			if (this.config.setOperators.length > 0) this.config.setOperators.at(-1).orderBy = orderByArray;
+			else this.config.orderBy = orderByArray;
+		}
+		return this;
+	}
+	/**
+	* Adds a `limit` clause to the query.
+	*
+	* Calling this method will set the maximum number of rows that will be returned by this query.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/select#limit--offset}
+	*
+	* @param limit the `limit` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Get the first 10 people from this query.
+	* await db.select().from(people).limit(10);
+	* ```
+	*/
+	limit(limit) {
+		if (this.config.setOperators.length > 0) this.config.setOperators.at(-1).limit = limit;
+		else this.config.limit = limit;
+		return this;
+	}
+	/**
+	* Adds an `offset` clause to the query.
+	*
+	* Calling this method will skip a number of rows when returning results from this query.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/select#limit--offset}
+	*
+	* @param offset the `offset` clause.
+	*
+	* @example
+	*
+	* ```ts
+	* // Get the 10th-20th people from this query.
+	* await db.select().from(people).offset(10).limit(10);
+	* ```
+	*/
+	offset(offset) {
+		if (this.config.setOperators.length > 0) this.config.setOperators.at(-1).offset = offset;
+		else this.config.offset = offset;
+		return this;
+	}
+	/** @internal */
+	getSQL() {
+		return this.dialect.buildSelectQuery(this.config);
+	}
+	toSQL() {
+		const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
+		return rest;
+	}
+	as(alias) {
+		const usedTables = [];
+		usedTables.push(...extractUsedTable(this.config.table));
+		if (this.config.joins) for (const it of this.config.joins) usedTables.push(...extractUsedTable(it.table));
+		return new Proxy(new Subquery(this.getSQL(), this.config.fields, alias, false, [...new Set(usedTables)]), new SelectionProxyHandler({
+			alias,
+			sqlAliasedBehavior: "alias",
+			sqlBehavior: "error"
+		}));
+	}
+	/** @internal */
+	getSelectedFields() {
+		return new Proxy(this.config.fields, new SelectionProxyHandler({
+			alias: this.tableName,
+			sqlAliasedBehavior: "alias",
+			sqlBehavior: "error"
+		}));
+	}
+	$dynamic() {
+		return this;
+	}
+};
+var SQLiteSelectBase = class extends SQLiteSelectQueryBuilderBase {
+	static [entityKind] = "SQLiteSelect";
+	/** @internal */
+	_prepare(isOneTimeQuery = true) {
+		if (!this.session) throw new Error("Cannot execute a query on a query builder. Please use a database instance instead.");
+		const fieldsList = orderSelectedFields(this.config.fields);
+		const query = this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](this.dialect.sqlToQuery(this.getSQL()), fieldsList, "all", true, void 0, {
+			type: "select",
+			tables: [...this.usedTables]
+		}, this.cacheConfig);
+		query.joinsNotNullableMap = this.joinsNotNullableMap;
+		return query;
+	}
+	$withCache(config) {
+		this.cacheConfig = config === void 0 ? {
+			config: {},
+			enable: true,
+			autoInvalidate: true
+		} : config === false ? { enable: false } : {
+			enable: true,
+			autoInvalidate: true,
+			...config
+		};
+		return this;
+	}
+	prepare() {
+		return this._prepare(false);
+	}
+	run = (placeholderValues) => {
+		return this._prepare().run(placeholderValues);
+	};
+	all = (placeholderValues) => {
+		return this._prepare().all(placeholderValues);
+	};
+	get = (placeholderValues) => {
+		return this._prepare().get(placeholderValues);
+	};
+	values = (placeholderValues) => {
+		return this._prepare().values(placeholderValues);
+	};
+	async execute() {
+		return this.all();
+	}
+};
+applyMixins(SQLiteSelectBase, [QueryPromise]);
+function createSetOperator(type, isAll) {
+	return (leftSelect, rightSelect, ...restSelects) => {
+		const setOperators = [rightSelect, ...restSelects].map((select) => ({
+			type,
+			isAll,
+			rightSelect: select
+		}));
+		for (const setOperator of setOperators) if (!haveSameKeys(leftSelect.getSelectedFields(), setOperator.rightSelect.getSelectedFields())) throw new Error("Set operator error (union / intersect / except): selected fields are not the same or are in a different order");
+		return leftSelect.addSetOperators(setOperators);
+	};
+}
+const getSQLiteSetOperators = () => ({
+	union,
+	unionAll,
+	intersect,
+	except
+});
+const union = createSetOperator("union", false);
+const unionAll = createSetOperator("union", true);
+const intersect = createSetOperator("intersect", false);
+const except = createSetOperator("except", false);
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/query-builder.js
+var QueryBuilder = class {
+	static [entityKind] = "SQLiteQueryBuilder";
+	dialect;
+	dialectConfig;
+	constructor(dialect) {
+		this.dialect = is(dialect, SQLiteDialect) ? dialect : void 0;
+		this.dialectConfig = is(dialect, SQLiteDialect) ? void 0 : dialect;
+	}
+	$with = (alias, selection) => {
+		const queryBuilder = this;
+		const as = (qb) => {
+			if (typeof qb === "function") qb = qb(queryBuilder);
+			return new Proxy(new WithSubquery(qb.getSQL(), selection ?? ("getSelectedFields" in qb ? qb.getSelectedFields() ?? {} : {}), alias, true), new SelectionProxyHandler({
+				alias,
+				sqlAliasedBehavior: "alias",
+				sqlBehavior: "error"
+			}));
+		};
+		return { as };
+	};
+	with(...queries) {
+		const self = this;
+		function select(fields) {
+			return new SQLiteSelectBuilder({
+				fields: fields ?? void 0,
+				session: void 0,
+				dialect: self.getDialect(),
+				withList: queries
+			});
+		}
+		function selectDistinct(fields) {
+			return new SQLiteSelectBuilder({
+				fields: fields ?? void 0,
+				session: void 0,
+				dialect: self.getDialect(),
+				withList: queries,
+				distinct: true
+			});
+		}
+		return {
+			select,
+			selectDistinct
+		};
+	}
+	select(fields) {
+		return new SQLiteSelectBuilder({
+			fields: fields ?? void 0,
+			session: void 0,
+			dialect: this.getDialect()
+		});
+	}
+	selectDistinct(fields) {
+		return new SQLiteSelectBuilder({
+			fields: fields ?? void 0,
+			session: void 0,
+			dialect: this.getDialect(),
+			distinct: true
+		});
+	}
+	getDialect() {
+		if (!this.dialect) this.dialect = new SQLiteSyncDialect(this.dialectConfig);
+		return this.dialect;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/insert.js
+var SQLiteInsertBuilder = class {
+	constructor(table, session, dialect, withList) {
+		this.table = table;
+		this.session = session;
+		this.dialect = dialect;
+		this.withList = withList;
+	}
+	static [entityKind] = "SQLiteInsertBuilder";
+	values(values) {
+		values = Array.isArray(values) ? values : [values];
+		if (values.length === 0) throw new Error("values() must be called with at least one value");
+		const mappedValues = values.map((entry) => {
+			const result = {};
+			const cols = this.table[Table.Symbol.Columns];
+			for (const colKey of Object.keys(entry)) {
+				const colValue = entry[colKey];
+				result[colKey] = is(colValue, SQL) ? colValue : new Param(colValue, cols[colKey]);
+			}
+			return result;
+		});
+		return new SQLiteInsertBase(this.table, mappedValues, this.session, this.dialect, this.withList);
+	}
+	select(selectQuery) {
+		const select = typeof selectQuery === "function" ? selectQuery(new QueryBuilder()) : selectQuery;
+		if (!is(select, SQL) && !haveSameKeys(this.table[Columns], select._.selectedFields)) throw new Error("Insert select error: selected fields are not the same or are in a different order compared to the table definition");
+		return new SQLiteInsertBase(this.table, select, this.session, this.dialect, this.withList, true);
+	}
+};
+var SQLiteInsertBase = class extends QueryPromise {
+	constructor(table, values, session, dialect, withList, select) {
+		super();
+		this.session = session;
+		this.dialect = dialect;
+		this.config = {
+			table,
+			values,
+			withList,
+			select
+		};
+	}
+	static [entityKind] = "SQLiteInsert";
+	/** @internal */
+	config;
+	returning(fields = this.config.table[SQLiteTable.Symbol.Columns]) {
+		this.config.returning = orderSelectedFields(fields);
+		return this;
+	}
+	/**
+	* Adds an `on conflict do nothing` clause to the query.
+	*
+	* Calling this method simply avoids inserting a row as its alternative action.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/insert#on-conflict-do-nothing}
+	*
+	* @param config The `target` and `where` clauses.
+	*
+	* @example
+	* ```ts
+	* // Insert one row and cancel the insert if there's a conflict
+	* await db.insert(cars)
+	*   .values({ id: 1, brand: 'BMW' })
+	*   .onConflictDoNothing();
+	*
+	* // Explicitly specify conflict target
+	* await db.insert(cars)
+	*   .values({ id: 1, brand: 'BMW' })
+	*   .onConflictDoNothing({ target: cars.id });
+	* ```
+	*/
+	onConflictDoNothing(config = {}) {
+		if (!this.config.onConflict) this.config.onConflict = [];
+		if (config.target === void 0) this.config.onConflict.push(sql` on conflict do nothing`);
+		else {
+			const targetSql = Array.isArray(config.target) ? sql`${config.target}` : sql`${[config.target]}`;
+			const whereSql = config.where ? sql` where ${config.where}` : sql``;
+			this.config.onConflict.push(sql` on conflict ${targetSql} do nothing${whereSql}`);
+		}
+		return this;
+	}
+	/**
+	* Adds an `on conflict do update` clause to the query.
+	*
+	* Calling this method will update the existing row that conflicts with the row proposed for insertion as its alternative action.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/insert#upserts-and-conflicts}
+	*
+	* @param config The `target`, `set` and `where` clauses.
+	*
+	* @example
+	* ```ts
+	* // Update the row if there's a conflict
+	* await db.insert(cars)
+	*   .values({ id: 1, brand: 'BMW' })
+	*   .onConflictDoUpdate({
+	*     target: cars.id,
+	*     set: { brand: 'Porsche' }
+	*   });
+	*
+	* // Upsert with 'where' clause
+	* await db.insert(cars)
+	*   .values({ id: 1, brand: 'BMW' })
+	*   .onConflictDoUpdate({
+	*     target: cars.id,
+	*     set: { brand: 'newBMW' },
+	*     where: sql`${cars.createdAt} > '2023-01-01'::date`,
+	*   });
+	* ```
+	*/
+	onConflictDoUpdate(config) {
+		if (config.where && (config.targetWhere || config.setWhere)) throw new Error("You cannot use both \"where\" and \"targetWhere\"/\"setWhere\" at the same time - \"where\" is deprecated, use \"targetWhere\" or \"setWhere\" instead.");
+		if (!this.config.onConflict) this.config.onConflict = [];
+		const whereSql = config.where ? sql` where ${config.where}` : void 0;
+		const targetWhereSql = config.targetWhere ? sql` where ${config.targetWhere}` : void 0;
+		const setWhereSql = config.setWhere ? sql` where ${config.setWhere}` : void 0;
+		const targetSql = Array.isArray(config.target) ? sql`${config.target}` : sql`${[config.target]}`;
+		const setSql = this.dialect.buildUpdateSet(this.config.table, mapUpdateSet(this.config.table, config.set));
+		this.config.onConflict.push(sql` on conflict ${targetSql}${targetWhereSql} do update set ${setSql}${whereSql}${setWhereSql}`);
+		return this;
+	}
+	/** @internal */
+	getSQL() {
+		return this.dialect.buildInsertQuery(this.config);
+	}
+	toSQL() {
+		const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
+		return rest;
+	}
+	/** @internal */
+	_prepare(isOneTimeQuery = true) {
+		return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](this.dialect.sqlToQuery(this.getSQL()), this.config.returning, this.config.returning ? "all" : "run", true, void 0, {
+			type: "insert",
+			tables: extractUsedTable(this.config.table)
+		});
+	}
+	prepare() {
+		return this._prepare(false);
+	}
+	run = (placeholderValues) => {
+		return this._prepare().run(placeholderValues);
+	};
+	all = (placeholderValues) => {
+		return this._prepare().all(placeholderValues);
+	};
+	get = (placeholderValues) => {
+		return this._prepare().get(placeholderValues);
+	};
+	values = (placeholderValues) => {
+		return this._prepare().values(placeholderValues);
+	};
+	async execute() {
+		return this.config.returning ? this.all() : this.run();
+	}
+	$dynamic() {
+		return this;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/update.js
+var SQLiteUpdateBuilder = class {
+	constructor(table, session, dialect, withList) {
+		this.table = table;
+		this.session = session;
+		this.dialect = dialect;
+		this.withList = withList;
+	}
+	static [entityKind] = "SQLiteUpdateBuilder";
+	set(values) {
+		return new SQLiteUpdateBase(this.table, mapUpdateSet(this.table, values), this.session, this.dialect, this.withList);
+	}
+};
+var SQLiteUpdateBase = class extends QueryPromise {
+	constructor(table, set, session, dialect, withList) {
+		super();
+		this.session = session;
+		this.dialect = dialect;
+		this.config = {
+			set,
+			table,
+			withList,
+			joins: []
+		};
+	}
+	static [entityKind] = "SQLiteUpdate";
+	/** @internal */
+	config;
+	from(source) {
+		this.config.from = source;
+		return this;
+	}
+	createJoin(joinType) {
+		return (table, on) => {
+			const tableName = getTableLikeName(table);
+			if (typeof tableName === "string" && this.config.joins.some((join) => join.alias === tableName)) throw new Error(`Alias "${tableName}" is already used in this query`);
+			if (typeof on === "function") {
+				const from = this.config.from ? is(table, SQLiteTable) ? table[Table.Symbol.Columns] : is(table, Subquery) ? table._.selectedFields : is(table, SQLiteViewBase) ? table[ViewBaseConfig].selectedFields : void 0 : void 0;
+				on = on(new Proxy(this.config.table[Table.Symbol.Columns], new SelectionProxyHandler({
+					sqlAliasedBehavior: "sql",
+					sqlBehavior: "sql"
+				})), from && new Proxy(from, new SelectionProxyHandler({
+					sqlAliasedBehavior: "sql",
+					sqlBehavior: "sql"
+				})));
+			}
+			this.config.joins.push({
+				on,
+				table,
+				joinType,
+				alias: tableName
+			});
+			return this;
+		};
+	}
+	leftJoin = this.createJoin("left");
+	rightJoin = this.createJoin("right");
+	innerJoin = this.createJoin("inner");
+	fullJoin = this.createJoin("full");
+	/**
+	* Adds a 'where' clause to the query.
+	*
+	* Calling this method will update only those rows that fulfill a specified condition.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/update}
+	*
+	* @param where the 'where' clause.
+	*
+	* @example
+	* You can use conditional operators and `sql function` to filter the rows to be updated.
+	*
+	* ```ts
+	* // Update all cars with green color
+	* db.update(cars).set({ color: 'red' })
+	*   .where(eq(cars.color, 'green'));
+	* // or
+	* db.update(cars).set({ color: 'red' })
+	*   .where(sql`${cars.color} = 'green'`)
+	* ```
+	*
+	* You can logically combine conditional operators with `and()` and `or()` operators:
+	*
+	* ```ts
+	* // Update all BMW cars with a green color
+	* db.update(cars).set({ color: 'red' })
+	*   .where(and(eq(cars.color, 'green'), eq(cars.brand, 'BMW')));
+	*
+	* // Update all cars with the green or blue color
+	* db.update(cars).set({ color: 'red' })
+	*   .where(or(eq(cars.color, 'green'), eq(cars.color, 'blue')));
+	* ```
+	*/
+	where(where) {
+		this.config.where = where;
+		return this;
+	}
+	orderBy(...columns) {
+		if (typeof columns[0] === "function") {
+			const orderBy = columns[0](new Proxy(this.config.table[Table.Symbol.Columns], new SelectionProxyHandler({
+				sqlAliasedBehavior: "alias",
+				sqlBehavior: "sql"
+			})));
+			const orderByArray = Array.isArray(orderBy) ? orderBy : [orderBy];
+			this.config.orderBy = orderByArray;
+		} else {
+			const orderByArray = columns;
+			this.config.orderBy = orderByArray;
+		}
+		return this;
+	}
+	limit(limit) {
+		this.config.limit = limit;
+		return this;
+	}
+	returning(fields = this.config.table[SQLiteTable.Symbol.Columns]) {
+		this.config.returning = orderSelectedFields(fields);
+		return this;
+	}
+	/** @internal */
+	getSQL() {
+		return this.dialect.buildUpdateQuery(this.config);
+	}
+	toSQL() {
+		const { typings: _typings, ...rest } = this.dialect.sqlToQuery(this.getSQL());
+		return rest;
+	}
+	/** @internal */
+	_prepare(isOneTimeQuery = true) {
+		return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](this.dialect.sqlToQuery(this.getSQL()), this.config.returning, this.config.returning ? "all" : "run", true, void 0, {
+			type: "insert",
+			tables: extractUsedTable(this.config.table)
+		});
+	}
+	prepare() {
+		return this._prepare(false);
+	}
+	run = (placeholderValues) => {
+		return this._prepare().run(placeholderValues);
+	};
+	all = (placeholderValues) => {
+		return this._prepare().all(placeholderValues);
+	};
+	get = (placeholderValues) => {
+		return this._prepare().get(placeholderValues);
+	};
+	values = (placeholderValues) => {
+		return this._prepare().values(placeholderValues);
+	};
+	async execute() {
+		return this.config.returning ? this.all() : this.run();
+	}
+	$dynamic() {
+		return this;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/count.js
+var SQLiteCountBuilder = class SQLiteCountBuilder extends SQL {
+	constructor(params) {
+		super(SQLiteCountBuilder.buildEmbeddedCount(params.source, params.filters).queryChunks);
+		this.params = params;
+		this.session = params.session;
+		this.sql = SQLiteCountBuilder.buildCount(params.source, params.filters);
+	}
+	sql;
+	static [entityKind] = "SQLiteCountBuilderAsync";
+	[Symbol.toStringTag] = "SQLiteCountBuilderAsync";
+	session;
+	static buildEmbeddedCount(source, filters) {
+		return sql`(select count(*) from ${source}${sql.raw(" where ").if(filters)}${filters})`;
+	}
+	static buildCount(source, filters) {
+		return sql`select count(*) from ${source}${sql.raw(" where ").if(filters)}${filters}`;
+	}
+	then(onfulfilled, onrejected) {
+		return Promise.resolve(this.session.count(this.sql)).then(onfulfilled, onrejected);
+	}
+	catch(onRejected) {
+		return this.then(void 0, onRejected);
+	}
+	finally(onFinally) {
+		return this.then((value) => {
+			onFinally?.();
+			return value;
+		}, (reason) => {
+			onFinally?.();
+			throw reason;
+		});
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/query.js
+var RelationalQueryBuilder = class {
+	constructor(mode, fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session) {
+		this.mode = mode;
+		this.fullSchema = fullSchema;
+		this.schema = schema;
+		this.tableNamesMap = tableNamesMap;
+		this.table = table;
+		this.tableConfig = tableConfig;
+		this.dialect = dialect;
+		this.session = session;
+	}
+	static [entityKind] = "SQLiteAsyncRelationalQueryBuilder";
+	findMany(config) {
+		return this.mode === "sync" ? new SQLiteSyncRelationalQuery(this.fullSchema, this.schema, this.tableNamesMap, this.table, this.tableConfig, this.dialect, this.session, config ? config : {}, "many") : new SQLiteRelationalQuery(this.fullSchema, this.schema, this.tableNamesMap, this.table, this.tableConfig, this.dialect, this.session, config ? config : {}, "many");
+	}
+	findFirst(config) {
+		return this.mode === "sync" ? new SQLiteSyncRelationalQuery(this.fullSchema, this.schema, this.tableNamesMap, this.table, this.tableConfig, this.dialect, this.session, config ? {
+			...config,
+			limit: 1
+		} : { limit: 1 }, "first") : new SQLiteRelationalQuery(this.fullSchema, this.schema, this.tableNamesMap, this.table, this.tableConfig, this.dialect, this.session, config ? {
+			...config,
+			limit: 1
+		} : { limit: 1 }, "first");
+	}
+};
+var SQLiteRelationalQuery = class extends QueryPromise {
+	constructor(fullSchema, schema, tableNamesMap, table, tableConfig, dialect, session, config, mode) {
+		super();
+		this.fullSchema = fullSchema;
+		this.schema = schema;
+		this.tableNamesMap = tableNamesMap;
+		this.table = table;
+		this.tableConfig = tableConfig;
+		this.dialect = dialect;
+		this.session = session;
+		this.config = config;
+		this.mode = mode;
+	}
+	static [entityKind] = "SQLiteAsyncRelationalQuery";
+	/** @internal */
+	mode;
+	/** @internal */
+	getSQL() {
+		return this.dialect.buildRelationalQuery({
+			fullSchema: this.fullSchema,
+			schema: this.schema,
+			tableNamesMap: this.tableNamesMap,
+			table: this.table,
+			tableConfig: this.tableConfig,
+			queryConfig: this.config,
+			tableAlias: this.tableConfig.tsName
+		}).sql;
+	}
+	/** @internal */
+	_prepare(isOneTimeQuery = false) {
+		const { query, builtQuery } = this._toSQL();
+		return this.session[isOneTimeQuery ? "prepareOneTimeQuery" : "prepareQuery"](builtQuery, void 0, this.mode === "first" ? "get" : "all", true, (rawRows, mapColumnValue) => {
+			const rows = rawRows.map((row) => mapRelationalRow(this.schema, this.tableConfig, row, query.selection, mapColumnValue));
+			if (this.mode === "first") return rows[0];
+			return rows;
+		});
+	}
+	prepare() {
+		return this._prepare(false);
+	}
+	_toSQL() {
+		const query = this.dialect.buildRelationalQuery({
+			fullSchema: this.fullSchema,
+			schema: this.schema,
+			tableNamesMap: this.tableNamesMap,
+			table: this.table,
+			tableConfig: this.tableConfig,
+			queryConfig: this.config,
+			tableAlias: this.tableConfig.tsName
+		});
+		return {
+			query,
+			builtQuery: this.dialect.sqlToQuery(query.sql)
+		};
+	}
+	toSQL() {
+		return this._toSQL().builtQuery;
+	}
+	/** @internal */
+	executeRaw() {
+		if (this.mode === "first") return this._prepare(false).get();
+		return this._prepare(false).all();
+	}
+	async execute() {
+		return this.executeRaw();
+	}
+};
+var SQLiteSyncRelationalQuery = class extends SQLiteRelationalQuery {
+	static [entityKind] = "SQLiteSyncRelationalQuery";
+	sync() {
+		return this.executeRaw();
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/query-builders/raw.js
+var SQLiteRaw = class extends QueryPromise {
+	constructor(execute, getSQL, action, dialect, mapBatchResult) {
+		super();
+		this.execute = execute;
+		this.getSQL = getSQL;
+		this.dialect = dialect;
+		this.mapBatchResult = mapBatchResult;
+		this.config = { action };
+	}
+	static [entityKind] = "SQLiteRaw";
+	/** @internal */
+	config;
+	getQuery() {
+		return {
+			...this.dialect.sqlToQuery(this.getSQL()),
+			method: this.config.action
+		};
+	}
+	mapResult(result, isFromBatch) {
+		return isFromBatch ? this.mapBatchResult(result) : result;
+	}
+	_prepare() {
+		return this;
+	}
+	/** @internal */
+	isResponseInArrayMode() {
+		return false;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/db.js
+var BaseSQLiteDatabase = class {
+	constructor(resultKind, dialect, session, schema) {
+		this.resultKind = resultKind;
+		this.dialect = dialect;
+		this.session = session;
+		this._ = schema ? {
+			schema: schema.schema,
+			fullSchema: schema.fullSchema,
+			tableNamesMap: schema.tableNamesMap
+		} : {
+			schema: void 0,
+			fullSchema: {},
+			tableNamesMap: {}
+		};
+		this.query = {};
+		const query = this.query;
+		if (this._.schema) for (const [tableName, columns] of Object.entries(this._.schema)) query[tableName] = new RelationalQueryBuilder(resultKind, schema.fullSchema, this._.schema, this._.tableNamesMap, schema.fullSchema[tableName], columns, dialect, session);
+		this.$cache = { invalidate: async (_params) => {} };
+	}
+	static [entityKind] = "BaseSQLiteDatabase";
+	query;
+	/**
+	* Creates a subquery that defines a temporary named result set as a CTE.
+	*
+	* It is useful for breaking down complex queries into simpler parts and for reusing the result set in subsequent parts of the query.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/select#with-clause}
+	*
+	* @param alias The alias for the subquery.
+	*
+	* Failure to provide an alias will result in a DrizzleTypeError, preventing the subquery from being referenced in other queries.
+	*
+	* @example
+	*
+	* ```ts
+	* // Create a subquery with alias 'sq' and use it in the select query
+	* const sq = db.$with('sq').as(db.select().from(users).where(eq(users.id, 42)));
+	*
+	* const result = await db.with(sq).select().from(sq);
+	* ```
+	*
+	* To select arbitrary SQL values as fields in a CTE and reference them in other CTEs or in the main query, you need to add aliases to them:
+	*
+	* ```ts
+	* // Select an arbitrary SQL value as a field in a CTE and reference it in the main query
+	* const sq = db.$with('sq').as(db.select({
+	*   name: sql<string>`upper(${users.name})`.as('name'),
+	* })
+	* .from(users));
+	*
+	* const result = await db.with(sq).select({ name: sq.name }).from(sq);
+	* ```
+	*/
+	$with = (alias, selection) => {
+		const self = this;
+		const as = (qb) => {
+			if (typeof qb === "function") qb = qb(new QueryBuilder(self.dialect));
+			return new Proxy(new WithSubquery(qb.getSQL(), selection ?? ("getSelectedFields" in qb ? qb.getSelectedFields() ?? {} : {}), alias, true), new SelectionProxyHandler({
+				alias,
+				sqlAliasedBehavior: "alias",
+				sqlBehavior: "error"
+			}));
+		};
+		return { as };
+	};
+	$count(source, filters) {
+		return new SQLiteCountBuilder({
+			source,
+			filters,
+			session: this.session
+		});
+	}
+	/**
+	* Incorporates a previously defined CTE (using `$with`) into the main query.
+	*
+	* This method allows the main query to reference a temporary named result set.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/select#with-clause}
+	*
+	* @param queries The CTEs to incorporate into the main query.
+	*
+	* @example
+	*
+	* ```ts
+	* // Define a subquery 'sq' as a CTE using $with
+	* const sq = db.$with('sq').as(db.select().from(users).where(eq(users.id, 42)));
+	*
+	* // Incorporate the CTE 'sq' into the main query and select from it
+	* const result = await db.with(sq).select().from(sq);
+	* ```
+	*/
+	with(...queries) {
+		const self = this;
+		function select(fields) {
+			return new SQLiteSelectBuilder({
+				fields: fields ?? void 0,
+				session: self.session,
+				dialect: self.dialect,
+				withList: queries
+			});
+		}
+		function selectDistinct(fields) {
+			return new SQLiteSelectBuilder({
+				fields: fields ?? void 0,
+				session: self.session,
+				dialect: self.dialect,
+				withList: queries,
+				distinct: true
+			});
+		}
+		function update(table) {
+			return new SQLiteUpdateBuilder(table, self.session, self.dialect, queries);
+		}
+		function insert(into) {
+			return new SQLiteInsertBuilder(into, self.session, self.dialect, queries);
+		}
+		function delete_(from) {
+			return new SQLiteDeleteBase(from, self.session, self.dialect, queries);
+		}
+		return {
+			select,
+			selectDistinct,
+			update,
+			insert,
+			delete: delete_
+		};
+	}
+	select(fields) {
+		return new SQLiteSelectBuilder({
+			fields: fields ?? void 0,
+			session: this.session,
+			dialect: this.dialect
+		});
+	}
+	selectDistinct(fields) {
+		return new SQLiteSelectBuilder({
+			fields: fields ?? void 0,
+			session: this.session,
+			dialect: this.dialect,
+			distinct: true
+		});
+	}
+	/**
+	* Creates an update query.
+	*
+	* Calling this method without `.where()` clause will update all rows in a table. The `.where()` clause specifies which rows should be updated.
+	*
+	* Use `.set()` method to specify which values to update.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/update}
+	*
+	* @param table The table to update.
+	*
+	* @example
+	*
+	* ```ts
+	* // Update all rows in the 'cars' table
+	* await db.update(cars).set({ color: 'red' });
+	*
+	* // Update rows with filters and conditions
+	* await db.update(cars).set({ color: 'red' }).where(eq(cars.brand, 'BMW'));
+	*
+	* // Update with returning clause
+	* const updatedCar: Car[] = await db.update(cars)
+	*   .set({ color: 'red' })
+	*   .where(eq(cars.id, 1))
+	*   .returning();
+	* ```
+	*/
+	update(table) {
+		return new SQLiteUpdateBuilder(table, this.session, this.dialect);
+	}
+	$cache;
+	/**
+	* Creates an insert query.
+	*
+	* Calling this method will create new rows in a table. Use `.values()` method to specify which values to insert.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/insert}
+	*
+	* @param table The table to insert into.
+	*
+	* @example
+	*
+	* ```ts
+	* // Insert one row
+	* await db.insert(cars).values({ brand: 'BMW' });
+	*
+	* // Insert multiple rows
+	* await db.insert(cars).values([{ brand: 'BMW' }, { brand: 'Porsche' }]);
+	*
+	* // Insert with returning clause
+	* const insertedCar: Car[] = await db.insert(cars)
+	*   .values({ brand: 'BMW' })
+	*   .returning();
+	* ```
+	*/
+	insert(into) {
+		return new SQLiteInsertBuilder(into, this.session, this.dialect);
+	}
+	/**
+	* Creates a delete query.
+	*
+	* Calling this method without `.where()` clause will delete all rows in a table. The `.where()` clause specifies which rows should be deleted.
+	*
+	* See docs: {@link https://orm.drizzle.team/docs/delete}
+	*
+	* @param table The table to delete from.
+	*
+	* @example
+	*
+	* ```ts
+	* // Delete all rows in the 'cars' table
+	* await db.delete(cars);
+	*
+	* // Delete rows with filters and conditions
+	* await db.delete(cars).where(eq(cars.color, 'green'));
+	*
+	* // Delete with returning clause
+	* const deletedCar: Car[] = await db.delete(cars)
+	*   .where(eq(cars.id, 1))
+	*   .returning();
+	* ```
+	*/
+	delete(from) {
+		return new SQLiteDeleteBase(from, this.session, this.dialect);
+	}
+	run(query) {
+		const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+		if (this.resultKind === "async") return new SQLiteRaw(async () => this.session.run(sequel), () => sequel, "run", this.dialect, this.session.extractRawRunValueFromBatchResult.bind(this.session));
+		return this.session.run(sequel);
+	}
+	all(query) {
+		const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+		if (this.resultKind === "async") return new SQLiteRaw(async () => this.session.all(sequel), () => sequel, "all", this.dialect, this.session.extractRawAllValueFromBatchResult.bind(this.session));
+		return this.session.all(sequel);
+	}
+	get(query) {
+		const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+		if (this.resultKind === "async") return new SQLiteRaw(async () => this.session.get(sequel), () => sequel, "get", this.dialect, this.session.extractRawGetValueFromBatchResult.bind(this.session));
+		return this.session.get(sequel);
+	}
+	values(query) {
+		const sequel = typeof query === "string" ? sql.raw(query) : query.getSQL();
+		if (this.resultKind === "async") return new SQLiteRaw(async () => this.session.values(sequel), () => sequel, "values", this.dialect, this.session.extractRawValuesValueFromBatchResult.bind(this.session));
+		return this.session.values(sequel);
+	}
+	transaction(transaction, config) {
+		return this.session.transaction(transaction, config);
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/cache/core/cache.js
+var Cache = class {
+	static [entityKind] = "Cache";
+};
+var NoopCache = class extends Cache {
+	strategy() {
+		return "all";
+	}
+	static [entityKind] = "NoopCache";
+	async get(_key) {}
+	async put(_hashedQuery, _response, _tables, _config) {}
+	async onMutate(_params) {}
+};
+async function hashQuery(sql, params) {
+	const dataToHash = `${sql}-${JSON.stringify(params)}`;
+	const data = new TextEncoder().encode(dataToHash);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+	return [...new Uint8Array(hashBuffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-core/session.js
+var ExecuteResultSync = class extends QueryPromise {
+	constructor(resultCb) {
+		super();
+		this.resultCb = resultCb;
+	}
+	static [entityKind] = "ExecuteResultSync";
+	async execute() {
+		return this.resultCb();
+	}
+	sync() {
+		return this.resultCb();
+	}
+};
+var SQLitePreparedQuery = class {
+	constructor(mode, executeMethod, query, cache, queryMetadata, cacheConfig) {
+		this.mode = mode;
+		this.executeMethod = executeMethod;
+		this.query = query;
+		this.cache = cache;
+		this.queryMetadata = queryMetadata;
+		this.cacheConfig = cacheConfig;
+		if (cache && cache.strategy() === "all" && cacheConfig === void 0) this.cacheConfig = {
+			enable: true,
+			autoInvalidate: true
+		};
+		if (!this.cacheConfig?.enable) this.cacheConfig = void 0;
+	}
+	static [entityKind] = "PreparedQuery";
+	/** @internal */
+	joinsNotNullableMap;
+	/** @internal */
+	async queryWithCache(queryString, params, query) {
+		if (this.cache === void 0 || is(this.cache, NoopCache) || this.queryMetadata === void 0) try {
+			return await query();
+		} catch (e) {
+			throw new DrizzleQueryError(queryString, params, e);
+		}
+		if (this.cacheConfig && !this.cacheConfig.enable) try {
+			return await query();
+		} catch (e) {
+			throw new DrizzleQueryError(queryString, params, e);
+		}
+		if ((this.queryMetadata.type === "insert" || this.queryMetadata.type === "update" || this.queryMetadata.type === "delete") && this.queryMetadata.tables.length > 0) try {
+			const [res] = await Promise.all([query(), this.cache.onMutate({ tables: this.queryMetadata.tables })]);
+			return res;
+		} catch (e) {
+			throw new DrizzleQueryError(queryString, params, e);
+		}
+		if (!this.cacheConfig) try {
+			return await query();
+		} catch (e) {
+			throw new DrizzleQueryError(queryString, params, e);
+		}
+		if (this.queryMetadata.type === "select") {
+			const fromCache = await this.cache.get(this.cacheConfig.tag ?? await hashQuery(queryString, params), this.queryMetadata.tables, this.cacheConfig.tag !== void 0, this.cacheConfig.autoInvalidate);
+			if (fromCache === void 0) {
+				let result;
+				try {
+					result = await query();
+				} catch (e) {
+					throw new DrizzleQueryError(queryString, params, e);
+				}
+				await this.cache.put(this.cacheConfig.tag ?? await hashQuery(queryString, params), result, this.cacheConfig.autoInvalidate ? this.queryMetadata.tables : [], this.cacheConfig.tag !== void 0, this.cacheConfig.config);
+				return result;
+			}
+			return fromCache;
+		}
+		try {
+			return await query();
+		} catch (e) {
+			throw new DrizzleQueryError(queryString, params, e);
+		}
+	}
+	getQuery() {
+		return this.query;
+	}
+	mapRunResult(result, _isFromBatch) {
+		return result;
+	}
+	mapAllResult(_result, _isFromBatch) {
+		throw new Error("Not implemented");
+	}
+	mapGetResult(_result, _isFromBatch) {
+		throw new Error("Not implemented");
+	}
+	execute(placeholderValues) {
+		if (this.mode === "async") return this[this.executeMethod](placeholderValues);
+		return new ExecuteResultSync(() => this[this.executeMethod](placeholderValues));
+	}
+	mapResult(response, isFromBatch) {
+		switch (this.executeMethod) {
+			case "run": return this.mapRunResult(response, isFromBatch);
+			case "all": return this.mapAllResult(response, isFromBatch);
+			case "get": return this.mapGetResult(response, isFromBatch);
+		}
+	}
+};
+var SQLiteSession = class {
+	constructor(dialect) {
+		this.dialect = dialect;
+	}
+	static [entityKind] = "SQLiteSession";
+	prepareOneTimeQuery(query, fields, executeMethod, isResponseInArrayMode, customResultMapper, queryMetadata, cacheConfig) {
+		return this.prepareQuery(query, fields, executeMethod, isResponseInArrayMode, customResultMapper, queryMetadata, cacheConfig);
+	}
+	run(query) {
+		const staticQuery = this.dialect.sqlToQuery(query);
+		try {
+			return this.prepareOneTimeQuery(staticQuery, void 0, "run", false).run();
+		} catch (err) {
+			throw new DrizzleError({
+				cause: err,
+				message: `Failed to run the query '${staticQuery.sql}'`
+			});
+		}
+	}
+	/** @internal */
+	extractRawRunValueFromBatchResult(result) {
+		return result;
+	}
+	all(query) {
+		return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).all();
+	}
+	/** @internal */
+	extractRawAllValueFromBatchResult(_result) {
+		throw new Error("Not implemented");
+	}
+	get(query) {
+		return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).get();
+	}
+	/** @internal */
+	extractRawGetValueFromBatchResult(_result) {
+		throw new Error("Not implemented");
+	}
+	values(query) {
+		return this.prepareOneTimeQuery(this.dialect.sqlToQuery(query), void 0, "run", false).values();
+	}
+	async count(sql) {
+		return (await this.values(sql))[0][0];
+	}
+	/** @internal */
+	extractRawValuesValueFromBatchResult(_result) {
+		throw new Error("Not implemented");
+	}
+};
+var SQLiteTransaction = class extends BaseSQLiteDatabase {
+	constructor(resultType, dialect, session, schema, nestedIndex = 0) {
+		super(resultType, dialect, session, schema);
+		this.schema = schema;
+		this.nestedIndex = nestedIndex;
+	}
+	static [entityKind] = "SQLiteTransaction";
+	rollback() {
+		throw new TransactionRollbackError();
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-proxy/session.js
+var SQLiteRemoteSession = class extends SQLiteSession {
+	constructor(client, dialect, schema, batchCLient, options = {}) {
+		super(dialect);
+		this.client = client;
+		this.schema = schema;
+		this.batchCLient = batchCLient;
+		this.logger = options.logger ?? new NoopLogger();
+		this.cache = options.cache ?? new NoopCache();
+	}
+	static [entityKind] = "SQLiteRemoteSession";
+	logger;
+	cache;
+	prepareQuery(query, fields, executeMethod, isResponseInArrayMode, customResultMapper, queryMetadata, cacheConfig) {
+		return new RemotePreparedQuery(this.client, query, this.logger, this.cache, queryMetadata, cacheConfig, fields, executeMethod, isResponseInArrayMode, customResultMapper);
+	}
+	async batch(queries) {
+		const preparedQueries = [];
+		const builtQueries = [];
+		for (const query of queries) {
+			const preparedQuery = query._prepare();
+			const builtQuery = preparedQuery.getQuery();
+			preparedQueries.push(preparedQuery);
+			builtQueries.push({
+				sql: builtQuery.sql,
+				params: builtQuery.params,
+				method: builtQuery.method
+			});
+		}
+		return (await this.batchCLient(builtQueries)).map((result, i) => preparedQueries[i].mapResult(result, true));
+	}
+	async transaction(transaction, config) {
+		const tx = new SQLiteProxyTransaction("async", this.dialect, this, this.schema);
+		await this.run(sql.raw(`begin${config?.behavior ? " " + config.behavior : ""}`));
+		try {
+			const result = await transaction(tx);
+			await this.run(sql`commit`);
+			return result;
+		} catch (err) {
+			await this.run(sql`rollback`);
+			throw err;
+		}
+	}
+	extractRawAllValueFromBatchResult(result) {
+		return result.rows;
+	}
+	extractRawGetValueFromBatchResult(result) {
+		return result.rows[0];
+	}
+	extractRawValuesValueFromBatchResult(result) {
+		return result.rows;
+	}
+};
+var SQLiteProxyTransaction = class SQLiteProxyTransaction extends SQLiteTransaction {
+	static [entityKind] = "SQLiteProxyTransaction";
+	async transaction(transaction) {
+		const savepointName = `sp${this.nestedIndex}`;
+		const tx = new SQLiteProxyTransaction("async", this.dialect, this.session, this.schema, this.nestedIndex + 1);
+		await this.session.run(sql.raw(`savepoint ${savepointName}`));
+		try {
+			const result = await transaction(tx);
+			await this.session.run(sql.raw(`release savepoint ${savepointName}`));
+			return result;
+		} catch (err) {
+			await this.session.run(sql.raw(`rollback to savepoint ${savepointName}`));
+			throw err;
+		}
+	}
+};
+var RemotePreparedQuery = class extends SQLitePreparedQuery {
+	constructor(client, query, logger, cache, queryMetadata, cacheConfig, fields, executeMethod, _isResponseInArrayMode, customResultMapper) {
+		super("async", executeMethod, query, cache, queryMetadata, cacheConfig);
+		this.client = client;
+		this.logger = logger;
+		this.fields = fields;
+		this._isResponseInArrayMode = _isResponseInArrayMode;
+		this.customResultMapper = customResultMapper;
+		this.customResultMapper = customResultMapper;
+		this.method = executeMethod;
+	}
+	static [entityKind] = "SQLiteProxyPreparedQuery";
+	method;
+	getQuery() {
+		return {
+			...this.query,
+			method: this.method
+		};
+	}
+	async run(placeholderValues) {
+		const params = fillPlaceholders(this.query.params, placeholderValues ?? {});
+		this.logger.logQuery(this.query.sql, params);
+		return await this.queryWithCache(this.query.sql, params, async () => {
+			return await this.client(this.query.sql, params, "run");
+		});
+	}
+	mapAllResult(rows, isFromBatch) {
+		if (isFromBatch) rows = rows.rows;
+		if (!this.fields && !this.customResultMapper) return rows;
+		if (this.customResultMapper) return this.customResultMapper(rows);
+		return rows.map((row) => {
+			return mapResultRow(this.fields, row, this.joinsNotNullableMap);
+		});
+	}
+	async all(placeholderValues) {
+		const { query, logger, client } = this;
+		const params = fillPlaceholders(query.params, placeholderValues ?? {});
+		logger.logQuery(query.sql, params);
+		const { rows } = await this.queryWithCache(query.sql, params, async () => {
+			return await client(query.sql, params, "all");
+		});
+		return this.mapAllResult(rows);
+	}
+	async get(placeholderValues) {
+		const { query, logger, client } = this;
+		const params = fillPlaceholders(query.params, placeholderValues ?? {});
+		logger.logQuery(query.sql, params);
+		const clientResult = await this.queryWithCache(query.sql, params, async () => {
+			return await client(query.sql, params, "get");
+		});
+		return this.mapGetResult(clientResult.rows);
+	}
+	mapGetResult(rows, isFromBatch) {
+		if (isFromBatch) rows = rows.rows;
+		const row = rows;
+		if (!this.fields && !this.customResultMapper) return row;
+		if (!row) return;
+		if (this.customResultMapper) return this.customResultMapper([rows]);
+		return mapResultRow(this.fields, row, this.joinsNotNullableMap);
+	}
+	async values(placeholderValues) {
+		const params = fillPlaceholders(this.query.params, placeholderValues ?? {});
+		this.logger.logQuery(this.query.sql, params);
+		return (await this.queryWithCache(this.query.sql, params, async () => {
+			return await this.client(this.query.sql, params, "values");
+		})).rows;
+	}
+	/** @internal */
+	isResponseInArrayMode() {
+		return this._isResponseInArrayMode;
+	}
+};
+//#endregion
+//#region ../../node_modules/.bun/drizzle-orm@0.45.2/node_modules/drizzle-orm/sqlite-proxy/driver.js
+var SqliteRemoteDatabase = class extends BaseSQLiteDatabase {
+	static [entityKind] = "SqliteRemoteDatabase";
+	async batch(batch) {
+		return this.session.batch(batch);
+	}
+};
+function drizzle(callback, batchCallback, config) {
+	const dialect = new SQLiteAsyncDialect({ casing: config?.casing });
+	let logger;
+	let cache;
+	let _batchCallback;
+	let _config = {};
+	if (batchCallback) {
+		if (typeof batchCallback === "function") {
+			_batchCallback = batchCallback;
+			_config = config ?? {};
+		} else {
+			_batchCallback = void 0;
+			_config = batchCallback;
+		}
+		if (_config.logger === true) logger = new DefaultLogger();
+		else if (_config.logger !== false) {
+			logger = _config.logger;
+			cache = _config.cache;
+		}
+	}
+	let schema;
+	if (_config.schema) {
+		const tablesConfig = extractTablesRelationalConfig(_config.schema, createTableRelationsHelpers);
+		schema = {
+			fullSchema: _config.schema,
+			schema: tablesConfig.tables,
+			tableNamesMap: tablesConfig.tableNamesMap
+		};
+	}
+	const db = new SqliteRemoteDatabase("async", dialect, new SQLiteRemoteSession(callback, dialect, schema, _batchCallback, {
+		logger,
+		cache
+	}), schema);
+	db.$cache = cache;
+	if (db.$cache) db.$cache["invalidate"] = cache?.onMutate;
+	return db;
+}
+//#endregion
 //#region ../../src/lib/database/driver.ts
 const _require = createRequire(import.meta.url);
 const SQLITE_WARNING_FILTER = Symbol.for("overdeck.sqliteWarningFilterInstalled");
@@ -4380,1772 +17215,1404 @@ function openDatabase(path, options = {}) {
 	return wrapDatabase(new DatabaseSync(path, options));
 }
 //#endregion
-//#region ../../src/lib/database/agent-mappers.ts
-function agentStateToDbAgent(state) {
-	return {
-		id: state.id,
-		issueId: state.issueId,
-		role: state.role,
-		status: state.status,
-		workspace: state.workspace,
-		harness: state.harness ?? null,
-		model: state.model ?? null,
-		branch: state.branch ?? null,
-		sessionId: state.sessionId ?? null,
-		startedAt: state.startedAt ?? null,
-		lastActivity: state.lastActivity ?? null,
-		lastResumeAt: state.lastResumeAt ?? null,
-		stoppedAt: state.stoppedAt ?? null,
-		stoppedByUser: state.stoppedByUser ?? null,
-		stoppedByPause: state.stoppedByPause ?? null,
-		kickoffDelivered: state.kickoffDelivered ?? null,
-		hostOverride: state.hostOverride ?? null,
-		costSoFar: state.costSoFar ?? null,
-		phase: state.phase ?? null,
-		workType: state.workType ?? null,
-		paused: state.paused ?? null,
-		pausedReason: state.pausedReason ?? null,
-		pausedAt: state.pausedAt ?? null,
-		troubled: state.troubled ?? null,
-		troubledAt: state.troubledAt ?? null,
-		consecutiveFailures: state.consecutiveFailures ?? null,
-		firstFailureInRunAt: state.firstFailureInRunAt ?? null,
-		lastFailureAt: state.lastFailureAt ?? null,
-		lastFailureReason: state.lastFailureReason ?? null,
-		lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
-		flywheelRunId: state.flywheelRunId ?? null,
-		roleRunHead: state.roleRunHead ?? null,
-		reviewSubRole: state.reviewSubRole ?? null,
-		reviewRunId: state.reviewRunId ?? null,
-		reviewSynthesisAgentId: state.reviewSynthesisAgentId ?? null,
-		reviewOutputPath: state.reviewOutputPath ?? null,
-		reviewDeadlineAt: state.reviewDeadlineAt ?? null,
-		reviewMonitorSignaled: state.reviewMonitorSignaled ?? null,
-		reviewRetryAttempt: state.reviewRetryAttempt ?? null,
-		inspectSubRole: state.inspectSubRole ?? null,
-		deliveryMethod: state.deliveryMethod ?? null,
-		supervisorEnabled: state.supervisorEnabled ?? null,
-		channelsEnabled: state.channelsEnabled ?? null,
-		updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-	};
-}
-//#endregion
-//#region ../../src/lib/database/agent-backfill.ts
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/unstable/process/ChildProcessSpawner.js
 /**
-* One-time versioned backfill for the PAN-1908 agents table.
+* Service contract and helpers for running child processes through Effect.
 *
-* This is the ONLY module permitted to enumerate
-* `${OVERDECK_HOME}/agents/{id}/state.json`. It is invoked:
+* This module defines the {@link ChildProcessSpawner} service used by child
+* process commands to start operating-system processes. A spawner turns a
+* command description into a {@link ChildProcessHandle}, which exposes scoped
+* lifecycle operations: write to stdin, stream stdout and stderr, wait for the
+* exit code, kill the process, inspect whether it is still running, and
+* temporarily unreference it from the parent process.
 *
-*   - automatically once during the v54 -> v55 schema migration, and
-*   - manually via `pan admin db rebuild-agents`.
+* Use this module when implementing a platform-specific process backend or
+* when code needs direct access to the process service. Most applications build
+* commands with the `ChildProcess` module; this service is the lower-level
+* execution boundary and also provides convenience methods for collecting exit
+* codes, strings, and output lines. The {@link make} constructor derives those
+* helpers from one primitive `spawn` implementation, so adapters only need to
+* supply process creation.
 *
-* Keeping the enumeration here makes it easy to audit that no hot path
-* (dashboard handlers, deacon patrol, read model) reads agent state from the
-* filesystem.
+* @since 4.0.0
 */
-const VALID_ROLES = new Set([
-	"plan",
-	"work",
-	"review",
-	"test",
-	"ship",
-	"flywheel",
-	"strike"
-]);
-const COLUMN_MAP = {
-	id: "id",
-	issueId: "issue_id",
-	role: "role",
-	status: "status",
-	workspace: "workspace",
-	harness: "harness",
-	model: "model",
-	branch: "branch",
-	sessionId: "session_id",
-	startedAt: "started_at",
-	lastActivity: "last_activity",
-	lastResumeAt: "last_resume_at",
-	stoppedAt: "stopped_at",
-	stoppedByUser: "stopped_by_user",
-	stoppedByPause: "stopped_by_pause",
-	kickoffDelivered: "kickoff_delivered",
-	hostOverride: "host_override",
-	costSoFar: "cost_so_far",
-	phase: "phase",
-	workType: "work_type",
-	paused: "paused",
-	pausedReason: "paused_reason",
-	pausedAt: "paused_at",
-	troubled: "troubled",
-	troubledAt: "troubled_at",
-	consecutiveFailures: "consecutive_failures",
-	firstFailureInRunAt: "first_failure_in_run_at",
-	lastFailureAt: "last_failure_at",
-	lastFailureReason: "last_failure_reason",
-	lastFailureNextRetryAt: "last_failure_next_retry_at",
-	flywheelRunId: "flywheel_run_id",
-	roleRunHead: "role_run_head",
-	reviewSubRole: "review_sub_role",
-	reviewRunId: "review_run_id",
-	reviewSynthesisAgentId: "review_synthesis_agent_id",
-	reviewOutputPath: "review_output_path",
-	reviewDeadlineAt: "review_deadline_at",
-	reviewMonitorSignaled: "review_monitor_signaled",
-	reviewRetryAttempt: "review_retry_attempt",
-	inspectSubRole: "inspect_sub_role",
-	deliveryMethod: "delivery_method",
-	supervisorEnabled: "supervisor_enabled",
-	channelsEnabled: "channels_enabled",
-	updatedAt: "updated_at"
-};
-function getManagedTmuxSocketName() {
-	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "overdeck";
-}
-function listLiveTmuxSessionNames() {
-	try {
-		const output = execFileSync$1("tmux", [
-			"-L",
-			getManagedTmuxSocketName(),
-			"list-sessions",
-			"-F",
-			"#{session_name}"
-		], {
-			encoding: "utf-8",
-			stdio: [
-				"ignore",
-				"pipe",
-				"ignore"
-			]
-		});
-		return new Set(output.split("\n").map((line) => line.trim()).filter(Boolean));
-	} catch {
-		return /* @__PURE__ */ new Set();
-	}
-}
-function parseAgentStateJson(content, fallbackId) {
-	let parsed;
-	try {
-		parsed = JSON.parse(content);
-	} catch {
-		return null;
-	}
-	if (!parsed.role || !VALID_ROLES.has(parsed.role)) return null;
-	if (!parsed.id) parsed.id = fallbackId;
-	if (!parsed.status) parsed.status = "stopped";
-	return parsed;
-}
-function buildNamedParams(row) {
-	const params = {};
-	for (const [key, column] of Object.entries(COLUMN_MAP)) {
-		let value = row[key];
-		if (typeof value === "boolean") value = value ? 1 : 0;
-		params[column] = value;
-	}
-	return params;
-}
 /**
-* Enumerate agent state files and upsert them into the agents table.
+* Constructs branded child process `ExitCode` values.
 *
-* Idempotent by id — re-running creates no duplicates. Status is reconciled
-* against live tmux sessions: an agent whose state says running/starting but
-* has no live session is marked stopped.
+* @category constructors
+* @since 4.0.0
 */
-function backfillAgentsFromStateJsonSync(db, options) {
-	const agentsDir = join$1(getOverdeckHome(), "agents");
-	const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNames();
-	let processed = 0;
-	let skipped = 0;
-	let markedStopped = 0;
-	let entries = [];
-	try {
-		entries = readdirSync(agentsDir);
-	} catch {
+const ExitCode = /* @__PURE__ */ nominal();
+/**
+* Constructs branded child process `ProcessId` values.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const ProcessId = /* @__PURE__ */ nominal();
+const HandleTypeId = "~effect/ChildProcessSpawner/ChildProcessHandle";
+const HandleProto = {
+	[HandleTypeId]: HandleTypeId,
+	...BaseProto,
+	toJSON() {
 		return {
-			processed,
-			skipped,
-			markedStopped
+			_id: "ChildProcessHandle",
+			pid: this.pid
 		};
 	}
-	const columns = Object.values(COLUMN_MAP);
-	const placeholders = columns.map((col) => `$${col}`).join(", ");
-	const upsert = db.prepare(`INSERT OR REPLACE INTO agents (${columns.join(", ")}) VALUES (${placeholders})`);
-	db.transaction(() => {
-		for (const entry of entries) {
-			const dirPath = join$1(agentsDir, entry);
-			let statePath;
-			try {
-				if (!statSync$1(dirPath).isDirectory()) continue;
-				statePath = join$1(dirPath, "state.json");
-			} catch {
-				continue;
-			}
-			let content;
-			try {
-				content = readFileSync$1(statePath, "utf-8");
-			} catch {
-				skipped++;
-				continue;
-			}
-			const state = parseAgentStateJson(content, entry);
-			if (!state) {
-				skipped++;
-				continue;
-			}
-			const reconciled = reconcileAgentStatus(state, liveSessions);
-			if (reconciled.status === "stopped" && state.status !== "stopped") markedStopped++;
-			const row = agentStateToDbAgent(reconciled);
-			upsert.run(buildNamedParams(row));
-			processed++;
-			if (options?.verbose) console.log(`[backfill] ${row.id} -> ${row.status}`);
+};
+/**
+* Constructs a new `ChildProcessHandle`.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const makeHandle = (params) => Object.assign(Object.create(HandleProto), params);
+/**
+* Creates a `ChildProcessSpawner` service from a `spawn` function, deriving
+* helpers for exit codes and output collection from that implementation.
+*
+* @category models
+* @since 4.0.0
+*/
+const make$2 = (spawn) => {
+	const streamString = (command, options) => spawn(command).pipe(map$3((handle) => decodeText(options?.includeStderr === true ? handle.all : handle.stdout)), unwrap);
+	const streamLines = (command, options) => splitLines(streamString(command, options));
+	return ChildProcessSpawner.of({
+		spawn,
+		exitCode: (command) => scoped(flatMap(spawn(command), (handle) => handle.exitCode)),
+		streamString,
+		streamLines,
+		lines: (command, options) => runCollect(streamLines(command, options)),
+		string: (command, options) => mkString(streamString(command, options))
+	});
+};
+/**
+* Service tag for child process spawning.
+*
+* @category services
+* @since 4.0.0
+*/
+var ChildProcessSpawner = class extends Service()("effect/process/ChildProcessSpawner") {};
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/unstable/process/ChildProcess.js
+/**
+* An Effect-native module for working with child processes.
+*
+* This module uses an AST-based approach where commands are built first
+* using `make` and `pipeTo`, then executed using `spawn`.
+*
+* **Example** (Spawning and piping commands)
+*
+* ```ts
+* import { Effect, Stream } from "effect"
+* import { NodeServices } from "@effect/platform-node"
+* import { ChildProcess } from "effect/unstable/process"
+*
+* // Build a command
+* const command = ChildProcess.make`echo "hello world"`
+*
+* // Spawn and collect output
+* const program = Effect.gen(function*() {
+*   // You can `yield*` a command, which calls `ChildProcess.spawn`
+*   const handle = yield* command
+*   const chunks = yield* Stream.runCollect(handle.stdout)
+*   const exitCode = yield* handle.exitCode
+*   return { chunks, exitCode }
+* }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+*
+* // With options
+* const withOptions = ChildProcess.make({ cwd: "/tmp" })`ls -la`
+*
+* // Piping commands
+* const pipeline = ChildProcess.make`cat package.json`.pipe(
+*   ChildProcess.pipeTo(ChildProcess.make`grep name`)
+* )
+*
+* // Spawn the pipeline
+* const pipelineProgram = Effect.gen(function*() {
+*   const handle = yield* pipeline
+*   const chunks = yield* Stream.runCollect(handle.stdout)
+*   return chunks
+* }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+* ```
+*
+* @since 4.0.0
+*/
+const TypeId = "~effect/unstable/process/ChildProcess";
+const Proto = {
+	.../* @__PURE__ */ Prototype({
+		label: "Command",
+		evaluate(fiber) {
+			return getUnsafe(fiber.context, ChildProcessSpawner).spawn(this);
 		}
-	})();
+	}),
+	[TypeId]: TypeId
+};
+const makeStandardCommand = (command, args, options) => Object.assign(Object.create(Proto), {
+	_tag: "StandardCommand",
+	command,
+	args,
+	options
+});
+/**
+* Create a command from a template literal, options + template, or array form.
+*
+* **Details**
+*
+* This function supports three calling conventions:
+* 1. Template literal: `make\`npm run build\``
+* 2. Options + template literal: `make({ cwd: "/app" })\`npm run build\``
+* 3. Array form: `make("npm", ["run", "build"], options?)`
+*
+* Template literals are not parsed until execution time, allowing parsing
+* errors to flow through Effect's error channel.
+*
+* **Example** (Creating commands)
+*
+* ```ts
+* import { ChildProcess } from "effect/unstable/process"
+*
+* // Template literal form
+* const cmd1 = ChildProcess.make`echo "hello"`
+*
+* // With options
+* const cmd2 = ChildProcess.make({ cwd: "/tmp" })`ls -la`
+*
+* // Array form
+* const cmd3 = ChildProcess.make("git", ["status"])
+* ```
+*
+* @category constructors
+* @since 4.0.0
+*/
+const make$1 = function make(...args) {
+	if (isTemplateString(args[0])) {
+		const [templates, ...expressions] = args;
+		const tokens = parseTemplates(templates, expressions);
+		return makeStandardCommand(tokens[0] ?? "", tokens.slice(1), {});
+	}
+	if (typeof args[0] === "object" && !Array.isArray(args[0]) && !isTemplateString(args[0])) {
+		const options = args[0];
+		return function(templates, ...expressions) {
+			const tokens = parseTemplates(templates, expressions);
+			return makeStandardCommand(tokens[0] ?? "", tokens.slice(1), options);
+		};
+	}
+	if (typeof args[0] === "string" && !Array.isArray(args[1])) {
+		const [command, options = {}] = args;
+		return makeStandardCommand(command, [], options);
+	}
+	const [command, cmdArgs = [], options = {}] = args;
+	return makeStandardCommand(command, cmdArgs, options);
+};
+const isTemplateString = (u) => Array.isArray(u) && "raw" in u && Array.isArray(u.raw);
+/**
+* Parses an fd name like "fd3" to its numeric index.
+* Returns undefined if the name is invalid.
+*
+* @category utils
+* @since 4.0.0
+*/
+const parseFdName = (name) => {
+	const match = /^fd(\d+)$/.exec(name);
+	if (match === null) return void 0;
+	const fd = parseInt(match[1], 10);
+	return fd >= 3 ? fd : void 0;
+};
+/**
+* Create an fd name from its numeric index.
+*
+* @category utils
+* @since 4.0.0
+*/
+const fdName = (fd) => `fd${fd}`;
+const parseTemplates = (templates, expressions) => {
+	let tokens = [];
+	for (const [index, template] of templates.entries()) tokens = parseTemplate(templates, expressions, tokens, template, index);
+	return tokens;
+};
+const parseTemplate = (templates, expressions, prevTokens, template, index) => {
+	const rawTemplate = templates.raw[index];
+	if (rawTemplate === void 0) throw new Error(`Invalid backslash sequence: ${templates.raw[index]}`);
+	const { hasLeadingWhitespace, hasTrailingWhitespace, tokens } = splitByWhitespaces(template, rawTemplate);
+	const nextTokens = concatTokens(prevTokens, tokens, hasLeadingWhitespace);
+	if (index === expressions.length) return nextTokens;
+	const expression = expressions[index];
+	return concatTokens(nextTokens, Array.isArray(expression) ? expression.map((expression) => parseExpression(expression)) : [parseExpression(expression)], hasTrailingWhitespace);
+};
+/**
+* Convert valid expressions defined in a template string command (i.e. using
+* `${expression}` into strings.
+*/
+const parseExpression = (expression) => {
+	if (typeof expression === "string") return expression;
+	return String(expression);
+};
+const DELIMITERS = /* @__PURE__ */ new Set([
+	" ",
+	"	",
+	"\r",
+	"\n"
+]);
+/**
+* Number of characters in backslash escape sequences: \0 \xXX or \uXXXX
+* \cX is allowed in RegExps but not in strings
+* Octal sequences are not allowed in strict mode
+*/
+const ESCAPE_LENGTH = {
+	x: 3,
+	u: 5
+};
+/**
+* Splits a template string by whitespace while also properly handling escape
+* sequences.
+*
+* As an example, let's review the following valid commands:
+*
+* ```ts
+* ChildProcess.exec`echo foo\n bar`
+* // We should run `["echo", "foo\n", "bar"]`
+*
+* ChildProcess.exec`echo foo
+*  bar`
+* // We should run `["echo", "foo", "bar]`
+* ```
+*
+* The problem is that when we evaluate the template string for both of the above
+* commands, we will end up with the same string "echo foo\n bar".
+*
+* What we really want is to include the escaped character in the arguments for
+* the first command, since it was written explicitly by the user.
+*
+* This is why also having access to the raw template string is useful - in a
+* template string, there are two representations of the same string:
+* 1. `template`     - The processed string (escape sequences are evaluated).
+* 2. `template.raw` - The raw string (escape sequences are literal).
+*/
+const splitByWhitespaces = (template, rawTemplate) => {
+	if (rawTemplate.length === 0) return {
+		tokens: [],
+		hasLeadingWhitespace: false,
+		hasTrailingWhitespace: false
+	};
+	const hasLeadingWhitespace = DELIMITERS.has(rawTemplate[0]);
+	const tokens = [];
+	let templateCursor = 0;
+	for (let templateIndex = 0, rawIndex = 0; templateIndex < template.length; templateIndex += 1, rawIndex += 1) {
+		const rawCharacter = rawTemplate[rawIndex];
+		if (DELIMITERS.has(rawCharacter)) {
+			if (templateCursor !== templateIndex) tokens.push(template.slice(templateCursor, templateIndex));
+			templateCursor = templateIndex + 1;
+		} else if (rawCharacter === "\\") {
+			const nextRawCharacter = rawTemplate[rawIndex + 1];
+			if (nextRawCharacter === "\n") {
+				templateIndex -= 1;
+				rawIndex += 1;
+			} else if (nextRawCharacter === "u" && rawTemplate[rawIndex + 2] === "{") rawIndex = rawTemplate.indexOf("}", rawIndex + 3);
+			else rawIndex += ESCAPE_LENGTH[nextRawCharacter] ?? 1;
+		}
+	}
+	const hasTrailingWhitespace = templateCursor === template.length;
+	if (!hasTrailingWhitespace) tokens.push(template.slice(templateCursor));
 	return {
-		processed,
-		skipped,
-		markedStopped
+		tokens,
+		hasLeadingWhitespace,
+		hasTrailingWhitespace
 	};
-}
-function reconcileAgentStatus(state, liveSessions) {
-	if ((state.status === "running" || state.status === "starting") && !liveSessions.has(state.id)) return {
-		...state,
-		status: "stopped",
-		stoppedAt: state.stoppedAt ?? (/* @__PURE__ */ new Date()).toISOString()
-	};
-	return state;
-}
-function parseArrayColumn(value) {
-	if (!value) return [];
-	try {
-		const parsed = JSON.parse(value);
-		return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string" && item.length > 0) : [];
-	} catch {
-		return [];
+};
+/**
+* Concatenates two separate sets of string tokens together.
+*
+* If either set is empty or `isSeparated=false`, the last element of `prevTokens`
+* and the first element of `nextTokens` will be joined into a single token.
+*/
+const concatTokens = (prevTokens, nextTokens, isSeparated) => isSeparated || prevTokens.length === 0 || nextTokens.length === 0 ? [...prevTokens, ...nextTokens] : [
+	...prevTokens.slice(0, -1),
+	`${prevTokens.at(-1)}${nextTokens.at(0)}`,
+	...nextTokens.slice(1)
+];
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node-shared@4.0.0-beta.73/node_modules/@effect/platform-node-shared/dist/internal/utils.js
+/** @internal */
+const handleErrnoException = (module, method) => (err, [path]) => {
+	let reason = "Unknown";
+	switch (err.code) {
+		case "ENOENT":
+			reason = "NotFound";
+			break;
+		case "EACCES":
+			reason = "PermissionDenied";
+			break;
+		case "EEXIST":
+			reason = "AlreadyExists";
+			break;
+		case "EISDIR":
+			reason = "BadResource";
+			break;
+		case "ENOTDIR":
+			reason = "BadResource";
+			break;
+		case "EBUSY":
+			reason = "Busy";
+			break;
+		case "ELOOP":
+			reason = "BadResource";
+			break;
 	}
-}
-function uniqueStrings(values) {
-	return [...new Set(values)];
-}
-function backfillDiscoveredSessionArrayIndexes(db) {
-	const rows = db.prepare(`SELECT id, tools_used, files_touched, tags FROM discovered_sessions`).all();
-	const deleteTags = db.prepare(`DELETE FROM discovered_session_tags WHERE session_id = ?`);
-	const deleteTools = db.prepare(`DELETE FROM discovered_session_tools WHERE session_id = ?`);
-	const deleteFiles = db.prepare(`DELETE FROM discovered_session_files WHERE session_id = ?`);
-	const insertTag = db.prepare(`INSERT OR IGNORE INTO discovered_session_tags (session_id, tag) VALUES (?, ?)`);
-	const insertTool = db.prepare(`INSERT OR IGNORE INTO discovered_session_tools (session_id, tool) VALUES (?, ?)`);
-	const insertFile = db.prepare(`INSERT OR IGNORE INTO discovered_session_files (session_id, file_path) VALUES (?, ?)`);
-	const replaceRow = db.transaction((row) => {
-		deleteTags.run(row.id);
-		deleteTools.run(row.id);
-		deleteFiles.run(row.id);
-		for (const tag of uniqueStrings(parseArrayColumn(row.tags))) insertTag.run(row.id, tag);
-		for (const tool of uniqueStrings(parseArrayColumn(row.tools_used))) insertTool.run(row.id, tool);
-		for (const file of uniqueStrings(parseArrayColumn(row.files_touched))) insertFile.run(row.id, file);
+	return systemError({
+		_tag: reason,
+		module,
+		method,
+		pathOrDescriptor: path,
+		syscall: err.syscall,
+		cause: err
 	});
-	for (const row of rows) replaceRow(row);
-}
-function initDiscoveredSessionsSchema(db) {
-	db.exec(`
-    CREATE TABLE IF NOT EXISTS discovered_sessions (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      jsonl_path        TEXT    NOT NULL UNIQUE,
-      session_id        TEXT,
-      workspace_path    TEXT,
-      workspace_hash    TEXT,
-      message_count     INTEGER NOT NULL DEFAULT 0,
-      first_ts          TEXT,
-      last_ts           TEXT,
-      models_used       TEXT,
-      primary_model     TEXT,
-      token_input       INTEGER NOT NULL DEFAULT 0,
-      token_output      INTEGER NOT NULL DEFAULT 0,
-      estimated_cost    REAL    NOT NULL DEFAULT 0,
-      tools_used        TEXT,
-      files_touched     TEXT,
-      tags              TEXT,
-      summary           TEXT,
-      summary_detailed  TEXT,
-      enrichment_level  INTEGER NOT NULL DEFAULT 0,
-      enrichment_model  TEXT,
-      enriched_at       TEXT,
-      enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      overdeck_managed INTEGER NOT NULL DEFAULT 0,
-      pan_issue_id      TEXT,
-      pan_agent_id      TEXT,
-      file_size         INTEGER,
-      file_mtime        TEXT,
-      scanned_at        TEXT    NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
-    CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
-    CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
-    CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
-    CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
-
-    CREATE TABLE IF NOT EXISTS discovered_session_tags (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      tag        TEXT    NOT NULL,
-      PRIMARY KEY (session_id, tag)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_session_tags_tag
-      ON discovered_session_tags(tag, session_id);
-
-    CREATE TABLE IF NOT EXISTS discovered_session_tools (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      tool       TEXT    NOT NULL,
-      PRIMARY KEY (session_id, tool)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_session_tools_tool
-      ON discovered_session_tools(tool, session_id);
-
-    CREATE TABLE IF NOT EXISTS discovered_session_files (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      file_path  TEXT    NOT NULL,
-      PRIMARY KEY (session_id, file_path)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_session_files_file_path
-      ON discovered_session_files(file_path, session_id);
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
-      summary,
-      summary_detailed,
-      tags,
-      files_touched,
-      content='discovered_sessions',
-      content_rowid='id'
-    );
-
-    CREATE TABLE IF NOT EXISTS session_embeddings (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL
-                   REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      model      TEXT    NOT NULL,
-      dim        INTEGER NOT NULL,
-      embedding  BLOB    NOT NULL,
-      created_at TEXT    NOT NULL
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
-      ON session_embeddings(session_id, model);
-
-    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
-      ON session_embeddings(model, session_id);
-  `);
-}
+};
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node-shared@4.0.0-beta.73/node_modules/@effect/platform-node-shared/dist/NodeSink.js
 /**
-* Initialize the complete database schema.
-* Idempotent — uses CREATE TABLE IF NOT EXISTS throughout.
+* Creates a `Sink` that writes chunks to a Node writable stream, respecting
+* backpressure, mapping writable errors with `onError`, and ending the stream
+* on completion unless `endOnDone` is `false`.
+*
+* @category constructors
+* @since 4.0.0
 */
-function initSchema(db) {
-	db.exec(`
-    -- ===== Cost Events =====
-    CREATE TABLE IF NOT EXISTS cost_events (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      ts            TEXT    NOT NULL,
-      agent_id      TEXT    NOT NULL,
-      issue_id      TEXT    NOT NULL,
-      session_type  TEXT    NOT NULL DEFAULT 'unknown',
-      provider      TEXT    NOT NULL DEFAULT 'anthropic',
-      model         TEXT    NOT NULL,
-      input         INTEGER NOT NULL DEFAULT 0,
-      output        INTEGER NOT NULL DEFAULT 0,
-      cache_read    INTEGER NOT NULL DEFAULT 0,
-      cache_write   INTEGER NOT NULL DEFAULT 0,
-      cost          REAL    NOT NULL DEFAULT 0,
-      request_id    TEXT,
-      session_id    TEXT,    -- Claude Code session UUID (for reconciler offset tracking)
-      -- TLDR metrics
-      tldr_interceptions INTEGER,
-      tldr_bypasses      INTEGER,
-      tldr_tokens_saved  INTEGER,
-      tldr_bypass_reasons TEXT,  -- JSON string
-      -- WAL source tracking
-      source_file   TEXT,  -- path of WAL file this came from (for imports)
-      -- Caveman A/B experiment tracking
-      caveman_variant TEXT  -- 'enabled', 'disabled', 'off', or null
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_cost_request_id
-      ON cost_events(request_id) WHERE request_id IS NOT NULL;
-
-    CREATE INDEX IF NOT EXISTS idx_cost_issue_id
-      ON cost_events(issue_id, ts);
-
-    CREATE INDEX IF NOT EXISTS idx_cost_agent_id
-      ON cost_events(agent_id, ts);
-
-    CREATE INDEX IF NOT EXISTS idx_cost_ts
-      ON cost_events(ts);
-
-    CREATE INDEX IF NOT EXISTS idx_cost_session_id
-      ON cost_events(session_id) WHERE session_id IS NOT NULL;
-
-    -- ===== Review Status =====
-    CREATE TABLE IF NOT EXISTS review_status (
-      issue_id              TEXT PRIMARY KEY,
-      review_status         TEXT NOT NULL DEFAULT 'pending',
-      test_status           TEXT NOT NULL DEFAULT 'pending',
-      merge_status          TEXT,
-      inspect_status        TEXT,
-      inspect_notes         TEXT,
-      inspect_started_at    TEXT,
-      inspect_bead_id       TEXT,
-      verification_status   TEXT,
-      verification_notes    TEXT,
-      verification_cycle_count  INTEGER DEFAULT 0,
-      verification_max_cycles   INTEGER,
-      review_notes          TEXT,
-      test_notes            TEXT,
-      merge_notes           TEXT,
-      updated_at            TEXT NOT NULL,
-      ready_for_merge       INTEGER NOT NULL DEFAULT 0,
-      auto_requeue_count    INTEGER DEFAULT 0,
-      merge_retry_count     INTEGER DEFAULT 0,
-      pr_url                TEXT,
-      -- PAN-905: tracked PR identity for webhook correlation
-      pr_head_sha           TEXT,
-      pr_number             INTEGER,
-      -- PAN-653: persistent stuck state (set when main diverges mid-approve)
-      stuck                 INTEGER NOT NULL DEFAULT 0,
-      stuck_reason          TEXT,
-      stuck_at              TEXT,
-      stuck_details         TEXT,
-      -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
-      reviewed_at_commit    TEXT,
-      -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
-      review_spawned_at     TEXT,
-      -- PAN-1765: timestamp when conflict resolution was dispatched
-      conflict_resolution_dispatched_at TEXT,
-      -- PAN-699: number of test-agent dispatch retries (circuit breaker)
-      test_retry_count      INTEGER DEFAULT 0,
-      -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
-      review_retry_count    INTEGER DEFAULT 0,
-      -- PAN-794: ISO timestamp marking the start of the current recovery cycle (breaker history cutoff)
-      recovery_started_at   TEXT,
-      -- Human-requested deacon ignore: when set, patrol skips this issue entirely
-      deacon_ignored          INTEGER NOT NULL DEFAULT 0,
-      deacon_ignored_at       TEXT,
-      deacon_ignored_reason   TEXT,
-      -- PAN-905: GitHub-native merge blocker reasons (JSON array)
-      blocker_reasons         TEXT,
-      -- PAN-938: pre-review verification gate commit SHA
-      last_verified_commit    TEXT,
-      -- PAN-938: current merge pipeline step
-      merge_step              TEXT,
-      -- PAN-1691: per-issue merge-train routing key (NULL=project default, 1=auto-merge, 0=hold-for-UAT)
-      auto_merge              INTEGER
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_review_status_updated
-      ON review_status(updated_at);
-
-    -- ===== Status History =====
-    CREATE TABLE IF NOT EXISTS status_history (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      issue_id   TEXT NOT NULL,
-      type       TEXT NOT NULL,  -- 'review', 'test', 'merge'
-      status     TEXT NOT NULL,
-      timestamp  TEXT NOT NULL,
-      notes      TEXT,
-      FOREIGN KEY (issue_id) REFERENCES review_status(issue_id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_status_history_issue
-      ON status_history(issue_id, timestamp);
-
-    -- UNIQUE constraint enables INSERT OR IGNORE deduplication in upsertReviewStatus
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_status_history_unique
-      ON status_history(issue_id, type, status, timestamp);
-
-    -- ===== Health Events =====
-    CREATE TABLE IF NOT EXISTS health_events (
-      id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      agent_id       TEXT NOT NULL,
-      timestamp      TEXT NOT NULL,
-      state          TEXT NOT NULL,
-      previous_state TEXT,
-      source         TEXT,
-      metadata       TEXT  -- JSON string
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_health_agent_timestamp
-      ON health_events(agent_id, timestamp);
-
-    CREATE INDEX IF NOT EXISTS idx_health_timestamp
-      ON health_events(timestamp);
-
-    -- ===== Processed Sessions (for reconciler offset tracking) =====
-    CREATE TABLE IF NOT EXISTS processed_sessions (
-      session_id     TEXT PRIMARY KEY,
-      agent_id       TEXT,
-      issue_id       TEXT,
-      transcript_path TEXT,           -- full path to the .jsonl file
-      byte_offset    INTEGER NOT NULL DEFAULT 0,  -- bytes consumed so far
-      processed_at   TEXT NOT NULL,
-      event_count    INTEGER NOT NULL DEFAULT 0
-    );
-
-    CREATE TABLE IF NOT EXISTS transcript_checkpoints (
-      session_id                     TEXT PRIMARY KEY,
-      project_id                     TEXT NOT NULL,
-      workspace_id                   TEXT NOT NULL,
-      issue_id                       TEXT NOT NULL,
-      transcript_path                TEXT NOT NULL,
-      last_offset                    INTEGER NOT NULL DEFAULT 0,
-      last_observation_at            TEXT,
-      last_mid_turn_at               TEXT,
-      mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
-      updated_at                     TEXT NOT NULL,
-      claim_owner                    TEXT,
-      claim_from                     INTEGER,
-      claim_to                       INTEGER,
-      claim_expires_at               TEXT
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
-      ON transcript_checkpoints(project_id, issue_id, workspace_id);
-
-    -- ===== API Cache =====
-    CREATE TABLE IF NOT EXISTS api_cache (
-      key         TEXT PRIMARY KEY,
-      value       TEXT NOT NULL,  -- JSON string
-      expires_at  TEXT,
-      created_at  TEXT NOT NULL
-    );
-
-    -- ===== App Settings (global key/value) =====
-    -- Generic persisted settings that survive restarts. Currently used for the
-    -- global deacon pause flag; add keys here rather than spawning new tables
-    -- for every bool/string the dashboard wants to remember.
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key         TEXT PRIMARY KEY,
-      value       TEXT NOT NULL,
-      updated_at  TEXT NOT NULL
-    );
-
-    -- ===== UAT Generations (PAN-1737: UAT batch trains) =====
-    -- One row per assembled uat/<codename>-<mmdd> batch branch. Append-only
-    -- chain: lifecycle transitions are status flips, rows are never deleted
-    -- (auditable history of what was bundled, resolved, and promoted).
-    CREATE TABLE IF NOT EXISTS uat_generations (
-      name             TEXT PRIMARY KEY,
-      worktree_path    TEXT NOT NULL,
-      project_root     TEXT NOT NULL,
-      base_sha         TEXT NOT NULL,
-      status           TEXT NOT NULL DEFAULT 'assembling',
-      members          TEXT NOT NULL DEFAULT '[]',
-      held_out         TEXT NOT NULL DEFAULT '[]',
-      resolutions      TEXT NOT NULL DEFAULT '[]',
-      stack_started_at TEXT,
-      cleaned_at       TEXT,
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_uat_generations_status
-      ON uat_generations(status);
-
-    CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
-      ON uat_generations(project_root, created_at DESC);
-
-    -- ===== Rate Limits =====
-    CREATE TABLE IF NOT EXISTS rate_limits (
-      service     TEXT PRIMARY KEY,
-      requests    INTEGER NOT NULL DEFAULT 0,
-      window_start TEXT NOT NULL,
-      limit_per_window INTEGER NOT NULL DEFAULT 1000
-    );
-
-    CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
-      issue_id               TEXT PRIMARY KEY,
-      filed_at               TEXT NOT NULL,
-      run_id                 TEXT,
-      filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
-      discovered_in_issue_id TEXT,
-      severity               TEXT NOT NULL DEFAULT 'P2',
-      status                 TEXT NOT NULL DEFAULT 'open',
-      fix_merged_at          TEXT,
-      fix_commit_sha         TEXT,
-      updated_at             TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
-      ON flywheel_substrate_bugs(filed_at);
-
-    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
-      ON flywheel_substrate_bugs(filed_by, filed_at);
-
-    CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
-      ON flywheel_substrate_bugs(status, fix_merged_at);
-
-    -- ===== Domain Events (PAN-428: push-first architecture) =====
-    CREATE TABLE IF NOT EXISTS events (
-      sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT    NOT NULL,
-      timestamp TEXT    NOT NULL,
-      payload   TEXT    NOT NULL  -- JSON
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_events_type
-      ON events(type);
-
-    CREATE INDEX IF NOT EXISTS idx_events_timestamp
-      ON events(timestamp);
-
-    CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
-      ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
-      WHERE json_type(payload, '$.issueId') = 'text';
-
-    CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
-      ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
-      WHERE json_type(payload, '$.issueId') = 'text';
-
-    -- ===== Agents (PAN-1908: authoritative runtime registry) =====
-    CREATE TABLE IF NOT EXISTS agents (
-      id            TEXT PRIMARY KEY,
-      issue_id      TEXT NOT NULL,
-      role          TEXT NOT NULL,
-      status        TEXT NOT NULL,
-      workspace     TEXT NOT NULL,
-      harness       TEXT,
-      model         TEXT,
-      branch        TEXT,
-      session_id    TEXT,
-      started_at    TEXT,
-      last_activity TEXT,
-      last_resume_at TEXT,
-      stopped_at    TEXT,
-      stopped_by_user INTEGER,
-      stopped_by_pause INTEGER,
-      kickoff_delivered INTEGER,
-      host_override INTEGER,
-      cost_so_far   REAL,
-      phase         TEXT,
-      work_type     TEXT,
-      paused        INTEGER,
-      paused_reason TEXT,
-      paused_at     TEXT,
-      troubled      INTEGER,
-      troubled_at   TEXT,
-      consecutive_failures INTEGER,
-      first_failure_in_run_at TEXT,
-      last_failure_at TEXT,
-      last_failure_reason TEXT,
-      last_failure_next_retry_at TEXT,
-      flywheel_run_id TEXT,
-      role_run_head TEXT,
-      review_sub_role TEXT,
-      review_run_id TEXT,
-      review_synthesis_agent_id TEXT,
-      review_output_path TEXT,
-      review_deadline_at TEXT,
-      review_monitor_signaled TEXT,
-      review_retry_attempt INTEGER,
-      inspect_sub_role TEXT,
-      delivery_method TEXT,
-      supervisor_enabled INTEGER,
-      channels_enabled INTEGER,
-      updated_at    TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_agents_status_role
-      ON agents(status, role);
-
-    CREATE INDEX IF NOT EXISTS idx_agents_issue
-      ON agents(issue_id);
-
-    -- ===== Conversations (PAN-416: Mission Control conversation launcher) =====
-    CREATE TABLE IF NOT EXISTS conversations (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      name             TEXT    NOT NULL UNIQUE,
-      tmux_session     TEXT    NOT NULL,
-      status           TEXT    NOT NULL DEFAULT 'active',  -- 'active', 'ended'
-      cwd              TEXT    NOT NULL,
-      issue_id         TEXT,                               -- optional cost attribution
-      created_at       TEXT    NOT NULL,
-      ended_at         TEXT,
-      last_attached_at TEXT,
-      session_file     TEXT,                               -- @deprecated: path to Claude Code JSONL session file (PAN-451). Kept for legacy rows — use claude_session_id.
-      claude_session_id TEXT,                              -- Claude Code session UUID. Immutable for the lifetime of the conversation.
-      title            TEXT,                               -- human-readable title, auto-set from first message
-      title_source     TEXT,                               -- 'auto', 'ai', or 'manual'
-      title_seed       TEXT,                               -- original auto-generated title for replacement check
-      total_cost       REAL DEFAULT 0,                     -- cached total cost in USD (cache-discount aware)
-      total_tokens     INTEGER DEFAULT 0,                  -- cached total tokens (input+output+cache read/write)
-      archived_at      TEXT,                               -- ISO timestamp when archived, null = active
-      model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
-      effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
-      fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
-      fork_error       TEXT,                               -- error message when fork_status='failed'
-      harness          TEXT,                                -- coding harness used for conversation runtime
-      delivery_method  TEXT,                               -- 'auto', 'channels', or 'tmux'
-      spawn_error      TEXT,                               -- error message when background spawn failed (quota, auth, etc.)
-      handoff_doc_path TEXT,                               -- target conversation's agent-authored handoff document path
-      handoff_target_conv_id INTEGER,                      -- source conversation's handoff target conversation id
-      fork_fallback_reason TEXT,                           -- reason a requested fork mode fell back to summary fork
-      cleared_to_conv_id INTEGER,                          -- PAN-1458: if this conv was cleared via /clear, the sibling conv that continues it
-      fork_request TEXT,                                   -- JSON blob of fork pipeline parameters for restart recovery
-      fork_retry_count INTEGER NOT NULL DEFAULT 0           -- restart recovery retry guard
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_conversations_status
-      ON conversations(status);
-
-    CREATE INDEX IF NOT EXISTS idx_conversations_created_at
-      ON conversations(created_at);
-
-    CREATE INDEX IF NOT EXISTS idx_conversations_archived_created
-      ON conversations(archived_at, created_at);
-    CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
-      ON conversations(status, archived_at, created_at);
-
-    -- ===== Favorites (PAN-662: conversation favorites) =====
-    CREATE TABLE IF NOT EXISTS favorites (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      type       TEXT NOT NULL,  -- 'conversation' or 'project'
-      item_id    TEXT NOT NULL,  -- conversation name or project path
-      created_at TEXT NOT NULL,
-      UNIQUE(type, item_id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_favorites_type
-      ON favorites(type);
-
-    -- ===== Merge Queue (PAN-632: persistent merge serialization) =====
-    CREATE TABLE IF NOT EXISTS merge_queue (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      project_key TEXT NOT NULL,
-      issue_id    TEXT NOT NULL UNIQUE,
-      position    INTEGER NOT NULL,
-      queued_at   TEXT NOT NULL,
-      started_at  TEXT,
-      status      TEXT NOT NULL DEFAULT 'queued'
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_merge_queue_project
-      ON merge_queue(project_key, status, position);
-
-    -- ===== Pending Auto-Merges (PAN-1486: Flywheel scheduled merge cooldown) =====
-    CREATE TABLE IF NOT EXISTS pending_auto_merges (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      issueId          TEXT NOT NULL,
-      prUrl            TEXT NOT NULL,
-      prNumber         INTEGER,
-      projectKey       TEXT NOT NULL,
-      forge            TEXT NOT NULL DEFAULT 'github',
-      "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
-      scheduledMergeAt TEXT NOT NULL,
-      scheduledAt      TEXT NOT NULL,
-      mergedAt         TEXT,
-      failureReason    TEXT,
-      cancelledAt      TEXT,
-      cancelledBy      TEXT
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
-      ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
-
-    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
-      ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
-
-    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_issue
-      ON pending_auto_merges(issueId, id) WHERE "status" IN ('pending','merging','blocked','failed');
-
-    CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
-      ON pending_auto_merges("status", scheduledMergeAt, id);
-
-    -- ===== Merge Sets (PAN-632: multi-repo merge coordination state) =====
-    CREATE TABLE IF NOT EXISTS merge_sets (
-      issue_id       TEXT PRIMARY KEY,
-      project_key    TEXT NOT NULL,
-      project_path   TEXT NOT NULL,
-      workspace_type TEXT NOT NULL,
-      status         TEXT NOT NULL DEFAULT 'draft',
-      created_at     TEXT NOT NULL,
-      updated_at     TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_merge_sets_project
-      ON merge_sets(project_key, updated_at);
-
-    CREATE TABLE IF NOT EXISTS merge_set_repos (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-      issue_id            TEXT NOT NULL,
-      repo_key            TEXT NOT NULL,
-      repo_path           TEXT NOT NULL,
-      forge               TEXT NOT NULL,
-      source_branch       TEXT NOT NULL,
-      target_branch       TEXT NOT NULL,
-      artifact_url        TEXT,
-      artifact_id         TEXT,
-      review_status       TEXT NOT NULL DEFAULT 'pending',
-      test_status         TEXT NOT NULL DEFAULT 'pending',
-      rebase_status       TEXT NOT NULL DEFAULT 'pending',
-      verification_status TEXT NOT NULL DEFAULT 'pending',
-      merge_status        TEXT NOT NULL DEFAULT 'pending',
-      merge_order         INTEGER NOT NULL DEFAULT 0,
-      required            INTEGER NOT NULL DEFAULT 1,
-      FOREIGN KEY (issue_id) REFERENCES merge_sets(issue_id) ON DELETE CASCADE
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_merge_set_repos_issue_repo
-      ON merge_set_repos(issue_id, repo_key);
-
-    CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
-      ON merge_set_repos(issue_id, merge_order, repo_key);
-
-    -- ===== Git Operations (PAN-653: persistent git event log) =====
-    CREATE TABLE IF NOT EXISTS git_operations (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      operation   TEXT NOT NULL,   -- e.g. 'push', 'fetch', 'force_push', 'merge', 'rev_parse'
-      branch      TEXT,
-      issue_id    TEXT,
-      before_sha  TEXT,
-      after_sha   TEXT,
-      remote_sha  TEXT,
-      status      TEXT NOT NULL,   -- 'success' | 'failure' | 'aborted'
-      error       TEXT,
-      ts          TEXT NOT NULL    -- ISO 8601 timestamp
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
-      ON git_operations(issue_id, ts);
-
-    CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
-      ON git_operations(operation, ts);
-
-    -- ===== Discovered Sessions (PAN-457: conversation discovery & indexing) =====
-    CREATE TABLE IF NOT EXISTS discovered_sessions (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      jsonl_path        TEXT    NOT NULL UNIQUE,
-      session_id        TEXT,
-      workspace_path    TEXT,
-      workspace_hash    TEXT,
-      message_count     INTEGER NOT NULL DEFAULT 0,
-      first_ts          TEXT,
-      last_ts           TEXT,
-      models_used       TEXT,
-      primary_model     TEXT,
-      token_input       INTEGER NOT NULL DEFAULT 0,
-      token_output      INTEGER NOT NULL DEFAULT 0,
-      estimated_cost    REAL    NOT NULL DEFAULT 0,
-      tools_used        TEXT,
-      files_touched     TEXT,
-      tags              TEXT,
-      summary           TEXT,
-      summary_detailed  TEXT,
-      enrichment_level  INTEGER NOT NULL DEFAULT 0,
-      enrichment_model  TEXT,
-      enriched_at       TEXT,
-      enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      overdeck_managed INTEGER NOT NULL DEFAULT 0,
-      pan_issue_id      TEXT,
-      pan_agent_id      TEXT,
-      file_size         INTEGER,
-      file_mtime        TEXT,
-      scanned_at        TEXT    NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_workspace
-      ON discovered_sessions(workspace_path);
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_last_ts
-      ON discovered_sessions(last_ts);
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_enrichment
-      ON discovered_sessions(enrichment_level, enriched_at);
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_managed
-      ON discovered_sessions(overdeck_managed, pan_issue_id);
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_model
-      ON discovered_sessions(primary_model);
-
-    CREATE INDEX IF NOT EXISTS idx_discovered_session_id
-      ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
-      summary,
-      summary_detailed,
-      tags,
-      files_touched,
-      content='discovered_sessions',
-      content_rowid='id'
-    );
-
-    -- ===== Session Embeddings (PAN-457: semantic search) =====
-    CREATE TABLE IF NOT EXISTS session_embeddings (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL
-                   REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      model      TEXT    NOT NULL,
-      dim        INTEGER NOT NULL,
-      embedding  BLOB    NOT NULL,
-      created_at TEXT    NOT NULL
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
-      ON session_embeddings(session_id, model);
-
-    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
-      ON session_embeddings(model, session_id);
-  `);
-	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 56`);
-}
+const fromWritable = (options) => fromChannel$1(mapDone(fromWritableChannel(options), (_) => [_]));
 /**
-* Run schema migrations if the database version is older than SCHEMA_VERSION.
-* This function handles upgrading from older schema versions.
+* Creates a `Channel` that pulls chunks from upstream and writes them to a
+* Node writable stream, respecting backpressure and optionally ending the
+* writable when upstream is done.
+*
+* @category constructors
+* @since 4.0.0
 */
-function runMigrations(db, dbPath) {
-	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 56) return;
-	if (currentVersion === 0) {
-		initSchema(db);
-		return;
-	}
-	if (currentVersion < 2) db.exec(`
-      DELETE FROM status_history
-      WHERE id NOT IN (
-        SELECT MIN(id)
-        FROM status_history
-        GROUP BY issue_id, type, status, timestamp
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_status_history_unique
-        ON status_history(issue_id, type, status, timestamp);
-    `);
-	if (currentVersion < 3) {
-		try {
-			db.exec(`ALTER TABLE cost_events ADD COLUMN session_id TEXT`);
-		} catch {}
-		db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_cost_session_id
-        ON cost_events(session_id) WHERE session_id IS NOT NULL;
-    `);
-		try {
-			db.exec(`ALTER TABLE processed_sessions ADD COLUMN agent_id TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE processed_sessions ADD COLUMN issue_id TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE processed_sessions ADD COLUMN transcript_path TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE processed_sessions ADD COLUMN byte_offset INTEGER NOT NULL DEFAULT 0`);
-		} catch {}
-	}
-	if (currentVersion < 4) db.exec(`
-      CREATE TABLE IF NOT EXISTS events (
-        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
-        type      TEXT    NOT NULL,
-        timestamp TEXT    NOT NULL,
-        payload   TEXT    NOT NULL  -- JSON
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_events_type
-        ON events(type);
-
-      CREATE INDEX IF NOT EXISTS idx_events_timestamp
-        ON events(timestamp);
-    `);
-	if (currentVersion < 6) db.exec(`
-      CREATE TABLE IF NOT EXISTS conversations (
-        id               INTEGER PRIMARY KEY AUTOINCREMENT,
-        name             TEXT    NOT NULL UNIQUE,
-        tmux_session     TEXT    NOT NULL,
-        status           TEXT    NOT NULL DEFAULT 'active',
-        cwd              TEXT    NOT NULL,
-        issue_id         TEXT,
-        created_at       TEXT    NOT NULL,
-        ended_at         TEXT,
-        last_attached_at TEXT
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_conversations_status
-        ON conversations(status);
-
-      CREATE INDEX IF NOT EXISTS idx_conversations_created_at
-        ON conversations(created_at);
-    `);
-	if (currentVersion < 7) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN session_file TEXT`);
-	} catch {}
-	if (currentVersion < 8) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN title TEXT`);
-	} catch {}
-	if (currentVersion < 9) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN title_source TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN title_seed TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 10) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN total_cost REAL DEFAULT 0`);
-	} catch {}
-	if (currentVersion < 11) try {
-		db.exec(`CREATE INDEX IF NOT EXISTS idx_cost_issue_upper ON cost_events(UPPER(issue_id))`);
-	} catch {}
-	if (currentVersion < 12) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN archived_at TEXT`);
-		} catch {}
-		try {
-			db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(archived_at)`);
-		} catch {}
-	}
-	if (currentVersion < 13) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN model TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN effort TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 14) db.exec(`
-      CREATE TABLE IF NOT EXISTS merge_queue (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_key TEXT NOT NULL,
-        issue_id    TEXT NOT NULL UNIQUE,
-        position    INTEGER NOT NULL,
-        queued_at   TEXT NOT NULL,
-        started_at  TEXT,
-        status      TEXT NOT NULL DEFAULT 'queued'
-      );
-      CREATE INDEX IF NOT EXISTS idx_merge_queue_project
-        ON merge_queue(project_key, status, position);
-    `);
-	if (currentVersion < 15) db.exec(`
-      CREATE TABLE IF NOT EXISTS merge_sets (
-        issue_id       TEXT PRIMARY KEY,
-        project_key    TEXT NOT NULL,
-        project_path   TEXT NOT NULL,
-        workspace_type TEXT NOT NULL,
-        status         TEXT NOT NULL DEFAULT 'draft',
-        created_at     TEXT NOT NULL,
-        updated_at     TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_merge_sets_project
-        ON merge_sets(project_key, updated_at);
-      CREATE TABLE IF NOT EXISTS merge_set_repos (
-        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-        issue_id            TEXT NOT NULL,
-        repo_key            TEXT NOT NULL,
-        repo_path           TEXT NOT NULL,
-        forge               TEXT NOT NULL,
-        source_branch       TEXT NOT NULL,
-        target_branch       TEXT NOT NULL,
-        artifact_url        TEXT,
-        artifact_id         TEXT,
-        review_status       TEXT NOT NULL DEFAULT 'pending',
-        test_status         TEXT NOT NULL DEFAULT 'pending',
-        rebase_status       TEXT NOT NULL DEFAULT 'pending',
-        verification_status TEXT NOT NULL DEFAULT 'pending',
-        merge_status        TEXT NOT NULL DEFAULT 'pending',
-        merge_order         INTEGER NOT NULL DEFAULT 0,
-        required            INTEGER NOT NULL DEFAULT 1,
-        FOREIGN KEY (issue_id) REFERENCES merge_sets(issue_id) ON DELETE CASCADE
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_merge_set_repos_issue_repo
-        ON merge_set_repos(issue_id, repo_key);
-      CREATE INDEX IF NOT EXISTS idx_merge_set_repos_issue_order
-        ON merge_set_repos(issue_id, merge_order, repo_key);
-    `);
-	if (currentVersion < 16) {
-		const conversations = db.prepare(`SELECT id, cwd, session_file FROM conversations WHERE session_file IS NOT NULL`).all();
-		for (const conversation of conversations) {
-			const match = conversation.session_file.match(/^(.*[/\\]\.claude[/\\]projects[/\\])([^/\\]+)([/\\]sessions[/\\][^/\\]+\.jsonl)$/);
-			if (!match) continue;
-			const [, prefix, encodedSegment, suffix] = match;
-			const expectedSegment = encodeClaudeProjectDir(conversation.cwd);
-			if (encodedSegment === expectedSegment) continue;
-			const correctedPath = `${prefix}${expectedSegment}${suffix}`;
-			if (!existsSync(correctedPath)) continue;
-			db.prepare(`UPDATE conversations SET session_file = ? WHERE id = ?`).run(correctedPath, conversation.id);
+const fromWritableChannel = (options) => fromTransform$1((pull) => {
+	const writable = options.evaluate();
+	return succeed(pullIntoWritable({
+		...options,
+		writable,
+		pull
+	}));
+});
+/**
+* Writes Effect chunks into a Node writable stream.
+*
+* **When to use**
+*
+* Use to implement custom Node stream adapters that already have an upstream
+* pull and need direct control over a writable stream.
+*
+* **Details**
+*
+* The loop waits for `drain` when needed, fails on writable errors, and ends
+* the writable on upstream completion unless `endOnDone` is `false`.
+*
+* @category converting
+* @since 4.0.0
+*/
+const pullIntoWritable = (options) => options.pull.pipe(flatMap((chunk) => {
+	let i = 0;
+	return callback$1(function loop(resume) {
+		for (; i < chunk.length;) if (!options.writable.write(chunk[i++], options.encoding)) {
+			options.writable.once("drain", () => loop(resume));
+			return;
 		}
+		resume(void_);
+	});
+}), forever({ disableYield: true }), raceFirst(callback$1((resume) => {
+	const onError = (error) => resume(fail(options.onError(error)));
+	options.writable.once("error", onError);
+	return sync(() => {
+		options.writable.off("error", onError);
+	});
+})), options.endOnDone !== false ? catchDone((_) => {
+	if ("closed" in options.writable && options.writable.closed) return done$1(_);
+	return callback$1((resume) => {
+		options.writable.once("finish", () => resume(done$1(_)));
+		options.writable.end();
+	});
+}) : identity);
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node-shared@4.0.0-beta.73/node_modules/@effect/platform-node-shared/dist/NodeStream.js
+/**
+* Adapters between Node streams and Effect streams, channels, and readables.
+*
+* This module is the stream boundary for Node APIs: wrap `Readable` or
+* `Duplex` values as Effect `Stream`s and `Channel`s, pipe an Effect stream
+* through a Node duplex transform, expose an Effect `Stream` back to Node as a
+* `Readable`, or collect bounded readable payloads into strings, array
+* buffers, and `Uint8Array`s. Common sources include files, HTTP bodies, child
+* process stdio, sockets, and compression or crypto transforms.
+*
+* **Mental model**
+*
+* Read adapters pull from Node's readable side into Effect. Duplex adapters
+* write upstream Effect chunks to Node while reading transformed chunks back.
+* `toReadable` runs an Effect stream from the caller's context, while
+* `toReadableNever` is for streams that need no services.
+*
+* **Gotchas**
+*
+* Node backpressure is preserved: writes pause until `drain` before more input
+* is pulled. Readables are destroyed on scope finalization by default, and
+* duplex writable sides are ended when upstream completes unless configured
+* otherwise. For externally owned or long-lived streams, choose `closeOnDone`
+* and `endOnDone` deliberately; for collection helpers, set `maxBytes` when
+* input size is not already bounded.
+*
+* @since 4.0.0
+*/
+/**
+* Converts a Node readable stream into an Effect `Stream`, reading chunks with
+* an optional chunk size, mapping stream errors with `onError`, and destroying
+* the readable on completion unless `closeOnDone` is `false`.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromReadable = (options) => fromChannel(fromReadableChannel(options));
+/**
+* Creates a `Channel` that pulls chunks from a Node readable stream, mapping
+* errors with `onError` and destroying the readable on completion unless
+* `closeOnDone` is `false`.
+*
+* @category constructors
+* @since 4.0.0
+*/
+const fromReadableChannel = (options) => fromTransform$1((_, scope) => readableToPullUnsafe({
+	scope,
+	readable: options.evaluate(),
+	onError: options.onError ?? defaultOnError,
+	chunkSize: options.chunkSize,
+	closeOnDone: options.closeOnDone
+}));
+const readableToPullUnsafe = (options) => {
+	const readable = options.readable;
+	if (readable.readableEnded) return succeed(done$1());
+	const closeOnDone = options.closeOnDone ?? true;
+	const exit = options.exit ?? make$5(void 0);
+	const latch = makeUnsafe(false);
+	function onReadable() {
+		latch.openUnsafe();
 	}
-	if (currentVersion < 17) db.exec(`
-      CREATE TABLE IF NOT EXISTS favorites (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        type       TEXT NOT NULL,
-        item_id    TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        UNIQUE(type, item_id)
-      );
-      CREATE INDEX IF NOT EXISTS idx_favorites_type
-        ON favorites(type);
-    `);
-	if (currentVersion < 18) try {
-		db.exec(`ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
-	} catch {}
-	if (currentVersion < 19) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN fork_status TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
-		} catch {}
-		db.exec(`
-      CREATE TABLE IF NOT EXISTS discovered_sessions (
-        id                INTEGER PRIMARY KEY AUTOINCREMENT,
-        jsonl_path        TEXT    NOT NULL UNIQUE,
-        session_id        TEXT,
-        workspace_path    TEXT,
-        workspace_hash    TEXT,
-        message_count     INTEGER NOT NULL DEFAULT 0,
-        first_ts          TEXT,
-        last_ts           TEXT,
-        models_used       TEXT,
-        primary_model     TEXT,
-        token_input       INTEGER NOT NULL DEFAULT 0,
-        token_output      INTEGER NOT NULL DEFAULT 0,
-        estimated_cost    REAL    NOT NULL DEFAULT 0,
-        tools_used        TEXT,
-        files_touched     TEXT,
-        tags              TEXT,
-        summary           TEXT,
-        summary_detailed  TEXT,
-        enrichment_level  INTEGER NOT NULL DEFAULT 0,
-        enrichment_model  TEXT,
-        enriched_at       TEXT,
-        enrichment_failed INTEGER NOT NULL DEFAULT 0,
-        overdeck_managed INTEGER NOT NULL DEFAULT 0,
-        pan_issue_id      TEXT,
-        pan_agent_id      TEXT,
-        file_size         INTEGER,
-        file_mtime        TEXT,
-        scanned_at        TEXT    NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
-      CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
-      CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
-      CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
-      CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
-      CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
-        summary, summary_detailed, tags, files_touched,
-        content='discovered_sessions', content_rowid='id'
-      );
-      CREATE TABLE IF NOT EXISTS session_embeddings (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-        model      TEXT    NOT NULL,
-        dim        INTEGER NOT NULL,
-        embedding  BLOB    NOT NULL,
-        created_at TEXT    NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
-        ON session_embeddings(session_id, model);
-    `);
+	function onError(error) {
+		exit.current = fail$1(options.onError(error));
+		latch.openUnsafe();
 	}
-	if (currentVersion < 20) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`);
-		} catch {}
+	function onEnd() {
+		exit.current = fail$1(Done());
+		latch.openUnsafe();
 	}
-	if (currentVersion < 21) db.exec(`
-      CREATE TABLE IF NOT EXISTS git_operations (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        operation   TEXT NOT NULL,
-        branch      TEXT,
-        issue_id    TEXT,
-        before_sha  TEXT,
-        after_sha   TEXT,
-        remote_sha  TEXT,
-        status      TEXT NOT NULL,
-        error       TEXT,
-        ts          TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_git_ops_issue_ts
-        ON git_operations(issue_id, ts);
-      CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
-        ON git_operations(operation, ts);
-    `);
-	if (currentVersion < 22) try {
-		db.exec(`ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`);
-	} catch {}
-	if (currentVersion < 23) try {
-		db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`);
-	} catch {}
-	if (currentVersion < 24) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`);
-		} catch {}
-	}
-	if (currentVersion < 25) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN review_retry_count INTEGER DEFAULT 0`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN recovery_started_at TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 26) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored INTEGER NOT NULL DEFAULT 0`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_at TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_reason TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 27) {
-		try {
-			db.exec(`
-        CREATE TABLE IF NOT EXISTS app_settings (
-          key         TEXT PRIMARY KEY,
-          value       TEXT NOT NULL,
-          updated_at  TEXT NOT NULL
-        )
-      `);
-		} catch {}
-		try {
-			db.prepare(`INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`).run("deacon.globally_paused", "true", (/* @__PURE__ */ new Date()).toISOString());
-		} catch (err) {
-			console.warn("[schema] Failed to seed deacon.globally_paused:", err);
+	readable.on("readable", onReadable);
+	readable.once("error", onError);
+	readable.once("end", onEnd);
+	const pull = suspend$2(function loop() {
+		let item = options.readable.read(options.chunkSize);
+		if (item === null) {
+			if (exit.current) return exit.current;
+			latch.closeUnsafe();
+			return flatMap(latch.await, loop);
 		}
-	}
-	if (currentVersion < 28) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN claude_session_id TEXT`);
-		} catch {}
-		const conversations = db.prepare(`SELECT id, session_file FROM conversations WHERE session_file IS NOT NULL`).all();
-		for (const conv of conversations) {
-			const sessionId = conv.session_file.split("/").pop()?.replace(".jsonl", "") ?? null;
-			if (sessionId) db.prepare(`UPDATE conversations SET claude_session_id = ? WHERE id = ?`).run(sessionId, conv.id);
+		const chunk = of(item);
+		while (true) {
+			item = options.readable.read(options.chunkSize);
+			if (item === null) break;
+			chunk.push(item);
 		}
-	}
-	if (currentVersion < 29) try {
-		db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
-          ON conversations(status, archived_at, created_at)
-      `);
-	} catch {}
-	if (currentVersion < 30) try {
-		db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`);
-	} catch {}
-	if (currentVersion < 31) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`);
-		} catch {}
-	}
-	if (currentVersion < 32) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 33) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN harness TEXT`);
-	} catch {}
-	if (currentVersion < 34) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN delivery_method TEXT`);
-	} catch {}
-	if (currentVersion < 35) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN spawn_error TEXT`);
-	} catch {}
-	if (currentVersion < 36) db.exec(`
-      CREATE TABLE IF NOT EXISTS discovered_sessions (
-        id                INTEGER PRIMARY KEY AUTOINCREMENT,
-        jsonl_path        TEXT    NOT NULL UNIQUE,
-        session_id        TEXT,
-        workspace_path    TEXT,
-        workspace_hash    TEXT,
-        message_count     INTEGER NOT NULL DEFAULT 0,
-        first_ts          TEXT,
-        last_ts           TEXT,
-        models_used       TEXT,
-        primary_model     TEXT,
-        token_input       INTEGER NOT NULL DEFAULT 0,
-        token_output      INTEGER NOT NULL DEFAULT 0,
-        estimated_cost    REAL    NOT NULL DEFAULT 0,
-        tools_used        TEXT,
-        files_touched     TEXT,
-        tags              TEXT,
-        summary           TEXT,
-        summary_detailed  TEXT,
-        enrichment_level  INTEGER NOT NULL DEFAULT 0,
-        enrichment_model  TEXT,
-        enriched_at       TEXT,
-        enrichment_failed INTEGER NOT NULL DEFAULT 0,
-        overdeck_managed INTEGER NOT NULL DEFAULT 0,
-        pan_issue_id      TEXT,
-        pan_agent_id      TEXT,
-        file_size         INTEGER,
-        file_mtime        TEXT,
-        scanned_at        TEXT    NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
-      CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
-      CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
-      CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
-      CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
-      CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
-        summary, summary_detailed, tags, files_touched,
-        content='discovered_sessions', content_rowid='id'
-      );
-      CREATE TABLE IF NOT EXISTS session_embeddings (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-        model      TEXT    NOT NULL,
-        dim        INTEGER NOT NULL,
-        embedding  BLOB    NOT NULL,
-        created_at TEXT    NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
-        ON session_embeddings(session_id, model);
-    `);
-	if (currentVersion < 37) db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
-        ON session_embeddings(model, session_id)
-    `);
-	if (currentVersion < 38) {
-		initDiscoveredSessionsSchema(db);
-		backfillDiscoveredSessionArrayIndexes(db);
-	}
-	if (currentVersion < 39) db.exec(`
-      CREATE TABLE IF NOT EXISTS transcript_checkpoints (
-        session_id                     TEXT PRIMARY KEY,
-        project_id                     TEXT NOT NULL,
-        workspace_id                   TEXT NOT NULL,
-        issue_id                       TEXT NOT NULL,
-        transcript_path                TEXT NOT NULL,
-        last_offset                    INTEGER NOT NULL DEFAULT 0,
-        last_observation_at            TEXT,
-        last_mid_turn_at               TEXT,
-        mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
-        updated_at                     TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
-        ON transcript_checkpoints(project_id, issue_id, workspace_id);
-    `);
-	if (currentVersion < 40) {
-		try {
-			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_owner TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_from INTEGER`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_to INTEGER`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 41) db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_discovered_session_id
-        ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
-    `);
-	if (currentVersion < 42) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN handoff_doc_path TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN handoff_target_conv_id INTEGER`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 43) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN cleared_to_conv_id INTEGER`);
-		} catch {}
-		try {
-			db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
-                 ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
-		} catch {}
-	}
-	if (currentVersion < 44) db.exec(`
-      CREATE TABLE IF NOT EXISTS pending_auto_merges (
-        id               INTEGER PRIMARY KEY AUTOINCREMENT,
-        issueId          TEXT NOT NULL,
-        prUrl            TEXT NOT NULL,
-        prNumber         INTEGER,
-        projectKey       TEXT NOT NULL,
-        "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
-        scheduledMergeAt TEXT NOT NULL,
-        scheduledAt      TEXT NOT NULL,
-        mergedAt         TEXT,
-        failureReason    TEXT,
-        cancelledAt      TEXT,
-        cancelledBy      TEXT
-      );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
-        ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
-    `);
-	if (currentVersion < 45) db.exec(`
-      CREATE TABLE IF NOT EXISTS pending_auto_merges (
-        id               INTEGER PRIMARY KEY AUTOINCREMENT,
-        issueId          TEXT NOT NULL,
-        prUrl            TEXT NOT NULL,
-        prNumber         INTEGER,
-        projectKey       TEXT NOT NULL,
-        "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
-        scheduledMergeAt TEXT NOT NULL,
-        scheduledAt      TEXT NOT NULL,
-        mergedAt         TEXT,
-        failureReason    TEXT,
-        cancelledAt      TEXT,
-        cancelledBy      TEXT
-      );
-
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_auto_merges_active_issue
-        ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
-
-      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_due_pending
-        ON pending_auto_merges(scheduledMergeAt, id) WHERE "status" = 'pending';
-
-      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_issue
-        ON pending_auto_merges(issueId, id) WHERE "status" IN ('pending','merging','blocked','failed');
-
-      CREATE INDEX IF NOT EXISTS idx_pending_auto_merges_actionable_schedule
-        ON pending_auto_merges("status", scheduledMergeAt, id);
-    `);
-	if (currentVersion < 46) db.exec(`
-      CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
-        issue_id               TEXT PRIMARY KEY,
-        filed_at               TEXT NOT NULL,
-        run_id                 TEXT,
-        filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
-        discovered_in_issue_id TEXT,
-        severity               TEXT NOT NULL DEFAULT 'P2',
-        status                 TEXT NOT NULL DEFAULT 'open',
-        fix_merged_at          TEXT,
-        fix_commit_sha         TEXT,
-        updated_at             TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_at
-        ON flywheel_substrate_bugs(filed_at);
-
-      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_filed_by_filed_at
-        ON flywheel_substrate_bugs(filed_by, filed_at);
-
-      CREATE INDEX IF NOT EXISTS idx_flywheel_substrate_bugs_status_fix_merged_at
-        ON flywheel_substrate_bugs(status, fix_merged_at);
-    `);
-	if (currentVersion < 47) db.exec(`
-      CREATE TABLE IF NOT EXISTS events (
-        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
-        type      TEXT    NOT NULL,
-        timestamp TEXT    NOT NULL,
-        payload   TEXT    NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_events_type
-        ON events(type);
-
-      CREATE INDEX IF NOT EXISTS idx_events_timestamp
-        ON events(timestamp);
-
-      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
-        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
-        WHERE json_type(payload, '$.issueId') = 'text';
-
-      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
-        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
-        WHERE json_type(payload, '$.issueId') = 'text';
-    `);
-	if (currentVersion < 48) try {
-		db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
-	} catch {}
-	if (currentVersion < 49) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_status TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`);
-		} catch {}
-	}
-	if (currentVersion < 50) try {
-		db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`);
-	} catch {}
-	if (currentVersion < 51) db.exec(`
-      CREATE TABLE IF NOT EXISTS uat_generations (
-        name             TEXT PRIMARY KEY,
-        worktree_path    TEXT NOT NULL,
-        project_root     TEXT NOT NULL,
-        base_sha         TEXT NOT NULL,
-        status           TEXT NOT NULL DEFAULT 'assembling',
-        members          TEXT NOT NULL DEFAULT '[]',
-        held_out         TEXT NOT NULL DEFAULT '[]',
-        resolutions      TEXT NOT NULL DEFAULT '[]',
-        stack_started_at TEXT,
-        created_at       TEXT NOT NULL,
-        updated_at       TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_uat_generations_status
-        ON uat_generations(status);
-
-      CREATE INDEX IF NOT EXISTS idx_uat_generations_project_created
-        ON uat_generations(project_root, created_at DESC);
-    `);
-	if (currentVersion < 52) try {
-		db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`);
-	} catch {}
-	if (currentVersion < 53) {
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
-		} catch {}
-	}
-	if (currentVersion < 54) {
-		try {
-			db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
-		} catch {}
-		try {
-			db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
-		} catch {}
-	}
-	if (currentVersion < 55) {
-		try {
-			const resolvedDbPath = dbPath ?? join(getOverdeckHome(), "panopticon.db");
-			const snapshotPath = `${resolvedDbPath}.v54-backfill-snapshot`;
-			if (existsSync(resolvedDbPath) && !existsSync(snapshotPath)) {
-				writeFileSync(snapshotPath, readFileSync(resolvedDbPath));
-				console.log(`[schema] Snapshot created: ${snapshotPath}`);
+		return succeed(chunk);
+	});
+	return as(addFinalizer(options.scope, sync(() => {
+		readable.off("readable", onReadable);
+		readable.off("error", onError);
+		readable.off("end", onEnd);
+		if (closeOnDone && "closed" in options.readable && !options.readable.closed) options.readable.destroy();
+	})), pull);
+};
+const defaultOnError = (error) => new UnknownError(error);
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node-shared@4.0.0-beta.73/node_modules/@effect/platform-node-shared/dist/NodeChildProcessSpawner.js
+const toError = (error) => error instanceof globalThis.Error ? error : new globalThis.Error(String(error));
+const toPlatformError = (method, error, command) => {
+	const { commands } = flattenCommand(command);
+	const commandStr = commands.reduce((acc, curr) => {
+		const cmd = `${curr.command} ${curr.args.join(" ")}`;
+		return acc.length === 0 ? cmd : `${acc} | ${cmd}`;
+	}, "");
+	return handleErrnoException("ChildProcess", method)(error, [commandStr]);
+};
+/**
+* Layer that provides the `NodeChildProcessSpawner` implementation.
+*
+* @category layers
+* @since 4.0.0
+*/
+const layer$4 = /* @__PURE__ */ effect(ChildProcessSpawner, /* @__PURE__ */ gen(function* () {
+	const fs = yield* FileSystem;
+	const path = yield* Path$1;
+	const resolveWorkingDirectory = fnUntraced(function* (options) {
+		if (isUndefined(options.cwd)) return void 0;
+		yield* fs.access(options.cwd);
+		return path.resolve(options.cwd);
+	});
+	const resolveEnvironment = (options) => {
+		return options.extendEnv ? {
+			...globalThis.process.env,
+			...options.env
+		} : options.env;
+	};
+	const inputToStdioOption = (input) => isStream(input) ? "pipe" : input;
+	const outputToStdioOption = (input) => isSink(input) ? "pipe" : input;
+	const resolveStdinOption = (options) => {
+		const defaultConfig = {
+			stream: "pipe",
+			encoding: "utf-8",
+			endOnDone: true
+		};
+		if (isUndefined(options.stdin)) return defaultConfig;
+		if (typeof options.stdin === "string") return {
+			...defaultConfig,
+			stream: options.stdin
+		};
+		if (isStream(options.stdin)) return {
+			...defaultConfig,
+			stream: options.stdin
+		};
+		return {
+			stream: options.stdin.stream,
+			encoding: options.stdin.encoding ?? defaultConfig.encoding,
+			endOnDone: options.stdin.endOnDone ?? defaultConfig.endOnDone
+		};
+	};
+	const resolveOutputOption = (options, streamName) => {
+		const option = options[streamName];
+		if (isUndefined(option)) return { stream: "pipe" };
+		if (typeof option === "string") return { stream: option };
+		if (isSink(option)) return { stream: option };
+		return { stream: option.stream };
+	};
+	const resolveAdditionalFds = (options) => {
+		if (isUndefined(options.additionalFds)) return [];
+		const result = [];
+		for (const [name, config] of Object.entries(options.additionalFds)) {
+			const fd = parseFdName(name);
+			if (isNotUndefined(fd)) result.push({
+				fd,
+				config
+			});
+		}
+		return result.sort((a, b) => a.fd - b.fd);
+	};
+	const buildStdioArray = (stdinConfig, stdoutConfig, stderrConfig, additionalFds) => {
+		const stdio = [
+			inputToStdioOption(stdinConfig.stream),
+			outputToStdioOption(stdoutConfig.stream),
+			outputToStdioOption(stderrConfig.stream)
+		];
+		if (additionalFds.length === 0) return stdio;
+		const maxFd = additionalFds.reduce((max, { fd }) => Math.max(max, fd), 2);
+		for (let i = 3; i <= maxFd; i++) stdio[i] = "ignore";
+		for (const { fd } of additionalFds) stdio[fd] = "pipe";
+		return stdio;
+	};
+	const setupAdditionalFds = fnUntraced(function* (command, childProcess, additionalFds) {
+		if (additionalFds.length === 0) return {
+			getInputFd: () => drain,
+			getOutputFd: () => empty
+		};
+		const inputSinks = /* @__PURE__ */ new Map();
+		const outputStreams = /* @__PURE__ */ new Map();
+		for (const { config, fd } of additionalFds) {
+			const nodeStream = childProcess.stdio[fd];
+			switch (config.type) {
+				case "input": {
+					let sink = drain;
+					if (nodeStream && "write" in nodeStream) sink = fromWritable({
+						evaluate: () => nodeStream,
+						onError: (error) => toPlatformError(`fromWritable(fd${fd})`, toError(error), command)
+					});
+					if (config.stream) yield* forkScoped(run(config.stream, sink));
+					inputSinks.set(fd, sink);
+					break;
+				}
+				case "output": {
+					let stream = empty;
+					if (nodeStream && "read" in nodeStream) stream = fromReadable({
+						evaluate: () => nodeStream,
+						onError: (error) => toPlatformError(`fromReadable(fd${fd})`, toError(error), command)
+					});
+					if (config.sink) stream = transduce(stream, config.sink);
+					outputStreams.set(fd, stream);
+					break;
+				}
 			}
-		} catch (err) {
-			console.warn("[schema] Failed to create pre-v55 snapshot:", err instanceof Error ? err.message : String(err));
 		}
-		db.exec(`
-      CREATE TABLE IF NOT EXISTS agents (
-        id            TEXT PRIMARY KEY,
-        issue_id      TEXT NOT NULL,
-        role          TEXT NOT NULL,
-        status        TEXT NOT NULL,
-        workspace     TEXT NOT NULL,
-        harness       TEXT,
-        model         TEXT,
-        branch        TEXT,
-        session_id    TEXT,
-        started_at    TEXT,
-        last_activity TEXT,
-        last_resume_at TEXT,
-        stopped_at    TEXT,
-        stopped_by_user INTEGER,
-        stopped_by_pause INTEGER,
-        kickoff_delivered INTEGER,
-        host_override INTEGER,
-        cost_so_far   REAL,
-        phase         TEXT,
-        work_type     TEXT,
-        paused        INTEGER,
-        paused_reason TEXT,
-        paused_at     TEXT,
-        troubled      INTEGER,
-        troubled_at   TEXT,
-        consecutive_failures INTEGER,
-        first_failure_in_run_at TEXT,
-        last_failure_at TEXT,
-        last_failure_reason TEXT,
-        last_failure_next_retry_at TEXT,
-        flywheel_run_id TEXT,
-        role_run_head TEXT,
-        review_sub_role TEXT,
-        review_run_id TEXT,
-        review_synthesis_agent_id TEXT,
-        review_output_path TEXT,
-        review_deadline_at TEXT,
-        review_monitor_signaled TEXT,
-        review_retry_attempt INTEGER,
-        inspect_sub_role TEXT,
-        delivery_method TEXT,
-        supervisor_enabled INTEGER,
-        channels_enabled INTEGER,
-        updated_at    TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_agents_status_role
-        ON agents(status, role);
-
-      CREATE INDEX IF NOT EXISTS idx_agents_issue
-        ON agents(issue_id);
-    `);
-		try {
-			const result = backfillAgentsFromStateJsonSync(db);
-			if (result.processed > 0 || result.markedStopped > 0) console.log(`[schema] Backfilled agents table: ${result.processed} rows, ${result.markedStopped} marked stopped (no live tmux session)`);
-		} catch (err) {
-			console.warn("[schema] agents-table backfill failed:", err instanceof Error ? err.message : String(err));
-		}
-	}
-	if (currentVersion < 56) db.exec(`DROP TABLE IF EXISTS projection_cache`);
-	db.pragma(`user_version = 56`);
-}
-//#endregion
-//#region ../../src/lib/database/index.ts
-/**
-* Overdeck Unified Database
-*
-* Single panopticon.db at ~/.overdeck/panopticon.db.
-* Singleton pattern — one connection shared across the process.
-*
-* IMPORTANT: This module is safe to import in both server and CLI contexts.
-* Never use execSync here — this is synchronous SQLite, not a subprocess.
-*
-* Dual-runtime (PAN-1579): uses the shared SQLite driver adapter, which selects
-* bun:sqlite under Bun and node:sqlite under Node.
-*/
-/**
-* PAN-1249: Local typed error for SQLite failures against panopticon.db.
-* Used by callers that want to surface DB faults instead of swallowing them.
-* Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
-*/
-var DatabaseError$1 = class extends TaggedError("DatabaseError") {};
-let _db = null;
-/**
-* Get the path to panopticon.db (dynamic, respects OVERDECK_HOME override for tests)
-*/
-function getDatabasePath() {
-	return join(getOverdeckHome(), "panopticon.db");
-}
-/**
-* Initialize and return the singleton database connection.
-* Safe to call multiple times — returns the existing connection after first call.
-*/
-function getDatabase() {
-	if (_db) return _db;
-	const home = getOverdeckHome();
-	if (!existsSync(home)) mkdirSync(home, { recursive: true });
-	const dbPath = getDatabasePath();
-	_db = openDatabase(dbPath);
-	_db.pragma("journal_mode = WAL");
-	_db.pragma("foreign_keys = ON");
-	_db.pragma("synchronous = NORMAL");
-	_db.pragma("journal_size_limit = 67108864");
-	runMigrations(_db, dbPath);
-	const currentVacuum = _db.pragma("auto_vacuum", { simple: true });
-	if (currentVacuum !== 2) {
-		const sizeBefore = _db.pragma("page_count", { simple: true });
-		const pageSize = _db.pragma("page_size", { simple: true });
-		const mbBefore = (sizeBefore * pageSize / 1024 / 1024).toFixed(1);
-		console.log(`[db] Migrating SQLite to incremental_vacuum (current=${currentVacuum}, size=${mbBefore}MB) — one-time, may take ~30s on a large DB...`);
-		const t0 = Date.now();
-		_db.pragma("auto_vacuum = INCREMENTAL");
-		_db.exec("VACUUM");
-		const mbAfter = (_db.pragma("page_count", { simple: true }) * pageSize / 1024 / 1024).toFixed(1);
-		console.log(`[db] Migration complete in ${Date.now() - t0}ms (${mbBefore}MB → ${mbAfter}MB)`);
-	}
-	setInterval(() => {
-		if (!_db) return;
-		const db = _db;
-		runSync(try_({
-			try: () => {
-				const free = db.pragma("freelist_count", { simple: true });
-				if (free > 256) db.pragma(`incremental_vacuum(${Math.min(free, 1e4)})`);
-			},
-			catch: (cause) => new DatabaseError$1({
-				operation: "incremental_vacuum",
-				cause
-			})
-		}).pipe(catchTag("DatabaseError", () => void_)));
-	}, 900 * 1e3).unref();
-	return _db;
-}
-//#endregion
-//#region ../../src/lib/database/cost-events-db.ts
-/**
-* Cost Events SQLite Storage
-*
-* Provides SQLite-backed storage for CostEvent records.
-* Deduplication is enforced via UNIQUE index on request_id.
-*
-* PAN-1249: Effect migration pass — synchronous public API preserved so
-* existing call sites stay unchanged. The hot insert paths are wrapped in
-* Effect.try with a local DatabaseError tag, matching prior best-effort
-* semantics (insert failures are logged and surfaced as `null`).
-* Full conversion to @effect/sql-sqlite-bun is deferred to PAN-447.
-*/
-/** A SQLite operation against panopticon.db failed. */
-var DatabaseError = class extends TaggedError("DatabaseError") {};
-const dailySpendCache = /* @__PURE__ */ new Map();
-function dailySpendCacheKey(issueId, startTs) {
-	return `${issueId}:${startTs}`;
-}
-function startOfLocalDayIso(ts) {
-	const d = new Date(ts);
-	return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
-}
-function recordMemoryExtractionSpend(issueId, startTs, cost) {
-	const key = dailySpendCacheKey(issueId, startTs);
-	const existing = dailySpendCache.get(key);
-	if (existing) {
-		existing.total += cost;
-		existing.updatedAt = Date.now();
-	} else dailySpendCache.set(key, {
-		total: cost,
-		updatedAt: Date.now()
+		return {
+			getInputFd: (fd) => inputSinks.get(fd) ?? drain,
+			getOutputFd: (fd) => outputStreams.get(fd) ?? empty
+		};
 	});
-}
+	const setupChildStdin = (command, childProcess, config) => suspend$2(() => {
+		let sink = drain;
+		if (isNotNull$1(childProcess.stdin)) sink = fromWritable({
+			evaluate: () => childProcess.stdin,
+			onError: (error) => toPlatformError("fromWritable(stdin)", toError(error), command),
+			endOnDone: config.endOnDone,
+			encoding: config.encoding
+		});
+		if (isStream(config.stream)) return as(forkScoped(run(config.stream, sink)), sink);
+		return succeed(sink);
+	});
+	const setupChildOutputStreams = (command, childProcess, stdoutConfig, stderrConfig) => {
+		let stdout = childProcess.stdout ? fromReadable({
+			evaluate: () => childProcess.stdout,
+			onError: (error) => toPlatformError("fromReadable(stdout)", toError(error), command)
+		}) : empty;
+		let stderr = childProcess.stderr ? fromReadable({
+			evaluate: () => childProcess.stderr,
+			onError: (error) => toPlatformError("fromReadable(stderr)", toError(error), command)
+		}) : empty;
+		if (isSink(stdoutConfig.stream)) stdout = transduce(stdout, stdoutConfig.stream);
+		if (isSink(stderrConfig.stream)) stderr = transduce(stderr, stderrConfig.stream);
+		const all = merge$1(stdout, stderr);
+		return {
+			stdout,
+			stderr,
+			all
+		};
+	};
+	const spawn = (command, spawnOptions) => callback$1((resume) => {
+		const deferred = makeUnsafe$2();
+		const handle = NodeChildProcess.spawn(command.command, command.args, spawnOptions);
+		handle.on("error", (error) => {
+			resume(fail(toPlatformError("spawn", error, command)));
+		});
+		handle.on("exit", (...args) => {
+			doneUnsafe(deferred, succeed$2(args));
+		});
+		handle.on("spawn", () => {
+			resume(succeed([handle, deferred]));
+		});
+		return sync(() => {
+			handle.kill("SIGTERM");
+		});
+	});
+	const killProcessGroup = (command, childProcess, signal) => {
+		if (globalThis.process.platform === "win32") return callback$1((resume) => {
+			NodeChildProcess.exec(`taskkill /pid ${childProcess.pid} /T /F`, (error) => {
+				if (error) resume(fail(toPlatformError("kill", toError(error), command)));
+				else resume(void_);
+			});
+		});
+		return try_({
+			try: () => {
+				globalThis.process.kill(-childProcess.pid, signal);
+			},
+			catch: (error) => toPlatformError("kill", toError(error), command)
+		});
+	};
+	const killProcessGroupOnExit = (childProcess, signal) => {
+		if (globalThis.process.platform === "win32") {
+			NodeChildProcess.exec(`taskkill /pid ${childProcess.pid} /T /F`, () => {});
+			return;
+		}
+		try {
+			globalThis.process.kill(-childProcess.pid, signal);
+		} catch {}
+	};
+	const killProcess = (command, childProcess, signal) => suspend$2(() => {
+		if (!childProcess.kill(signal)) return fail(toPlatformError("kill", new globalThis.Error("Failed to kill child process"), command));
+		return void_;
+	});
+	const withTimeout = (childProcess, command, options) => (kill) => {
+		const killSignal = options?.killSignal ?? "SIGTERM";
+		return isUndefined(options?.forceKillAfter) ? kill(command, childProcess, killSignal) : timeoutOrElse(kill(command, childProcess, killSignal), {
+			duration: options.forceKillAfter,
+			orElse: () => kill(command, childProcess, "SIGKILL")
+		});
+	};
+	/**
+	* Get the appropriate source stream from a process handle based on the
+	* `from` pipe option.
+	*/
+	const getSourceStream = (handle, from) => {
+		const fromOption = from ?? "stdout";
+		switch (fromOption) {
+			case "stdout": return handle.stdout;
+			case "stderr": return handle.stderr;
+			case "all": return handle.all;
+			default: {
+				const fd = parseFdName(fromOption);
+				if (isNotUndefined(fd)) return handle.getOutputFd(fd);
+				return handle.stdout;
+			}
+		}
+	};
+	const spawnCommand = fnUntraced(function* (cmd) {
+		switch (cmd._tag) {
+			case "StandardCommand": {
+				const stdinConfig = resolveStdinOption(cmd.options);
+				const stdoutConfig = resolveOutputOption(cmd.options, "stdout");
+				const stderrConfig = resolveOutputOption(cmd.options, "stderr");
+				const resolvedAdditionalFds = resolveAdditionalFds(cmd.options);
+				let isReferenced = true;
+				let cleanupOnNonZeroExit = false;
+				const [childProcess, exitSignal] = yield* acquireRelease(spawn(cmd, {
+					cwd: yield* resolveWorkingDirectory(cmd.options),
+					env: resolveEnvironment(cmd.options),
+					stdio: buildStdioArray(stdinConfig, stdoutConfig, stderrConfig, resolvedAdditionalFds),
+					detached: cmd.options.detached ?? process.platform !== "win32",
+					shell: cmd.options.shell
+				}), fnUntraced(function* ([childProcess, exitSignal]) {
+					const exited = yield* isDone(exitSignal);
+					const killWithTimeout = withTimeout(childProcess, cmd, cmd.options);
+					if (exited) {
+						const [code] = yield* _await(exitSignal);
+						if (code !== 0 && isNotNull$1(code)) return yield* ignore(killWithTimeout(killProcessGroup));
+						return yield* void_;
+					}
+					if (!isReferenced) return yield* void_;
+					return yield* killWithTimeout((command, childProcess, signal) => catch_(killProcessGroup(command, childProcess, signal), () => killProcess(command, childProcess, signal))).pipe(andThen(_await(exitSignal)), ignore);
+				}));
+				const pid = ProcessId(childProcess.pid);
+				childProcess.on("exit", (code) => {
+					if (cleanupOnNonZeroExit && code !== 0 && isNotNull$1(code)) killProcessGroupOnExit(childProcess, cmd.options.killSignal ?? "SIGTERM");
+				});
+				const reref = sync(() => {
+					if (!isReferenced) {
+						childProcess.ref();
+						isReferenced = true;
+						cleanupOnNonZeroExit = false;
+					}
+				});
+				const unref = sync(() => {
+					if (isReferenced) {
+						childProcess.unref();
+						isReferenced = false;
+						cleanupOnNonZeroExit = true;
+					}
+					return reref;
+				});
+				const stdin = yield* setupChildStdin(cmd, childProcess, stdinConfig);
+				const { all, stderr, stdout } = setupChildOutputStreams(cmd, childProcess, stdoutConfig, stderrConfig);
+				const { getInputFd, getOutputFd } = yield* setupAdditionalFds(cmd, childProcess, resolvedAdditionalFds);
+				const isRunning = map$3(isDone(exitSignal), (done) => !done);
+				const exitCode = flatMap(_await(exitSignal), ([code, signal]) => {
+					if (isNotNull$1(code)) return succeed(ExitCode(code));
+					return fail(toPlatformError("exitCode", new globalThis.Error(`Process interrupted due to receipt of signal: '${signal}'`), cmd));
+				});
+				const kill = (options) => {
+					return withTimeout(childProcess, cmd, options)((command, childProcess, signal) => catch_(killProcessGroup(command, childProcess, signal), () => killProcess(command, childProcess, signal))).pipe(andThen(_await(exitSignal)), asVoid);
+				};
+				return makeHandle({
+					pid,
+					exitCode,
+					isRunning,
+					kill,
+					stdin,
+					stdout,
+					stderr,
+					all,
+					getInputFd,
+					getOutputFd,
+					unref
+				});
+			}
+			case "PipedCommand": {
+				const { commands, pipeOptions } = flattenCommand(cmd);
+				const [root, ...pipeline] = commands;
+				const handles = [yield* spawnCommand(root)];
+				for (let i = 0; i < pipeline.length; i++) {
+					const command = pipeline[i];
+					const options = pipeOptions[i] ?? {};
+					const stdinConfig = resolveStdinOption(command.options);
+					const sourceStream = unwrap(succeed(getSourceStream(handles[handles.length - 1], options.from)));
+					const toOption = options.to ?? "stdin";
+					if (toOption === "stdin") handles.push(yield* spawnCommand(make$1(command.command, command.args, {
+						...command.options,
+						stdin: {
+							...stdinConfig,
+							stream: sourceStream
+						}
+					})));
+					else {
+						const fd = parseFdName(toOption);
+						if (isNotUndefined(fd)) {
+							const fdName$1 = fdName(fd);
+							const existingFds = command.options.additionalFds ?? {};
+							handles.push(yield* spawnCommand(make$1(command.command, command.args, {
+								...command.options,
+								additionalFds: {
+									...existingFds,
+									[fdName$1]: {
+										type: "input",
+										stream: sourceStream
+									}
+								}
+							})));
+						} else handles.push(yield* spawnCommand(make$1(command.command, command.args, {
+							...command.options,
+							stdin: {
+								...stdinConfig,
+								stream: sourceStream
+							}
+						})));
+					}
+				}
+				const handle = handles[handles.length - 1];
+				const unref = gen(function* () {
+					const rerefs = [];
+					for (const handle of handles) rerefs.push(yield* handle.unref);
+					return forEach$1([...rerefs].reverse(), (reref) => reref, { discard: true });
+				});
+				return makeHandle({
+					pid: handle.pid,
+					exitCode: handle.exitCode,
+					isRunning: handle.isRunning,
+					kill: handle.kill,
+					stdin: handle.stdin,
+					stdout: handle.stdout,
+					stderr: handle.stderr,
+					all: handle.all,
+					getInputFd: handle.getInputFd,
+					getOutputFd: handle.getOutputFd,
+					unref
+				});
+			}
+		}
+	});
+	return make$2(spawnCommand);
+}));
 /**
-* Insert a cost event. Returns the new row ID, or null if it was a duplicate.
-* Deduplication is handled by the UNIQUE index on request_id.
+* Flattens a `Command` into an array of `StandardCommand`s along with pipe
+* options for each connection.
+*
+* @category utils
+* @since 4.0.0
 */
-function insertCostEvent(event, sourceFile) {
-	return runSync(try_({
-		try: () => {
-			const result = getDatabase().prepare(`
-          INSERT OR IGNORE INTO cost_events (
-            ts, agent_id, issue_id, session_type, provider, model,
-            input, output, cache_read, cache_write, cost, request_id,
-            session_id,
-            tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons,
-            source_file, caveman_variant
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(event.ts, event.agentId, event.issueId, event.sessionType || "unknown", event.provider || "anthropic", event.model, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.sessionId ?? null, event.tldrInterceptions ?? null, event.tldrBypasses ?? null, event.tldrTokensSaved ?? null, event.tldrBypassReasons ? JSON.stringify(event.tldrBypassReasons) : null, event.source ?? sourceFile ?? null, event.cavemanVariant ?? null);
-			if (result.changes === 0) return null;
-			if (event.source === "memory-extraction" || sourceFile === "memory-extraction") recordMemoryExtractionSpend(event.issueId, startOfLocalDayIso(event.ts), event.cost);
-			return result.lastInsertRowid;
-		},
-		catch: (cause) => new DatabaseError({
-			operation: "insertCostEvent",
-			cause
-		})
-	}).pipe(catchTag("DatabaseError", (err) => {
-		console.error("[cost-events-db] Insert failed:", err.cause);
-		return succeed(null);
-	})));
-}
+const flattenCommand = (command) => {
+	const commands = [];
+	const pipeOptions = [];
+	const flatten = (cmd) => {
+		switch (cmd._tag) {
+			case "StandardCommand":
+				commands.push(cmd);
+				break;
+			case "PipedCommand":
+				flatten(cmd.left);
+				pipeOptions.push(cmd.options);
+				flatten(cmd.right);
+				break;
+		}
+	};
+	flatten(command);
+	if (commands.length === 0) throw new Error("flattenCommand produced empty commands array");
+	const [first, ...rest] = commands;
+	return {
+		commands: [first, ...rest],
+		pipeOptions
+	};
+};
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node-shared@4.0.0-beta.73/node_modules/@effect/platform-node-shared/dist/NodeFileSystem.js
+/**
+* Shared Node-compatible implementation of Effect's `FileSystem` service.
+*
+* This module adapts Node's `node:fs`, `node:os`, and `node:path` APIs into a
+* `FileSystem` layer for Effect programs running on Node-compatible runtimes.
+* Platform packages use it to provide file and directory I/O, permissions,
+* links, metadata, temporary files and directories, and file watching through
+* the shared `FileSystem` service.
+*
+* **Mental model**
+*
+* {@link layer} installs a process-backed `FileSystem` service. Each operation
+* delegates to the corresponding Node filesystem API, then maps Node failures
+* into `PlatformError` values and invalid arguments into `BadArgument` failures.
+* Paths keep Node's normal behavior: relative paths resolve from the current
+* working directory and platform path rules still apply.
+*
+* **Common tasks**
+*
+* Provide {@link layer} at the Node runtime boundary, then depend on the
+* `FileSystem` service from application code. Use the service for ordinary
+* reads and writes, directory management, metadata inspection, links, temporary
+* resources, and file watching without importing Node's `fs` APIs directly.
+*
+* **Gotchas**
+*
+* Open files are scoped resources with tracked read and write positions; append
+* mode lets the operating system choose the write offset. File watching follows
+* `node:fs.watch` semantics unless a custom watch backend is supplied, so
+* recursive support, event coalescing, and reported paths vary by runtime and
+* platform.
+*
+* @since 4.0.0
+*/
+const handleBadArgument = (method) => (err) => badArgument({
+	module: "FileSystem",
+	method,
+	description: err.message ?? String(err)
+});
+const access = /* @__PURE__ */ (() => {
+	const nodeAccess = /* @__PURE__ */ effectify(NFS.access, /* @__PURE__ */ handleErrnoException("FileSystem", "access"), /* @__PURE__ */ handleBadArgument("access"));
+	return (path, options) => {
+		let mode = NFS.constants.F_OK;
+		if (options?.readable) mode |= NFS.constants.R_OK;
+		if (options?.writable) mode |= NFS.constants.W_OK;
+		return nodeAccess(path, mode);
+	};
+})();
+const copy = /* @__PURE__ */ (() => {
+	const nodeCp = /* @__PURE__ */ effectify(NFS.cp, /* @__PURE__ */ handleErrnoException("FileSystem", "copy"), /* @__PURE__ */ handleBadArgument("copy"));
+	return (fromPath, toPath, options) => nodeCp(fromPath, toPath, {
+		force: options?.overwrite ?? false,
+		preserveTimestamps: options?.preserveTimestamps ?? false,
+		recursive: true
+	});
+})();
+const copyFile = /* @__PURE__ */ (() => {
+	const nodeCopyFile = /* @__PURE__ */ effectify(NFS.copyFile, /* @__PURE__ */ handleErrnoException("FileSystem", "copyFile"), /* @__PURE__ */ handleBadArgument("copyFile"));
+	return (fromPath, toPath) => nodeCopyFile(fromPath, toPath);
+})();
+const chmod = /* @__PURE__ */ (() => {
+	const nodeChmod = /* @__PURE__ */ effectify(NFS.chmod, /* @__PURE__ */ handleErrnoException("FileSystem", "chmod"), /* @__PURE__ */ handleBadArgument("chmod"));
+	return (path, mode) => nodeChmod(path, mode);
+})();
+const chown = /* @__PURE__ */ (() => {
+	const nodeChown = /* @__PURE__ */ effectify(NFS.chown, /* @__PURE__ */ handleErrnoException("FileSystem", "chown"), /* @__PURE__ */ handleBadArgument("chown"));
+	return (path, uid, gid) => nodeChown(path, uid, gid);
+})();
+const link = /* @__PURE__ */ (() => {
+	const nodeLink = /* @__PURE__ */ effectify(NFS.link, /* @__PURE__ */ handleErrnoException("FileSystem", "link"), /* @__PURE__ */ handleBadArgument("link"));
+	return (existingPath, newPath) => nodeLink(existingPath, newPath);
+})();
+const makeDirectory = /* @__PURE__ */ (() => {
+	const nodeMkdir = /* @__PURE__ */ effectify(NFS.mkdir, /* @__PURE__ */ handleErrnoException("FileSystem", "makeDirectory"), /* @__PURE__ */ handleBadArgument("makeDirectory"));
+	return (path, options) => nodeMkdir(path, {
+		recursive: options?.recursive ?? false,
+		mode: options?.mode
+	});
+})();
+const makeTempDirectoryFactory = (method) => {
+	const nodeMkdtemp = effectify(NFS.mkdtemp, handleErrnoException("FileSystem", method), handleBadArgument(method));
+	return (options) => suspend$2(() => {
+		const prefix = options?.prefix ?? "";
+		const directory = typeof options?.directory === "string" ? Path.join(options.directory, ".") : OS.tmpdir();
+		return nodeMkdtemp(prefix ? Path.join(directory, prefix) : directory + "/");
+	});
+};
+const makeTempDirectory = /* @__PURE__ */ makeTempDirectoryFactory("makeTempDirectory");
+const removeFactory = (method) => {
+	const nodeRm = effectify(NFS.rm, handleErrnoException("FileSystem", method), handleBadArgument(method));
+	return (path, options) => nodeRm(path, {
+		recursive: options?.recursive ?? false,
+		force: options?.force ?? false
+	});
+};
+const remove = /* @__PURE__ */ removeFactory("remove");
+const makeTempDirectoryScoped = /* @__PURE__ */ (() => {
+	const makeDirectory = /* @__PURE__ */ makeTempDirectoryFactory("makeTempDirectoryScoped");
+	const removeDirectory = /* @__PURE__ */ removeFactory("makeTempDirectoryScoped");
+	return (options) => acquireRelease(makeDirectory(options), (directory) => orDie(removeDirectory(directory, { recursive: true })));
+})();
+const openFactory = (method) => {
+	const nodeOpen = effectify(NFS.open, handleErrnoException("FileSystem", method), handleBadArgument(method));
+	const nodeClose = effectify(NFS.close, handleErrnoException("FileSystem", method), handleBadArgument(method));
+	return (path, options) => pipe(acquireRelease(nodeOpen(path, options?.flag ?? "r", options?.mode), (fd) => orDie(nodeClose(fd))), map$3((fd) => makeFile(FileDescriptor(fd), options?.flag?.startsWith("a") ?? false)));
+};
+const open = /* @__PURE__ */ openFactory("open");
+const makeFile = /* @__PURE__ */ (() => {
+	const nodeReadFactory = (method) => effectify(NFS.read, handleErrnoException("FileSystem", method), handleBadArgument(method));
+	const nodeRead = /* @__PURE__ */ nodeReadFactory("read");
+	const nodeReadAlloc = /* @__PURE__ */ nodeReadFactory("readAlloc");
+	const nodeStat = /* @__PURE__ */ effectify(NFS.fstat, /* @__PURE__ */ handleErrnoException("FileSystem", "stat"), /* @__PURE__ */ handleBadArgument("stat"));
+	const nodeTruncate = /* @__PURE__ */ effectify(NFS.ftruncate, /* @__PURE__ */ handleErrnoException("FileSystem", "truncate"), /* @__PURE__ */ handleBadArgument("truncate"));
+	const nodeSync = /* @__PURE__ */ effectify(NFS.fsync, /* @__PURE__ */ handleErrnoException("FileSystem", "sync"), /* @__PURE__ */ handleBadArgument("sync"));
+	const nodeWriteFactory = (method) => effectify(NFS.write, handleErrnoException("FileSystem", method), handleBadArgument(method));
+	const nodeWrite = /* @__PURE__ */ nodeWriteFactory("write");
+	const nodeWriteAll = /* @__PURE__ */ nodeWriteFactory("writeAll");
+	class FileImpl {
+		[FileTypeId];
+		fd;
+		append;
+		position = /* @__PURE__ */ BigInt(0);
+		constructor(fd, append) {
+			this[FileTypeId] = FileTypeId;
+			this.fd = fd;
+			this.append = append;
+		}
+		get stat() {
+			return map$3(nodeStat(this.fd), makeFileInfo);
+		}
+		get sync() {
+			return nodeSync(this.fd);
+		}
+		seek(offset, from) {
+			const offsetSize = Size(offset);
+			return sync(() => {
+				if (from === "start") this.position = offsetSize;
+				else if (from === "current") this.position = this.position + offsetSize;
+				return this.position;
+			});
+		}
+		read(buffer) {
+			return suspend$2(() => {
+				const position = this.position;
+				return map$3(nodeRead(this.fd, {
+					buffer,
+					position
+				}), (bytesRead) => {
+					const sizeRead = Size(bytesRead);
+					this.position = position + sizeRead;
+					return sizeRead;
+				});
+			});
+		}
+		readAlloc(size) {
+			const sizeNumber = Number(size);
+			return suspend$2(() => {
+				const buffer = Buffer.allocUnsafeSlow(sizeNumber);
+				const position = this.position;
+				return map$3(nodeReadAlloc(this.fd, {
+					buffer,
+					position
+				}), (bytesRead) => {
+					if (bytesRead === 0) return none();
+					this.position = position + BigInt(bytesRead);
+					if (bytesRead === sizeNumber) return some(buffer);
+					const dst = Buffer.allocUnsafeSlow(bytesRead);
+					buffer.copy(dst, 0, 0, bytesRead);
+					return some(dst);
+				});
+			});
+		}
+		truncate(length) {
+			return map$3(nodeTruncate(this.fd, length ? Number(length) : void 0), () => {
+				if (!this.append) {
+					const len = BigInt(length ?? 0);
+					if (this.position > len) this.position = len;
+				}
+			});
+		}
+		write(buffer) {
+			return suspend$2(() => {
+				const position = this.position;
+				return map$3(nodeWrite(this.fd, buffer, void 0, void 0, this.append ? void 0 : Number(position)), (bytesWritten) => {
+					const sizeWritten = Size(bytesWritten);
+					if (!this.append) this.position = position + sizeWritten;
+					return sizeWritten;
+				});
+			});
+		}
+		writeAllChunk(buffer) {
+			return suspend$2(() => {
+				const position = this.position;
+				return flatMap(nodeWriteAll(this.fd, buffer, void 0, void 0, this.append ? void 0 : Number(position)), (bytesWritten) => {
+					if (bytesWritten === 0) return fail(systemError({
+						module: "FileSystem",
+						method: "writeAll",
+						_tag: "WriteZero",
+						pathOrDescriptor: this.fd,
+						description: "write returned 0 bytes written"
+					}));
+					if (!this.append) this.position = position + BigInt(bytesWritten);
+					return bytesWritten < buffer.length ? this.writeAllChunk(buffer.subarray(bytesWritten)) : void_;
+				});
+			});
+		}
+		writeAll(buffer) {
+			return this.writeAllChunk(buffer);
+		}
+	}
+	return (fd, append) => new FileImpl(fd, append);
+})();
+const makeTempFileFactory = (method) => {
+	const makeDirectory = makeTempDirectoryFactory(method);
+	return fnUntraced(function* (options) {
+		const directory = yield* makeDirectory(options);
+		const random = Crypto.randomBytes(6).toString("hex");
+		const name = Path.join(directory, options?.suffix ? `${random}${options.suffix}` : random);
+		yield* writeFile$1(name, new Uint8Array(0));
+		return name;
+	});
+};
+const makeTempFile = /* @__PURE__ */ makeTempFileFactory("makeTempFile");
+const makeTempFileScoped = /* @__PURE__ */ (() => {
+	const makeFile = /* @__PURE__ */ makeTempFileFactory("makeTempFileScoped");
+	const removeDirectory = /* @__PURE__ */ removeFactory("makeTempFileScoped");
+	return (options) => acquireRelease(makeFile(options), (file) => orDie(removeDirectory(Path.dirname(file), { recursive: true })));
+})();
+const readDirectory = (path, options) => tryPromise({
+	try: () => NFS.promises.readdir(path, options),
+	catch: (err) => handleErrnoException("FileSystem", "readDirectory")(err, [path])
+});
+const readFile$1 = (path) => callback$1((resume, signal) => {
+	try {
+		NFS.readFile(path, { signal }, (err, data) => {
+			if (err) resume(fail(handleErrnoException("FileSystem", "readFile")(err, [path])));
+			else resume(succeed(data));
+		});
+	} catch (err) {
+		resume(fail(handleBadArgument("readFile")(err)));
+	}
+});
+const readLink = /* @__PURE__ */ (() => {
+	const nodeReadLink = /* @__PURE__ */ effectify(NFS.readlink, /* @__PURE__ */ handleErrnoException("FileSystem", "readLink"), /* @__PURE__ */ handleBadArgument("readLink"));
+	return (path) => nodeReadLink(path);
+})();
+const realPath = /* @__PURE__ */ (() => {
+	const nodeRealPath = /* @__PURE__ */ effectify(NFS.realpath, /* @__PURE__ */ handleErrnoException("FileSystem", "realPath"), /* @__PURE__ */ handleBadArgument("realPath"));
+	return (path) => nodeRealPath(path);
+})();
+const rename = /* @__PURE__ */ (() => {
+	const nodeRename = /* @__PURE__ */ effectify(NFS.rename, /* @__PURE__ */ handleErrnoException("FileSystem", "rename"), /* @__PURE__ */ handleBadArgument("rename"));
+	return (oldPath, newPath) => nodeRename(oldPath, newPath);
+})();
+const makeFileInfo = (stat) => ({
+	type: stat.isFile() ? "File" : stat.isDirectory() ? "Directory" : stat.isSymbolicLink() ? "SymbolicLink" : stat.isBlockDevice() ? "BlockDevice" : stat.isCharacterDevice() ? "CharacterDevice" : stat.isFIFO() ? "FIFO" : stat.isSocket() ? "Socket" : "Unknown",
+	mtime: fromNullishOr(stat.mtime),
+	atime: fromNullishOr(stat.atime),
+	birthtime: fromNullishOr(stat.birthtime),
+	dev: stat.dev,
+	rdev: fromNullishOr(stat.rdev),
+	ino: fromNullishOr(stat.ino),
+	mode: stat.mode,
+	nlink: fromNullishOr(stat.nlink),
+	uid: fromNullishOr(stat.uid),
+	gid: fromNullishOr(stat.gid),
+	size: Size(stat.size),
+	blksize: stat.blksize !== void 0 ? some(Size(stat.blksize)) : none(),
+	blocks: fromNullishOr(stat.blocks)
+});
+const stat$1 = /* @__PURE__ */ (() => {
+	const nodeStat = /* @__PURE__ */ effectify(NFS.stat, /* @__PURE__ */ handleErrnoException("FileSystem", "stat"), /* @__PURE__ */ handleBadArgument("stat"));
+	return (path) => map$3(nodeStat(path), makeFileInfo);
+})();
+const symlink = /* @__PURE__ */ (() => {
+	const nodeSymlink = /* @__PURE__ */ effectify(NFS.symlink, /* @__PURE__ */ handleErrnoException("FileSystem", "symlink"), /* @__PURE__ */ handleBadArgument("symlink"));
+	return (target, path) => nodeSymlink(target, path);
+})();
+const truncate = /* @__PURE__ */ (() => {
+	const nodeTruncate = /* @__PURE__ */ effectify(NFS.truncate, /* @__PURE__ */ handleErrnoException("FileSystem", "truncate"), /* @__PURE__ */ handleBadArgument("truncate"));
+	return (path, length) => nodeTruncate(path, length !== void 0 ? Number(length) : void 0);
+})();
+const utimes = /* @__PURE__ */ (() => {
+	const nodeUtimes = /* @__PURE__ */ effectify(NFS.utimes, /* @__PURE__ */ handleErrnoException("FileSystem", "utime"), /* @__PURE__ */ handleBadArgument("utime"));
+	return (path, atime, mtime) => nodeUtimes(path, atime, mtime);
+})();
+const watchNode = (path) => callback((queue) => acquireRelease(sync(() => {
+	const watcher = NFS.watch(path, { recursive: true }, (event, path) => {
+		if (!path) return;
+		switch (event) {
+			case "rename":
+				runFork(matchEffect(stat$1(path), {
+					onSuccess: (_) => offer(queue, {
+						_tag: "Create",
+						path
+					}),
+					onFailure: (_) => offer(queue, {
+						_tag: "Remove",
+						path
+					})
+				}));
+				return;
+			case "change":
+				offerUnsafe(queue, {
+					_tag: "Update",
+					path
+				});
+				return;
+		}
+	});
+	watcher.on("error", (error) => {
+		failCauseUnsafe(queue, fail$2(systemError({
+			module: "FileSystem",
+			_tag: "Unknown",
+			method: "watch",
+			pathOrDescriptor: path,
+			cause: error
+		})));
+	});
+	watcher.on("close", () => {
+		endUnsafe(queue);
+	});
+	return watcher;
+}), (watcher) => sync(() => watcher.close())));
+const watch = (backend, path) => stat$1(path).pipe(map$3((stat) => backend.pipe(flatMap$2((_) => _.register(path, stat)), getOrElse$1(() => watchNode(path)))), unwrap);
+const writeFile$1 = (path, data, options) => callback$1((resume, signal) => {
+	try {
+		NFS.writeFile(path, data, {
+			signal,
+			flag: options?.flag,
+			mode: options?.mode
+		}, (err) => {
+			if (err) resume(fail(handleErrnoException("FileSystem", "writeFile")(err, [path])));
+			else resume(void_);
+		});
+	} catch (err) {
+		resume(fail(handleBadArgument("writeFile")(err)));
+	}
+});
+const makeFileSystem = /* @__PURE__ */ map$3(/* @__PURE__ */ serviceOption(WatchBackend), (backend) => make$3({
+	access,
+	chmod,
+	chown,
+	copy,
+	copyFile,
+	link,
+	makeDirectory,
+	makeTempDirectory,
+	makeTempDirectoryScoped,
+	makeTempFile,
+	makeTempFileScoped,
+	open,
+	readDirectory,
+	readFile: readFile$1,
+	readLink,
+	realPath,
+	remove,
+	rename,
+	stat: stat$1,
+	symlink,
+	truncate,
+	utimes,
+	watch(path) {
+		return watch(backend, path);
+	},
+	writeFile: writeFile$1
+}));
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node@4.0.0-beta.73/node_modules/@effect/platform-node/dist/NodeFileSystem.js
+/**
+* Node.js `FileSystem` layer for programs that perform real filesystem I/O.
+*
+* The exported layer satisfies the platform-independent `FileSystem` service
+* with Node-backed operations for files, directories, metadata, permissions,
+* links, temporary paths, and path watching. Effects still call the service from
+* `effect/FileSystem`; this module only chooses the Node implementation.
+*
+* **Mental model**
+*
+* Provide `NodeFileSystem.layer` at the process boundary when filesystem
+* effects should touch the host filesystem. Use `NodeServices.layer` instead
+* when the same program also needs the standard Node path, stdio, terminal,
+* crypto, and child process services. Tests that need isolation can provide a
+* different `FileSystem` layer without changing the code that performs the
+* reads and writes.
+*
+* **Gotchas**
+*
+* Paths are interpreted by Node, so relative paths resolve against the current
+* working directory and platform-specific path rules apply. Filesystem failures
+* are reported through Effect platform errors rather than thrown exceptions.
+* File watching uses `FileSystem.WatchBackend` when one is available; otherwise
+* it follows `node:fs.watch`, whose recursive support, event batching, and
+* reported path names vary across operating systems.
+*
+* @since 4.0.0
+*/
+/**
+* Provides the `FileSystem` service backed by Node filesystem APIs.
+*
+* @category layers
+* @since 4.0.0
+*/
+const layer$2 = /* @__PURE__ */ effect(FileSystem)(makeFileSystem);
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node-shared@4.0.0-beta.73/node_modules/@effect/platform-node-shared/dist/NodePath.js
+/**
+* Node-backed provider for Effect's `Path` service.
+*
+* This module turns Node's `node:path` and `node:url` APIs into `Layer`s for
+* programs that depend on `Path`. Use it when code should receive path
+* operations from the Effect environment instead of importing `node:path`
+* directly, including configuration loading, filesystem composition, and file
+* URL conversion.
+*
+* **Mental model**
+*
+* `layer` follows the platform semantics of the current Node runtime. The
+* `layerPosix` and `layerWin32` variants pin the syntax rules to POSIX or
+* Windows, which is useful for deterministic parsing, formatting, and tests.
+* All three layers include `fromFileUrl` and `toFileUrl` behavior backed by
+* Node's URL conversion functions.
+*
+* **Gotchas**
+*
+* Path operations are syntactic: they normalize separators, roots, drive
+* letters, UNC segments, extensions, and relative segments without checking the
+* filesystem. File URL conversion follows Node's validation and encoding
+* rules, and invalid conversions fail with `BadArgument`.
+*
+* @since 4.0.0
+*/
+const fromFileUrl = (url) => try_({
+	try: () => NodeUrl.fileURLToPath(url),
+	catch: (cause) => new BadArgument({
+		module: "Path",
+		method: "fromFileUrl",
+		cause
+	})
+});
+const toFileUrl = (path) => try_({
+	try: () => NodeUrl.pathToFileURL(path),
+	catch: (cause) => new BadArgument({
+		module: "Path",
+		method: "toFileUrl",
+		cause
+	})
+});
+({ ...Path.posix });
+({ ...Path.win32 });
+//#endregion
+//#region ../../node_modules/.bun/@effect+platform-node@4.0.0-beta.73/node_modules/@effect/platform-node/dist/NodePath.js
+/**
+* Node.js layers for Effect's `Path` service.
+*
+* This module adapts Node's path and file URL behavior to the
+* platform-independent `Path` service. Provide one of its layers when a Node
+* program needs to build, normalize, parse, resolve, or convert paths without
+* depending directly on `node:path`.
+*
+* **Mental model**
+*
+* `Path` is a syntactic service: it manipulates strings and `file:` URLs. It
+* does not read the filesystem, check permissions, or validate that paths
+* exist. The selected layer decides which separator, drive-letter, UNC, and URL
+* conversion rules are used.
+*
+* **Common tasks**
+*
+* Use `layer` for host-platform Node semantics, `layerPosix` for stable POSIX
+* behavior, and `layerWin32` for stable Windows behavior. `NodeServices.layer`
+* already includes `layer`, so import this module directly when a program wants
+* only path support or a platform-specific variant.
+*
+* **Gotchas**
+*
+* Results that are correct on one platform may not be portable to another.
+* `fromFileUrl` and `toFileUrl` use Node's `node:url` conversion rules and
+* report invalid conversions as `BadArgument` failures.
+*
+* @since 4.0.0
+*/
+/**
+* Provides the default Node `Path` service using the platform's `node:path`
+* implementation.
+*
+* @category layers
+* @since 4.0.0
+*/
+const layer = /* @__PURE__ */ succeed$1(Path$1)({
+	[TypeId$1]: TypeId$1,
+	...Path,
+	fromFileUrl,
+	toFileUrl
+});
+layer$4.pipe(provide(mergeAll(layer$2, layer)));
+Promise.resolve();
 //#endregion
 //#region ../../node_modules/.bun/yaml@2.9.0/node_modules/yaml/dist/nodes/identity.js
 var require_identity = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -12815,6 +25282,10 @@ function extractPrefixSync(issueId) {
 * Maps Linear team prefixes and labels to project paths for workspace creation.
 */
 const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, "projects.yaml");
+/** Resolve the issue prefix for a project. */
+function getIssuePrefix(config) {
+	return config.issue_prefix;
+}
 let _projectsCache = null;
 function loadProjectsConfigSync() {
 	if (!existsSync(PROJECTS_CONFIG_FILE)) return { projects: {} };
@@ -12841,6 +25312,4854 @@ function listProjectsSync() {
 		key,
 		config: projectConfig
 	}));
+}
+function resolveProjectPath(project, labels = []) {
+	if (!project.issue_routing || project.issue_routing.length === 0) return project.path;
+	const normalizedLabels = labels.map((l) => l.toLowerCase());
+	for (const rule of project.issue_routing) if (rule.labels && rule.labels.length > 0) {
+		if (rule.labels.map((l) => l.toLowerCase()).some((label) => normalizedLabels.includes(label))) return rule.path;
+	}
+	for (const rule of project.issue_routing) if (rule.default) return rule.path;
+	return project.path;
+}
+/**
+* Resolve project from an issue ID (and optional labels)
+*
+* @param issueId - Issue ID in any supported format (e.g., "MIN-123", "F29698")
+* @param labels - Optional array of label names
+* @returns Resolved project info or null if not found
+*/
+function resolveProjectFromIssueSync(issueId, labels = []) {
+	const parsed = parseIssueIdSync(issueId);
+	if (!parsed) return null;
+	const config = loadProjectsConfigSync();
+	for (const [key, projectConfig] of Object.entries(config.projects)) {
+		const singlePrefix = getIssuePrefix(projectConfig);
+		if (singlePrefix?.toUpperCase() === parsed.prefix) {
+			const resolvedPath = resolveProjectPath(projectConfig, labels);
+			return {
+				projectKey: key,
+				projectName: projectConfig.name,
+				projectPath: resolvedPath,
+				linearTeam: singlePrefix
+			};
+		}
+		if (projectConfig.issue_prefixes?.some((p) => p.toUpperCase() === parsed.prefix)) {
+			const resolvedPath = resolveProjectPath(projectConfig, labels);
+			return {
+				projectKey: key,
+				projectName: projectConfig.name,
+				projectPath: resolvedPath,
+				linearTeam: projectConfig.issue_prefixes?.find((p) => p.toUpperCase() === parsed.prefix)
+			};
+		}
+		if (!singlePrefix && !projectConfig.issue_prefixes) {
+			if (key.toUpperCase().replace(/-/g, "") === parsed.prefix) {
+				const resolvedPath = resolveProjectPath(projectConfig, labels);
+				return {
+					projectKey: key,
+					projectName: projectConfig.name,
+					projectPath: resolvedPath,
+					linearTeam: void 0
+				};
+			}
+		}
+	}
+	return null;
+}
+const RECORD_DIRNAME = "records";
+/** Workspace path for an issue, or null if no project is configured. */
+function getIssueWorkspacePath(issueId) {
+	const resolved = resolveProjectFromIssueSync(issueId);
+	if (!resolved) return null;
+	return join$1(resolved.projectPath, "workspaces", `feature-${issueId.toLowerCase()}`);
+}
+/**
+* Record path for an issue. Lives in the workspace (feature branch) at
+* `.pan/records/<issueId-lowercase>.json` when the workspace can be resolved;
+* otherwise falls back to `<project.path>/.pan/records/<issueId-lowercase>.json`
+* (used in tests and non-worktree contexts).
+*/
+function getIssueRecordPath(project, issueId) {
+	return join$1(getIssueRecordBasePath(project, issueId), ".pan", RECORD_DIRNAME, `${issueId.toLowerCase()}.json`);
+}
+/** Base directory for an issue record: workspace if it exists, else project root. */
+function getIssueRecordBasePath(project, issueId) {
+	const workspacePath = getIssueWorkspacePath(issueId);
+	return workspacePath && existsSync$1(workspacePath) ? workspacePath : project.path;
+}
+function writeIssueRecordSync(project, issueId, record) {
+	const path = getIssueRecordPath(project, issueId);
+	const dir = dirname$1(path);
+	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
+	const now = (/* @__PURE__ */ new Date()).toISOString();
+	const next = {
+		...record,
+		issueId: issueId.toUpperCase(),
+		schemaVersion: 2,
+		created: record.created || now,
+		updated: now
+	};
+	writeFileSync$1(path, JSON.stringify(next, null, 2), "utf-8");
+	return path;
+}
+function readIssueRecordSync(project, issueId) {
+	const path = getIssueRecordPath(project, issueId);
+	try {
+		const raw = readFileSync$1(path, "utf-8");
+		return JSON.parse(raw);
+	} catch {
+		return null;
+	}
+}
+//#endregion
+//#region ../../node_modules/.bun/js-yaml@4.1.1/node_modules/js-yaml/dist/js-yaml.mjs
+/*! js-yaml 4.1.1 https://github.com/nodeca/js-yaml @license MIT */
+function isNothing(subject) {
+	return typeof subject === "undefined" || subject === null;
+}
+function isObject(subject) {
+	return typeof subject === "object" && subject !== null;
+}
+function toArray(sequence) {
+	if (Array.isArray(sequence)) return sequence;
+	else if (isNothing(sequence)) return [];
+	return [sequence];
+}
+function extend(target, source) {
+	var index, length, key, sourceKeys;
+	if (source) {
+		sourceKeys = Object.keys(source);
+		for (index = 0, length = sourceKeys.length; index < length; index += 1) {
+			key = sourceKeys[index];
+			target[key] = source[key];
+		}
+	}
+	return target;
+}
+function repeat(string, count) {
+	var result = "", cycle;
+	for (cycle = 0; cycle < count; cycle += 1) result += string;
+	return result;
+}
+function isNegativeZero(number) {
+	return number === 0 && Number.NEGATIVE_INFINITY === 1 / number;
+}
+var common = {
+	isNothing,
+	isObject,
+	toArray,
+	repeat,
+	isNegativeZero,
+	extend
+};
+function formatError(exception, compact) {
+	var where = "", message = exception.reason || "(unknown reason)";
+	if (!exception.mark) return message;
+	if (exception.mark.name) where += "in \"" + exception.mark.name + "\" ";
+	where += "(" + (exception.mark.line + 1) + ":" + (exception.mark.column + 1) + ")";
+	if (!compact && exception.mark.snippet) where += "\n\n" + exception.mark.snippet;
+	return message + " " + where;
+}
+function YAMLException$1(reason, mark) {
+	Error.call(this);
+	this.name = "YAMLException";
+	this.reason = reason;
+	this.mark = mark;
+	this.message = formatError(this, false);
+	if (Error.captureStackTrace) Error.captureStackTrace(this, this.constructor);
+	else this.stack = (/* @__PURE__ */ new Error()).stack || "";
+}
+YAMLException$1.prototype = Object.create(Error.prototype);
+YAMLException$1.prototype.constructor = YAMLException$1;
+YAMLException$1.prototype.toString = function toString(compact) {
+	return this.name + ": " + formatError(this, compact);
+};
+var exception = YAMLException$1;
+function getLine(buffer, lineStart, lineEnd, position, maxLineLength) {
+	var head = "";
+	var tail = "";
+	var maxHalfLength = Math.floor(maxLineLength / 2) - 1;
+	if (position - lineStart > maxHalfLength) {
+		head = " ... ";
+		lineStart = position - maxHalfLength + head.length;
+	}
+	if (lineEnd - position > maxHalfLength) {
+		tail = " ...";
+		lineEnd = position + maxHalfLength - tail.length;
+	}
+	return {
+		str: head + buffer.slice(lineStart, lineEnd).replace(/\t/g, "→") + tail,
+		pos: position - lineStart + head.length
+	};
+}
+function padStart(string, max) {
+	return common.repeat(" ", max - string.length) + string;
+}
+function makeSnippet(mark, options) {
+	options = Object.create(options || null);
+	if (!mark.buffer) return null;
+	if (!options.maxLength) options.maxLength = 79;
+	if (typeof options.indent !== "number") options.indent = 1;
+	if (typeof options.linesBefore !== "number") options.linesBefore = 3;
+	if (typeof options.linesAfter !== "number") options.linesAfter = 2;
+	var re = /\r?\n|\r|\0/g;
+	var lineStarts = [0];
+	var lineEnds = [];
+	var match;
+	var foundLineNo = -1;
+	while (match = re.exec(mark.buffer)) {
+		lineEnds.push(match.index);
+		lineStarts.push(match.index + match[0].length);
+		if (mark.position <= match.index && foundLineNo < 0) foundLineNo = lineStarts.length - 2;
+	}
+	if (foundLineNo < 0) foundLineNo = lineStarts.length - 1;
+	var result = "", i, line;
+	var lineNoLength = Math.min(mark.line + options.linesAfter, lineEnds.length).toString().length;
+	var maxLineLength = options.maxLength - (options.indent + lineNoLength + 3);
+	for (i = 1; i <= options.linesBefore; i++) {
+		if (foundLineNo - i < 0) break;
+		line = getLine(mark.buffer, lineStarts[foundLineNo - i], lineEnds[foundLineNo - i], mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo - i]), maxLineLength);
+		result = common.repeat(" ", options.indent) + padStart((mark.line - i + 1).toString(), lineNoLength) + " | " + line.str + "\n" + result;
+	}
+	line = getLine(mark.buffer, lineStarts[foundLineNo], lineEnds[foundLineNo], mark.position, maxLineLength);
+	result += common.repeat(" ", options.indent) + padStart((mark.line + 1).toString(), lineNoLength) + " | " + line.str + "\n";
+	result += common.repeat("-", options.indent + lineNoLength + 3 + line.pos) + "^\n";
+	for (i = 1; i <= options.linesAfter; i++) {
+		if (foundLineNo + i >= lineEnds.length) break;
+		line = getLine(mark.buffer, lineStarts[foundLineNo + i], lineEnds[foundLineNo + i], mark.position - (lineStarts[foundLineNo] - lineStarts[foundLineNo + i]), maxLineLength);
+		result += common.repeat(" ", options.indent) + padStart((mark.line + i + 1).toString(), lineNoLength) + " | " + line.str + "\n";
+	}
+	return result.replace(/\n$/, "");
+}
+var snippet = makeSnippet;
+var TYPE_CONSTRUCTOR_OPTIONS = [
+	"kind",
+	"multi",
+	"resolve",
+	"construct",
+	"instanceOf",
+	"predicate",
+	"represent",
+	"representName",
+	"defaultStyle",
+	"styleAliases"
+];
+var YAML_NODE_KINDS = [
+	"scalar",
+	"sequence",
+	"mapping"
+];
+function compileStyleAliases(map) {
+	var result = {};
+	if (map !== null) Object.keys(map).forEach(function(style) {
+		map[style].forEach(function(alias) {
+			result[String(alias)] = style;
+		});
+	});
+	return result;
+}
+function Type$1(tag, options) {
+	options = options || {};
+	Object.keys(options).forEach(function(name) {
+		if (TYPE_CONSTRUCTOR_OPTIONS.indexOf(name) === -1) throw new exception("Unknown option \"" + name + "\" is met in definition of \"" + tag + "\" YAML type.");
+	});
+	this.options = options;
+	this.tag = tag;
+	this.kind = options["kind"] || null;
+	this.resolve = options["resolve"] || function() {
+		return true;
+	};
+	this.construct = options["construct"] || function(data) {
+		return data;
+	};
+	this.instanceOf = options["instanceOf"] || null;
+	this.predicate = options["predicate"] || null;
+	this.represent = options["represent"] || null;
+	this.representName = options["representName"] || null;
+	this.defaultStyle = options["defaultStyle"] || null;
+	this.multi = options["multi"] || false;
+	this.styleAliases = compileStyleAliases(options["styleAliases"] || null);
+	if (YAML_NODE_KINDS.indexOf(this.kind) === -1) throw new exception("Unknown kind \"" + this.kind + "\" is specified for \"" + tag + "\" YAML type.");
+}
+var type = Type$1;
+function compileList(schema, name) {
+	var result = [];
+	schema[name].forEach(function(currentType) {
+		var newIndex = result.length;
+		result.forEach(function(previousType, previousIndex) {
+			if (previousType.tag === currentType.tag && previousType.kind === currentType.kind && previousType.multi === currentType.multi) newIndex = previousIndex;
+		});
+		result[newIndex] = currentType;
+	});
+	return result;
+}
+function compileMap() {
+	var result = {
+		scalar: {},
+		sequence: {},
+		mapping: {},
+		fallback: {},
+		multi: {
+			scalar: [],
+			sequence: [],
+			mapping: [],
+			fallback: []
+		}
+	}, index, length;
+	function collectType(type) {
+		if (type.multi) {
+			result.multi[type.kind].push(type);
+			result.multi["fallback"].push(type);
+		} else result[type.kind][type.tag] = result["fallback"][type.tag] = type;
+	}
+	for (index = 0, length = arguments.length; index < length; index += 1) arguments[index].forEach(collectType);
+	return result;
+}
+function Schema$1(definition) {
+	return this.extend(definition);
+}
+Schema$1.prototype.extend = function extend(definition) {
+	var implicit = [];
+	var explicit = [];
+	if (definition instanceof type) explicit.push(definition);
+	else if (Array.isArray(definition)) explicit = explicit.concat(definition);
+	else if (definition && (Array.isArray(definition.implicit) || Array.isArray(definition.explicit))) {
+		if (definition.implicit) implicit = implicit.concat(definition.implicit);
+		if (definition.explicit) explicit = explicit.concat(definition.explicit);
+	} else throw new exception("Schema.extend argument should be a Type, [ Type ], or a schema definition ({ implicit: [...], explicit: [...] })");
+	implicit.forEach(function(type$1) {
+		if (!(type$1 instanceof type)) throw new exception("Specified list of YAML types (or a single Type object) contains a non-Type object.");
+		if (type$1.loadKind && type$1.loadKind !== "scalar") throw new exception("There is a non-scalar type in the implicit list of a schema. Implicit resolving of such types is not supported.");
+		if (type$1.multi) throw new exception("There is a multi type in the implicit list of a schema. Multi tags can only be listed as explicit.");
+	});
+	explicit.forEach(function(type$1) {
+		if (!(type$1 instanceof type)) throw new exception("Specified list of YAML types (or a single Type object) contains a non-Type object.");
+	});
+	var result = Object.create(Schema$1.prototype);
+	result.implicit = (this.implicit || []).concat(implicit);
+	result.explicit = (this.explicit || []).concat(explicit);
+	result.compiledImplicit = compileList(result, "implicit");
+	result.compiledExplicit = compileList(result, "explicit");
+	result.compiledTypeMap = compileMap(result.compiledImplicit, result.compiledExplicit);
+	return result;
+};
+var schema = Schema$1;
+var str = new type("tag:yaml.org,2002:str", {
+	kind: "scalar",
+	construct: function(data) {
+		return data !== null ? data : "";
+	}
+});
+var seq = new type("tag:yaml.org,2002:seq", {
+	kind: "sequence",
+	construct: function(data) {
+		return data !== null ? data : [];
+	}
+});
+var map = new type("tag:yaml.org,2002:map", {
+	kind: "mapping",
+	construct: function(data) {
+		return data !== null ? data : {};
+	}
+});
+var failsafe = new schema({ explicit: [
+	str,
+	seq,
+	map
+] });
+function resolveYamlNull(data) {
+	if (data === null) return true;
+	var max = data.length;
+	return max === 1 && data === "~" || max === 4 && (data === "null" || data === "Null" || data === "NULL");
+}
+function constructYamlNull() {
+	return null;
+}
+function isNull(object) {
+	return object === null;
+}
+var _null = new type("tag:yaml.org,2002:null", {
+	kind: "scalar",
+	resolve: resolveYamlNull,
+	construct: constructYamlNull,
+	predicate: isNull,
+	represent: {
+		canonical: function() {
+			return "~";
+		},
+		lowercase: function() {
+			return "null";
+		},
+		uppercase: function() {
+			return "NULL";
+		},
+		camelcase: function() {
+			return "Null";
+		},
+		empty: function() {
+			return "";
+		}
+	},
+	defaultStyle: "lowercase"
+});
+function resolveYamlBoolean(data) {
+	if (data === null) return false;
+	var max = data.length;
+	return max === 4 && (data === "true" || data === "True" || data === "TRUE") || max === 5 && (data === "false" || data === "False" || data === "FALSE");
+}
+function constructYamlBoolean(data) {
+	return data === "true" || data === "True" || data === "TRUE";
+}
+function isBoolean(object) {
+	return Object.prototype.toString.call(object) === "[object Boolean]";
+}
+var bool = new type("tag:yaml.org,2002:bool", {
+	kind: "scalar",
+	resolve: resolveYamlBoolean,
+	construct: constructYamlBoolean,
+	predicate: isBoolean,
+	represent: {
+		lowercase: function(object) {
+			return object ? "true" : "false";
+		},
+		uppercase: function(object) {
+			return object ? "TRUE" : "FALSE";
+		},
+		camelcase: function(object) {
+			return object ? "True" : "False";
+		}
+	},
+	defaultStyle: "lowercase"
+});
+function isHexCode(c) {
+	return 48 <= c && c <= 57 || 65 <= c && c <= 70 || 97 <= c && c <= 102;
+}
+function isOctCode(c) {
+	return 48 <= c && c <= 55;
+}
+function isDecCode(c) {
+	return 48 <= c && c <= 57;
+}
+function resolveYamlInteger(data) {
+	if (data === null) return false;
+	var max = data.length, index = 0, hasDigits = false, ch;
+	if (!max) return false;
+	ch = data[index];
+	if (ch === "-" || ch === "+") ch = data[++index];
+	if (ch === "0") {
+		if (index + 1 === max) return true;
+		ch = data[++index];
+		if (ch === "b") {
+			index++;
+			for (; index < max; index++) {
+				ch = data[index];
+				if (ch === "_") continue;
+				if (ch !== "0" && ch !== "1") return false;
+				hasDigits = true;
+			}
+			return hasDigits && ch !== "_";
+		}
+		if (ch === "x") {
+			index++;
+			for (; index < max; index++) {
+				ch = data[index];
+				if (ch === "_") continue;
+				if (!isHexCode(data.charCodeAt(index))) return false;
+				hasDigits = true;
+			}
+			return hasDigits && ch !== "_";
+		}
+		if (ch === "o") {
+			index++;
+			for (; index < max; index++) {
+				ch = data[index];
+				if (ch === "_") continue;
+				if (!isOctCode(data.charCodeAt(index))) return false;
+				hasDigits = true;
+			}
+			return hasDigits && ch !== "_";
+		}
+	}
+	if (ch === "_") return false;
+	for (; index < max; index++) {
+		ch = data[index];
+		if (ch === "_") continue;
+		if (!isDecCode(data.charCodeAt(index))) return false;
+		hasDigits = true;
+	}
+	if (!hasDigits || ch === "_") return false;
+	return true;
+}
+function constructYamlInteger(data) {
+	var value = data, sign = 1, ch;
+	if (value.indexOf("_") !== -1) value = value.replace(/_/g, "");
+	ch = value[0];
+	if (ch === "-" || ch === "+") {
+		if (ch === "-") sign = -1;
+		value = value.slice(1);
+		ch = value[0];
+	}
+	if (value === "0") return 0;
+	if (ch === "0") {
+		if (value[1] === "b") return sign * parseInt(value.slice(2), 2);
+		if (value[1] === "x") return sign * parseInt(value.slice(2), 16);
+		if (value[1] === "o") return sign * parseInt(value.slice(2), 8);
+	}
+	return sign * parseInt(value, 10);
+}
+function isInteger(object) {
+	return Object.prototype.toString.call(object) === "[object Number]" && object % 1 === 0 && !common.isNegativeZero(object);
+}
+var int = new type("tag:yaml.org,2002:int", {
+	kind: "scalar",
+	resolve: resolveYamlInteger,
+	construct: constructYamlInteger,
+	predicate: isInteger,
+	represent: {
+		binary: function(obj) {
+			return obj >= 0 ? "0b" + obj.toString(2) : "-0b" + obj.toString(2).slice(1);
+		},
+		octal: function(obj) {
+			return obj >= 0 ? "0o" + obj.toString(8) : "-0o" + obj.toString(8).slice(1);
+		},
+		decimal: function(obj) {
+			return obj.toString(10);
+		},
+		hexadecimal: function(obj) {
+			return obj >= 0 ? "0x" + obj.toString(16).toUpperCase() : "-0x" + obj.toString(16).toUpperCase().slice(1);
+		}
+	},
+	defaultStyle: "decimal",
+	styleAliases: {
+		binary: [2, "bin"],
+		octal: [8, "oct"],
+		decimal: [10, "dec"],
+		hexadecimal: [16, "hex"]
+	}
+});
+var YAML_FLOAT_PATTERN = /* @__PURE__ */ new RegExp("^(?:[-+]?(?:[0-9][0-9_]*)(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9_]+(?:[eE][-+]?[0-9]+)?|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN))$");
+function resolveYamlFloat(data) {
+	if (data === null) return false;
+	if (!YAML_FLOAT_PATTERN.test(data) || data[data.length - 1] === "_") return false;
+	return true;
+}
+function constructYamlFloat(data) {
+	var value = data.replace(/_/g, "").toLowerCase(), sign = value[0] === "-" ? -1 : 1;
+	if ("+-".indexOf(value[0]) >= 0) value = value.slice(1);
+	if (value === ".inf") return sign === 1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+	else if (value === ".nan") return NaN;
+	return sign * parseFloat(value, 10);
+}
+var SCIENTIFIC_WITHOUT_DOT = /^[-+]?[0-9]+e/;
+function representYamlFloat(object, style) {
+	var res;
+	if (isNaN(object)) switch (style) {
+		case "lowercase": return ".nan";
+		case "uppercase": return ".NAN";
+		case "camelcase": return ".NaN";
+	}
+	else if (Number.POSITIVE_INFINITY === object) switch (style) {
+		case "lowercase": return ".inf";
+		case "uppercase": return ".INF";
+		case "camelcase": return ".Inf";
+	}
+	else if (Number.NEGATIVE_INFINITY === object) switch (style) {
+		case "lowercase": return "-.inf";
+		case "uppercase": return "-.INF";
+		case "camelcase": return "-.Inf";
+	}
+	else if (common.isNegativeZero(object)) return "-0.0";
+	res = object.toString(10);
+	return SCIENTIFIC_WITHOUT_DOT.test(res) ? res.replace("e", ".e") : res;
+}
+function isFloat(object) {
+	return Object.prototype.toString.call(object) === "[object Number]" && (object % 1 !== 0 || common.isNegativeZero(object));
+}
+var float = new type("tag:yaml.org,2002:float", {
+	kind: "scalar",
+	resolve: resolveYamlFloat,
+	construct: constructYamlFloat,
+	predicate: isFloat,
+	represent: representYamlFloat,
+	defaultStyle: "lowercase"
+});
+var json = failsafe.extend({ implicit: [
+	_null,
+	bool,
+	int,
+	float
+] });
+var core = json;
+var YAML_DATE_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])$");
+var YAML_TIMESTAMP_REGEXP = /* @__PURE__ */ new RegExp("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)(?:[Tt]|[ \\t]+)([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(?:\\.([0-9]*))?(?:[ \\t]*(Z|([-+])([0-9][0-9]?)(?::([0-9][0-9]))?))?$");
+function resolveYamlTimestamp(data) {
+	if (data === null) return false;
+	if (YAML_DATE_REGEXP.exec(data) !== null) return true;
+	if (YAML_TIMESTAMP_REGEXP.exec(data) !== null) return true;
+	return false;
+}
+function constructYamlTimestamp(data) {
+	var match, year, month, day, hour, minute, second, fraction = 0, delta = null, tz_hour, tz_minute, date;
+	match = YAML_DATE_REGEXP.exec(data);
+	if (match === null) match = YAML_TIMESTAMP_REGEXP.exec(data);
+	if (match === null) throw new Error("Date resolve error");
+	year = +match[1];
+	month = +match[2] - 1;
+	day = +match[3];
+	if (!match[4]) return new Date(Date.UTC(year, month, day));
+	hour = +match[4];
+	minute = +match[5];
+	second = +match[6];
+	if (match[7]) {
+		fraction = match[7].slice(0, 3);
+		while (fraction.length < 3) fraction += "0";
+		fraction = +fraction;
+	}
+	if (match[9]) {
+		tz_hour = +match[10];
+		tz_minute = +(match[11] || 0);
+		delta = (tz_hour * 60 + tz_minute) * 6e4;
+		if (match[9] === "-") delta = -delta;
+	}
+	date = new Date(Date.UTC(year, month, day, hour, minute, second, fraction));
+	if (delta) date.setTime(date.getTime() - delta);
+	return date;
+}
+function representYamlTimestamp(object) {
+	return object.toISOString();
+}
+var timestamp = new type("tag:yaml.org,2002:timestamp", {
+	kind: "scalar",
+	resolve: resolveYamlTimestamp,
+	construct: constructYamlTimestamp,
+	instanceOf: Date,
+	represent: representYamlTimestamp
+});
+function resolveYamlMerge(data) {
+	return data === "<<" || data === null;
+}
+var merge = new type("tag:yaml.org,2002:merge", {
+	kind: "scalar",
+	resolve: resolveYamlMerge
+});
+var BASE64_MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r";
+function resolveYamlBinary(data) {
+	if (data === null) return false;
+	var code, idx, bitlen = 0, max = data.length, map = BASE64_MAP;
+	for (idx = 0; idx < max; idx++) {
+		code = map.indexOf(data.charAt(idx));
+		if (code > 64) continue;
+		if (code < 0) return false;
+		bitlen += 6;
+	}
+	return bitlen % 8 === 0;
+}
+function constructYamlBinary(data) {
+	var idx, tailbits, input = data.replace(/[\r\n=]/g, ""), max = input.length, map = BASE64_MAP, bits = 0, result = [];
+	for (idx = 0; idx < max; idx++) {
+		if (idx % 4 === 0 && idx) {
+			result.push(bits >> 16 & 255);
+			result.push(bits >> 8 & 255);
+			result.push(bits & 255);
+		}
+		bits = bits << 6 | map.indexOf(input.charAt(idx));
+	}
+	tailbits = max % 4 * 6;
+	if (tailbits === 0) {
+		result.push(bits >> 16 & 255);
+		result.push(bits >> 8 & 255);
+		result.push(bits & 255);
+	} else if (tailbits === 18) {
+		result.push(bits >> 10 & 255);
+		result.push(bits >> 2 & 255);
+	} else if (tailbits === 12) result.push(bits >> 4 & 255);
+	return new Uint8Array(result);
+}
+function representYamlBinary(object) {
+	var result = "", bits = 0, idx, tail, max = object.length, map = BASE64_MAP;
+	for (idx = 0; idx < max; idx++) {
+		if (idx % 3 === 0 && idx) {
+			result += map[bits >> 18 & 63];
+			result += map[bits >> 12 & 63];
+			result += map[bits >> 6 & 63];
+			result += map[bits & 63];
+		}
+		bits = (bits << 8) + object[idx];
+	}
+	tail = max % 3;
+	if (tail === 0) {
+		result += map[bits >> 18 & 63];
+		result += map[bits >> 12 & 63];
+		result += map[bits >> 6 & 63];
+		result += map[bits & 63];
+	} else if (tail === 2) {
+		result += map[bits >> 10 & 63];
+		result += map[bits >> 4 & 63];
+		result += map[bits << 2 & 63];
+		result += map[64];
+	} else if (tail === 1) {
+		result += map[bits >> 2 & 63];
+		result += map[bits << 4 & 63];
+		result += map[64];
+		result += map[64];
+	}
+	return result;
+}
+function isBinary(obj) {
+	return Object.prototype.toString.call(obj) === "[object Uint8Array]";
+}
+var binary = new type("tag:yaml.org,2002:binary", {
+	kind: "scalar",
+	resolve: resolveYamlBinary,
+	construct: constructYamlBinary,
+	predicate: isBinary,
+	represent: representYamlBinary
+});
+var _hasOwnProperty$3 = Object.prototype.hasOwnProperty;
+var _toString$2 = Object.prototype.toString;
+function resolveYamlOmap(data) {
+	if (data === null) return true;
+	var objectKeys = [], index, length, pair, pairKey, pairHasKey, object = data;
+	for (index = 0, length = object.length; index < length; index += 1) {
+		pair = object[index];
+		pairHasKey = false;
+		if (_toString$2.call(pair) !== "[object Object]") return false;
+		for (pairKey in pair) if (_hasOwnProperty$3.call(pair, pairKey)) if (!pairHasKey) pairHasKey = true;
+		else return false;
+		if (!pairHasKey) return false;
+		if (objectKeys.indexOf(pairKey) === -1) objectKeys.push(pairKey);
+		else return false;
+	}
+	return true;
+}
+function constructYamlOmap(data) {
+	return data !== null ? data : [];
+}
+var omap = new type("tag:yaml.org,2002:omap", {
+	kind: "sequence",
+	resolve: resolveYamlOmap,
+	construct: constructYamlOmap
+});
+var _toString$1 = Object.prototype.toString;
+function resolveYamlPairs(data) {
+	if (data === null) return true;
+	var index, length, pair, keys, result, object = data;
+	result = new Array(object.length);
+	for (index = 0, length = object.length; index < length; index += 1) {
+		pair = object[index];
+		if (_toString$1.call(pair) !== "[object Object]") return false;
+		keys = Object.keys(pair);
+		if (keys.length !== 1) return false;
+		result[index] = [keys[0], pair[keys[0]]];
+	}
+	return true;
+}
+function constructYamlPairs(data) {
+	if (data === null) return [];
+	var index, length, pair, keys, result, object = data;
+	result = new Array(object.length);
+	for (index = 0, length = object.length; index < length; index += 1) {
+		pair = object[index];
+		keys = Object.keys(pair);
+		result[index] = [keys[0], pair[keys[0]]];
+	}
+	return result;
+}
+var pairs = new type("tag:yaml.org,2002:pairs", {
+	kind: "sequence",
+	resolve: resolveYamlPairs,
+	construct: constructYamlPairs
+});
+var _hasOwnProperty$2 = Object.prototype.hasOwnProperty;
+function resolveYamlSet(data) {
+	if (data === null) return true;
+	var key, object = data;
+	for (key in object) if (_hasOwnProperty$2.call(object, key)) {
+		if (object[key] !== null) return false;
+	}
+	return true;
+}
+function constructYamlSet(data) {
+	return data !== null ? data : {};
+}
+var set = new type("tag:yaml.org,2002:set", {
+	kind: "mapping",
+	resolve: resolveYamlSet,
+	construct: constructYamlSet
+});
+var _default = core.extend({
+	implicit: [timestamp, merge],
+	explicit: [
+		binary,
+		omap,
+		pairs,
+		set
+	]
+});
+var _hasOwnProperty$1 = Object.prototype.hasOwnProperty;
+var CONTEXT_FLOW_IN = 1;
+var CONTEXT_FLOW_OUT = 2;
+var CONTEXT_BLOCK_IN = 3;
+var CONTEXT_BLOCK_OUT = 4;
+var CHOMPING_CLIP = 1;
+var CHOMPING_STRIP = 2;
+var CHOMPING_KEEP = 3;
+var PATTERN_NON_PRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:[^\uD800-\uDBFF]|^)[\uDC00-\uDFFF]/;
+var PATTERN_NON_ASCII_LINE_BREAKS = /[\x85\u2028\u2029]/;
+var PATTERN_FLOW_INDICATORS = /[,\[\]\{\}]/;
+var PATTERN_TAG_HANDLE = /^(?:!|!!|![a-z\-]+!)$/i;
+var PATTERN_TAG_URI = /^(?:!|[^,\[\]\{\}])(?:%[0-9a-f]{2}|[0-9a-z\-#;\/\?:@&=\+\$,_\.!~\*'\(\)\[\]])*$/i;
+function _class(obj) {
+	return Object.prototype.toString.call(obj);
+}
+function is_EOL(c) {
+	return c === 10 || c === 13;
+}
+function is_WHITE_SPACE(c) {
+	return c === 9 || c === 32;
+}
+function is_WS_OR_EOL(c) {
+	return c === 9 || c === 32 || c === 10 || c === 13;
+}
+function is_FLOW_INDICATOR(c) {
+	return c === 44 || c === 91 || c === 93 || c === 123 || c === 125;
+}
+function fromHexCode(c) {
+	var lc;
+	if (48 <= c && c <= 57) return c - 48;
+	lc = c | 32;
+	if (97 <= lc && lc <= 102) return lc - 97 + 10;
+	return -1;
+}
+function escapedHexLen(c) {
+	if (c === 120) return 2;
+	if (c === 117) return 4;
+	if (c === 85) return 8;
+	return 0;
+}
+function fromDecimalCode(c) {
+	if (48 <= c && c <= 57) return c - 48;
+	return -1;
+}
+function simpleEscapeSequence(c) {
+	return c === 48 ? "\0" : c === 97 ? "\x07" : c === 98 ? "\b" : c === 116 ? "	" : c === 9 ? "	" : c === 110 ? "\n" : c === 118 ? "\v" : c === 102 ? "\f" : c === 114 ? "\r" : c === 101 ? "\x1B" : c === 32 ? " " : c === 34 ? "\"" : c === 47 ? "/" : c === 92 ? "\\" : c === 78 ? "" : c === 95 ? "\xA0" : c === 76 ? "\u2028" : c === 80 ? "\u2029" : "";
+}
+function charFromCodepoint(c) {
+	if (c <= 65535) return String.fromCharCode(c);
+	return String.fromCharCode((c - 65536 >> 10) + 55296, (c - 65536 & 1023) + 56320);
+}
+function setProperty(object, key, value) {
+	if (key === "__proto__") Object.defineProperty(object, key, {
+		configurable: true,
+		enumerable: true,
+		writable: true,
+		value
+	});
+	else object[key] = value;
+}
+var simpleEscapeCheck = new Array(256);
+var simpleEscapeMap = new Array(256);
+for (var i = 0; i < 256; i++) {
+	simpleEscapeCheck[i] = simpleEscapeSequence(i) ? 1 : 0;
+	simpleEscapeMap[i] = simpleEscapeSequence(i);
+}
+function State$1(input, options) {
+	this.input = input;
+	this.filename = options["filename"] || null;
+	this.schema = options["schema"] || _default;
+	this.onWarning = options["onWarning"] || null;
+	this.legacy = options["legacy"] || false;
+	this.json = options["json"] || false;
+	this.listener = options["listener"] || null;
+	this.implicitTypes = this.schema.compiledImplicit;
+	this.typeMap = this.schema.compiledTypeMap;
+	this.length = input.length;
+	this.position = 0;
+	this.line = 0;
+	this.lineStart = 0;
+	this.lineIndent = 0;
+	this.firstTabInLine = -1;
+	this.documents = [];
+}
+function generateError(state, message) {
+	var mark = {
+		name: state.filename,
+		buffer: state.input.slice(0, -1),
+		position: state.position,
+		line: state.line,
+		column: state.position - state.lineStart
+	};
+	mark.snippet = snippet(mark);
+	return new exception(message, mark);
+}
+function throwError(state, message) {
+	throw generateError(state, message);
+}
+function throwWarning(state, message) {
+	if (state.onWarning) state.onWarning.call(null, generateError(state, message));
+}
+var directiveHandlers = {
+	YAML: function handleYamlDirective(state, name, args) {
+		var match, major, minor;
+		if (state.version !== null) throwError(state, "duplication of %YAML directive");
+		if (args.length !== 1) throwError(state, "YAML directive accepts exactly one argument");
+		match = /^([0-9]+)\.([0-9]+)$/.exec(args[0]);
+		if (match === null) throwError(state, "ill-formed argument of the YAML directive");
+		major = parseInt(match[1], 10);
+		minor = parseInt(match[2], 10);
+		if (major !== 1) throwError(state, "unacceptable YAML version of the document");
+		state.version = args[0];
+		state.checkLineBreaks = minor < 2;
+		if (minor !== 1 && minor !== 2) throwWarning(state, "unsupported YAML version of the document");
+	},
+	TAG: function handleTagDirective(state, name, args) {
+		var handle, prefix;
+		if (args.length !== 2) throwError(state, "TAG directive accepts exactly two arguments");
+		handle = args[0];
+		prefix = args[1];
+		if (!PATTERN_TAG_HANDLE.test(handle)) throwError(state, "ill-formed tag handle (first argument) of the TAG directive");
+		if (_hasOwnProperty$1.call(state.tagMap, handle)) throwError(state, "there is a previously declared suffix for \"" + handle + "\" tag handle");
+		if (!PATTERN_TAG_URI.test(prefix)) throwError(state, "ill-formed tag prefix (second argument) of the TAG directive");
+		try {
+			prefix = decodeURIComponent(prefix);
+		} catch (err) {
+			throwError(state, "tag prefix is malformed: " + prefix);
+		}
+		state.tagMap[handle] = prefix;
+	}
+};
+function captureSegment(state, start, end, checkJson) {
+	var _position, _length, _character, _result;
+	if (start < end) {
+		_result = state.input.slice(start, end);
+		if (checkJson) for (_position = 0, _length = _result.length; _position < _length; _position += 1) {
+			_character = _result.charCodeAt(_position);
+			if (!(_character === 9 || 32 <= _character && _character <= 1114111)) throwError(state, "expected valid JSON character");
+		}
+		else if (PATTERN_NON_PRINTABLE.test(_result)) throwError(state, "the stream contains non-printable characters");
+		state.result += _result;
+	}
+}
+function mergeMappings(state, destination, source, overridableKeys) {
+	var sourceKeys, key, index, quantity;
+	if (!common.isObject(source)) throwError(state, "cannot merge mappings; the provided source object is unacceptable");
+	sourceKeys = Object.keys(source);
+	for (index = 0, quantity = sourceKeys.length; index < quantity; index += 1) {
+		key = sourceKeys[index];
+		if (!_hasOwnProperty$1.call(destination, key)) {
+			setProperty(destination, key, source[key]);
+			overridableKeys[key] = true;
+		}
+	}
+}
+function storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, startLine, startLineStart, startPos) {
+	var index, quantity;
+	if (Array.isArray(keyNode)) {
+		keyNode = Array.prototype.slice.call(keyNode);
+		for (index = 0, quantity = keyNode.length; index < quantity; index += 1) {
+			if (Array.isArray(keyNode[index])) throwError(state, "nested arrays are not supported inside keys");
+			if (typeof keyNode === "object" && _class(keyNode[index]) === "[object Object]") keyNode[index] = "[object Object]";
+		}
+	}
+	if (typeof keyNode === "object" && _class(keyNode) === "[object Object]") keyNode = "[object Object]";
+	keyNode = String(keyNode);
+	if (_result === null) _result = {};
+	if (keyTag === "tag:yaml.org,2002:merge") if (Array.isArray(valueNode)) for (index = 0, quantity = valueNode.length; index < quantity; index += 1) mergeMappings(state, _result, valueNode[index], overridableKeys);
+	else mergeMappings(state, _result, valueNode, overridableKeys);
+	else {
+		if (!state.json && !_hasOwnProperty$1.call(overridableKeys, keyNode) && _hasOwnProperty$1.call(_result, keyNode)) {
+			state.line = startLine || state.line;
+			state.lineStart = startLineStart || state.lineStart;
+			state.position = startPos || state.position;
+			throwError(state, "duplicated mapping key");
+		}
+		setProperty(_result, keyNode, valueNode);
+		delete overridableKeys[keyNode];
+	}
+	return _result;
+}
+function readLineBreak(state) {
+	var ch = state.input.charCodeAt(state.position);
+	if (ch === 10) state.position++;
+	else if (ch === 13) {
+		state.position++;
+		if (state.input.charCodeAt(state.position) === 10) state.position++;
+	} else throwError(state, "a line break is expected");
+	state.line += 1;
+	state.lineStart = state.position;
+	state.firstTabInLine = -1;
+}
+function skipSeparationSpace(state, allowComments, checkIndent) {
+	var lineBreaks = 0, ch = state.input.charCodeAt(state.position);
+	while (ch !== 0) {
+		while (is_WHITE_SPACE(ch)) {
+			if (ch === 9 && state.firstTabInLine === -1) state.firstTabInLine = state.position;
+			ch = state.input.charCodeAt(++state.position);
+		}
+		if (allowComments && ch === 35) do
+			ch = state.input.charCodeAt(++state.position);
+		while (ch !== 10 && ch !== 13 && ch !== 0);
+		if (is_EOL(ch)) {
+			readLineBreak(state);
+			ch = state.input.charCodeAt(state.position);
+			lineBreaks++;
+			state.lineIndent = 0;
+			while (ch === 32) {
+				state.lineIndent++;
+				ch = state.input.charCodeAt(++state.position);
+			}
+		} else break;
+	}
+	if (checkIndent !== -1 && lineBreaks !== 0 && state.lineIndent < checkIndent) throwWarning(state, "deficient indentation");
+	return lineBreaks;
+}
+function testDocumentSeparator(state) {
+	var _position = state.position, ch = state.input.charCodeAt(_position);
+	if ((ch === 45 || ch === 46) && ch === state.input.charCodeAt(_position + 1) && ch === state.input.charCodeAt(_position + 2)) {
+		_position += 3;
+		ch = state.input.charCodeAt(_position);
+		if (ch === 0 || is_WS_OR_EOL(ch)) return true;
+	}
+	return false;
+}
+function writeFoldedLines(state, count) {
+	if (count === 1) state.result += " ";
+	else if (count > 1) state.result += common.repeat("\n", count - 1);
+}
+function readPlainScalar(state, nodeIndent, withinFlowCollection) {
+	var preceding, following, captureStart, captureEnd, hasPendingContent, _line, _lineStart, _lineIndent, _kind = state.kind, _result = state.result, ch = state.input.charCodeAt(state.position);
+	if (is_WS_OR_EOL(ch) || is_FLOW_INDICATOR(ch) || ch === 35 || ch === 38 || ch === 42 || ch === 33 || ch === 124 || ch === 62 || ch === 39 || ch === 34 || ch === 37 || ch === 64 || ch === 96) return false;
+	if (ch === 63 || ch === 45) {
+		following = state.input.charCodeAt(state.position + 1);
+		if (is_WS_OR_EOL(following) || withinFlowCollection && is_FLOW_INDICATOR(following)) return false;
+	}
+	state.kind = "scalar";
+	state.result = "";
+	captureStart = captureEnd = state.position;
+	hasPendingContent = false;
+	while (ch !== 0) {
+		if (ch === 58) {
+			following = state.input.charCodeAt(state.position + 1);
+			if (is_WS_OR_EOL(following) || withinFlowCollection && is_FLOW_INDICATOR(following)) break;
+		} else if (ch === 35) {
+			preceding = state.input.charCodeAt(state.position - 1);
+			if (is_WS_OR_EOL(preceding)) break;
+		} else if (state.position === state.lineStart && testDocumentSeparator(state) || withinFlowCollection && is_FLOW_INDICATOR(ch)) break;
+		else if (is_EOL(ch)) {
+			_line = state.line;
+			_lineStart = state.lineStart;
+			_lineIndent = state.lineIndent;
+			skipSeparationSpace(state, false, -1);
+			if (state.lineIndent >= nodeIndent) {
+				hasPendingContent = true;
+				ch = state.input.charCodeAt(state.position);
+				continue;
+			} else {
+				state.position = captureEnd;
+				state.line = _line;
+				state.lineStart = _lineStart;
+				state.lineIndent = _lineIndent;
+				break;
+			}
+		}
+		if (hasPendingContent) {
+			captureSegment(state, captureStart, captureEnd, false);
+			writeFoldedLines(state, state.line - _line);
+			captureStart = captureEnd = state.position;
+			hasPendingContent = false;
+		}
+		if (!is_WHITE_SPACE(ch)) captureEnd = state.position + 1;
+		ch = state.input.charCodeAt(++state.position);
+	}
+	captureSegment(state, captureStart, captureEnd, false);
+	if (state.result) return true;
+	state.kind = _kind;
+	state.result = _result;
+	return false;
+}
+function readSingleQuotedScalar(state, nodeIndent) {
+	var ch = state.input.charCodeAt(state.position), captureStart, captureEnd;
+	if (ch !== 39) return false;
+	state.kind = "scalar";
+	state.result = "";
+	state.position++;
+	captureStart = captureEnd = state.position;
+	while ((ch = state.input.charCodeAt(state.position)) !== 0) if (ch === 39) {
+		captureSegment(state, captureStart, state.position, true);
+		ch = state.input.charCodeAt(++state.position);
+		if (ch === 39) {
+			captureStart = state.position;
+			state.position++;
+			captureEnd = state.position;
+		} else return true;
+	} else if (is_EOL(ch)) {
+		captureSegment(state, captureStart, captureEnd, true);
+		writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
+		captureStart = captureEnd = state.position;
+	} else if (state.position === state.lineStart && testDocumentSeparator(state)) throwError(state, "unexpected end of the document within a single quoted scalar");
+	else {
+		state.position++;
+		captureEnd = state.position;
+	}
+	throwError(state, "unexpected end of the stream within a single quoted scalar");
+}
+function readDoubleQuotedScalar(state, nodeIndent) {
+	var captureStart, captureEnd, hexLength, hexResult, tmp, ch = state.input.charCodeAt(state.position);
+	if (ch !== 34) return false;
+	state.kind = "scalar";
+	state.result = "";
+	state.position++;
+	captureStart = captureEnd = state.position;
+	while ((ch = state.input.charCodeAt(state.position)) !== 0) if (ch === 34) {
+		captureSegment(state, captureStart, state.position, true);
+		state.position++;
+		return true;
+	} else if (ch === 92) {
+		captureSegment(state, captureStart, state.position, true);
+		ch = state.input.charCodeAt(++state.position);
+		if (is_EOL(ch)) skipSeparationSpace(state, false, nodeIndent);
+		else if (ch < 256 && simpleEscapeCheck[ch]) {
+			state.result += simpleEscapeMap[ch];
+			state.position++;
+		} else if ((tmp = escapedHexLen(ch)) > 0) {
+			hexLength = tmp;
+			hexResult = 0;
+			for (; hexLength > 0; hexLength--) {
+				ch = state.input.charCodeAt(++state.position);
+				if ((tmp = fromHexCode(ch)) >= 0) hexResult = (hexResult << 4) + tmp;
+				else throwError(state, "expected hexadecimal character");
+			}
+			state.result += charFromCodepoint(hexResult);
+			state.position++;
+		} else throwError(state, "unknown escape sequence");
+		captureStart = captureEnd = state.position;
+	} else if (is_EOL(ch)) {
+		captureSegment(state, captureStart, captureEnd, true);
+		writeFoldedLines(state, skipSeparationSpace(state, false, nodeIndent));
+		captureStart = captureEnd = state.position;
+	} else if (state.position === state.lineStart && testDocumentSeparator(state)) throwError(state, "unexpected end of the document within a double quoted scalar");
+	else {
+		state.position++;
+		captureEnd = state.position;
+	}
+	throwError(state, "unexpected end of the stream within a double quoted scalar");
+}
+function readFlowCollection(state, nodeIndent) {
+	var readNext = true, _line, _lineStart, _pos, _tag = state.tag, _result, _anchor = state.anchor, following, terminator, isPair, isExplicitPair, isMapping, overridableKeys = Object.create(null), keyNode, keyTag, valueNode, ch = state.input.charCodeAt(state.position);
+	if (ch === 91) {
+		terminator = 93;
+		isMapping = false;
+		_result = [];
+	} else if (ch === 123) {
+		terminator = 125;
+		isMapping = true;
+		_result = {};
+	} else return false;
+	if (state.anchor !== null) state.anchorMap[state.anchor] = _result;
+	ch = state.input.charCodeAt(++state.position);
+	while (ch !== 0) {
+		skipSeparationSpace(state, true, nodeIndent);
+		ch = state.input.charCodeAt(state.position);
+		if (ch === terminator) {
+			state.position++;
+			state.tag = _tag;
+			state.anchor = _anchor;
+			state.kind = isMapping ? "mapping" : "sequence";
+			state.result = _result;
+			return true;
+		} else if (!readNext) throwError(state, "missed comma between flow collection entries");
+		else if (ch === 44) throwError(state, "expected the node content, but found ','");
+		keyTag = keyNode = valueNode = null;
+		isPair = isExplicitPair = false;
+		if (ch === 63) {
+			following = state.input.charCodeAt(state.position + 1);
+			if (is_WS_OR_EOL(following)) {
+				isPair = isExplicitPair = true;
+				state.position++;
+				skipSeparationSpace(state, true, nodeIndent);
+			}
+		}
+		_line = state.line;
+		_lineStart = state.lineStart;
+		_pos = state.position;
+		composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
+		keyTag = state.tag;
+		keyNode = state.result;
+		skipSeparationSpace(state, true, nodeIndent);
+		ch = state.input.charCodeAt(state.position);
+		if ((isExplicitPair || state.line === _line) && ch === 58) {
+			isPair = true;
+			ch = state.input.charCodeAt(++state.position);
+			skipSeparationSpace(state, true, nodeIndent);
+			composeNode(state, nodeIndent, CONTEXT_FLOW_IN, false, true);
+			valueNode = state.result;
+		}
+		if (isMapping) storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos);
+		else if (isPair) _result.push(storeMappingPair(state, null, overridableKeys, keyTag, keyNode, valueNode, _line, _lineStart, _pos));
+		else _result.push(keyNode);
+		skipSeparationSpace(state, true, nodeIndent);
+		ch = state.input.charCodeAt(state.position);
+		if (ch === 44) {
+			readNext = true;
+			ch = state.input.charCodeAt(++state.position);
+		} else readNext = false;
+	}
+	throwError(state, "unexpected end of the stream within a flow collection");
+}
+function readBlockScalar(state, nodeIndent) {
+	var captureStart, folding, chomping = CHOMPING_CLIP, didReadContent = false, detectedIndent = false, textIndent = nodeIndent, emptyLines = 0, atMoreIndented = false, tmp, ch = state.input.charCodeAt(state.position);
+	if (ch === 124) folding = false;
+	else if (ch === 62) folding = true;
+	else return false;
+	state.kind = "scalar";
+	state.result = "";
+	while (ch !== 0) {
+		ch = state.input.charCodeAt(++state.position);
+		if (ch === 43 || ch === 45) if (CHOMPING_CLIP === chomping) chomping = ch === 43 ? CHOMPING_KEEP : CHOMPING_STRIP;
+		else throwError(state, "repeat of a chomping mode identifier");
+		else if ((tmp = fromDecimalCode(ch)) >= 0) if (tmp === 0) throwError(state, "bad explicit indentation width of a block scalar; it cannot be less than one");
+		else if (!detectedIndent) {
+			textIndent = nodeIndent + tmp - 1;
+			detectedIndent = true;
+		} else throwError(state, "repeat of an indentation width identifier");
+		else break;
+	}
+	if (is_WHITE_SPACE(ch)) {
+		do
+			ch = state.input.charCodeAt(++state.position);
+		while (is_WHITE_SPACE(ch));
+		if (ch === 35) do
+			ch = state.input.charCodeAt(++state.position);
+		while (!is_EOL(ch) && ch !== 0);
+	}
+	while (ch !== 0) {
+		readLineBreak(state);
+		state.lineIndent = 0;
+		ch = state.input.charCodeAt(state.position);
+		while ((!detectedIndent || state.lineIndent < textIndent) && ch === 32) {
+			state.lineIndent++;
+			ch = state.input.charCodeAt(++state.position);
+		}
+		if (!detectedIndent && state.lineIndent > textIndent) textIndent = state.lineIndent;
+		if (is_EOL(ch)) {
+			emptyLines++;
+			continue;
+		}
+		if (state.lineIndent < textIndent) {
+			if (chomping === CHOMPING_KEEP) state.result += common.repeat("\n", didReadContent ? 1 + emptyLines : emptyLines);
+			else if (chomping === CHOMPING_CLIP) {
+				if (didReadContent) state.result += "\n";
+			}
+			break;
+		}
+		if (folding) if (is_WHITE_SPACE(ch)) {
+			atMoreIndented = true;
+			state.result += common.repeat("\n", didReadContent ? 1 + emptyLines : emptyLines);
+		} else if (atMoreIndented) {
+			atMoreIndented = false;
+			state.result += common.repeat("\n", emptyLines + 1);
+		} else if (emptyLines === 0) {
+			if (didReadContent) state.result += " ";
+		} else state.result += common.repeat("\n", emptyLines);
+		else state.result += common.repeat("\n", didReadContent ? 1 + emptyLines : emptyLines);
+		didReadContent = true;
+		detectedIndent = true;
+		emptyLines = 0;
+		captureStart = state.position;
+		while (!is_EOL(ch) && ch !== 0) ch = state.input.charCodeAt(++state.position);
+		captureSegment(state, captureStart, state.position, false);
+	}
+	return true;
+}
+function readBlockSequence(state, nodeIndent) {
+	var _line, _tag = state.tag, _anchor = state.anchor, _result = [], following, detected = false, ch;
+	if (state.firstTabInLine !== -1) return false;
+	if (state.anchor !== null) state.anchorMap[state.anchor] = _result;
+	ch = state.input.charCodeAt(state.position);
+	while (ch !== 0) {
+		if (state.firstTabInLine !== -1) {
+			state.position = state.firstTabInLine;
+			throwError(state, "tab characters must not be used in indentation");
+		}
+		if (ch !== 45) break;
+		following = state.input.charCodeAt(state.position + 1);
+		if (!is_WS_OR_EOL(following)) break;
+		detected = true;
+		state.position++;
+		if (skipSeparationSpace(state, true, -1)) {
+			if (state.lineIndent <= nodeIndent) {
+				_result.push(null);
+				ch = state.input.charCodeAt(state.position);
+				continue;
+			}
+		}
+		_line = state.line;
+		composeNode(state, nodeIndent, CONTEXT_BLOCK_IN, false, true);
+		_result.push(state.result);
+		skipSeparationSpace(state, true, -1);
+		ch = state.input.charCodeAt(state.position);
+		if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0) throwError(state, "bad indentation of a sequence entry");
+		else if (state.lineIndent < nodeIndent) break;
+	}
+	if (detected) {
+		state.tag = _tag;
+		state.anchor = _anchor;
+		state.kind = "sequence";
+		state.result = _result;
+		return true;
+	}
+	return false;
+}
+function readBlockMapping(state, nodeIndent, flowIndent) {
+	var following, allowCompact, _line, _keyLine, _keyLineStart, _keyPos, _tag = state.tag, _anchor = state.anchor, _result = {}, overridableKeys = Object.create(null), keyTag = null, keyNode = null, valueNode = null, atExplicitKey = false, detected = false, ch;
+	if (state.firstTabInLine !== -1) return false;
+	if (state.anchor !== null) state.anchorMap[state.anchor] = _result;
+	ch = state.input.charCodeAt(state.position);
+	while (ch !== 0) {
+		if (!atExplicitKey && state.firstTabInLine !== -1) {
+			state.position = state.firstTabInLine;
+			throwError(state, "tab characters must not be used in indentation");
+		}
+		following = state.input.charCodeAt(state.position + 1);
+		_line = state.line;
+		if ((ch === 63 || ch === 58) && is_WS_OR_EOL(following)) {
+			if (ch === 63) {
+				if (atExplicitKey) {
+					storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+					keyTag = keyNode = valueNode = null;
+				}
+				detected = true;
+				atExplicitKey = true;
+				allowCompact = true;
+			} else if (atExplicitKey) {
+				atExplicitKey = false;
+				allowCompact = true;
+			} else throwError(state, "incomplete explicit mapping pair; a key node is missed; or followed by a non-tabulated empty line");
+			state.position += 1;
+			ch = following;
+		} else {
+			_keyLine = state.line;
+			_keyLineStart = state.lineStart;
+			_keyPos = state.position;
+			if (!composeNode(state, flowIndent, CONTEXT_FLOW_OUT, false, true)) break;
+			if (state.line === _line) {
+				ch = state.input.charCodeAt(state.position);
+				while (is_WHITE_SPACE(ch)) ch = state.input.charCodeAt(++state.position);
+				if (ch === 58) {
+					ch = state.input.charCodeAt(++state.position);
+					if (!is_WS_OR_EOL(ch)) throwError(state, "a whitespace character is expected after the key-value separator within a block mapping");
+					if (atExplicitKey) {
+						storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+						keyTag = keyNode = valueNode = null;
+					}
+					detected = true;
+					atExplicitKey = false;
+					allowCompact = false;
+					keyTag = state.tag;
+					keyNode = state.result;
+				} else if (detected) throwError(state, "can not read an implicit mapping pair; a colon is missed");
+				else {
+					state.tag = _tag;
+					state.anchor = _anchor;
+					return true;
+				}
+			} else if (detected) throwError(state, "can not read a block mapping entry; a multiline key may not be an implicit key");
+			else {
+				state.tag = _tag;
+				state.anchor = _anchor;
+				return true;
+			}
+		}
+		if (state.line === _line || state.lineIndent > nodeIndent) {
+			if (atExplicitKey) {
+				_keyLine = state.line;
+				_keyLineStart = state.lineStart;
+				_keyPos = state.position;
+			}
+			if (composeNode(state, nodeIndent, CONTEXT_BLOCK_OUT, true, allowCompact)) if (atExplicitKey) keyNode = state.result;
+			else valueNode = state.result;
+			if (!atExplicitKey) {
+				storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, valueNode, _keyLine, _keyLineStart, _keyPos);
+				keyTag = keyNode = valueNode = null;
+			}
+			skipSeparationSpace(state, true, -1);
+			ch = state.input.charCodeAt(state.position);
+		}
+		if ((state.line === _line || state.lineIndent > nodeIndent) && ch !== 0) throwError(state, "bad indentation of a mapping entry");
+		else if (state.lineIndent < nodeIndent) break;
+	}
+	if (atExplicitKey) storeMappingPair(state, _result, overridableKeys, keyTag, keyNode, null, _keyLine, _keyLineStart, _keyPos);
+	if (detected) {
+		state.tag = _tag;
+		state.anchor = _anchor;
+		state.kind = "mapping";
+		state.result = _result;
+	}
+	return detected;
+}
+function readTagProperty(state) {
+	var _position, isVerbatim = false, isNamed = false, tagHandle, tagName, ch = state.input.charCodeAt(state.position);
+	if (ch !== 33) return false;
+	if (state.tag !== null) throwError(state, "duplication of a tag property");
+	ch = state.input.charCodeAt(++state.position);
+	if (ch === 60) {
+		isVerbatim = true;
+		ch = state.input.charCodeAt(++state.position);
+	} else if (ch === 33) {
+		isNamed = true;
+		tagHandle = "!!";
+		ch = state.input.charCodeAt(++state.position);
+	} else tagHandle = "!";
+	_position = state.position;
+	if (isVerbatim) {
+		do
+			ch = state.input.charCodeAt(++state.position);
+		while (ch !== 0 && ch !== 62);
+		if (state.position < state.length) {
+			tagName = state.input.slice(_position, state.position);
+			ch = state.input.charCodeAt(++state.position);
+		} else throwError(state, "unexpected end of the stream within a verbatim tag");
+	} else {
+		while (ch !== 0 && !is_WS_OR_EOL(ch)) {
+			if (ch === 33) if (!isNamed) {
+				tagHandle = state.input.slice(_position - 1, state.position + 1);
+				if (!PATTERN_TAG_HANDLE.test(tagHandle)) throwError(state, "named tag handle cannot contain such characters");
+				isNamed = true;
+				_position = state.position + 1;
+			} else throwError(state, "tag suffix cannot contain exclamation marks");
+			ch = state.input.charCodeAt(++state.position);
+		}
+		tagName = state.input.slice(_position, state.position);
+		if (PATTERN_FLOW_INDICATORS.test(tagName)) throwError(state, "tag suffix cannot contain flow indicator characters");
+	}
+	if (tagName && !PATTERN_TAG_URI.test(tagName)) throwError(state, "tag name cannot contain such characters: " + tagName);
+	try {
+		tagName = decodeURIComponent(tagName);
+	} catch (err) {
+		throwError(state, "tag name is malformed: " + tagName);
+	}
+	if (isVerbatim) state.tag = tagName;
+	else if (_hasOwnProperty$1.call(state.tagMap, tagHandle)) state.tag = state.tagMap[tagHandle] + tagName;
+	else if (tagHandle === "!") state.tag = "!" + tagName;
+	else if (tagHandle === "!!") state.tag = "tag:yaml.org,2002:" + tagName;
+	else throwError(state, "undeclared tag handle \"" + tagHandle + "\"");
+	return true;
+}
+function readAnchorProperty(state) {
+	var _position, ch = state.input.charCodeAt(state.position);
+	if (ch !== 38) return false;
+	if (state.anchor !== null) throwError(state, "duplication of an anchor property");
+	ch = state.input.charCodeAt(++state.position);
+	_position = state.position;
+	while (ch !== 0 && !is_WS_OR_EOL(ch) && !is_FLOW_INDICATOR(ch)) ch = state.input.charCodeAt(++state.position);
+	if (state.position === _position) throwError(state, "name of an anchor node must contain at least one character");
+	state.anchor = state.input.slice(_position, state.position);
+	return true;
+}
+function readAlias(state) {
+	var _position, alias, ch = state.input.charCodeAt(state.position);
+	if (ch !== 42) return false;
+	ch = state.input.charCodeAt(++state.position);
+	_position = state.position;
+	while (ch !== 0 && !is_WS_OR_EOL(ch) && !is_FLOW_INDICATOR(ch)) ch = state.input.charCodeAt(++state.position);
+	if (state.position === _position) throwError(state, "name of an alias node must contain at least one character");
+	alias = state.input.slice(_position, state.position);
+	if (!_hasOwnProperty$1.call(state.anchorMap, alias)) throwError(state, "unidentified alias \"" + alias + "\"");
+	state.result = state.anchorMap[alias];
+	skipSeparationSpace(state, true, -1);
+	return true;
+}
+function composeNode(state, parentIndent, nodeContext, allowToSeek, allowCompact) {
+	var allowBlockStyles, allowBlockScalars, allowBlockCollections, indentStatus = 1, atNewLine = false, hasContent = false, typeIndex, typeQuantity, typeList, type, flowIndent, blockIndent;
+	if (state.listener !== null) state.listener("open", state);
+	state.tag = null;
+	state.anchor = null;
+	state.kind = null;
+	state.result = null;
+	allowBlockStyles = allowBlockScalars = allowBlockCollections = CONTEXT_BLOCK_OUT === nodeContext || CONTEXT_BLOCK_IN === nodeContext;
+	if (allowToSeek) {
+		if (skipSeparationSpace(state, true, -1)) {
+			atNewLine = true;
+			if (state.lineIndent > parentIndent) indentStatus = 1;
+			else if (state.lineIndent === parentIndent) indentStatus = 0;
+			else if (state.lineIndent < parentIndent) indentStatus = -1;
+		}
+	}
+	if (indentStatus === 1) while (readTagProperty(state) || readAnchorProperty(state)) if (skipSeparationSpace(state, true, -1)) {
+		atNewLine = true;
+		allowBlockCollections = allowBlockStyles;
+		if (state.lineIndent > parentIndent) indentStatus = 1;
+		else if (state.lineIndent === parentIndent) indentStatus = 0;
+		else if (state.lineIndent < parentIndent) indentStatus = -1;
+	} else allowBlockCollections = false;
+	if (allowBlockCollections) allowBlockCollections = atNewLine || allowCompact;
+	if (indentStatus === 1 || CONTEXT_BLOCK_OUT === nodeContext) {
+		if (CONTEXT_FLOW_IN === nodeContext || CONTEXT_FLOW_OUT === nodeContext) flowIndent = parentIndent;
+		else flowIndent = parentIndent + 1;
+		blockIndent = state.position - state.lineStart;
+		if (indentStatus === 1) if (allowBlockCollections && (readBlockSequence(state, blockIndent) || readBlockMapping(state, blockIndent, flowIndent)) || readFlowCollection(state, flowIndent)) hasContent = true;
+		else {
+			if (allowBlockScalars && readBlockScalar(state, flowIndent) || readSingleQuotedScalar(state, flowIndent) || readDoubleQuotedScalar(state, flowIndent)) hasContent = true;
+			else if (readAlias(state)) {
+				hasContent = true;
+				if (state.tag !== null || state.anchor !== null) throwError(state, "alias node should not have any properties");
+			} else if (readPlainScalar(state, flowIndent, CONTEXT_FLOW_IN === nodeContext)) {
+				hasContent = true;
+				if (state.tag === null) state.tag = "?";
+			}
+			if (state.anchor !== null) state.anchorMap[state.anchor] = state.result;
+		}
+		else if (indentStatus === 0) hasContent = allowBlockCollections && readBlockSequence(state, blockIndent);
+	}
+	if (state.tag === null) {
+		if (state.anchor !== null) state.anchorMap[state.anchor] = state.result;
+	} else if (state.tag === "?") {
+		if (state.result !== null && state.kind !== "scalar") throwError(state, "unacceptable node kind for !<?> tag; it should be \"scalar\", not \"" + state.kind + "\"");
+		for (typeIndex = 0, typeQuantity = state.implicitTypes.length; typeIndex < typeQuantity; typeIndex += 1) {
+			type = state.implicitTypes[typeIndex];
+			if (type.resolve(state.result)) {
+				state.result = type.construct(state.result);
+				state.tag = type.tag;
+				if (state.anchor !== null) state.anchorMap[state.anchor] = state.result;
+				break;
+			}
+		}
+	} else if (state.tag !== "!") {
+		if (_hasOwnProperty$1.call(state.typeMap[state.kind || "fallback"], state.tag)) type = state.typeMap[state.kind || "fallback"][state.tag];
+		else {
+			type = null;
+			typeList = state.typeMap.multi[state.kind || "fallback"];
+			for (typeIndex = 0, typeQuantity = typeList.length; typeIndex < typeQuantity; typeIndex += 1) if (state.tag.slice(0, typeList[typeIndex].tag.length) === typeList[typeIndex].tag) {
+				type = typeList[typeIndex];
+				break;
+			}
+		}
+		if (!type) throwError(state, "unknown tag !<" + state.tag + ">");
+		if (state.result !== null && type.kind !== state.kind) throwError(state, "unacceptable node kind for !<" + state.tag + "> tag; it should be \"" + type.kind + "\", not \"" + state.kind + "\"");
+		if (!type.resolve(state.result, state.tag)) throwError(state, "cannot resolve a node with !<" + state.tag + "> explicit tag");
+		else {
+			state.result = type.construct(state.result, state.tag);
+			if (state.anchor !== null) state.anchorMap[state.anchor] = state.result;
+		}
+	}
+	if (state.listener !== null) state.listener("close", state);
+	return state.tag !== null || state.anchor !== null || hasContent;
+}
+function readDocument(state) {
+	var documentStart = state.position, _position, directiveName, directiveArgs, hasDirectives = false, ch;
+	state.version = null;
+	state.checkLineBreaks = state.legacy;
+	state.tagMap = Object.create(null);
+	state.anchorMap = Object.create(null);
+	while ((ch = state.input.charCodeAt(state.position)) !== 0) {
+		skipSeparationSpace(state, true, -1);
+		ch = state.input.charCodeAt(state.position);
+		if (state.lineIndent > 0 || ch !== 37) break;
+		hasDirectives = true;
+		ch = state.input.charCodeAt(++state.position);
+		_position = state.position;
+		while (ch !== 0 && !is_WS_OR_EOL(ch)) ch = state.input.charCodeAt(++state.position);
+		directiveName = state.input.slice(_position, state.position);
+		directiveArgs = [];
+		if (directiveName.length < 1) throwError(state, "directive name must not be less than one character in length");
+		while (ch !== 0) {
+			while (is_WHITE_SPACE(ch)) ch = state.input.charCodeAt(++state.position);
+			if (ch === 35) {
+				do
+					ch = state.input.charCodeAt(++state.position);
+				while (ch !== 0 && !is_EOL(ch));
+				break;
+			}
+			if (is_EOL(ch)) break;
+			_position = state.position;
+			while (ch !== 0 && !is_WS_OR_EOL(ch)) ch = state.input.charCodeAt(++state.position);
+			directiveArgs.push(state.input.slice(_position, state.position));
+		}
+		if (ch !== 0) readLineBreak(state);
+		if (_hasOwnProperty$1.call(directiveHandlers, directiveName)) directiveHandlers[directiveName](state, directiveName, directiveArgs);
+		else throwWarning(state, "unknown document directive \"" + directiveName + "\"");
+	}
+	skipSeparationSpace(state, true, -1);
+	if (state.lineIndent === 0 && state.input.charCodeAt(state.position) === 45 && state.input.charCodeAt(state.position + 1) === 45 && state.input.charCodeAt(state.position + 2) === 45) {
+		state.position += 3;
+		skipSeparationSpace(state, true, -1);
+	} else if (hasDirectives) throwError(state, "directives end mark is expected");
+	composeNode(state, state.lineIndent - 1, CONTEXT_BLOCK_OUT, false, true);
+	skipSeparationSpace(state, true, -1);
+	if (state.checkLineBreaks && PATTERN_NON_ASCII_LINE_BREAKS.test(state.input.slice(documentStart, state.position))) throwWarning(state, "non-ASCII line breaks are interpreted as content");
+	state.documents.push(state.result);
+	if (state.position === state.lineStart && testDocumentSeparator(state)) {
+		if (state.input.charCodeAt(state.position) === 46) {
+			state.position += 3;
+			skipSeparationSpace(state, true, -1);
+		}
+		return;
+	}
+	if (state.position < state.length - 1) throwError(state, "end of the stream or a document separator is expected");
+	else return;
+}
+function loadDocuments(input, options) {
+	input = String(input);
+	options = options || {};
+	if (input.length !== 0) {
+		if (input.charCodeAt(input.length - 1) !== 10 && input.charCodeAt(input.length - 1) !== 13) input += "\n";
+		if (input.charCodeAt(0) === 65279) input = input.slice(1);
+	}
+	var state = new State$1(input, options);
+	var nullpos = input.indexOf("\0");
+	if (nullpos !== -1) {
+		state.position = nullpos;
+		throwError(state, "null byte is not allowed in input");
+	}
+	state.input += "\0";
+	while (state.input.charCodeAt(state.position) === 32) {
+		state.lineIndent += 1;
+		state.position += 1;
+	}
+	while (state.position < state.length - 1) readDocument(state);
+	return state.documents;
+}
+function loadAll$1(input, iterator, options) {
+	if (iterator !== null && typeof iterator === "object" && typeof options === "undefined") {
+		options = iterator;
+		iterator = null;
+	}
+	var documents = loadDocuments(input, options);
+	if (typeof iterator !== "function") return documents;
+	for (var index = 0, length = documents.length; index < length; index += 1) iterator(documents[index]);
+}
+function load$1(input, options) {
+	var documents = loadDocuments(input, options);
+	if (documents.length === 0) return;
+	else if (documents.length === 1) return documents[0];
+	throw new exception("expected a single document in the stream, but found more");
+}
+var loader = {
+	loadAll: loadAll$1,
+	load: load$1
+};
+var _toString = Object.prototype.toString;
+var _hasOwnProperty = Object.prototype.hasOwnProperty;
+var CHAR_BOM = 65279;
+var CHAR_TAB = 9;
+var CHAR_LINE_FEED = 10;
+var CHAR_CARRIAGE_RETURN = 13;
+var CHAR_SPACE = 32;
+var CHAR_EXCLAMATION = 33;
+var CHAR_DOUBLE_QUOTE = 34;
+var CHAR_SHARP = 35;
+var CHAR_PERCENT = 37;
+var CHAR_AMPERSAND = 38;
+var CHAR_SINGLE_QUOTE = 39;
+var CHAR_ASTERISK = 42;
+var CHAR_COMMA = 44;
+var CHAR_MINUS = 45;
+var CHAR_COLON = 58;
+var CHAR_EQUALS = 61;
+var CHAR_GREATER_THAN = 62;
+var CHAR_QUESTION = 63;
+var CHAR_COMMERCIAL_AT = 64;
+var CHAR_LEFT_SQUARE_BRACKET = 91;
+var CHAR_RIGHT_SQUARE_BRACKET = 93;
+var CHAR_GRAVE_ACCENT = 96;
+var CHAR_LEFT_CURLY_BRACKET = 123;
+var CHAR_VERTICAL_LINE = 124;
+var CHAR_RIGHT_CURLY_BRACKET = 125;
+var ESCAPE_SEQUENCES = {};
+ESCAPE_SEQUENCES[0] = "\\0";
+ESCAPE_SEQUENCES[7] = "\\a";
+ESCAPE_SEQUENCES[8] = "\\b";
+ESCAPE_SEQUENCES[9] = "\\t";
+ESCAPE_SEQUENCES[10] = "\\n";
+ESCAPE_SEQUENCES[11] = "\\v";
+ESCAPE_SEQUENCES[12] = "\\f";
+ESCAPE_SEQUENCES[13] = "\\r";
+ESCAPE_SEQUENCES[27] = "\\e";
+ESCAPE_SEQUENCES[34] = "\\\"";
+ESCAPE_SEQUENCES[92] = "\\\\";
+ESCAPE_SEQUENCES[133] = "\\N";
+ESCAPE_SEQUENCES[160] = "\\_";
+ESCAPE_SEQUENCES[8232] = "\\L";
+ESCAPE_SEQUENCES[8233] = "\\P";
+var DEPRECATED_BOOLEANS_SYNTAX = [
+	"y",
+	"Y",
+	"yes",
+	"Yes",
+	"YES",
+	"on",
+	"On",
+	"ON",
+	"n",
+	"N",
+	"no",
+	"No",
+	"NO",
+	"off",
+	"Off",
+	"OFF"
+];
+var DEPRECATED_BASE60_SYNTAX = /^[-+]?[0-9_]+(?::[0-9_]+)+(?:\.[0-9_]*)?$/;
+function compileStyleMap(schema, map) {
+	var result, keys, index, length, tag, style, type;
+	if (map === null) return {};
+	result = {};
+	keys = Object.keys(map);
+	for (index = 0, length = keys.length; index < length; index += 1) {
+		tag = keys[index];
+		style = String(map[tag]);
+		if (tag.slice(0, 2) === "!!") tag = "tag:yaml.org,2002:" + tag.slice(2);
+		type = schema.compiledTypeMap["fallback"][tag];
+		if (type && _hasOwnProperty.call(type.styleAliases, style)) style = type.styleAliases[style];
+		result[tag] = style;
+	}
+	return result;
+}
+function encodeHex(character) {
+	var string = character.toString(16).toUpperCase(), handle, length;
+	if (character <= 255) {
+		handle = "x";
+		length = 2;
+	} else if (character <= 65535) {
+		handle = "u";
+		length = 4;
+	} else if (character <= 4294967295) {
+		handle = "U";
+		length = 8;
+	} else throw new exception("code point within a string may not be greater than 0xFFFFFFFF");
+	return "\\" + handle + common.repeat("0", length - string.length) + string;
+}
+var QUOTING_TYPE_SINGLE = 1, QUOTING_TYPE_DOUBLE = 2;
+function State(options) {
+	this.schema = options["schema"] || _default;
+	this.indent = Math.max(1, options["indent"] || 2);
+	this.noArrayIndent = options["noArrayIndent"] || false;
+	this.skipInvalid = options["skipInvalid"] || false;
+	this.flowLevel = common.isNothing(options["flowLevel"]) ? -1 : options["flowLevel"];
+	this.styleMap = compileStyleMap(this.schema, options["styles"] || null);
+	this.sortKeys = options["sortKeys"] || false;
+	this.lineWidth = options["lineWidth"] || 80;
+	this.noRefs = options["noRefs"] || false;
+	this.noCompatMode = options["noCompatMode"] || false;
+	this.condenseFlow = options["condenseFlow"] || false;
+	this.quotingType = options["quotingType"] === "\"" ? QUOTING_TYPE_DOUBLE : QUOTING_TYPE_SINGLE;
+	this.forceQuotes = options["forceQuotes"] || false;
+	this.replacer = typeof options["replacer"] === "function" ? options["replacer"] : null;
+	this.implicitTypes = this.schema.compiledImplicit;
+	this.explicitTypes = this.schema.compiledExplicit;
+	this.tag = null;
+	this.result = "";
+	this.duplicates = [];
+	this.usedDuplicates = null;
+}
+function indentString(string, spaces) {
+	var ind = common.repeat(" ", spaces), position = 0, next = -1, result = "", line, length = string.length;
+	while (position < length) {
+		next = string.indexOf("\n", position);
+		if (next === -1) {
+			line = string.slice(position);
+			position = length;
+		} else {
+			line = string.slice(position, next + 1);
+			position = next + 1;
+		}
+		if (line.length && line !== "\n") result += ind;
+		result += line;
+	}
+	return result;
+}
+function generateNextLine(state, level) {
+	return "\n" + common.repeat(" ", state.indent * level);
+}
+function testImplicitResolving(state, str) {
+	var index, length, type;
+	for (index = 0, length = state.implicitTypes.length; index < length; index += 1) {
+		type = state.implicitTypes[index];
+		if (type.resolve(str)) return true;
+	}
+	return false;
+}
+function isWhitespace(c) {
+	return c === CHAR_SPACE || c === CHAR_TAB;
+}
+function isPrintable(c) {
+	return 32 <= c && c <= 126 || 161 <= c && c <= 55295 && c !== 8232 && c !== 8233 || 57344 <= c && c <= 65533 && c !== CHAR_BOM || 65536 <= c && c <= 1114111;
+}
+function isNsCharOrWhitespace(c) {
+	return isPrintable(c) && c !== CHAR_BOM && c !== CHAR_CARRIAGE_RETURN && c !== CHAR_LINE_FEED;
+}
+function isPlainSafe(c, prev, inblock) {
+	var cIsNsCharOrWhitespace = isNsCharOrWhitespace(c);
+	var cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c);
+	return (inblock ? cIsNsCharOrWhitespace : cIsNsCharOrWhitespace && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET) && c !== CHAR_SHARP && !(prev === CHAR_COLON && !cIsNsChar) || isNsCharOrWhitespace(prev) && !isWhitespace(prev) && c === CHAR_SHARP || prev === CHAR_COLON && cIsNsChar;
+}
+function isPlainSafeFirst(c) {
+	return isPrintable(c) && c !== CHAR_BOM && !isWhitespace(c) && c !== CHAR_MINUS && c !== CHAR_QUESTION && c !== CHAR_COLON && c !== CHAR_COMMA && c !== CHAR_LEFT_SQUARE_BRACKET && c !== CHAR_RIGHT_SQUARE_BRACKET && c !== CHAR_LEFT_CURLY_BRACKET && c !== CHAR_RIGHT_CURLY_BRACKET && c !== CHAR_SHARP && c !== CHAR_AMPERSAND && c !== CHAR_ASTERISK && c !== CHAR_EXCLAMATION && c !== CHAR_VERTICAL_LINE && c !== CHAR_EQUALS && c !== CHAR_GREATER_THAN && c !== CHAR_SINGLE_QUOTE && c !== CHAR_DOUBLE_QUOTE && c !== CHAR_PERCENT && c !== CHAR_COMMERCIAL_AT && c !== CHAR_GRAVE_ACCENT;
+}
+function isPlainSafeLast(c) {
+	return !isWhitespace(c) && c !== CHAR_COLON;
+}
+function codePointAt(string, pos) {
+	var first = string.charCodeAt(pos), second;
+	if (first >= 55296 && first <= 56319 && pos + 1 < string.length) {
+		second = string.charCodeAt(pos + 1);
+		if (second >= 56320 && second <= 57343) return (first - 55296) * 1024 + second - 56320 + 65536;
+	}
+	return first;
+}
+function needIndentIndicator(string) {
+	return /^\n* /.test(string);
+}
+var STYLE_PLAIN = 1, STYLE_SINGLE = 2, STYLE_LITERAL = 3, STYLE_FOLDED = 4, STYLE_DOUBLE = 5;
+function chooseScalarStyle(string, singleLineOnly, indentPerLevel, lineWidth, testAmbiguousType, quotingType, forceQuotes, inblock) {
+	var i;
+	var char = 0;
+	var prevChar = null;
+	var hasLineBreak = false;
+	var hasFoldableLine = false;
+	var shouldTrackWidth = lineWidth !== -1;
+	var previousLineBreak = -1;
+	var plain = isPlainSafeFirst(codePointAt(string, 0)) && isPlainSafeLast(codePointAt(string, string.length - 1));
+	if (singleLineOnly || forceQuotes) for (i = 0; i < string.length; char >= 65536 ? i += 2 : i++) {
+		char = codePointAt(string, i);
+		if (!isPrintable(char)) return STYLE_DOUBLE;
+		plain = plain && isPlainSafe(char, prevChar, inblock);
+		prevChar = char;
+	}
+	else {
+		for (i = 0; i < string.length; char >= 65536 ? i += 2 : i++) {
+			char = codePointAt(string, i);
+			if (char === CHAR_LINE_FEED) {
+				hasLineBreak = true;
+				if (shouldTrackWidth) {
+					hasFoldableLine = hasFoldableLine || i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
+					previousLineBreak = i;
+				}
+			} else if (!isPrintable(char)) return STYLE_DOUBLE;
+			plain = plain && isPlainSafe(char, prevChar, inblock);
+			prevChar = char;
+		}
+		hasFoldableLine = hasFoldableLine || shouldTrackWidth && i - previousLineBreak - 1 > lineWidth && string[previousLineBreak + 1] !== " ";
+	}
+	if (!hasLineBreak && !hasFoldableLine) {
+		if (plain && !forceQuotes && !testAmbiguousType(string)) return STYLE_PLAIN;
+		return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
+	}
+	if (indentPerLevel > 9 && needIndentIndicator(string)) return STYLE_DOUBLE;
+	if (!forceQuotes) return hasFoldableLine ? STYLE_FOLDED : STYLE_LITERAL;
+	return quotingType === QUOTING_TYPE_DOUBLE ? STYLE_DOUBLE : STYLE_SINGLE;
+}
+function writeScalar(state, string, level, iskey, inblock) {
+	state.dump = function() {
+		if (string.length === 0) return state.quotingType === QUOTING_TYPE_DOUBLE ? "\"\"" : "''";
+		if (!state.noCompatMode) {
+			if (DEPRECATED_BOOLEANS_SYNTAX.indexOf(string) !== -1 || DEPRECATED_BASE60_SYNTAX.test(string)) return state.quotingType === QUOTING_TYPE_DOUBLE ? "\"" + string + "\"" : "'" + string + "'";
+		}
+		var indent = state.indent * Math.max(1, level);
+		var lineWidth = state.lineWidth === -1 ? -1 : Math.max(Math.min(state.lineWidth, 40), state.lineWidth - indent);
+		var singleLineOnly = iskey || state.flowLevel > -1 && level >= state.flowLevel;
+		function testAmbiguity(string) {
+			return testImplicitResolving(state, string);
+		}
+		switch (chooseScalarStyle(string, singleLineOnly, state.indent, lineWidth, testAmbiguity, state.quotingType, state.forceQuotes && !iskey, inblock)) {
+			case STYLE_PLAIN: return string;
+			case STYLE_SINGLE: return "'" + string.replace(/'/g, "''") + "'";
+			case STYLE_LITERAL: return "|" + blockHeader(string, state.indent) + dropEndingNewline(indentString(string, indent));
+			case STYLE_FOLDED: return ">" + blockHeader(string, state.indent) + dropEndingNewline(indentString(foldString(string, lineWidth), indent));
+			case STYLE_DOUBLE: return "\"" + escapeString(string) + "\"";
+			default: throw new exception("impossible error: invalid scalar style");
+		}
+	}();
+}
+function blockHeader(string, indentPerLevel) {
+	var indentIndicator = needIndentIndicator(string) ? String(indentPerLevel) : "";
+	var clip = string[string.length - 1] === "\n";
+	return indentIndicator + (clip && (string[string.length - 2] === "\n" || string === "\n") ? "+" : clip ? "" : "-") + "\n";
+}
+function dropEndingNewline(string) {
+	return string[string.length - 1] === "\n" ? string.slice(0, -1) : string;
+}
+function foldString(string, width) {
+	var lineRe = /(\n+)([^\n]*)/g;
+	var result = function() {
+		var nextLF = string.indexOf("\n");
+		nextLF = nextLF !== -1 ? nextLF : string.length;
+		lineRe.lastIndex = nextLF;
+		return foldLine(string.slice(0, nextLF), width);
+	}();
+	var prevMoreIndented = string[0] === "\n" || string[0] === " ";
+	var moreIndented;
+	var match;
+	while (match = lineRe.exec(string)) {
+		var prefix = match[1], line = match[2];
+		moreIndented = line[0] === " ";
+		result += prefix + (!prevMoreIndented && !moreIndented && line !== "" ? "\n" : "") + foldLine(line, width);
+		prevMoreIndented = moreIndented;
+	}
+	return result;
+}
+function foldLine(line, width) {
+	if (line === "" || line[0] === " ") return line;
+	var breakRe = / [^ ]/g;
+	var match;
+	var start = 0, end, curr = 0, next = 0;
+	var result = "";
+	while (match = breakRe.exec(line)) {
+		next = match.index;
+		if (next - start > width) {
+			end = curr > start ? curr : next;
+			result += "\n" + line.slice(start, end);
+			start = end + 1;
+		}
+		curr = next;
+	}
+	result += "\n";
+	if (line.length - start > width && curr > start) result += line.slice(start, curr) + "\n" + line.slice(curr + 1);
+	else result += line.slice(start);
+	return result.slice(1);
+}
+function escapeString(string) {
+	var result = "";
+	var char = 0;
+	var escapeSeq;
+	for (var i = 0; i < string.length; char >= 65536 ? i += 2 : i++) {
+		char = codePointAt(string, i);
+		escapeSeq = ESCAPE_SEQUENCES[char];
+		if (!escapeSeq && isPrintable(char)) {
+			result += string[i];
+			if (char >= 65536) result += string[i + 1];
+		} else result += escapeSeq || encodeHex(char);
+	}
+	return result;
+}
+function writeFlowSequence(state, level, object) {
+	var _result = "", _tag = state.tag, index, length, value;
+	for (index = 0, length = object.length; index < length; index += 1) {
+		value = object[index];
+		if (state.replacer) value = state.replacer.call(object, String(index), value);
+		if (writeNode(state, level, value, false, false) || typeof value === "undefined" && writeNode(state, level, null, false, false)) {
+			if (_result !== "") _result += "," + (!state.condenseFlow ? " " : "");
+			_result += state.dump;
+		}
+	}
+	state.tag = _tag;
+	state.dump = "[" + _result + "]";
+}
+function writeBlockSequence(state, level, object, compact) {
+	var _result = "", _tag = state.tag, index, length, value;
+	for (index = 0, length = object.length; index < length; index += 1) {
+		value = object[index];
+		if (state.replacer) value = state.replacer.call(object, String(index), value);
+		if (writeNode(state, level + 1, value, true, true, false, true) || typeof value === "undefined" && writeNode(state, level + 1, null, true, true, false, true)) {
+			if (!compact || _result !== "") _result += generateNextLine(state, level);
+			if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0)) _result += "-";
+			else _result += "- ";
+			_result += state.dump;
+		}
+	}
+	state.tag = _tag;
+	state.dump = _result || "[]";
+}
+function writeFlowMapping(state, level, object) {
+	var _result = "", _tag = state.tag, objectKeyList = Object.keys(object), index, length, objectKey, objectValue, pairBuffer;
+	for (index = 0, length = objectKeyList.length; index < length; index += 1) {
+		pairBuffer = "";
+		if (_result !== "") pairBuffer += ", ";
+		if (state.condenseFlow) pairBuffer += "\"";
+		objectKey = objectKeyList[index];
+		objectValue = object[objectKey];
+		if (state.replacer) objectValue = state.replacer.call(object, objectKey, objectValue);
+		if (!writeNode(state, level, objectKey, false, false)) continue;
+		if (state.dump.length > 1024) pairBuffer += "? ";
+		pairBuffer += state.dump + (state.condenseFlow ? "\"" : "") + ":" + (state.condenseFlow ? "" : " ");
+		if (!writeNode(state, level, objectValue, false, false)) continue;
+		pairBuffer += state.dump;
+		_result += pairBuffer;
+	}
+	state.tag = _tag;
+	state.dump = "{" + _result + "}";
+}
+function writeBlockMapping(state, level, object, compact) {
+	var _result = "", _tag = state.tag, objectKeyList = Object.keys(object), index, length, objectKey, objectValue, explicitPair, pairBuffer;
+	if (state.sortKeys === true) objectKeyList.sort();
+	else if (typeof state.sortKeys === "function") objectKeyList.sort(state.sortKeys);
+	else if (state.sortKeys) throw new exception("sortKeys must be a boolean or a function");
+	for (index = 0, length = objectKeyList.length; index < length; index += 1) {
+		pairBuffer = "";
+		if (!compact || _result !== "") pairBuffer += generateNextLine(state, level);
+		objectKey = objectKeyList[index];
+		objectValue = object[objectKey];
+		if (state.replacer) objectValue = state.replacer.call(object, objectKey, objectValue);
+		if (!writeNode(state, level + 1, objectKey, true, true, true)) continue;
+		explicitPair = state.tag !== null && state.tag !== "?" || state.dump && state.dump.length > 1024;
+		if (explicitPair) if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0)) pairBuffer += "?";
+		else pairBuffer += "? ";
+		pairBuffer += state.dump;
+		if (explicitPair) pairBuffer += generateNextLine(state, level);
+		if (!writeNode(state, level + 1, objectValue, true, explicitPair)) continue;
+		if (state.dump && CHAR_LINE_FEED === state.dump.charCodeAt(0)) pairBuffer += ":";
+		else pairBuffer += ": ";
+		pairBuffer += state.dump;
+		_result += pairBuffer;
+	}
+	state.tag = _tag;
+	state.dump = _result || "{}";
+}
+function detectType(state, object, explicit) {
+	var _result, typeList = explicit ? state.explicitTypes : state.implicitTypes, index, length, type, style;
+	for (index = 0, length = typeList.length; index < length; index += 1) {
+		type = typeList[index];
+		if ((type.instanceOf || type.predicate) && (!type.instanceOf || typeof object === "object" && object instanceof type.instanceOf) && (!type.predicate || type.predicate(object))) {
+			if (explicit) if (type.multi && type.representName) state.tag = type.representName(object);
+			else state.tag = type.tag;
+			else state.tag = "?";
+			if (type.represent) {
+				style = state.styleMap[type.tag] || type.defaultStyle;
+				if (_toString.call(type.represent) === "[object Function]") _result = type.represent(object, style);
+				else if (_hasOwnProperty.call(type.represent, style)) _result = type.represent[style](object, style);
+				else throw new exception("!<" + type.tag + "> tag resolver accepts not \"" + style + "\" style");
+				state.dump = _result;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+function writeNode(state, level, object, block, compact, iskey, isblockseq) {
+	state.tag = null;
+	state.dump = object;
+	if (!detectType(state, object, false)) detectType(state, object, true);
+	var type = _toString.call(state.dump);
+	var inblock = block;
+	var tagStr;
+	if (block) block = state.flowLevel < 0 || state.flowLevel > level;
+	var objectOrArray = type === "[object Object]" || type === "[object Array]", duplicateIndex, duplicate;
+	if (objectOrArray) {
+		duplicateIndex = state.duplicates.indexOf(object);
+		duplicate = duplicateIndex !== -1;
+	}
+	if (state.tag !== null && state.tag !== "?" || duplicate || state.indent !== 2 && level > 0) compact = false;
+	if (duplicate && state.usedDuplicates[duplicateIndex]) state.dump = "*ref_" + duplicateIndex;
+	else {
+		if (objectOrArray && duplicate && !state.usedDuplicates[duplicateIndex]) state.usedDuplicates[duplicateIndex] = true;
+		if (type === "[object Object]") if (block && Object.keys(state.dump).length !== 0) {
+			writeBlockMapping(state, level, state.dump, compact);
+			if (duplicate) state.dump = "&ref_" + duplicateIndex + state.dump;
+		} else {
+			writeFlowMapping(state, level, state.dump);
+			if (duplicate) state.dump = "&ref_" + duplicateIndex + " " + state.dump;
+		}
+		else if (type === "[object Array]") if (block && state.dump.length !== 0) {
+			if (state.noArrayIndent && !isblockseq && level > 0) writeBlockSequence(state, level - 1, state.dump, compact);
+			else writeBlockSequence(state, level, state.dump, compact);
+			if (duplicate) state.dump = "&ref_" + duplicateIndex + state.dump;
+		} else {
+			writeFlowSequence(state, level, state.dump);
+			if (duplicate) state.dump = "&ref_" + duplicateIndex + " " + state.dump;
+		}
+		else if (type === "[object String]") {
+			if (state.tag !== "?") writeScalar(state, state.dump, level, iskey, inblock);
+		} else if (type === "[object Undefined]") return false;
+		else {
+			if (state.skipInvalid) return false;
+			throw new exception("unacceptable kind of an object to dump " + type);
+		}
+		if (state.tag !== null && state.tag !== "?") {
+			tagStr = encodeURI(state.tag[0] === "!" ? state.tag.slice(1) : state.tag).replace(/!/g, "%21");
+			if (state.tag[0] === "!") tagStr = "!" + tagStr;
+			else if (tagStr.slice(0, 18) === "tag:yaml.org,2002:") tagStr = "!!" + tagStr.slice(18);
+			else tagStr = "!<" + tagStr + ">";
+			state.dump = tagStr + " " + state.dump;
+		}
+	}
+	return true;
+}
+function getDuplicateReferences(object, state) {
+	var objects = [], duplicatesIndexes = [], index, length;
+	inspectNode(object, objects, duplicatesIndexes);
+	for (index = 0, length = duplicatesIndexes.length; index < length; index += 1) state.duplicates.push(objects[duplicatesIndexes[index]]);
+	state.usedDuplicates = new Array(length);
+}
+function inspectNode(object, objects, duplicatesIndexes) {
+	var objectKeyList, index, length;
+	if (object !== null && typeof object === "object") {
+		index = objects.indexOf(object);
+		if (index !== -1) {
+			if (duplicatesIndexes.indexOf(index) === -1) duplicatesIndexes.push(index);
+		} else {
+			objects.push(object);
+			if (Array.isArray(object)) for (index = 0, length = object.length; index < length; index += 1) inspectNode(object[index], objects, duplicatesIndexes);
+			else {
+				objectKeyList = Object.keys(object);
+				for (index = 0, length = objectKeyList.length; index < length; index += 1) inspectNode(object[objectKeyList[index]], objects, duplicatesIndexes);
+			}
+		}
+	}
+}
+function dump$1(input, options) {
+	options = options || {};
+	var state = new State(options);
+	if (!state.noRefs) getDuplicateReferences(input, state);
+	var value = input;
+	if (state.replacer) value = state.replacer.call({ "": value }, "", value);
+	if (writeNode(state, 0, value, true, true)) return state.dump + "\n";
+	return "";
+}
+var dumper = { dump: dump$1 };
+function renamed(from, to) {
+	return function() {
+		throw new Error("Function yaml." + from + " is removed in js-yaml 4. Use yaml." + to + " instead, which is now safe by default.");
+	};
+}
+var jsYaml = {
+	Type: type,
+	Schema: schema,
+	FAILSAFE_SCHEMA: failsafe,
+	JSON_SCHEMA: json,
+	CORE_SCHEMA: core,
+	DEFAULT_SCHEMA: _default,
+	load: loader.load,
+	loadAll: loader.loadAll,
+	dump: dumper.dump,
+	YAMLException: exception,
+	types: {
+		binary,
+		float,
+		map,
+		null: _null,
+		pairs,
+		set,
+		timestamp,
+		bool,
+		int,
+		merge,
+		omap,
+		seq,
+		str
+	},
+	safeLoad: renamed("safeLoad", "load"),
+	safeLoadAll: renamed("safeLoadAll", "loadAll"),
+	safeDump: renamed("safeDump", "dump")
+};
+//#endregion
+//#region ../../src/lib/model-capabilities.ts
+/**
+* Model ID deprecation mapping
+*
+* Maps deprecated model IDs to their current replacements.
+* When a model ID changes (e.g., claude-opus-4-5 → claude-opus-4-6),
+* add the mapping here to enable automatic migration.
+*
+* Strategy: Single-hop only. Only add models here when the provider has
+* actually retired them — not just because a newer version exists.
+*/
+const MODEL_DEPRECATIONS = {
+	"claude-opus-4-5": "claude-opus-4-7",
+	"claude-sonnet-4-5": "claude-sonnet-4-6",
+	"gpt-5.2-codex": "gpt-5.3-codex",
+	"gpt-5.5-mini": "gpt-5.4-mini",
+	"gpt-5.5-nano": "gpt-5.4-mini",
+	"gpt-5.4-nano": "gpt-5.4-mini",
+	"gpt-5.5-pro": "gpt-5.5",
+	"gpt-5.4-pro": "gpt-5.4",
+	"o3": "gpt-5.4",
+	"o3-deep-research": "gpt-5.4",
+	"o4-mini": "gpt-5.4-mini",
+	"gpt-4o": "gpt-5.4",
+	"gpt-4o-mini": "gpt-5.4-mini",
+	"gemini-3-pro-preview": "gemini-3.1-pro-preview",
+	"gemini-3-flash": "gemini-3-flash-preview",
+	"gemini-2.5-pro": "gemini-3.1-pro-preview",
+	"gemini-2.5-flash": "gemini-3-flash-preview",
+	"kimi-k2": "kimi-k2.5",
+	"glm-4.7": "glm-5.1",
+	"glm-4.7-flash": "glm-5.1"
+};
+/**
+* Resolve a model ID to its current version
+*
+* If the model ID is deprecated, returns the replacement.
+* Otherwise, returns the model ID unchanged.
+*
+* @param modelId - Model ID to resolve (may be deprecated)
+* @returns Current model ID
+*/
+function resolveModelIdSync(modelId) {
+	return MODEL_DEPRECATIONS[modelId] || modelId;
+}
+/**
+* Master capability database
+*
+* Scores are based on:
+* - Public benchmarks (HumanEval, SWE-bench, MBPP)
+* - Community consensus
+* - Practical experience
+*
+* These are baseline scores - run Kimi 2.5 research to refine.
+*/
+const MODEL_CAPABILITIES = {
+	"claude-fable-5": {
+		model: "claude-fable-5",
+		provider: "anthropic",
+		displayName: "Claude Fable 5",
+		costPer1MTokens: 90,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 99,
+			"code-review": 99,
+			debugging: 99,
+			planning: 99,
+			documentation: 97,
+			testing: 96,
+			security: 99,
+			performance: 95,
+			synthesis: 99,
+			speed: 42,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding."
+	},
+	"claude-opus-4-8": {
+		model: "claude-opus-4-8",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.8",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 98,
+			"code-review": 99,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 95,
+			security: 99,
+			performance: 93,
+			synthesis: 99,
+			speed: 40,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Successor to Opus 4.7 and current flagship. Same effort levels (xhigh between high and max). Best for deepest reasoning and long-horizon coding tasks. Scores provisional — verify against benchmarks."
+	},
+	"claude-opus-4-7": {
+		model: "claude-opus-4-7",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.7",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 98,
+			"code-review": 99,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 94,
+			security: 99,
+			performance: 92,
+			synthesis: 99,
+			speed: 38,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"xhigh",
+			"max"
+		],
+		notes: "Successor to Opus 4.6. Adds the xhigh effort level (between high and max) for extended thinking. Best for deepest reasoning and long-horizon coding tasks."
+	},
+	"claude-opus-4-6": {
+		model: "claude-opus-4-6",
+		provider: "anthropic",
+		displayName: "Claude Opus 4.6",
+		costPer1MTokens: 45,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 96,
+			"code-review": 98,
+			debugging: 97,
+			planning: 99,
+			documentation: 95,
+			testing: 92,
+			security: 98,
+			performance: 90,
+			synthesis: 98,
+			speed: 40,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high",
+			"max"
+		],
+		notes: "Successor to Opus 4.5. Same pricing, 1M context available (opt-in beta). Best for planning, security, complex reasoning."
+	},
+	"claude-sonnet-4-6": {
+		model: "claude-sonnet-4-6",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 4.6",
+		costPer1MTokens: 9,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 94,
+			"code-review": 94,
+			debugging: 92,
+			planning: 90,
+			documentation: 92,
+			testing: 92,
+			security: 88,
+			performance: 88,
+			synthesis: 90,
+			speed: 70,
+			"context-length": 95
+		},
+		effortLevels: [
+			"low",
+			"medium",
+			"high"
+		],
+		notes: "Successor to Sonnet 4.5. Same pricing tier. Improved coding and reasoning."
+	},
+	"claude-sonnet-4-5": {
+		model: "claude-sonnet-4-5",
+		provider: "anthropic",
+		displayName: "Claude Sonnet 4.5",
+		costPer1MTokens: 9,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 92,
+			"code-review": 92,
+			debugging: 90,
+			planning: 88,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 85,
+			synthesis: 88,
+			speed: 70,
+			"context-length": 95
+		},
+		notes: "Best value: 77.2% SWE-bench at 1/5th Opus cost. Beats GPT-5 Codex."
+	},
+	"claude-haiku-4-5": {
+		model: "claude-haiku-4-5",
+		provider: "anthropic",
+		displayName: "Claude Haiku 4.5",
+		costPer1MTokens: 4,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 75,
+			"code-review": 72,
+			debugging: 70,
+			planning: 65,
+			documentation: 75,
+			testing: 70,
+			security: 60,
+			performance: 65,
+			synthesis: 68,
+			speed: 95,
+			"context-length": 95
+		},
+		notes: "Fast and cheap, good for simple tasks and exploration"
+	},
+	"gpt-5.4": {
+		model: "gpt-5.4",
+		provider: "openai",
+		displayName: "GPT-5.4",
+		costPer1MTokens: 8.75,
+		contextWindow: 105e4,
+		minTier: "plus",
+		skills: {
+			"code-generation": 96,
+			"code-review": 92,
+			debugging: 94,
+			planning: 92,
+			documentation: 90,
+			testing: 92,
+			security: 88,
+			performance: 90,
+			synthesis: 92,
+			speed: 60,
+			"context-length": 100
+		},
+		notes: "OpenAI flagship (March 2026). 1.05M context, 128K max output. Strong coding and reasoning."
+	},
+	"gpt-5.4-mini": {
+		model: "gpt-5.4-mini",
+		provider: "openai",
+		displayName: "GPT-5.4 Mini",
+		costPer1MTokens: 1,
+		contextWindow: 4e5,
+		minTier: "free",
+		skills: {
+			"code-generation": 82,
+			"code-review": 78,
+			debugging: 76,
+			planning: 72,
+			documentation: 80,
+			testing: 76,
+			security: 68,
+			performance: 72,
+			synthesis: 75,
+			speed: 90,
+			"context-length": 90
+		},
+		notes: "Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers."
+	},
+	"o3": {
+		model: "o3",
+		provider: "openai",
+		displayName: "O3",
+		costPer1MTokens: 5,
+		contextWindow: 2e5,
+		minTier: "plus",
+		skills: {
+			"code-generation": 90,
+			"code-review": 95,
+			debugging: 98,
+			planning: 95,
+			documentation: 88,
+			testing: 88,
+			security: 92,
+			performance: 92,
+			synthesis: 95,
+			speed: 25,
+			"context-length": 95
+		},
+		notes: "Deep reasoning model. Excels at complex debugging, math, scientific reasoning."
+	},
+	"o4-mini": {
+		model: "o4-mini",
+		provider: "openai",
+		displayName: "O4 Mini",
+		costPer1MTokens: 2.75,
+		contextWindow: 2e5,
+		minTier: "plus",
+		skills: {
+			"code-generation": 85,
+			"code-review": 90,
+			debugging: 94,
+			planning: 88,
+			documentation: 84,
+			testing: 85,
+			security: 86,
+			performance: 88,
+			synthesis: 88,
+			speed: 70,
+			"context-length": 90
+		},
+		notes: "Compact reasoning model (April 2025). Fast, cost-efficient, tool-use capable."
+	},
+	"gpt-5.4-pro": {
+		model: "gpt-5.4-pro",
+		provider: "openai",
+		displayName: "GPT-5.4 Pro",
+		costPer1MTokens: 105,
+		contextWindow: 105e4,
+		minTier: "pro",
+		skills: {
+			"code-generation": 98,
+			"code-review": 98,
+			debugging: 98,
+			planning: 99,
+			documentation: 96,
+			testing: 96,
+			security: 96,
+			performance: 95,
+			synthesis: 99,
+			speed: 45,
+			"context-length": 100
+		},
+		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.4. Pro subscribers only."
+	},
+	"gpt-5.5": {
+		model: "gpt-5.5",
+		provider: "openai",
+		displayName: "GPT-5.5",
+		costPer1MTokens: 10.5,
+		contextWindow: 15e4,
+		minTier: "plus",
+		skills: {
+			"code-generation": 97,
+			"code-review": 94,
+			debugging: 96,
+			planning: 95,
+			documentation: 92,
+			testing: 94,
+			security: 91,
+			performance: 92,
+			synthesis: 94,
+			speed: 65,
+			"context-length": 95
+		},
+		notes: "OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. Effective Claude Code/CLIProxy ceiling is 150K (CLIPROXY_CODEX_CONTEXT_WINDOW), 128K max output."
+	},
+	"gpt-5.5-pro": {
+		model: "gpt-5.5-pro",
+		provider: "openai",
+		displayName: "GPT-5.5 Pro",
+		costPer1MTokens: 119,
+		contextWindow: 105e4,
+		minTier: "pro",
+		skills: {
+			"code-generation": 99,
+			"code-review": 99,
+			debugging: 99,
+			planning: 99,
+			documentation: 97,
+			testing: 97,
+			security: 97,
+			performance: 96,
+			synthesis: 99,
+			speed: 50,
+			"context-length": 100
+		},
+		notes: "Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only."
+	},
+	"gpt-5.3-codex": {
+		model: "gpt-5.3-codex",
+		provider: "openai",
+		displayName: "GPT-5.3 Codex",
+		costPer1MTokens: 7.875,
+		contextWindow: 4e5,
+		skills: {
+			"code-generation": 96,
+			"code-review": 95,
+			debugging: 94,
+			planning: 90,
+			documentation: 88,
+			testing: 90,
+			security: 86,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 90
+		},
+		notes: "Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API."
+	},
+	"gpt-5.2": {
+		model: "gpt-5.2",
+		provider: "openai",
+		displayName: "GPT-5.2",
+		costPer1MTokens: 5.625,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 84,
+			planning: 82,
+			documentation: 84,
+			testing: 82,
+			security: 78,
+			performance: 80,
+			synthesis: 84,
+			speed: 70,
+			"context-length": 85
+		},
+		notes: "Previous-generation general-purpose model (Oct 2025). Positioned by OpenAI for long-running agent workloads — strong candidate for orchestrator/flywheel roles."
+	},
+	"gpt-5.3-codex-spark": {
+		model: "gpt-5.3-codex-spark",
+		provider: "openai",
+		displayName: "GPT-5.3 Codex Spark",
+		costPer1MTokens: 7.875,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 86,
+			debugging: 84,
+			planning: 78,
+			documentation: 82,
+			testing: 88,
+			security: 76,
+			performance: 82,
+			synthesis: 84,
+			speed: 98,
+			"context-length": 72
+		},
+		notes: "Ultra-fast coding research preview (Feb 2026). Text-only, 128K context, ChatGPT-Pro-only. Candidate for work.inspect / high-volume code scans when a Pro account is available."
+	},
+	"o3-deep-research": {
+		model: "o3-deep-research",
+		provider: "openai",
+		displayName: "O3 Deep Research (deprecated)",
+		costPer1MTokens: 5,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 95,
+			debugging: 98,
+			planning: 95,
+			documentation: 88,
+			testing: 88,
+			security: 92,
+			performance: 92,
+			synthesis: 95,
+			speed: 25,
+			"context-length": 95
+		}
+	},
+	"gpt-4o": {
+		model: "gpt-4o",
+		provider: "openai",
+		displayName: "GPT-4o",
+		costPer1MTokens: 7.5,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 78,
+			planning: 76,
+			documentation: 80,
+			testing: 76,
+			security: 74,
+			performance: 74,
+			synthesis: 80,
+			speed: 75,
+			"context-length": 75
+		}
+	},
+	"gpt-4o-mini": {
+		model: "gpt-4o-mini",
+		provider: "openai",
+		displayName: "GPT-4o Mini",
+		costPer1MTokens: .6,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 68,
+			"code-review": 64,
+			debugging: 60,
+			planning: 56,
+			documentation: 66,
+			testing: 60,
+			security: 52,
+			performance: 56,
+			synthesis: 62,
+			speed: 92,
+			"context-length": 75
+		}
+	},
+	"gemini-3.1-pro-preview": {
+		model: "gemini-3.1-pro-preview",
+		provider: "google",
+		displayName: "Gemini 3.1 Pro",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 88,
+			planning: 88,
+			documentation: 90,
+			testing: 88,
+			security: 82,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 100
+		},
+		notes: "Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities."
+	},
+	"gemini-3-flash-preview": {
+		model: "gemini-3-flash-preview",
+		provider: "google",
+		displayName: "Gemini 3 Flash Preview",
+		costPer1MTokens: .4,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 80,
+			"code-review": 75,
+			debugging: 72,
+			planning: 68,
+			documentation: 76,
+			testing: 72,
+			security: 60,
+			performance: 70,
+			synthesis: 75,
+			speed: 96,
+			"context-length": 100
+		},
+		notes: "Fast and cheap with 1M context. Strong reasoning and agentic capabilities."
+	},
+	"gemini-3.1-flash-lite-preview": {
+		model: "gemini-3.1-flash-lite-preview",
+		provider: "google",
+		displayName: "Gemini 3.1 Flash Lite",
+		costPer1MTokens: .9,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 72,
+			"code-review": 68,
+			debugging: 65,
+			planning: 60,
+			documentation: 70,
+			testing: 65,
+			security: 52,
+			performance: 62,
+			synthesis: 68,
+			speed: 98,
+			"context-length": 100
+		},
+		notes: "Most cost-efficient Google model. Great for high-volume, latency-sensitive workloads."
+	},
+	"gemini-3-pro-preview": {
+		model: "gemini-3-pro-preview",
+		provider: "google",
+		displayName: "Gemini 3 Pro (deprecated)",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 88,
+			planning: 88,
+			documentation: 90,
+			testing: 88,
+			security: 82,
+			performance: 88,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 100
+		}
+	},
+	"gemini-2.5-pro": {
+		model: "gemini-2.5-pro",
+		provider: "google",
+		displayName: "Gemini 2.5 Pro (deprecated)",
+		costPer1MTokens: 7,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 86,
+			planning: 86,
+			documentation: 88,
+			testing: 86,
+			security: 80,
+			performance: 86,
+			synthesis: 90,
+			speed: 70,
+			"context-length": 100
+		}
+	},
+	"gemini-2.5-flash": {
+		model: "gemini-2.5-flash",
+		provider: "google",
+		displayName: "Gemini 2.5 Flash (deprecated)",
+		costPer1MTokens: .4,
+		contextWindow: 1e6,
+		skills: {
+			"code-generation": 78,
+			"code-review": 74,
+			debugging: 70,
+			planning: 66,
+			documentation: 74,
+			testing: 70,
+			security: 58,
+			performance: 68,
+			synthesis: 74,
+			speed: 94,
+			"context-length": 100
+		}
+	},
+	"kimi-k2.7-code": {
+		model: "kimi-k2.7-code",
+		provider: "kimi",
+		displayName: "Kimi K2.7 Code",
+		costPer1MTokens: 2.5,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 95,
+			"code-review": 93,
+			debugging: 93,
+			planning: 90,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 88,
+			synthesis: 94,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Moonshot/Kimi's coding-first open-weight model (June 2026). 1T MoE / 32B active, multimodal, extended thinking modes. API id `kimi-k2.7-code`. Source: https://platform.moonshot.ai/docs/pricing/chat"
+	},
+	"kimi-k2.6": {
+		model: "kimi-k2.6",
+		provider: "kimi",
+		displayName: "Kimi K2.6",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 94,
+			"code-review": 92,
+			debugging: 92,
+			planning: 90,
+			documentation: 90,
+			testing: 90,
+			security: 85,
+			performance: 88,
+			synthesis: 94,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Kimi's smartest model (April 2026). Native multimodal, superior agentic coding, and autonomous agent execution. Replaces K2.6-code-preview."
+	},
+	"kimi-k2.5": {
+		model: "kimi-k2.5",
+		provider: "kimi",
+		displayName: "Kimi K2.5",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Best open-source coding model. 5x cheaper than GPT-5.2. Excellent for frontend dev and multi-agent orchestration."
+	},
+	"K2.6-code-preview": {
+		model: "K2.6-code-preview",
+		provider: "kimi",
+		displayName: "K2.6-code-preview",
+		costPer1MTokens: 1.6,
+		contextWindow: 256e3,
+		skills: {
+			"code-generation": 92,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 75,
+			"context-length": 98
+		},
+		notes: "Kimi coding preview model."
+	},
+	"kimi-k2": {
+		model: "kimi-k2",
+		provider: "kimi",
+		displayName: "Kimi K2 (deprecated)",
+		costPer1MTokens: 1.6,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 78,
+			performance: 80,
+			synthesis: 88,
+			speed: 72,
+			"context-length": 80
+		},
+		notes: "65.8% SWE-bench. Superseded by Kimi K2.5."
+	},
+	"minimax-m2.7": {
+		model: "minimax-m2.7",
+		provider: "minimax",
+		displayName: "MiniMax M2.7",
+		costPer1MTokens: 1.5,
+		contextWindow: 204800,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 85,
+			documentation: 85,
+			testing: 86,
+			security: 80,
+			performance: 82,
+			synthesis: 90,
+			speed: 80,
+			"context-length": 92
+		},
+		notes: "10B active params, 56.22% SWE-Pro, 1495 ELO GDPval-AA. $0.06/M blended with auto-cache."
+	},
+	"minimax-m2.7-highspeed": {
+		model: "minimax-m2.7-highspeed",
+		provider: "minimax",
+		displayName: "MiniMax M2.7 Highspeed",
+		costPer1MTokens: 1.5,
+		contextWindow: 204800,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 85,
+			documentation: 85,
+			testing: 86,
+			security: 80,
+			performance: 82,
+			synthesis: 90,
+			speed: 92,
+			"context-length": 92
+		},
+		notes: "Identical quality to M2.7, 100 tps (3x Opus speed). Best for high-throughput agent work."
+	},
+	"MiniMax-M3": {
+		model: "MiniMax-M3",
+		provider: "minimax",
+		displayName: "MiniMax M3",
+		costPer1MTokens: 1.5,
+		contextWindow: 1024e3,
+		skills: {
+			"code-generation": 93,
+			"code-review": 90,
+			debugging: 90,
+			planning: 88,
+			documentation: 88,
+			testing: 88,
+			security: 82,
+			performance: 85,
+			synthesis: 92,
+			speed: 80,
+			"context-length": 100
+		},
+		notes: "MSA (MiniMax Sparse Attention), 1M context, native multimodal, top-tier coding/agentic. Same pricing as M2.7."
+	},
+	"glm-5.2": {
+		model: "glm-5.2",
+		provider: "zai",
+		displayName: "GLM-5.2",
+		costPer1MTokens: 2,
+		contextWindow: 128e3,
+		effortLevels: ["high", "max"],
+		skills: {
+			"code-generation": 85,
+			"code-review": 83,
+			debugging: 83,
+			planning: 81,
+			documentation: 80,
+			testing: 80,
+			security: 77,
+			performance: 77,
+			synthesis: 82,
+			speed: 84,
+			"context-length": 75
+		},
+		notes: "Z.AI GLM-5.2 flagship via Anthropic-compatible API. Supports only high and max effort levels. Scores provisional — verify against benchmarks."
+	},
+	"glm-5.1": {
+		model: "glm-5.1",
+		provider: "zai",
+		displayName: "GLM-5.1",
+		costPer1MTokens: 2,
+		contextWindow: 128e3,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 80,
+			planning: 78,
+			documentation: 78,
+			testing: 78,
+			security: 75,
+			performance: 75,
+			synthesis: 80,
+			speed: 85,
+			"context-length": 75
+		},
+		notes: "Z.AI GLM-5.1 model via Anthropic-compatible API. Previous flagship; retained alongside GLM-5.2."
+	},
+	"glm-4.7": {
+		model: "glm-4.7",
+		provider: "zai",
+		displayName: "GLM-4.7 (deprecated)",
+		costPer1MTokens: 1.5,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 88,
+			"code-review": 85,
+			debugging: 84,
+			planning: 82,
+			documentation: 80,
+			testing: 82,
+			security: 78,
+			performance: 80,
+			synthesis: 84,
+			speed: 80,
+			"context-length": 92
+		},
+		notes: "Top open-source model for agentic coding. 73.8% SWE-bench, 200K context."
+	},
+	"glm-4.7-flash": {
+		model: "glm-4.7-flash",
+		provider: "zai",
+		displayName: "GLM-4.7 Flash (deprecated)",
+		costPer1MTokens: .3,
+		contextWindow: 2e5,
+		skills: {
+			"code-generation": 78,
+			"code-review": 74,
+			debugging: 72,
+			planning: 70,
+			documentation: 72,
+			testing: 72,
+			security: 68,
+			performance: 70,
+			synthesis: 74,
+			speed: 95,
+			"context-length": 92
+		},
+		notes: "Fast and affordable GLM model for quick iterations. 200K context."
+	},
+	"mimo-v2.5-pro": {
+		model: "mimo-v2.5-pro",
+		provider: "mimo",
+		displayName: "MiMo V2.5 Pro",
+		costPer1MTokens: 2,
+		contextWindow: 1048576,
+		supportsImages: false,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 80,
+			performance: 82,
+			synthesis: 88,
+			speed: 78,
+			"context-length": 100
+		},
+		notes: "Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window."
+	},
+	"mimo-v2.5": {
+		model: "mimo-v2.5",
+		provider: "mimo",
+		displayName: "MiMo V2.5",
+		costPer1MTokens: 1,
+		contextWindow: 262144,
+		supportsImages: true,
+		skills: {
+			"code-generation": 82,
+			"code-review": 80,
+			debugging: 80,
+			planning: 78,
+			documentation: 78,
+			testing: 78,
+			security: 74,
+			performance: 76,
+			synthesis: 82,
+			speed: 85,
+			"context-length": 96
+		},
+		notes: "Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities."
+	},
+	"qwen/qwen3.6-plus": {
+		model: "qwen/qwen3.6-plus",
+		provider: "nous",
+		displayName: "Qwen 3.6 Plus (Nous Portal)",
+		costPer1MTokens: 0,
+		contextWindow: 1048576,
+		skills: {
+			"code-generation": 94,
+			"code-review": 92,
+			debugging: 92,
+			planning: 92,
+			documentation: 90,
+			testing: 90,
+			security: 88,
+			performance: 88,
+			synthesis: 92,
+			speed: 74,
+			"context-length": 100
+		},
+		notes: "Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material."
+	},
+	"qwen3-max": {
+		model: "qwen3-max",
+		provider: "dashscope",
+		displayName: "Qwen3 Max (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 95,
+			"code-review": 93,
+			debugging: 93,
+			planning: 94,
+			documentation: 91,
+			testing: 91,
+			security: 89,
+			performance: 89,
+			synthesis: 94,
+			speed: 72,
+			"context-length": 98
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3-coder-plus": {
+		model: "qwen3-coder-plus",
+		provider: "dashscope",
+		displayName: "Qwen3 Coder Plus (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 96,
+			"code-review": 94,
+			debugging: 94,
+			planning: 91,
+			documentation: 90,
+			testing: 92,
+			security: 89,
+			performance: 90,
+			synthesis: 92,
+			speed: 74,
+			"context-length": 98
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3-plus": {
+		model: "qwen3-plus",
+		provider: "dashscope",
+		displayName: "Qwen3 Plus (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 131072,
+		skills: {
+			"code-generation": 88,
+			"code-review": 86,
+			debugging: 86,
+			planning: 84,
+			documentation: 84,
+			testing: 84,
+			security: 80,
+			performance: 82,
+			synthesis: 88,
+			speed: 82,
+			"context-length": 96
+		},
+		notes: "Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"qwen3.7-max": {
+		model: "qwen3.7-max",
+		provider: "dashscope",
+		displayName: "Qwen3.7 Max (DashScope)",
+		costPer1MTokens: 0,
+		contextWindow: 262144,
+		skills: {
+			"code-generation": 96,
+			"code-review": 94,
+			debugging: 94,
+			planning: 95,
+			documentation: 92,
+			testing: 92,
+			security: 90,
+			performance: 90,
+			synthesis: 95,
+			speed: 70,
+			"context-length": 98
+		},
+		notes: "Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing."
+	},
+	"grok-build-0.1": {
+		model: "grok-build-0.1",
+		provider: "xai",
+		displayName: "Grok Build 0.1",
+		costPer1MTokens: 1.5,
+		contextWindow: 256e3,
+		supportsImages: true,
+		skills: {
+			"code-generation": 90,
+			"code-review": 88,
+			debugging: 88,
+			planning: 87,
+			documentation: 85,
+			testing: 86,
+			security: 82,
+			performance: 84,
+			synthesis: 88,
+			speed: 82,
+			"context-length": 97
+		},
+		notes: "xAI's agentic coding model (May 2026). 256K context, $1/M in / $2/M out / $0.20/M cached. Reasoning always active. API id `grok-build-0.1` at https://api.x.ai/v1 (Anthropic-compatible). Sources: openrouter.ai/x-ai/grok-build-0.1/api, x.ai/news/grok-build-cli."
+	}
+};
+/**
+* Effort levels a model accepts, or `undefined` when not enumerated for that
+* model (treat undefined as "no model-specific restriction"). Resolves
+* deprecated IDs first so callers can pass raw config refs.
+*/
+function getModelEffortLevelsSync(model) {
+	return MODEL_CAPABILITIES[resolveModelIdSync(String(model))]?.effortLevels;
+}
+//#endregion
+//#region ../../src/lib/background-ai/registry.ts
+/**
+* Background AI feature registry — pure data, no dependencies (PAN-1583).
+*
+* Kept dependency-free so `config-yaml.ts` can import the feature list and
+* defaults without creating an import cycle with the enablement gate in
+* `features.ts` (which imports `config-yaml`).
+*/
+/** Every background AI feature Overdeck can run automatically. */
+const BACKGROUND_AI_FEATURES = [
+	"conversationTitles",
+	"titleRefinement",
+	"memoryExtraction",
+	"memoryQueryExpansion",
+	"conversationEnrichment",
+	"sessionEmbeddings",
+	"summaryFork",
+	"ttsSummarizer"
+];
+/**
+* Feature metadata. The `defaultEnabled` values mirror the historical
+* behavior of each subsystem so introducing the registry changes nothing
+* until the user flips a toggle:
+*   - sessionEmbeddings defaults OFF  (conversations.embeddings default false)
+*   - ttsSummarizer defaults OFF      (ttsSummarizer.enabled default false)
+*   - everything else defaults ON.
+*/
+const BACKGROUND_AI_FEATURE_META = [
+	{
+		key: "conversationTitles",
+		label: "Conversation titles",
+		description: "Generate a title for a new conversation from its first message.",
+		defaultEnabled: true
+	},
+	{
+		key: "titleRefinement",
+		label: "Title refinement",
+		description: "Refine a conversation title once the first assistant reply arrives.",
+		defaultEnabled: true
+	},
+	{
+		key: "memoryExtraction",
+		label: "Memory extraction",
+		description: "Extract structured observations from running agent transcripts.",
+		defaultEnabled: true
+	},
+	{
+		key: "memoryQueryExpansion",
+		label: "Memory query expansion",
+		description: "Expand memory search queries into related terms for better recall.",
+		defaultEnabled: true
+	},
+	{
+		key: "conversationEnrichment",
+		label: "Conversation enrichment",
+		description: "Summarize and tag discovered sessions for search and display.",
+		defaultEnabled: true
+	},
+	{
+		key: "sessionEmbeddings",
+		label: "Session embeddings",
+		description: "Build embedding vectors for semantic conversation search.",
+		defaultEnabled: false
+	},
+	{
+		key: "summaryFork",
+		label: "Summary fork / compaction",
+		description: "Summarize a transcript on compaction or handoff fallback.",
+		defaultEnabled: true
+	},
+	{
+		key: "ttsSummarizer",
+		label: "TTS activity narration",
+		description: "Summarize recent activity into spoken narration utterances.",
+		defaultEnabled: false
+	}
+];
+/** The default per-feature enablement map (used by config normalization). */
+function defaultBackgroundAiFeatures() {
+	const out = {};
+	for (const meta of BACKGROUND_AI_FEATURE_META) out[meta.key] = meta.defaultEnabled;
+	return out;
+}
+//#endregion
+//#region ../../src/lib/config-yaml.ts
+/**
+* YAML Configuration Loader
+*
+* Loads and merges configuration from:
+* 1. Global config: ~/.overdeck/config.yaml
+* 2. Per-project config: .pan.yaml (project root, falls back to .overdeck.yaml with deprecation warning)
+*
+* Uses smart (capability-based) model selection - no legacy presets.
+*/
+const COMPLIANCE_MODES = [
+	"off",
+	"advisory",
+	"enforcing"
+];
+function isComplianceMode(value) {
+	return typeof value === "string" && COMPLIANCE_MODES.includes(value);
+}
+function isFeatureRegistryClassificationProvider(value) {
+	return value === "anthropic" || value === "cliproxy";
+}
+const VALID_RESILIENCY_TIERS = ["ephemeral", "durable"];
+function isResiliencyTier(value) {
+	return typeof value === "string" && VALID_RESILIENCY_TIERS.includes(value);
+}
+/**
+* Merge remote work-agent provisioning settings from a single config source.
+*/
+function mergeRemoteConfig(result, config) {
+	const remote = config?.remote;
+	if (!remote) return;
+	if (remote.resiliency_tier !== void 0) {
+		if (!isResiliencyTier(remote.resiliency_tier)) throw new Error(`config.yaml: remote.resiliency_tier must be one of ${VALID_RESILIENCY_TIERS.join(", ")}`);
+		result.remote = {
+			...result.remote ?? { maxConcurrentAgents: 0 },
+			resiliencyTier: remote.resiliency_tier
+		};
+	}
+	if (remote.max_concurrent_agents !== void 0) {
+		if (typeof remote.max_concurrent_agents !== "number" || !Number.isInteger(remote.max_concurrent_agents) || remote.max_concurrent_agents < 0) throw new Error("config.yaml: remote.max_concurrent_agents must be a non-negative integer");
+		result.remote = {
+			...result.remote ?? { resiliencyTier: "ephemeral" },
+			maxConcurrentAgents: remote.max_concurrent_agents
+		};
+	}
+}
+const PARENT_MODEL_REF = "parent";
+/**
+* Canonical workhorse slot list. Anything outside this set is rejected by
+* config-load validation (PAN-1048 review feedback 003 / REQ-18).
+*/
+const WORKHORSE_SLOTS = [
+	"expensive",
+	"mid",
+	"cheap"
+];
+const ROLE_EFFORTS = [
+	"low",
+	"medium",
+	"high",
+	"xhigh",
+	"max"
+];
+const DEFAULT_WORKHORSES = {
+	expensive: "claude-opus-4-8",
+	mid: "claude-sonnet-4-6",
+	cheap: "claude-haiku-4-5"
+};
+const DEFAULT_ROLES = {
+	plan: { model: "workhorse:expensive" },
+	work: {
+		model: "workhorse:mid",
+		sub: {
+			inspect: { model: "workhorse:cheap" },
+			"inspect-deep": { model: "workhorse:mid" }
+		}
+	},
+	review: {
+		model: "workhorse:expensive",
+		sub: {
+			security: { model: "workhorse:expensive" },
+			correctness: { model: "workhorse:mid" },
+			performance: { model: "workhorse:mid" },
+			requirements: { model: "workhorse:mid" },
+			synthesis: { model: "workhorse:expensive" }
+		}
+	},
+	test: { model: "workhorse:mid" },
+	ship: { model: "workhorse:mid" },
+	strike: { model: "workhorse:expensive" },
+	flywheel: {
+		model: "claude-opus-4-8",
+		effort: "high",
+		minAgents: 20,
+		maxAgents: 30,
+		scope: "pan-only"
+	}
+};
+function cloneRoles(roles) {
+	const cloned = {};
+	for (const [role, roleConfig] of Object.entries(roles)) cloned[role] = {
+		...roleConfig,
+		sub: roleConfig.sub ? { ...roleConfig.sub } : void 0
+	};
+	return cloned;
+}
+/**
+* Default configuration (used when no config files exist)
+*/
+const DEFAULT_DOCS_TRIGGER_REGEXES = [
+	"pan",
+	"overdeck",
+	"cloister",
+	"deacon",
+	"workspace",
+	"specialist",
+	"harness",
+	"bd",
+	"beads",
+	"vbrief",
+	"workhorse"
+];
+const DEFAULT_CONFIG = {
+	tmux: { configMode: "managed" },
+	enabledProviders: new Set(["anthropic"]),
+	apiKeys: {},
+	providerAuth: {},
+	providerPlan: {},
+	providerHarnesses: {},
+	openrouterFavorites: [],
+	workhorses: { ...DEFAULT_WORKHORSES },
+	roles: cloneRoles(DEFAULT_ROLES),
+	overrides: {},
+	geminiThinkingLevel: 3,
+	trackerKeys: {},
+	conversations: {
+		compactionModel: "claude-haiku-4-5",
+		manualCompactMode: "claude-code",
+		richCompaction: true,
+		titleModel: "claude-haiku-4-5",
+		watchDirs: ["~/Projects"],
+		scanMaxParallel: null,
+		embeddings: false,
+		embeddingProvider: "openai",
+		embeddingModel: "text-embedding-3-small",
+		embeddingAutoOnDeep: true,
+		enrichment: {
+			quickModel: null,
+			deepModel: null,
+			maxParallel: 4,
+			costConfirmThreshold: 1
+		}
+	},
+	docs: {
+		enabled: true,
+		promptInjectionEnabled: true,
+		cliEnabled: true,
+		trigger: {
+			regexes: DEFAULT_DOCS_TRIGGER_REGEXES,
+			caseSensitive: false
+		},
+		corpus: {
+			docs: true,
+			skills: true,
+			rules: true,
+			claudeMd: true,
+			prds: false,
+			prdStatuses: ["active", "planned"],
+			maxChunkTokens: 500
+		},
+		budget: {
+			injectionRate: 1,
+			turnWindow: 10,
+			maxTokensPerInjection: 3e3,
+			maxChunksPerInjection: 5,
+			bypassClassifierThreshold: .85
+		},
+		embedding: {
+			provider: "local",
+			model: "gte-small",
+			dimensions: 384
+		},
+		classifier: {
+			enabled: false,
+			provider: "anthropic",
+			model: "claude-haiku-4-5",
+			threshold: .85,
+			timeoutMs: 1500
+		}
+	},
+	conversationSearch: {
+		enabled: false,
+		provider: "openai",
+		model: "text-embedding-3-small",
+		apiKeyRef: void 0,
+		dbPath: join(homedir(), ".overdeck", "conversations", "embeddings.db")
+	},
+	memory: {
+		extraction: { fallbackChain: [] },
+		observationsEnabled: true,
+		promptTimeInjectionEnabled: true,
+		rollupPendingThreshold: 4,
+		sidebarRefreshIntervalMs: 1e4,
+		workerConcurrency: 4
+	},
+	backgroundAi: {
+		cheapMode: true,
+		features: defaultBackgroundAiFeatures()
+	},
+	compliance: { mode: "advisory" },
+	registry: { classification: {
+		enabled: true,
+		provider: "cliproxy",
+		model: "gpt-4.1-nano",
+		perDayCostCapUsd: 1
+	} },
+	shadow: {
+		enabled: false,
+		trackers: {
+			linear: false,
+			github: false,
+			gitlab: false,
+			rally: false
+		}
+	},
+	caveman: {
+		enabled: false,
+		abTest: false,
+		modes: {
+			work: "full",
+			review: "review",
+			test: "full",
+			merge: "full"
+		}
+	},
+	rtk: { enabled: false },
+	tldr: { enabled: true },
+	tts: {
+		enabled: false,
+		lifecycle: true,
+		voice: "",
+		volume: 1,
+		rate: 1,
+		maxChars: 140,
+		dropInfoWhenFull: true,
+		daemonPort: 8787,
+		daemonHost: "127.0.0.1",
+		daemonAutoStart: false,
+		voiceMap: {},
+		mutedSources: [],
+		utteranceTemplates: {},
+		mutedIssues: []
+	},
+	ttsSummarizer: {
+		enabled: false,
+		model: "gpt-5.4-mini",
+		batchWindowSeconds: 15
+	},
+	resources: {
+		memoryWarnGb: 4,
+		memoryBlockGb: 2,
+		agentWarnCount: 8,
+		agentBlockCount: 10
+	},
+	experimental: {
+		claudeCodeChannels: false,
+		claudeCodeChannelsMcp: false,
+		streamdownRenderer: false
+	},
+	claude: { permissionMode: "auto" },
+	codex: { permissionMode: "auto-review" }
+};
+/**
+* Path to global config file
+*/
+const GLOBAL_CONFIG_PATH = join(homedir(), ".overdeck", "config.yaml");
+/**
+* Normalize a provider config (handle both boolean and object forms)
+*/
+function normalizeProviderConfig(providerConfig, fallbackKey) {
+	if (providerConfig === void 0) return { enabled: false };
+	if (typeof providerConfig === "boolean") return {
+		enabled: providerConfig,
+		api_key: fallbackKey
+	};
+	return {
+		enabled: providerConfig.enabled,
+		api_key: providerConfig.api_key || fallbackKey,
+		harness: providerConfig.harness,
+		auth: providerConfig.auth,
+		plan: providerConfig.plan
+	};
+}
+function validateProviderHarness(provider, harness) {
+	if (harness !== void 0 && harness !== "claude-code" && harness !== "pi" && harness !== "codex") throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, pi, or codex`);
+}
+function applyProviderHarness(result, provider, harness) {
+	validateProviderHarness(provider, harness);
+	if (harness !== void 0) result.providerHarnesses[provider] = harness;
+}
+/**
+* Resolve environment variables in config values.
+* If the env var is not set, returns the original reference (e.g., "$OPENAI_API_KEY")
+* so the UI can show that it's configured via env var but not resolved.
+*/
+function resolveEnvVar(value) {
+	if (!value) return void 0;
+	return value.replace(/\$\{?([A-Z_][A-Z0-9_]*)\}?/g, (match, varName) => {
+		const envValue = process.env[varName];
+		return envValue !== void 0 ? envValue : match;
+	});
+}
+/**
+* Load and parse a YAML config file
+*/
+function loadYamlFile(filePath) {
+	if (!existsSync(filePath)) return null;
+	try {
+		const content = readFileSync(filePath, "utf-8");
+		return jsYaml.load(content) || {};
+	} catch (error) {
+		console.error(`Error loading YAML config from ${filePath}:`, error);
+		return null;
+	}
+}
+/**
+* Find project root by looking for .git directory
+*/
+function findProjectRoot(startDir = process.cwd()) {
+	let currentDir = startDir;
+	while (true) {
+		if (existsSync(join(currentDir, ".git"))) return currentDir;
+		const parent = dirname(currentDir);
+		if (parent === currentDir) return null;
+		currentDir = parent;
+	}
+}
+function stripProjectTtsEndpoint(config) {
+	if (!config?.tts) return config;
+	const { daemonHost: _daemonHost, daemonPort: _daemonPort, ...tts } = config.tts;
+	return {
+		...config,
+		tts
+	};
+}
+/**
+* Load per-project config (.pan.yaml in project root, with fallback to .overdeck.yaml)
+*/
+function loadProjectConfig() {
+	const projectRoot = findProjectRoot();
+	if (!projectRoot) return null;
+	const newConfigPath = join(projectRoot, ".pan.yaml");
+	if (existsSync(newConfigPath)) return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
+	const legacyConfigPath = join(projectRoot, ".overdeck.yaml");
+	if (existsSync(legacyConfigPath)) {
+		process.stderr.write(`[overdeck] Deprecation warning: .overdeck.yaml is deprecated. Rename it to .pan.yaml.\n`);
+		return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
+	}
+	return null;
+}
+/**
+* Load global config (~/.overdeck/config.yaml)
+*/
+function loadGlobalConfig() {
+	return loadYamlFile(GLOBAL_CONFIG_PATH);
+}
+/**
+* Merge shadow configuration from multiple sources
+*/
+function mergeShadowConfig(result, config) {
+	if (!config?.shadow) return;
+	if (config.shadow.enabled !== void 0) result.enabled = config.shadow.enabled;
+	if (config.shadow.trackers) {
+		if (config.shadow.trackers.linear !== void 0) result.trackers.linear = config.shadow.trackers.linear;
+		if (config.shadow.trackers.github !== void 0) result.trackers.github = config.shadow.trackers.github;
+		if (config.shadow.trackers.gitlab !== void 0) result.trackers.gitlab = config.shadow.trackers.gitlab;
+		if (config.shadow.trackers.rally !== void 0) result.trackers.rally = config.shadow.trackers.rally;
+	}
+}
+/**
+* Merge caveman configuration from a single config source into the result.
+*/
+function mergeCavemanConfig(result, config) {
+	const caveman = config?.agents?.caveman;
+	if (!caveman) return;
+	if (caveman.enabled !== void 0) result.enabled = caveman.enabled;
+	if (caveman.ab_test !== void 0) result.abTest = caveman.ab_test;
+	if (caveman.work !== void 0) result.modes.work = caveman.work;
+	if (caveman.review !== void 0) result.modes.review = caveman.review;
+	if (caveman.test !== void 0) result.modes.test = caveman.test;
+	if (caveman.merge !== void 0) result.modes.merge = caveman.merge;
+}
+function mergeRtkConfig(result, config) {
+	const rtk = config?.agents?.rtk;
+	if (!rtk) return;
+	if (rtk.enabled !== void 0) result.enabled = rtk.enabled;
+}
+function mergeTldrConfig(result, config) {
+	const tldr = config?.agents?.tldr;
+	if (!tldr) return;
+	if (tldr.enabled !== void 0) result.enabled = tldr.enabled;
+}
+function cloneDocsConfig(config) {
+	return {
+		enabled: config.enabled,
+		promptInjectionEnabled: config.promptInjectionEnabled,
+		cliEnabled: config.cliEnabled,
+		trigger: {
+			regexes: [...config.trigger.regexes],
+			caseSensitive: config.trigger.caseSensitive
+		},
+		corpus: {
+			docs: config.corpus.docs,
+			skills: config.corpus.skills,
+			rules: config.corpus.rules,
+			claudeMd: config.corpus.claudeMd,
+			prds: config.corpus.prds,
+			prdStatuses: [...config.corpus.prdStatuses],
+			maxChunkTokens: config.corpus.maxChunkTokens
+		},
+		budget: { ...config.budget },
+		embedding: { ...config.embedding },
+		classifier: { ...config.classifier }
+	};
+}
+function mergeDocsConfig(result, config) {
+	const docs = config?.docs;
+	if (!docs) return;
+	if (docs.enabled !== void 0) result.enabled = docs.enabled;
+	if (docs.prompt_injection !== void 0) result.promptInjectionEnabled = docs.prompt_injection;
+	if (docs.cli !== void 0) result.cliEnabled = docs.cli;
+	if (docs.trigger) {
+		if (docs.trigger.regexes !== void 0) result.trigger.regexes = [...docs.trigger.regexes];
+		if (docs.trigger.case_sensitive !== void 0) result.trigger.caseSensitive = docs.trigger.case_sensitive;
+	}
+	if (docs.corpus) {
+		if (docs.corpus.docs !== void 0) result.corpus.docs = docs.corpus.docs;
+		if (docs.corpus.skills !== void 0) result.corpus.skills = docs.corpus.skills;
+		if (docs.corpus.rules !== void 0) result.corpus.rules = docs.corpus.rules;
+		if (docs.corpus.claude_md !== void 0) result.corpus.claudeMd = docs.corpus.claude_md;
+		if (docs.corpus.prds !== void 0) result.corpus.prds = docs.corpus.prds;
+		if (docs.corpus.prd_statuses !== void 0) result.corpus.prdStatuses = [...docs.corpus.prd_statuses];
+		if (docs.corpus.max_chunk_tokens !== void 0) result.corpus.maxChunkTokens = docs.corpus.max_chunk_tokens;
+	}
+	if (docs.budget) {
+		if (docs.budget.injection_rate !== void 0) result.budget.injectionRate = docs.budget.injection_rate;
+		if (docs.budget.turn_window !== void 0) result.budget.turnWindow = docs.budget.turn_window;
+		if (docs.budget.max_tokens_per_injection !== void 0) result.budget.maxTokensPerInjection = docs.budget.max_tokens_per_injection;
+		if (docs.budget.max_chunks_per_injection !== void 0) result.budget.maxChunksPerInjection = docs.budget.max_chunks_per_injection;
+		if (docs.budget.bypass_classifier_threshold !== void 0) result.budget.bypassClassifierThreshold = docs.budget.bypass_classifier_threshold;
+	}
+	if (docs.embedding) {
+		if (docs.embedding.provider !== void 0) result.embedding.provider = docs.embedding.provider;
+		if (docs.embedding.model !== void 0) result.embedding.model = docs.embedding.model;
+		if (docs.embedding.dimensions !== void 0) result.embedding.dimensions = docs.embedding.dimensions;
+	}
+	if (docs.classifier) {
+		if (docs.classifier.enabled !== void 0) result.classifier.enabled = docs.classifier.enabled;
+		if (docs.classifier.provider !== void 0) result.classifier.provider = docs.classifier.provider;
+		if (docs.classifier.model !== void 0) result.classifier.model = docs.classifier.model;
+		if (docs.classifier.threshold !== void 0) result.classifier.threshold = docs.classifier.threshold;
+		if (docs.classifier.timeout_ms !== void 0) result.classifier.timeoutMs = docs.classifier.timeout_ms;
+	}
+}
+function mergeTtsConfig(result, config) {
+	const tts = config?.tts;
+	if (!tts) return;
+	if (tts.enabled !== void 0) result.enabled = tts.enabled;
+	if (tts.lifecycle !== void 0) result.lifecycle = tts.lifecycle;
+	if (tts.voice !== void 0) result.voice = tts.voice;
+	if (tts.statusVoice !== void 0) result.statusVoice = tts.statusVoice;
+	if (tts.volume !== void 0) result.volume = tts.volume;
+	if (tts.rate !== void 0) result.rate = tts.rate;
+	if (tts.maxChars !== void 0) result.maxChars = tts.maxChars;
+	if (tts.dropInfoWhenFull !== void 0) result.dropInfoWhenFull = tts.dropInfoWhenFull;
+	if (tts.daemonPort !== void 0) result.daemonPort = tts.daemonPort;
+	if (tts.daemonHost !== void 0) result.daemonHost = tts.daemonHost;
+	if (tts.daemon?.autoStart !== void 0) result.daemonAutoStart = tts.daemon.autoStart;
+	if (tts.voiceMap !== void 0) result.voiceMap = { ...tts.voiceMap };
+	if (tts.mutedSources !== void 0) result.mutedSources = [...tts.mutedSources];
+	if (tts.utteranceTemplates !== void 0) result.utteranceTemplates = { ...tts.utteranceTemplates };
+	if (tts.mutedIssues !== void 0) result.mutedIssues = [...tts.mutedIssues];
+}
+function isWorkhorseRef(ref) {
+	return ref.startsWith("workhorse:");
+}
+function workhorseSlotFromRef(ref) {
+	return ref.slice(10);
+}
+function derefWorkhorse(ref, config, fieldPath = "model") {
+	if (ref === "parent") throw new Error(`config.yaml: ${fieldPath} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is a resolve-only sub-role sentinel`);
+	if (!isWorkhorseRef(ref)) return resolveModelIdSync(ref);
+	const slot = workhorseSlotFromRef(ref);
+	const resolved = config.workhorses?.[slot];
+	if (!resolved) throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
+	if (isWorkhorseRef(resolved)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+	return resolveModelIdSync(resolved);
+}
+function mergeRoleConfig(result, config) {
+	if (!config?.workhorses && !config?.roles) return;
+	if (config.workhorses) {
+		const unknownSlots = Object.keys(config.workhorses).filter((slot) => !WORKHORSE_SLOTS.includes(slot));
+		if (unknownSlots.length > 0) throw new Error(`config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? "s" : ""} ` + unknownSlots.map((s) => `workhorses.${s}`).join(", ") + `. Valid slots: ${WORKHORSE_SLOTS.join(", ")}.`);
+		result.workhorses = {
+			...result.workhorses ?? {},
+			...config.workhorses
+		};
+	}
+	if (config.roles) {
+		result.roles = { ...result.roles ?? {} };
+		for (const [role, roleConfig] of Object.entries(config.roles)) {
+			const existing = result.roles[role];
+			const sub = {
+				...existing?.sub ?? {},
+				...roleConfig.sub ?? {}
+			};
+			const mergedRoleConfig = {
+				...existing,
+				...roleConfig,
+				sub: Object.keys(sub).length > 0 ? sub : void 0
+			};
+			if (roleConfig.maxAgents !== void 0 && roleConfig.minAgents === void 0 && mergedRoleConfig.minAgents !== void 0 && mergedRoleConfig.minAgents > roleConfig.maxAgents) mergedRoleConfig.minAgents = roleConfig.maxAgents;
+			result.roles[role] = mergedRoleConfig;
+		}
+	}
+}
+function validateRoleFields(role, roleConfig) {
+	if (roleConfig.harness !== void 0 && roleConfig.harness !== "claude-code" && roleConfig.harness !== "pi" && roleConfig.harness !== "codex") throw new Error(`config.yaml: roles.${role}.harness must be claude-code, pi, or codex`);
+	if (roleConfig.effort !== void 0 && !ROLE_EFFORTS.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort must be one of ${ROLE_EFFORTS.join(", ")}`);
+	if (roleConfig.maxAgents !== void 0 && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
+	if (roleConfig.minAgents !== void 0 && (!Number.isInteger(roleConfig.minAgents) || roleConfig.minAgents < 0)) throw new Error(`config.yaml: roles.${role}.minAgents must be a non-negative integer`);
+	if (roleConfig.minAgents !== void 0 && roleConfig.maxAgents !== void 0 && roleConfig.minAgents > roleConfig.maxAgents) throw new Error(`config.yaml: roles.${role}.minAgents (${roleConfig.minAgents}) cannot exceed maxAgents (${roleConfig.maxAgents})`);
+	if (roleConfig.scope !== void 0 && roleConfig.scope !== "pan-only" && roleConfig.scope !== "all-tracked-projects") throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
+}
+function validateRoleModelRefs(config) {
+	for (const [slot, ref] of Object.entries(config.workhorses ?? {})) {
+		if (ref === "parent") throw new Error(`config.yaml: workhorses.${slot} cannot be ${PARENT_MODEL_REF}; ${PARENT_MODEL_REF} is valid only for sub-role models`);
+		if (isWorkhorseRef(ref)) throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+		resolveModelIdSync(ref);
+	}
+	for (const [role, roleConfig] of Object.entries(config.roles ?? {})) {
+		validateRoleFields(role, roleConfig);
+		if (roleConfig.model) {
+			const resolvedModel = derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+			if (roleConfig.effort !== void 0) {
+				const supported = getModelEffortLevelsSync(resolvedModel);
+				if (supported !== void 0 && !supported.includes(roleConfig.effort)) throw new Error(`config.yaml: roles.${role}.effort '${roleConfig.effort}' is not supported by ${resolvedModel} (supported: ${supported.join(", ")})`);
+			}
+		}
+		for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) if (subConfig.model && subConfig.model !== "parent") derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
+	}
+}
+/**
+* Merge multiple configs with precedence: project > global > defaults
+*/
+function mergeConfigs(...configs) {
+	const result = {
+		...DEFAULT_CONFIG,
+		tmux: { ...DEFAULT_CONFIG.tmux },
+		enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
+		workhorses: { ...DEFAULT_WORKHORSES },
+		roles: cloneRoles(DEFAULT_ROLES),
+		memory: {
+			extraction: {
+				...DEFAULT_CONFIG.memory.extraction,
+				fallbackChain: [...DEFAULT_CONFIG.memory.extraction.fallbackChain]
+			},
+			observationsEnabled: DEFAULT_CONFIG.memory.observationsEnabled,
+			promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
+			rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
+			sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
+			workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency
+		},
+		backgroundAi: {
+			cheapMode: DEFAULT_CONFIG.backgroundAi.cheapMode,
+			features: { ...DEFAULT_CONFIG.backgroundAi.features }
+		},
+		compliance: { mode: DEFAULT_CONFIG.compliance.mode },
+		registry: { classification: { ...DEFAULT_CONFIG.registry.classification } },
+		shadow: {
+			enabled: DEFAULT_CONFIG.shadow.enabled,
+			trackers: { ...DEFAULT_CONFIG.shadow.trackers }
+		},
+		caveman: {
+			enabled: DEFAULT_CONFIG.caveman.enabled,
+			abTest: DEFAULT_CONFIG.caveman.abTest,
+			modes: { ...DEFAULT_CONFIG.caveman.modes }
+		},
+		rtk: { enabled: DEFAULT_CONFIG.rtk.enabled },
+		docs: cloneDocsConfig(DEFAULT_CONFIG.docs),
+		conversationSearch: { ...DEFAULT_CONFIG.conversationSearch },
+		tts: {
+			enabled: DEFAULT_CONFIG.tts.enabled,
+			lifecycle: DEFAULT_CONFIG.tts.lifecycle,
+			voice: DEFAULT_CONFIG.tts.voice,
+			volume: DEFAULT_CONFIG.tts.volume,
+			rate: DEFAULT_CONFIG.tts.rate,
+			maxChars: DEFAULT_CONFIG.tts.maxChars,
+			dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+			daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+			daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+			daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
+			voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+			mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+			utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+			mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues]
+		},
+		ttsSummarizer: {
+			enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
+			model: DEFAULT_CONFIG.ttsSummarizer.model,
+			batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds
+		},
+		resources: {
+			memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
+			memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
+			agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
+			agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount
+		},
+		experimental: {
+			claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+			claudeCodeChannelsMcp: DEFAULT_CONFIG.experimental.claudeCodeChannelsMcp,
+			streamdownRenderer: DEFAULT_CONFIG.experimental.streamdownRenderer
+		},
+		claude: { permissionMode: DEFAULT_CONFIG.claude.permissionMode },
+		codex: { permissionMode: DEFAULT_CONFIG.codex.permissionMode }
+	};
+	const explicitlyDisabled = /* @__PURE__ */ new Set();
+	const validConfigs = configs.filter((c) => c !== null);
+	for (const config of validConfigs.reverse()) {
+		if (config.models?.providers) {
+			const providers = config.models.providers;
+			const legacyKeys = config.api_keys || {};
+			const anthropic = normalizeProviderConfig(providers.anthropic, void 0);
+			applyProviderHarness(result, "anthropic", anthropic.harness);
+			if (anthropic.enabled) result.enabledProviders.add("anthropic");
+			else if (providers.anthropic !== void 0) {
+				explicitlyDisabled.add("anthropic");
+				result.enabledProviders.delete("anthropic");
+			}
+			const openai = normalizeProviderConfig(providers.openai, legacyKeys.openai);
+			applyProviderHarness(result, "openai", openai.harness);
+			if (openai.enabled) {
+				result.enabledProviders.add("openai");
+				if (openai.api_key) result.apiKeys.openai = resolveEnvVar(openai.api_key);
+				if (openai.auth) result.providerAuth.openai = openai.auth;
+				if (openai.plan) result.providerPlan.openai = openai.plan;
+			} else if (providers.openai !== void 0) explicitlyDisabled.add("openai");
+			const google = normalizeProviderConfig(providers.google, legacyKeys.google);
+			applyProviderHarness(result, "google", google.harness);
+			if (google.enabled) {
+				result.enabledProviders.add("google");
+				if (google.api_key) result.apiKeys.google = resolveEnvVar(google.api_key);
+				if (google.auth) result.providerAuth.google = google.auth;
+				if (google.plan) result.providerPlan.google = google.plan;
+			} else if (providers.google !== void 0) explicitlyDisabled.add("google");
+			const minimax = normalizeProviderConfig(providers.minimax, legacyKeys.minimax);
+			applyProviderHarness(result, "minimax", minimax.harness);
+			if (minimax.enabled) {
+				result.enabledProviders.add("minimax");
+				if (minimax.api_key) result.apiKeys.minimax = resolveEnvVar(minimax.api_key);
+			} else if (providers.minimax !== void 0) explicitlyDisabled.add("minimax");
+			const zai = normalizeProviderConfig(providers.zai, legacyKeys.zai);
+			applyProviderHarness(result, "zai", zai.harness);
+			if (zai.enabled) {
+				result.enabledProviders.add("zai");
+				if (zai.api_key) result.apiKeys.zai = resolveEnvVar(zai.api_key);
+			} else if (providers.zai !== void 0) explicitlyDisabled.add("zai");
+			const kimi = normalizeProviderConfig(providers.kimi, legacyKeys.kimi);
+			applyProviderHarness(result, "kimi", kimi.harness);
+			if (kimi.enabled) {
+				result.enabledProviders.add("kimi");
+				if (kimi.api_key) result.apiKeys.kimi = resolveEnvVar(kimi.api_key);
+			} else if (providers.kimi !== void 0) explicitlyDisabled.add("kimi");
+			const openrouter = normalizeProviderConfig(providers.openrouter, legacyKeys.openrouter);
+			applyProviderHarness(result, "openrouter", openrouter.harness);
+			if (openrouter.enabled) {
+				result.enabledProviders.add("openrouter");
+				if (openrouter.api_key) result.apiKeys.openrouter = resolveEnvVar(openrouter.api_key);
+			} else if (providers.openrouter !== void 0) explicitlyDisabled.add("openrouter");
+			const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+			applyProviderHarness(result, "mimo", mimo.harness);
+			if (mimo.enabled) {
+				result.enabledProviders.add("mimo");
+				if (mimo.api_key) result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
+			} else if (providers.mimo !== void 0) explicitlyDisabled.add("mimo");
+			const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
+			applyProviderHarness(result, "nous", nous.harness);
+			if (nous.enabled) {
+				result.enabledProviders.add("nous");
+				if (nous.api_key) result.apiKeys.nous = resolveEnvVar(nous.api_key);
+			} else if (providers.nous !== void 0) explicitlyDisabled.add("nous");
+			const dashscope = normalizeProviderConfig(providers.dashscope, legacyKeys.dashscope);
+			applyProviderHarness(result, "dashscope", dashscope.harness);
+			if (dashscope.enabled) {
+				result.enabledProviders.add("dashscope");
+				if (dashscope.api_key) result.apiKeys.dashscope = resolveEnvVar(dashscope.api_key);
+			} else if (providers.dashscope !== void 0) explicitlyDisabled.add("dashscope");
+		}
+		if (config.tmux?.config_mode) result.tmux.configMode = config.tmux.config_mode;
+		if (config.conversations?.compaction_model) result.conversations.compactionModel = resolveModelIdSync(config.conversations.compaction_model);
+		if (config.conversations?.manual_compact_mode) result.conversations.manualCompactMode = config.conversations.manual_compact_mode;
+		if (config.conversations?.rich_compaction !== void 0) result.conversations.richCompaction = config.conversations.rich_compaction;
+		if (config.conversations?.title_model) result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+		if (config.conversations?.watch_dirs) result.conversations.watchDirs = config.conversations.watch_dirs;
+		if (config.conversations?.scan_max_parallel !== void 0) result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
+		if (config.conversations?.embeddings !== void 0) result.conversations.embeddings = config.conversations.embeddings;
+		if (config.conversations?.embedding_provider) {
+			result.conversations.embeddingProvider = config.conversations.embedding_provider;
+			if (config.conversations.embedding_provider === "ollama" && !config.conversations.embedding_model) result.conversations.embeddingModel = "nomic-embed-text";
+		}
+		if (config.conversations?.embedding_model) result.conversations.embeddingModel = config.conversations.embedding_model;
+		if (config.conversations?.embedding_auto_on_deep !== void 0) result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
+		if (config.conversations?.enrichment?.quick_model !== void 0) result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
+		if (config.conversations?.enrichment?.deep_model !== void 0) result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
+		if (config.conversations?.enrichment?.max_parallel !== void 0) result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
+		if (config.conversations?.enrichment?.cost_confirm_threshold !== void 0) result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
+		if (config.memory) {
+			if (config.memory.extraction) result.memory.extraction = {
+				...result.memory.extraction,
+				...config.memory.extraction.provider !== void 0 ? { provider: config.memory.extraction.provider } : {},
+				...config.memory.extraction.model !== void 0 ? { model: config.memory.extraction.model } : {},
+				...config.memory.extraction.per_day_cost_cap_usd !== void 0 ? { perDayCostCapUsd: config.memory.extraction.per_day_cost_cap_usd } : {},
+				...config.memory.extraction.fallback_chain !== void 0 ? { fallbackChain: config.memory.extraction.fallback_chain } : {}
+			};
+			if (config.memory.features?.observations !== void 0) result.memory.observationsEnabled = config.memory.features.observations;
+			if (config.memory.features?.prompt_time_injection !== void 0) result.memory.promptTimeInjectionEnabled = config.memory.features.prompt_time_injection;
+			if (config.memory.rollup_pending_threshold !== void 0) result.memory.rollupPendingThreshold = config.memory.rollup_pending_threshold;
+			if (config.memory.sidebar_refresh_interval_ms !== void 0) result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
+			if (config.memory.worker_concurrency !== void 0) result.memory.workerConcurrency = config.memory.worker_concurrency;
+		}
+		if (config.compliance?.mode !== void 0) {
+			if (!isComplianceMode(config.compliance.mode)) throw new Error(`config.yaml: compliance.mode must be ${COMPLIANCE_MODES.join(", ")}`);
+			result.compliance.mode = config.compliance.mode;
+		}
+		if (config.registry?.classification) {
+			const classification = config.registry.classification;
+			if (classification.enabled !== void 0) result.registry.classification.enabled = classification.enabled;
+			if (classification.provider !== void 0) {
+				if (!isFeatureRegistryClassificationProvider(classification.provider)) throw new Error("config.yaml: registry.classification.provider must be anthropic or cliproxy");
+				result.registry.classification.provider = classification.provider;
+			}
+			if (classification.model !== void 0) result.registry.classification.model = classification.model;
+			if (classification.per_day_cost_cap_usd !== void 0) {
+				if (typeof classification.per_day_cost_cap_usd !== "number" || classification.per_day_cost_cap_usd < 0) throw new Error("config.yaml: registry.classification.per_day_cost_cap_usd must be a non-negative number");
+				result.registry.classification.perDayCostCapUsd = classification.per_day_cost_cap_usd;
+			}
+		}
+		if (config.openrouter?.favorites) result.openrouterFavorites = config.openrouter.favorites;
+		mergeRoleConfig(result, config);
+		if (config.api_keys) {
+			if (config.api_keys.openai) {
+				result.apiKeys.openai = resolveEnvVar(config.api_keys.openai);
+				if (!explicitlyDisabled.has("openai")) result.enabledProviders.add("openai");
+			}
+			if (config.api_keys.voyage) result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
+			if (config.api_keys.google) {
+				result.apiKeys.google = resolveEnvVar(config.api_keys.google);
+				if (!explicitlyDisabled.has("google")) result.enabledProviders.add("google");
+			}
+			if (config.api_keys.minimax) {
+				result.apiKeys.minimax = resolveEnvVar(config.api_keys.minimax);
+				if (!explicitlyDisabled.has("minimax")) result.enabledProviders.add("minimax");
+			}
+			if (config.api_keys.zai) {
+				result.apiKeys.zai = resolveEnvVar(config.api_keys.zai);
+				if (!explicitlyDisabled.has("zai")) result.enabledProviders.add("zai");
+			}
+			if (config.api_keys.kimi) {
+				result.apiKeys.kimi = resolveEnvVar(config.api_keys.kimi);
+				if (!explicitlyDisabled.has("kimi")) result.enabledProviders.add("kimi");
+			}
+			if (config.api_keys.openrouter) {
+				result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
+				if (!explicitlyDisabled.has("openrouter")) result.enabledProviders.add("openrouter");
+			}
+			if (config.api_keys.mimo) {
+				result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
+				if (!explicitlyDisabled.has("mimo")) result.enabledProviders.add("mimo");
+			}
+			if (config.api_keys.nous) {
+				result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
+				if (!explicitlyDisabled.has("nous")) result.enabledProviders.add("nous");
+			}
+			if (config.api_keys.dashscope) {
+				result.apiKeys.dashscope = resolveEnvVar(config.api_keys.dashscope);
+				if (!explicitlyDisabled.has("dashscope")) result.enabledProviders.add("dashscope");
+			}
+		}
+		if (config.models?.overrides) result.overrides = {
+			...result.overrides,
+			...config.models.overrides
+		};
+		if (config.models?.gemini_thinking_level) result.geminiThinkingLevel = config.models.gemini_thinking_level;
+		if (config.models?.default_conversation_model) result.defaultConversationModel = config.models.default_conversation_model;
+		if (config.tracker_keys) {
+			if (config.tracker_keys.linear) result.trackerKeys.linear = resolveEnvVar(config.tracker_keys.linear);
+			if (config.tracker_keys.github) result.trackerKeys.github = resolveEnvVar(config.tracker_keys.github);
+			if (config.tracker_keys.gitlab) result.trackerKeys.gitlab = resolveEnvVar(config.tracker_keys.gitlab);
+			if (config.tracker_keys.rally) result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
+		}
+		mergeShadowConfig(result.shadow, config);
+		mergeCavemanConfig(result.caveman, config);
+		mergeRtkConfig(result.rtk, config);
+		mergeTldrConfig(result.tldr, config);
+		mergeDocsConfig(result.docs, config);
+		mergeTtsConfig(result.tts, config);
+		if (config.tts?.summarizer) {
+			const s = config.tts.summarizer;
+			if (s.enabled !== void 0) result.ttsSummarizer.enabled = s.enabled;
+			if (s.model) result.ttsSummarizer.model = resolveModelIdSync(s.model);
+			if (s.batch_window_seconds !== void 0) result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
+		}
+		if (config.background_ai) {
+			if (typeof config.background_ai.cheap_mode === "boolean") result.backgroundAi.cheapMode = config.background_ai.cheap_mode;
+			if (config.background_ai.features) for (const feature of BACKGROUND_AI_FEATURES) {
+				const value = config.background_ai.features[feature];
+				if (typeof value === "boolean") result.backgroundAi.features[feature] = value;
+			}
+		}
+		if (config.resources) {
+			if (typeof config.resources.memory_warn_gb === "number") result.resources.memoryWarnGb = config.resources.memory_warn_gb;
+			if (typeof config.resources.memory_block_gb === "number") result.resources.memoryBlockGb = config.resources.memory_block_gb;
+			if (typeof config.resources.agent_warn_count === "number") result.resources.agentWarnCount = config.resources.agent_warn_count;
+			if (typeof config.resources.agent_block_count === "number") result.resources.agentBlockCount = config.resources.agent_block_count;
+		}
+		if (config.experimental) {
+			if (typeof config.experimental.claudeCodeChannels === "boolean") result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
+			if (typeof config.experimental.claudeCodeChannelsMcp === "boolean") result.experimental.claudeCodeChannelsMcp = config.experimental.claudeCodeChannelsMcp;
+			if (typeof config.experimental.streamdownRenderer === "boolean") result.experimental.streamdownRenderer = config.experimental.streamdownRenderer;
+		}
+		if (config.claude && (config.claude.permissionMode === "auto" || config.claude.permissionMode === "bypass")) result.claude.permissionMode = config.claude.permissionMode;
+		if (config.codex && (config.codex.permissionMode === "read-only" || config.codex.permissionMode === "workspace" || config.codex.permissionMode === "auto-review" || config.codex.permissionMode === "full-access")) result.codex.permissionMode = config.codex.permissionMode;
+		mergeRemoteConfig(result, config);
+		if (config.conversationSearch) {
+			const cs = config.conversationSearch;
+			if (typeof cs.enabled === "boolean") result.conversationSearch.enabled = cs.enabled;
+			if (cs.provider !== void 0) result.conversationSearch.provider = cs.provider;
+			if (cs.model !== void 0) result.conversationSearch.model = cs.model;
+			if (cs.apiKeyRef !== void 0) result.conversationSearch.apiKeyRef = cs.apiKeyRef;
+			if (cs.dbPath !== void 0) result.conversationSearch.dbPath = cs.dbPath;
+		}
+	}
+	validateRoleModelRefs(result);
+	return {
+		config: result,
+		explicitlyDisabled
+	};
+}
+/**
+* Detect deprecated model IDs in config overrides
+*
+* Returns array of migrations to perform, or empty array if none found.
+*/
+function detectDeprecatedModels(config) {
+	if (!config?.models?.overrides) return [];
+	const migrations = [];
+	for (const [workType, modelId] of Object.entries(config.models.overrides)) if (modelId && MODEL_DEPRECATIONS[modelId]) migrations.push({
+		workType,
+		from: modelId,
+		to: MODEL_DEPRECATIONS[modelId]
+	});
+	return migrations;
+}
+/**
+* Apply deprecation migrations to a YamlConfig (in-place)
+*/
+function applyMigrations(config, migrations) {
+	if (!config.models) config.models = {};
+	if (!config.models.overrides) config.models.overrides = {};
+	for (const { workType, to } of migrations) config.models.overrides[workType] = to;
+}
+/**
+* Create backup of global config file
+*/
+function backupGlobalConfig() {
+	try {
+		copyFileSync(GLOBAL_CONFIG_PATH, `${GLOBAL_CONFIG_PATH}.bak`);
+		console.log(`✓ Backed up config.yaml → config.yaml.bak`);
+		return true;
+	} catch (error) {
+		console.error(`Failed to create config backup:`, error);
+		return false;
+	}
+}
+/**
+* Write YamlConfig back to global config file
+*/
+function writeGlobalConfig(config) {
+	writeFileSync(GLOBAL_CONFIG_PATH, jsYaml.dump(config, {
+		indent: 2,
+		lineWidth: 100,
+		noRefs: true
+	}), "utf-8");
+	chmodSync(GLOBAL_CONFIG_PATH, 384);
+}
+let configCache = null;
+function applyEnvironmentFallbacks(config, explicitlyDisabled) {
+	if (process.env.OPENAI_API_KEY && !config.apiKeys.openai) {
+		config.apiKeys.openai = process.env.OPENAI_API_KEY;
+		if (!explicitlyDisabled.has("openai")) config.enabledProviders.add("openai");
+	}
+	if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
+	if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
+		config.apiKeys.google = process.env.GOOGLE_API_KEY;
+		if (!explicitlyDisabled.has("google")) config.enabledProviders.add("google");
+	}
+	if (process.env.MINIMAX_API_KEY && !config.apiKeys.minimax) {
+		config.apiKeys.minimax = process.env.MINIMAX_API_KEY;
+		if (!explicitlyDisabled.has("minimax")) config.enabledProviders.add("minimax");
+	}
+	if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
+		config.apiKeys.zai = process.env.ZAI_API_KEY;
+		if (!explicitlyDisabled.has("zai")) config.enabledProviders.add("zai");
+	}
+	const kimiKey = process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY;
+	if (kimiKey && !config.apiKeys.kimi) {
+		config.apiKeys.kimi = kimiKey;
+		if (!explicitlyDisabled.has("kimi")) config.enabledProviders.add("kimi");
+	}
+	if (process.env.OPENROUTER_API_KEY && !config.apiKeys.openrouter) {
+		config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
+		if (!explicitlyDisabled.has("openrouter")) config.enabledProviders.add("openrouter");
+	}
+	if (process.env.MIMO_API_KEY && !config.apiKeys.mimo) {
+		config.apiKeys.mimo = process.env.MIMO_API_KEY;
+		if (!explicitlyDisabled.has("mimo")) config.enabledProviders.add("mimo");
+	}
+	if (process.env.NOUS_API_KEY && !config.apiKeys.nous) {
+		config.apiKeys.nous = process.env.NOUS_API_KEY;
+		if (!explicitlyDisabled.has("nous")) config.enabledProviders.add("nous");
+	}
+	if (process.env.DASHSCOPE_API_KEY && !config.apiKeys.dashscope) {
+		config.apiKeys.dashscope = process.env.DASHSCOPE_API_KEY;
+		if (!explicitlyDisabled.has("dashscope")) config.enabledProviders.add("dashscope");
+	}
+	if (process.env.LINEAR_API_KEY && !config.trackerKeys.linear) config.trackerKeys.linear = process.env.LINEAR_API_KEY;
+	if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) config.trackerKeys.github = process.env.GITHUB_TOKEN;
+	if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
+	if (process.env.RALLY_API_KEY && !config.trackerKeys.rally) config.trackerKeys.rally = process.env.RALLY_API_KEY;
+	if (process.env.SHADOW_MODE !== void 0) config.shadow.enabled = [
+		"true",
+		"1",
+		"yes"
+	].includes(process.env.SHADOW_MODE.toLowerCase());
+}
+function getConfigMtimes() {
+	let globalMtime = 0;
+	let projectMtime = 0;
+	try {
+		if (existsSync(GLOBAL_CONFIG_PATH)) globalMtime = statSync(GLOBAL_CONFIG_PATH).mtimeMs;
+	} catch {}
+	const projectRoot = findProjectRoot();
+	if (projectRoot) for (const name of [".pan.yaml", ".overdeck.yaml"]) {
+		const path = join(projectRoot, name);
+		try {
+			if (existsSync(path)) {
+				projectMtime = statSync(path).mtimeMs;
+				break;
+			}
+		} catch {}
+	}
+	return {
+		global: globalMtime,
+		project: projectMtime
+	};
+}
+/**
+* Load complete configuration (global + project + defaults)
+* Also loads API keys from environment variables as fallback
+*
+* IMPORTANT: This function may modify config.yaml if deprecated model IDs
+* are detected. A backup is created before any modifications.
+*
+* Results are cached in memory and invalidated when the underlying config
+* files change (checked via mtime).
+*/
+function loadConfigSync() {
+	const mtimes = getConfigMtimes();
+	if (configCache && configCache.globalMtime === mtimes.global && configCache.projectMtime === mtimes.project) return configCache.result;
+	let globalConfig = loadGlobalConfig();
+	const projectConfig = loadProjectConfig();
+	let migrationResult;
+	if (globalConfig && hasGlobalConfig()) {
+		const migrations = detectDeprecatedModels(globalConfig);
+		if (migrations.length > 0) {
+			const backedUp = backupGlobalConfig();
+			applyMigrations(globalConfig, migrations);
+			writeGlobalConfig(globalConfig);
+			if (migrations.length > 0) {
+				console.log("\n🔄 Model ID Migration:");
+				for (const { workType, from, to } of migrations) console.log(`  ${workType}: ${from} → ${to}`);
+			}
+			console.log("");
+			migrationResult = {
+				migrated: migrations,
+				backedUp
+			};
+		}
+	}
+	const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
+	applyEnvironmentFallbacks(config, explicitlyDisabled);
+	const result = {
+		config,
+		migration: migrationResult
+	};
+	const freshMtimes = getConfigMtimes();
+	configCache = {
+		globalMtime: freshMtimes.global,
+		projectMtime: freshMtimes.project,
+		result
+	};
+	return result;
+}
+/**
+* Check if global config exists
+*/
+function hasGlobalConfig() {
+	return existsSync(GLOBAL_CONFIG_PATH);
+}
+//#endregion
+//#region ../../src/lib/child-env.ts
+/** Env vars that leak from a parent shell / tmux / screen and must not reach children. */
+const LEAKED_ENV_KEYS = new Set([
+	"TMUX",
+	"TMUX_PANE",
+	"STY",
+	"WINDOW"
+]);
+/** Provider-specific keys that must be cleared before re-routing a child. */
+const PROVIDER_ENV_KEYS = new Set([
+	"ANTHROPIC_API_KEY",
+	"ANTHROPIC_BASE_URL",
+	"ANTHROPIC_AUTH_TOKEN",
+	"ANTHROPIC_DEFAULT_HAIKU_MODEL",
+	"OPENAI_API_KEY",
+	"GEMINI_API_KEY",
+	"API_TIMEOUT_MS",
+	"CLAUDE_CODE_API_KEY_HELPER_TTL_MS",
+	"KIMI_API_KEY",
+	"MINIMAX_API_KEY",
+	"ZAI_API_KEY",
+	"MIMO_API_KEY",
+	"OPENROUTER_API_KEY",
+	"NOUS_API_KEY",
+	"DASHSCOPE_API_KEY"
+]);
+/** All keys that should be stripped by default. */
+const STRIPPED_KEYS = new Set([...LEAKED_ENV_KEYS, ...PROVIDER_ENV_KEYS]);
+/**
+* Build a sanitized child environment.
+*
+* @param baseEnv  Source environment (default: process.env). Only string values are copied.
+* @param overrides  Key/value pairs to overlay AFTER stripping.
+* @returns  A plain object safe to pass to spawn, pty.spawn, etc.
+*/
+function buildChildEnvSync(baseEnv = process.env, overrides) {
+	const out = {};
+	for (const [k, v] of Object.entries(baseEnv)) {
+		if (v === void 0) continue;
+		if (STRIPPED_KEYS.has(k)) continue;
+		out[k] = v;
+	}
+	if (overrides) for (const [k, v] of Object.entries(overrides)) out[k] = v;
+	return out;
+}
+Object.fromEntries([...PROVIDER_ENV_KEYS].map((k) => [k, ""]));
+//#endregion
+//#region ../../src/lib/tmux.ts
+const execFileAsync = promisify(execFile);
+const MANAGED_TMUX_SERVER_UNIT = "overdeck-tmux-server";
+const SERVER_ALIVE_POLL_MS = 50;
+const SERVER_ALIVE_TIMEOUT_MS = 5e3;
+const MANAGED_TMUX_CONFIG_CONTENT = [
+	"# Overdeck-managed tmux config",
+	"# Keep this minimal and include only behavior Overdeck intentionally depends on.",
+	"# PAN-1798: keep the server alive at zero sessions so a dedicated, cleanly-named",
+	"# server process can be founded ahead of any agent spawn and persist between them.",
+	"set -g exit-empty off",
+	"set -g mouse on",
+	"# Overdeck owns the browser-facing context menu. Prevent tmux defaults",
+	"# from opening a competing right-click menu inside managed sessions.",
+	"unbind-key -T root MouseDown3Pane",
+	"unbind-key -T root M-MouseDown3Pane",
+	"bind-key -T root MouseDown3Pane select-pane -t =",
+	"bind-key -T root M-MouseDown3Pane select-pane -t =",
+	""
+].join("\n");
+let tmuxContextPrepared = false;
+function getTmuxDir() {
+	return join(getOverdeckHome(), "tmux");
+}
+function getManagedTmuxConfigPath() {
+	return join(getTmuxDir(), "overdeck.tmux.conf");
+}
+function getManagedTmuxSocketName() {
+	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "overdeck";
+}
+async function ensureManagedTmuxDirAsync() {
+	await mkdir(getTmuxDir(), { recursive: true });
+}
+/**
+* True when a tmux server is already answering on the managed socket.
+* `list-sessions` exits 0 (possibly with empty output) on a live server and
+* fails with "no server running" / ENOENT when there is none.
+*/
+function isManagedServerAliveSync() {
+	try {
+		execFileSync("tmux", [
+			"-L",
+			getManagedTmuxSocketName(),
+			"list-sessions"
+		], { stdio: "ignore" });
+		return true;
+	} catch {
+		return false;
+	}
+}
+/**
+* PAN-1798: locate the shared tmux server PID. Prefer the dedicated unit's
+* MainPID when we manage it; fall back to pgrep so the founder guard still
+* fires on pre-fix or manually-founded servers.
+*/
+function findManagedServerPidSync() {
+	try {
+		const mainPidOut = execFileSync("systemctl", [
+			"--user",
+			"show",
+			"--property=MainPID",
+			"--value",
+			MANAGED_TMUX_SERVER_UNIT
+		], {
+			encoding: "utf-8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"ignore"
+			]
+		}).trim();
+		const mainPid = Number.parseInt(mainPidOut, 10);
+		if (Number.isInteger(mainPid) && mainPid > 0) return mainPid;
+	} catch {}
+	try {
+		const pgrepOut = execFileSync("pgrep", ["-f", `tmux -L ${getManagedTmuxSocketName()}`], {
+			encoding: "utf-8",
+			stdio: [
+				"ignore",
+				"pipe",
+				"ignore"
+			]
+		}).trim();
+		for (const line of pgrepOut.split("\n")) {
+			const pid = Number.parseInt(line.trim(), 10);
+			if (Number.isInteger(pid) && pid > 0) return pid;
+		}
+	} catch {}
+}
+/**
+* PAN-1798: read the cgroup of the given PID. Returns empty string on failure.
+*/
+function readServerCgroupSync(pid) {
+	try {
+		return readFileSync(`/proc/${pid}/cgroup`, "utf-8");
+	} catch {
+		return "";
+	}
+}
+/**
+* PAN-1798: read /proc/<pid>/cmdline for the given PID. Returns empty string
+* on failure.
+*/
+function readServerCmdlineSync(pid) {
+	try {
+		return readFileSync(`/proc/${pid}/cmdline`, "utf-8").replace(/\0/g, " ").trim();
+	} catch {
+		return "";
+	}
+}
+/**
+* PAN-1798: warn if the live shared server is still stuck inside a per-spawn
+* scope (servers founded before this fix, or by manual tmux use). Never auto-
+* restart — the operator must decide when to migrate off the live founder.
+*/
+function warnIfServerInTmuxSpawnScopeSync() {
+	const pid = findManagedServerPidSync();
+	if (pid === void 0) return;
+	const cgroup = readServerCgroupSync(pid);
+	if (!cgroup.includes("tmux-spawn-")) return;
+	console.warn(`[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} lives in a per-spawn scope. Cgroup: ${cgroup.trim().replace(/\n/g, " ")}. Killing the founding session/agent may destroy the entire shared server. Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`);
+}
+/**
+* PAN-1798: warn if the live shared server was founded implicitly by a client
+* `new-session` rather than by the dedicated `start-server` founding. A dirty
+* cmdline embeds the founding session name, so any cmdline-match teardown
+* (pkill -f, pgrep -f) can hit the server itself. Never auto-restart.
+*/
+function warnIfServerCmdlineIsDirtySync() {
+	const pid = findManagedServerPidSync();
+	if (pid === void 0) return;
+	const cmdline = readServerCmdlineSync(pid);
+	if (!cmdline.includes("new-session")) return;
+	console.warn(`[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} has a dirty cmdline founded by a client new-session: ${cmdline.slice(0, 240)}. Conversation/agent teardown that matches cmdlines may destroy the entire shared server. Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`);
+}
+/**
+* PAN-1798: ensure the shared tmux server is running in a dedicated, long-lived
+* systemd user service — never inside an agent/conversation spawn scope. The
+* service is created on demand; once running it outlives every client on the
+* socket so `pan kill` of any agent cannot take down the fleet.
+*
+* Must be invoked before any `new-session` and at `pan up` time. Waits for the
+* socket to answer before returning.
+*/
+function ensureOverdeckTmuxServerSync(cleanEnv) {
+	if (process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE !== "1") {
+		if (process.env.OVERDECK_TMUX_NO_MANAGED_SERVER === "1" || process.env.VITEST) return;
+	}
+	if (isManagedServerAliveSync()) {
+		warnIfServerInTmuxSpawnScopeSync();
+		warnIfServerCmdlineIsDirtySync();
+		return;
+	}
+	const args = [
+		"-L",
+		getManagedTmuxSocketName(),
+		"-f",
+		getManagedTmuxConfigPath(),
+		"start-server"
+	];
+	if (!(() => {
+		try {
+			execFileSync("systemd-run", [
+				"--user",
+				"--unit",
+				MANAGED_TMUX_SERVER_UNIT,
+				"--collect",
+				"--quiet",
+				"tmux",
+				...args
+			], {
+				stdio: "ignore",
+				env: cleanEnv
+			});
+			return true;
+		} catch {
+			return false;
+		}
+	})()) {
+		let daemonized = false;
+		try {
+			execFileSync("setsid", ["tmux", ...args], {
+				stdio: "ignore",
+				env: cleanEnv
+			});
+			daemonized = true;
+		} catch {}
+		if (!daemonized) execFileSync("tmux", args, {
+			stdio: "ignore",
+			env: cleanEnv
+		});
+		console.warn(`[tmux] WARNING (PAN-1798): could not start '${MANAGED_TMUX_SERVER_UNIT}' via systemd-run. Shared tmux server is running without systemd scope isolation; killing the founding process tree may still destroy the server.`);
+	}
+	const deadline = Date.now() + SERVER_ALIVE_TIMEOUT_MS;
+	while (Date.now() < deadline) {
+		if (isManagedServerAliveSync()) {
+			warnIfServerInTmuxSpawnScopeSync();
+			return;
+		}
+		try {
+			execFileSync("sleep", [String(SERVER_ALIVE_POLL_MS / 1e3)], { stdio: "ignore" });
+		} catch {}
+	}
+}
+/**
+* Async variant of ensureOverdeckTmuxServerSync. Effect-spawn paths use this
+* so server preflight does not block the event loop. Founding itself is still
+* sync (it is rare, fast, and uses the same single path for both variants).
+*/
+async function ensureOverdeckTmuxServerAsync(cleanEnv) {
+	ensureOverdeckTmuxServerSync(cleanEnv);
+}
+async function reloadManagedTmuxConfigAsync() {
+	try {
+		const cleanEnv = buildChildEnvSync();
+		await ensureOverdeckTmuxServerAsync(cleanEnv);
+		await execFileAsync("tmux", [
+			"-L",
+			getManagedTmuxSocketName(),
+			"start-server"
+		], {
+			encoding: "utf-8",
+			env: cleanEnv
+		});
+		await execFileAsync("tmux", [
+			"-L",
+			getManagedTmuxSocketName(),
+			"source-file",
+			getManagedTmuxConfigPath()
+		], { encoding: "utf-8" });
+	} catch {}
+}
+async function ensureManagedTmuxConfigAsync() {
+	if (tmuxContextPrepared) return;
+	await ensureManagedTmuxDirAsync();
+	await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, "utf-8");
+	await reloadManagedTmuxConfigAsync();
+	tmuxContextPrepared = true;
+}
+function getTmuxConfigMode() {
+	const { config } = loadConfigSync();
+	return config.tmux.configMode;
+}
+function getTmuxContextArgsForMode(mode) {
+	if (mode === "inherit-user") return [];
+	return [
+		"-L",
+		getManagedTmuxSocketName(),
+		"-f",
+		getManagedTmuxConfigPath()
+	];
+}
+async function ensureTmuxContextPreparedAsync(mode) {
+	if (mode === "managed") await ensureManagedTmuxConfigAsync();
+}
+async function tmuxExecAsync(args, options) {
+	const mode = getTmuxConfigMode();
+	await ensureTmuxContextPreparedAsync(mode);
+	return execFileAsync("tmux", [...getTmuxContextArgsForMode(mode), ...args], options);
+}
+/**
+* tmux target-session syntax: a bare name is matched as a *prefix* against
+* existing session names. That means `has-session -t agent-pan-977` returns
+* true when only `agent-pan-977-review` exists, `kill-session -t agent-pan-977`
+* kills `agent-pan-977-review`, and `capture-pane -t agent-pan-977` captures the
+* wrong pane. Prefixing the name with `=` forces an exact-name match. Every
+* call site that targets a *whole session by its exact name* must route through
+* this helper. (PAN-977 fallout: recoverAgent saw the lingering review session
+* as the work agent and silently no-op'd.)
+*/
+function exactSession(name) {
+	return name.startsWith("=") ? name : `=${name}`;
+}
+const toTmuxError = (op, cause) => new TmuxError({
+	command: op,
+	message: cause instanceof Error ? cause.message : String(cause),
+	cause
+});
+const listSessions = () => tryPromise({
+	try: async () => {
+		try {
+			const { stdout } = await tmuxExecAsync([
+				"list-sessions",
+				"-F",
+				"#{session_name}|#{session_created}|#{session_attached}|#{session_windows}"
+			], { encoding: "utf8" });
+			return String(stdout).trim().split("\n").filter(Boolean).map((line) => {
+				const [name, created, attached, windows] = line.split("|");
+				return {
+					name,
+					created: /* @__PURE__ */ new Date(parseInt(created) * 1e3),
+					attached: attached === "1",
+					windows: parseInt(windows)
+				};
+			});
+		} catch {
+			return [];
+		}
+	},
+	catch: (cause) => toTmuxError("list-sessions", cause)
+});
+const sessionExists = (name) => tryPromise({
+	try: async () => {
+		try {
+			await tmuxExecAsync([
+				"has-session",
+				"-t",
+				exactSession(name)
+			], { encoding: "utf-8" });
+			return true;
+		} catch {
+			return false;
+		}
+	},
+	catch: (cause) => toTmuxError("session-exists", cause)
+});
+const killSession = (name) => tryPromise({
+	try: () => tmuxExecAsync([
+		"kill-session",
+		"-t",
+		exactSession(name)
+	], { encoding: "utf-8" }).then(() => void 0),
+	catch: (cause) => toTmuxError("kill-session", cause)
+});
+const getAgentSessions = () => listSessions().pipe(map$3((sessions) => sessions.filter((s) => s.name.startsWith("agent-"))));
+//#endregion
+//#region ../../src/lib/overdeck/paths.ts
+const OVERDECK_MIGRATION_PATH = join$1(packageRoot, "drizzle", "overdeck", "0000_overdeck_init.sql");
+function getOverdeckDatabasePath() {
+	return join$1(getOverdeckHome(), "overdeck.db");
+}
+//#endregion
+//#region ../../src/lib/overdeck/infra.ts
+const overdeckEvents = sqliteTable("events", {
+	sequence: integer("sequence").primaryKey({ autoIncrement: true }),
+	type: text("type").notNull(),
+	timestamp: integer("timestamp", { mode: "timestamp_ms" }).notNull(),
+	payload: text("payload", { mode: "json" }).$type()
+});
+const overdeckSchema = { events: overdeckEvents };
+var Db = class extends Service()("overdeck/Db") {};
+let overdeckDbSync = null;
+function runOverdeckMigrationSync(db) {
+	if (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agents'`).get()) return;
+	const migration = readFileSync$1(OVERDECK_MIGRATION_PATH, "utf8");
+	for (const statement of migration.split("--> statement-breakpoint")) {
+		const trimmed = statement.trim();
+		if (trimmed) db.exec(trimmed);
+	}
+}
+function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()) {
+	if (overdeckDbSync?.path === dbPath) return overdeckDbSync.db;
+	if (overdeckDbSync) {
+		overdeckDbSync.db.close();
+		overdeckDbSync = null;
+	}
+	const dir = dirname$1(dbPath);
+	if (!existsSync$1(dir)) mkdirSync$1(dir, { recursive: true });
+	const db = openDatabase(dbPath);
+	db.pragma("journal_mode = WAL");
+	db.pragma("foreign_keys = ON");
+	db.pragma("synchronous = NORMAL");
+	runOverdeckMigrationSync(db);
+	overdeckDbSync = {
+		path: dbPath,
+		db
+	};
+	return db;
+}
+function rowValues(row) {
+	return row ? Object.values(row) : [];
+}
+function createDrizzleNodeSqliteDatabase(raw) {
+	const callback = async (sql, params, method) => {
+		const statement = raw.prepare(sql);
+		if (method === "run") {
+			statement.run(params);
+			return { rows: [] };
+		}
+		if (method === "get") return { rows: rowValues(statement.get(params)) };
+		return { rows: statement.all(params).map((row) => rowValues(row)) };
+	};
+	return drizzle(callback, { schema: overdeckSchema });
+}
+function makeDbLive(dbPath = getOverdeckDatabasePath()) {
+	return effect(Db, acquireRelease(sync(() => {
+		const raw = openDatabase(dbPath);
+		raw.exec("PRAGMA foreign_keys = ON");
+		return raw;
+	}), (raw) => sync(() => raw.close())).pipe(map$3((raw) => Db.of({
+		q: createDrizzleNodeSqliteDatabase(raw),
+		path: dbPath
+	}))));
+}
+makeDbLive();
+var EventBus = class extends Service()("overdeck/EventBus") {};
+function eventTimestampMillis(timestamp) {
+	if (timestamp instanceof Date) return timestamp.getTime();
+	return timestamp ?? Date.now();
+}
+function parsePayload(payload) {
+	if (payload == null) return null;
+	return JSON.parse(payload);
+}
+function readEventRow(row) {
+	return {
+		sequence: row.sequence,
+		type: row.type,
+		timestamp: new Date(row.timestamp),
+		payload: parsePayload(row.payload)
+	};
+}
+effect(EventBus, gen(function* () {
+	const db = yield* Db;
+	const queue = yield* unbounded();
+	return EventBus.of({
+		emit: (event) => promise(async () => {
+			const timestamp = eventTimestampMillis(event.timestamp);
+			const payload = event.payload ?? null;
+			const [inserted] = await db.q.insert(overdeckEvents).values({
+				type: event.type,
+				timestamp: new Date(timestamp),
+				payload
+			}).returning({
+				sequence: overdeckEvents.sequence,
+				type: overdeckEvents.type,
+				timestamp: overdeckEvents.timestamp,
+				payload: overdeckEvents.payload
+			});
+			if (!inserted) throw new Error(`Failed to insert overdeck event ${event.type}.`);
+			const stored = readEventRow({
+				sequence: inserted.sequence,
+				type: inserted.type,
+				timestamp: inserted.timestamp.getTime(),
+				payload: JSON.stringify(inserted.payload ?? null)
+			});
+			runSync(offer(queue, stored));
+			return stored.sequence;
+		}),
+		readFrom: (fromSequence) => promise(async () => (await db.q.select().from(overdeckEvents).where(gt(overdeckEvents.sequence, fromSequence)).orderBy(asc(overdeckEvents.sequence))).map((row) => readEventRow({
+			sequence: row.sequence,
+			type: row.type,
+			timestamp: row.timestamp.getTime(),
+			payload: JSON.stringify(row.payload ?? null)
+		}))),
+		getLatestSequence: promise(async () => {
+			const [row] = await db.q.select({ sequence: sql`COALESCE(MAX(${overdeckEvents.sequence}), 0)` }).from(overdeckEvents);
+			return Number(row?.sequence ?? 0);
+		}),
+		stream: fromQueue(queue)
+	});
+}));
+var Records = class extends Service()("overdeck/Records") {};
+succeed$1(Records, Records.of({
+	writeIssue: (project, issueId, record) => sync(() => writeIssueRecordSync(project, issueId, record)),
+	readIssue: (project, issueId) => sync(() => readIssueRecordSync(project, issueId)),
+	readSpec: (planRef) => sync(() => {
+		const path = isAbsolute(planRef) ? planRef : join$1(packageRoot, planRef);
+		return JSON.parse(readFileSync$1(path, "utf8"));
+	}),
+	writeAgentIdentity: (_issueId, _opts) => void_
+}));
+var Tmux = class extends Service()("overdeck/Tmux") {};
+succeed$1(Tmux, Tmux.of({
+	sessionExists: (name) => sessionExists(name).pipe(catch_(() => succeed(false))),
+	killSession: (name) => killSession(name).pipe(catch_(() => void_)),
+	readRuntimeJson: (agentId) => promise(async () => {
+		try {
+			const text = await readFile(join$1(getOverdeckHome(), "agents", agentId, "runtime.json"), "utf8");
+			return JSON.parse(text);
+		} catch {
+			return null;
+		}
+	}),
+	listSessions: () => getAgentSessions().pipe(map$3((sessions) => sessions.map((s) => s.name)), catch_(() => succeed([])))
+}));
+Service()("overdeck/Forge");
+Service()("overdeck/Projects");
+var CostArchive = class extends Service()("overdeck/CostArchive") {};
+succeed$1(CostArchive, CostArchive.of({ append: (_event) => void_ }));
+Service()("overdeck/MemorySearch");
+Service()("overdeck/MemoryFiles");
+//#endregion
+//#region ../../src/lib/overdeck/cost-sync.ts
+/**
+* Best-effort sync insert of a cost event into overdeck.db.
+* Returns true on success, false if row was a duplicate (request_id conflict).
+* Throws on unexpected errors — caller wraps in try/catch.
+*/
+function insertCostEventSync(event) {
+	const db = getOverdeckDatabaseSync();
+	const tsMillis = new Date(event.ts).getTime();
+	return db.prepare(`INSERT OR IGNORE INTO cost_events
+        (ts, issue_id, agent_id, session_id, session_type, provider, model,
+         input, output, cache_read, cache_write, cost, request_id, source_file)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(tsMillis, event.issueId ?? null, event.agentId ?? null, event.sessionId ?? null, event.sessionType ?? null, event.provider ?? null, event.model ?? null, event.input, event.output, event.cacheRead, event.cacheWrite, event.cost, event.requestId ?? null, event.source ?? null).changes > 0;
 }
 //#endregion
 //#region ../../src/lib/costs/wal.ts
@@ -12929,7 +30248,7 @@ function appendCostEventSync(event) {
 	const line = JSON.stringify(event) + "\n";
 	appendFileSync(getEventsFile(), line, "utf-8");
 	try {
-		insertCostEvent(event);
+		insertCostEventSync(event);
 	} catch (err) {
 		console.error("[cost-events] SQLite write failed (continuing with JSONL):", err);
 	}

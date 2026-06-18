@@ -27,7 +27,7 @@ npx @overdeck/cli
 
 **That's it!** Overdeck starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
 
-For a full local install with reusable `panctl` and `pan` commands:
+For a full local install with reusable `overdeck` and `pan` commands:
 
 ```bash
 npm install -g @overdeck/cli && pan install && pan up

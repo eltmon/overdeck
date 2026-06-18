@@ -29,7 +29,7 @@ IDEs were built for humans who type code. Overdeck is built for humans who **dir
 npx @overdeck/cli
 ```
 
-No install step required. `npx @overdeck/cli` starts Command Deck and opens the dashboard in your browser. Use `panctl` or `pan` after `npm install -g @overdeck/cli`. The packaged desktop app is published separately as `@overdeck/desktop`.
+No install step required. `npx @overdeck/cli` starts Command Deck and opens the dashboard in your browser. Use `overdeck` or `pan` after `npm install -g @overdeck/cli`. The packaged desktop app is published separately as `@overdeck/desktop`.
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
 

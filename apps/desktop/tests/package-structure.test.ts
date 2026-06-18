@@ -2,7 +2,7 @@
  * Smoke tests for the npm-publishable package structure.
  *
  * Verifies that the required files and package.json fields are present
- * and correct for the `panctl` npm package.
+ * and correct for the `overdeck` npm package.
  */
 
 import * as FS from "node:fs";
@@ -27,11 +27,11 @@ describe("package.json", () => {
     expect(pkg.name).toBe("@overdeck/desktop");
   });
 
-  it("has a bin entry pointing to bin/panctl.mjs", () => {
+  it("has a bin entry pointing to bin/overdeck.mjs", () => {
     const pkg = readPkg();
     const bin = pkg.bin as Record<string, string> | undefined;
     expect(bin).toBeDefined();
-    expect(bin?.["panctl"]).toBe("./bin/panctl.mjs");
+    expect(bin?.["overdeck"]).toBe("./bin/overdeck.mjs");
   });
 
   it("includes bin, dist-electron, server, and resources in files", () => {
@@ -66,8 +66,8 @@ describe("package.json", () => {
   });
 });
 
-describe("bin/panctl.mjs", () => {
-  const binPath = Path.join(desktopDir, "bin/panctl.mjs");
+describe("bin/overdeck.mjs", () => {
+  const binPath = Path.join(desktopDir, "bin/overdeck.mjs");
 
   it("exists", () => {
     expect(FS.existsSync(binPath)).toBe(true);
