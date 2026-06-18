@@ -633,10 +633,12 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
   }
 }
 
-// ── Overdeck boot: create overdeck.db if needed, seed from panopticon.db ──────
+// ── Overdeck boot: create overdeck.db if needed; optional legacy seed ─────────
 //
-// Idempotent: runs every boot, but makeCutoverEffect upserts so duplicate runs
-// are safe. panopticon.db is NEVER written — it stays as the rollback backup.
+// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). The
+// legacy seed (copy conversations + reconstruct in-flight agents/issues from
+// panopticon.db) is OPT-IN via `pan up --seed-from-legacy` (PAN-1960).
+// panopticon.db is NEVER written — it stays as the rollback backup.
 await (async () => {
   try {
     const overdeckDbPath = getOverdeckDatabasePath();
@@ -645,6 +647,13 @@ await (async () => {
     if (!existsSync(overdeckDbPath)) {
       createOverdeckDatabase({ dbPath: overdeckDbPath });
       console.log(`[panopticon] Created overdeck.db at ${overdeckDbPath}`);
+    }
+
+    // PAN-1960: the legacy seed is opt-in. A normal boot leaves overdeck.db
+    // empty; enable the import on demand with `pan up --seed-from-legacy`.
+    if (process.env.PANOPTICON_SEED_FROM_LEGACY !== '1') {
+      console.log('[panopticon] Overdeck seed skipped — empty DB (pass `pan up --seed-from-legacy` to import legacy conversations + in-flight state)');
+      return;
     }
 
     if (!existsSync(legacyDbPath)) {
