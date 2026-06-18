@@ -16,10 +16,9 @@ const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
 
-// records.ts now imports from overdeck/cost-sync (not database/cost-events-db)
-vi.mock('../../overdeck/cost-sync.js', () => ({
-  getCostBreakdownByStageAndModelSync: mockGetCostBreakdownByStageAndModel,
-  getCostForIssueSync: mockGetCostForIssueFromDb,
+vi.mock('../../database/cost-events-db.js', () => ({
+  getCostBreakdownByStageAndModel: mockGetCostBreakdownByStageAndModel,
+  getCostForIssueFromDb: mockGetCostForIssueFromDb,
 }));
 
 vi.mock('../../merge-set.js', () => ({

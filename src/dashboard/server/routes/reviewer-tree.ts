@@ -18,8 +18,6 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { getAgentStateSync } from '../../../lib/agents.js';
-
 import { Effect } from 'effect';
 import type { AgentStatus, SessionNodePresence } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
@@ -71,11 +69,12 @@ async function detectApiError(sessionId: string): Promise<boolean> {
  */
 async function readReviewerStoppedAt(
   sessionId: string,
-  _agentsRoot?: string,
+  agentsRoot: string,
 ): Promise<string | undefined> {
   try {
-    const state = getAgentStateSync(sessionId);
-    return state?.stoppedAt;
+    const raw = await readFile(join(agentsRoot, sessionId, 'state.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as { stoppedAt?: string };
+    return typeof parsed.stoppedAt === 'string' ? parsed.stoppedAt : undefined;
   } catch {
     return undefined;
   }

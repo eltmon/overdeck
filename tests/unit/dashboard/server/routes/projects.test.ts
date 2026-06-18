@@ -18,25 +18,6 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn(),
   getAgentRuntimeStateProgram: vi.fn(),
-  // fetchProjectSessionTree → collectSessionTreeNodes calls
-  // getAgentStateSync for each candidate session id. The test seeds
-  // agent-pan-539 via the readFile mock (readFileSync from node:fs is not
-  // mocked here, so the rollback layer would throw ENOENT), so resolve the
-  // agent state through this direct hook instead.
-  getAgentStateSync: vi.fn((id: string) => {
-    if (id === 'agent-pan-539') {
-      return {
-        id: 'agent-pan-539',
-        issueId: 'PAN-539',
-        workspace: '/tmp/panopticon-cli/workspaces/feature-pan-539',
-        role: 'work',
-        model: 'gpt-4',
-        status: 'running',
-        startedAt: '2026-01-01T00:00:00Z',
-      };
-    }
-    return null;
-  }),
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({

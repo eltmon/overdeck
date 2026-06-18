@@ -18,22 +18,7 @@ import { join, resolve } from 'node:path';
 import { httpHandler } from '../http-handler.js';
 import { EventStoreService, EventStoreServiceLive } from '../../services/domain-services.js';
 import { ReadModelServiceLive } from '../../read-model.js';
-import { AgentsResolver } from '../../../../lib/overdeck/agents.js';
 import { jsonResponse } from '../../http-helpers.js';
-
-// Mock AgentsResolver: ReadModelServiceLive now requires overdeck/AgentsResolver
-// (PAN-1938 source-swap). Supply a minimal no-op resolver so this test's
-// EventStoreService layer composition doesn't fail at bootstrap.
-const MockAgentsResolverLive = Layer.succeed(
-  AgentsResolver,
-  AgentsResolver.of({
-    list: (_f) => Effect.succeed([]),
-    get: (_id) => Effect.fail(new Error('not found') as never),
-    isAlive: (_id) => Effect.succeed(false),
-    getRuntime: (_id) => Effect.succeed(null),
-    getHealthHistory: (_id) => Effect.succeed([]),
-  }),
-);
 
 /** Run a route effect and return the response status and parsed JSON body. */
 async function runRoute(
@@ -104,19 +89,7 @@ describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
         return events;
       });
 
-      const { AgentsResolver: AGSR } = await import('../../../../lib/overdeck/agents.js');
-      const MockAgentsResolverLiveLocal = Layer.succeed(
-        AGSR,
-        AGSR.of({
-          list: (_f: unknown) => Effect.succeed([]),
-          get: (_id: unknown) => Effect.fail(new Error('not found') as never),
-          isAlive: (_id: unknown) => Effect.succeed(false),
-          getRuntime: (_id: unknown) => Effect.succeed(null),
-          getHealthHistory: (_id: unknown) => Effect.succeed([]),
-        }),
-      );
-      const RMSLWithAgents = RMSL.pipe(Layer.provide(MockAgentsResolverLiveLocal));
-      const layer = ESL.pipe(Layer.provide(RMSLWithAgents));
+      const layer = ESL.pipe(Layer.provide(RMSL));
       const events = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(events.length).toBeGreaterThanOrEqual(1);

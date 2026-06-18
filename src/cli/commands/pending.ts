@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listRunningAgentsSync } from '../../lib/agents.js';
-import { getAllReviewStatusesFromDb } from '../../lib/overdeck/review-status-sync.js';
+import { getAllReviewStatusesFromDb } from '../../lib/database/review-status-db.js';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from '../../lib/paths.js';

@@ -1,28 +1,31 @@
 /**
  * Tests for git-activity service (PAN-653).
- * git-activity now uses overdeck/git-activity.ts (overdeck.db).
- * Uses the overdeck test fixture for isolation.
+ * Uses an in-memory SQLite database injected via vi.mock.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
+import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
+import { initSchema } from '../../../../src/lib/database/schema.js';
 
-// ============== Overdeck fixture ==============
-// vi.resetModules() resets the _schemaBootstrapped flag in overdeck/git-activity.ts
-// so each test gets a clean schema bootstrap against the fresh temp DB.
+// ============== In-memory DB injection ==============
 
-let odb: OverdeckTestDb;
+let testDb: SqliteDatabase;
+
+vi.mock('../../../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
+}));
 
 beforeEach(() => {
-  vi.resetModules();
-  odb = setupOverdeckTestDb();
+  testDb = openDatabase(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
 });
 
 afterEach(() => {
-  teardownOverdeckTestDb(odb);
+  testDb.close();
 });
 
-// ============== Imports (after fixture is set up) ==============
+// ============== Imports (after mock is set up) ==============
 
 import {
   appendGitOperationSync,

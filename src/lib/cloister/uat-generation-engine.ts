@@ -22,7 +22,7 @@ import type {
   UatGeneration,
   UatGenerationMember,
   UatGenerationStatus,
-} from '../overdeck/merge-sync.js';
+} from '../database/uat-generations-db.js';
 
 /** A feature eligible for bundling, in merge-queue order. */
 export interface ReadyFeature {

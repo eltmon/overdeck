@@ -18,7 +18,7 @@ export interface PipelineRunMetrics {
 interface EventRow {
   sequence: number;
   type: string;
-  timestamp: number;
+  timestamp: string;
   payload: string;
 }
 
@@ -76,7 +76,7 @@ function rowToStoredEvent(row: EventRow): StoredEvent {
   return {
     sequence: row.sequence,
     type: row.type,
-    timestamp: new Date(row.timestamp).toISOString(),
+    timestamp: row.timestamp,
     payload: JSON.parse(row.payload),
   };
 }
@@ -360,13 +360,11 @@ export function createPipelineRunStatsInputsReader(db: DbAdapter) {
 
   return {
     derivePipelineRunStatsInputs(since: string, until: string): PipelineRunStatsInputs {
-      const sinceMs = Date.parse(since);
-      const untilMs = Date.parse(until);
       const issueIds = completedIssuesStmt
-        .all([...terminalEventTypes, sinceMs, untilMs])
+        .all([...terminalEventTypes, since, until])
         .map((row) => row.issueId)
         .filter((issueId) => issueId.length > 0);
-      const verificationRows = verificationWindowStmt.all([...verificationEventTypes, sinceMs, untilMs]);
+      const verificationRows = verificationWindowStmt.all([...verificationEventTypes, since, until]);
 
       if (issueIds.length === 0) {
         return derivePipelineRunStatsInputsFromEvents(verificationRows.map(rowToStoredEvent), since, until);
@@ -382,7 +380,7 @@ export function createPipelineRunStatsInputsReader(db: DbAdapter) {
            AND json_type(payload, '$.issueId') = 'text'
          ORDER BY sequence ASC`,
       );
-      const issueHistoryRows = issueHistoryStmt.all([...issueIds, ...relevantEventTypes, untilMs]);
+      const issueHistoryRows = issueHistoryStmt.all([...issueIds, ...relevantEventTypes, until]);
       const rowsBySequence = new Map<number, EventRow>();
       for (const row of issueHistoryRows) rowsBySequence.set(row.sequence, row);
       for (const row of verificationRows) rowsBySequence.set(row.sequence, row);

@@ -82,12 +82,11 @@ vi.mock('../concurrency.js', () => ({
   tryReserveAdvancingSlot: vi.fn(() => true),
 }));
 
-vi.mock('../../overdeck/review-status-sync.js', () => ({
+vi.mock('../../../lib/database/review-status-db.js', () => ({
   markWorkspaceStuck: vi.fn(),
-  clearWorkspaceStuck: vi.fn(),
 }));
 
-vi.mock('../../overdeck/control-settings.js', () => ({
+vi.mock('../../../lib/database/app-settings.js', () => ({
   isDeaconGloballyPaused: vi.fn(() => false),
 }));
 
@@ -214,13 +213,13 @@ vi.mock('../../../lib/paths.js', () => ({
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
   PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
-  packageRoot: '/tmp/test-package-root',
 }));
 
-// PAN-1908: autoResumeStoppedWorkAgents now reads from the overdeck agents table.
-// Feed the reconcile a deterministic candidate list via the overdeck door.
-vi.mock('../../overdeck/agents.js', () => ({
-  listAllAgentsSync: vi.fn(() => [{ id: 'agent-pan-871', status: 'stopped', role: 'work' }]),
+// PAN-1908: autoResumeStoppedWorkAgents now reads from the agents table instead
+// of scanning directories. The real fs is mocked in this suite, so feed the
+// reconcile a deterministic candidate list.
+vi.mock('../../../lib/database/agents-db.js', () => ({
+  listAllAgents: vi.fn(() => [{ id: 'agent-pan-871', status: 'stopped', role: 'work' }]),
 }));
 
 vi.mock('fs', () => ({

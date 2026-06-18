@@ -21,8 +21,8 @@ import { patchConversationTitle } from '../../src/dashboard/server/routes/conver
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../src/lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
+  const { resetDatabase } = await import('../../src/lib/database/index.js');
+  resetDatabase();
 }
 
 beforeEach(() => {
@@ -48,7 +48,7 @@ describe('PATCH /api/conversations/:name', () => {
 
   it('returns success and stores the title with title_source=manual', async () => {
     const { createConversation, getConversationByName } = await import(
-      '../../src/lib/overdeck/conversations.js'
+      '../../src/lib/database/conversations-db.js'
     );
     createConversation({ name: 'my-conv', tmuxSession: 'my-sess', cwd: '/home/user' });
 
@@ -64,7 +64,7 @@ describe('PATCH /api/conversations/:name', () => {
 
   it('trims whitespace from the title before storing', async () => {
     const { createConversation, getConversationByName } = await import(
-      '../../src/lib/overdeck/conversations.js'
+      '../../src/lib/database/conversations-db.js'
     );
     createConversation({ name: 'trim-conv', tmuxSession: 'trim-sess', cwd: '/home/user' });
 
@@ -76,7 +76,7 @@ describe('PATCH /api/conversations/:name', () => {
 
   it('skips the update when title is an empty string', async () => {
     const { createConversation, getConversationByName } = await import(
-      '../../src/lib/overdeck/conversations.js'
+      '../../src/lib/database/conversations-db.js'
     );
     createConversation({
       name: 'empty-conv',
@@ -95,7 +95,7 @@ describe('PATCH /api/conversations/:name', () => {
 
   it('skips the update when title is whitespace only', async () => {
     const { createConversation, getConversationByName } = await import(
-      '../../src/lib/overdeck/conversations.js'
+      '../../src/lib/database/conversations-db.js'
     );
     createConversation({
       name: 'ws-conv',
@@ -114,7 +114,7 @@ describe('PATCH /api/conversations/:name', () => {
 
   it('skips the update when title field is missing from body', async () => {
     const { createConversation, getConversationByName } = await import(
-      '../../src/lib/overdeck/conversations.js'
+      '../../src/lib/database/conversations-db.js'
     );
     createConversation({
       name: 'no-title-conv',
@@ -132,7 +132,7 @@ describe('PATCH /api/conversations/:name', () => {
 
   it('manual title_source prevents AI from overwriting (canReplaceTitle=false)', async () => {
     const { createConversation, getConversationByName, canReplaceTitle } = await import(
-      '../../src/lib/overdeck/conversations.js'
+      '../../src/lib/database/conversations-db.js'
     );
     createConversation({
       name: 'ai-conv',

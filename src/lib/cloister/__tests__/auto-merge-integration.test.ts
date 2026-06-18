@@ -1,45 +1,11 @@
+import { mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDatabase } from '../../database/index.js';
 import { getPendingAutoMergePayload, postAutoMergeSchedulePayload, deleteAutoMergePayload } from '../../../dashboard/server/routes/flywheel.js';
 import { tickAutoMergeExecutor } from '../../../dashboard/server/services/auto-merge-executor.js';
-import {
-  setupOverdeckTestDb,
-  teardownOverdeckTestDb,
-  type OverdeckTestDb,
-} from '../../../../tests/helpers/overdeck-test-db.js';
-import { getOverdeckDatabaseSync } from '../../overdeck/infra.js';
-import type { PendingAutoMerge } from '../../database/pending-auto-merges-db.js';
-
-interface RawMergeRow {
-  id: number; issue_id: string; pr_url: string; project_key: string; forge: string;
-  status: string; scheduled_merge_at: number; scheduled_at: number;
-  merged_at: number | null; failure_reason: string | null;
-  cancelled_at: number | null; cancelled_by: string | null;
-}
-
-function isoFromMs(ms: number | null): string | undefined {
-  return ms == null ? undefined : new Date(ms).toISOString();
-}
-
-/** Read all rows from pending_auto_merges — drop-in for the old listPendingAutoMerges. */
-function listPendingAutoMerges(): PendingAutoMerge[] {
-  const db = getOverdeckDatabaseSync();
-  const rows = db.prepare('SELECT * FROM pending_auto_merges ORDER BY scheduled_merge_at ASC, id ASC').all() as RawMergeRow[];
-  return rows.map(row => ({
-    id: row.id,
-    issueId: row.issue_id,
-    prUrl: row.pr_url,
-    projectKey: row.project_key,
-    forge: row.forge as PendingAutoMerge['forge'],
-    status: row.status as PendingAutoMerge['status'],
-    scheduledMergeAt: new Date(row.scheduled_merge_at).toISOString(),
-    scheduledAt: new Date(row.scheduled_at).toISOString(),
-    mergedAt: isoFromMs(row.merged_at),
-    failureReason: row.failure_reason ?? undefined,
-    cancelledAt: isoFromMs(row.cancelled_at),
-    cancelledBy: row.cancelled_by ?? undefined,
-  }));
-}
+import { listPendingAutoMerges } from '../../database/pending-auto-merges-db.js';
 
 const START = new Date('2026-05-25T10:00:00.000Z');
 const PR_URL = 'https://github.com/eltmon/panopticon-cli/pull/1486';
@@ -94,22 +60,26 @@ async function advanceFakeTimers(ms: number): Promise<void> {
 }
 
 describe('auto-merge schedule/cancel/executor integration', () => {
-  let odb: OverdeckTestDb;
+  const originalHome = process.env.PANOPTICON_HOME;
+  let testHome: string;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(START);
     resetDatabase();
-    odb = setupOverdeckTestDb();
-    // Seed the issue row that pending_auto_merges FK requires
-    odb.raw().prepare(
-      `INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, 'pending', ?)`,
-    ).run('PAN-1486', Date.now());
+    testHome = join(tmpdir(), `pan-auto-merge-integration-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(testHome, { recursive: true });
+    process.env.PANOPTICON_HOME = testHome;
   });
 
   afterEach(() => {
     resetDatabase();
-    teardownOverdeckTestDb(odb);
+    if (originalHome === undefined) {
+      delete process.env.PANOPTICON_HOME;
+    } else {
+      process.env.PANOPTICON_HOME = originalHome;
+    }
+    rmSync(testHome, { recursive: true, force: true });
     vi.useRealTimers();
   });
 

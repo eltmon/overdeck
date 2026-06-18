@@ -19,7 +19,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
-import type { UatGeneration, UatGenerationStatus } from '../overdeck/merge-sync.js';
+import type { UatGeneration, UatGenerationStatus } from '../database/uat-generations-db.js';
 import type { GenerationStorePort } from './uat-generation-engine.js';
 
 const execFileAsync = promisify(execFile);

@@ -89,11 +89,7 @@ vi.mock('../../paths.js', () => ({
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
   PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
-  packageRoot: '/tmp/test-package-root',
 }));
-vi.mock('../../overdeck/agents.js', () => ({ listAllAgentsSync: vi.fn(() => []) }));
-vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
-vi.mock('../../overdeck/review-status-sync.js', () => ({ markWorkspaceStuck: vi.fn(), clearWorkspaceStuck: vi.fn() }));
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();

@@ -22,7 +22,7 @@ import {
   summarizeCostsSync,
 } from '../../lib/cost.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
-import { getCostForIssueAggregateSync, type IssueAggregate } from '../../lib/overdeck/cost-sync.js';
+import { getCostForIssueFromDb, type IssueAggregate } from '../../lib/database/cost-events-db.js';
 
 /**
  * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
@@ -273,7 +273,7 @@ export function createCostCommand(): Command {
     .option('-d, --days <n>', 'Number of days to look back', '30')
     .action((issueId: string, options) => {
       try {
-        const aggregate = getCostForIssueAggregateSync(issueId);
+        const aggregate = getCostForIssueFromDb(issueId);
         if (aggregate) {
           for (const line of formatIssueCostAggregate(issueId, aggregate)) {
             console.log(line);

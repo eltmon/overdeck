@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -10,11 +10,6 @@ import {
   buildReviewerNodes,
 } from '../reviewer-tree.js';
 import { REVIEWER_ROLES, getReviewerSessionName } from '../../../../lib/cloister/specialists.js';
-import { getAgentStateSync } from '../../../../lib/agents.js';
-
-vi.mock('../../../../lib/agents.js', () => ({
-  getAgentStateSync: vi.fn(() => null),
-}));
 
 const PROJECT_KEY = 'panopticon';
 const ISSUE_ID = 'pan-830';
@@ -31,7 +26,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(testDir, { recursive: true, force: true });
-  vi.mocked(getAgentStateSync).mockImplementation(() => null);
 });
 
 describe('extractReviewerRole (PAN-830)', () => {
@@ -352,15 +346,21 @@ describe('buildReviewerNodes (PAN-830)', () => {
     expect(nodes.every(n => n.endedAt === undefined)).toBe(true);
   });
 
-  it('uses per-reviewer stoppedAt (via getAgentStateSync) instead of parent endedAt', async () => {
+  it('uses per-reviewer stoppedAt from state.json instead of parent endedAt', async () => {
     // Sub-reviewer finished early, parent (synthesizer) still active.
     // Without per-node endedAt, the frontend renders "Starting…" over the JSONL.
     const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
-    // PAN-1938: stoppedAt now read via getAgentStateSync (overdeck DB), not state.json directly.
-    vi.mocked(getAgentStateSync).mockImplementation((id) =>
-      id === correctness
-        ? { id: correctness, issueId: ISSUE_ID, role: 'review', model: 'sonnet', status: 'stopped', startedAt: '2026-01-01T00:00:00Z', workspace: WORKSPACE_PATH, stoppedAt: '2026-01-01T00:05:00Z' } as any
-        : null,
+    await mkdir(join(agentsDir, correctness), { recursive: true });
+    await writeFile(
+      join(agentsDir, correctness, 'state.json'),
+      JSON.stringify({
+        id: correctness,
+        role: 'review',
+        reviewSubRole: 'correctness',
+        status: 'stopped',
+        startedAt: '2026-01-01T00:00:00Z',
+        stoppedAt: '2026-01-01T00:05:00Z',
+      }),
     );
 
     const nodes = await buildReviewerNodes({

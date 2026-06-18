@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-vi.mock('../../../../../src/lib/overdeck/conversations.js', async () => {
+vi.mock('../../../../../src/lib/database/conversations-db.js', async () => {
   const { vi } = await import('vitest');
   return {
     updateForkStatus: vi.fn(),
@@ -42,7 +42,7 @@ const { handleForkPipelineFailure } = await import(
 const {
   updateForkStatus,
   markConversationEnded,
-} = await import('../../../../../src/lib/overdeck/conversations.js');
+} = await import('../../../../../src/lib/database/conversations-db.js');
 
 describe('handleForkPipelineFailure', () => {
   beforeEach(() => {

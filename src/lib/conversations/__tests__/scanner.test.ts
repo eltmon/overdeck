@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import { tmpdir } from 'os';
 import { parseSessionJsonl } from '../jsonl-async.js';
 import { scan, validateEstimatedCost } from '../scanner.js';
-import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
-import { findDiscoveredSessions } from '../../overdeck/discovered-sessions.js';
-import { insertCostEventSync } from '../../overdeck/cost-sync.js';
 
 // Allow individual tests to inject a parse failure for a specific file path
 let failParseForPath: string | null = null;
@@ -24,9 +22,8 @@ vi.mock('../jsonl-async.js', async (importOriginal) => {
   };
 });
 
-let odb: OverdeckTestDb;
+let TEST_HOME: string;
 let fakeClaudeDir: string;
-let savedHome: string | undefined;
 
 // Fixture JSONL lines for a simple session
 const SESSION_JSONL = [
@@ -45,22 +42,25 @@ const SESSION_JSONL = [
   }),
 ].join('\n') + '\n';
 
+async function resetDb() {
+  const { resetDatabase } = await import('../../database/index.js');
+  resetDatabase();
+}
+
 beforeEach(() => {
-  odb = setupOverdeckTestDb();
-  fakeClaudeDir = join(odb.home, '.claude', 'projects');
+  TEST_HOME = join(tmpdir(), `pan-457-scanner-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  fakeClaudeDir = join(TEST_HOME, '.claude', 'projects');
   mkdirSync(join(fakeClaudeDir, '-home-user-Projects-myapp'), { recursive: true });
   mkdirSync(join(fakeClaudeDir, '-home-user-Projects-otherapp'), { recursive: true });
-  savedHome = process.env.HOME;
-  process.env.HOME = odb.home; // point ~ to test dir so scanner finds ~/.claude/projects
+  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.HOME = TEST_HOME; // point ~ to test dir
 });
 
-afterEach(() => {
-  teardownOverdeckTestDb(odb);
-  if (savedHome !== undefined) {
-    process.env.HOME = savedHome;
-  } else {
-    delete process.env.HOME;
-  }
+afterEach(async () => {
+  await resetDb();
+  delete process.env.PANOPTICON_HOME;
+  delete process.env.HOME;
+  rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
 describe('work-pool', () => {
@@ -102,6 +102,7 @@ describe('scanner', () => {
 
     await scan({ mode: 'system', watchDirs: [] });
 
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
     const sessions = findDiscoveredSessions();
     expect(sessions.length).toBeGreaterThan(0);
     const sess = sessions.find((s) => s.jsonlPath === p);
@@ -129,9 +130,11 @@ describe('scanner', () => {
     writeFileSync(p, SESSION_JSONL, 'utf8');
 
     await scan({ mode: 'system', watchDirs: [] });
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
     expect(findDiscoveredSessions().find((s) => s.jsonlPath === p)?.panopticonManaged).toBe(false);
 
-    insertCostEventSync({
+    const { insertCostEvent } = await import('../../database/cost-events-db.js');
+    insertCostEvent({
       ts: '2025-01-01T10:02:00Z',
       type: 'cost',
       agentId: 'agent-late',
@@ -162,6 +165,7 @@ describe('scanner', () => {
 
     await scan({ mode: 'system', watchDirs: [], dryRun: true });
 
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
     expect(findDiscoveredSessions()).toHaveLength(0);
   });
 
@@ -267,7 +271,8 @@ describe('scanner', () => {
   it('validates estimated scan cost against matching cost_events records', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'cost-session.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');
-    insertCostEventSync({
+    const { insertCostEvent } = await import('../../database/cost-events-db.js');
+    insertCostEvent({
       ts: '2025-01-01T10:02:00Z',
       type: 'cost',
       agentId: 'agent-cost',
@@ -286,6 +291,7 @@ describe('scanner', () => {
     const result = await scan({ mode: 'system', watchDirs: [] });
 
     expect(result.warnings?.some((warning) => warning.includes('differs from cost_events'))).toBe(true);
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
     const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
     expect(session?.panopticonManaged).toBe(true);
     expect(session?.panIssueId).toBe('PAN-457');
@@ -298,6 +304,7 @@ describe('scanner', () => {
 
     await scan({ mode: 'system', watchDirs: [] });
 
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
     const sessions = findDiscoveredSessions();
     const sess = sessions.find((s) => s.jsonlPath === p);
     expect(sess).toBeDefined();

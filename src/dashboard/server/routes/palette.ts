@@ -20,7 +20,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { listProjectsSync } from '../../../lib/projects.js';
 import { runMemoryFtsStatement } from '../../../lib/memory/fts-db.js';
 import { buildMatchQuery } from '../../../lib/memory/search.js';
-import { getConversationByClaudeSessionId } from '../../../lib/overdeck/conversations.js';
+import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
 import { type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
 import { searchConversationChunks } from '../services/conversation-search-service.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';

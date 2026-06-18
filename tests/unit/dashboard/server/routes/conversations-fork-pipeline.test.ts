@@ -50,13 +50,13 @@ describe('runForkPipeline fallback resilience', () => {
     process.env.PANOPTICON_HOME = TEST_HOME;
     mkdirSync(TEST_HOME, { recursive: true });
 
-    const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
-    closeOverdeckDatabaseSync();
+    const { resetDatabase } = await import('../../../../../src/lib/database/index.js');
+    resetDatabase();
   });
 
   afterEach(async () => {
-    const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
-    closeOverdeckDatabaseSync();
+    const { resetDatabase } = await import('../../../../../src/lib/database/index.js');
+    resetDatabase();
     if (ORIGINAL_HOME !== undefined) {
       process.env.HOME = ORIGINAL_HOME;
     } else {
@@ -69,7 +69,7 @@ describe('runForkPipeline fallback resilience', () => {
 
   async function createParentAndFork() {
     const { createConversation, getConversationByName } = await import(
-      '../../../../../src/lib/overdeck/conversations.js'
+      '../../../../../src/lib/database/conversations-db.js'
     );
 
     const parentCwd = join(TEST_HOME, 'parent-project');
@@ -201,7 +201,7 @@ describe('runForkPipeline fallback resilience', () => {
     );
 
     const { getConversationByName } = await import(
-      '../../../../../src/lib/overdeck/conversations.js'
+      '../../../../../src/lib/database/conversations-db.js'
     );
     const fork = getConversationByName('fork-conv')!;
     expect(fork.forkFallbackReason).toBeTruthy();

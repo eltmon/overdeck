@@ -12,31 +12,19 @@
  * processUnstickRequest() is exported from workspaces.ts following the project's
  * established pattern for route helper extraction (computeStuckCount, parseGitActivityParams,
  * pushApproveMain). The route handler calls it and maps the UnstickResult to an HTTP response.
- *
- * PAN-1938: ported from panopticon.db to overdeck.db via setupOverdeckTestDb().
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  setupOverdeckTestDb,
-  teardownOverdeckTestDb,
-  type OverdeckTestDb,
-} from '../../../../helpers/overdeck-test-db.js';
+import { openDatabase, type SqliteDatabase } from '../../../../../src/lib/database/driver.js';
+import { initSchema } from '../../../../../src/lib/database/schema.js';
 
-// ─── Overdeck DB injection ────────────────────────────────────────────────────
+// ─── In-memory DB injection (needed for clearWorkspaceStuck / setReviewStatus) ─
 
-let odb: OverdeckTestDb;
+let testDb: SqliteDatabase;
 
-beforeEach(() => {
-  odb = setupOverdeckTestDb();
-});
-
-afterEach(() => {
-  teardownOverdeckTestDb(odb);
-  vi.clearAllMocks();
-});
-
-// ─── Stubs not under test ─────────────────────────────────────────────────────
+vi.mock('../../../../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
+}));
 
 // PAN-1613: checkPostReviewCommits now gates on isIssueClosed, whose tracker
 // fallback shells out to `gh issue view`. Keep this a hermetic unit test (no
@@ -61,10 +49,7 @@ vi.mock('../../../../../src/lib/activity-logger.js', () => ({
 }));
 
 // Stub modules imported at workspaces.ts module scope
-vi.mock('../../../../../src/lib/projects.js', () => ({
-  resolveProjectFromIssue: vi.fn(),
-  resolveProjectFromIssueSync: vi.fn(),
-}));
+vi.mock('../../../../../src/lib/projects.js', () => ({ resolveProjectFromIssue: vi.fn() }));
 vi.mock('../../../../../src/lib/cloister/service.js', () => ({ getCloisterService: vi.fn() }));
 vi.mock('../../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn().mockReturnValue([]),
@@ -87,13 +72,20 @@ vi.mock('../../../../../src/lib/git/operations.js', () => ({
   MainDivergedError: class MainDivergedError extends Error {},
 }));
 
+beforeEach(() => {
+  testDb = openDatabase(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
+});
+
+afterEach(() => {
+  testDb.close();
+});
+
 // ─── Import under test (after mocks) ──────────────────────────────────────────
 
 import { processUnstickRequest } from '../../../../../src/dashboard/server/routes/workspaces.js';
-import {
-  markWorkspaceStuck,
-  getReviewStatusFromDbSync,
-} from '../../../../../src/lib/overdeck/review-status-sync.js';
+import { markWorkspaceStuck, getReviewStatusFromDbSync } from '../../../../../src/lib/database/review-status-db.js';
 import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────

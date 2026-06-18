@@ -24,7 +24,7 @@ import {
   saveAgentStateSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
-import { countAgentsByStatus } from '../overdeck/agents.js';
+import { countAgentsByStatus } from '../database/agents-db.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;

@@ -64,8 +64,7 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
-import { getAgentState, getAgentStateSync, saveAgentStateSync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
-import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
+import { getAgentState, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
 import { canUseHarnessSync } from '../../../lib/harness-policy.js';
@@ -979,18 +978,15 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     // make the dashboard discard this planning session on the next startup scan.
     const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
     yield* Effect.promise(() => mkdir(agentStateDir, { recursive: true }));
-    yield* Effect.promise(() => {
-      saveAgentStateSync({
-        id: sessionName,
-        issueId: issue.identifier,
-        workspace: workspacePath,
-        status: 'starting',
-        startedAt: new Date().toISOString(),
-        role: 'plan',
-        model: '',
-      });
-      return Promise.resolve();
-    });
+    yield* Effect.promise(() => writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
+      id: sessionName,
+      issueId: issue.identifier,
+      workspace: workspacePath,
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      role: 'plan',
+      location: workspaceLocation,
+    }, null, 2)));
 
     if (issue.source === 'linear') {
       // Transition to "In Planning" state — emits issue.transitioned which
@@ -1291,16 +1287,30 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     // Detect remote planning session (non-fatal reads)
     const { isRemotePlanning, remoteVmName } = yield* Effect.promise(async (): Promise<{ isRemotePlanning: boolean; remoteVmName: string | null }> => {
+      let isRemotePlanning = false;
+      let remoteVmName: string | null = null;
       try {
-        const remoteState = loadRemoteAgentState(sessionName);
-        if (remoteState?.vmName) return { isRemotePlanning: true, remoteVmName: remoteState.vmName };
-        const remoteMetadataPath = join(homedir(), '.panopticon', 'agents', sessionName, 'remote-workspace.json');
-        if (existsSync(remoteMetadataPath)) {
-          const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
-          if (remoteMetadata.vmName) return { isRemotePlanning: true, remoteVmName: remoteMetadata.vmName };
+        const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+        const stateJsonPath = join(agentStateDir, 'state.json');
+        if (existsSync(stateJsonPath)) {
+          const agentState = JSON.parse(await readFile(stateJsonPath, 'utf-8'));
+          if (agentState.location === 'remote' && agentState.vmName) {
+            isRemotePlanning = true;
+            remoteVmName = agentState.vmName;
+          }
+        }
+        if (!isRemotePlanning) {
+          const remoteMetadataPath = join(homedir(), '.panopticon', 'agents', sessionName, 'remote-workspace.json');
+          if (existsSync(remoteMetadataPath)) {
+            const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
+            if (remoteMetadata.vmName) {
+              isRemotePlanning = true;
+              remoteVmName = remoteMetadata.vmName;
+            }
+          }
         }
       } catch { /* Not a remote session */ }
-      return { isRemotePlanning: false, remoteVmName: null };
+      return { isRemotePlanning, remoteVmName };
     });
 
     // Session kill is deferred to after the HTTP response is sent. When
@@ -1312,9 +1322,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
     yield* Effect.promise(async () => {
       try {
-        const planningState = getAgentStateSync(sessionName);
-        if (planningState) {
-          saveAgentStateSync({ ...planningState, status: 'stopped', stoppedAt: new Date().toISOString() });
+        const planningStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+        const planningStatePath = join(planningStateDir, 'state.json');
+        if (existsSync(planningStatePath)) {
+          const planningState = JSON.parse(await readFile(planningStatePath, 'utf-8'));
+          planningState.status = 'stopped';
+          planningState.stoppedAt = new Date().toISOString();
+          await writeFile(planningStatePath, JSON.stringify(planningState, null, 2), 'utf-8');
           console.log(`[complete-planning] Marked ${sessionName} as stopped`);
         }
       } catch { /* Non-fatal — agent status is cosmetic */ }
@@ -2882,26 +2896,47 @@ const getIssueBeadsRoute = HttpRouter.add(
 
     // Check for remote workspace (reads non-fatal state files)
     const { isRemoteWorkspace, remoteVmName } = yield* Effect.promise(async (): Promise<{ isRemoteWorkspace: boolean; remoteVmName: string | null }> => {
-      const planningSessionName = `planning-${issueLower}`;
-      try {
-        const remoteState = loadRemoteAgentState(planningSessionName);
-        if (remoteState?.vmName) return { isRemoteWorkspace: true, remoteVmName: remoteState.vmName };
-      } catch { /* Ignore */ }
+      let isRemoteWorkspace = false;
+      let remoteVmName: string | null = null;
 
-      try {
-        const remoteMetadataPath = join(homedir(), '.panopticon', 'agents', planningSessionName, 'remote-workspace.json');
+      const sessionName = `planning-${issueLower}`;
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+
+      const stateJsonPath = join(agentStateDir, 'state.json');
+      if (existsSync(stateJsonPath)) {
+        try {
+          const agentState = JSON.parse(await readFile(stateJsonPath, 'utf-8'));
+          if (agentState.location === 'remote' && agentState.vmName) {
+            isRemoteWorkspace = true;
+            remoteVmName = agentState.vmName;
+          }
+        } catch { /* Ignore parse errors */ }
+      }
+
+      if (!isRemoteWorkspace) {
+        const remoteMetadataPath = join(agentStateDir, 'remote-workspace.json');
         if (existsSync(remoteMetadataPath)) {
-          const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
-          if (remoteMetadata.vmName) return { isRemoteWorkspace: true, remoteVmName: remoteMetadata.vmName };
+          try {
+            const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
+            if (remoteMetadata.vmName) {
+              isRemoteWorkspace = true;
+              remoteVmName = remoteMetadata.vmName;
+            }
+          } catch { /* Ignore parse errors */ }
         }
-      } catch { /* Ignore parse errors */ }
+      }
 
-      try {
-        const wsMetadata = loadWorkspaceMetadataStatic(id);
-        if (wsMetadata?.vmName) return { isRemoteWorkspace: true, remoteVmName: wsMetadata.vmName };
-      } catch { /* Not a remote workspace */ }
+      if (!isRemoteWorkspace) {
+        try {
+          const wsMetadata = loadWorkspaceMetadataStatic(id);
+          if (wsMetadata?.vmName) {
+            isRemoteWorkspace = true;
+            remoteVmName = wsMetadata.vmName;
+          }
+        } catch { /* Not a remote workspace */ }
+      }
 
-      return { isRemoteWorkspace: false, remoteVmName: null };
+      return { isRemoteWorkspace, remoteVmName };
     });
 
     // Try local beads query (non-fatal on bd error)

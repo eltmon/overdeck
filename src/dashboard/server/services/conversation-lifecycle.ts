@@ -27,8 +27,8 @@ import {
   listActiveConversations,
   markConversationEnded,
   setClearedToConvId,
-  type LegacyConversation as Conversation,
-} from '../../../lib/overdeck/conversations.js';
+  type Conversation,
+} from '../../../lib/database/conversations-db.js';
 import { listSessionNames, isHarnessProcessAlive } from '../../../lib/tmux.js';
 import { isRespawnPending } from './pending-respawn.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../../../lib/paths.js';

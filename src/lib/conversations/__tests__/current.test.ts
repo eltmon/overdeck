@@ -1,29 +1,38 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 // PANOPTICON_HOME must be set before the DB modules are imported so they use a
 // temp database. The env-var path of resolveCurrentConversation is the
 // deterministic core (it never shells out to tmux), so these tests exercise it
 // without a real tmux server.
-import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
-import { createConversation } from '../../overdeck/conversations.js';
-
-let odb: OverdeckTestDb;
+let TEST_HOME: string;
 const originalAgentId = process.env.PANOPTICON_AGENT_ID;
 const originalTmux = process.env.TMUX;
 
+async function resetDb() {
+  const { resetDatabase } = await import('../../database/index.js');
+  resetDatabase();
+}
+
 beforeEach(() => {
-  odb = setupOverdeckTestDb();
+  TEST_HOME = join(tmpdir(), `pan-1520-current-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(TEST_HOME, { recursive: true });
+  process.env.PANOPTICON_HOME = TEST_HOME;
   delete process.env.PANOPTICON_AGENT_ID;
   // Ensure the tmux fallback is never taken in these env-var-focused tests.
   delete process.env.TMUX;
 });
 
-afterEach(() => {
-  teardownOverdeckTestDb(odb);
+afterEach(async () => {
+  await resetDb();
+  delete process.env.PANOPTICON_HOME;
   if (originalAgentId === undefined) delete process.env.PANOPTICON_AGENT_ID;
   else process.env.PANOPTICON_AGENT_ID = originalAgentId;
   if (originalTmux === undefined) delete process.env.TMUX;
   else process.env.TMUX = originalTmux;
+  rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
 describe('resolveCurrentConversation (PAN-1520)', () => {
@@ -33,6 +42,7 @@ describe('resolveCurrentConversation (PAN-1520)', () => {
   });
 
   it('resolves the conversation named by PANOPTICON_AGENT_ID', async () => {
+    const { createConversation } = await import('../../database/conversations-db.js');
     createConversation({ name: 'mine', tmuxSession: 'conv-mine', cwd: '/cwd' });
     process.env.PANOPTICON_AGENT_ID = 'conv-mine';
 

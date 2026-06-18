@@ -44,7 +44,7 @@ import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '..
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
-import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
+import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/database/conversation-embeddings-db.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 

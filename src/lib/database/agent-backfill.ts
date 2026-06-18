@@ -17,7 +17,6 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { getPanopticonHome } from '../paths.js';
 import type { SqliteDatabase } from './driver.js';
-import { getDatabase } from './index.js';
 import { agentStateToDbAgent } from './agent-mappers.js';
 import type { AgentState } from '../agents.js';
 import type { Agent as DbAgent } from './agents-db.js';
@@ -244,8 +243,4 @@ function reconcileAgentStatus(
     };
   }
   return state;
-}
-
-export function backfillAgentsAutoSync(options?: BackfillAgentsOptions): BackfillAgentsResult {
-  return backfillAgentsFromStateJsonSync(getDatabase(), options);
 }

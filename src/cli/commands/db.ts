@@ -6,7 +6,8 @@ import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
-import { backfillAgentsSync } from '../../lib/overdeck/agents.js';
+import { getDatabase } from '../../lib/database/index.js';
+import { backfillAgentsFromStateJsonSync } from '../../lib/database/agent-backfill.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -642,15 +643,20 @@ async function rebuildAgentsCommand(options: {
   const spinner = ora('Rebuilding agents table from state.json sources...').start();
 
   try {
-    const result = backfillAgentsSync({ verbose: options.verbose });
+    const db = getDatabase();
 
     if (options.dryRun) {
+      // For a dry run we still need to read state.json, but we don't write.
+      const { backfillAgentsFromStateJsonSync } = await import('../../lib/database/agent-backfill.js');
+      const result = backfillAgentsFromStateJsonSync(db, { verbose: options.verbose });
       spinner.info(
         `Dry run: would process ${result.processed} agents, mark ${result.markedStopped} stopped, skip ${result.skipped}`
       );
       return;
     }
 
+    const { backfillAgentsFromStateJsonSync } = await import('../../lib/database/agent-backfill.js');
+    const result = backfillAgentsFromStateJsonSync(db, { verbose: options.verbose });
     spinner.succeed(
       `Rebuilt agents table: ${result.processed} rows, ${result.markedStopped} marked stopped, ${result.skipped} skipped`
     );
@@ -664,8 +670,9 @@ async function rebuildCommand(options: { verbose?: boolean }): Promise<void> {
   const spinner = ora('Reconstructing cache from git + GitHub sources...').start();
 
   try {
-    const { reconstructCacheAuto } = await import('../../lib/reconstruct/reconstruct-cache.js');
-    const r = await reconstructCacheAuto({ verbose: options.verbose });
+    const db = getDatabase();
+    const { reconstructCache } = await import('../../lib/reconstruct/reconstruct-cache.js');
+    const r = await reconstructCache(db, { verbose: options.verbose });
     const phases = Object.entries(r.phaseCounts)
       .map(([p, n]) => `${p}=${n}`)
       .join(' ');

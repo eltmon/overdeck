@@ -17,9 +17,8 @@ import {
   getDiscoveredStats,
   getDiscoveredSessionById,
   findDiscoveredSessions,
-  resetDiscoveredSessionsSchemaBootstrap,
   type UpsertDiscoveredSessionOpts,
-} from '../../../../lib/overdeck/discovered-sessions.js';
+} from '../../../../lib/database/discovered-sessions-db.js';
 import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
 import { parseSearchParams, rejectUntrustedOrigin } from '../discovered-sessions.js';
@@ -55,9 +54,8 @@ const SESSION_JSONL = [
 ].join('\n') + '\n';
 
 async function resetDb() {
-  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
-  closeOverdeckDatabaseSync();
-  resetDiscoveredSessionsSchemaBootstrap();
+  const { resetDatabase } = await import('../../../../lib/database/index.js');
+  resetDatabase();
 }
 
 beforeEach(() => {
@@ -428,7 +426,7 @@ describe('scan targeted mode with dirs', () => {
 
     expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
 
-    const { findDiscoveredSessions } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const { findDiscoveredSessions } = await import('../../../../lib/database/discovered-sessions-db.js');
     const sessions = findDiscoveredSessions();
     // Only myapp sessions should be indexed (otherapp not in dirs)
     expect(sessions.some((s) => s.jsonlPath === pA)).toBe(true);

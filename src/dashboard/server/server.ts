@@ -18,9 +18,6 @@ import { FetchHttpClient, HttpRouter, HttpServer, HttpServerRequest, HttpServerR
 import { ServerConfig } from './config.js';
 import { EventStoreServiceLive } from './services/domain-services.js';
 import { ReadModelServiceLive } from './read-model.js';
-import { AgentsResolverLive } from '../../lib/overdeck/agents.js';
-import { CostResolverLive } from '../../lib/overdeck/cost.js';
-import { DbLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { AgentStateServiceLive } from './services/agent-state-service.js';
 import { TerminalServiceLive } from './services/terminal-service.js';
 import { LinearClientOptionalLive } from './services/linear-client.js';
@@ -339,26 +336,6 @@ export const makeRoutesLayer = Layer.mergeAll(
 // ReadModelServiceLive bootstraps during construction (reads lib modules, JSON-cleans).
 // EventStoreServiceLive depends on ReadModelService (wires event subscription → read model).
 
-// ── Overdeck resolver layers ────────────────────────────────────────────────
-//
-// Pattern (PAN-1938): each resolver/writer layer is wired here and added to
-// DomainServicesLive. Route handlers use `yield* XxxResolver` to read from
-// overdeck.db instead of calling legacy DB functions directly.
-//
-// Wiring order: route group converted → add its Live layer here → add to DomainServicesLive.
-// CostWriter deferred until CostArchiveLive is implemented.
-const OverdeckAgentsResolverLive = AgentsResolverLive.pipe(
-  Layer.provide(Layer.mergeAll(DbLive, TmuxLive)),
-);
-
-const OverdeckCostResolverLive = CostResolverLive.pipe(
-  Layer.provide(DbLive),
-);
-
-const ReadModelWithOverdeckLive = ReadModelServiceLive.pipe(
-  Layer.provide(OverdeckAgentsResolverLive),
-);
-
 // ─── Tracker + lifecycle services (PAN-449) ───────────────────────────────────
 // Optional layers: server starts even if tracker keys are not configured.
 // Route handlers that need a tracker service get TrackerNotConfigured if it's absent.
@@ -374,9 +351,9 @@ const IssueLifecycleServiceLive = IssueLifecycleLive.pipe(
 );
 
 const DomainServicesLive = Layer.mergeAll(
-  ReadModelWithOverdeckLive,
+  ReadModelServiceLive,
   AgentStateServiceLive,
-  EventStoreServiceLive.pipe(Layer.provide(ReadModelWithOverdeckLive)),
+  EventStoreServiceLive.pipe(Layer.provide(ReadModelServiceLive)),
   TerminalServiceLive,
   TrackerClientsLive,
   IssueLifecycleServiceLive,
@@ -384,7 +361,6 @@ const DomainServicesLive = Layer.mergeAll(
   WorkspaceServiceLive,
   OpenRouterServiceLive,
   PanOpenLive,
-  OverdeckCostResolverLive,
 );
 
 // ─── Full server layer ────────────────────────────────────────────────────────

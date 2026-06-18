@@ -4,8 +4,6 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../agents.js';
-import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
-import { closeOverdeckDatabaseSync } from '../overdeck/infra.js';
 
 let tmpHome: string;
 let workspace: string;
@@ -149,15 +147,9 @@ function mockSpawnDependencies(): void {
   vi.doMock('../provider-health.js', () => ({
     validateProviderHealth: vi.fn(() => Effect.succeed(undefined)),
   }));
-  // agents.ts now imports getFlywheelActiveRunIdSync from overdeck/control-settings (not database/app-settings)
-  vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../overdeck/control-settings.js')>();
-    return {
-      ...actual,
-      getFlywheelActiveRunId: () => activeFlywheelRunId,
-      getFlywheelActiveRunIdSync: () => activeFlywheelRunId,
-    };
-  });
+  vi.doMock('../database/app-settings.js', () => ({
+    getFlywheelActiveRunId: () => activeFlywheelRunId,
+  }));
   vi.doMock('../projects.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../projects.js')),
     findProjectByPathSync: vi.fn(() => null),
@@ -169,10 +161,6 @@ beforeEach(() => {
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-home-'));
   workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-workspace-'));
   packageRootDir = mkdtempSync(join(tmpdir(), 'pan-spawn-supervisor-package-'));
-  // Seed overdeck.db so saveAgentStateSync can find the migration SQL
-  closeOverdeckDatabaseSync();
-  createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
-  closeOverdeckDatabaseSync();
   process.env.PANOPTICON_HOME = tmpHome;
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
@@ -199,9 +187,8 @@ afterEach(() => {
   vi.doUnmock('../openai-auth.js');
   vi.doUnmock('../cliproxy.js');
   vi.doUnmock('../provider-health.js');
-  vi.doUnmock('../overdeck/control-settings.js');
+  vi.doUnmock('../database/app-settings.js');
   vi.doUnmock('../projects.js');
-  closeOverdeckDatabaseSync();
   delete process.env.PANOPTICON_HOME;
   delete process.env.PAN_DOCKER;
   delete process.env.PANOPTICON_DOCKER_WORKSPACE;

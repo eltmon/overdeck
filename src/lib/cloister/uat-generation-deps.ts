@@ -18,7 +18,7 @@ import {
   listUatGenerationNamesSync,
   listUatGenerationsSync,
   updateUatGenerationSync,
-} from '../overdeck/merge-sync.js';
+} from '../database/uat-generations-db.js';
 import type { GenerationGitDeps, GenerationStorePort } from './uat-generation-engine.js';
 
 const execFileAsync = promisify(execFile);

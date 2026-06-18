@@ -5,11 +5,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
+import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
+import { initSchema } from '../../../src/lib/database/schema.js';
 
-// ============== Overdeck DB fixture ==============
+// ============== In-memory DB injection ==============
 
-let odb: OverdeckTestDb;
+let testDb: SqliteDatabase;
+
+vi.mock('../../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
+}));
 
 const mockNotifyPipeline = vi.fn();
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
@@ -33,12 +38,14 @@ vi.mock('../../../src/lib/vbrief/io.js', () => {
 });
 
 beforeEach(() => {
-  odb = setupOverdeckTestDb();
+  testDb = openDatabase(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
   mockNotifyPipeline.mockClear();
 });
 
 afterEach(() => {
-  teardownOverdeckTestDb(odb);
+  testDb.close();
 });
 
 // ============== Imports (after mocks are set up) ==============
@@ -49,7 +56,10 @@ import { markWorkspaceStuck, clearWorkspaceStuck, loadReviewStatuses, setReviewS
 
 describe('clearWorkspaceStuck', () => {
   it('calls notifyPipeline with status_changed after clearing stuck state', () => {
-    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, stuck, stuck_reason, updated_at, ready_for_merge) VALUES ('PAN-42', 'passed', 'passed', 1, 'main_diverged', datetime('now'), 0)`).run();
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, stuck, stuck_reason, updated_at, ready_for_merge)
+      VALUES ('PAN-42', 'passed', 'passed', 1, 'main_diverged', datetime('now'), 0)
+    `).run();
 
     clearWorkspaceStuck('PAN-42');
 
@@ -69,7 +79,10 @@ describe('clearWorkspaceStuck', () => {
 
 describe('markWorkspaceStuck (notifyPipeline symmetry)', () => {
   it('calls notifyPipeline with status_changed after marking stuck', () => {
-    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-99', 'passed', 'passed', datetime('now'), 0)`).run();
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-99', 'passed', 'passed', datetime('now'), 0)
+    `).run();
 
     markWorkspaceStuck('PAN-99', 'main_diverged', { beforeSha: 'abc123' });
 
@@ -97,8 +110,11 @@ describe('markWorkspaceStuck (notifyPipeline symmetry)', () => {
 describe('setReviewStatus concurrent updates (default path)', () => {
   it('does not clobber a different issue when two updates race', () => {
     // Seed two issues
-    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-A', 'pending', 'pending', datetime('now'), 0)`).run();
-    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-B', 'pending', 'pending', datetime('now'), 0)`).run();
+    testDb.prepare(`
+      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+      VALUES ('PAN-A', 'pending', 'pending', datetime('now'), 0),
+             ('PAN-B', 'pending', 'pending', datetime('now'), 0)
+    `).run();
 
     // Simulate a TOCTOU race: both callers read the DB, then both write.
     // With the old read-all/write-all approach the second write would delete
@@ -114,7 +130,10 @@ describe('setReviewStatus concurrent updates (default path)', () => {
   it('setReviewStatus uses single-row read — does not load the entire table', () => {
     // Seed many rows
     for (let i = 0; i < 5; i++) {
-      odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-MANY-${i}', 'pending', 'pending', datetime('now'), 0)`).run();
+      testDb.prepare(`
+        INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
+        VALUES ('PAN-MANY-${i}', 'pending', 'pending', datetime('now'), 0)
+      `).run();
     }
 
     // Update one row — all others must remain intact

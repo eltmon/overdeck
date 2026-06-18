@@ -1,7 +1,7 @@
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { rankConversationSearch, type ConversationSearchHit } from '../../../lib/conversation-search/ranker.js';
-import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../../../lib/overdeck/conversations-search.js';
+import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../../../lib/database/conversation-embeddings-db.js';
 
 interface ConversationSearchServiceHandle {
   signature: string;

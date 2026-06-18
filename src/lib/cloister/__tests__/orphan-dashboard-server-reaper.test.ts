@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
+vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn() }));
 vi.mock('../../persistent-logger.js', () => ({ logDeaconEventSync: vi.fn() }));
 
@@ -14,7 +14,7 @@ import {
   parseDashboardServerProcs,
   reapOrphanedDashboardServers,
 } from '../orphan-dashboard-server-reaper.js';
-import { isDeaconGloballyPaused } from '../../overdeck/control-settings.js';
+import { isDeaconGloballyPaused } from '../../database/app-settings.js';
 
 describe('selectOrphanServerPids (PAN-1625)', () => {
   const base = { selfPid: 100, portOwnerPid: 100, minAgeSeconds: 120 };

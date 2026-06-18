@@ -7,11 +7,6 @@ import { Command } from 'commander';
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { tmpdir } from 'os';
-import {
-  setupOverdeckTestDb,
-  teardownOverdeckTestDb,
-  type OverdeckTestDb,
-} from '../../../../../tests/helpers/overdeck-test-db.js';
 
 vi.mock('chalk', () => {
   const identity = (s: unknown) => String(s);
@@ -21,22 +16,30 @@ vi.mock('chalk', () => {
   return { default: chalk };
 });
 
-let odb: OverdeckTestDb;
+let TEST_HOME: string;
+
+async function resetDb() {
+  const { resetDatabase } = await import('../../../../lib/database/index.js');
+  resetDatabase();
+}
 
 beforeEach(() => {
-  odb = setupOverdeckTestDb();
-  // Keep HOME pointing to a real-ish dir for transcript path resolution
-  process.env.HOME = odb.home;
+  TEST_HOME = join(tmpdir(), `jsonl-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(TEST_HOME, { recursive: true });
+  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.HOME = TEST_HOME;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await resetDb();
+  delete process.env.PANOPTICON_HOME;
   delete process.env.HOME;
-  teardownOverdeckTestDb(odb);
+  rmSync(TEST_HOME, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
 
 async function seedConversation(opts: { cwd?: string; claudeSessionId?: string | null } = {}) {
-  const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
+  const { createConversation } = await import('../../../../lib/database/conversations-db.js');
   const claudeSessionId = Object.prototype.hasOwnProperty.call(opts, 'claudeSessionId')
     ? (opts.claudeSessionId ?? undefined)
     : 'jsonl-session';
@@ -140,6 +143,8 @@ describe('jsonlAction', () => {
   });
 
   it('exits 1 for non-numeric ids and not-found conversations in plain and JSON modes', async () => {
+    const { getDatabase } = await import('../../../../lib/database/index.js');
+    getDatabase();
     const { jsonlAction } = await import('../jsonl.js');
     const { logs, errors } = captureConsole();
     const exitSpy = mockExit();

@@ -3,7 +3,7 @@
  */
 
 import chalk from 'chalk';
-import type { DiscoveredSession } from '../../../lib/overdeck/discovered-sessions.js';
+import type { DiscoveredSession } from '../../../lib/database/discovered-sessions-db.js';
 
 /**
  * Render sessions as a table.

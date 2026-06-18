@@ -13,9 +13,10 @@ import {
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
   setAutoMerge as dbSetAutoMerge,
-} from './overdeck/review-status-sync.js';
+  getReviewStatusFromDb,
+} from './database/review-status-db.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { updateIssueRecordForReviewStatusSync } from './overdeck/review-status-record-sync.js';
+import { updateIssueRecordForIssue } from './pan-dir/records.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -341,7 +342,7 @@ export function setReviewStatusSync(
   // PAN-1908: project durable review_status verdicts into the infra repo's
   // per-issue permanent record. Fire-and-forget so the SQLite write path stays
   // synchronous and fast; queueAutoCommit debounces bursts into one commit.
-  updateIssueRecordForReviewStatusSync(issueId, updated);
+  void updateIssueRecordForIssue(issueId, updated);
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 
@@ -704,13 +705,13 @@ export const setReviewStatus = (
 export const getReviewStatus = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
-  Effect.try({
-    try: () => getReviewStatusFromDbSync(issueId),
-    catch: (cause) =>
+  getReviewStatusFromDb(issueId).pipe(
+    Effect.mapError((cause) =>
       new ReviewStatusError({
         issueId,
         operation: 'getReviewStatus',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
-  });
+    ),
+  );

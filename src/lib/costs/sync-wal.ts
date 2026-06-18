@@ -11,10 +11,9 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { listProjectsSync } from '../projects.js';
+import { insertCostEvents } from '../database/cost-events-db.js';
 import { FsError } from '../errors.js';
 import type { CostEvent } from './events.js';
-import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
-import type { IssueId } from '../overdeck/issues.js';
 
 const DEFAULT_EVENTS_SUBDIR = '.pan/events';
 
@@ -63,7 +62,7 @@ export interface SyncResult {
       if (events.length === 0) continue;
 
       try {
-        const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, filePath);
+        const { inserted, duplicates } = insertCostEvents(events, filePath);
         projectStats.imported += inserted;
         projectStats.duplicates += duplicates;
         projectStats.files++;
@@ -100,7 +99,7 @@ export interface SyncResult {
     if (events.length === 0) continue;
 
     try {
-      const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, filePath);
+      const { inserted, duplicates } = insertCostEvents(events, filePath);
       stats.imported += inserted;
       stats.duplicates += duplicates;
       stats.files++;
@@ -113,43 +112,6 @@ export interface SyncResult {
 }
 
 // ============== Helpers ==============
-
-function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCostEvent {
-  return {
-    ts: new Date(event.ts),
-    issueId: event.issueId ? (event.issueId as IssueId) : null,
-    agentId: event.agentId ?? null,
-    sessionId: event.sessionId ?? null,
-    sessionType: event.sessionType ?? null,
-    provider: event.provider ?? null,
-    model: event.model ?? null,
-    input: event.input ?? 0,
-    output: event.output ?? 0,
-    cacheRead: event.cacheRead ?? 0,
-    cacheWrite: event.cacheWrite ?? 0,
-    cost: event.cost ?? 0,
-    requestId: event.requestId ?? null,
-    sourceFile,
-  };
-}
-
-async function recordCostEventsThroughOverdeck(
-  events: CostEvent[],
-  sourceFile: string,
-): Promise<{ inserted: number; duplicates: number }> {
-  let inserted = 0;
-  let duplicates = 0;
-  for (const event of events) {
-    const didInsert = await Effect.runPromise(
-      CostWriter.use((writer) => writer.record(toOverdeckCostEvent(event, sourceFile))).pipe(
-        Effect.provide(CostDoorLive),
-      ),
-    );
-    if (didInsert) inserted++;
-    else duplicates++;
-  }
-  return { inserted, duplicates };
-}
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 

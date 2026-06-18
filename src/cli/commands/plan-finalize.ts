@@ -81,11 +81,11 @@ function findWorkspaceRoot(start: string): string | null {
 
 function readAutoSpawnOnFinalize(issueId: string): boolean {
   const panopticonHome = process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
-  const flagFile = join(panopticonHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
+  const stateFile = join(panopticonHome, 'agents', `planning-${issueId.toLowerCase()}`, 'state.json');
   try {
-    if (!existsSync(flagFile)) return false;
-    const flag = JSON.parse(readFileSync(flagFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
-    return flag.autoSpawnOnFinalize === true;
+    if (!existsSync(stateFile)) return false;
+    const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };
+    return state.autoSpawnOnFinalize === true;
   } catch {
     return false;
   }
