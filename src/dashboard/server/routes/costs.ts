@@ -28,13 +28,13 @@ import {
   reconcile,
 } from '../../../lib/costs/index.js';
 import {
-  getCostsByIssueFromDb,
-  getCostForIssueFromDb,
-  getDailyTrends,
-  getModelRollup,
-  getCavemanExperimentData,
-  getBackgroundCostBySource,
-} from '../../../lib/database/cost-events-db.js';
+  getCostsByIssueSync,
+  getCostForIssueAggregateSync,
+  getDailyTrendsSync,
+  getModelRollupSync,
+  getCavemanExperimentDataSync,
+  getBackgroundCostBySourceSync,
+} from '../../../lib/overdeck/cost-sync.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
 // PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
@@ -100,7 +100,7 @@ const getCostsByIssueRoute = HttpRouter.add(
   '/api/costs/by-issue',
   httpHandler(Effect.try({
     try: () => {
-      const dbIssues = getCostsByIssueFromDb();
+      const dbIssues = getCostsByIssueSync();
 
       const issues = Object.entries(dbIssues).map(([issueId, data]) => {
         const d = data as {
@@ -236,7 +236,7 @@ const getCostsTrendsRoute = HttpRouter.add(
     const issueId = searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
-      try: () => jsonResponse({ trends: getDailyTrends({ days, issueId }), days, issueId: issueId ?? null }),
+      try: () => jsonResponse({ trends: getDailyTrendsSync({ days, issueId }), days, issueId: issueId ?? null }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
   })),
@@ -256,7 +256,7 @@ const getCostsByModelRoute = HttpRouter.add(
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
-      try: () => jsonResponse({ models: getModelRollup(issueId), issueId: issueId ?? null }),
+      try: () => jsonResponse({ models: getModelRollupSync(issueId), issueId: issueId ?? null }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
   })),
@@ -273,7 +273,7 @@ const getCostsIssueRoute = HttpRouter.add(
 
     return yield* Effect.try({
       try: () => {
-        const data = getCostForIssueFromDb(id);
+        const data = getCostForIssueAggregateSync(id);
         if (!data) {
           return jsonResponse({ issueId: id.toUpperCase(), totalCost: 0, models: {}, stages: {} });
         }
@@ -342,7 +342,7 @@ const getCostsExperimentsRoute = HttpRouter.add(
   'GET',
   '/api/costs/experiments',
   httpHandler(Effect.try({
-    try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
+    try: () => jsonResponse({ experiments: getCavemanExperimentDataSync() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -359,7 +359,7 @@ const getCostsBackgroundRoute = HttpRouter.add(
       const url = new URL(request.url, 'http://localhost');
       const hoursParam = Number(url.searchParams.get('hours'));
       const hours = Number.isFinite(hoursParam) && hoursParam > 0 ? hoursParam : 24;
-      return jsonResponse({ hours, bySource: getBackgroundCostBySource(hours) });
+      return jsonResponse({ hours, bySource: getBackgroundCostBySourceSync(hours) });
     }),
   ),
 );

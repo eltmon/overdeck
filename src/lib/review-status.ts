@@ -13,8 +13,7 @@ import {
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
   setAutoMerge as dbSetAutoMerge,
-  getReviewStatusFromDb,
-} from './database/review-status-db.js';
+} from './overdeck/review-status-sync.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync } from './overdeck/review-status-record-sync.js';
 
@@ -705,13 +704,13 @@ export const setReviewStatus = (
 export const getReviewStatus = (
   issueId: string,
 ): Effect.Effect<ReviewStatus | null, ReviewStatusError> =>
-  getReviewStatusFromDb(issueId).pipe(
-    Effect.mapError((cause) =>
+  Effect.try({
+    try: () => getReviewStatusFromDbSync(issueId),
+    catch: (cause) =>
       new ReviewStatusError({
         issueId,
         operation: 'getReviewStatus',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
-    ),
-  );
+  });
