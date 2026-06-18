@@ -135,6 +135,11 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
   const s = { ...status, issueId: status.issueId.toUpperCase() };
 
   const upsert = db.transaction(() => {
+    // Ensure the issues row exists so status_history FK is satisfied.
+    db.prepare(
+      `INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, 'working', ?)`,
+    ).run(s.issueId, Date.now());
+
     db.prepare(`
       INSERT INTO review_status (
         issue_id, review_status, test_status, merge_status,

@@ -17,9 +17,10 @@ const CLAIM_EXPIRY_MS = 60_000;
 
 export interface TranscriptCheckpoint {
   sessionId: string;
-  projectId: string | null;
-  workspaceId: string | null;
-  issueId: string | null;
+  /** Nullable in overdeck.db schema; returned as empty string when NULL. */
+  projectId: string;
+  workspaceId: string;
+  issueId: string;
   transcriptPath: string;
   lastOffset: number;
   lastMidTurnAt: string | null;
@@ -71,9 +72,9 @@ interface DbRow {
   claim_from: number | null;
   claim_to: number | null;
   claim_expires_at: number | null;
-  project_id: string | null;
-  workspace_id: string | null;
-  issue_id: string | null;
+  project_id: string | null;   // nullable in overdeck schema
+  workspace_id: string | null; // nullable in overdeck schema
+  issue_id: string | null;     // nullable in overdeck schema
 }
 
 function toIso(unixSecs: number | null): string | null {
@@ -97,9 +98,10 @@ function rowToCheckpoint(row: DbRow): TranscriptCheckpoint {
     claimFrom: row.claim_from,
     claimTo: row.claim_to,
     claimExpiresAt: toIso(row.claim_expires_at),
-    projectId: row.project_id,
-    workspaceId: row.workspace_id,
-    issueId: row.issue_id,
+    // Default null to empty string to maintain the non-nullable API contract.
+    projectId: row.project_id ?? '',
+    workspaceId: row.workspace_id ?? '',
+    issueId: row.issue_id ?? '',
   };
 }
 

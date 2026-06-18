@@ -39,7 +39,7 @@ type OverdeckAgentRow = {
 };
 
 /** Exported for agent-projection.ts transactional writes. */
-export const AGENT_COLUMNS_FOR_DB_FOR_DB = [
+export const AGENT_COLUMNS_FOR_DB = [
   'id',
   'issue_id',
   'role',

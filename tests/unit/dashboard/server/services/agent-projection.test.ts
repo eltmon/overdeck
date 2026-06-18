@@ -265,7 +265,8 @@ describe('saveAgentStateAndEmitEventWithDeps', () => {
 
     const row = getOverdeckAgentStateSync('agent-pan-1908');
     expect(row?.status).toBe('running');
-    expect(row?.stoppedAt).toBeNull();
+    // overdeck returns undefined (not null) for absent optional fields
+    expect(row?.stoppedAt).toBeUndefined();
   });
 
   it('emits the stored event with the real sequence after commit', () => {
