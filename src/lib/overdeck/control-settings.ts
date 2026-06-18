@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus } from './infra.js';
+import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId } from './issues.js';
 import type { ProjectConfig as RawProjectConfig } from '../projects.js';
 import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
@@ -364,3 +364,17 @@ export const ConfigApi = HttpApiGroup.make('config')
       success: Schema.Array(ProjectConfig),
     }),
   );
+
+// ── Sync bridge — used by lib/agents.ts (sync context) ──────────────────────
+
+/**
+ * Returns the currently-active flywheel run ID from overdeck.db, or null.
+ * Sync version of SettingsResolver.getFlywheelRuntime().activeRunId.
+ */
+export function getFlywheelActiveRunIdSync(): string | null {
+  const db = getOverdeckDatabaseSync();
+  const row = db
+    .prepare(`SELECT value FROM app_settings WHERE key = 'flywheel.active_run_id'`)
+    .get() as { value: string | null } | undefined;
+  return (row?.value as string | null | undefined) ?? null;
+}

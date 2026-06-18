@@ -30,7 +30,7 @@ import type { IssueState } from './tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
-import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
+import { createConversation, getConversationByName, reactivateConversationForSpawn } from './overdeck/conversations.js';
 import { getOverdeckAgentStateSync, listOverdeckAgentStatesSync, saveOverdeckAgentStateSync } from './overdeck/agent-state-sync.js';
 import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from './overdeck/agent-record-sync.js';
 import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from './overdeck/agent-rollback-state.js';
@@ -52,7 +52,7 @@ import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync, shellQuoteModelIdSync } from './model-validation.js';
 import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 import { recordFeatureRegistryLifecycle } from './registry/feature-registry-population.js';
-import { getFlywheelActiveRunId } from './database/app-settings.js';
+import { getFlywheelActiveRunIdSync } from './overdeck/control-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import { sendGracefulRestartWarning } from './graceful-restart.js';
@@ -78,7 +78,7 @@ function normalizeFlywheelRunId(runId: string | null | undefined): string | unde
 }
 
 function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
-  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunId());
+  const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
   return runId
     ? { PANOPTICON_FLYWHEEL_RUN_ID: runId, PANOPTICON_FLYWHEEL_AGENT_ROLE: role }
     : {};
@@ -4907,7 +4907,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         const { getReviewStatusSync } = await import('./review-status.js');
         const rs = getReviewStatusSync(agentState.issueId);
         if (rs?.stuck && rs.stuckReason === 'context_overflow') {
-          const { clearWorkspaceStuck } = await import('./database/review-status-db.js');
+          const { clearWorkspaceStuck } = await import('./review-status.js');
           clearWorkspaceStuck(agentState.issueId);
           logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
         }
