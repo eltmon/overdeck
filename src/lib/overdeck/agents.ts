@@ -1,3 +1,7 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+
 import { Context, Effect, Layer, Schema } from 'effect';
 import { and, eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
@@ -5,6 +9,9 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records, Tmux } from './infra.js';
 import { IssueId } from './issues.js';
+import { getOverdeckDatabaseSync } from './infra.js';
+import { getPanopticonHome } from '../paths.js';
+import type { AgentState } from '../agents.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -640,3 +647,313 @@ export const AgentsDomainLayer = Layer.mergeAll(
   AgentsResolverLive,
   AgentWriterLive,
 );
+
+// ── Sync helpers (for CLI and reconstruct paths that cannot use Effect) ────────
+
+/**
+ * All columns in the overdeck agents table (matches 0000_overdeck_init.sql).
+ * Timestamps are stored as INTEGER (Unix ms); booleans as INTEGER 0/1.
+ */
+const OVERDECK_AGENT_COLUMNS = [
+  'id', 'issue_id', 'role', 'status', 'workspace',
+  'session_id', 'harness', 'model', 'host_override', 'delivery_method',
+  'started_at', 'last_resume_at', 'stopped_by_user', 'kickoff_delivered',
+  'paused', 'paused_reason', 'troubled', 'channels_enabled',
+  'consecutive_failures', 'first_failure_in_run_at', 'last_failure_next_retry_at',
+  'stopped_at', 'paused_at', 'troubled_at', 'last_activity', 'last_failure_reason',
+  'phase', 'role_run_head', 'flywheel_run_id', 'cost_so_far',
+  'review_sub_role', 'review_run_id', 'updated_at',
+] as const;
+
+/** Convert an ISO timestamp string or null → Unix ms INTEGER or null. */
+function toMs(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Convert boolean → 0/1 integer, or null if input is null/undefined. */
+function toBit(v: boolean | null | undefined): number | null {
+  if (v == null) return null;
+  return v ? 1 : 0;
+}
+
+/**
+ * Map an AgentState to a parameter array for the overdeck agents INSERT.
+ * Column order matches OVERDECK_AGENT_COLUMNS.
+ */
+function agentStateToOverdeckRow(state: AgentState): unknown[] {
+  return [
+    state.id,
+    state.issueId,
+    state.role,
+    state.status,
+    state.workspace ?? '',
+    state.sessionId ?? null,
+    state.harness ?? null,
+    state.model ?? null,
+    typeof state.hostOverride === 'string' ? state.hostOverride : null,
+    state.deliveryMethod ?? null,
+    toMs(state.startedAt),
+    toMs(state.lastResumeAt),
+    toBit(state.stoppedByUser),
+    toBit(state.kickoffDelivered),
+    toBit(state.paused),
+    state.pausedReason ?? null,
+    toBit(state.troubled),
+    toBit(state.channelsEnabled),
+    state.consecutiveFailures ?? 0,
+    toMs(state.firstFailureInRunAt),
+    toMs(state.lastFailureNextRetryAt),
+    toMs(state.stoppedAt),
+    toMs(state.pausedAt),
+    toMs(state.troubledAt),
+    toMs(state.lastActivity),
+    state.lastFailureReason ?? null,
+    state.phase ?? null,
+    state.roleRunHead ?? null,
+    state.flywheelRunId ?? null,
+    state.costSoFar ?? null,
+    state.reviewSubRole ?? null,
+    state.reviewRunId ?? null,
+    Date.now(),
+  ];
+}
+
+function getManagedTmuxSocketName(): string {
+  return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? 'panopticon';
+}
+
+function listLiveTmuxSessionNamesSync(): Set<string> {
+  try {
+    const output = execFileSync(
+      'tmux',
+      ['-L', getManagedTmuxSocketName(), 'list-sessions', '-F', '#{session_name}'],
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    return new Set(
+      output.split('\n').map((l) => l.trim()).filter(Boolean),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike']);
+
+function parseAgentStateJsonSync(content: string, fallbackId: string): AgentState | null {
+  let parsed: Partial<AgentState>;
+  try {
+    parsed = JSON.parse(content) as Partial<AgentState>;
+  } catch {
+    return null;
+  }
+  if (!parsed.role || !VALID_ROLES_SYNC.has(parsed.role)) return null;
+  if (!parsed.id) parsed.id = fallbackId;
+  if (!parsed.status) parsed.status = 'stopped';
+  return parsed as AgentState;
+}
+
+export interface BackfillAgentsSyncOptions {
+  verbose?: boolean;
+  listLiveSessions?: () => Set<string>;
+}
+
+export interface BackfillAgentsSyncResult {
+  processed: number;
+  skipped: number;
+  markedStopped: number;
+}
+
+/**
+ * Read each agent's state.json from ~/.panopticon/agents/ and upsert rows into
+ * the overdeck agents table. Reconciles running/starting agents against live
+ * tmux sessions.
+ *
+ * Replaces database/agent-backfill.ts backfillAgentsAutoSync for the overdeck layer.
+ */
+export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
+  const db = getOverdeckDatabaseSync();
+  const agentsDir = join(getPanopticonHome(), 'agents');
+  const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNamesSync();
+
+  let processed = 0;
+  let skipped = 0;
+  let markedStopped = 0;
+
+  let entries: string[] = [];
+  try {
+    entries = readdirSync(agentsDir);
+  } catch {
+    return { processed, skipped, markedStopped };
+  }
+
+  const cols = OVERDECK_AGENT_COLUMNS.join(', ');
+  const placeholders = OVERDECK_AGENT_COLUMNS.map(() => '?').join(', ');
+  const upsert = db.prepare(
+    `INSERT OR REPLACE INTO agents (${cols}) VALUES (${placeholders})`,
+  );
+
+  const tx = db.transaction(() => {
+    for (const entry of entries) {
+      const dirPath = join(agentsDir, entry);
+      let statePath: string;
+      try {
+        if (!statSync(dirPath).isDirectory()) continue;
+        statePath = join(dirPath, 'state.json');
+      } catch {
+        continue;
+      }
+
+      let content: string;
+      try {
+        content = readFileSync(statePath, 'utf-8');
+      } catch {
+        skipped++;
+        continue;
+      }
+
+      const state = parseAgentStateJsonSync(content, entry);
+      if (!state) {
+        skipped++;
+        continue;
+      }
+
+      // Reconcile: mark stopped if no live tmux session
+      if ((state.status === 'running' || state.status === 'starting') && !liveSessions.has(state.id)) {
+        state.status = 'stopped';
+        state.stoppedAt = state.stoppedAt ?? new Date().toISOString();
+        markedStopped++;
+      }
+
+      upsert.run(...agentStateToOverdeckRow(state));
+      processed++;
+
+      if (options?.verbose) {
+        console.log(`[backfill] ${state.id} -> ${state.status}`);
+      }
+    }
+  });
+
+  tx();
+  return { processed, skipped, markedStopped };
+}
+
+/**
+ * List all agents from the overdeck agents table as AgentState-compatible objects.
+ * Used as a fallback in reconstruct-cache when listRunningAgents() fails.
+ */
+export function listAllAgentsSync(): Array<{
+  id: string;
+  issueId: string;
+  role: string;
+  status: string;
+  workspace: string | null;
+  harness: string | null;
+  model: string | null;
+  branch: null;
+  sessionId: string | null;
+  startedAt: string | null;
+  lastActivity: string | null;
+  lastResumeAt: string | null;
+  stoppedAt: string | null;
+  stoppedByUser: boolean | null;
+  stoppedByPause: null;
+  kickoffDelivered: boolean | null;
+  hostOverride: null;
+  costSoFar: number | null;
+  phase: string | null;
+  workType: null;
+  paused: boolean | null;
+  pausedReason: string | null;
+  pausedAt: string | null;
+  troubled: boolean | null;
+  troubledAt: string | null;
+  consecutiveFailures: number | null;
+  firstFailureInRunAt: string | null;
+  lastFailureAt: null;
+  lastFailureReason: string | null;
+  lastFailureNextRetryAt: string | null;
+  flywheelRunId: string | null;
+  roleRunHead: string | null;
+  reviewSubRole: string | null;
+  reviewRunId: string | null;
+  reviewSynthesisAgentId: null;
+  reviewOutputPath: null;
+  reviewDeadlineAt: null;
+  reviewMonitorSignaled: null;
+  reviewRetryAttempt: null;
+  inspectSubRole: null;
+  deliveryMethod: string | null;
+  supervisorEnabled: null;
+  channelsEnabled: boolean | null;
+  updatedAt: string;
+}> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db.prepare(`
+    SELECT id, issue_id, role, status, workspace, session_id, harness, model,
+           host_override, delivery_method, started_at, last_resume_at,
+           stopped_by_user, kickoff_delivered, paused, paused_reason, troubled,
+           channels_enabled, consecutive_failures, first_failure_in_run_at,
+           last_failure_next_retry_at, stopped_at, paused_at, troubled_at,
+           last_activity, last_failure_reason, phase, role_run_head,
+           flywheel_run_id, cost_so_far, review_sub_role, review_run_id,
+           updated_at
+    FROM agents
+  `).all() as Array<Record<string, unknown>>;
+
+  /** Convert INTEGER ms timestamp → ISO string or null. */
+  const fromMs = (v: unknown): string | null => {
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? new Date(n).toISOString() : null;
+  };
+  const fromBit = (v: unknown): boolean | null => v == null ? null : v !== 0;
+
+  return rows.map((row) => ({
+    id: row['id'] as string,
+    issueId: row['issue_id'] as string,
+    role: row['role'] as string,
+    status: row['status'] as string,
+    workspace: (row['workspace'] as string | null) ?? null,
+    harness: (row['harness'] as string | null) ?? null,
+    model: (row['model'] as string | null) ?? null,
+    branch: null,
+    sessionId: (row['session_id'] as string | null) ?? null,
+    startedAt: fromMs(row['started_at']),
+    lastActivity: fromMs(row['last_activity']),
+    lastResumeAt: fromMs(row['last_resume_at']),
+    stoppedAt: fromMs(row['stopped_at']),
+    stoppedByUser: fromBit(row['stopped_by_user']),
+    stoppedByPause: null,
+    kickoffDelivered: fromBit(row['kickoff_delivered']),
+    hostOverride: null,
+    costSoFar: (row['cost_so_far'] as number | null) ?? null,
+    phase: (row['phase'] as string | null) ?? null,
+    workType: null,
+    paused: fromBit(row['paused']),
+    pausedReason: (row['paused_reason'] as string | null) ?? null,
+    pausedAt: fromMs(row['paused_at']),
+    troubled: fromBit(row['troubled']),
+    troubledAt: fromMs(row['troubled_at']),
+    consecutiveFailures: (row['consecutive_failures'] as number | null) ?? null,
+    firstFailureInRunAt: fromMs(row['first_failure_in_run_at']),
+    lastFailureAt: null,
+    lastFailureReason: (row['last_failure_reason'] as string | null) ?? null,
+    lastFailureNextRetryAt: fromMs(row['last_failure_next_retry_at']),
+    flywheelRunId: (row['flywheel_run_id'] as string | null) ?? null,
+    roleRunHead: (row['role_run_head'] as string | null) ?? null,
+    reviewSubRole: (row['review_sub_role'] as string | null) ?? null,
+    reviewRunId: (row['review_run_id'] as string | null) ?? null,
+    reviewSynthesisAgentId: null,
+    reviewOutputPath: null,
+    reviewDeadlineAt: null,
+    reviewMonitorSignaled: null,
+    reviewRetryAttempt: null,
+    inspectSubRole: null,
+    deliveryMethod: (row['delivery_method'] as string | null) ?? null,
+    supervisorEnabled: null,
+    channelsEnabled: fromBit(row['channels_enabled']),
+    updatedAt: fromMs(row['updated_at']) ?? new Date().toISOString(),
+  }));
+}
