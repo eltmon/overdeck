@@ -38,7 +38,8 @@ type OverdeckAgentRow = {
   updated_at: number;
 };
 
-const AGENT_COLUMNS = [
+/** Exported for agent-projection.ts transactional writes. */
+export const AGENT_COLUMNS_FOR_DB_FOR_DB = [
   'id',
   'issue_id',
   'role',
@@ -74,7 +75,7 @@ const AGENT_COLUMNS = [
   'updated_at',
 ] as const;
 
-const SELECT_AGENT_SQL = `SELECT ${AGENT_COLUMNS.join(', ')} FROM agents`;
+const SELECT_AGENT_SQL = `SELECT ${AGENT_COLUMNS_FOR_DB.join(', ')} FROM agents`;
 
 function isoFromMillis(value: number | null | undefined): string | undefined {
   return value == null ? undefined : new Date(value).toISOString();
@@ -138,7 +139,8 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
   };
 }
 
-function stateToOverdeckParams(state: AgentState, updatedAt: number): unknown[] {
+/** Exported for agent-projection.ts transactional writes. */
+export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number): unknown[] {
   const deliveryMethod = state.deliveryMethod ?? (state.supervisorEnabled === true ? 'supervisor' : null);
   return [
     state.id,
@@ -198,6 +200,7 @@ export function saveOverdeckAgentStateSync(state: AgentState): void {
     `INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, 'working', ?)`,
   ).run(state.issueId, updatedAt);
   db.prepare(
-    `INSERT OR REPLACE INTO agents (${AGENT_COLUMNS.join(', ')}) VALUES (${AGENT_COLUMNS.map(() => '?').join(', ')})`,
-  ).run(...stateToOverdeckParams(state, updatedAt));
+    `INSERT OR REPLACE INTO agents (${AGENT_COLUMNS_FOR_DB.join(', ')}) VALUES (${AGENT_COLUMNS_FOR_DB.map(() => '?').join(', ')})`,
+  ).run(...stateToOverdeckParamsForDb(state, updatedAt));
 }
+

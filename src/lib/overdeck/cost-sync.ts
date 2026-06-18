@@ -154,3 +154,285 @@ export function getCostBreakdownByStageAndModelSync(issueId: string): {
 
   return { byStage, totals };
 }
+
+// ── IssueAggregate helpers (for routes/costs.ts and cli/commands/cost.ts) ─────
+
+export interface ModelBreakdown {
+  cost: number;
+  calls: number;
+  tokens: number;
+}
+
+export interface StageBreakdown {
+  cost: number;
+  calls: number;
+  tokens: number;
+}
+
+export interface IssueAggregate {
+  issueId: string;
+  totalCost: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  lastUpdated: string;
+  budgetWarning: boolean;
+  models: Record<string, ModelBreakdown>;
+  stages: Record<string, StageBreakdown>;
+  budget?: number;
+}
+
+function getModelBreakdownForIssueSync(issueId: string): Record<string, ModelBreakdown> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db
+    .prepare(
+      `SELECT model,
+              SUM(cost) AS cost,
+              COUNT(*)  AS calls,
+              SUM(input + output + cache_read + cache_write) AS tokens
+       FROM cost_events
+       WHERE UPPER(issue_id) = UPPER(?)
+       GROUP BY model`,
+    )
+    .all(issueId) as Array<{ model: string; cost: number; calls: number; tokens: number }>;
+  const result: Record<string, ModelBreakdown> = {};
+  for (const r of rows) {
+    result[r.model ?? 'unknown'] = { cost: r.cost ?? 0, calls: r.calls ?? 0, tokens: r.tokens ?? 0 };
+  }
+  return result;
+}
+
+function getStageBreakdownForIssueSync(issueId: string): Record<string, StageBreakdown> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db
+    .prepare(
+      `SELECT session_type AS stage,
+              SUM(cost) AS cost,
+              COUNT(*)  AS calls,
+              SUM(input + output + cache_read + cache_write) AS tokens
+       FROM cost_events
+       WHERE UPPER(issue_id) = UPPER(?)
+       GROUP BY session_type`,
+    )
+    .all(issueId) as Array<{ stage: string; cost: number; calls: number; tokens: number }>;
+  const result: Record<string, StageBreakdown> = {};
+  for (const r of rows) {
+    result[r.stage ?? 'unknown'] = { cost: r.cost ?? 0, calls: r.calls ?? 0, tokens: r.tokens ?? 0 };
+  }
+  return result;
+}
+
+/**
+ * Get aggregated costs by issue. Mirrors getCostsByIssueFromDb from cost-events-db.
+ * overdeck stores ts as unix int — MAX(ts) is converted to ISO string for lastUpdated.
+ */
+export function getCostsByIssueSync(): Record<string, IssueAggregate> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db
+    .prepare(
+      `SELECT UPPER(issue_id) AS issue_id,
+              SUM(cost)        AS total_cost,
+              SUM(input)       AS input_tokens,
+              SUM(output)      AS output_tokens,
+              SUM(cache_read)  AS cache_read_tokens,
+              SUM(cache_write) AS cache_write_tokens,
+              MAX(ts)          AS last_updated
+       FROM cost_events
+       GROUP BY UPPER(issue_id)
+       ORDER BY total_cost DESC`,
+    )
+    .all() as Array<{
+    issue_id: string;
+    total_cost: number;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    last_updated: number;
+  }>;
+
+  const result: Record<string, IssueAggregate> = {};
+  for (const row of rows) {
+    const models = getModelBreakdownForIssueSync(row.issue_id);
+    const stages = getStageBreakdownForIssueSync(row.issue_id);
+    result[row.issue_id] = {
+      issueId: row.issue_id,
+      totalCost: row.total_cost ?? 0,
+      inputTokens: row.input_tokens ?? 0,
+      outputTokens: row.output_tokens ?? 0,
+      cacheReadTokens: row.cache_read_tokens ?? 0,
+      cacheWriteTokens: row.cache_write_tokens ?? 0,
+      lastUpdated: row.last_updated != null ? new Date(row.last_updated * 1000).toISOString() : new Date().toISOString(),
+      budgetWarning: false,
+      models,
+      stages,
+    };
+  }
+  return result;
+}
+
+/**
+ * Get aggregated costs for a single issue. Mirrors getCostForIssueFromDb.
+ */
+export function getCostForIssueAggregateSync(issueId: string): IssueAggregate | null {
+  const db = getOverdeckDatabaseSync();
+  const row = db
+    .prepare(
+      `SELECT UPPER(issue_id) AS issue_id,
+              SUM(cost)        AS total_cost,
+              SUM(input)       AS input_tokens,
+              SUM(output)      AS output_tokens,
+              SUM(cache_read)  AS cache_read_tokens,
+              SUM(cache_write) AS cache_write_tokens,
+              MAX(ts)          AS last_updated
+       FROM cost_events
+       WHERE UPPER(issue_id) = UPPER(?)
+       GROUP BY UPPER(issue_id)`,
+    )
+    .get(issueId) as {
+    issue_id: string;
+    total_cost: number;
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    last_updated: number;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    issueId: row.issue_id,
+    totalCost: row.total_cost ?? 0,
+    inputTokens: row.input_tokens ?? 0,
+    outputTokens: row.output_tokens ?? 0,
+    cacheReadTokens: row.cache_read_tokens ?? 0,
+    cacheWriteTokens: row.cache_write_tokens ?? 0,
+    lastUpdated: row.last_updated != null ? new Date(row.last_updated * 1000).toISOString() : new Date().toISOString(),
+    budgetWarning: false,
+    models: getModelBreakdownForIssueSync(row.issue_id),
+    stages: getStageBreakdownForIssueSync(row.issue_id),
+  };
+}
+
+export interface DailyTrend {
+  date: string;
+  totalCost: number;
+  eventCount: number;
+  totalTokens: number;
+}
+
+/**
+ * Get daily cost totals for trend charts. overdeck stores ts as unix int;
+ * DATE() still works on integer unix seconds in SQLite (via datetime()).
+ */
+export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {}): DailyTrend[] {
+  const db = getOverdeckDatabaseSync();
+  const days = opts.days ?? 30;
+  const sinceSecs = Math.floor((Date.now() - days * 86_400_000) / 1000);
+  const conditions = ['ts >= ?'];
+  const params: (string | number)[] = [sinceSecs];
+  if (opts.issueId) {
+    conditions.push('UPPER(issue_id) = UPPER(?)');
+    params.push(opts.issueId);
+  }
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const rows = db
+    .prepare(
+      `SELECT DATE(datetime(ts, 'unixepoch')) AS date,
+              SUM(cost)  AS total_cost,
+              COUNT(*)   AS event_count,
+              SUM(input + output + cache_read + cache_write) AS total_tokens
+       FROM cost_events
+       ${where}
+       GROUP BY DATE(datetime(ts, 'unixepoch'))
+       ORDER BY date ASC`,
+    )
+    .all(...params) as Array<{ date: string; total_cost: number; event_count: number; total_tokens: number }>;
+  return rows.map((r) => ({
+    date: r.date,
+    totalCost: r.total_cost ?? 0,
+    eventCount: r.event_count ?? 0,
+    totalTokens: r.total_tokens ?? 0,
+  }));
+}
+
+export interface ModelRollup {
+  model: string;
+  totalCost: number;
+  calls: number;
+  totalTokens: number;
+}
+
+/**
+ * Get model-level rollup across all issues or for a specific issue.
+ * Mirrors getModelRollup from cost-events-db.
+ */
+export function getModelRollupSync(issueId?: string): ModelRollup[] {
+  const db = getOverdeckDatabaseSync();
+  const where = issueId ? 'WHERE UPPER(issue_id) = UPPER(?)' : '';
+  const params = issueId ? [issueId] : [];
+  const rows = db
+    .prepare(
+      `SELECT model,
+              SUM(cost) AS total_cost,
+              COUNT(*)  AS calls,
+              SUM(input + output + cache_read + cache_write) AS total_tokens
+       FROM cost_events
+       ${where}
+       GROUP BY model
+       ORDER BY total_cost DESC`,
+    )
+    .all(...params) as Array<{ model: string; total_cost: number; calls: number; total_tokens: number }>;
+  return rows.map((r) => ({
+    model: r.model ?? 'unknown',
+    totalCost: r.total_cost ?? 0,
+    calls: r.calls ?? 0,
+    totalTokens: r.total_tokens ?? 0,
+  }));
+}
+
+/**
+ * Get background cost by source_file for last N hours.
+ * Mirrors getBackgroundCostBySource from cost-events-db.
+ * overdeck stores ts as unix int seconds.
+ */
+export function getBackgroundCostBySourceSync(hours = 24): Record<string, number> {
+  const db = getOverdeckDatabaseSync();
+  const sinceSecs = Math.floor((Date.now() - hours * 3_600_000) / 1000);
+  const rows = db
+    .prepare(
+      `SELECT source_file AS source, COALESCE(SUM(cost), 0) AS cost
+       FROM cost_events
+       WHERE ts >= ?
+         AND (source_file LIKE 'background:%' OR source_file = 'memory-extraction')
+       GROUP BY source_file`,
+    )
+    .all(sinceSecs) as Array<{ source: string | null; cost: number }>;
+  const out: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.source) out[row.source] = row.cost ?? 0;
+  }
+  return out;
+}
+
+/**
+ * getCavemanExperimentData equivalent.
+ * The overdeck cost_events table has no caveman_variant column — this column
+ * was dropped as zero-read bloat in the overdeck schema (overdeck-schema.ts).
+ * Returns empty array since there is nothing to query.
+ */
+export interface CavemanExperimentRow {
+  variant: string;
+  eventCount: number;
+  avgOutputTokens: number;
+  totalOutputTokens: number;
+  avgInputTokens: number;
+  avgCost: number;
+  totalCost: number;
+}
+
+export function getCavemanExperimentDataSync(): CavemanExperimentRow[] {
+  return [];
+}

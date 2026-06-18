@@ -5,7 +5,7 @@ export type {
   CommitTranscriptRangeInput,
   ClaimTranscriptRangeResult,
   CommitTranscriptRangeResult,
-} from '../database/transcript-checkpoint-db.js';
+} from '../overdeck/transcript-checkpoint-sync.js';
 
 export {
   claimTranscriptRange,
@@ -13,4 +13,4 @@ export {
   releaseTranscriptRange,
   listTranscriptCheckpoints,
   getTranscriptCheckpoint,
-} from '../database/transcript-checkpoint-db.js';
+} from '../overdeck/transcript-checkpoint-sync.js';
