@@ -537,7 +537,7 @@ Environment variables available to agents:
 ### Directory Structure (End-State)
 
 ```
-~/.overdeck/                          PANOPTICON'S PRIVATE CACHE
+~/.overdeck/                          OVERDECK'S PRIVATE CACHE
 ├── skills/                             64 skills (kept fresh by pan sync)
 ├── dev-skills/                         3 dev-only skills
 ├── agents/                             8 agent definitions
@@ -561,7 +561,7 @@ Environment variables available to agents:
 ├── myn/                                Git repos
 └── ...
 
-~/.claude/                              USER'S PERSONAL SPACE — UNTOUCHED BY PANOPTICON
+~/.claude/                              USER'S PERSONAL SPACE — UNTOUCHED BY OVERDECK
 ├── CLAUDE.md                           User's personal preferences
 ├── skills/                             User's personal overrides ONLY (if any)
 │   └── my-custom-skill/SKILL.md       (beats everything — personal > project)

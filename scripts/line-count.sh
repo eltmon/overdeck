@@ -4,7 +4,7 @@
 
 VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
 
-echo "=== PANOPTICON-CLI v${VERSION} — Codebase Line Count ==="
+echo "=== OVERDECK-CLI v${VERSION} — Codebase Line Count ==="
 echo ""
 
 echo "--- By Directory ---"

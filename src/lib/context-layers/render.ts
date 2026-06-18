@@ -14,10 +14,10 @@ import { globalContextFile, projectContextFile, readLayerContent } from './layer
 
 /** Opening marker of the Overdeck-managed region in a target CLAUDE.md. */
 export const REGION_BEGIN =
-  '<!-- BEGIN PANOPTICON CONTEXT — managed by `pan sync`; edit the layer source, not this region -->';
+  '<!-- BEGIN OVERDECK CONTEXT — managed by `pan sync`; edit the layer source, not this region -->';
 
 /** Closing marker of the Overdeck-managed region. */
-export const REGION_END = '<!-- END PANOPTICON CONTEXT -->';
+export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
 
 /**
  * Insert or replace the Overdeck-managed region inside an existing file.
@@ -31,7 +31,7 @@ export function applyManagedRegion(existing: string, managed: string): string {
   const region = `${REGION_BEGIN}\n${managed.trim()}\n${REGION_END}`;
   const beginIdx = existing.indexOf(REGION_BEGIN);
   // Use the LAST end-marker, not the first. Layer content may legitimately
-  // contain the literal string `<!-- END PANOPTICON CONTEXT -->` in prose (e.g.
+  // contain the literal string `<!-- END OVERDECK CONTEXT -->` in prose (e.g.
   // global.md documents the markers). With `indexOf`, that inner mention is
   // mistaken for the region terminator, so everything after it — including any
   // previously-rendered copies — survives as "outside" content and a fresh copy

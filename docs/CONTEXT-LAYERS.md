@@ -92,9 +92,9 @@ a **managed region** of the target CLAUDE.md, delimited by HTML comment
 markers:
 
 ```
-<!-- BEGIN PANOPTICON CONTEXT — managed by `pan sync`; edit the layer source, not this region -->
+<!-- BEGIN OVERDECK CONTEXT — managed by `pan sync`; edit the layer source, not this region -->
 …rendered content…
-<!-- END PANOPTICON CONTEXT -->
+<!-- END OVERDECK CONTEXT -->
 ```
 
 Content **outside** the markers is preserved untouched — a hand-authored
@@ -121,7 +121,7 @@ Overdeck is designed to **augment, never replace** any context files you
 already maintain. Three guarantees:
 
 1. **Managed-region surgery.** `pan sync` only ever owns the span between the
-   `BEGIN/END PANOPTICON CONTEXT` markers in `~/.claude/CLAUDE.md`, each
+   `BEGIN/END OVERDECK CONTEXT` markers in `~/.claude/CLAUDE.md`, each
    project's `CLAUDE.md`, and each project's `AGENTS.md`. Everything outside
    the markers — including content you add *above* or *below* the region — is
    preserved verbatim across every sync.

@@ -287,7 +287,7 @@ export function ContextPage() {
           <p className="font-medium text-foreground">Where this gets injected</p>
           <p className="mt-1 leading-5">
             <code className="rounded bg-muted px-1">pan sync</code> writes a managed region —
-            between <code className="rounded bg-muted px-1">BEGIN/END PANOPTICON CONTEXT</code> markers —
+            between <code className="rounded bg-muted px-1">BEGIN/END OVERDECK CONTEXT</code> markers —
             into the files below. Anything you wrote <span className="font-medium text-foreground">outside</span> those
             markers is never modified. Edit the layer source here, not the region.
           </p>

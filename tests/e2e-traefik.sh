@@ -54,7 +54,7 @@ cleanup() {
     pan down 2>/dev/null || true
 
     # Remove test installation
-    if [ "$CLEAN_PANOPTICON" = "true" ]; then
+    if [ "$CLEAN_OVERDECK" = "true" ]; then
         rm -rf ~/.overdeck.test
     fi
 
@@ -90,7 +90,7 @@ fi
 
 # Use test environment
 export OVERDECK_HOME=~/.overdeck.test
-export CLEAN_PANOPTICON=true
+export CLEAN_OVERDECK=true
 
 log_info "Using test environment: $OVERDECK_HOME"
 

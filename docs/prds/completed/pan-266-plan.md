@@ -55,7 +55,7 @@ REPO SOURCE (overdeck/)
         │
         │ pan sync (COPY, keeps fresh)
         ▼
-PANOPTICON CACHE (~/.overdeck/)
+OVERDECK CACHE (~/.overdeck/)
   skills/           Full copies (always up-to-date)
   agents/
   rules/
