@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Context, Effect, Layer, Schema, Stream } from 'effect';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import type { RuntimeName } from '../runtimes/types.js';
@@ -41,6 +41,20 @@ const conversationsTable = sqliteTable('conversations', {
   handoffDocPath:      text('handoff_doc_path'),
   handoffTargetConvId: text('handoff_target_conv_id'),
   clearedToConvId:     text('cleared_to_conv_id'),
+  tmuxSession:         text('tmux_session'),
+  status:              text('status').notNull().default('active'),
+  endedAt:             text('ended_at'),
+  lastAttachedAt:      text('last_attached_at'),
+  sessionFile:         text('session_file'),
+  totalCost:           real('total_cost').default(0),
+  totalTokens:         integer('total_tokens').default(0),
+  forkStatus:          text('fork_status'),
+  forkError:           text('fork_error'),
+  forkRetryCount:      integer('fork_retry_count').notNull().default(0),
+  forkRequest:         text('fork_request'),
+  forkFallbackReason:  text('fork_fallback_reason'),
+  deliveryMethod:      text('delivery_method'),
+  spawnError:          text('spawn_error'),
 });
 
 const conversationFilesTable = sqliteTable('conversation_files', {
@@ -717,6 +731,20 @@ interface LegacyConversationRow {
   handoff_target_conv_id: string | null;
   cleared_to_conv_id: string | null;
   claude_session_id: string | null;
+  tmux_session: string | null;
+  status: string | null;
+  ended_at: string | null;
+  last_attached_at: string | null;
+  session_file: string | null;
+  total_cost: number | null;
+  total_tokens: number | null;
+  fork_status: string | null;
+  fork_error: string | null;
+  fork_retry_count: number | null;
+  fork_request: string | null;
+  fork_fallback_reason: string | null;
+  delivery_method: string | null;
+  spawn_error: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -736,6 +764,20 @@ const LEGACY_CONVERSATION_SELECT = `
     c.handoff_doc_path,
     c.handoff_target_conv_id,
     c.cleared_to_conv_id,
+    c.tmux_session,
+    c.status,
+    c.ended_at,
+    c.last_attached_at,
+    c.session_file,
+    c.total_cost,
+    c.total_tokens,
+    c.fork_status,
+    c.fork_error,
+    c.fork_retry_count,
+    c.fork_request,
+    c.fork_fallback_reason,
+    c.delivery_method,
+    c.spawn_error,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -801,33 +843,33 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
   return {
     id: row.legacy_id,
     name: row.name,
-    tmuxSession: `conv-${row.name}`,
-    status: archivedAt ? 'ended' : 'active',
+    tmuxSession: row.tmux_session ?? `conv-${row.name}`,
+    status: (row.status ?? (archivedAt ? 'ended' : 'active')) as 'active' | 'ended',
     cwd: row.cwd,
     issueId: row.issue_id ?? null,
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
-    endedAt: archivedAt,
-    lastAttachedAt: null,
+    endedAt: row.ended_at ?? archivedAt,
+    lastAttachedAt: row.last_attached_at ?? null,
     claudeSessionId: row.claude_session_id ?? null,
     title: row.title ?? null,
     titleSource: (row.title_source as LegacyTitleSource | null) ?? null,
     titleSeed: row.title ?? null,
-    totalCost: 0,
-    totalTokens: 0,
+    totalCost: row.total_cost ?? 0,
+    totalTokens: row.total_tokens ?? 0,
     archivedAt,
     model: row.model ?? null,
     effort: row.effort ?? null,
-    forkStatus: null,
-    forkError: null,
+    forkStatus: row.fork_status ?? null,
+    forkError: row.fork_error ?? null,
     harness: normalizeHarness(row.harness),
-    deliveryMethod: null,
-    spawnError: null,
+    deliveryMethod: (row.delivery_method as 'auto' | 'channels' | 'tmux' | null) ?? null,
+    spawnError: row.spawn_error ?? null,
     handoffDocPath: row.handoff_doc_path ?? null,
     handoffTargetConvId: legacyRowIdForConversationId(row.handoff_target_conv_id),
-    forkFallbackReason: null,
+    forkFallbackReason: row.fork_fallback_reason ?? null,
     clearedToConvId: legacyRowIdForConversationId(row.cleared_to_conv_id),
-    forkRequest: null,
-    forkRetryCount: 0,
+    forkRequest: row.fork_request ?? null,
+    forkRetryCount: row.fork_retry_count ?? 0,
   };
 }
 
@@ -991,8 +1033,9 @@ export function createConversation(opts: {
     db.prepare(`DELETE FROM conversations WHERE name = ?`).run(opts.name);
     db.prepare(`
       INSERT INTO conversations
-        (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?)
     `).run(
       id,
       opts.name,
@@ -1004,6 +1047,10 @@ export function createConversation(opts: {
       opts.title ?? null,
       opts.titleSource ?? (opts.title ? 'auto' : null),
       now,
+      opts.tmuxSession ?? null,
+      opts.forkStatus ?? null,
+      opts.deliveryMethod ?? null,
+      null,  // spawn_error starts null
     );
     if (opts.claudeSessionId) {
       db.prepare(`
@@ -1018,8 +1065,10 @@ export function createConversation(opts: {
   return conv;
 }
 
-export function markConversationEnded(_name: string): void {
-  // overdeck does not persist live/ended process state.
+export function markConversationEnded(name: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET ended_at = ?, status = 'ended' WHERE name = ?`)
+    .run(new Date().toISOString(), name);
 }
 
 export function markConversationActive(name: string): void {
@@ -1052,12 +1101,16 @@ export function reactivateConversationForSpawn(opts: {
   }
 }
 
-export function updateLastAttached(_name: string): void {
-  // overdeck does not persist attach timestamps.
+export function updateLastAttached(name: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET last_attached_at = ? WHERE name = ?`)
+    .run(new Date().toISOString(), name);
 }
 
 export function markAllEndedOnStartup(): void {
-  // overdeck does not persist live/ended process state.
+  overdeckDb()
+    .prepare(`UPDATE conversations SET status = 'ended', ended_at = COALESCE(ended_at, ?) WHERE status = 'active'`)
+    .run(new Date().toISOString());
 }
 
 export function updateConversationTitle(name: string, title: string, titleSource?: LegacyTitleSource): void {
@@ -1076,8 +1129,10 @@ export function unarchiveConversation(name: string): void {
   overdeckDb().prepare(`UPDATE conversations SET archived_at = NULL WHERE name = ?`).run(name);
 }
 
-export function updateConversationCost(_name: string, _totalCost: number, _totalTokens?: number): void {
-  // Cost totals now live in the overdeck cost_events domain.
+export function updateConversationCost(name: string, totalCost: number, totalTokens?: number): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET total_cost = ?, total_tokens = COALESCE(?, total_tokens) WHERE name = ?`)
+    .run(totalCost, totalTokens ?? null, name);
 }
 
 export function setConversationModel(name: string, model: string): void {
@@ -1099,32 +1154,48 @@ export function setConversationClaudeSessionId(name: string, claudeSessionId: st
   `).run(id, harness, claudeSessionId, toUnixSeconds());
 }
 
-export function updateConversationDeliveryMethod(_name: string, _method: 'auto' | 'channels' | 'tmux' | null): void {
-  // overdeck does not persist delivery-method cache state.
+export function updateConversationDeliveryMethod(name: string, method: 'auto' | 'channels' | 'tmux' | null): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET delivery_method = ? WHERE name = ?`)
+    .run(method, name);
 }
 
 export function backfillConversationModel(name: string, model: string): void {
   overdeckDb().prepare(`UPDATE conversations SET model = ? WHERE name = ? AND model IS NULL`).run(model, name);
 }
 
-export function updateForkStatus(_name: string, _status: string | null, _error?: string): void {
-  // overdeck does not persist transient async fork status.
+export function updateForkStatus(name: string, status: string | null, error?: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET fork_status = ?, fork_error = ? WHERE name = ?`)
+    .run(status, error ?? null, name);
 }
 
 export function getStuckForks(): LegacyConversation[] {
-  return [];
+  const rows = overdeckDb()
+    .prepare(`${LEGACY_CONVERSATION_SELECT} WHERE c.fork_status = 'pending' AND c.archived_at IS NULL`)
+    .all() as LegacyConversationRow[];
+  return rows.map(rowToLegacyConversation);
 }
 
-export function setForkRequest(_name: string, _json: string): void {
-  // overdeck does not persist transient fork requests.
+export function setForkRequest(name: string, json: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET fork_request = ? WHERE name = ?`)
+    .run(json, name);
 }
 
-export function incrementForkRetryCount(_name: string): number {
-  return 0;
+export function incrementForkRetryCount(name: string): number {
+  const db = overdeckDb();
+  db.prepare(`UPDATE conversations SET fork_retry_count = fork_retry_count + 1 WHERE name = ?`).run(name);
+  const row = db.prepare(`SELECT fork_retry_count FROM conversations WHERE name = ?`).get(name) as
+    | { fork_retry_count: number }
+    | undefined;
+  return row?.fork_retry_count ?? 0;
 }
 
-export function updateConversationForkFallbackReason(_name: string, _reason: string | null): void {
-  // overdeck does not persist fork fallback reason.
+export function updateConversationForkFallbackReason(name: string, reason: string | null): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET fork_fallback_reason = ? WHERE name = ?`)
+    .run(reason, name);
 }
 
 export function recordConversationHandoff(sourceName: string, targetName: string, docPath: string): LegacyConversation {
