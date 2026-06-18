@@ -8,10 +8,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { initSchema } from '../../../../src/lib/database/schema.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
-// ============== In-memory DB injection ==============
+// ============== In-memory panopticon DB (for no-loss audit tests) ==============
+// verdict-restore writes review_status through review-status.js which uses overdeck.
+// We keep testDb for schema-audit tests (which inspect the panopticon.db DDL).
 
 let testDb: SqliteDatabase;
+let odb: OverdeckTestDb;
 
 vi.mock('../../../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
@@ -66,12 +70,14 @@ beforeEach(() => {
   testDb = openDatabase(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
+  odb = setupOverdeckTestDb();
   mockUpdateIssueRecordForIssue.mockClear();
   mockRefreshMergeStateFromGitHub.mockClear();
 });
 
 afterEach(() => {
   testDb.close();
+  teardownOverdeckTestDb(odb);
 });
 
 // ============== Import after mocks ==============

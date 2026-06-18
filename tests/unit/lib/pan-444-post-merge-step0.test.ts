@@ -89,6 +89,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
   PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
+  packageRoot: '/tmp/panopticon-test',
 }));
 
 vi.mock('../../../src/lib/tracker-utils.js', () => ({
