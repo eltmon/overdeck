@@ -123,15 +123,16 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityTts: vi.fn(),
   emitActivityTtsSync: vi.fn(),
 }));
-vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
-vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
+vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
+vi.mock('../../overdeck/review-status-sync.js', () => ({ markWorkspaceStuck: vi.fn(), clearWorkspaceStuck: vi.fn() }));
+vi.mock('../../overdeck/agents.js', () => ({ listAllAgentsSync: vi.fn(() => []) }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../lifecycle/workflows.js', async () => {
   // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.
   const { Effect } = await import('effect');
   return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
 });
-vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents' }));
+vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents', packageRoot: '/tmp/test-package-root' }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
 vi.mock('../../projects.js', () => ({
   getProject: vi.fn(() => null),
