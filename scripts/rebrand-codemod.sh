@@ -86,3 +86,14 @@ _apply 'panopticon-cli' 's/panopticon-cli/overdeck/g'
 # ===========================================================================
 echo "Family 6: lowercase panopticon -> overdeck (except .db / -agent)"
 _apply 'panopticon' 's/panopticon(?!\.db|-agent)/overdeck/g'
+
+# ===========================================================================
+# Family 7 — legacy-home reader (HAND-EDIT, not scripted)
+# Family 6 renamed .panopticon -> .overdeck everywhere, including the one reader
+# that must keep the OLD home: the `--seed-from-legacy` importer. Fixed by hand:
+#   * src/lib/paths.ts      — add getLegacyHome() -> ~/.panopticon (hardcoded)
+#   * src/dashboard/server/main.ts:645 — legacyDbPath uses getLegacyHome()
+# The active DB path (getDatabasePath / the migration snapshot) correctly follows
+# the renamed home (~/.overdeck) and is intentionally left alone.
+# ===========================================================================
+echo "Family 7: legacy-home reader — applied by hand (see comment above)"

@@ -10,6 +10,16 @@ export function getOverdeckHome(): string {
   return process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
 }
 
+/**
+ * Pre-rebrand home (`~/.panopticon`). Used ONLY by the opt-in `--seed-from-legacy`
+ * importer to locate the user's old `panopticon.db`. Never the live home — that is
+ * {@link getOverdeckHome}. Hardcoded (PAN-1964); this whole legacy-import path is
+ * slated for removal once the cutover is complete.
+ */
+export function getLegacyHome(): string {
+  return join(homedir(), '.panopticon');
+}
+
 // Subdirectories
 export const CONFIG_DIR = OVERDECK_HOME;
 export const SKILLS_DIR = join(OVERDECK_HOME, 'skills');

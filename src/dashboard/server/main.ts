@@ -38,7 +38,7 @@ import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
-import { getOverdeckHome } from '../../lib/paths.js';
+import { getOverdeckHome, getLegacyHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
@@ -642,7 +642,7 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
 await (async () => {
   try {
     const overdeckDbPath = getOverdeckDatabasePath();
-    const legacyDbPath = join(getOverdeckHome(), 'panopticon.db');
+    const legacyDbPath = join(getLegacyHome(), 'panopticon.db');
 
     if (!existsSync(overdeckDbPath)) {
       createOverdeckDatabase({ dbPath: overdeckDbPath });
