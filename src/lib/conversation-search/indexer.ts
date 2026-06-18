@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
-import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../database/conversation-embeddings-db.js';
+import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../overdeck/conversations-search.js';
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
 
