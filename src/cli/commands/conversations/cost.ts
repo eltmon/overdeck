@@ -3,7 +3,7 @@
  */
 
 import chalk from 'chalk';
-import { findDiscoveredSessions } from '../../../lib/database/discovered-sessions-db.js';
+import { findDiscoveredSessions } from '../../../lib/overdeck/discovered-sessions.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 
 type GroupBy = 'workspace' | 'model' | 'day' | 'month';

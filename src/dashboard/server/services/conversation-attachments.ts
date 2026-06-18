@@ -4,7 +4,6 @@ import { readdir, mkdir, rm, stat, realpath } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import type { Conversation } from '../../../lib/database/conversations-db.js';
 import { getPanopticonHome } from '../../../lib/paths.js';
 
 const CONVERSATION_ATTACHMENTS_DIR = 'conversation-attachments';
@@ -82,7 +81,7 @@ export async function cleanupConversationAttachments(name: string): Promise<void
  *  sessions that the lifecycle poller missed. */
 export async function cleanupOrphanedConversationAttachments(): Promise<void> {
   try {
-    const { listConversations } = await import('../../../lib/database/conversations-db.js');
+    const { listConversations } = await import('../../../lib/overdeck/conversations.js');
     const convNames = new Set(listConversations().map((c) => c.name));
     const root = getConversationAttachmentsRoot();
     const dirs = await readdir(root, { withFileTypes: true });
