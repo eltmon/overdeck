@@ -10,35 +10,28 @@
  * call clearWorkspaceStuck. These tests verify the stuck-flag lifecycle.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
-import { initSchema } from '../../../src/lib/database/schema.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 
-// ============== In-memory DB injection ==============
+// ============== Overdeck DB fixture ==============
 
-let testDb: SqliteDatabase;
-
-vi.mock('../../../src/lib/database/index.js', () => ({
-  getDatabase: () => testDb,
-}));
+let odb: OverdeckTestDb;
 
 beforeEach(() => {
-  testDb = openDatabase(':memory:');
-  testDb.pragma('foreign_keys = ON');
-  initSchema(testDb);
+  odb = setupOverdeckTestDb();
 });
 
 afterEach(() => {
-  testDb.close();
+  teardownOverdeckTestDb(odb);
 });
 
-// ============== Imports (after mock is set up) ==============
+// ============== Imports ==============
 
 import {
   markWorkspaceStuck,
   clearWorkspaceStuck,
   getReviewStatusFromDbSync,
-} from '../../../src/lib/database/review-status-db.js';
+} from '../../../src/lib/overdeck/review-status-sync.js';
 import { setReviewStatusSync, getReviewStatusSync } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
@@ -67,10 +60,7 @@ describe('markWorkspaceStuck', () => {
 
   it('overwrites an existing status without resetting other columns', () => {
     // First, give the issue a passing review
-    testDb.prepare(`
-      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
-      VALUES ('PAN-200', 'passed', 'passed', datetime('now'), 1)
-    `).run();
+    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-200', 'passed', 'passed', datetime('now'), 0)`).run();
 
     markWorkspaceStuck('PAN-200', 'main_diverged');
 
@@ -97,10 +87,7 @@ describe('clearWorkspaceStuck (unstick endpoint core logic)', () => {
 
   it('is idempotent — clearing an already-not-stuck workspace does not error', () => {
     // Insert a non-stuck row
-    testDb.prepare(`
-      INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge)
-      VALUES ('PAN-400', 'pending', 'pending', datetime('now'), 0)
-    `).run();
+    odb.raw().prepare(`INSERT INTO review_status (issue_id, review_status, test_status, updated_at, ready_for_merge) VALUES ('PAN-400', 'pending', 'pending', datetime('now'), 0)`).run();
 
     // Should not throw
     expect(() => clearWorkspaceStuck('PAN-400')).not.toThrow();

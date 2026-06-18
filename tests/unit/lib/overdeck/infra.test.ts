@@ -88,7 +88,7 @@ describe('overdeck infra', () => {
         WHERE type = 'table'
           AND name NOT LIKE 'sqlite_%'
       `).get<{ count: number }>()?.count;
-      expect(tableCount).toBe(24);
+      expect(tableCount).toBe(32);
     } finally {
       raw.close();
     }

@@ -94,7 +94,7 @@ panloc=$(
 
 violations=$(
   { printf '%s\n' "$getdb" "$dbimport" "$rawdb" "$panloc"; } \
-    | grep -vE '^[[:space:]]*$' | comment_filter | sort -u
+    | grep -vE '^[[:space:]]*$' | comment_filter | sort -u || true
 )
 
 if [[ -n "$violations" ]]; then
