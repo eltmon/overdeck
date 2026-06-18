@@ -14,9 +14,9 @@ import { PANOPTICON_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
 import {
   getAgentRollup,
-  getDailyTrends,
-  getCostForIssueFromDb,
-} from '../database/cost-events-db.js';
+  getDailyTrendsSync as getDailyTrends,
+  getCostForIssueSync as getCostForIssueFromDb,
+} from '../overdeck/cost-sync.js';
 
 /**
  * Cost alert level

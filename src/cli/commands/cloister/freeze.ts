@@ -9,7 +9,7 @@
  */
 
 import chalk from 'chalk';
-import { setDeaconGloballyPaused, isDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
+import { setDeaconGloballyPaused, isDeaconGloballyPaused } from '../../../lib/overdeck/control-settings.js';
 
 export async function freezeCommand(): Promise<void> {
   if (isDeaconGloballyPaused()) {

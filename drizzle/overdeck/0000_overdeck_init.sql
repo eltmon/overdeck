@@ -460,3 +460,17 @@ CREATE TABLE `git_operations` (
 );--> statement-breakpoint
 CREATE INDEX `idx_git_ops_ts` ON `git_operations` (`ts`);--> statement-breakpoint
 CREATE INDEX `idx_git_ops_issue` ON `git_operations` (`issue_id`,`ts`);--> statement-breakpoint
+CREATE TABLE `flywheel_substrate_bugs` (
+	`issue_id` text PRIMARY KEY NOT NULL,
+	`filed_at` text NOT NULL,
+	`run_id` text,
+	`filed_by` text NOT NULL,
+	`discovered_in_issue_id` text,
+	`severity` text NOT NULL DEFAULT 'P2',
+	`status` text NOT NULL DEFAULT 'open',
+	`fix_merged_at` text,
+	`fix_commit_sha` text,
+	`updated_at` text NOT NULL
+);--> statement-breakpoint
+CREATE INDEX `idx_fsb_filed_at` ON `flywheel_substrate_bugs` (`filed_at`);--> statement-breakpoint
+CREATE INDEX `idx_fsb_status` ON `flywheel_substrate_bugs` (`status`);--> statement-breakpoint

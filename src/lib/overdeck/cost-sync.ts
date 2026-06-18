@@ -418,6 +418,57 @@ export function getBackgroundCostBySourceSync(hours = 24): Record<string, number
 }
 
 /**
+ * Get per-agent cost rollup. Mirrors getAgentRollup from cost-events-db.
+ * Optional issueId narrows to events for that issue.
+ * overdeck stores ts as unix int seconds — converted to ISO for firstEvent/lastEvent.
+ */
+export interface AgentRollup {
+  agentId: string;
+  totalCost: number;
+  calls: number;
+  totalTokens: number;
+  firstEvent: string;
+  lastEvent: string;
+}
+
+export function getAgentRollup(issueId?: string): AgentRollup[] {
+  const db = getOverdeckDatabaseSync();
+  const where = issueId ? 'WHERE UPPER(issue_id) = UPPER(?)' : '';
+  const params = issueId ? [issueId] : [];
+  const rows = db
+    .prepare(
+      `SELECT agent_id,
+              SUM(cost)                                    AS total_cost,
+              COUNT(*)                                     AS calls,
+              SUM(input + output + cache_read + cache_write) AS total_tokens,
+              MIN(ts)                                      AS first_event,
+              MAX(ts)                                      AS last_event
+       FROM cost_events
+       ${where}
+       GROUP BY agent_id
+       ORDER BY total_cost DESC`,
+    )
+    .all(...params) as Array<{
+    agent_id: string | null;
+    total_cost: number;
+    calls: number;
+    total_tokens: number;
+    first_event: number | null;
+    last_event: number | null;
+  }>;
+  return rows
+    .filter((r) => r.agent_id != null)
+    .map((r) => ({
+      agentId: r.agent_id as string,
+      totalCost: r.total_cost ?? 0,
+      calls: r.calls ?? 0,
+      totalTokens: r.total_tokens ?? 0,
+      firstEvent: r.first_event != null ? new Date(r.first_event * 1000).toISOString() : new Date().toISOString(),
+      lastEvent: r.last_event != null ? new Date(r.last_event * 1000).toISOString() : new Date().toISOString(),
+    }));
+}
+
+/**
  * getCavemanExperimentData equivalent.
  * The overdeck cost_events table has no caveman_variant column — this column
  * was dropped as zero-read bloat in the overdeck schema (overdeck-schema.ts).
