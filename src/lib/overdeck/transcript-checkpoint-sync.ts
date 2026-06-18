@@ -5,7 +5,7 @@
  * getOverdeckDatabaseSync() instead of getDatabase().
  *
  * Schema differences vs old DB:
- * - Timestamps stored as integer unix seconds (not ISO text)
+ * - Timestamps stored as integer epoch milliseconds (not ISO text)
  * - last_observation_at dropped (zero reads; overdeck-schema.ts:387)
  */
 import { randomUUID } from 'node:crypto';
@@ -59,7 +59,7 @@ export type CommitTranscriptRangeResult =
   | { status: 'committed'; checkpoint: TranscriptCheckpoint }
   | { status: 'empty'; reason: 'invalid-range' | 'offset-mismatch' | 'no-active-claim' };
 
-// ── Row type from overdeck (unix-int timestamps) ─────────────────────────────
+// ── Row type from overdeck (epoch-millisecond timestamps) ───────────────────
 
 interface DbRow {
   session_id: string;
@@ -77,13 +77,13 @@ interface DbRow {
   issue_id: string | null;     // nullable in overdeck schema
 }
 
-function toIso(unixSecs: number | null): string | null {
-  if (unixSecs === null || unixSecs === undefined) return null;
-  return new Date(unixSecs * 1000).toISOString();
+function toIso(millis: number | null): string | null {
+  if (millis === null || millis === undefined) return null;
+  return new Date(millis).toISOString();
 }
 
-function toSecs(d: Date): number {
-  return Math.floor(d.getTime() / 1000);
+function toMillis(d: Date): number {
+  return d.getTime();
 }
 
 function rowToCheckpoint(row: DbRow): TranscriptCheckpoint {
@@ -116,8 +116,8 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
 
   const db = getOverdeckDatabaseSync();
   const nowDate = input.now ?? new Date();
-  const nowSecs = toSecs(nowDate);
-  const expirySecs = toSecs(new Date(nowDate.getTime() + CLAIM_EXPIRY_MS));
+  const nowMillis = toMillis(nowDate);
+  const expiryMillis = toMillis(new Date(nowDate.getTime() + CLAIM_EXPIRY_MS));
 
   const insertInitial = db.prepare(`
     INSERT INTO transcript_checkpoints (
@@ -156,18 +156,18 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
       input.identity.projectId,
       input.identity.workspaceId,
       input.identity.issueId,
-      nowSecs,
+      nowMillis,
       input.expectedFromOffset,
     );
     return claim.get(
       owner,
       input.expectedFromOffset,
       input.toOffset,
-      expirySecs,
-      nowSecs,
+      expiryMillis,
+      nowMillis,
       input.sessionId,
       input.expectedFromOffset,
-      nowSecs,
+      nowMillis,
     ) as DbRow | undefined;
   });
 
@@ -176,7 +176,7 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
     const existing = db
       .prepare(`SELECT claim_owner, claim_expires_at FROM transcript_checkpoints WHERE session_id = ?`)
       .get(input.sessionId) as { claim_owner: string | null; claim_expires_at: number | null } | undefined;
-    if (existing && existing.claim_owner && (existing.claim_expires_at ?? 0) >= nowSecs) {
+    if (existing && existing.claim_owner && (existing.claim_expires_at ?? 0) >= nowMillis) {
       return { status: 'empty', reason: 'already-claimed' };
     }
     return { status: 'empty', reason: 'offset-mismatch' };
@@ -203,7 +203,7 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
   }
 
   const db = getOverdeckDatabaseSync();
-  const nowSecs = toSecs(input.now ?? new Date());
+  const nowMillis = toMillis(input.now ?? new Date());
   const trigger = input.trigger ?? 'manual';
 
   const row = db.prepare(`
@@ -243,9 +243,9 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
     input.identity.issueId,
     input.transcriptPath,
     input.consumedOffset,
-    trigger, trigger, nowSecs,   // last_mid_turn_at CASE
+    trigger, trigger, nowMillis, // last_mid_turn_at CASE
     trigger, trigger,             // mid_turn_count CASE
-    nowSecs,
+    nowMillis,
     input.sessionId,
     input.expectedFromOffset,
   ) as DbRow | undefined;

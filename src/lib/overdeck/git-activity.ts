@@ -2,40 +2,14 @@
  * Overdeck door for git_operations — persistent log of git push/fetch/merge
  * events. Replaces database/git-operations-db.ts.
  *
- * Uses getOverdeckDatabaseSync() with CREATE TABLE IF NOT EXISTS guards for
- * existing overdeck.db instances that predate this migration addition.
+ * Uses the hand-maintained overdeck migration as the schema source of truth.
  */
 
 import { getOverdeckDatabaseSync } from './infra.js';
 
 // ─── Schema bootstrap ─────────────────────────────────────────────────────────
 
-let _schemaBootstrapped = false;
-
-function ensureSchema(): void {
-  if (_schemaBootstrapped) return;
-  const db = getOverdeckDatabaseSync();
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS git_operations (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      operation  TEXT    NOT NULL,
-      branch     TEXT,
-      issue_id   TEXT,
-      before_sha TEXT,
-      after_sha  TEXT,
-      remote_sha TEXT,
-      status     TEXT    NOT NULL,
-      error      TEXT,
-      ts         TEXT    NOT NULL
-    )
-  `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_git_ops_ts ON git_operations(ts)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_git_ops_issue ON git_operations(issue_id, ts)`);
-  _schemaBootstrapped = true;
-}
-
 function overdeckDb() {
-  ensureSchema();
   return getOverdeckDatabaseSync();
 }
 
@@ -98,7 +72,7 @@ export function appendGitOperationSync(op: Omit<GitOperation, 'id'>): number {
     op.remoteSha ?? null,
     op.status,
     op.error ?? null,
-    op.ts,
+    new Date(op.ts).getTime(),
   );
   return result.lastInsertRowid as number;
 }
@@ -110,7 +84,7 @@ export function listGitOperationsSync(filter: GitOperationFilter = {}): GitOpera
   if (filter.issueId) { conditions.push('issue_id = ?'); params.push(filter.issueId); }
   if (filter.operation) { conditions.push('operation = ?'); params.push(filter.operation); }
   if (filter.status) { conditions.push('status = ?'); params.push(filter.status); }
-  if (filter.since) { conditions.push('ts >= ?'); params.push(filter.since); }
+  if (filter.since) { conditions.push('ts >= ?'); params.push(new Date(filter.since).getTime()); }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const limit = filter.limit ? `LIMIT ${filter.limit}` : 'LIMIT 500';
@@ -128,7 +102,7 @@ export function listGitOperationsSync(filter: GitOperationFilter = {}): GitOpera
     remote_sha: string | null;
     status: string;
     error: string | null;
-    ts: string;
+    ts: number;
   }>;
 
   return rows.map((row) => ({
@@ -141,6 +115,6 @@ export function listGitOperationsSync(filter: GitOperationFilter = {}): GitOpera
     remoteSha: row.remote_sha ?? undefined,
     status: row.status as GitOperationStatus,
     error: row.error ?? undefined,
-    ts: row.ts,
+    ts: new Date(row.ts).toISOString(),
   }));
 }

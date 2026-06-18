@@ -75,8 +75,8 @@ CREATE TABLE `conversations` (
 	`cleared_to_conv_id` text,
 	`tmux_session` text,
 	`status` text NOT NULL DEFAULT 'active',
-	`ended_at` text,
-	`last_attached_at` text,
+	`ended_at` integer,
+	`last_attached_at` integer,
 	`session_file` text,
 	`total_cost` real DEFAULT 0,
 	`total_tokens` integer DEFAULT 0,
@@ -411,8 +411,8 @@ CREATE TABLE `discovered_sessions` (
 	`workspace_path` text,
 	`workspace_hash` text,
 	`message_count` integer NOT NULL DEFAULT 0,
-	`first_ts` text,
-	`last_ts` text,
+	`first_ts` integer,
+	`last_ts` integer,
 	`models_used` text,
 	`primary_model` text,
 	`token_input` integer NOT NULL DEFAULT 0,
@@ -425,14 +425,14 @@ CREATE TABLE `discovered_sessions` (
 	`summary_detailed` text,
 	`enrichment_level` integer NOT NULL DEFAULT 0,
 	`enrichment_model` text,
-	`enriched_at` text,
+	`enriched_at` integer,
 	`enrichment_failed` integer NOT NULL DEFAULT 0,
 	`panopticon_managed` integer NOT NULL DEFAULT 0,
 	`pan_issue_id` text,
 	`pan_agent_id` text,
 	`file_size` integer,
-	`file_mtime` text,
-	`scanned_at` text NOT NULL
+	`file_mtime` integer,
+	`scanned_at` integer NOT NULL
 );--> statement-breakpoint
 CREATE INDEX `idx_discovered_workspace` ON `discovered_sessions` (`workspace_path`);--> statement-breakpoint
 CREATE INDEX `idx_discovered_last_ts` ON `discovered_sessions` (`last_ts`);--> statement-breakpoint
@@ -463,7 +463,7 @@ CREATE TABLE `session_embeddings` (
 	`model` text NOT NULL,
 	`dim` integer NOT NULL,
 	`embedding` blob NOT NULL,
-	`created_at` text NOT NULL,
+	`created_at` integer NOT NULL,
 	PRIMARY KEY (`session_id`, `model`)
 );--> statement-breakpoint
 CREATE TABLE `git_operations` (
@@ -476,21 +476,21 @@ CREATE TABLE `git_operations` (
 	`remote_sha` text,
 	`status` text NOT NULL,
 	`error` text,
-	`ts` text NOT NULL
+	`ts` integer NOT NULL
 );--> statement-breakpoint
 CREATE INDEX `idx_git_ops_ts` ON `git_operations` (`ts`);--> statement-breakpoint
 CREATE INDEX `idx_git_ops_issue` ON `git_operations` (`issue_id`,`ts`);--> statement-breakpoint
 CREATE TABLE `flywheel_substrate_bugs` (
 	`issue_id` text PRIMARY KEY NOT NULL,
-	`filed_at` text NOT NULL,
+	`filed_at` integer NOT NULL,
 	`run_id` text,
 	`filed_by` text NOT NULL,
 	`discovered_in_issue_id` text,
 	`severity` text NOT NULL DEFAULT 'P2',
 	`status` text NOT NULL DEFAULT 'open',
-	`fix_merged_at` text,
+	`fix_merged_at` integer,
 	`fix_commit_sha` text,
-	`updated_at` text NOT NULL
+	`updated_at` integer NOT NULL
 );--> statement-breakpoint
 CREATE INDEX `idx_fsb_filed_at` ON `flywheel_substrate_bugs` (`filed_at`);--> statement-breakpoint
 CREATE INDEX `idx_fsb_status` ON `flywheel_substrate_bugs` (`status`);--> statement-breakpoint

@@ -38,7 +38,7 @@ function walkJsonl(dir: string): string[] {
 
 const costEventsTable = sqliteTable('cost_events', {
   id:          integer('id').primaryKey({ autoIncrement: true }),
-  ts:          integer('ts', { mode: 'timestamp' }).notNull(),
+  ts:          integer('ts', { mode: 'timestamp_ms' }).notNull(),
   issueId:     text('issue_id'),
   agentId:     text('agent_id'),
   sessionId:   text('session_id'),

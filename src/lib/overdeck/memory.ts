@@ -40,13 +40,13 @@ const transcriptCheckpoints = sqliteTable('transcript_checkpoints', {
   claimOwner: text('claim_owner'),
   claimFrom: integer('claim_from'),
   claimTo: integer('claim_to'),
-  claimExpiresAt: integer('claim_expires_at', { mode: 'timestamp' }),
+  claimExpiresAt: integer('claim_expires_at', { mode: 'timestamp_ms' }),
   midTurnCountInCurrentTurn: integer('mid_turn_count_in_current_turn').default(0),
-  lastMidTurnAt: integer('last_mid_turn_at', { mode: 'timestamp' }),
+  lastMidTurnAt: integer('last_mid_turn_at', { mode: 'timestamp_ms' }),
   projectId: text('project_id'),
   workspaceId: text('workspace_id'),
   issueId: text('issue_id'),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
 // ── Schema entities ──────────────────────────────────────────────────────────
@@ -600,60 +600,24 @@ function makeInsertResetMarkerStatement(marker: ResetMarker): FtsStatement {
   return {
     method: 'run',
     sql: `INSERT INTO reset_markers (scope, scope_id, from_timestamp, reason, created_at) VALUES (?, ?, ?, ?, ?)`,
-    params: [marker.scope, marker.scopeId, marker.fromTimestamp, marker.reason, marker.createdAt],
+    params: [
+      marker.scope,
+      marker.scopeId,
+      new Date(marker.fromTimestamp).getTime(),
+      marker.reason,
+      new Date(marker.createdAt).getTime(),
+    ],
   }
 }
 
-// Drops and recreates the three FTS cache tables. Used by rebuildIndex to start fresh.
-// Must run as a single exec (DDL outside transaction) to avoid SQLite FTS5 constraints.
-function dropAndRecreateFtsStatement(): FtsStatement {
+// Clears the rebuildable cache tables. Used by rebuildIndex to start fresh.
+function clearFtsCacheStatement(): FtsStatement {
   return {
     method: 'exec',
     sql: `
-      DROP TABLE IF EXISTS memory_fts;
-      DROP TABLE IF EXISTS reset_markers;
-      DROP TABLE IF EXISTS observation_index;
-
-      CREATE VIRTUAL TABLE memory_fts USING fts5(
-        content,
-        display_content UNINDEXED,
-        source,
-        branch UNINDEXED,
-        entry_date,
-        entry_time,
-        entry_type,
-        files,
-        tags UNINDEXED,
-        doc_type UNINDEXED,
-        scope UNINDEXED,
-        project_id,
-        workspace_id,
-        issue_id,
-        run_id,
-        session_id,
-        agent_role,
-        agent_harness,
-        tokenize = 'porter unicode61'
-      );
-
-      CREATE TABLE reset_markers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        scope TEXT NOT NULL,
-        scope_id TEXT NOT NULL,
-        from_timestamp TEXT NOT NULL,
-        reason TEXT,
-        created_at TEXT NOT NULL
-      );
-      CREATE INDEX idx_reset_markers_scope ON reset_markers(scope, scope_id, from_timestamp);
-      CREATE INDEX idx_reset_markers_created_at ON reset_markers(created_at);
-
-      CREATE TABLE observation_index (
-        id TEXT PRIMARY KEY,
-        observation_path_jsonl TEXT NOT NULL,
-        byte_offset INTEGER NOT NULL
-      );
-      CREATE INDEX idx_observation_index_path_offset
-        ON observation_index(observation_path_jsonl, byte_offset);
+      DELETE FROM memory_fts;
+      DELETE FROM reset_markers;
+      DELETE FROM observation_index;
     `,
   }
 }
@@ -842,7 +806,7 @@ export const MemoryWriterLive = Layer.effect(
     const rebuildIndex = (projectId: string) =>
       Effect.gen(function* () {
         // 1. Drop and recreate the three cache tables.
-        yield* fts.statement<null>(projectId, dropAndRecreateFtsStatement())
+        yield* fts.statement<null>(projectId, clearFtsCacheStatement())
         // 2. Walk every JSONL file and re-index its observations.
         const filePaths = yield* files.listObservationFiles(projectId)
         let count = 0

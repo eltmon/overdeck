@@ -13,7 +13,7 @@ import { getProjectSync, loadProjectsConfigSync } from '../projects.js';
 const appSettings = sqliteTable('app_settings', {
   key: text('key').primaryKey(),
   value: text('value', { mode: 'json' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
 });
 
 // issueId has no FK in the local def — the FK to issues.id lives only in the
@@ -24,7 +24,7 @@ const issuePolicy = sqliteTable('issue_policy', {
   deaconIgnored: integer('deacon_ignored', { mode: 'boolean' }),
   deaconIgnoredReason: text('deacon_ignored_reason'),
   autoMerge: integer('auto_merge', { mode: 'boolean' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
 });
 
 // ── Schema entities ──────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ import { getOverdeckDatabaseSync } from './infra.js';
 /**
  * Query total memory-extraction cost in USD for an issue within a time window.
  * Mirrors the queryMemoryExtractionCostUsd function from cost-events-db.
- * startTs/endTs are ISO timestamp strings; overdeck stores ts as unix seconds.
+ * startTs/endTs are ISO timestamp strings; overdeck stores ts as epoch milliseconds.
  */
 export function queryMemoryExtractionCostUsdSync(opts: {
   issueId: string;
@@ -20,16 +20,16 @@ export function queryMemoryExtractionCostUsdSync(opts: {
   endTs?: string;
 }): number {
   const db = getOverdeckDatabaseSync();
-  const startSeconds = Math.floor(new Date(opts.startTs).getTime() / 1000);
+  const startMillis = new Date(opts.startTs).getTime();
   const conditions = [
     'UPPER(issue_id) = UPPER(?)',
     "source_file = 'memory-extraction'",
     'ts >= ?',
   ];
-  const params: (string | number)[] = [opts.issueId, startSeconds];
+  const params: (string | number)[] = [opts.issueId, startMillis];
   if (opts.endTs) {
     conditions.push('ts <= ?');
-    params.push(Math.floor(new Date(opts.endTs).getTime() / 1000));
+    params.push(new Date(opts.endTs).getTime());
   }
   const row = db
     .prepare(
@@ -46,8 +46,7 @@ export function queryMemoryExtractionCostUsdSync(opts: {
  */
 export function insertCostEventSync(event: CostEvent): boolean {
   const db = getOverdeckDatabaseSync();
-  // overdeck stores ts as integer unix seconds
-  const tsSeconds = Math.floor(new Date(event.ts).getTime() / 1000);
+  const tsMillis = new Date(event.ts).getTime();
   const result = db
     .prepare(
       `INSERT OR IGNORE INTO cost_events
@@ -56,7 +55,7 @@ export function insertCostEventSync(event: CostEvent): boolean {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      tsSeconds,
+      tsMillis,
       event.issueId ?? null,
       event.agentId ?? null,
       event.sessionId ?? null,
@@ -95,7 +94,7 @@ export function getCostForIssueSync(issueId: string): { totalCost: number } | nu
 /**
  * Returns per-stage/per-model token breakdown for an issue.
  * Mirrors getCostBreakdownByStageAndModel from cost-events-db.
- * overdeck stores ts as unix int (not text), but the GROUP BY query is the same.
+ * overdeck stores ts as integer milliseconds, but the GROUP BY query is the same.
  */
 export function getCostBreakdownByStageAndModelSync(issueId: string): {
   byStage: Record<
@@ -225,7 +224,7 @@ function getStageBreakdownForIssueSync(issueId: string): Record<string, StageBre
 
 /**
  * Get aggregated costs by issue. Mirrors getCostsByIssueFromDb from cost-events-db.
- * overdeck stores ts as unix int — MAX(ts) is converted to ISO string for lastUpdated.
+ * overdeck stores ts as epoch milliseconds — MAX(ts) is converted to ISO string for lastUpdated.
  */
 export function getCostsByIssueSync(): Record<string, IssueAggregate> {
   const db = getOverdeckDatabaseSync();
@@ -263,7 +262,7 @@ export function getCostsByIssueSync(): Record<string, IssueAggregate> {
       outputTokens: row.output_tokens ?? 0,
       cacheReadTokens: row.cache_read_tokens ?? 0,
       cacheWriteTokens: row.cache_write_tokens ?? 0,
-      lastUpdated: row.last_updated != null ? new Date(row.last_updated * 1000).toISOString() : new Date().toISOString(),
+      lastUpdated: row.last_updated != null ? new Date(row.last_updated).toISOString() : new Date().toISOString(),
       budgetWarning: false,
       models,
       stages,
@@ -309,7 +308,7 @@ export function getCostForIssueAggregateSync(issueId: string): IssueAggregate | 
     outputTokens: row.output_tokens ?? 0,
     cacheReadTokens: row.cache_read_tokens ?? 0,
     cacheWriteTokens: row.cache_write_tokens ?? 0,
-    lastUpdated: row.last_updated != null ? new Date(row.last_updated * 1000).toISOString() : new Date().toISOString(),
+    lastUpdated: row.last_updated != null ? new Date(row.last_updated).toISOString() : new Date().toISOString(),
     budgetWarning: false,
     models: getModelBreakdownForIssueSync(row.issue_id),
     stages: getStageBreakdownForIssueSync(row.issue_id),
@@ -324,15 +323,14 @@ export interface DailyTrend {
 }
 
 /**
- * Get daily cost totals for trend charts. overdeck stores ts as unix int;
- * DATE() still works on integer unix seconds in SQLite (via datetime()).
+ * Get daily cost totals for trend charts.
  */
 export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {}): DailyTrend[] {
   const db = getOverdeckDatabaseSync();
   const days = opts.days ?? 30;
-  const sinceSecs = Math.floor((Date.now() - days * 86_400_000) / 1000);
+  const sinceMillis = Date.now() - days * 86_400_000;
   const conditions = ['ts >= ?'];
-  const params: (string | number)[] = [sinceSecs];
+  const params: (string | number)[] = [sinceMillis];
   if (opts.issueId) {
     conditions.push('UPPER(issue_id) = UPPER(?)');
     params.push(opts.issueId);
@@ -340,13 +338,13 @@ export function getDailyTrendsSync(opts: { days?: number; issueId?: string } = {
   const where = `WHERE ${conditions.join(' AND ')}`;
   const rows = db
     .prepare(
-      `SELECT DATE(datetime(ts, 'unixepoch')) AS date,
+      `SELECT DATE(datetime(ts / 1000, 'unixepoch')) AS date,
               SUM(cost)  AS total_cost,
               COUNT(*)   AS event_count,
               SUM(input + output + cache_read + cache_write) AS total_tokens
        FROM cost_events
        ${where}
-       GROUP BY DATE(datetime(ts, 'unixepoch'))
+       GROUP BY DATE(datetime(ts / 1000, 'unixepoch'))
        ORDER BY date ASC`,
     )
     .all(...params) as Array<{ date: string; total_cost: number; event_count: number; total_tokens: number }>;
@@ -396,11 +394,11 @@ export function getModelRollupSync(issueId?: string): ModelRollup[] {
 /**
  * Get background cost by source_file for last N hours.
  * Mirrors getBackgroundCostBySource from cost-events-db.
- * overdeck stores ts as unix int seconds.
+ * overdeck stores ts as epoch milliseconds.
  */
 export function getBackgroundCostBySourceSync(hours = 24): Record<string, number> {
   const db = getOverdeckDatabaseSync();
-  const sinceSecs = Math.floor((Date.now() - hours * 3_600_000) / 1000);
+  const sinceMillis = Date.now() - hours * 3_600_000;
   const rows = db
     .prepare(
       `SELECT source_file AS source, COALESCE(SUM(cost), 0) AS cost
@@ -409,7 +407,7 @@ export function getBackgroundCostBySourceSync(hours = 24): Record<string, number
          AND (source_file LIKE 'background:%' OR source_file = 'memory-extraction')
        GROUP BY source_file`,
     )
-    .all(sinceSecs) as Array<{ source: string | null; cost: number }>;
+    .all(sinceMillis) as Array<{ source: string | null; cost: number }>;
   const out: Record<string, number> = {};
   for (const row of rows) {
     if (row.source) out[row.source] = row.cost ?? 0;
@@ -420,7 +418,7 @@ export function getBackgroundCostBySourceSync(hours = 24): Record<string, number
 /**
  * Get per-agent cost rollup. Mirrors getAgentRollup from cost-events-db.
  * Optional issueId narrows to events for that issue.
- * overdeck stores ts as unix int seconds — converted to ISO for firstEvent/lastEvent.
+ * overdeck stores ts as epoch milliseconds — converted to ISO for firstEvent/lastEvent.
  */
 export interface AgentRollup {
   agentId: string;
@@ -463,8 +461,8 @@ export function getAgentRollup(issueId?: string): AgentRollup[] {
       totalCost: r.total_cost ?? 0,
       calls: r.calls ?? 0,
       totalTokens: r.total_tokens ?? 0,
-      firstEvent: r.first_event != null ? new Date(r.first_event * 1000).toISOString() : new Date().toISOString(),
-      lastEvent: r.last_event != null ? new Date(r.last_event * 1000).toISOString() : new Date().toISOString(),
+      firstEvent: r.first_event != null ? new Date(r.first_event).toISOString() : new Date().toISOString(),
+      lastEvent: r.last_event != null ? new Date(r.last_event).toISOString() : new Date().toISOString(),
     }));
 }
 

@@ -559,8 +559,8 @@ describe('MemoryWriter.rebuildIndex', () => {
     expect(result.reindexed).toBe(2)
     expect(indexedObsIds).toContain('obs-001')
     expect(indexedObsIds).toContain('obs-002')
-    // The drop+recreate exec was called.
-    expect(execStatements.some((s) => s.includes('DROP TABLE IF EXISTS memory_fts'))).toBe(true)
+    // The rebuildable cache tables were cleared without recreating migration-owned tables.
+    expect(execStatements.some((s) => s.includes('DELETE FROM memory_fts'))).toBe(true)
     // Reset marker was re-applied.
     expect(execStatements.some((s) => s.includes('INSERT INTO reset_markers'))).toBe(true)
   })

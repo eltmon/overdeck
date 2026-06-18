@@ -37,15 +37,15 @@ const conversationsTable = sqliteTable('conversations', {
   effort:              text('effort'),
   title:               text('title'),
   titleSource:         text('title_source'),
-  createdAt:           integer('created_at', { mode: 'timestamp' }).notNull(),
-  archivedAt:          integer('archived_at', { mode: 'timestamp' }),
+  createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  archivedAt:          integer('archived_at', { mode: 'timestamp_ms' }),
   handoffDocPath:      text('handoff_doc_path'),
   handoffTargetConvId: text('handoff_target_conv_id'),
   clearedToConvId:     text('cleared_to_conv_id'),
   tmuxSession:         text('tmux_session'),
   status:              text('status').notNull().default('active'),
-  endedAt:             text('ended_at'),
-  lastAttachedAt:      text('last_attached_at'),
+  endedAt:             integer('ended_at', { mode: 'timestamp_ms' }),
+  lastAttachedAt:      integer('last_attached_at', { mode: 'timestamp_ms' }),
   sessionFile:         text('session_file'),
   totalCost:           real('total_cost').default(0),
   totalTokens:         integer('total_tokens').default(0),
@@ -63,13 +63,13 @@ const conversationFilesTable = sqliteTable('conversation_files', {
   conversationId: text('conversation_id').notNull(),
   harness:        text('harness').notNull(),
   locator:        text('locator').notNull(),
-  createdAt:      integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 const favoritesTable = sqliteTable('favorites', {
   type:      text('type').notNull(),
   itemId:    text('item_id').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 const transcriptsTable = sqliteTable('transcripts', {
@@ -81,8 +81,8 @@ const transcriptsTable = sqliteTable('transcripts', {
   models:          text('models', { mode: 'json' }).$type<string[] | null>(),
   tokenInput:      integer('token_input'),
   tokenOutput:     integer('token_output'),
-  firstTs:         integer('first_ts', { mode: 'timestamp' }),
-  lastTs:          integer('last_ts', { mode: 'timestamp' }),
+  firstTs:         integer('first_ts', { mode: 'timestamp_ms' }),
+  lastTs:          integer('last_ts', { mode: 'timestamp_ms' }),
   panIssueId:      text('pan_issue_id'),
   panAgentId:      text('pan_agent_id'),
 });
@@ -726,16 +726,16 @@ interface LegacyConversationRow {
   effort: string | null;
   title: string | null;
   title_source: string | null;
-  created_at: number | string | Date;
-  archived_at: number | string | Date | null;
+  created_at: number | Date;
+  archived_at: number | Date | null;
   handoff_doc_path: string | null;
   handoff_target_conv_id: string | null;
   cleared_to_conv_id: string | null;
   claude_session_id: string | null;
   tmux_session: string | null;
   status: string | null;
-  ended_at: string | null;
-  last_attached_at: string | null;
+  ended_at: number | null;
+  last_attached_at: number | null;
   session_file: string | null;
   total_cost: number | null;
   total_tokens: number | null;
@@ -799,25 +799,16 @@ function overdeckDb() {
   return getOverdeckDatabaseSync();
 }
 
-function toIso(value: number | string | Date | null | undefined): string | null {
+function toIso(value: number | Date | null | undefined): string | null {
   if (value == null) return null;
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'number') {
-    const millis = value < 10_000_000_000 ? value * 1000 : value;
-    return new Date(millis).toISOString();
-  }
-  const numeric = Number(value);
-  if (Number.isFinite(numeric) && value.trim() !== '') {
-    const millis = numeric < 10_000_000_000 ? numeric * 1000 : numeric;
-    return new Date(millis).toISOString();
-  }
   return new Date(value).toISOString();
 }
 
-function toUnixSeconds(value: Date | string | number = new Date()): number {
-  if (value instanceof Date) return Math.floor(value.getTime() / 1000);
-  if (typeof value === 'number') return value < 10_000_000_000 ? value : Math.floor(value / 1000);
-  return Math.floor(new Date(value).getTime() / 1000);
+function toMillis(value: Date | string | number = new Date()): number {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number') return value;
+  return new Date(value).getTime();
 }
 
 function normalizeHarness(harness: string | null): RuntimeName | null {
@@ -849,8 +840,8 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     cwd: row.cwd,
     issueId: row.issue_id ?? null,
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
-    endedAt: row.ended_at ?? archivedAt,
-    lastAttachedAt: row.last_attached_at ?? null,
+    endedAt: toIso(row.ended_at) ?? archivedAt,
+    lastAttachedAt: toIso(row.last_attached_at),
     claudeSessionId: row.claude_session_id ?? null,
     title: row.title ?? null,
     titleSource: (row.title_source as LegacyTitleSource | null) ?? null,
@@ -988,9 +979,9 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
   if (options.workspacePath !== undefined) { conditions.push('c.cwd = ?'); params.push(options.workspacePath); }
   if (options.primaryModel !== undefined) { conditions.push(`${primaryModel} = ?`); params.push(options.primaryModel); }
   if (options.issueId !== undefined) { conditions.push('c.issue_id = ?'); params.push(options.issueId); }
-  if (options.since !== undefined) { conditions.push(`${lastTs} >= ?`); params.push(options.since); }
-  if (options.before !== undefined) { conditions.push(`${lastTs} < ?`); params.push(options.before); }
-  if (options.after !== undefined) { conditions.push(`${firstTs} >= ?`); params.push(options.after); }
+  if (options.since !== undefined) { conditions.push(`${lastTs} >= ?`); params.push(toMillis(options.since)); }
+  if (options.before !== undefined) { conditions.push(`${lastTs} < ?`); params.push(toMillis(options.before)); }
+  if (options.after !== undefined) { conditions.push(`${firstTs} >= ?`); params.push(toMillis(options.after)); }
   if (options.minCost !== undefined) { conditions.push(`${estimatedCost} >= ?`); params.push(options.minCost); }
   if (options.maxCost !== undefined) { conditions.push(`${estimatedCost} <= ?`); params.push(options.maxCost); }
   if (options.minMessages !== undefined) { conditions.push(`${messageCount} >= ?`); params.push(options.minMessages); }
@@ -1073,10 +1064,10 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
 
   type RawRow = {
     legacy_id: number; uuid: string; name: string; cwd: string; issue_id: string | null;
-    created_at: number | string; claude_session_id: string | null; title: string | null;
-    total_cost: number | null; archived_at: number | string | null; model: string | null;
+    created_at: number; claude_session_id: string | null; title: string | null;
+    total_cost: number | null; archived_at: number | null; model: string | null;
     discovered_jsonl_path: string | null; discovered_workspace_path: string | null;
-    message_count: number | null; first_ts: string | null; last_ts: string | null;
+    message_count: number | null; first_ts: number | null; last_ts: number | null;
     primary_model: string | null; token_input: number | null; token_output: number | null;
     estimated_cost: number | null; tools_used: string | null; files_touched: string | null;
     tags: string | null; summary: string | null; enrichment_level: number | null;
@@ -1099,8 +1090,8 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
     discoveredJsonlPath: r.discovered_jsonl_path ?? null,
     discoveredWorkspacePath: r.discovered_workspace_path ?? r.cwd,
     messageCount: r.message_count ?? null,
-    firstTs: r.first_ts ?? null,
-    lastTs: r.last_ts ?? null,
+    firstTs: toIso(r.first_ts),
+    lastTs: toIso(r.last_ts),
     primaryModel: r.primary_model ?? r.model ?? null,
     tokenInput: r.token_input ?? null,
     tokenOutput: r.token_output ?? null,
@@ -1135,7 +1126,7 @@ export function createConversation(opts: {
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
-  const now = toUnixSeconds();
+  const now = toMillis();
 
   db.transaction(() => {
     db.prepare(`DELETE FROM conversation_files WHERE conversation_id IN (SELECT id FROM conversations WHERE name = ?)`).run(opts.name);
@@ -1177,7 +1168,7 @@ export function createConversation(opts: {
 export function markConversationEnded(name: string): void {
   overdeckDb()
     .prepare(`UPDATE conversations SET ended_at = ?, status = 'ended' WHERE name = ?`)
-    .run(new Date().toISOString(), name);
+    .run(Date.now(), name);
 }
 
 export function markConversationActive(name: string): void {
@@ -1194,7 +1185,7 @@ export function reactivateConversationForSpawn(opts: {
   harness?: RuntimeName;
 }): void {
   const db = overdeckDb();
-  const now = toUnixSeconds();
+  const now = toMillis();
   const id = getConversationUuidByName(opts.name);
   if (!id) return;
   db.prepare(`
@@ -1213,13 +1204,13 @@ export function reactivateConversationForSpawn(opts: {
 export function updateLastAttached(name: string): void {
   overdeckDb()
     .prepare(`UPDATE conversations SET last_attached_at = ? WHERE name = ?`)
-    .run(new Date().toISOString(), name);
+    .run(Date.now(), name);
 }
 
 export function markAllEndedOnStartup(): void {
   overdeckDb()
     .prepare(`UPDATE conversations SET status = 'ended', ended_at = COALESCE(ended_at, ?) WHERE status = 'active'`)
-    .run(new Date().toISOString());
+    .run(Date.now());
 }
 
 export function updateConversationTitle(name: string, title: string, titleSource?: LegacyTitleSource): void {
@@ -1230,7 +1221,7 @@ export function updateConversationTitle(name: string, title: string, titleSource
 
 export function archiveConversation(name: string): void {
   const db = overdeckDb();
-  db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run(toUnixSeconds(), name);
+  db.prepare(`UPDATE conversations SET archived_at = ? WHERE name = ?`).run(toMillis(), name);
   db.prepare(`DELETE FROM favorites WHERE type = 'conversation' AND item_id = ?`).run(name);
 }
 
@@ -1260,7 +1251,7 @@ export function setConversationClaudeSessionId(name: string, claudeSessionId: st
   db.prepare(`
     INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)
     VALUES (?, ?, ?, ?)
-  `).run(id, harness, claudeSessionId, toUnixSeconds());
+  `).run(id, harness, claudeSessionId, toMillis());
 }
 
 export function updateConversationDeliveryMethod(name: string, method: 'auto' | 'channels' | 'tmux' | null): void {
@@ -1349,7 +1340,7 @@ export function listFavoritedIds(type: LegacyFavoriteType): string[] {
 export function setFavorite(type: LegacyFavoriteType, itemId: string): void {
   overdeckDb()
     .prepare(`INSERT OR IGNORE INTO favorites (type, item_id, created_at) VALUES (?, ?, ?)`)
-    .run(type, itemId, toUnixSeconds());
+    .run(type, itemId, toMillis());
 }
 
 export function removeFavorite(type: LegacyFavoriteType, itemId: string): void {

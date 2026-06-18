@@ -118,13 +118,13 @@ function getHistorySync(issueId: string): StatusHistoryEntry[] {
     .all(issueId.toUpperCase()) as Array<{
     type: string;
     status: string;
-    timestamp: string;
+    timestamp: number;
     notes: string | null;
   }>;
   return rows.map((r) => ({
     type: r.type as StatusHistoryEntry['type'],
     status: r.status,
-    timestamp: r.timestamp,
+    timestamp: new Date(r.timestamp).toISOString(),
     ...(r.notes ? { notes: r.notes } : {}),
   }));
 }
@@ -245,7 +245,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
          VALUES (?, ?, ?, ?, ?)`,
       );
       for (const entry of s.history) {
-        insertHistory.run(s.issueId, entry.type, entry.status, entry.timestamp, entry.notes ?? null);
+        insertHistory.run(s.issueId, entry.type, entry.status, new Date(entry.timestamp).getTime(), entry.notes ?? null);
       }
     }
   });

@@ -51,9 +51,8 @@ interface LegacyFavorite {
   created_at: string;
 }
 
-// Drizzle mode:'timestamp' stores Unix seconds in the INTEGER column.
-function toUnixSeconds(isoString: string): number {
-  return Math.floor(new Date(isoString).getTime() / 1000);
+function toMillis(isoString: string): number {
+  return new Date(isoString).getTime();
 }
 
 /**
@@ -117,8 +116,8 @@ export function exportLegacyConversations(
 
       for (const conv of legacyConvs) {
         const newId = idMap.get(conv.id)!;
-        const createdAt = toUnixSeconds(conv.created_at);
-        const archivedAt = conv.archived_at ? toUnixSeconds(conv.archived_at) : null;
+        const createdAt = toMillis(conv.created_at);
+        const archivedAt = conv.archived_at ? toMillis(conv.archived_at) : null;
         // Resolve lineage edges from INTEGER to UUID; null if the target is missing
         // (should not happen on a healthy DB, but be defensive).
         const handoffTargetConvId =
@@ -163,7 +162,7 @@ export function exportLegacyConversations(
       }
 
       for (const fav of legacyFavs) {
-        insertFav.run(fav.type, fav.item_id, toUnixSeconds(fav.created_at));
+        insertFav.run(fav.type, fav.item_id, toMillis(fav.created_at));
       }
     })();
 

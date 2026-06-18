@@ -8,12 +8,8 @@
  *   - substrate-bug-poller.ts: upsert, getByIssueId, markFixed
  *   - flywheel-telemetry.ts:   listInWindow
  *
- * The table uses TEXT timestamps (ISO-8601 strings) to match the old panopticon.db
- * contract so callers need no structural changes.
- *
- * NOTE: This door calls CREATE TABLE IF NOT EXISTS on first use so that
- * existing overdeck.db instances (created before the table was added to
- * 0000_overdeck_init.sql) get the table automatically.
+ * The table stores timestamps as epoch milliseconds and exposes ISO-8601 strings
+ * to match the old panopticon.db contract.
  */
 
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -53,50 +49,34 @@ export interface UpsertFlywheelSubstrateBugInput {
 
 interface Row {
   issue_id: string;
-  filed_at: string;
+  filed_at: number;
   run_id: string | null;
   filed_by: string;
   discovered_in_issue_id: string | null;
   severity: string;
   status: string;
-  fix_merged_at: string | null;
+  fix_merged_at: number | null;
   fix_commit_sha: string | null;
-  updated_at: string;
+  updated_at: number;
 }
 
 function mapRow(row: Row): FlywheelSubstrateBug {
   return {
     issueId: row.issue_id,
-    filedAt: row.filed_at,
+    filedAt: new Date(row.filed_at).toISOString(),
     runId: row.run_id,
     filedBy: row.filed_by as FlywheelSubstrateBugFiledBy,
     discoveredInIssueId: row.discovered_in_issue_id,
     severity: row.severity,
     status: row.status as FlywheelSubstrateBugStatus,
-    fixMergedAt: row.fix_merged_at,
+    fixMergedAt: row.fix_merged_at == null ? null : new Date(row.fix_merged_at).toISOString(),
     fixCommitSha: row.fix_commit_sha,
-    updatedAt: row.updated_at,
+    updatedAt: new Date(row.updated_at).toISOString(),
   };
 }
 
-/** Ensure the table exists for databases created before this table was added. */
 function ensureTable(): ReturnType<typeof getOverdeckDatabaseSync> {
-  const db = getOverdeckDatabaseSync();
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS flywheel_substrate_bugs (
-      issue_id TEXT PRIMARY KEY NOT NULL,
-      filed_at TEXT NOT NULL,
-      run_id TEXT,
-      filed_by TEXT NOT NULL,
-      discovered_in_issue_id TEXT,
-      severity TEXT NOT NULL DEFAULT 'P2',
-      status TEXT NOT NULL DEFAULT 'open',
-      fix_merged_at TEXT,
-      fix_commit_sha TEXT,
-      updated_at TEXT NOT NULL
-    )
-  `);
-  return db;
+  return getOverdeckDatabaseSync();
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
@@ -121,15 +101,15 @@ export function upsert(input: UpsertFlywheelSubstrateBugInput): FlywheelSubstrat
       updated_at = excluded.updated_at
   `).run(
     input.issueId,
-    input.filedAt,
+    new Date(input.filedAt).getTime(),
     input.runId ?? null,
     input.filedBy,
     input.discoveredInIssueId ?? null,
     input.severity ?? 'P2',
     input.status ?? 'open',
-    input.fixMergedAt ?? null,
+    input.fixMergedAt == null ? null : new Date(input.fixMergedAt).getTime(),
     input.fixCommitSha ?? null,
-    input.updatedAt,
+    new Date(input.updatedAt).getTime(),
     input.status === undefined ? 0 : 1,
     input.fixMergedAt === undefined ? 0 : 1,
     input.fixCommitSha === undefined ? 0 : 1,
@@ -150,7 +130,7 @@ export function markFixed(issueId: string, commitSha: string, mergedAt: string):
     UPDATE flywheel_substrate_bugs
     SET status = 'fixed', fix_commit_sha = ?, fix_merged_at = ?, updated_at = ?
     WHERE issue_id = ?
-  `).run(commitSha, mergedAt, mergedAt, issueId);
+  `).run(commitSha, new Date(mergedAt).getTime(), new Date(mergedAt).getTime(), issueId);
 
   const row = db.prepare(`
     SELECT issue_id, filed_at, run_id, filed_by, discovered_in_issue_id,
@@ -182,6 +162,6 @@ export function listInWindow(since: string, until = new Date().toISOString()): F
     FROM flywheel_substrate_bugs
     WHERE filed_at >= ? AND filed_at <= ?
     ORDER BY filed_at ASC, issue_id ASC
-  `).all(since, until) as Row[];
+  `).all(new Date(since).getTime(), new Date(until).getTime()) as Row[];
   return rows.map(mapRow);
 }

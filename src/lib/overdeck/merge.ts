@@ -16,8 +16,8 @@ const mergeSets = sqliteTable('merge_sets', {
   projectPath:   text('project_path').notNull(),
   workspaceType: text('workspace_type').notNull(),
   status:        text('status').notNull(),
-  createdAt:     integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt:     integer('updated_at', { mode: 'timestamp' }).notNull(),
+  createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt:     integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 const mergeSetRepos = sqliteTable('merge_set_repos', {
@@ -45,8 +45,8 @@ const mergeQueue = sqliteTable('merge_queue', {
   projectKey: text('project_key').notNull(),
   status:     text('status').notNull(),
   position:   integer('position').notNull(),
-  createdAt:  integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt:  integer('updated_at', { mode: 'timestamp' }).notNull(),
+  createdAt:  integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt:  integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 const pendingAutoMerges = sqliteTable('pending_auto_merges', {
@@ -57,11 +57,11 @@ const pendingAutoMerges = sqliteTable('pending_auto_merges', {
   projectKey:       text('project_key').notNull(),
   forge:            text('forge').notNull(),
   status:           text('status').notNull(),
-  scheduledMergeAt: integer('scheduled_merge_at', { mode: 'timestamp' }).notNull(),
-  scheduledAt:      integer('scheduled_at', { mode: 'timestamp' }).notNull(),
-  mergedAt:         integer('merged_at', { mode: 'timestamp' }),
+  scheduledMergeAt: integer('scheduled_merge_at', { mode: 'timestamp_ms' }).notNull(),
+  scheduledAt:      integer('scheduled_at', { mode: 'timestamp_ms' }).notNull(),
+  mergedAt:         integer('merged_at', { mode: 'timestamp_ms' }),
   failureReason:    text('failure_reason'),
-  cancelledAt:      integer('cancelled_at', { mode: 'timestamp' }),
+  cancelledAt:      integer('cancelled_at', { mode: 'timestamp_ms' }),
   cancelledBy:      text('cancelled_by'),
 });
 
@@ -71,10 +71,10 @@ const uatGenerations = sqliteTable('uat_generations', {
   projectRoot:    text('project_root').notNull(),
   baseSha:        text('base_sha').notNull(),
   status:         text('status').notNull(),
-  stackStartedAt: integer('stack_started_at', { mode: 'timestamp' }),
-  cleanedAt:      integer('cleaned_at', { mode: 'timestamp' }),
-  createdAt:      integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt:      integer('updated_at', { mode: 'timestamp' }).notNull(),
+  stackStartedAt: integer('stack_started_at', { mode: 'timestamp_ms' }),
+  cleanedAt:      integer('cleaned_at', { mode: 'timestamp_ms' }),
+  createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt:      integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 const uatGenerationMembers = sqliteTable('uat_generation_members', {

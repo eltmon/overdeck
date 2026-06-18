@@ -28,81 +28,6 @@ export function ensureDiscoveredSessionsSchema(): void {
 function ensureSchema(): void {
   if (_schemaBootstrapped) return;
   const db = getOverdeckDatabaseSync();
-  // The five regular tables are in the migration SQL (0000_overdeck_init.sql)
-  // and will already exist on new overdeck.db instances. The IF NOT EXISTS guard
-  // handles existing databases that predate this migration addition.
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS discovered_sessions (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      jsonl_path        TEXT    NOT NULL UNIQUE,
-      session_id        TEXT,
-      workspace_path    TEXT,
-      workspace_hash    TEXT,
-      message_count     INTEGER NOT NULL DEFAULT 0,
-      first_ts          TEXT,
-      last_ts           TEXT,
-      models_used       TEXT,
-      primary_model     TEXT,
-      token_input       INTEGER NOT NULL DEFAULT 0,
-      token_output      INTEGER NOT NULL DEFAULT 0,
-      estimated_cost    REAL    NOT NULL DEFAULT 0,
-      tools_used        TEXT,
-      files_touched     TEXT,
-      tags              TEXT,
-      summary           TEXT,
-      summary_detailed  TEXT,
-      enrichment_level  INTEGER NOT NULL DEFAULT 0,
-      enrichment_model  TEXT,
-      enriched_at       TEXT,
-      enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      panopticon_managed INTEGER NOT NULL DEFAULT 0,
-      pan_issue_id      TEXT,
-      pan_agent_id      TEXT,
-      file_size         INTEGER,
-      file_mtime        TEXT,
-      scanned_at        TEXT    NOT NULL
-    )
-  `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL`);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS discovered_session_tags (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      tag        TEXT    NOT NULL,
-      PRIMARY KEY (session_id, tag)
-    )
-  `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_session_tags_tag ON discovered_session_tags(tag, session_id)`);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS discovered_session_tools (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      tool       TEXT    NOT NULL,
-      PRIMARY KEY (session_id, tool)
-    )
-  `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_session_tools_tool ON discovered_session_tools(tool, session_id)`);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS discovered_session_files (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      file_path  TEXT    NOT NULL,
-      PRIMARY KEY (session_id, file_path)
-    )
-  `);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_discovered_session_files_file_path ON discovered_session_files(file_path, session_id)`);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS session_embeddings (
-      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
-      model      TEXT    NOT NULL,
-      dim        INTEGER NOT NULL,
-      embedding  BLOB    NOT NULL,
-      created_at TEXT    NOT NULL,
-      PRIMARY KEY (session_id, model)
-    )
-  `);
   // FTS5 virtual table — not in migration SQL, created inline.
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
@@ -191,6 +116,16 @@ export interface CosineSearchResult {
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
 
+function toMillis(value: string | null | undefined): number | null {
+  if (value == null) return null;
+  return new Date(value).getTime();
+}
+
+function toIso(value: number | null | undefined): string | null {
+  if (value == null) return null;
+  return new Date(value).toISOString();
+}
+
 function rowToSession(row: Record<string, unknown>): DiscoveredSession {
   function parseJsonArray(val: unknown): string[] {
     if (!val) return [];
@@ -203,8 +138,8 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
     workspacePath: (row['workspace_path'] as string | null) ?? null,
     workspaceHash: (row['workspace_hash'] as string | null) ?? null,
     messageCount: (row['message_count'] as number) ?? 0,
-    firstTs: (row['first_ts'] as string | null) ?? null,
-    lastTs: (row['last_ts'] as string | null) ?? null,
+    firstTs: toIso(row['first_ts'] as number | null),
+    lastTs: toIso(row['last_ts'] as number | null),
     modelsUsed: parseJsonArray(row['models_used']),
     primaryModel: (row['primary_model'] as string | null) ?? null,
     tokenInput: (row['token_input'] as number) ?? 0,
@@ -217,14 +152,14 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
     summaryDetailed: (row['summary_detailed'] as string | null) ?? null,
     enrichmentLevel: ((row['enrichment_level'] as number) ?? 0) as 0 | 1 | 2 | 3,
     enrichmentModel: (row['enrichment_model'] as string | null) ?? null,
-    enrichedAt: (row['enriched_at'] as string | null) ?? null,
+    enrichedAt: toIso(row['enriched_at'] as number | null),
     enrichmentFailed: Boolean(row['enrichment_failed']),
     panopticonManaged: Boolean(row['panopticon_managed']),
     panIssueId: (row['pan_issue_id'] as string | null) ?? null,
     panAgentId: (row['pan_agent_id'] as string | null) ?? null,
     fileSize: (row['file_size'] as number | null) ?? null,
-    fileMtime: (row['file_mtime'] as string | null) ?? null,
-    scannedAt: row['scanned_at'] as string,
+    fileMtime: toIso(row['file_mtime'] as number | null),
+    scannedAt: toIso(row['scanned_at'] as number) ?? new Date(0).toISOString(),
   };
 }
 
@@ -257,9 +192,9 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
   if (filter.primaryModel !== undefined) { conditions.push(`${col('primary_model')} = ?`); params.push(filter.primaryModel); }
   if (filter.managed === true) conditions.push(`${col('panopticon_managed')} = 1`);
   if (filter.unmanaged === true) conditions.push(`${col('panopticon_managed')} = 0`);
-  if (filter.since !== undefined) { conditions.push(`${col('last_ts')} >= ?`); params.push(filter.since); }
-  if (filter.before !== undefined) { conditions.push(`${col('last_ts')} < ?`); params.push(filter.before); }
-  if (filter.after !== undefined) { conditions.push(`${col('first_ts')} >= ?`); params.push(filter.after); }
+  if (filter.since !== undefined) { conditions.push(`${col('last_ts')} >= ?`); params.push(toMillis(filter.since)); }
+  if (filter.before !== undefined) { conditions.push(`${col('last_ts')} < ?`); params.push(toMillis(filter.before)); }
+  if (filter.after !== undefined) { conditions.push(`${col('first_ts')} >= ?`); params.push(toMillis(filter.after)); }
   if (filter.minCost !== undefined) { conditions.push(`${col('estimated_cost')} >= ?`); params.push(filter.minCost); }
   if (filter.maxCost !== undefined) { conditions.push(`${col('estimated_cost')} <= ?`); params.push(filter.maxCost); }
   if (filter.minMessages !== undefined) { conditions.push(`${col('message_count')} >= ?`); params.push(filter.minMessages); }
@@ -341,8 +276,8 @@ export function aggregateDiscoveredSessionCostBy(
     switch (groupBy) {
       case 'workspace': return `COALESCE(workspace_path, '(unknown)')`;
       case 'model':     return `COALESCE(primary_model, '(unknown)')`;
-      case 'day':       return `COALESCE(substr(last_ts, 1, 10), '(unknown)')`;
-      case 'month':     return `COALESCE(substr(last_ts, 1, 7), '(unknown)')`;
+      case 'day':       return `COALESCE(strftime('%Y-%m-%d', last_ts / 1000, 'unixepoch'), '(unknown)')`;
+      case 'month':     return `COALESCE(strftime('%Y-%m', last_ts / 1000, 'unixepoch'), '(unknown)')`;
     }
   })();
   const rows = db.prepare(
@@ -499,7 +434,7 @@ function replaceDiscoveredSessionArrayIndexes(session: DiscoveredSession): void 
  */
 export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): DiscoveredSession {
   const db = overdeckDb();
-  const now = new Date().toISOString();
+  const now = Date.now();
   const oldRow = db.prepare(
     `SELECT id, enrichment_level, summary, summary_detailed, tags, files_touched
      FROM discovered_sessions WHERE jsonl_path = ?`,
@@ -543,8 +478,8 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     opts.workspacePath ?? null,
     opts.workspaceHash ?? null,
     opts.messageCount ?? 0,
-    opts.firstTs ?? null,
-    opts.lastTs ?? null,
+    toMillis(opts.firstTs),
+    toMillis(opts.lastTs),
     JSON.stringify(opts.modelsUsed ?? []),
     opts.primaryModel ?? null,
     opts.tokenInput ?? 0,
@@ -557,7 +492,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     opts.panIssueId ?? null,
     opts.panAgentId ?? null,
     opts.fileSize ?? null,
-    opts.fileMtime ?? null,
+    toMillis(opts.fileMtime),
     now,
     opts.tags !== undefined ? 1 : 0,
   );
@@ -601,7 +536,7 @@ export function updateEnrichment(
   ).run(
     opts.enrichmentLevel,
     opts.enrichmentModel,
-    new Date().toISOString(),
+    Date.now(),
     opts.summary ?? null,
     opts.summary ?? null,
     opts.summaryDetailed ?? null,
@@ -772,7 +707,7 @@ export function insertEmbedding(sessionId: number, model: string, embedding: Flo
        dim        = excluded.dim,
        embedding  = excluded.embedding,
        created_at = excluded.created_at`,
-  ).run(sessionId, model, embedding.length, blob, new Date().toISOString());
+  ).run(sessionId, model, embedding.length, blob, Date.now());
 }
 
 /**
