@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PendingTurn } from '@panctl/contracts';
+import type { PendingTurn } from '@overdeck/contracts';
 import {
   maybeTriggerStatusRollup,
   pendingTurnFileName,

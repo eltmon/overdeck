@@ -652,7 +652,7 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
 
     // Install dependencies using the project's package manager.
     // Each worktree needs its own node_modules so that local workspace packages
-    // (e.g., @panctl/contracts) resolve to the worktree's code, not the main repo's.
+    // (e.g., @overdeck/contracts) resolve to the worktree's code, not the main repo's.
     const pkgManager = projectConfig?.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
     const installCmd = pkgManager === 'bun' ? 'bun install' : `${pkgManager} install`;
     spinner.text = `Installing dependencies (${pkgManager})...`;

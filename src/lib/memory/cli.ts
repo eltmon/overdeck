@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { readdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
-import type { MemoryObservation, MemoryStatus, ResetMarker } from '@panctl/contracts';
+import type { MemoryObservation, MemoryStatus, ResetMarker } from '@overdeck/contracts';
 import { getPanopticonHome } from '../paths.js';
 import { runMemoryFtsTransaction, withMemoryFtsDatabase } from './fts-db.js';
 import { resolveExtractionProviderSelection } from './providers/index.js';

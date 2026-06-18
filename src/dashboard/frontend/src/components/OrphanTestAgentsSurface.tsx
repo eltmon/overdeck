@@ -1,4 +1,4 @@
-import type { AgentStatus } from '@panctl/contracts';
+import type { AgentStatus } from '@overdeck/contracts';
 import { ChevronDown, ChevronRight, ClipboardCopy } from 'lucide-react';
 import { useState } from 'react';
 

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { Effect } from 'effect';
-import type { AgentStatus } from '@panctl/contracts';
+import type { AgentStatus } from '@overdeck/contracts';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';

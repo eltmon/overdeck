@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReviewStatusSnapshot } from '@panctl/contracts';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';

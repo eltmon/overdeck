@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FeatureRegistryEntry } from '@panctl/contracts';
+import type { FeatureRegistryEntry } from '@overdeck/contracts';
 import { getFeatureRegistryListPayload } from '../feature-registry.js';
 
 function makeEntry(): FeatureRegistryEntry {

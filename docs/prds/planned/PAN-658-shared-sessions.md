@@ -364,7 +364,7 @@ Conversation events cross the channel in a wire format defined **specifically fo
 the internal `PanRpcGroup` / `ChatMessage` types. Host and viewer run independently-updated
 Panopticon versions; coupling the wire format to an internal type would break rendering on version
 skew. The wire format is an explicit allow-list of fields permitted to cross the host→viewer
-boundary. It lives in `packages/contracts/src/sharing.ts` and is exported from `@panctl/contracts`.
+boundary. It lives in `packages/contracts/src/sharing.ts` and is exported from `@overdeck/contracts`.
 
 ```ts
 interface SharedEnvelope {

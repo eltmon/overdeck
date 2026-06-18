@@ -3,7 +3,7 @@ import { readFile, realpath } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
-import type { FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStatus } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { loadConfigNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';

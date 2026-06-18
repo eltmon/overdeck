@@ -2,7 +2,7 @@ import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import type { SessionNodePresence } from '@panctl/contracts';
+import type { SessionNodePresence } from '@overdeck/contracts';
 
 /**
  * Derive session presence from runtime state, tmux session existence, and recent activity.

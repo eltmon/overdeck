@@ -1,4 +1,4 @@
-import type { EditorId } from '@panctl/contracts';
+import type { EditorId } from '@overdeck/contracts';
 import { Code2, FolderClosed } from 'lucide-react';
 import { useId, type ComponentType, type SVGProps } from 'react';
 

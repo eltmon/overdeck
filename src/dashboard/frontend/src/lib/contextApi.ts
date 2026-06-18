@@ -7,7 +7,7 @@ import type {
   ContextPreviewResponse,
   ContextSyncRequest,
   ContextSyncResponse,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 
 export class ContextApiError extends Error {
   constructor(message: string, readonly status: number, readonly body: unknown) {

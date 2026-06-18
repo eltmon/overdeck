@@ -26,7 +26,7 @@ import { stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 
 import { Effect } from 'effect';
-import { PanRpcError, type ResolveFilePathExistsInput, type ResolveFilePathExistsResult } from '@panctl/contracts';
+import { PanRpcError, type ResolveFilePathExistsInput, type ResolveFilePathExistsResult } from '@overdeck/contracts';
 
 const MAX_PATH_LENGTH = 4096;
 

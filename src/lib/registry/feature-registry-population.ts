@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
 import { Effect, Result, Schema } from 'effect';
-import type { FeatureRegistryEntry, FeatureRegistryStatus, FeatureRegistryTagInput, FeatureRegistryOwnershipUpdate, MemoryIdentity } from '@panctl/contracts';
+import type { FeatureRegistryEntry, FeatureRegistryStatus, FeatureRegistryTagInput, FeatureRegistryOwnershipUpdate, MemoryIdentity } from '@overdeck/contracts';
 import { loadConfigNoMigration, type NormalizedFeatureRegistryConfig } from '../config-yaml.js';
 import { extractWithProviderPolicy, type MemoryExtractionPolicyResult } from '../memory/providers/index.js';
 import {

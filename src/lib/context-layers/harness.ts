@@ -21,7 +21,7 @@
  * for a harness Panopticon does not ship an adapter for yet.
  */
 
-import type { Harness } from '@panctl/contracts';
+import type { Harness } from '@overdeck/contracts';
 
 /** Short marker name used in `{{#harness:<name>}}` blocks. */
 export type HarnessMarker = 'claude' | 'pi' | 'codex';

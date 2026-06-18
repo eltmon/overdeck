@@ -1,4 +1,4 @@
-import type { ChannelPermissionRequestSnapshot, ResolvedChannelPermissionDecision as ContractsResolvedChannelPermissionDecision } from '@panctl/contracts';
+import type { ChannelPermissionRequestSnapshot, ResolvedChannelPermissionDecision as ContractsResolvedChannelPermissionDecision } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import * as Result from 'effect/Result';
 

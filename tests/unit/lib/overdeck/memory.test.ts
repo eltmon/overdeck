@@ -23,7 +23,7 @@ import {
   CommitResult,
   RebuildResult,
 } from '../../../../src/lib/overdeck/memory.js'
-import { MemoryObservation, ResetMarker } from '@panctl/contracts'
+import { MemoryObservation, ResetMarker } from '@overdeck/contracts'
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 

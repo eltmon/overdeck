@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promi
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
-import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
+import { FlywheelRunId, FlywheelStatus } from '@overdeck/contracts';
 import {
   getFlywheelActiveRunId,
   isFlywheelGloballyPaused,

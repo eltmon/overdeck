@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import {
   getAgentRuntimeState,

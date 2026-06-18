@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts';
+import type { ChannelPermissionRequestSnapshot } from '@overdeck/contracts';
 
 import {
   buildPermissionActivityDetails,

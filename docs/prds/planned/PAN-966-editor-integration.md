@@ -46,7 +46,7 @@ Adopted from T3Code's `EDITORS` array, plus Windsurf (candidate for upstream PR 
 
 ## Architecture
 
-Mirrors T3Code exactly, with `@t3tools/contracts` → `@panctl/contracts`:
+Mirrors T3Code exactly, with `@t3tools/contracts` → `@overdeck/contracts`:
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -202,7 +202,7 @@ On WebSocket connection, the server includes `availableEditors: EditorId[]` in t
 
 ## Acceptance Criteria
 
-- [ ] `EDITORS` array in `@panctl/contracts` matches T3Code + Windsurf
+- [ ] `EDITORS` array in `@overdeck/contracts` matches T3Code + Windsurf
 - [ ] Server detects installed editors at startup via async PATH scan
 - [ ] `pan.shellOpenInEditor` RPC launches editor as detached process
 - [ ] `--goto` flag used when editor supports it and path contains `:line:col`

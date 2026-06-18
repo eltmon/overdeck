@@ -7,7 +7,7 @@
  * hand-authored content in that file is preserved across syncs.
  */
 
-import type { Harness } from '@panctl/contracts';
+import type { Harness } from '@overdeck/contracts';
 import { renderForHarness } from './harness.js';
 import { renderBundledRules } from './rules.js';
 import { globalContextFile, projectContextFile, readLayerContent } from './layers.js';

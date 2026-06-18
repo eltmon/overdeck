@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus } from '@panctl/contracts';
-import { INITIAL_READ_MODEL_STATE } from '@panctl/contracts';
+import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus } from '@overdeck/contracts';
+import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts';
 
 import { HomePage } from './HomePage';
 import { useDashboardStore } from '../lib/store';

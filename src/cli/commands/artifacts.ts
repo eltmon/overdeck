@@ -7,7 +7,7 @@ import type {
   ArtifactMetadata,
   ArtifactUrls,
   ArtifactValidationResult,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import type { Command } from 'commander';
 import { ArtifactIndexRepository } from '../../lib/artifacts/index-store.js';
 import {

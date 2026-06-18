@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeFlywheelStats } from '@panctl/contracts';
+import { decodeFlywheelStats } from '@overdeck/contracts';
 import {
   computeBugRateCriterion,
   computeCriterion1,

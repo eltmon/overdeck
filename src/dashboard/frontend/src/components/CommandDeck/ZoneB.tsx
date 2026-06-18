@@ -17,7 +17,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle } from 'lucide-react';
-import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType, SessionNodePresence } from '@overdeck/contracts';
 import { useLiveFlash } from '../../lib/useLiveFlash';
 import { useDashboardStore } from '../../lib/store';
 import { RoleBadge, type ReviewerRole } from './RoleBadge';

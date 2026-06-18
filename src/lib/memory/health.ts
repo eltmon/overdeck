@@ -1,6 +1,6 @@
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { ensureParentDir, resolveIssueMemoryRoot } from './paths.js';
 
 export type MemoryHealthStatus = 'healthy' | 'degraded' | 'failing';

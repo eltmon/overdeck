@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentStatus } from '@panctl/contracts';
+import type { AgentStatus } from '@overdeck/contracts';
 import { projectPendingInput } from '../read-model.js';
 
 // PAN-1591 — a non-running agent cannot be awaiting interactive input. The

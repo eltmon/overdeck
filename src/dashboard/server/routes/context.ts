@@ -19,7 +19,7 @@ import {
   type ContextSyncTarget,
   type ContextWorkspaceSummary,
   type Harness,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 

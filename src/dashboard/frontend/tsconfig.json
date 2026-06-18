@@ -8,7 +8,7 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@panctl/contracts": ["../../../packages/contracts/src/index.ts"]
+      "@overdeck/contracts": ["../../../packages/contracts/src/index.ts"]
     },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,

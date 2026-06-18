@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { WS_METHODS } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport';
 import {
   getCachedExists,

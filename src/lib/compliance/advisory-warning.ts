@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import type { MemoryIdentity, MemoryObservation } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { COMPLIANCE_MODES, loadConfigNoMigration, type ComplianceMode } from '../config-yaml.js';
 import { ensureParentDir, resolveIssueMemoryRoot } from '../memory/paths.js';
 import { readRecentObservations } from '../memory/rollup.js';

@@ -5,7 +5,7 @@ import {
   ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
   BookText, Bug, Container, Radio, Workflow,
 } from 'lucide-react';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
 import { SessionNode } from './SessionNode';

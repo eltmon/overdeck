@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { FlywheelAgent, FlywheelStatus, FlywheelSubstrateBug, FlywheelSuggestion } from '@panctl/contracts';
+import type { FlywheelAgent, FlywheelStatus, FlywheelSubstrateBug, FlywheelSuggestion } from '@overdeck/contracts';
 import { AgentCard as ResourceAgentCard } from '../ResourceCard';
 import { IssueRow, MetricStrip, MetricTile } from '../shared/statusPrimitives';
 import type { Agent } from '../../types';

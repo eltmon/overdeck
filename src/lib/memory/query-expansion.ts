@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
 import { appendFile } from 'fs/promises';
 import { Result, Schema } from 'effect';
-import type { MemoryIdentity, MemoryObservation } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile } from './paths.js';
 import {
   extractWithProviderPolicy,

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { EDITORS, type EditorId, WS_METHODS } from '@panctl/contracts';
+import { EDITORS, type EditorId, WS_METHODS } from '@overdeck/contracts';
 import { toast } from 'sonner';
 
 import { getPreferredEditor, setPreferredEditor } from '../editorPreferences';

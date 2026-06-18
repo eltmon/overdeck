@@ -27,7 +27,7 @@ function getCurrentVersion(): string {
 // Get latest version from npm
 async function getLatestVersion(): Promise<string> {
   try {
-    const result = execSync('npm view @panctl/cli version', {
+    const result = execSync('npm view @overdeck/cli version', {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -88,7 +88,7 @@ export async function updateCommand(options: {
   );
 
   if (options.check) {
-    console.log(chalk.dim('\nRun `pan update` to install @panctl/cli.'));
+    console.log(chalk.dim('\nRun `pan update` to install @overdeck/cli.'));
     console.log(chalk.dim('If you previously installed panopticon-cli or @eltmon/panctl, this migrates you to the new package name.'));
     return;
   }
@@ -97,12 +97,12 @@ export async function updateCommand(options: {
   console.log(chalk.dim('\nUpdating Panopticon...'));
 
   try {
-    execSync('npm install -g @panctl/cli@latest', {
+    execSync('npm install -g @overdeck/cli@latest', {
       stdio: 'inherit',
     });
 
     console.log(chalk.green(`\n✓ Updated to ${latestVersion}`));
-    console.log(chalk.dim('Installed package: @panctl/cli'));
+    console.log(chalk.dim('Installed package: @overdeck/cli'));
     console.log(chalk.dim('If you previously installed panopticon-cli or @eltmon/panctl, npm now resolves to the renamed package.'));
 
     // Auto-sync if enabled
@@ -116,10 +116,10 @@ export async function updateCommand(options: {
   } catch (error) {
     console.error(chalk.red('\nUpdate failed'));
     console.error(
-      chalk.dim('Try running with sudo: sudo npm install -g @panctl/cli@latest')
+      chalk.dim('Try running with sudo: sudo npm install -g @overdeck/cli@latest')
     );
     console.error(
-      chalk.dim('If you were on panopticon-cli or @eltmon/panctl, rerun the install command above to migrate to @panctl/cli.')
+      chalk.dim('If you were on panopticon-cli or @eltmon/panctl, rerun the install command above to migrate to @overdeck/cli.')
     );
     process.exit(1);
   }

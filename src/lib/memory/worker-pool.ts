@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import {
   extractObservationFromTurn,
   type ExtractObservationCall,

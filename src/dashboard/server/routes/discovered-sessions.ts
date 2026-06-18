@@ -29,7 +29,7 @@ import type {
   EnrichProgressEvent,
   EnrichCompleteEvent,
   EmbedProgressEvent,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import type { ConversationFilter, DiscoveredSession } from '../../../lib/overdeck/discovered-sessions.js';
 import type { SearchResult } from '../../../lib/conversations/search.js';
 import { CostThresholdError } from '../../../lib/conversations/enrichment/index.js';

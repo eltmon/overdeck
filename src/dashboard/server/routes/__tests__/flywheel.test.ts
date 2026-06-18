@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { decodeFlywheelStats, type FlywheelStats, type FlywheelStatus } from '@panctl/contracts';
+import { decodeFlywheelStats, type FlywheelStats, type FlywheelStatus } from '@overdeck/contracts';
 import {
   flywheelRouteLayer,
   getAutoMergeProblemPayload,

@@ -9,7 +9,7 @@
     "build": "tsdown"
   },
   "dependencies": {
-    "@panctl/contracts": "workspace:*",
+    "@overdeck/contracts": "workspace:*",
     "effect": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",

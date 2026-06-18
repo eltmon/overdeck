@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import {
   ShieldCheck,
   Lock,

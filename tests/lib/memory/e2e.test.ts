@@ -2,7 +2,7 @@ import { appendFile, mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { MemoryIdentity, MemoryObservation, MemoryStatus, PendingTurn } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryObservation, MemoryStatus, PendingTurn } from '@overdeck/contracts';
 import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import { createResetMarker, searchMemory as searchMemoryCli } from '../../../src/lib/memory/cli.js';

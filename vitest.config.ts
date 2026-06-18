@@ -9,7 +9,7 @@ export default defineConfig({
   cacheDir: '.cache/vitest',
   resolve: {
     alias: {
-      '@panctl/contracts': path.resolve(__dirname, 'packages/contracts/src/index.ts'),
+      '@overdeck/contracts': path.resolve(__dirname, 'packages/contracts/src/index.ts'),
     },
   },
   test: {

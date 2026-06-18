@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { SessionNode } from '@panctl/contracts';
+import type { SessionNode } from '@overdeck/contracts';
 
 let resolvedModelsCache: Record<string, string | null> | null = null;
 let resolvedModelsFetchPromise: Promise<Record<string, string | null>> | null = null;

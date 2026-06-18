@@ -1,4 +1,4 @@
-import type { DashboardSnapshot, FeatureRegistryEntry } from '@panctl/contracts'
+import type { DashboardSnapshot, FeatureRegistryEntry } from '@overdeck/contracts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { startSessionContextWriter } from '../session-context-writer.js'
 

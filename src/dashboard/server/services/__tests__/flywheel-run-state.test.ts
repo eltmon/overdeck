@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStatus } from '@overdeck/contracts';
 
 // PAN-1245: resolver reads SQLite via app-settings. Mock the gate so we can
 // exercise self-healing without touching the real ~/.panopticon/state.db.

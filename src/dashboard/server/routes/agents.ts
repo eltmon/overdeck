@@ -49,8 +49,8 @@ import { promisify } from 'node:util';
 
 import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
-import { DomainEvent } from '@panctl/contracts';
-import type { AgentStatus, Role } from '@panctl/contracts';
+import { DomainEvent } from '@overdeck/contracts';
+import type { AgentStatus, Role } from '@overdeck/contracts';
 import { bodyToEvent, decodeDomainEvent } from '../services/agent-event-utils.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
@@ -132,7 +132,7 @@ import {
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
-import type { ConversationResponse } from '@panctl/contracts';
+import type { ConversationResponse } from '@overdeck/contracts';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';

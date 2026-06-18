@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ArtifactListEntry, ArtifactListResponse, ArtifactUnshareResponse } from '@panctl/contracts';
+import type { ArtifactListEntry, ArtifactListResponse, ArtifactUnshareResponse } from '@overdeck/contracts';
 
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { cn } from '../../lib/utils';

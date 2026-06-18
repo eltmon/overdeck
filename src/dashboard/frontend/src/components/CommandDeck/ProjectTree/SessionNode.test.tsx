@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import type { AgentRuntimeSnapshot, SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { AgentRuntimeSnapshot, SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { SessionNode } from './SessionNode';
 
 vi.mock('lucide-react', async (importOriginal) => {

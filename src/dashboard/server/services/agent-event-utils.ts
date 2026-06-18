@@ -8,7 +8,7 @@ import { Schema } from 'effect';
 import {
   DomainEvent,
   normalizeChannelReplyPayload,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 
 /**
  * Translate a decoded body into an unsigned DomainEvent (no sequence yet).

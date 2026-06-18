@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { IssueId } from '@panctl/contracts';
+import type { IssueId } from '@overdeck/contracts';
 import type { ConversationSessionFeedEntry } from './types';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 

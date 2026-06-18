@@ -141,7 +141,7 @@ export interface ProjectConfig {
   quality_gates?: Record<string, QualityGateConfig>;
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
   package_manager?: 'bun' | 'npm' | 'pnpm';
-  /** Local workspace packages that need building before quality gates (e.g., @panctl/contracts) */
+  /** Local workspace packages that need building before quality gates (e.g., @overdeck/contracts) */
   workspace_packages?: Array<{ path: string; build_command: string }>;
   /**
    * Directory name for vBRIEF lifecycle directories (proposed/active/completed/cancelled).

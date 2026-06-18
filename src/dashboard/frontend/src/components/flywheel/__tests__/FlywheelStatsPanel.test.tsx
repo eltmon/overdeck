@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
-import type { FlywheelStats } from '@panctl/contracts';
+import type { FlywheelStats } from '@overdeck/contracts';
 import { FlywheelStatsPanel } from '../FlywheelStatsPanel';
 
 const stats: FlywheelStats = {

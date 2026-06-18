@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { MemoryIdentity, MemoryObservation } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import {
   COMPLIANCE_ADVISORY_WARNING,
   readComplianceWarningMarkers,

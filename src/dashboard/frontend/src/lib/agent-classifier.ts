@@ -1,4 +1,4 @@
-import type { AgentSnapshot } from '@panctl/contracts';
+import type { AgentSnapshot } from '@overdeck/contracts';
 
 export type DashboardAgentClassification = 'active' | 'stopped' | 'orphan_test';
 

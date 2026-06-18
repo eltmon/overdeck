@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WS_METHODS } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
   subscribe: vi.fn(() => vi.fn()),

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { open, readFile, rename, stat, writeFile } from 'fs/promises';
 import { dirname } from 'path';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import { ensureParentDir, resolveObservationsFile } from './paths.js';
 import { runMemoryFtsStatement, runMemoryFtsTransaction } from './fts-db.js';
 import { updateMemoryHealth } from './health.js';

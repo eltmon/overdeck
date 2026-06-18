@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import {
   buildQueryExpansionCacheKey,
   buildQueryExpansionPrompt,

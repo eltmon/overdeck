@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStatus } from '@overdeck/contracts';
 import { FlywheelPage } from '../FlywheelPage';
 
 const mocks = vi.hoisted(() => ({

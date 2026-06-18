@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
-import type { EditorId } from '@panctl/contracts';
+import type { EditorId } from '@overdeck/contracts';
 
 // ─── Mock child_process ──────────────────────────────────────────────────────
 

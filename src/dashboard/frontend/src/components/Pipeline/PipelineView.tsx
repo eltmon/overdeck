@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import type { ReviewStatusSnapshot } from '@panctl/contracts';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';

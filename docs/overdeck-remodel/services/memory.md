@@ -258,7 +258,7 @@ Written in the verified v4-beta idiom from
 `Context.Service` (never `Effect.Service`), `effect/unstable/*` imports, Drizzle
 behind `Db`, `Schema.Literals([...])` taking arrays, `Schema.TaggedErrorClass`,
 source-first-then-cache writer ordering (§5). Every method below traces to a
-Part-1 row. The entities reuse the **existing** `@panctl/contracts` Memory
+Part-1 row. The entities reuse the **existing** `@overdeck/contracts` Memory
 schemas verbatim (`packages/contracts/src/memory.ts`) — they are already Effect
 `Schema.Struct`s, so no parallel definition is created.
 
@@ -271,7 +271,7 @@ import { transcriptCheckpoints } from "../overdeck-schema"          // the locke
 import {
   MemoryObservation, MemoryStatus, ResetMarker, ResetMarkerScope,
   MemoryIdentity, PendingTurn,
-} from "@panctl/contracts/memory"                                    // already Effect Schema.Struct — reused, not redefined
+} from "@overdeck/contracts/memory"                                    // already Effect Schema.Struct — reused, not redefined
 import { Db, MemorySearch, MemoryFiles, EventBus } from "./infra"    // see §2.2 for MemorySearch / MemoryFiles
 
 // ── The checkpoint entity — the DB-row decoder AND the cursor read type ─────

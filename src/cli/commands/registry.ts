@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import type { FeatureRegistryEntry, FeatureRegistryListFilter, FeatureRegistryStatus } from '@panctl/contracts';
+import type { FeatureRegistryEntry, FeatureRegistryListFilter, FeatureRegistryStatus } from '@overdeck/contracts';
 import {
   closeFeatureRegistryStorage,
   listFeatureRegistryEntries,

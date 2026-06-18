@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getHarness } from '@panctl/contracts';
+import { getHarness } from '@overdeck/contracts';
 
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import { isAgentProblemStatus } from '../../lib/pipeline-state';

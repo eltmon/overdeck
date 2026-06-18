@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentSnapshot } from '@panctl/contracts';
+import type { AgentSnapshot } from '@overdeck/contracts';
 import {
   classifyDashboardAgent,
   ORPHAN_AGE_THRESHOLD_MS,

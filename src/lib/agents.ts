@@ -56,7 +56,7 @@ import { getFlywheelActiveRunIdSync } from './overdeck/control-settings.js';
 import { appendOperatorInterventionEvent } from './operator-interventions.js';
 import { captureTranscriptUserRecordSnapshot, hasNewTranscriptUserRecord, type TranscriptUserRecordSnapshot } from './transcript-landing.js';
 import { sendGracefulRestartWarning } from './graceful-restart.js';
-import type { MemoryIdentity, AgentStatus } from '@panctl/contracts';
+import type { MemoryIdentity, AgentStatus } from '@overdeck/contracts';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
@@ -2214,7 +2214,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // ~30 call sites across the cloister consumed the old shape and migrating
 // every field access in one PR would have been mechanical noise.
 
-import type { AgentRuntimeSnapshot } from '@panctl/contracts';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,

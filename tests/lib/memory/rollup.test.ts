@@ -2,7 +2,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { MemoryObservation, MemoryStatus, PendingTurn } from '@panctl/contracts';
+import type { MemoryObservation, MemoryStatus, PendingTurn } from '@overdeck/contracts';
 import {
   buildStatusRollupPrompt,
   commitStatusRollup,

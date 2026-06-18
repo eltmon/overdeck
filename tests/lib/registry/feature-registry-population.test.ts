@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FeatureRegistryEntry } from '@panctl/contracts';
+import type { FeatureRegistryEntry } from '@overdeck/contracts';
 import {
   applyIssueFeatureClassification,
   classifyIssueFeatures,

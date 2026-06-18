@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Effect, Stream } from 'effect';
 import { buildEnrichSessionsJobPayload, conversationDiscoveringStream, filterDomainEventForIssue } from '../ws-rpc.js';
-import type { DomainEvent } from '@panctl/contracts';
+import type { DomainEvent } from '@overdeck/contracts';
 import type { RuntimeConversationsConfig } from '../../../lib/config-yaml.js';
 
 describe('conversationDiscoveringStream', () => {

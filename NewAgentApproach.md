@@ -273,7 +273,7 @@ Run `pan sync` after editing; changes reach **new** sessions only.
 | `dist/dashboard/deacon-*.js` | deacon chunk (separate bundle) | — |
 | `dist/pty-supervisor.js` | PTY supervisor (`node dist/pty-supervisor.js claude …`) | Node 22 only |
 | `dist/cli/*` | the `pan` CLI | — |
-| `packages/contracts/dist/*` | `@panctl/contracts` shared schemas | rebuild after editing contracts |
+| `packages/contracts/dist/*` | `@overdeck/contracts` shared schemas | rebuild after editing contracts |
 
 Build: `npm run build` (tsdown for CLI/server/contracts, Vite for frontend).
 `pan up` runs the built server under Node 22; `pan reload` = build + restart.

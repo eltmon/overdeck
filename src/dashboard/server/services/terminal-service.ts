@@ -13,7 +13,7 @@
 
 import { Cause, Effect, Layer, Queue, Context, Stream } from 'effect';
 import { homedir } from 'node:os';
-import { PanRpcError, TerminalOutput } from '@panctl/contracts';
+import { PanRpcError, TerminalOutput } from '@overdeck/contracts';
 import { buildTmuxArgs, resizeWindow, sessionExists } from '../../../lib/tmux.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
 

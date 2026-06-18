@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { ArtifactLifecycleState, ArtifactMetadata } from '@panctl/contracts';
+import type { ArtifactLifecycleState, ArtifactMetadata } from '@overdeck/contracts';
 import { openDatabase, type SqliteDatabase } from '../database/driver.js';
 import { getPanopticonHome } from '../paths.js';
 

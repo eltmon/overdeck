@@ -21,7 +21,7 @@ import { getPanopticonHome } from '../../lib/paths.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
-import type { DomainEvent } from '@panctl/contracts';
+import type { DomainEvent } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

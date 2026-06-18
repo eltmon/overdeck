@@ -16,10 +16,10 @@ export default defineConfig({
   sourcemap: true,
   outExtensions: () => ({ js: '.js' }),
   alias: {
-    '@panctl/contracts': resolve(import.meta.dirname, '../../../packages/contracts/src/index.ts'),
+    '@overdeck/contracts': resolve(import.meta.dirname, '../../../packages/contracts/src/index.ts'),
   },
   deps: {
-    alwaysBundle: [/^@panctl\//],
+    alwaysBundle: [/^@overdeck\//],
     neverBundle: [
       '@homebridge/node-pty-prebuilt-multiarch',
       'ssh2',

@@ -3707,10 +3707,10 @@ Panopticon is distributed via npm for easy installation via `npx`.
 | Name | Status | Usage |
 |------|--------|-------|
 | `panopticon` | **Taken** | (Cluster monitoring lib from 2015) |
-| `@panctl/cli` | **Available** ✅ | `npx @panctl/cli` |
+| `@overdeck/cli` | **Available** ✅ | `npx @overdeck/cli` |
 | `@mindyournow/*` | **Reserved** | For MYN-specific packages |
 
-**Decision:** Use the scoped package `@panctl/cli` for the official zero-install entrypoint. Panopticon is a general tool, not MYN-specific.
+**Decision:** Use the scoped package `@overdeck/cli` for the official zero-install entrypoint. Panopticon is a general tool, not MYN-specific.
 
 #### npm Account & Organization
 
@@ -3718,7 +3718,7 @@ Panopticon is distributed via npm for easy installation via `npx`.
 - **Organization:** [@mindyournow](https://www.npmjs.com/org/mindyournow) (free, public packages)
 
 **Strategy:**
-- `@panctl/cli` → Official CLI package under the panctl scope
+- `@overdeck/cli` → Official CLI package under the panctl scope
 - `@mindyournow/*` → Future MYN-specific packages (SDK, integrations)
 
 #### Source Code Hosting
@@ -3761,7 +3761,7 @@ npm Provenance cryptographically proves that a package was built from a specific
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  @panctl/cli                                          │
+│  @overdeck/cli                                          │
 │  ✓ Provenance                                          │
 │    Published from: github.com/eltmon/panopticon-cli   │
 │    Commit: abc123...                                     │
@@ -3786,7 +3786,7 @@ permissions:
 |---------|--------|-------------|
 | npm Provenance | ✅ Enabled | Cryptographic proof of build origin |
 | 2FA on npm | ✅ Required | Account protection |
-| Granular tokens | ✅ Using | Scoped to `@panctl/cli` only |
+| Granular tokens | ✅ Using | Scoped to `@overdeck/cli` only |
 | Branch protection | 📋 TODO | Require PR reviews for main branch |
 | Signed commits | 📋 TODO | GPG signing for commits |
 | CODEOWNERS | 📋 TODO | Require specific reviewers |
@@ -3796,7 +3796,7 @@ permissions:
 
 ```json
 {
-  "name": "@panctl/cli",
+  "name": "@overdeck/cli",
   "version": "1.0.0",
   "description": "Multi-agent orchestration dashboard for Claude Code",
   "keywords": [
@@ -3858,7 +3858,7 @@ pan --version  # Should work
 npm publish
 
 # 5. Verify it's live
-npm view @panctl/cli
+npm view @overdeck/cli
 ```
 
 #### Version Management
@@ -3877,10 +3877,10 @@ npm publish
 
 ```bash
 # One-shot (no global install needed)
-npx @panctl/cli
+npx @overdeck/cli
 
 # Or global install for frequent use
-npm install -g @panctl/cli
+npm install -g @overdeck/cli
 pan --version
 ```
 
@@ -3892,7 +3892,7 @@ npm version 1.0.0-beta.1
 npm publish --tag beta
 
 # Users install beta with:
-npx @panctl/cli@beta install
+npx @overdeck/cli@beta install
 ```
 
 #### GitHub Actions (Automated Publishing)
@@ -3926,7 +3926,7 @@ jobs:
 
 **Setup:**
 1. Go to npmjs.com → Avatar → Access Tokens → Generate New Token
-2. Choose **"Granular Access Token"** with publish permissions for `@panctl/cli`
+2. Choose **"Granular Access Token"** with publish permissions for `@overdeck/cli`
 3. Add as `NPM_TOKEN` secret in GitHub repo settings
 
 #### npm Token Management

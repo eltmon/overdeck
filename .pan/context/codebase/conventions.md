@@ -28,7 +28,7 @@
 ## Frontend
 - Follow `pan-style-guide`: no pill badges, no decorative color, muted status
   text; existing icon size classes (`.pickerProviderIcon` 14px, `.agentLogo` etc.).
-- State via Zustand with shared reducers from `@panctl/contracts`; data over
+- State via Zustand with shared reducers from `@overdeck/contracts`; data over
   `/ws/rpc` (Effect RPC) — terminals over raw `/ws/terminal`.
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).

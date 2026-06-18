@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { insertCostEventSync } from '../../overdeck/cost-sync.js';
 import type { CostEvent } from '../../costs/events.js';
 

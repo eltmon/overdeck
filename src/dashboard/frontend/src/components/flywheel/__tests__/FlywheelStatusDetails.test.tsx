@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { FlywheelStatusDetails, adaptFlywheelAgent } from '../FlywheelStatusDetails';
-import type { FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStatus } from '@overdeck/contracts';
 import type { Agent } from '../../../types';
 
 vi.mock('../../ResourceCard', () => ({

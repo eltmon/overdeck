@@ -7,7 +7,7 @@ import {
   type MemoryIdentity,
   type MemoryObservation,
   type PendingTurn,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import {
   extractWithProviderPolicy,
   type MemoryExtractionPolicyResult,

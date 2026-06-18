@@ -14,7 +14,7 @@
 
 import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
-import type { DomainEvent } from '@panctl/contracts';
+import type { DomainEvent } from '@overdeck/contracts';
 import type { Role } from './agents.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';

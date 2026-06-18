@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { MAX_MEMORY_POLLER_SAMPLE_BYTES, TranscriptPoller } from '../../../src/lib/memory/poller.js';
 import type { TranscriptEntry } from '../../../src/lib/memory/transcript-source.js';
 

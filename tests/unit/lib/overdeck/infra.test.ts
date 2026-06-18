@@ -150,7 +150,7 @@ describe('overdeck infra', () => {
     expect(JSON.parse(readFileSync(result.path, 'utf8')).issueId).toBe('PAN-1938');
     expect(result.record?.issueId).toBe('PAN-1938');
     expect(result.record?.schemaVersion).toBe(RECORD_SCHEMA_VERSION);
-    expect(result.spec).toMatchObject({ name: '@panctl/cli' });
+    expect(result.spec).toMatchObject({ name: '@overdeck/cli' });
   });
 
   it('exports the domain infra tags whose Live layers are supplied by owning domains', () => {

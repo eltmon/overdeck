@@ -10,7 +10,7 @@
 import { readdir, readFile, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
+import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, WorkLogEntry } from '@overdeck/contracts';
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../../lib/cost.js';
 import { MODEL_CAPABILITIES, resolveModelIdSync } from '../../../lib/model-capabilities.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';

@@ -1,4 +1,4 @@
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { queryMemoryExtractionCostUsdSync } from '../../overdeck/cost-sync.js';
 import { updateMemoryHealth } from '../health.js';
 import {

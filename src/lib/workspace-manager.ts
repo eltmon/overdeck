@@ -754,7 +754,7 @@ function copyProjectTemplateDirs(
     return result;
   }
 
-  // Build workspace packages (e.g., @panctl/contracts) so types resolve correctly
+  // Build workspace packages (e.g., @overdeck/contracts) so types resolve correctly
   const workspacePackages = projectConfig.workspace_packages;
   if (workspacePackages && workspacePackages.length > 0) {
     progress('Building workspace packages', workspacePackages.map(p => p.path).join(', '));

@@ -21,7 +21,7 @@
  * layering inversion.
  */
 import { spawn } from 'node:child_process';
-import type { ChatMessage } from '@panctl/contracts';
+import type { ChatMessage } from '@overdeck/contracts';
 import { buildChildEnvSync } from '../child-env.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';

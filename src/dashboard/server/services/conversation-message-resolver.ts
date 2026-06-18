@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import type { ChatMessage } from '@panctl/contracts';
+import type { ChatMessage } from '@overdeck/contracts';
 
 import { parseConversationMessages } from './conversation-service.js';
 

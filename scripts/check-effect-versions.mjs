@@ -2,7 +2,7 @@
 //
 // check-effect-versions.mjs — guard against Effect version drift.
 //
-// Background: PAN-1562. A published `@panctl/cli` shipped with `effect`
+// Background: PAN-1562. A published `@overdeck/cli` shipped with `effect`
 // declared only as a devDependency (`"effect": "catalog:"`), never as a
 // runtime dependency. When installed via npx/npm, `effect` resolved
 // transitively through `@effect/platform-node`'s peer range

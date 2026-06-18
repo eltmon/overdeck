@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AgentPane } from './AgentPane'
 import { usePanesStore, selectPanesForWorkspace } from '../../../lib/panesStore'
-import type { SessionNode as SessionNodeType } from '@panctl/contracts'
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts'
 import type { Conversation } from '../../CommandDeck/ConversationList'
 import type { StageContext, AgentPaneData } from '../types'
 

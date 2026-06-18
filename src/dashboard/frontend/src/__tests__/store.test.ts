@@ -28,7 +28,7 @@ import {
   type AgentSnapshot,
   type DashboardSnapshot,
   type DomainEvent,
-} from '@panctl/contracts'
+} from '@overdeck/contracts'
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 

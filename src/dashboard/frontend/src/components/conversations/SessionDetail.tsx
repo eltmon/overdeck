@@ -5,8 +5,8 @@
 import { useState } from 'react';
 import { X, ExternalLink, Sparkles } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { WS_METHODS } from '@panctl/contracts';
-import type { DiscoveredSessionSnapshot } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
+import type { DiscoveredSessionSnapshot } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore } from '../../lib/store';
 

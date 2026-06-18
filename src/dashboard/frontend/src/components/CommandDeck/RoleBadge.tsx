@@ -14,7 +14,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import type { SessionNodeType } from '@panctl/contracts';
+import type { SessionNodeType } from '@overdeck/contracts';
 
 /**
  * <RoleBadge role role_ size /> — icon + ring color by session role.

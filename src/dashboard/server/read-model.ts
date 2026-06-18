@@ -13,7 +13,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect, Layer, Context } from 'effect';
 import { getSharedDb } from './event-store.js';
-import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@panctl/contracts';
+import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@overdeck/contracts';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import {
   type ReadModelState,
@@ -22,8 +22,8 @@ import {
   getMaxTurnDiffSummariesPerAgent,
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
-} from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@panctl/contracts';
+} from '@overdeck/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue, ResourceStats } from '@overdeck/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEventSync } from '../../lib/persistent-logger.js';
 import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
@@ -344,11 +344,11 @@ export interface ReadModelServiceShape {
   /** Return a single pending channel permission request without rebuilding a full snapshot. */
   readonly getChannelPermissionRequest: (
     requestId: string,
-  ) => Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null>;
+  ) => Effect.Effect<import('@overdeck/contracts').ChannelPermissionRequestSnapshot | null>;
   /** Return a recent resolved channel permission decision for safe delivery retries. */
   readonly getResolvedChannelPermissionDecision: (
     requestId: string,
-  ) => Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null>;
+  ) => Effect.Effect<import('@overdeck/contracts').ResolvedChannelPermissionDecision | null>;
   /** Return in-memory turn diff summaries for a single agent. */
   readonly getTurnDiffSummaries: (agentId: string) => Effect.Effect<TurnDiffSummary[]>;
   /** Return the agentId for a given sessionId (from agent snapshot or runtime claudeSessionId). */
@@ -500,12 +500,12 @@ export const ReadModelServiceLive = Layer.effect(
 
     const getChannelPermissionRequest = (
       requestId: string,
-    ): Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null> =>
+    ): Effect.Effect<import('@overdeck/contracts').ChannelPermissionRequestSnapshot | null> =>
       Effect.succeed(state.channelPermissionRequestsById?.[requestId] ?? null);
 
     const getResolvedChannelPermissionDecision = (
       requestId: string,
-    ): Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null> =>
+    ): Effect.Effect<import('@overdeck/contracts').ResolvedChannelPermissionDecision | null> =>
       Effect.succeed(state.resolvedChannelPermissionDecisionsById?.[requestId] ?? null);
 
     const getTurnDiffSummaries = (agentId: string): Effect.Effect<TurnDiffSummary[]> =>

@@ -1,4 +1,4 @@
-import type { Harness, SessionNodeType } from '@panctl/contracts';
+import type { Harness, SessionNodeType } from '@overdeck/contracts';
 
 export interface RestartRouteInput {
   projectKey?: string | null;

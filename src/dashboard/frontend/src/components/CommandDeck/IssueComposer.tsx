@@ -13,7 +13,7 @@ import { useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { StartAgentResponse } from '../../types';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';

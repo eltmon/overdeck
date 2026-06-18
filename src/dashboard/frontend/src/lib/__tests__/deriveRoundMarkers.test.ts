@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { deriveRoundMarkers } from '../deriveRoundMarkers';
-import type { ReviewerRoundMetadata } from '@panctl/contracts';
+import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 
 const MESSAGES = [
   { id: 'm1', createdAt: '2026-04-26T10:00:00Z' },

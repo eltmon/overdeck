@@ -15,7 +15,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { Harness } from '@panctl/contracts';
+import type { Harness } from '@overdeck/contracts';
 import { SYNC_SOURCES } from '../paths.js';
 import { renderForHarness } from './harness.js';
 

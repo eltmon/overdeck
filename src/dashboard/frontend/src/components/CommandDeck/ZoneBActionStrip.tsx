@@ -16,7 +16,7 @@ import {
   FolderOpen, FileText, Trash2, RotateCcw, Download, History,
   BookText, Copy, ClipboardCopy,
 } from 'lucide-react';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';

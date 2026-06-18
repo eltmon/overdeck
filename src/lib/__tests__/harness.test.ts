@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getHarness } from '@panctl/contracts'
+import { getHarness } from '@overdeck/contracts'
 
 describe('getHarness', () => {
   it('returns claude-code when runtime is the canonical literal', () => {

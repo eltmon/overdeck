@@ -9,7 +9,7 @@ import {
   FileText,
   Loader2,
 } from 'lucide-react';
-import { EDITORS, type EditorId, WS_METHODS } from '@panctl/contracts';
+import { EDITORS, type EditorId, WS_METHODS } from '@overdeck/contracts';
 import { toast } from 'sonner';
 import type { DiffsThemeNames } from '@pierre/diffs';
 

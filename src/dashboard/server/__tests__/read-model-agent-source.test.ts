@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { AgentSnapshot } from '@panctl/contracts';
+import type { AgentSnapshot } from '@overdeck/contracts';
 import {
   setupOverdeckTestDb,
   teardownOverdeckTestDb,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { appendFile, readFile } from 'fs/promises';
-import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
 import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { searchMemory, type MemorySearchHit } from './search.js';

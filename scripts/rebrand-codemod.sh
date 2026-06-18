@@ -39,3 +39,12 @@ _apply() {
 # ===========================================================================
 echo "Family 1: PANOPTICON_ -> OVERDECK_"
 _apply 'PANOPTICON_' 's/PANOPTICON_/OVERDECK_/g'
+
+# ===========================================================================
+# Family 2 — package scope:  @panctl/*  ->  @overdeck/*
+# Renames the 4 workspace package names + all imports/deps. The bare `panctl`
+# bin name is NOT here (handled in the CLI family). Run `bun install` after to
+# re-link the workspace under the new scope.
+# ===========================================================================
+echo "Family 2: @panctl -> @overdeck"
+_apply '@panctl' 's/\@panctl/\@overdeck/g'

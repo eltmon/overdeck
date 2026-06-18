@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
-import { PanRpcError } from '@panctl/contracts';
+import { PanRpcError } from '@overdeck/contracts';
 
 const projectPath = vi.hoisted(() => ({ value: '' }));
 

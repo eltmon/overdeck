@@ -25,7 +25,7 @@ import {
   MemoryStatus,
   ResetMarker,
   ResetMarkerScope,
-} from '@panctl/contracts'
+} from '@overdeck/contracts'
 import { runMemoryFtsStatement, runMemoryFtsTransaction } from '../memory/fts-db.js'
 import { resolveMemoryRoot, resolveIssueMemoryRoot, resolveStatusFile } from '../memory/paths.js'
 import { readMemoryHealthSnapshot, type MemoryHealthSnapshot as HealthSnapshotType } from '../memory/health.js'

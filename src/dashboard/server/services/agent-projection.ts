@@ -18,7 +18,7 @@ import { stateToOverdeckParamsForDb, AGENT_COLUMNS_FOR_DB } from '../../../lib/o
 import { getEventStore, type EventStore, type StoredEvent } from '../event-store.js';
 import { writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
-import type { DomainEvent } from '@panctl/contracts';
+import type { DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
   /** Assigned event sequence number. */

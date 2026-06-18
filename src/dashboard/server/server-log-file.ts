@@ -5,7 +5,7 @@
  *
  * Detached launchers (`pan up --detach`, `pan restart`) redirect the child's
  * stdout/stderr straight to the log file at the OS level. But `serve` (the
- * `npx @panctl/cli` entrypoint) and the desktop app inherit a terminal/pipe,
+ * `npx @overdeck/cli` entrypoint) and the desktop app inherit a terminal/pipe,
  * so without this the only record of an error — e.g. the cause behind a
  * conversation-message 500 — lives in a foreground terminal and is lost the
  * moment that process exits.

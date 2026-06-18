@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
-import type { FeatureRegistryEntry, FeatureRegistryListFilter } from '@panctl/contracts';
+import type { FeatureRegistryEntry, FeatureRegistryListFilter } from '@overdeck/contracts';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { listFeatureRegistryForDashboard } from '../services/feature-registry-service.js';

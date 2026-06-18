@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cloneElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WS_METHODS } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
 
 // PAN-1457: MarkdownFileLink chips now require a server-side existence check.
 // Tests must mock the resolveFilePathExists RPC and wait for it to resolve.

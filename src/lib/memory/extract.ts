@@ -3,7 +3,7 @@ import { Result, Schema } from 'effect';
 import {
   MemoryObservation,
   type MemoryIdentity,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import {
   extractWithProviderPolicy,
   type MemoryExtractionPolicyResult,

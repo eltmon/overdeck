@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import type { DashboardState } from '../../lib/store';
 import { useDashboardStore } from '../../lib/store';
 import { bucketByTime, type TimeBucketKey } from '../../lib/timeBuckets';

@@ -4,7 +4,7 @@ import type {
   FeatureRegistryOwnershipUpdate,
   FeatureRegistryTagInput,
   FeatureRegistryUntagInput,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import {
   initializeFeatureRegistryStorage,
   listFeatureRegistryEntries,

@@ -5,7 +5,7 @@ import type {
   ArtifactListEntry,
   ArtifactUnshareResponse,
   WorkspaceArtifactsResponse,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import type { ArtifactIndexEntry } from '../../../lib/artifacts/index-store.js';

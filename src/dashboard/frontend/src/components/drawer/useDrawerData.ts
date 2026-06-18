@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 
-import { type ReviewStatusSnapshot, type DomainEvent, WS_METHODS } from '@panctl/contracts';
+import { type ReviewStatusSnapshot, type DomainEvent, WS_METHODS } from '@overdeck/contracts';
 import { Stream } from 'effect';
 
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';

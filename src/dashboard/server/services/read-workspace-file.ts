@@ -2,7 +2,7 @@ import { open, realpath, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 
 import { Effect } from 'effect';
-import { PanRpcError, type ReadWorkspaceFileInput, type ReadWorkspaceFileResult } from '@panctl/contracts';
+import { PanRpcError, type ReadWorkspaceFileInput, type ReadWorkspaceFileResult } from '@overdeck/contracts';
 
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { getWorkspacePathForIssue } from '../workspace-paths.js';

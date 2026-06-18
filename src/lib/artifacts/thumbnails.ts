@@ -1,6 +1,6 @@
 import { access, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { ArtifactMetadata } from '@panctl/contracts';
+import type { ArtifactMetadata } from '@overdeck/contracts';
 import { getPanopticonHome } from '../paths.js';
 
 export interface ArtifactThumbnailOptions {

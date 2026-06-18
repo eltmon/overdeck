@@ -22,7 +22,7 @@
 ### Quick Install
 
 ```bash
-npx @panctl/cli
+npx @overdeck/cli
 ```
 
 **That's it!** Panopticon starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
@@ -30,14 +30,14 @@ npx @panctl/cli
 For a full local install with reusable `panctl` and `pan` commands:
 
 ```bash
-npm install -g @panctl/cli && pan install && pan up
+npm install -g @overdeck/cli && pan install && pan up
 ```
 
 ### Step-by-Step Installation
 
 1. **Install the CLI:**
    ```bash
-   npm install -g @panctl/cli
+   npm install -g @overdeck/cli
    ```
 
 2. **Run the installation wizard:**
@@ -750,5 +750,5 @@ This starts the server and opens it in your default browser after 1.5 seconds. U
 
 <div align="center">
 <p><strong>Made with ❤️ by the Panopticon team</strong></p>
-<p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/@panctl/cli">npm</a> · <a href="INDEX.md">Documentation</a></p>
+<p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/@overdeck/cli">npm</a> · <a href="INDEX.md">Documentation</a></p>
 </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FlywheelStats, FlywheelStatsCriteria, FlywheelStatsCriterion, FlywheelStatsCriterionStatus, FlywheelStatsTrend } from '@panctl/contracts';
+import type { FlywheelStats, FlywheelStatsCriteria, FlywheelStatsCriterion, FlywheelStatsCriterionStatus, FlywheelStatsTrend } from '@overdeck/contracts';
 import { cn } from '../../lib/utils';
 
 const REFRESH_INTERVAL_MS = 60_000;

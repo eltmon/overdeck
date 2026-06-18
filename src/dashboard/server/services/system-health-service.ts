@@ -4,7 +4,7 @@ import { cpus, freemem, loadavg, totalmem, homedir, platform } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { DashboardSnapshot } from '@panctl/contracts';
+import type { DashboardSnapshot } from '@overdeck/contracts';
 
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';

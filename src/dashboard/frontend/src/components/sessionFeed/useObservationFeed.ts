@@ -1,4 +1,4 @@
-import type { IssueId, MemoryObservation } from '@panctl/contracts';
+import type { IssueId, MemoryObservation } from '@overdeck/contracts';
 import type { DashboardState } from '../../lib/store';
 import { useDashboardStore } from '../../lib/store';
 import type { ActivitySessionFeedEntry } from './types';

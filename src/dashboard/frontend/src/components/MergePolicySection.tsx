@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
-import type { ReviewStatusSnapshot } from '@panctl/contracts';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../lib/store';
 import { AutoMergeToggle } from './AutoMergeToggle';
 

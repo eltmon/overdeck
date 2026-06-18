@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
 import { ActivityFeedSidebar, createActionStatusObservationSelector } from './ActivityFeedSidebar';
 

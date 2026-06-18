@@ -1,5 +1,5 @@
 import { open, stat } from 'fs/promises';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { getTranscriptCheckpoint } from './checkpoint-client.js';
 import type { TranscriptCheckpoint } from './checkpoints.js';

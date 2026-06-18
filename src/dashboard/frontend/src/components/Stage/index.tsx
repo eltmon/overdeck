@@ -8,7 +8,7 @@ import {
   type PaneSpec,
 } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
-import type { SessionNode as SessionNodeType } from '@panctl/contracts'
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts'
 import { useConversationMutations } from '../CommandDeck/useConversationMutations'
 import { ConversationActionMenu } from '../CommandDeck/ConversationActionMenu'
 import { PaneTabMenu } from './PaneTabMenu'

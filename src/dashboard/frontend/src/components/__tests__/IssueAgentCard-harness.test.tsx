@@ -13,7 +13,7 @@ const SRC = readFileSync(
 
 describe('IssueAgentCard harness badge (PAN-636 workspace-dbf)', () => {
   it('AC: card renders a span tagged data-testid="agent-harness-badge" sourced from getHarness(agent)', () => {
-    expect(SRC).toMatch(/import\s*\{[^}]*getHarness[^}]*\}\s*from\s*['"]@panctl\/contracts['"]/)
+    expect(SRC).toMatch(/import\s*\{[^}]*getHarness[^}]*\}\s*from\s*['"]@overdeck\/contracts['"]/)
     expect(SRC).toContain('data-testid="agent-harness-badge"')
     // The badge content must come from getHarness(agent), not a string literal or
     // the raw runtime/harness field — that would skip legacy normalization.

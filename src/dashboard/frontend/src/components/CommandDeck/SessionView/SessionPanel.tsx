@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { GitFork, TriangleAlert, AlertCircle, TerminalSquare, MessagesSquare, Wrench } from 'lucide-react';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
 import type { RoundMarker } from '../../chat/MessagesTimeline';

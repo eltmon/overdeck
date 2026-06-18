@@ -1,4 +1,4 @@
-import type { EditorId } from '@panctl/contracts';
+import type { EditorId } from '@overdeck/contracts';
 
 const STORAGE_KEY = 'panopticon:last-editor';
 

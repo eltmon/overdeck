@@ -1,4 +1,4 @@
-import type { FlywheelStats, FlywheelStatsCriterion } from '@panctl/contracts';
+import type { FlywheelStats, FlywheelStatsCriterion } from '@overdeck/contracts';
 import { listInWindow } from '../../../lib/overdeck/flywheel-substrate-bugs.js';
 import type { PipelineRunMetrics } from './pipeline-run-metrics.js';
 

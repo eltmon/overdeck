@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import type { MemoryObservation, MemoryStatus } from '@panctl/contracts';
+import type { MemoryObservation, MemoryStatus } from '@overdeck/contracts';
 import { WorkspaceStatusCard } from './WorkspaceStatusCard';
 
 const issue = {

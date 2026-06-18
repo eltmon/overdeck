@@ -11,7 +11,7 @@
 - **Server:** Effect.js HTTP + Effect RPC over WebSocket (`/ws/rpc`); raw `ws`
   + `@homebridge/node-pty-prebuilt-multiarch` for terminal streaming
   (`/ws/terminal`). SQLite for event store / deacon state.
-- **Frontend:** React 18, Zustand (shared reducers from `@panctl/contracts`),
+- **Frontend:** React 18, Zustand (shared reducers from `@overdeck/contracts`),
   TanStack Query for settings mutations, CSS modules (`command-deck.module.css`,
   `stage.module.css`) + Tailwind-style utility classes in Settings, lucide-react
   icons (being replaced by brand SVGs for providers/harnesses).

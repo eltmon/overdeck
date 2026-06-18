@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname } from 'node:path';
-import type { ArtifactValidationFinding, ArtifactValidationResult } from '@panctl/contracts';
+import type { ArtifactValidationFinding, ArtifactValidationResult } from '@overdeck/contracts';
 
 export const MAX_ARTIFACT_SIZE_BYTES = 1024 * 1024;
 

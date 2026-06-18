@@ -6,7 +6,7 @@ import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
-import { getHarness } from '@panctl/contracts';
+import { getHarness } from '@overdeck/contracts';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 

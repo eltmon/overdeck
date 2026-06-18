@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import {
   MEMORY_DOMAIN_TAGS,
   buildObservationPrompt,

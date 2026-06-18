@@ -33,7 +33,7 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { cn } from '../lib/utils';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/workAgents';
-import type { ReviewStatusSnapshot } from '@panctl/contracts';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';

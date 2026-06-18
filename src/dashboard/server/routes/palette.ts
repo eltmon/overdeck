@@ -101,7 +101,7 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan restore [timestamp]', description: 'Restore Panopticon state from a backup', group: 'Backup' },
 
   // Release
-  { name: 'pan release stable --version X.Y.Z', description: 'Cut a stable @panctl/* release (bump + tag + notes)', group: 'Release', keywords: ['publish', 'tag', 'version'] },
+  { name: 'pan release stable --version X.Y.Z', description: 'Cut a stable @overdeck/* release (bump + tag + notes)', group: 'Release', keywords: ['publish', 'tag', 'version'] },
   { name: 'pan release canary', description: 'Cut a canary release', group: 'Release' },
 
   // Flywheel + close-out

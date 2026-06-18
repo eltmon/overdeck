@@ -11,7 +11,7 @@ import type {
   ArtifactUnshareResponse,
   ArtifactUrls,
   ArtifactValidationResult,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import {
   ArtifactIndexRepository,
   type ArtifactIndexEntry,

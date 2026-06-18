@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { IssueId } from '@panctl/contracts';
+import type { IssueId } from '@overdeck/contracts';
 import type { GitSessionFeedEntry } from './types';
 
 export interface GitActivityEntry {

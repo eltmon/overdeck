@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { FlywheelPipelineItem } from '@panctl/contracts';
+import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { cn } from '../../lib/utils';
 
 interface MetricTileProps {

@@ -27,7 +27,7 @@
  */
 
 import { readFile, stat } from 'node:fs/promises';
-import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@panctl/contracts';
+import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
 import { summarizeToolInputForWorkLog } from './format-tool-input.js';
 

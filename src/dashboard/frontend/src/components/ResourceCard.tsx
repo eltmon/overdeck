@@ -6,7 +6,7 @@
 import { ContainerStats, ContainerHistory, Agent } from '../types';
 import { ResourceBar } from './ResourceBar';
 import { Sparkline } from './Sparkline';
-import { getHarness } from '@panctl/contracts';
+import { getHarness } from '@overdeck/contracts';
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}GiB`;

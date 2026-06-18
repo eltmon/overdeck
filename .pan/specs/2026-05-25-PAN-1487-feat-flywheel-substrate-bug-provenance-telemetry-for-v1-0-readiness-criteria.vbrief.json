@@ -277,7 +277,7 @@
       },
       {
         "id": "events-substrate-bug-filed",
-        "title": "Add SubstrateBugFiledEvent to @panctl/contracts DomainEvent union",
+        "title": "Add SubstrateBugFiledEvent to @overdeck/contracts DomainEvent union",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T08:45:00.000Z",
@@ -320,7 +320,7 @@
       },
       {
         "id": "events-operator-intervention",
-        "title": "Add OperatorInterventionEvent to @panctl/contracts DomainEvent union",
+        "title": "Add OperatorInterventionEvent to @overdeck/contracts DomainEvent union",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T08:45:00.000Z",
@@ -1142,7 +1142,7 @@
       },
       {
         "id": "stats-contracts",
-        "title": "Add FlywheelStats schema to @panctl/contracts",
+        "title": "Add FlywheelStats schema to @overdeck/contracts",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-25T08:45:00.000Z",

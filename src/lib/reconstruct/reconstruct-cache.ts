@@ -14,7 +14,7 @@ import type {
   AgentRuntimeSnapshot,
   AgentSnapshot,
   ReviewStatusSnapshot,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import { backfillAgentsSync, listAllAgentsSync } from '../overdeck/agents.js';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { listProjectsSync, type ProjectConfig } from '../projects.js';

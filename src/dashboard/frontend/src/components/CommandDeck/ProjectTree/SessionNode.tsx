@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@overdeck/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { canUsePickerHarness, HARNESS_OPTIONS, useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';

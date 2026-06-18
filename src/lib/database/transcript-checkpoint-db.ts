@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { getDatabase } from './index.js';
 
 export type TranscriptClaimTrigger = 'stop-hook' | 'poller' | 'reconciliation' | 'manual';

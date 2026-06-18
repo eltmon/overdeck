@@ -9,7 +9,7 @@
  */
 
 import { Effect } from 'effect';
-import type { AgentRuntimeSnapshot } from '@panctl/contracts';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
 
 let mirror: Record<string, AgentRuntimeSnapshot> = {};
 

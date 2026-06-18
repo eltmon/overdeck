@@ -7,8 +7,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter } from 'lucide-react';
-import { WS_METHODS } from '@panctl/contracts';
-import type { DiscoveredSessionSnapshot } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
+import type { DiscoveredSessionSnapshot } from '@overdeck/contracts';
 import { SessionTable } from './SessionTable';
 import { SessionDetail } from './SessionDetail';
 import { ScanButton } from './ScanButton';

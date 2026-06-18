@@ -14,7 +14,7 @@ import { spawnSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import inquirer from 'inquirer';
-import type { Harness } from '@panctl/contracts';
+import type { Harness } from '@overdeck/contracts';
 import {
   globalContextFile,
   projectContextFile,

@@ -1,5 +1,5 @@
 import { Loader2, ShieldAlert } from 'lucide-react'
-import type { ChannelPermissionRequestSnapshot } from '@panctl/contracts'
+import type { ChannelPermissionRequestSnapshot } from '@overdeck/contracts'
 
 interface ChannelPermissionDialogProps {
   request: ChannelPermissionRequestSnapshot | null

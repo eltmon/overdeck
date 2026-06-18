@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, FileText, Loader2, Maximize2, MoreHorizontal, Pause, Plus, RotateCcw, Settings, StopCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStatus } from '@overdeck/contracts';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';

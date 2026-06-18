@@ -1,5 +1,5 @@
 {
-  "name": "@panctl/frontend",
+  "name": "@overdeck/frontend",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -21,7 +21,7 @@
     "@fontsource/space-grotesk": "^5.0.0",
     "@lexical/react": "^0.41.0",
     "@monaco-editor/react": "^4.7.0",
-    "@panctl/contracts": "workspace:*",
+    "@overdeck/contracts": "workspace:*",
     "@pierre/diffs": "^1.1.0",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@tailwindcss/typography": "^0.5.19",

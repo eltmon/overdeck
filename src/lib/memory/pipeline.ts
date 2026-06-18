@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import {
   claimTranscriptRange,

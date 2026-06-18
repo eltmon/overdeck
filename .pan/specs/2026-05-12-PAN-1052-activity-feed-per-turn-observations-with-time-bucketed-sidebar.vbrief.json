@@ -49,7 +49,7 @@
     "items": [
       {
         "id": "a1-memory-contracts",
-        "title": "Define memory contracts in @panctl/contracts (Observation, Status, PendingTurn, ResetMarker, RagDecision)",
+        "title": "Define memory contracts in @overdeck/contracts (Observation, Status, PendingTurn, ResetMarker, RagDecision)",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-12T19:50:00.000Z",
@@ -115,7 +115,7 @@
       },
       {
         "id": "a2-domain-events",
-        "title": "Add memory domain events to @panctl/contracts events union",
+        "title": "Add memory domain events to @overdeck/contracts events union",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-12T19:50:00.000Z",
@@ -1572,7 +1572,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add slices to useDashboardStore: observationsByIssueId (rolling buffer of recent obs per issue), statusByIssueId, resetMarkersByScope. Reducers shared from @panctl/contracts. Rolling buffer cap (default 50 per issue) to keep memory bounded."
+          "Action": "Add slices to useDashboardStore: observationsByIssueId (rolling buffer of recent obs per issue), statusByIssueId, resetMarkersByScope. Reducers shared from @overdeck/contracts. Rolling buffer cap (default 50 per issue) to keep memory bounded."
         },
         "subItems": [
           {
@@ -1593,7 +1593,7 @@
           },
           {
             "id": "h2-zustand-slice.ac3",
-            "title": "Reducers exported from @panctl/contracts and used by both server read-model and frontend store",
+            "title": "Reducers exported from @overdeck/contracts and used by both server read-model and frontend store",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

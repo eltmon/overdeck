@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { readdir, readFile, rename, writeFile } from 'fs/promises';
-import type { MemoryIdentity, PendingTurn } from '@panctl/contracts';
+import type { MemoryIdentity, PendingTurn } from '@overdeck/contracts';
 import { ensureDir, resolvePendingDir } from './paths.js';
 import { getMemoryRollupPendingThreshold } from './settings.js';
 import { updateMemoryHealth } from './health.js';

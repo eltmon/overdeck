@@ -1,4 +1,4 @@
-import type { AgentStatus } from '@panctl/contracts';
+import type { AgentStatus } from '@overdeck/contracts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';

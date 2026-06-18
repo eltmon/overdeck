@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
-import type { FlywheelStats, FlywheelStatus } from '@panctl/contracts';
+import type { FlywheelStats, FlywheelStatus } from '@overdeck/contracts';
 import { getFlywheelRunDir, readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 
 const flywheelLifecycleMocks = vi.hoisted(() => ({

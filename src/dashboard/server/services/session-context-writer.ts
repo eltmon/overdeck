@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { DashboardSnapshot, FeatureRegistryEntry } from '@panctl/contracts';
+import type { DashboardSnapshot, FeatureRegistryEntry } from '@overdeck/contracts';
 import { assembleLiveBriefingMarkdown } from '../../../lib/briefing-assembler.js';
 import { resolveSessionContextBriefingPath } from '../../../lib/briefing-freshness.js';
 import { listFeatureRegistryEntries } from '../../../lib/registry/feature-registry-storage.js';

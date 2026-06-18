@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReviewStatusSnapshot } from '@panctl/contracts';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
 
 // ProjectOverview now fetches recent spend via react-query (PAN-1597), so every

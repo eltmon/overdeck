@@ -17,7 +17,7 @@ import type {
   ChannelReplyArtifactRef,
   ChannelReplyKind,
   WaitingReason,
-} from '@panctl/contracts'
+} from '@overdeck/contracts'
 
 // Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
 // (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and

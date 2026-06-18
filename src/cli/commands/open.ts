@@ -3,14 +3,14 @@ import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import chalk from 'chalk';
-import type { EditorId } from '@panctl/contracts';
+import type { EditorId } from '@overdeck/contracts';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 
-type Editor = (typeof import('@panctl/contracts'))['EDITORS'][number];
+type Editor = (typeof import('@overdeck/contracts'))['EDITORS'][number];
 
 async function loadEditors(): Promise<readonly Editor[]> {
-  const { EDITORS } = await import('@panctl/contracts');
+  const { EDITORS } = await import('@overdeck/contracts');
   return EDITORS;
 }
 

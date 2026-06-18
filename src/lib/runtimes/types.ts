@@ -14,7 +14,7 @@
  * Supported runtime types for agent execution.
  *
  * PAN-636 widened this union to include 'pi' alongside Claude Code. Reads of
- * AgentSnapshot.runtime should go through getHarness() from @panctl/contracts
+ * AgentSnapshot.runtime should go through getHarness() from @overdeck/contracts
  * so unknown or legacy values normalize to 'claude-code'.
  */
 export type RuntimeName = 'claude-code' | 'pi' | 'codex';

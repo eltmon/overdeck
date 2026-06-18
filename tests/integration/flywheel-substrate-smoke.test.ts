@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { FlywheelStats } from '@panctl/contracts';
+import type { FlywheelStats } from '@overdeck/contracts';
 import { runGhIssueTrailerHook } from '../../sync-sources/hooks/gh-issue-trailer-hook.ts';
 
 const projectRoot = resolve(__dirname, '../..');

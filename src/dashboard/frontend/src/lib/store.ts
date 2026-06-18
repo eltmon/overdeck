@@ -3,7 +3,7 @@
  *
  * Replaces React Query polling with event-sourced state.
  * The store receives a full snapshot on connect, then applies domain events incrementally.
- * Pure reducer functions are shared with the server read model via @panctl/contracts.
+ * Pure reducer functions are shared with the server read model via @overdeck/contracts.
  */
 
 import { create } from 'zustand'
@@ -17,14 +17,14 @@ import type {
   ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
-} from '@panctl/contracts'
+} from '@overdeck/contracts'
 import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
   syncSnapshot as syncSnapshotShared,
   applyEvent as applyEventShared,
   applyEvents as applyEventsShared,
-} from '@panctl/contracts'
+} from '@overdeck/contracts'
 import { saveSnapshotToCache } from './snapshotCache'
 
 // ─── State shape ──────────────────────────────────────────────────────────────

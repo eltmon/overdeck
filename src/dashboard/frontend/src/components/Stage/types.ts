@@ -1,4 +1,4 @@
-import type { SessionNode as SessionNodeType } from '@panctl/contracts'
+import type { SessionNode as SessionNodeType } from '@overdeck/contracts'
 import type { WorkspacePane, WorkspaceId, PaneSpec, PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
 

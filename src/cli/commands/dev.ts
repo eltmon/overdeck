@@ -471,7 +471,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       // PAN-1664: use the NON-destructive hot build. The normal build:dashboard:server
       // runs build:contracts which `rmrf`s packages/contracts/dist (and tsdown cleans
       // it) — deleting index.mjs out from under the running Vite frontend, which 404s
-      // the @panctl/contracts module and wedges open tabs on "Reconnecting…".
+      // the @overdeck/contracts module and wedges open tabs on "Reconnecting…".
       // build:dashboard:server:hot + PAN_HOT_RELOAD=1 overwrites dist in place instead.
       const build = spawn('npm', ['run', 'build:dashboard:server:hot'], {
         cwd: join(__dirname, '..', '..'),

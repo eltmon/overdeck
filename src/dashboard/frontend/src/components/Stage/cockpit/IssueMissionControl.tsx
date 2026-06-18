@@ -31,7 +31,7 @@ import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { ReviewVerificationCard } from './ReviewVerificationCard'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
-import type { ProjectSessionTree, SessionNode } from '@panctl/contracts'
+import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
 import styles from './cockpitBody.module.css'
 
 export interface IssueMissionControlProps {

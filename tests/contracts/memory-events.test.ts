@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { DomainEvent, INITIAL_READ_MODEL_STATE, applyEvent, syncSnapshot } from '@panctl/contracts'
+import { DomainEvent, INITIAL_READ_MODEL_STATE, applyEvent, syncSnapshot } from '@overdeck/contracts'
 
 const TS = '2026-05-15T00:00:00.000Z'
 const decode = Schema.decodeUnknownResult(DomainEvent)

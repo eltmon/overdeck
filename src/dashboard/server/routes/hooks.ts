@@ -13,7 +13,7 @@
 
 import { stat } from 'fs/promises';
 import { basename, dirname, resolve } from 'path';
-import type { MemoryIdentity } from '@panctl/contracts';
+import type { MemoryIdentity } from '@overdeck/contracts';
 import { Effect, Layer, Result, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';

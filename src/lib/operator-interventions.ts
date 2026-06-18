@@ -1,4 +1,4 @@
-import type { DomainEvent } from '@panctl/contracts';
+import type { DomainEvent } from '@overdeck/contracts';
 import { initEventStore } from '../dashboard/server/event-store.js';
 
 export type OperatorInterventionKind = 'tell' | 'pause' | 'restart' | 'manual_edit' | 'deep_wipe' | 'unpause' | 'untroubled';

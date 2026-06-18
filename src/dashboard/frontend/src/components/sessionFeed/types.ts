@@ -1,4 +1,4 @@
-import type { IssueId } from '@panctl/contracts';
+import type { IssueId } from '@overdeck/contracts';
 
 export type SessionFeedTab = 'all' | 'chats' | 'files' | 'git' | 'comments' | 'activity';
 

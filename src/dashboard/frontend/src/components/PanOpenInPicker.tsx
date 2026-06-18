@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { EDITORS, type EditorId, WS_METHODS } from '@panctl/contracts';
+import { EDITORS, type EditorId, WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport';
 import { getPreferredEditor, setPreferredEditor } from '../editorPreferences';
 import { EDITOR_OPEN_FAVORITE_KEY_LABEL, useEditorOpenFavoriteShortcut } from '../lib/keybindings';

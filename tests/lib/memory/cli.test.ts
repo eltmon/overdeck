@@ -2,7 +2,7 @@ import { appendFile, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { MemoryObservation, MemoryIdentity } from '@panctl/contracts';
+import type { MemoryObservation, MemoryIdentity } from '@overdeck/contracts';
 import {
   createResetMarker,
   generateDailySummary,

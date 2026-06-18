@@ -11,7 +11,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 | `src/lib/` | Core domain logic shared by CLI and server. The big ones below. |
 | `src/dashboard/server/` | Effect.js HTTP server + raw WebSocket terminal streaming. Entry `main.ts`, routes in `routes/`, services in `services/`. Runs ONLY as built `dist/dashboard/server.js` under Node 22. |
 | `src/dashboard/frontend/` | React + Zustand + Vite SPA. Components under `src/components/`. |
-| `packages/contracts/` | Shared types/schemas (`@panctl/contracts`) used by server + frontend (e.g. `Harness` union at `src/types.ts:49`). |
+| `packages/contracts/` | Shared types/schemas (`@overdeck/contracts`) used by server + frontend (e.g. `Harness` union at `src/types.ts:49`). |
 | `skills/` | Claude Code wrapper skills for `pan` verbs (lint-enforced vs `--help`). |
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |

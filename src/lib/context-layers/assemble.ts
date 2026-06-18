@@ -14,7 +14,7 @@
  * picks it up) and consumed harness-neutrally by the briefing system.
  */
 
-import type { Harness } from '@panctl/contracts';
+import type { Harness } from '@overdeck/contracts';
 import { renderProjectLayer } from './render.js';
 
 /** Inputs for {@link assembleWorkspaceContext}. */

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { ContextEditableLayerRecord, ContextLayerDraft, ContextLayerTarget, ContextPreviewDiagnostic } from '@panctl/contracts';
+import type { ContextEditableLayerRecord, ContextLayerDraft, ContextLayerTarget, ContextPreviewDiagnostic } from '@overdeck/contracts';
 import { ContextEditor } from './ContextEditor';
 import {
   useContextLayersQuery,

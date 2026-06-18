@@ -30,8 +30,8 @@
       "bugfix"
     ],
     "narratives": {
-      "Problem": "Operators cannot select the 'extra-high' or 'max' thinking-budget tier for the Flywheel orchestrator from Settings → Roles → Flywheel. The role config dropdown renders only low/medium/high because both FlywheelEffort (Schema.Literals in @panctl/contracts) and RoleEffort (src/lib/config-yaml.ts) cap at 'high'. Meanwhile the conversation composer EffortPicker (src/dashboard/frontend/src/components/chat/EffortPicker.tsx) already exposes five tiers — low, medium, high, xhigh, max — so the Flywheel role config is the lone holdout. The chosen Flywheel effort propagates through Cloister → spawnRun → getRoleRuntimeBaseCommand which passes `--effort <level>` directly to the claude CLI, so widening the literal at the contract and config layers is enough to unlock the new tiers end-to-end.",
-      "Proposal": "Widen the effort literal across the contract package and the canonical RoleEffort type to ['low', 'medium', 'high', 'xhigh', 'max'], matching the chat EffortPicker IDs exactly. Update every validator (settings-api, config-yaml) and inline duplicate type declaration so typecheck passes. Add the two new <option> tags to the Flywheel effort <select> in RolesPanel. Keep the default Flywheel effort at 'high' so existing operators see no behavior change. Do NOT add model-aware availableLevels gating in RolesPanel (out of scope; chat composer has that, RolesPanel does not). Do NOT add a `pan flywheel start --effort` flag — Flywheel reads effort from settings; only `pan plan --effort` and `pan strike --effort` (which already exist) get their help strings widened. The work is decomposed into 9 small beads with B1 (the @panctl/contracts FlywheelEffort widening) as the inspected foundation."
+      "Problem": "Operators cannot select the 'extra-high' or 'max' thinking-budget tier for the Flywheel orchestrator from Settings → Roles → Flywheel. The role config dropdown renders only low/medium/high because both FlywheelEffort (Schema.Literals in @overdeck/contracts) and RoleEffort (src/lib/config-yaml.ts) cap at 'high'. Meanwhile the conversation composer EffortPicker (src/dashboard/frontend/src/components/chat/EffortPicker.tsx) already exposes five tiers — low, medium, high, xhigh, max — so the Flywheel role config is the lone holdout. The chosen Flywheel effort propagates through Cloister → spawnRun → getRoleRuntimeBaseCommand which passes `--effort <level>` directly to the claude CLI, so widening the literal at the contract and config layers is enough to unlock the new tiers end-to-end.",
+      "Proposal": "Widen the effort literal across the contract package and the canonical RoleEffort type to ['low', 'medium', 'high', 'xhigh', 'max'], matching the chat EffortPicker IDs exactly. Update every validator (settings-api, config-yaml) and inline duplicate type declaration so typecheck passes. Add the two new <option> tags to the Flywheel effort <select> in RolesPanel. Keep the default Flywheel effort at 'high' so existing operators see no behavior change. Do NOT add model-aware availableLevels gating in RolesPanel (out of scope; chat composer has that, RolesPanel does not). Do NOT add a `pan flywheel start --effort` flag — Flywheel reads effort from settings; only `pan plan --effort` and `pan strike --effort` (which already exist) get their help strings widened. The work is decomposed into 9 small beads with B1 (the @overdeck/contracts FlywheelEffort widening) as the inspected foundation."
     },
     "autoDecisions": [
       {
@@ -62,7 +62,7 @@
     "items": [
       {
         "id": "b1-contract-flywheel-effort",
-        "title": "Widen FlywheelEffort schema literal in @panctl/contracts to include 'xhigh' and 'max'",
+        "title": "Widen FlywheelEffort schema literal in @overdeck/contracts to include 'xhigh' and 'max'",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-25T16:25:39Z",
@@ -102,7 +102,7 @@
           },
           {
             "id": "b1-contract-flywheel-effort.ac3",
-            "title": "`cd packages/contracts && npm run build` succeeds and the new dist exposes the widened literal (verifiable by importing FlywheelEffort from @panctl/contracts in a sibling file)",
+            "title": "`cd packages/contracts && npm run build` succeeds and the new dist exposes the widened literal (verifiable by importing FlywheelEffort from @overdeck/contracts in a sibling file)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

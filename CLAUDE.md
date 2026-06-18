@@ -66,7 +66,7 @@ When working directly on `main` (not in a Panopticon workspace), commit complete
 
 ## CRITICAL: Releases Go Through `pan release stable` — Never Manual
 
-**To cut a new release of `@panctl/*`, ALWAYS use `pan release stable --version X.Y.Z`. NEVER run `git tag v...` manually, never edit `"version"` in any `package.json` directly, never `npm version` or `npm publish`.**
+**To cut a new release of `@overdeck/*`, ALWAYS use `pan release stable --version X.Y.Z`. NEVER run `git tag v...` manually, never edit `"version"` in any `package.json` directly, never `npm version` or `npm publish`.**
 
 The release tooling does five things atomically that humans (and agents) get wrong piecemeal:
 
@@ -180,7 +180,7 @@ Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue t
 
 Workspaces are git worktrees at `workspaces/feature-<issue-id>/`. Each worktree has its
 own `node_modules` created by `bun install` — **never symlink node_modules from the main repo**.
-Symlinks break local workspace package resolution (e.g., `@panctl/contracts` would
+Symlinks break local workspace package resolution (e.g., `@overdeck/contracts` would
 resolve to the main repo's stale build instead of the worktree's version).
 
 See [docs/WORKSPACE-CONTAINERS.md](docs/WORKSPACE-CONTAINERS.md) for the workspace
@@ -192,7 +192,7 @@ container contract, stack-health surfaces, spawn gate, and recovery commands.
 3. Build commands use the root `node_modules/.bin/` — run from workspace root, not subdirectories
 
 **NEVER symlink node_modules** — `bun install` uses hardlinks from the global cache and is
-nearly instant (~2s). It correctly resolves `@panctl/contracts` to the worktree's local
+nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktree's local
 `packages/contracts/` via Bun workspace resolution.
 
 **Quality gates** (must pass before `pan done`):
@@ -292,7 +292,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,
   subscribes to `subscribeDomainEvents` stream, applies events to Zustand store
 - `WsTransport.ts` — Effect-based RPC client with auto-reconnection
-- Store: Zustand with shared reducers from `@panctl/contracts`
+- Store: Zustand with shared reducers from `@overdeck/contracts`
 
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.

@@ -58,7 +58,7 @@
     ],
     "narratives": {
       "Problem": "Tonight's 4.5h autonomous flywheel run worked, but every piece was ad-hoc — the brief lived in ~/Projects, the status report was a hand-rebuilt HTML file, run config lived only in the operator's session with no way to swap harness/model mid-run, the conversation was the raw Claude Code TUI, and the run report had to be hand-written. None of it is a first-class Panopticon surface; none of it is reproducible by a new contributor.",
-      "Proposal": "Make the flywheel a Panopticon-native lifecycle role. Add a sixth `flywheel` role (singleton, Cloister-managed) alongside plan/work/review/test/ship; ship a typed FlywheelStatus contract in @panctl/contracts; expose a /flywheel page with two panes (standardized status left, live conversation right) composing PAN-1148 primitives; expose `pan flywheel start|pause|resume|status|report` plus a Settings → Roles → Flywheel row; persist only the latest snapshot + commit end-of-run artifacts (docs/FLYWHEEL-STATE.md, append docs/OPERATION-FIX-ALL.md) via `pan flywheel report`. Hard-blocks on PAN-1148 for shared primitives."
+      "Proposal": "Make the flywheel a Panopticon-native lifecycle role. Add a sixth `flywheel` role (singleton, Cloister-managed) alongside plan/work/review/test/ship; ship a typed FlywheelStatus contract in @overdeck/contracts; expose a /flywheel page with two panes (standardized status left, live conversation right) composing PAN-1148 primitives; expose `pan flywheel start|pause|resume|status|report` plus a Settings → Roles → Flywheel row; persist only the latest snapshot + commit end-of-run artifacts (docs/FLYWHEEL-STATE.md, append docs/OPERATION-FIX-ALL.md) via `pan flywheel report`. Hard-blocks on PAN-1148 for shared primitives."
     },
     "autoDecisions": [
       {
@@ -109,7 +109,7 @@
     "items": [
       {
         "id": "contract-flywheel-status",
-        "title": "Add FlywheelStatus contract to @panctl/contracts",
+        "title": "Add FlywheelStatus contract to @overdeck/contracts",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-18T13:05:00.000Z",
@@ -388,7 +388,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Extend the PanRpcGroup in `src/dashboard/server/ws-rpc.ts` (and the matching client transport) with a `subscribeFlywheelStatus` stream method. The stream emits the current latest snapshot on subscribe, then every subsequent update from the POST route's pubsub. Schema lives in @panctl/contracts. Add a client-side hook (or store action) so React components can subscribe with one line."
+          "Action": "Extend the PanRpcGroup in `src/dashboard/server/ws-rpc.ts` (and the matching client transport) with a `subscribeFlywheelStatus` stream method. The stream emits the current latest snapshot on subscribe, then every subsequent update from the POST route's pubsub. Schema lives in @overdeck/contracts. Add a client-side hook (or store action) so React components can subscribe with one line."
         },
         "subItems": [
           {

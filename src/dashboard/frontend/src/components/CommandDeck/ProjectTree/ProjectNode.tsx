@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronRight, MessageSquarePlus } from 'lucide-react';
-import type { SessionNode } from '@panctl/contracts';
+import type { SessionNode } from '@overdeck/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';

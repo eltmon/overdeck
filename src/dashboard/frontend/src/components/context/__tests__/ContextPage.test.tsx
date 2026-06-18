@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
-import type { ContextLayerSaveRequest, ContextLayersResponse, ContextPreviewRequest } from '@panctl/contracts';
+import type { ContextLayerSaveRequest, ContextLayersResponse, ContextPreviewRequest } from '@overdeck/contracts';
 
 import { ContextPage } from '../ContextPage';
 

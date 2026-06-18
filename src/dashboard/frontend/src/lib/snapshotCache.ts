@@ -9,7 +9,7 @@
  * If localStorage quota is exceeded, the issues array is stripped and retried.
  */
 
-import type { DashboardSnapshot } from '@panctl/contracts'
+import type { DashboardSnapshot } from '@overdeck/contracts'
 
 const CACHE_KEY = 'pan-snapshot-cache-v1'
 

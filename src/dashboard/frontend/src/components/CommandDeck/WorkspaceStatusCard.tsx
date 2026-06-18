@@ -1,6 +1,6 @@
 import { AlertTriangle, Brush, CheckCircle2, ClipboardList, Rocket, Search, ShipWheel } from 'lucide-react';
 import type { ComponentType } from 'react';
-import type { MemoryObservation, MemoryStatus, MemoryStatusPhase } from '@panctl/contracts';
+import type { MemoryObservation, MemoryStatus, MemoryStatusPhase } from '@overdeck/contracts';
 import type { Issue } from '../../types';
 
 export interface WorkspaceStatusStats {

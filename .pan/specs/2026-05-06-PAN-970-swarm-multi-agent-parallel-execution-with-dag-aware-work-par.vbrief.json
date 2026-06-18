@@ -174,12 +174,12 @@
           "phase": 2
         },
         "narrative": {
-          "Action": "Add SwarmState, Wave, and SlotAssignment types to @panctl/contracts. Add swarmStateByIssueId to the Zustand store and read model. SwarmState tracks: mode (single/swarm), waves array with per-wave status, currentWave number, mergeState (idle/cascading/conflict). Each Wave has slots with item assignments and per-slot status. Emit domain events: swarm.wave_started, swarm.slot_completed, swarm.wave_merging, swarm.wave_completed, swarm.conflict. Wire into EventRouter for real-time dashboard updates."
+          "Action": "Add SwarmState, Wave, and SlotAssignment types to @overdeck/contracts. Add swarmStateByIssueId to the Zustand store and read model. SwarmState tracks: mode (single/swarm), waves array with per-wave status, currentWave number, mergeState (idle/cascading/conflict). Each Wave has slots with item assignments and per-slot status. Emit domain events: swarm.wave_started, swarm.slot_completed, swarm.wave_merging, swarm.wave_completed, swarm.conflict. Wire into EventRouter for real-time dashboard updates."
         },
         "subItems": [
           {
             "id": "swarm-state-model.types",
-            "title": "SwarmState, Wave, SlotAssignment types defined in @panctl/contracts with Effect Schema",
+            "title": "SwarmState, Wave, SlotAssignment types defined in @overdeck/contracts with Effect Schema",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

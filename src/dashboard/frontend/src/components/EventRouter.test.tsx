@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DashboardSnapshot, DomainEvent } from '@panctl/contracts'
-import { INITIAL_READ_MODEL_STATE } from '@panctl/contracts'
+import type { DashboardSnapshot, DomainEvent } from '@overdeck/contracts'
+import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
 import { EventRouter } from './EventRouter'
 import { useDashboardStore } from '../lib/store'
 

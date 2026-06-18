@@ -324,7 +324,7 @@ function getSyncTargetBranch(
         console.warn(`[${logPrefix}] Dependency install warning: ${installErr.message}`);
       }
 
-      // Build workspace packages (e.g., @panctl/contracts) before running gates
+      // Build workspace packages (e.g., @overdeck/contracts) before running gates
       const workspacePackages = (projectConfig as any)?.workspace_packages as Array<{ path: string; build_command: string }> | undefined;
       if (workspacePackages) {
         for (const pkg of workspacePackages) {

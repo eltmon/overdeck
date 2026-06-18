@@ -4,7 +4,7 @@ import { Loader2, RotateCcw } from 'lucide-react';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
-import type { ReviewStatusSnapshot } from '@panctl/contracts';
+import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 
 interface RecoverButtonProps {
   issueId: string;

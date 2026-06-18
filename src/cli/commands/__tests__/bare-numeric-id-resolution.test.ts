@@ -142,7 +142,7 @@ vi.mock('../../../lib/config.js', async (importActual) => ({
   getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
 }));
 
-vi.mock('@panctl/contracts', () => ({
+vi.mock('@overdeck/contracts', () => ({
   EDITORS: [{ id: 'code', label: 'VS Code', command: 'code' }],
 }));
 

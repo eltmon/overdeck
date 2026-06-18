@@ -190,7 +190,7 @@
           },
           {
             "id": "context-dashboard-contracts.ac3",
-            "title": "`npm run typecheck` can import the new context contracts from `@panctl/contracts` in both dashboard server and frontend code.",
+            "title": "`npm run typecheck` can import the new context contracts from `@overdeck/contracts` in both dashboard server and frontend code.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -309,7 +309,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Create `src/dashboard/frontend/src/lib/contextApi.ts` (or colocate in the new context page directory) with typed fetch helpers for `GET /api/context/layers`, `POST /api/context/preview`, `PUT /api/context/layers`, and `POST /api/context/sync`. Use the contracts from `@panctl/contracts`. Add React Query hooks or plain helpers used by the page; keep path/query construction in one place. Tests should mock `fetch` and assert request methods/bodies for load, preview, save, and sync."
+          "Action": "Create `src/dashboard/frontend/src/lib/contextApi.ts` (or colocate in the new context page directory) with typed fetch helpers for `GET /api/context/layers`, `POST /api/context/preview`, `PUT /api/context/layers`, and `POST /api/context/sync`. Use the contracts from `@overdeck/contracts`. Add React Query hooks or plain helpers used by the page; keep path/query construction in one place. Tests should mock `fetch` and assert request methods/bodies for load, preview, save, and sync."
         },
         "subItems": [
           {

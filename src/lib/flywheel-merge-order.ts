@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
-import type { FlywheelPipelineItem } from '@panctl/contracts';
+import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 

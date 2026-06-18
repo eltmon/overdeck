@@ -820,7 +820,7 @@ program
 
     if (!isProduction && !isDevelopment) {
       console.error(chalk.red('Error: Dashboard not found'));
-      console.error(chalk.dim('This may be a corrupted installation. Try reinstalling @panctl/cli.'));
+      console.error(chalk.dim('This may be a corrupted installation. Try reinstalling @overdeck/cli.'));
       process.exit(1);
     }
 

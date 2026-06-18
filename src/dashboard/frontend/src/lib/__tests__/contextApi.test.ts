@@ -13,7 +13,7 @@ import type {
   ContextPreviewRequest,
   ContextPreviewResponse,
   ContextSyncResponse,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 
 const fetchMock = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>();
 

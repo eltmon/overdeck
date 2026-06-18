@@ -17,10 +17,10 @@ export default defineConfig({
   shims: true,
   outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
   alias: {
-    '@panctl/contracts': resolve(import.meta.dirname, 'packages/contracts/src/index.ts'),
+    '@overdeck/contracts': resolve(import.meta.dirname, 'packages/contracts/src/index.ts'),
   },
   deps: {
-    alwaysBundle: (id) => id.startsWith('@panctl/'),
+    alwaysBundle: (id) => id.startsWith('@overdeck/'),
     neverBundle: ['@homebridge/node-pty-prebuilt-multiarch'],
   },
   outDir: 'dist',

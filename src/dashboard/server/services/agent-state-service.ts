@@ -25,11 +25,11 @@ import { Effect, Layer, Context, Stream, SubscriptionRef } from 'effect';
 import {
   applyEvent as applyReducerEvent,
   INITIAL_READ_MODEL_STATE,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import type {
   AgentRuntimeSnapshot,
   DomainEvent,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';

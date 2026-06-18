@@ -13,7 +13,7 @@
 
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 
 export interface GodViewActivityEvent {
   id: string;

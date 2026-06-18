@@ -1,4 +1,4 @@
-import { AgentStatus, type AgentSnapshot } from '@panctl/contracts';
+import { AgentStatus, type AgentSnapshot } from '@overdeck/contracts';
 
 interface ResolveIssueHeadlineCostOptions {
   issueId: string;

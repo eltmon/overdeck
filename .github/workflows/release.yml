@@ -130,7 +130,7 @@ jobs:
 
       # Trusted Publishing: no NODE_AUTH_TOKEN. npm authenticates to npmjs.org
       # using the GitHub OIDC token granted by `id-token: write` above. The
-      # trusted-publisher config on each @panctl/* package on npmjs.com pins
+      # trusted-publisher config on each @overdeck/* package on npmjs.com pins
       # this repo + workflow filename as the only allowed publisher.
       - name: Publish CLI to npm
         run: |

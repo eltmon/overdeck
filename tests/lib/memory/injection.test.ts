@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MemoryIdentity, MemoryStatus } from '@panctl/contracts';
+import type { MemoryIdentity, MemoryStatus } from '@overdeck/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
 import { handleMemoryInjectBody, handleMemorySessionStartBody } from '../../../src/dashboard/server/routes/hooks.js';

@@ -254,7 +254,7 @@ const REGISTRY: Record<RuntimeName, ConversationTranscriptAdapter> = {
 /**
  * Look up the transcript adapter for a harness. Unknown harnesses default to
  * the Claude Code adapter — that matches the conservative behavior of the rest
- * of the codebase (see getHarness() in @panctl/contracts).
+ * of the codebase (see getHarness() in @overdeck/contracts).
  */
 export function getTranscriptAdapter(harness: RuntimeName | undefined): ConversationTranscriptAdapter {
   return REGISTRY[harness ?? 'claude-code'] ?? claudeCodeAdapter;

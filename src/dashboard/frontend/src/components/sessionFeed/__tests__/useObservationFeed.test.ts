@@ -1,4 +1,4 @@
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 import { createObservationFeedSelector, MAX_OBSERVATION_FEED_ENTRIES } from '../useObservationFeed';
 

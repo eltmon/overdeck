@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { getAgentStateSync } from '../../../lib/agents.js';
 
 import { Effect } from 'effect';
-import type { AgentStatus, SessionNodePresence } from '@panctl/contracts';
+import type { AgentStatus, SessionNodePresence } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
   getReviewerSessionName,

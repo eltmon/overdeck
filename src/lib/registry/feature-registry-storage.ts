@@ -9,7 +9,7 @@ import type {
   FeatureRegistryOwnershipUpdate,
   FeatureRegistryTagInput,
   FeatureRegistryUntagInput,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 
 export type {
   FeatureRegistryEntry,
@@ -17,7 +17,7 @@ export type {
   FeatureRegistryOwnershipUpdate,
   FeatureRegistryTagInput,
   FeatureRegistryUntagInput,
-} from '@panctl/contracts';
+} from '@overdeck/contracts';
 
 type FeatureRegistryOperation =
   | 'initialize'

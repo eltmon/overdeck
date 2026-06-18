@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { readFile } from 'fs/promises';
 import yaml from 'js-yaml';
-import type { MemoryObservation } from '@panctl/contracts';
+import type { MemoryObservation } from '@overdeck/contracts';
 import { getPanopticonHome } from '../paths.js';
 import { searchMemory, type MemorySearchResult } from '../memory/cli.js';
 

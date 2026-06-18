@@ -150,8 +150,8 @@ function buildReleaseNotesMarkdown(params: {
   const { channel, version, from, to, entries } = params;
   const range = from ? `${from}...${to}` : to;
   const installCommand = channel === 'stable'
-    ? 'npm install -g @panctl/cli'
-    : `npm install -g @panctl/cli@${channel}`;
+    ? 'npm install -g @overdeck/cli'
+    : `npm install -g @overdeck/cli@${channel}`;
 
   const bullets = entries.length > 0
     ? entries.map((entry) => `- ${entry}`).join('\n')

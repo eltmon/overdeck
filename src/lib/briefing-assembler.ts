@@ -1,6 +1,6 @@
 import { readFile, stat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
-import type { DashboardSnapshot, FeatureRegistryEntry } from '@panctl/contracts';
+import type { DashboardSnapshot, FeatureRegistryEntry } from '@overdeck/contracts';
 import { resolveStatusFile } from './memory/paths.js';
 
 export interface AssembleLiveBriefingInput {

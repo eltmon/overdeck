@@ -26,8 +26,8 @@ import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 import { getDirectRestartRequest } from '../../lib/restartRouting';
-import { WS_METHODS } from '@panctl/contracts';
-import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
+import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 
@@ -330,7 +330,7 @@ export function CommandDeck({
       const tree = sessionTreeMap[project.name];
       if (!tree) return project;
 
-      const featureSessions = new Map<string, readonly import('@panctl/contracts').SessionNode[]>();
+      const featureSessions = new Map<string, readonly import('@overdeck/contracts').SessionNode[]>();
       for (const feature of tree.features) {
         featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
       }

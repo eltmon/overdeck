@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WS_METHODS } from '@panctl/contracts';
+import { WS_METHODS } from '@overdeck/contracts';
 
 const wsTransportMock = vi.hoisted(() => ({
   request: vi.fn(),
