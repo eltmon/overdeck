@@ -11,7 +11,7 @@
 import { join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { getAllReviewStatusesFromDb } from '../database/review-status-db.js';
+import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { spawnRun } from '../agents.js';
 import type { ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
