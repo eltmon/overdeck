@@ -26,7 +26,7 @@ import {
   type WebhookPayload,
 } from '../../../lib/webhook-handlers.js';
 
-const WEBHOOK_SECRET_PATH = join(homedir(), '.panopticon', 'github-app', 'webhook-secret');
+const WEBHOOK_SECRET_PATH = join(homedir(), '.overdeck', 'github-app', 'webhook-secret');
 
 // ─── Lazy async secret loading (defers to first request so tests can mock fs) ─
 

@@ -10,7 +10,7 @@ interface PendingSpawn {
 let pendingSpawn: PendingSpawn | null = null;
 
 const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
-const STORAGE_KEY = 'panopticon.codex.pendingSpawn';
+const STORAGE_KEY = 'overdeck.codex.pendingSpawn';
 
 function readStoredPendingSpawn(): PendingSpawn | null {
   try {

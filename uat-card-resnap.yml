@@ -2776,14 +2776,14 @@
                       - generic [ref=e3617]: Claude Code
                       - time [ref=e3618]: May 28
                     - paragraph [ref=e3619]: "Handoff: Workspace panes integration approach"
-              - button "Claude Code May 28 Release panopticon 0.14.0 and watch CI" [ref=e3620] [cursor=pointer]:
+              - button "Claude Code May 28 Release overdeck 0.14.0 and watch CI" [ref=e3620] [cursor=pointer]:
                 - generic [ref=e3621]:
                   - img [ref=e3623]
                   - generic [ref=e3626]:
                     - generic [ref=e3627]:
                       - generic [ref=e3628]: Claude Code
                       - time [ref=e3629]: May 28
-                    - paragraph [ref=e3630]: Release panopticon 0.14.0 and watch CI
+                    - paragraph [ref=e3630]: Release overdeck 0.14.0 and watch CI
               - button "Claude Code May 28 Understanding t3code terminal spawning design" [ref=e3631] [cursor=pointer]:
                 - generic [ref=e3632]:
                   - img [ref=e3634]
@@ -4828,14 +4828,14 @@
           - generic [ref=e6339]:
             - heading "May 3" [level=3] [ref=e6340]
             - generic [ref=e6341]:
-              - 'button "U Unknown May 3 Summary Fork: Add support for GPT 5.5 to panopticon (Mirror how it works w…" [ref=e6342] [cursor=pointer]':
+              - 'button "U Unknown May 3 Summary Fork: Add support for GPT 5.5 to overdeck (Mirror how it works w…" [ref=e6342] [cursor=pointer]':
                 - generic [ref=e6343]:
                   - generic [ref=e6345]: U
                   - generic [ref=e6347]:
                     - generic [ref=e6348]:
                       - generic [ref=e6349]: Unknown
                       - time [ref=e6350]: May 3
-                    - paragraph [ref=e6351]: "Summary Fork: Add support for GPT 5.5 to panopticon (Mirror how it works w…"
+                    - paragraph [ref=e6351]: "Summary Fork: Add support for GPT 5.5 to overdeck (Mirror how it works w…"
               - button "U Unknown May 3 FINAL FLOW" [ref=e6352] [cursor=pointer]:
                 - generic [ref=e6353]:
                   - generic [ref=e6355]: U

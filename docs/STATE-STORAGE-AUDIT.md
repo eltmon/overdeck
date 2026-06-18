@@ -1,15 +1,15 @@
-# State Storage Audit — review-status and the `~/.panopticon` surface
+# State Storage Audit — review-status and the `~/.overdeck` surface
 
 **Status:** Resolved by [PAN-1908](https://github.com/eltmon/overdeck/issues/1908). Author: orchestrator conversation, 2026-06-14.
 **Trigger:** investigation into why 11 issues showed BLOCKED in the Flywheel emit but not the
 Command Deck tree. That investigation surfaced a misdiagnosed substrate bug ([PAN-1883](https://github.com/eltmon/overdeck/issues/1883))
-and a deeper question: how much `~/.panopticon` state is authoritative vs. vestigial,
+and a deeper question: how much `~/.overdeck` state is authoritative vs. vestigial,
 and what should the storage model actually be.
 
 > **Resolution note:** The authoritative-source questions raised here were settled by
 > [PAN-1908](https://github.com/eltmon/overdeck/issues/1908): agent runtime state now lives in the SQLite `agents` table in
-> `~/.panopticon/panopticon.db`, durable per-issue records live in the git-backed infra repo
-> under `.pan/` records, and tmux on the `panopticon` socket remains the liveness oracle. See
+> `~/.overdeck/panopticon.db`, durable per-issue records live in the git-backed infra repo
+> under `.pan/` records, and tmux on the `overdeck` socket remains the liveness oracle. See
 > [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) for the current model. This audit is kept
 > as historical context for the design rationale, but its Pass 2 action items are superseded.
 
@@ -28,9 +28,9 @@ The originating incident was **misdiagnosed**. The corrected facts:
 - **[V] SQLite is the authoritative review-status store, not the JSON file.**
   `src/lib/review-status.ts:156` — `loadReviewStatuses()` reads `getAllReviewStatusesFromDb()`;
   `setReviewStatusSync()` upserts into the `review_status` table in
-  `~/.panopticon/panopticon.db`. The default-path JSON file is never read or written by
+  `~/.overdeck/panopticon.db`. The default-path JSON file is never read or written by
   `review-status.ts`.
-- **[V] `~/.panopticon/review-status.json` is vestigial.** No production module imports
+- **[V] `~/.overdeck/review-status.json` is vestigial.** No production module imports
   `review-status-json.ts` (the only writer of that file). It is written **only by tests**
   and CLI tooling. At audit time it held a single dead-end test fixture
   (`PAN-714-DEAD-END-TEST-…`, 336 bytes) — pure test scratch with zero production meaning.
@@ -41,7 +41,7 @@ The originating incident was **misdiagnosed**. The corrected facts:
   - 1 × `failing_checks` blocker (PAN-1498)
   - 2 × genuine `review=blocked` (PAN-1817, PAN-1696)
   - 1 × in-progress, `review=pending` (PAN-1845)
-- **[V] SQLite already has durable backups.** `~/.panopticon/backups/` holds hourly
+- **[V] SQLite already has durable backups.** `~/.overdeck/backups/` holds hourly
   timestamped snapshots (e.g. `2026-06-14T03-32-52Z`). So review-status durability via
   snapshot **already exists** — contradicting [PAN-1883](https://github.com/eltmon/overdeck/issues/1883)'s "no backup, no reconstruct" premise.
 
@@ -51,7 +51,7 @@ a file the system does not use. The issue must be **re-scoped**, not implemented
 
 ### Why the Flywheel showed BLOCKED but the Command Deck did not
 
-- **[V]** The Flywheel "Active Pipeline" renders `~/.panopticon/flywheel/runs/RUN-34/latest.json`
+- **[V]** The Flywheel "Active Pipeline" renders `~/.overdeck/flywheel/runs/RUN-34/latest.json`
   — a snapshot **hand-authored by the orchestrator agent**. It stamped `status:"blocked"`
   on each item. The agent's *reasoning* (review-status wiped) was wrong, but the *label*
   was directionally right: those issues really are blocked (by merge conflicts / failing
@@ -72,14 +72,14 @@ attributed it to a JSON wipe.
 | --- | --- | --- | --- |
 | `src/lib/review-status.ts` | `panopticon.db` `review_status` table | **Authoritative** (server/deacon path) | server, deacon, CLI |
 | `src/lib/database/review-status-db.ts` | same table | SQLite primitives (upsert/delete/query) | review-status.ts |
-| `src/lib/review-status-json.ts` | `~/.panopticon/review-status.json` | **Vestigial** JSON file ops | **tests + CLI only** — no production importer **[V]** |
+| `src/lib/review-status-json.ts` | `~/.overdeck/review-status.json` | **Vestigial** JSON file ops | **tests + CLI only** — no production importer **[V]** |
 
 **The test-pollution vector (separate bug, [PAN-1877](https://github.com/eltmon/overdeck/issues/1877)):**
 `tests/lib/cloister/deacon-ci-retry.test.ts` and `pan-344-auto-merge.test.ts` write the
-**real** `~/.panopticon/review-status.json` (path built from `homedir()`), full-overwrite
+**real** `~/.overdeck/review-status.json` (path built from `homedir()`), full-overwrite
 it, and restore via a non-crash-safe `afterEach`. This corrupts the vestigial file but —
 because production ignores that file — has **no production impact**. It does, however,
-prove a class problem: **≥10 test files mutate real `~/.panopticon` paths** (see §5).
+prove a class problem: **≥10 test files mutate real `~/.overdeck` paths** (see §5).
 
 ---
 
@@ -181,13 +181,13 @@ This is the "git-backed store + SQLite index" pattern — the same shape beads a
 
 ### 4e. Cleanup this implies ("never optimize what shouldn't exist")
 
-- **Delete** the vestigial `~/.panopticon/review-status.json` path + `review-status-json.ts`.
+- **Delete** the vestigial `~/.overdeck/review-status.json` path + `review-status-json.ts`.
 - **Audit** the ~20 ephemeral columns — delete the recovery band-aids that a sane storage
   model makes unnecessary. **[P2]**
 
 ---
 
-## 5. `~/.panopticon` surface inventory (first cut)
+## 5. `~/.overdeck` surface inventory (first cut)
 
 43 top-level entries. Classified by role; **[P2]** marks entries needing a deep dive before
 any deletion. This is the "how much is hacked-in dumping ground" answer, pass 1.
@@ -248,7 +248,7 @@ Each is a discrete, scoped investigation (read-only) producing a verified verdic
    references live or migration debris? Output: safe-to-delete list.
 3. **`shadow-state/` pollution check** — is it another test-written real path?
 4. **State-surface classification completion** — resolve every **[P2]** in §5.
-5. **Test-isolation fix ([PAN-1877](https://github.com/eltmon/overdeck/issues/1877))** — env-rootable `.pan`/`~/.panopticon` base path so no
+5. **Test-isolation fix ([PAN-1877](https://github.com/eltmon/overdeck/issues/1877))** — env-rootable `.pan`/`~/.overdeck` base path so no
    test writes a real store; audit the ≥10 offending files.
 
 ---

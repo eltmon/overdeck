@@ -691,7 +691,7 @@ export class CloisterService {
 
     try {
       await cleanupLegacySpecialistsDirectory();
-      console.log('  ✓ Removed legacy ~/.panopticon/specialists directory');
+      console.log('  ✓ Removed legacy ~/.overdeck/specialists directory');
     } catch (error) {
       console.error('  ✗ Failed to remove legacy specialists directory:', error);
     }

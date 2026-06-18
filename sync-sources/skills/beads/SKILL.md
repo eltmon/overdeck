@@ -32,12 +32,12 @@ Graph-based issue tracker that survives conversation compaction. Provides persis
 
 | System | Format | Example |
 |--------|--------|---------|
-| **Beads** | `repo-hash` | `panopticon-3eb7`, `panopticon-6ax` |
-| **Beads (hierarchical)** | `repo-hash.N` | `panopticon-3eb7.4` |
+| **Beads** | `repo-hash` | `overdeck-3eb7`, `overdeck-6ax` |
+| **Beads (hierarchical)** | `repo-hash.N` | `overdeck-3eb7.4` |
 | **GitHub Issues** | `PREFIX-number` | `PAN-84`, `PAN-73` |
 | **Linear Issues** | `PREFIX-number` | `MIN-123`, `HH-456` |
 
-**CRITICAL**: Commands like `bd dep add`, `--parent`, and `--deps` expect **beads IDs** (e.g., `panopticon-abc1`), NOT external tracker IDs (e.g., `PAN-5`).
+**CRITICAL**: Commands like `bd dep add`, `--parent`, and `--deps` expect **beads IDs** (e.g., `overdeck-abc1`), NOT external tracker IDs (e.g., `PAN-5`).
 
 ### Linking to External Trackers
 
@@ -152,8 +152,8 @@ bd create "Title" --deps blocks:pan-1 --json            # with dependency
 # Make issue-A blocked by issue-B (A cannot start until B is done)
 bd dep add <blocked-issue> <blocker-issue> --type blocks
 
-# Example: panopticon-abc1 is blocked by panopticon-def2
-bd dep add panopticon-abc1 panopticon-def2 --type blocks
+# Example: overdeck-abc1 is blocked by overdeck-def2
+bd dep add overdeck-abc1 overdeck-def2 --type blocks
 
 # View dependency tree
 bd dep tree <id>

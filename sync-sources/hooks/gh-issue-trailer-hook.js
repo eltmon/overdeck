@@ -73,7 +73,7 @@ function containsFlywheelRunId(body) {
 function resolveDiscoveredIn(env) {
 	const agentId = env.OVERDECK_AGENT_ID;
 	if (!agentId || basename(agentId) !== agentId) return null;
-	const statePath = join(env.OVERDECK_HOME ?? join(env.HOME ?? homedir(), ".panopticon"), "agents", agentId, "state.json");
+	const statePath = join(env.OVERDECK_HOME ?? join(env.HOME ?? homedir(), ".overdeck"), "agents", agentId, "state.json");
 	if (!existsSync(statePath)) return null;
 	try {
 		const parsed = JSON.parse(readFileSync(statePath, "utf-8"));

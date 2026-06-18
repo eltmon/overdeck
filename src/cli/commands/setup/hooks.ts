@@ -196,7 +196,7 @@ async function installRtk(binDir: string): Promise<boolean> {
       throw new Error(`rtk --version returned ${installedVersion ?? 'no output'}`);
     }
 
-    console.log(chalk.green(`✓ Installed RTK ${RTK_VERSION} to ~/.panopticon/bin/rtk`));
+    console.log(chalk.green(`✓ Installed RTK ${RTK_VERSION} to ~/.overdeck/bin/rtk`));
     return true;
   } catch (err: unknown) {
     console.log(
@@ -224,7 +224,7 @@ function isHookConfigured(
   return hooks.some((hookConfig: HookConfig) =>
     hookConfig.hooks?.some((hook: { type: string; command: string }) =>
       (hook.command?.includes(join(binDir, scriptName)) ?? false) ||
-      (hook.command?.includes(`panopticon/bin/${scriptName}`) ?? false)
+      (hook.command?.includes(`overdeck/bin/${scriptName}`) ?? false)
     )
   );
 }
@@ -346,22 +346,22 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     console.log(chalk.green('✓ jq is installed'));
   }
 
-  // 2. Ensure ~/.panopticon/bin directory exists
-  const panopticonHome = join(homedir(), '.panopticon');
-  const binDir = join(panopticonHome, 'bin');
-  const heartbeatsDir = join(panopticonHome, 'heartbeats');
+  // 2. Ensure ~/.overdeck/bin directory exists
+  const overdeckHome = join(homedir(), '.overdeck');
+  const binDir = join(overdeckHome, 'bin');
+  const heartbeatsDir = join(overdeckHome, 'heartbeats');
 
   if (!existsSync(binDir)) {
     mkdirSync(binDir, { recursive: true });
-    console.log(chalk.green('✓ Created ~/.panopticon/bin/'));
+    console.log(chalk.green('✓ Created ~/.overdeck/bin/'));
   }
 
   if (!existsSync(heartbeatsDir)) {
     mkdirSync(heartbeatsDir, { recursive: true });
-    console.log(chalk.green('✓ Created ~/.panopticon/heartbeats/'));
+    console.log(chalk.green('✓ Created ~/.overdeck/heartbeats/'));
   }
 
-  // 3. Copy hook scripts to ~/.panopticon/bin/
+  // 3. Copy hook scripts to ~/.overdeck/bin/
   const hookScripts = [
     'pan-hook-lib.sh',        // PAN-800: shared library sourced by all hooks
     'pre-tool-hook',
@@ -518,7 +518,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     for (const entry of added) console.log(chalk.dim(`  • ${entry}`));
   }
 
-  // 8. Install caveman hook files and compress scripts to ~/.panopticon/hooks/caveman/
+  // 8. Install caveman hook files and compress scripts to ~/.overdeck/hooks/caveman/
   try {
     const { setupCavemanHooks, setupCavemanCompressScripts } = await import('../../../lib/caveman/setup.js');
     const { Effect } = await import('effect');
@@ -526,13 +526,13 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
       setupCavemanHooks().pipe(Effect.match({ onFailure: () => false, onSuccess: () => true })),
     );
     if (cavemanOk) {
-      console.log(chalk.green('✓ Installed caveman hook files to ~/.panopticon/hooks/caveman/'));
+      console.log(chalk.green('✓ Installed caveman hook files to ~/.overdeck/hooks/caveman/'));
     } else {
       console.log(chalk.yellow('⚠ Caveman hook files not found — skipping (non-fatal)'));
     }
     const compressOk = await Effect.runPromise(setupCavemanCompressScripts());
     if (compressOk) {
-      console.log(chalk.green('✓ Installed caveman-compress scripts to ~/.panopticon/hooks/caveman-compress/'));
+      console.log(chalk.green('✓ Installed caveman-compress scripts to ~/.overdeck/hooks/caveman-compress/'));
     }
   } catch (err: unknown) {
     console.log(chalk.yellow(`⚠ Caveman hook install failed: ${err instanceof Error ? err.message : String(err)} (non-fatal)`));

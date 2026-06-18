@@ -10,7 +10,7 @@ import { describePendingInput } from '../../lib/pendingInput';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 // ActivityPanel.tsx is the raw activity log; CommandDeck/ActivityFeedSidebar.tsx is per-issue observations; this SessionFeedSidebar is the cross-session feed.
-export const SESSION_FEED_TAB_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarTab';
+export const SESSION_FEED_TAB_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarTab';
 
 interface SessionFeedSidebarProps {
   onClose?: () => void;
@@ -35,7 +35,7 @@ interface SessionFeedSidebarProps {
 }
 
 type FeedScope = 'needs' | 'project' | 'global';
-const FEED_SCOPE_STORAGE_KEY = 'panopticon.ui.awarenessScope';
+const FEED_SCOPE_STORAGE_KEY = 'overdeck.ui.awarenessScope';
 
 const TABS: Array<{ id: SessionFeedTab; label: string }> = [
   { id: 'all', label: 'All' },

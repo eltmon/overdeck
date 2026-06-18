@@ -5,7 +5,7 @@ import type { AgentState } from '../../../../src/lib/agents.js';
 const agentState = (overrides: Partial<AgentState> = {}): AgentState & { tmuxActive: boolean } => ({
   id: 'agent-pan-1920',
   issueId: 'PAN-1920',
-  workspace: '/projects/panopticon/workspaces/feature-pan-1920',
+  workspace: '/projects/overdeck/workspaces/feature-pan-1920',
   role: 'work',
   model: 'claude-sonnet-4',
   status: 'running',
@@ -109,7 +109,7 @@ describe('reconstructCache', () => {
     listAllAgentsMock.mockReturnValue([{
       id: 'agent-pan-1919',
       issueId: 'PAN-1919',
-      workspace: '/projects/panopticon/workspaces/feature-pan-1919',
+      workspace: '/projects/overdeck/workspaces/feature-pan-1919',
       role: 'work',
       status: 'stopped',
       harness: null,
@@ -159,12 +159,12 @@ describe('reconstructCache', () => {
   });
 
   it('derives phases from records and PR state', async () => {
-    listProjectsMock.mockReturnValue([{ key: 'panopticon', config: { name: 'panopticon', path: '/projects/panopticon' } }]);
+    listProjectsMock.mockReturnValue([{ key: 'overdeck', config: { name: 'overdeck', path: '/projects/overdeck' } }]);
     getIssueServiceMock.mockReturnValue({
       getIssues: () => [{ identifier: 'PAN-1920', state: 'open', status: 'In Progress' }],
     } as any);
     enumerateMock.mockResolvedValue(new Set(['PAN-1920']));
-    resolveProjectMock.mockReturnValue({ name: 'panopticon', path: '/projects/panopticon' } as any);
+    resolveProjectMock.mockReturnValue({ name: 'overdeck', path: '/projects/overdeck' } as any);
     readRecordMock.mockResolvedValue({
       issueId: 'PAN-1920',
       schemaVersion: 2,
@@ -186,7 +186,7 @@ describe('reconstructCache', () => {
   });
 
   it('falls back to review when no record or approval exists', async () => {
-    listProjectsMock.mockReturnValue([{ key: 'panopticon', config: { name: 'panopticon', path: '/projects/panopticon' } }]);
+    listProjectsMock.mockReturnValue([{ key: 'overdeck', config: { name: 'overdeck', path: '/projects/overdeck' } }]);
     getIssueServiceMock.mockReturnValue({
       getIssues: () => [{ identifier: 'PAN-1920', state: 'open', status: 'In Progress' }],
     } as any);

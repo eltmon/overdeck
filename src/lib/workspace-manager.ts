@@ -33,7 +33,7 @@ import { FsError, ProcessSpawnError } from './errors.js';
 const execAsync = promisify(exec);
 
 export interface PanMigrationResult {
-  /** Subdirectories migrated from .panopticon/ to .pan/ */
+  /** Subdirectories migrated from .overdeck/ to .pan/ */
   migrated: string[];
   /** Subdirectories skipped because .pan/<subdir> already exists */
   skipped: string[];
@@ -42,7 +42,7 @@ export interface PanMigrationResult {
 }
 
 /**
- * Migrate existing .panopticon/<subdir> directories to .pan/<subdir> within a project.
+ * Migrate existing .overdeck/<subdir> directories to .pan/<subdir> within a project.
  *
  * Safety rules:
  * - If old path exists and new path does NOT exist → move old to new.
@@ -54,13 +54,13 @@ export interface PanMigrationResult {
 export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResult {
   const result: PanMigrationResult = { migrated: [], skipped: [], errors: [] };
 
-  // Map legacy .panopticon/<subdir> paths to new .pan/<subdir> paths.
+  // Map legacy .overdeck/<subdir> paths to new .pan/<subdir> paths.
   const legacyMappings: Array<{ old: string; new: string }> = [
-    { old: '.panopticon/events', new: '.pan/events' },
-    { old: '.panopticon/triage', new: '.pan/review' },
-    { old: '.panopticon/health', new: '.pan/review' },
-    { old: '.panopticon/convoy-output', new: '.pan/review' },
-    { old: '.panopticon/prompts', new: '.pan/prompts' },
+    { old: '.overdeck/events', new: '.pan/events' },
+    { old: '.overdeck/triage', new: '.pan/review' },
+    { old: '.overdeck/health', new: '.pan/review' },
+    { old: '.overdeck/convoy-output', new: '.pan/review' },
+    { old: '.overdeck/prompts', new: '.pan/prompts' },
   ];
 
   for (const { old: oldRelPath, new: newRelPath } of legacyMappings) {
@@ -71,7 +71,7 @@ export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResul
 
     if (existsSync(newPath)) {
       const msg = `Migration skipped: both ${oldRelPath} and ${newRelPath} exist in ${projectPath} — remove one manually`;
-      console.warn(`[panopticon] ${msg}`);
+      console.warn(`[overdeck] ${msg}`);
       result.skipped.push(oldRelPath);
       continue;
     }
@@ -89,14 +89,14 @@ export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResul
     }
   }
 
-  // Clean up empty .panopticon/ dir if nothing remains
-  const panopticonDir = join(projectPath, '.panopticon');
-  if (existsSync(panopticonDir)) {
+  // Clean up empty .overdeck/ dir if nothing remains
+  const overdeckDir = join(projectPath, '.overdeck');
+  if (existsSync(overdeckDir)) {
     try {
-      const remaining = readdirSync(panopticonDir);
+      const remaining = readdirSync(overdeckDir);
       if (remaining.length === 0) {
-        rmdirSync(panopticonDir);
-        result.migrated.push('.panopticon/ (empty dir removed)');
+        rmdirSync(overdeckDir);
+        result.migrated.push('.overdeck/ (empty dir removed)');
       }
     } catch {
       // Non-fatal — dir may have been removed already
@@ -111,27 +111,27 @@ export function migrateOverdeckToPanSync(projectPath: string): PanMigrationResul
  * Overdeck itself have the same projects, model assignments, and hooks.
  *
  * Copies:
- *   - ~/.panopticon/config.yaml      → <workspace>/.panopticon/config.yaml
- *   - ~/.panopticon/projects.yaml    → <workspace>/.panopticon/projects.yaml
- *   - ~/.panopticon/settings.json    → <workspace>/.panopticon/settings.json
+ *   - ~/.overdeck/config.yaml      → <workspace>/.overdeck/config.yaml
+ *   - ~/.overdeck/projects.yaml    → <workspace>/.overdeck/projects.yaml
+ *   - ~/.overdeck/settings.json    → <workspace>/.overdeck/settings.json
  *   - ~/.claude/settings.json hooks  → <workspace>/.claude/settings.json (merged)
  *
  * Safe to call multiple times — merges rather than overwrites.
  */
 export function copyOverdeckSettingsToWorkspaceSync(workspacePath: string): { copied: string[]; errors: string[] } {
   const result = { copied: [] as string[], errors: [] as string[] };
-  const panopticonDir = join(workspacePath, '.panopticon');
+  const overdeckDir = join(workspacePath, '.overdeck');
   const claudeDir = join(workspacePath, '.claude');
 
-  mkdirSync(panopticonDir, { recursive: true });
+  mkdirSync(overdeckDir, { recursive: true });
   if (!existsSync(claudeDir)) {
     mkdirSync(claudeDir, { recursive: true });
   }
 
   const filesToCopy = [
-    { source: join(homedir(), '.panopticon', 'config.yaml'), target: join(panopticonDir, 'config.yaml') },
-    { source: join(homedir(), '.panopticon', 'projects.yaml'), target: join(panopticonDir, 'projects.yaml') },
-    { source: join(homedir(), '.panopticon', 'settings.json'), target: join(panopticonDir, 'settings.json') },
+    { source: join(homedir(), '.overdeck', 'config.yaml'), target: join(overdeckDir, 'config.yaml') },
+    { source: join(homedir(), '.overdeck', 'projects.yaml'), target: join(overdeckDir, 'projects.yaml') },
+    { source: join(homedir(), '.overdeck', 'settings.json'), target: join(overdeckDir, 'settings.json') },
     { source: join(homedir(), '.claude', 'mcp.json'), target: join(claudeDir, 'mcp.json') },
   ];
 
@@ -975,14 +975,14 @@ function copyProjectTemplateDirs(
     progress('Starting Docker containers', 'Building and starting services');
     // Check for Traefik
     if (workspaceConfig.docker?.traefik) {
-      // Always use the installed Traefik location (~/.panopticon/traefik/), not the
-      // template source in projects.yaml. The template is copied to ~/.panopticon/traefik/
+      // Always use the installed Traefik location (~/.overdeck/traefik/), not the
+      // template source in projects.yaml. The template is copied to ~/.overdeck/traefik/
       // during `pan install`, and the installed copy has the correct volume mounts
-      // (dynamic configs, certs) relative to ~/.panopticon/traefik/.
-      const traefikPath = join(homedir(), '.panopticon', 'traefik', 'docker-compose.yml');
+      // (dynamic configs, certs) relative to ~/.overdeck/traefik/.
+      const traefikPath = join(homedir(), '.overdeck', 'traefik', 'docker-compose.yml');
       if (existsSync(traefikPath)) {
         try {
-          await execAsync(`docker compose -f "${traefikPath}" up -d`, { cwd: join(homedir(), '.panopticon', 'traefik') });
+          await execAsync(`docker compose -f "${traefikPath}" up -d`, { cwd: join(homedir(), '.overdeck', 'traefik') });
           result.steps.push('Started Traefik');
         } catch (error: any) {
           const msg = error?.message || String(error);
@@ -1307,7 +1307,7 @@ export interface DockerCleanupResult {
   }
 
   const featureFolder = `feature-${featureName}`;
-  const composeProjectName = `panopticon-${featureFolder}`;
+  const composeProjectName = `overdeck-${featureFolder}`;
   const devScriptPaths = [
     join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
     join(workspacePath, 'dev'),
@@ -1540,7 +1540,7 @@ const toWmProcessError = (op: string, cause: unknown): ProcessSpawnError =>
     cause,
   });
 
-/** Migrate any pre-PAN-967 .panopticon/* subdirs to the .pan/ layout. */
+/** Migrate any pre-PAN-967 .overdeck/* subdirs to the .pan/ layout. */
 export const migrateOverdeckToPan = (
   projectPath: string,
 ): Effect.Effect<PanMigrationResult, FsError> =>

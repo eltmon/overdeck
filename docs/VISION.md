@@ -29,7 +29,7 @@ A single Overdeck instance used by a development team.
 **Implications for infrastructure decisions:**
 - Webhook relay (smee.io) remains acceptable for now, but the system should accept direct webhooks when a shared instance has a public URL.
 - SQLite may need to migrate to PostgreSQL for concurrent team access.
-- File-system paths (`~/.panopticon/`, workspace directories) need to be configurable per deployment.
+- File-system paths (`~/.overdeck/`, workspace directories) need to be configurable per deployment.
 
 ### Phase 2 — Multi-Tenant SaaS
 A fully hosted Overdeck service.
@@ -41,7 +41,7 @@ A fully hosted Overdeck service.
 
 **Implications for infrastructure decisions:**
 - All paths, secrets, and service endpoints must be injectable via configuration.
-- No hard-coded assumptions about `localhost`, `~/.panopticon/`, or single-user file permissions.
+- No hard-coded assumptions about `localhost`, `~/.overdeck/`, or single-user file permissions.
 - Cost tracking and resource metering must be tenant-aware.
 
 ---
@@ -59,7 +59,7 @@ When making infrastructure decisions (webhooks, networking, auth, storage), pref
 | **Webhooks** | smee.io relay | Direct delivery |
 | **Auth** | None (local-only) | OAuth / SSO |
 | **Workspace infra** | Fly.io (personal account) | Overdeck-managed or BYOC |
-| **File storage** | `~/.panopticon/` | S3-compatible object store |
+| **File storage** | `~/.overdeck/` | S3-compatible object store |
 | **Config** | `projects.yaml` + env vars | Tenant-scoped config API |
 
 ---

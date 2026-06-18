@@ -111,7 +111,7 @@ test.describe('Flywheel page', () => {
     await page.route('**/api/dashboard/session', (route) => route.fulfill({ status: 200, body: '{}' }));
     await page.route('**/api/flywheel/status', async (route) => {
       expect(route.request().method()).toBe('POST');
-      expect(route.request().headers()['x-panopticon-internal-token']).toBe('test-token');
+      expect(route.request().headers()['x-overdeck-internal-token']).toBe('test-token');
       postedStatus = route.request().postDataJSON() as typeof status;
       await route.fulfill({
         status: 200,
@@ -157,7 +157,7 @@ test.describe('Flywheel page', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-panopticon-internal-token': 'test-token',
+          'x-overdeck-internal-token': 'test-token',
         },
         body: JSON.stringify(payload),
       });

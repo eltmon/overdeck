@@ -6,8 +6,8 @@ vi.mock('../../agents.js', () => ({
 }));
 
 vi.mock('../../projects.js', () => ({
-  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/panopticon' })),
-  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/panopticon' })),
+  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/tmp/overdeck' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/tmp/overdeck' })),
 }));
 
 vi.mock('../../review-status.js', () => ({

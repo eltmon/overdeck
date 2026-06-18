@@ -97,7 +97,7 @@ function createLegacyDb(dbPath: string) {
 // ── Fake service layers for the cutover's Projects / Records / Tmux deps ──────
 
 const FAKE_PROJECT: ProjectConfig = {
-  id: 'panopticon',
+  id: 'overdeck',
   name: 'overdeck',
   path: '/home/eltmon/Projects/overdeck',
   tracker: 'github',

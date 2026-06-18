@@ -72,7 +72,7 @@ describe('project-repos', () => {
   it('resolves a monorepo project as a single repo target', () => {
     const projectConfig: ProjectConfig = {
       name: 'Overdeck',
-      path: '/tmp/panopticon',
+      path: '/tmp/overdeck',
       github_repo: 'eltmon/overdeck',
       workspace: {
         type: 'monorepo',
@@ -80,11 +80,11 @@ describe('project-repos', () => {
       },
     };
 
-    const repos = resolveConfiguredReposSync('panopticon', '/tmp/panopticon', projectConfig, 'PAN-632');
+    const repos = resolveConfiguredReposSync('overdeck', '/tmp/overdeck', projectConfig, 'PAN-632');
     expect(repos).toEqual([
       expect.objectContaining({
-        repoKey: 'panopticon',
-        repoPath: '/tmp/panopticon',
+        repoKey: 'overdeck',
+        repoPath: '/tmp/overdeck',
         forge: 'github',
         sourceBranch: 'feature/pan-632',
         targetBranch: 'main',

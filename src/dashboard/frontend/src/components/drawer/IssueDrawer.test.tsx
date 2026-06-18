@@ -10,7 +10,7 @@ const wsTransportMock = vi.hoisted(() => ({
   shellOpenInEditor: vi.fn(),
   dashboardMutationJsonHeaders: vi.fn(async () => ({
     'Content-Type': 'application/json',
-    'x-panopticon-csrf-token': 'test-csrf',
+    'x-overdeck-csrf-token': 'test-csrf',
   })),
 }));
 
@@ -345,7 +345,7 @@ describe('IssueDrawer', () => {
         editor: 'vscode',
       });
     });
-    expect(localStorage.getItem('panopticon:last-editor')).toBe('vscode');
+    expect(localStorage.getItem('overdeck:last-editor')).toBe('vscode');
   });
 
   it('hides the drawer open-in picker when no workspace exists', async () => {

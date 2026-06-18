@@ -21,13 +21,13 @@ export async function deriveSessionPresence(
   if (rtState.state === 'active') return 'active';
   if (rtState.state === 'suspended') return 'suspended';
   if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
-    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`);
+    const heartbeatPath = join(homedir(), '.overdeck', 'heartbeats', `${agentId}.json`);
     const hbStat = await stat(heartbeatPath).catch(() => null);
     if (hbStat && (Date.now() - hbStat.mtime.getTime()) < 5000) {
       return 'active';
     }
 
-    const logPath = join(homedir(), '.panopticon', 'agents', agentId, 'output.log');
+    const logPath = join(homedir(), '.overdeck', 'agents', agentId, 'output.log');
     const logStat = await stat(logPath).catch(() => null);
     if (logStat && (Date.now() - logStat.mtime.getTime()) < 5000) {
       return 'active';

@@ -65,7 +65,7 @@ PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-
 |--------|--------|---------|
 | ISSUE | `/api/issues` `identifier` | PAN-NNNN |
 | TITLE | `/api/issues` `title` | truncated to ~52 chars |
-| MODEL | `~/.panopticon/agents/agent-pan-NNN/state.json` `.model` | Which model the work agent is using |
+| MODEL | `~/.overdeck/agents/agent-pan-NNN/state.json` `.model` | Which model the work agent is using |
 | AGENT | tmux + `state.json` `.status` | `✓` if agent tmux session is alive AND `status: running` |
 | REVIEW | review-status DB `.review_status` | `passed`, `reviewing`, `failed`, `blocked`, `null` |
 | TEST | review-status DB `.test_status` | `passed`, `testing`, `failed`, `null` |
@@ -93,8 +93,8 @@ python3 - <<'PY'
 import json, subprocess, sqlite3, os
 from pathlib import Path
 
-PANO_DB = Path.home() / ".panopticon" / "panopticon.db"
-AGENTS = Path.home() / ".panopticon" / "agents"
+PANO_DB = Path.home() / ".overdeck" / "panopticon.db"
+AGENTS = Path.home() / ".overdeck" / "agents"
 
 issues_data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
 panissues = [i for i in issues_data
@@ -118,7 +118,7 @@ def state_json(name):
 
 def has_session(name):
     try:
-        subprocess.check_output(['tmux','-L','panopticon','has-session','-t',name],
+        subprocess.check_output(['tmux','-L','overdeck','has-session','-t',name],
                                 stderr=subprocess.DEVNULL)
         return True
     except: return False
@@ -163,7 +163,7 @@ for i in panissues:
 print()
 print("PLANNING SESSIONS (Opus drafting vBRIEFs)")
 print('─' * 130)
-sessions = subprocess.check_output(['tmux','-L','panopticon','list-sessions','-F','#{session_name}']).decode().split('\n')
+sessions = subprocess.check_output(['tmux','-L','overdeck','list-sessions','-F','#{session_name}']).decode().split('\n')
 for ps in sorted(s for s in sessions if s.startswith('planning-pan-')):
     iid = 'PAN-' + ps.replace('planning-pan-','').upper()
     sj = state_json(ps)

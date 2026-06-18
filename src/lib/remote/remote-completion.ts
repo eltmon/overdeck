@@ -44,7 +44,7 @@ import { createWorkspace } from '../workspace-manager.js';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
 
 const execAsync = promisify(exec);
-const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
+const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
 const REMOTE_CLAUDE_CREDENTIAL_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
 
 interface PerVmCredentialRefreshState {

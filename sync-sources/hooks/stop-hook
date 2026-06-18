@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/stop-hook  (PAN-800)
+# ~/.overdeck/bin/stop-hook  (PAN-800)
 #
 # Fires on Claude Code Stop. Emits agent.activity_changed(idle) — the reducer
 # clears currentTool / thinking / waiting on that transition, so no separate
@@ -12,7 +12,7 @@ set +e
 # whether anything downstream succeeded. Silent failures in pan_resolve_agent_id
 # used to leave zero trace, making "did the Stop hook even fire?" impossible to
 # answer post-hoc.
-LOG_DIR="$HOME/.panopticon/logs"
+LOG_DIR="$HOME/.overdeck/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 echo "[$(date -Iseconds)] stop-hook: invoked CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} OVERDECK_AGENT_ID=${OVERDECK_AGENT_ID:-unset} cwd=$(pwd)" \
   >> "$LOG_DIR/hooks.log" 2>/dev/null || true
@@ -42,9 +42,9 @@ pan_emit_event "$AGENT_ID" "$BODY"
 # If the agent stopped because of a transient API error, nudge it to retry.
 # This runs before chaining to specialist/work-agent hooks because it
 # applies universally. 5-minute cooldown per agent.
-LOG_DIR="$HOME/.panopticon/logs"
+LOG_DIR="$HOME/.overdeck/logs"
 mkdir -p "$LOG_DIR"
-API_ERROR_NUDGE_FILE="$HOME/.panopticon/agents/$AGENT_ID/.last-api-error-nudge"
+API_ERROR_NUDGE_FILE="$HOME/.overdeck/agents/$AGENT_ID/.last-api-error-nudge"
 
 OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -100 2>/dev/null || echo "")
 if [ -n "$OUTPUT" ]; then
@@ -93,13 +93,13 @@ if [ -n "$OUTPUT" ]; then
 fi
 
 # Chain to specialist-specific hook (auto-completion detection).
-SPECIALIST_HOOK="$HOME/.panopticon/bin/specialist-stop-hook"
+SPECIALIST_HOOK="$HOME/.overdeck/bin/specialist-stop-hook"
 if [ -x "$SPECIALIST_HOOK" ]; then
   "$SPECIALIST_HOOK" &
 fi
 
 # Chain to work-agent completion detection (nudges agents that forgot `pan work done`).
-WORK_AGENT_HOOK="$HOME/.panopticon/bin/work-agent-stop-hook"
+WORK_AGENT_HOOK="$HOME/.overdeck/bin/work-agent-stop-hook"
 if [ -x "$WORK_AGENT_HOOK" ]; then
   "$WORK_AGENT_HOOK" &
 fi
@@ -122,8 +122,8 @@ fi
 # the failure path, so we never emit a premature REVIEWER_FAILED.
 # Pattern: agent-<issueId>-review-<subRole>
 if [[ "$AGENT_ID" =~ ^agent-.+-review-(security|correctness|performance|requirements)$ ]]; then
-  R_STATE="$HOME/.panopticon/agents/$AGENT_ID/state.json"
-  R_MARKER="$HOME/.panopticon/agents/$AGENT_ID/reviewer-signaled"
+  R_STATE="$HOME/.overdeck/agents/$AGENT_ID/state.json"
+  R_MARKER="$HOME/.overdeck/agents/$AGENT_ID/reviewer-signaled"
   if [ -f "$R_STATE" ] && [ ! -f "$R_MARKER" ]; then
     # state.json is pretty-printed ("key": "value" with whitespace after the
     # colon), so the extraction must tolerate optional whitespace.
@@ -132,15 +132,15 @@ if [[ "$AGENT_ID" =~ ^agent-.+-review-(security|correctness|performance|requirem
     R_SYNTH=$(sed -nE 's/.*"reviewSynthesisAgentId"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' "$R_STATE" | head -1)
     if [ -n "$R_OUT" ] && [ -n "$R_SUB" ] && [ -n "$R_SYNTH" ] && [ -s "$R_OUT" ]; then
       # Deliver via the load-buffer + paste-buffer + Enter pattern on the
-      # panopticon socket (matches the API-error nudge above and the project's
+      # overdeck socket (matches the API-error nudge above and the project's
       # tmux-delivery rule). The synthesis session is always an interactive
       # tmux session, so the paste reaches its prompt.
       R_TMP=$(mktemp)
       printf 'REVIEWER_READY %s %s' "$R_SUB" "$R_OUT" > "$R_TMP"
-      tmux -L panopticon load-buffer "$R_TMP" 2>/dev/null
-      tmux -L panopticon paste-buffer -t "$R_SYNTH" 2>/dev/null
+      tmux -L overdeck load-buffer "$R_TMP" 2>/dev/null
+      tmux -L overdeck paste-buffer -t "$R_SYNTH" 2>/dev/null
       sleep 0.3
-      tmux -L panopticon send-keys -t "$R_SYNTH" C-m 2>/dev/null
+      tmux -L overdeck send-keys -t "$R_SYNTH" C-m 2>/dev/null
       rm -f "$R_TMP"
       touch "$R_MARKER"
       echo "[$(date -Iseconds)] stop-hook: $AGENT_ID signaled REVIEWER_READY $R_SUB to $R_SYNTH" \
@@ -165,11 +165,11 @@ if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
     # reviewer with NO marker is either still running OR belongs to a newer
     # review cycle that reused this session name; reaping it would be the
     # cross-cycle race that left running reviewers terminal-less. Skip it.
-    CONVOY_MARKER="$HOME/.panopticon/agents/$CONVOY_SESSION/reviewer-signaled"
+    CONVOY_MARKER="$HOME/.overdeck/agents/$CONVOY_SESSION/reviewer-signaled"
     if [ ! -f "$CONVOY_MARKER" ]; then
       continue
     fi
-    if tmux -L panopticon kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
+    if tmux -L overdeck kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
       KILLED_ANY=true
       echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION (signaled)" \
         >> "$LOG_DIR/hooks.log" 2>/dev/null || true

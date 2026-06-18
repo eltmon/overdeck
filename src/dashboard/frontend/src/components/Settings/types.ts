@@ -170,7 +170,7 @@ export interface SettingsConfig {
   };
   conversations?: {
     compaction_model?: ModelId;
-    manual_compact_mode?: 'claude-code' | 'panopticon-native';
+    manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
     watch_dirs?: string[];

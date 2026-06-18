@@ -35,7 +35,7 @@ Conversation references it by `claude_session_id`, Agent by `agents.session_id`.
   filename). The unit both a Conversation and an Agent point at.
 - **The scan** — `src/lib/conversations/scanner.ts:scan()` walks every JSONL,
   parses it (`jsonl-async.ts`), resolves the workspace (`hash-resolver.ts`), runs
-  the **correlator** (`correlator.ts`) to tag panopticon-managed sessions, and
+  the **correlator** (`correlator.ts`) to tag overdeck-managed sessions, and
   `upsertDiscoveredSession()`. This is the rebuild engine for the whole
   Transcript subsystem.
 - **The JOIN** — `conversations` LEFT JOINs `discovered_sessions ON
@@ -161,7 +161,7 @@ each value:
 | `enrichment_level` (0–3) | enrichment tier reached | CACHE |
 | `enrichment_model` / `enriched_at` | enrichment run metadata | CACHE |
 | `enrichment_failed` | enrichment error flag | CACHE |
-| `panopticon_managed` | **correlator** (JSONL path ↔ `conversations`/`cost_events`) | CACHE |
+| `overdeck_managed` | **correlator** (JSONL path ↔ `conversations`/`cost_events`) | CACHE |
 | `pan_issue_id` / `pan_agent_id` | correlator (from `conversations.issue_id`/`name` or `cost_events`) | CACHE |
 | `file_size` / `file_mtime` | `fs.stat` — the scan's change-detection key | CACHE |
 | `scanned_at` | scan timestamp | CACHE |
@@ -356,7 +356,7 @@ Agent resolver. Not a fifth pane.
    `enrichment_level` feed FTS/embeddings and nothing else — no pipeline gate
    reads them. Regenerable, costs API $. Keep lazy/opt-in.
 
-8. **`discovered_sessions.panopticon_managed` (+ `pan_issue_id`/`pan_agent_id`)
+8. **`discovered_sessions.overdeck_managed` (+ `pan_issue_id`/`pan_agent_id`)
    is derived from `conversations` + `cost_events`, not stored truth.** The
    correlator joins JSONL paths against `conversations.session_file`/
    `claude_session_id` and `cost_events.session_id`. So the "managed" tagging

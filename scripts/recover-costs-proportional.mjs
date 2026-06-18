@@ -14,7 +14,7 @@ import { homedir } from 'os';
 import { openNodeSqliteDatabase } from './sqlite.mjs';
 
 const CLAUDE_PROJECTS = join(homedir(), '.claude', 'projects');
-const DB_PATH = join(homedir(), '.panopticon', 'panopticon.db');
+const DB_PATH = join(homedir(), '.overdeck', 'panopticon.db');
 
 const PRICING = [
   { provider: 'anthropic', model: 'claude-opus-4.6', inputPer1k: 5e-3, outputPer1k: 0.025, cacheReadPer1k: 5e-4, cacheWrite5mPer1k: 625e-5 },

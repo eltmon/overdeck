@@ -187,7 +187,7 @@ describe('loadSettingsApi', () => {
     mockLoadConfig.mockReturnValue(baseConfig({
       conversations: {
         compactionModel: 'claude-sonnet-4-6',
-        manualCompactMode: 'panopticon-native',
+        manualCompactMode: 'overdeck-native',
         richCompaction: true,
         titleModel: 'claude-haiku-4-5',
       },
@@ -198,7 +198,7 @@ describe('loadSettingsApi', () => {
 
     expect(settings.conversations).toEqual({
       compaction_model: 'claude-sonnet-4-6',
-      manual_compact_mode: 'panopticon-native',
+      manual_compact_mode: 'overdeck-native',
       rich_compaction: true,
       title_model: 'claude-haiku-4-5',
     });

@@ -517,7 +517,7 @@ describe('conversations route — DB integration', () => {
     expect(rows.map((row) => row.conversationName)).not.toContain('active-conv');
     expect(rows[0]).toMatchObject({
       source: 'managed-archived',
-      panopticonManaged: true,
+      overdeckManaged: true,
       archivedAt: '2026-05-23T00:00:00.000Z',
     });
 
@@ -969,8 +969,8 @@ describe('validateOrigin', () => {
 describe('transformMessageForHarness (PAN-1535)', () => {
   it('passes claude-code messages through unchanged', async () => {
     const { transformMessageForHarness } = await import('../conversations.js');
-    const message = '@/home/u/.panopticon/conversation-attachments/c1/abc.png\nhello';
-    expect(transformMessageForHarness(message, 'claude-code', ['/home/u/.panopticon/conversation-attachments/c1/abc.png'])).toBe(message);
+    const message = '@/home/u/.overdeck/conversation-attachments/c1/abc.png\nhello';
+    expect(transformMessageForHarness(message, 'claude-code', ['/home/u/.overdeck/conversation-attachments/c1/abc.png'])).toBe(message);
   });
 
   it('passes through unchanged when there are no managed paths', async () => {
@@ -980,7 +980,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
 
   it('rewrites pi messages to an explicit Read-tool instruction', async () => {
     const { transformMessageForHarness } = await import('../conversations.js');
-    const path = '/home/u/.panopticon/conversation-attachments/c1/abc.png';
+    const path = '/home/u/.overdeck/conversation-attachments/c1/abc.png';
     const out = transformMessageForHarness(`@${path}\nwhat is this?`, 'pi', [path]);
     expect(out).toContain('Read tool');
     expect(out).toContain(`- ${path}`);
@@ -990,7 +990,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
 
   it('handles empty user text by switching to a describe-what-you-see prompt', async () => {
     const { transformMessageForHarness } = await import('../conversations.js');
-    const path = '/home/u/.panopticon/conversation-attachments/c1/abc.png';
+    const path = '/home/u/.overdeck/conversation-attachments/c1/abc.png';
     const out = transformMessageForHarness(`@${path}`, 'pi', [path]);
     expect(out).toContain('describe what you see');
     expect(out).toContain(`- ${path}`);
@@ -999,8 +999,8 @@ describe('transformMessageForHarness (PAN-1535)', () => {
 
   it('handles multiple managed attachments', async () => {
     const { transformMessageForHarness } = await import('../conversations.js');
-    const p1 = '/home/u/.panopticon/conversation-attachments/c1/a.png';
-    const p2 = '/home/u/.panopticon/conversation-attachments/c1/b.png';
+    const p1 = '/home/u/.overdeck/conversation-attachments/c1/a.png';
+    const p2 = '/home/u/.overdeck/conversation-attachments/c1/b.png';
     const out = transformMessageForHarness(`@${p1}\n@${p2}\ncompare`, 'pi', [p1, p2]);
     expect(out).toContain(`- ${p1}`);
     expect(out).toContain(`- ${p2}`);
@@ -1011,7 +1011,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
 
   it('leaves unmanaged @mentions in user prose alone', async () => {
     const { transformMessageForHarness } = await import('../conversations.js');
-    const managed = '/home/u/.panopticon/conversation-attachments/c1/a.png';
+    const managed = '/home/u/.overdeck/conversation-attachments/c1/a.png';
     const unmanaged = '/etc/passwd';
     const out = transformMessageForHarness(`@${managed}\nalso look at @${unmanaged} please`, 'pi', [managed]);
     expect(out).toContain(`- ${managed}`);
@@ -1021,7 +1021,7 @@ describe('transformMessageForHarness (PAN-1535)', () => {
   it('escapes regex metacharacters in attachment paths', async () => {
     const { transformMessageForHarness } = await import('../conversations.js');
     // Paths can legitimately contain `.` and other regex metacharacters
-    const path = '/home/u/.panopticon/conversation-attachments/c1/file.with.dots.png';
+    const path = '/home/u/.overdeck/conversation-attachments/c1/file.with.dots.png';
     const out = transformMessageForHarness(`@${path}\nhi`, 'pi', [path]);
     expect(out).toContain(`- ${path}`);
     expect(out).not.toContain(`@${path}`);

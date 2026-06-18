@@ -10,7 +10,7 @@ if [ -f .env ]; then set -a; source .env; set +a; fi
 FEATURE_FOLDER="{{FEATURE_FOLDER}}"
 
 # Use workspace-specific project name to avoid container conflicts
-export COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"
+export COMPOSE_PROJECT_NAME="overdeck-${FEATURE_FOLDER}"
 
 case "${1:-help}" in
   up|all)

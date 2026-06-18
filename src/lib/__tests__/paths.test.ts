@@ -15,7 +15,7 @@ import {
 describe('docs RAG paths', () => {
   it.effect('resolves docs state under OVERDECK_HOME', () =>
     Effect.sync(() => {
-      expect(getDocsPaths({ panopticonHome: '/tmp/pan-home' })).toEqual({
+      expect(getDocsPaths({ overdeckHome: '/tmp/pan-home' })).toEqual({
         docsDir: join('/tmp/pan-home', 'docs'),
         indexPath: join('/tmp/pan-home', 'docs', 'index.sqlite'),
         budgetStatePath: join('/tmp/pan-home', 'docs', 'budget-state.json'),

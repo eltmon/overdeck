@@ -19,10 +19,10 @@ describe('workspace rebuild', () => {
     mkdirSync(join(workspace, '.devcontainer'), { recursive: true });
     writeFileSync(
       join(workspace, '.devcontainer', 'dev'),
-      'FEATURE_FOLDER="feature-pan-1140"\nexport COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"\n',
+      'FEATURE_FOLDER="feature-pan-1140"\nexport COMPOSE_PROJECT_NAME="overdeck-${FEATURE_FOLDER}"\n',
     );
 
-    expect(composeProjectNameForWorkspace(workspace, 'PAN-1140')).toBe('panopticon-feature-pan-1140');
+    expect(composeProjectNameForWorkspace(workspace, 'PAN-1140')).toBe('overdeck-feature-pan-1140');
   });
 
   it('refuses a workspace-controlled compose project name mismatch', () => {
@@ -39,10 +39,10 @@ describe('workspace rebuild', () => {
     );
   });
 
-  it('falls back to the canonical panopticon feature project name', () => {
+  it('falls back to the canonical overdeck feature project name', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-workspace-rebuild-'));
     tempDirs.push(workspace);
 
-    expect(composeProjectNameForWorkspace(workspace, 'PAN-1140')).toBe('panopticon-feature-pan-1140');
+    expect(composeProjectNameForWorkspace(workspace, 'PAN-1140')).toBe('overdeck-feature-pan-1140');
   });
 });

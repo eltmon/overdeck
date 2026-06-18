@@ -1,7 +1,7 @@
 services:
   dashboard:
     build: .
-    container_name: panopticon-dashboard
+    container_name: overdeck-dashboard
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -11,18 +11,18 @@ services:
     volumes:
       # Mount host paths for workspace/agent management
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${HOME}/.panopticon:/root/.panopticon:ro
+      - ${HOME}/.overdeck:/root/.overdeck:ro
       - ${HOME}/Projects:/root/Projects
     networks:
-      - panopticon
+      - overdeck
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.panopticon.rule=Host(`pan.localhost`)"
-      - "traefik.http.routers.panopticon.entrypoints=websecure"
-      - "traefik.http.routers.panopticon.tls=true"
-      - "traefik.http.services.panopticon.loadbalancer.server.port=3000"
+      - "traefik.http.routers.overdeck.rule=Host(`pan.localhost`)"
+      - "traefik.http.routers.overdeck.entrypoints=websecure"
+      - "traefik.http.routers.overdeck.tls=true"
+      - "traefik.http.services.overdeck.loadbalancer.server.port=3000"
 
 networks:
-  panopticon:
-    name: panopticon
+  overdeck:
+    name: overdeck
     external: true

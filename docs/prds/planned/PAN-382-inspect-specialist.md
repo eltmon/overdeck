@@ -164,7 +164,7 @@ Branch base ──── Bead 1 commits ──── [Inspect PASS] ────
 - **On PASS:** current HEAD SHA stored as the new checkpoint
 - **On BLOCKED + fix + re-inspect:** diff from same checkpoint (includes fix commits)
 
-Checkpoints stored in: `~/.panopticon/specialists/<project>/inspect-agent/checkpoints/<issueId>.json`
+Checkpoints stored in: `~/.overdeck/specialists/<project>/inspect-agent/checkpoints/<issueId>.json`
 
 ```json
 {

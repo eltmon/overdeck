@@ -33,9 +33,9 @@ describe('resolveTrackerType', () => {
   it('returns "github" for issues matching a project with github_repo', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
-        panopticon: {
+        overdeck: {
           name: 'Overdeck',
-          path: '/home/user/panopticon',
+          path: '/home/user/overdeck',
           github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
@@ -91,9 +91,9 @@ describe('resolveTrackerType', () => {
   it('returns "linear" as fallback for unknown prefixes', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
-        panopticon: {
+        overdeck: {
           name: 'Overdeck',
-          path: '/home/user/panopticon',
+          path: '/home/user/overdeck',
           github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },

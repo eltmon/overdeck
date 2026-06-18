@@ -9,9 +9,9 @@ vi.mock('fs', async (importOriginal) => {
     existsSync: (path: Parameters<typeof actual.existsSync>[0]) => {
       const stringPath = String(path);
       if (
-        stringPath.endsWith('/.panopticon/config.yaml') ||
+        stringPath.endsWith('/.overdeck/config.yaml') ||
         stringPath.endsWith('/.pan.yaml') ||
-        stringPath.endsWith('/.panopticon.yaml')
+        stringPath.endsWith('/.overdeck.yaml')
       ) {
         return false;
       }
@@ -31,7 +31,7 @@ describe('conversationSearch configuration', () => {
       provider: 'openai',
       model: 'text-embedding-3-small',
       apiKeyRef: undefined,
-      dbPath: join(homedir(), '.panopticon', 'conversations', 'embeddings.db'),
+      dbPath: join(homedir(), '.overdeck', 'conversations', 'embeddings.db'),
     });
   });
 

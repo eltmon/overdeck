@@ -85,7 +85,7 @@ export async function pollOnce(state: AgentOutputServiceState): Promise<void> {
         // Check for remote agent
         let stdout: string
         try {
-          const remoteStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'remote-state.json')
+          const remoteStateFile = join(homedir(), '.overdeck', 'agents', agentId, 'remote-state.json')
           const remoteState = await readFile(remoteStateFile, 'utf-8')
             .then((text) => JSON.parse(text) as { location?: string; vmName?: string })
             .catch(() => null)

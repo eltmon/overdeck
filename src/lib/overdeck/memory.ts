@@ -2,7 +2,7 @@
  * The Memory domain: MemoryResolver (read door) + MemoryWriter (write door).
  *
  * Architecture: docs/overdeck-remodel/services/memory.md
- * The source of truth is the observation JSONL files under ~/.panopticon/memory/.
+ * The source of truth is the observation JSONL files under ~/.overdeck/memory/.
  * memory-search.db (per-project) is a rebuildable cache, reached through MemorySearch.
  * transcript_checkpoints (in overdeck.db) is the dedup-cursor cache, reached through Db.
  *

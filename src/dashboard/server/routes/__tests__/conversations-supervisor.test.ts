@@ -9,7 +9,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, write
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-let panopticonHome: string;
+let overdeckHome: string;
 let channelsEnabled = false;
 let createSupervisorSocket = false;
 let dismissDevChannelsDialogMock: ReturnType<typeof vi.fn>;
@@ -37,7 +37,7 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
       conversations: {
         titleModel: 'claude-haiku-4-5',
         compactionModel: 'claude-haiku-4-5',
-        manualCompactMode: 'panopticon-native',
+        manualCompactMode: 'overdeck-native',
         richCompaction: false,
       },
       codex: { permissionMode: 'workspace' },
@@ -64,7 +64,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   createSession: vi.fn((session: string, _cwd: string, command: string) => Effect.sync(() => {
     createSessionCalls.push({ session, command });
     if (createSupervisorSocket) {
-      const socketDir = join(panopticonHome, 'sockets');
+      const socketDir = join(overdeckHome, 'sockets');
       mkdirSync(socketDir, { recursive: true, mode: 0o700 });
       const socketPath = join(socketDir, `pty-${session}.sock`);
       writeFileSync(socketPath, '');
@@ -78,7 +78,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
 }));
 
 function conversationDir(session: string): string {
-  return join(panopticonHome, 'conversations', session);
+  return join(overdeckHome, 'conversations', session);
 }
 
 function launcherFor(session: string): string {
@@ -87,14 +87,14 @@ function launcherFor(session: string): string {
 
 function cleanupSession(session: string): void {
   rmSync(conversationDir(session), { recursive: true, force: true });
-  rmSync(join(panopticonHome, 'agents', session), { recursive: true, force: true });
-  rmSync(join(panopticonHome, 'sockets', `pty-${session}.sock`), { force: true });
+  rmSync(join(overdeckHome, 'agents', session), { recursive: true, force: true });
+  rmSync(join(overdeckHome, 'sockets', `pty-${session}.sock`), { force: true });
 }
 
 describe('spawnConversationSession PTY supervisor wiring', () => {
   beforeEach(() => {
-    panopticonHome = join(tmpdir(), `pan-conv-supervisor-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    process.env.OVERDECK_HOME = panopticonHome;
+    overdeckHome = join(tmpdir(), `pan-conv-supervisor-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    process.env.OVERDECK_HOME = overdeckHome;
     channelsEnabled = false;
     dismissDevChannelsDialogMock?.mockClear();
     delete process.env.PAN_DOCKER;
@@ -105,7 +105,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
   afterEach(() => {
     for (const call of createSessionCalls) cleanupSession(call.session);
-    rmSync(panopticonHome, { recursive: true, force: true });
+    rmSync(overdeckHome, { recursive: true, force: true });
     delete process.env.OVERDECK_HOME;
     delete process.env.PAN_DOCKER;
     delete process.env.OVERDECK_DOCKER_WORKSPACE;
@@ -130,8 +130,8 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-supervisor-test'");
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
-    expect(existsSync(join(panopticonHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
-    expect((statSync(join(panopticonHome, 'sockets', 'pty-conv-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
+    expect(existsSync(join(overdeckHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
+    expect((statSync(join(overdeckHome, 'sockets', 'pty-conv-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 
@@ -152,11 +152,11 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-codex-supervisor-test');
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-codex-supervisor-test'");
-    expect(launcher).toContain(`export CODEX_HOME='${join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
+    expect(launcher).toContain(`export CODEX_HOME='${join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' codex");
-    expect(existsSync(join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(true);
-    expect((statSync(join(panopticonHome, 'sockets', 'pty-conv-codex-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
+    expect(existsSync(join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(true);
+    expect((statSync(join(overdeckHome, 'sockets', 'pty-conv-codex-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 
@@ -164,7 +164,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     createSupervisorSocket = true;
     const session = 'conv-codex-resume-supervisor-test';
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
-    const agentDir = join(panopticonHome, 'agents', session);
+    const agentDir = join(overdeckHome, 'agents', session);
     const dayDir = join(agentDir, 'codex-home', 'sessions', '2026', '06', '14');
     mkdirSync(dayDir, { recursive: true });
     writeFileSync(join(dayDir, `rollout-2026-06-14T10-00-00-${threadId}.jsonl`), '{"type":"session_meta"}\n');
@@ -247,7 +247,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-pi-test');
     expect(launcher).not.toContain('pty-supervisor.js');
-    expect(existsSync(join(panopticonHome, 'agents', 'conv-pi-test', 'pty-token'))).toBe(false);
+    expect(existsSync(join(overdeckHome, 'agents', 'conv-pi-test', 'pty-token'))).toBe(false);
   });
 
   it('does not wrap Docker conversations with the PTY supervisor', async () => {
@@ -267,6 +267,6 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-docker-test');
     expect(launcher).not.toContain('pty-supervisor.js');
-    expect(existsSync(join(panopticonHome, 'agents', 'conv-docker-test', 'pty-token'))).toBe(false);
+    expect(existsSync(join(overdeckHome, 'agents', 'conv-docker-test', 'pty-token'))).toBe(false);
   });
 });

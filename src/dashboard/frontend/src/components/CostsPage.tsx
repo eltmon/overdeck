@@ -332,7 +332,7 @@ function ExperimentsView({ experiments }: { experiments: CavemanExperimentRow[] 
         <FlaskConical className="w-12 h-12 mb-4 opacity-30" />
         <p className="text-lg font-medium mb-2">No experiment data yet</p>
         <p className="text-sm text-center max-w-md">
-          Enable caveman in your <code className="text-primary">~/.panopticon/config.yaml</code> with{' '}
+          Enable caveman in your <code className="text-primary">~/.overdeck/config.yaml</code> with{' '}
           <code className="text-primary">agents.caveman.enabled: true</code> to start tracking output token reduction.
         </p>
       </div>

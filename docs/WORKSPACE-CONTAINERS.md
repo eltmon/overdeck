@@ -20,7 +20,7 @@ The `init` service must install development dependencies and must not try to ins
 
 ## Single-deacon invariant
 
-Workspace containers must never mount `${HOME}/.panopticon`, and the container `server` service must set `OVERDECK_DISABLE_DEACON=1`. The container server is a development-time read/UI peer, not a second orchestrator.
+Workspace containers must never mount `${HOME}/.overdeck`, and the container `server` service must set `OVERDECK_DISABLE_DEACON=1`. The container server is a development-time read/UI peer, not a second orchestrator.
 
 See `.claude/rules/single-deacon-invariant.md` for the full invariant and failure history.
 
@@ -28,7 +28,7 @@ See `.claude/rules/single-deacon-invariant.md` for the full invariant and failur
 
 Remote Fly workspaces support two resiliency tiers. The tier is chosen at spawn time
 (`pan start --remote --tier <tier>`) and stored in the workspace config; it can also
-be set as the default in dashboard Settings or `~/.panopticon/config.yaml`.
+be set as the default in dashboard Settings or `~/.overdeck/config.yaml`.
 
 | Tier | Durability posture | Use when |
 |---|---|---|

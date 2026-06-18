@@ -66,7 +66,7 @@ interface TranscriptEntry {
 // ============== Path Helpers ==============
 
 function getAgentsDir(): string {
-  return join(process.env.HOME || homedir(), '.panopticon', 'agents');
+  return join(process.env.HOME || homedir(), '.overdeck', 'agents');
 }
 
 function getClaudeProjectsDir(): string {

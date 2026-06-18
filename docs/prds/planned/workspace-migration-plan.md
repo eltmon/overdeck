@@ -10,10 +10,10 @@ Add a `pan workspace migrate <issue-id>` command to move workspaces between loca
 - Location: `<project>/workspaces/feature-<issue-id>/`
 - Structure: Git worktrees for each repo (polyrepo) or single worktree (monorepo)
 - Docker: `.devcontainer/docker-compose.devcontainer.yml`
-- Agent state: `~/.panopticon/agents/agent-<issue-id>/`
+- Agent state: `~/.overdeck/agents/agent-<issue-id>/`
 
 ### Remote Workspaces
-- Metadata: `~/.panopticon/workspaces/<issue-id>.yaml`
+- Metadata: `~/.overdeck/workspaces/<issue-id>.yaml`
 - VM: `pan-<project>-<issue-id>-ws.exe.xyz`
 - Structure: Cloned repos in `/workspace/`
 - Uses shared infra VM for postgres/redis
@@ -67,7 +67,7 @@ New command that:
    - Copy any workspace-specific configs
 
 6. **Create workspace metadata**
-   - Save to `~/.panopticon/workspaces/<issue-id>.yaml`
+   - Save to `~/.overdeck/workspaces/<issue-id>.yaml`
 
 7. **Cleanup (optional)**
    - Stop local Docker containers
@@ -76,7 +76,7 @@ New command that:
 ### Migration: Remote → Local
 
 1. **Find remote workspace**
-   - Load from `~/.panopticon/workspaces/<issue-id>.yaml`
+   - Load from `~/.overdeck/workspaces/<issue-id>.yaml`
    - Verify VM is accessible
 
 2. **Pull git changes**
@@ -95,7 +95,7 @@ New command that:
    - Run `./dev all` or `docker-compose up -d`
 
 6. **Migrate agent state**
-   - Copy/update `~/.panopticon/agents/agent-<issue-id>/`
+   - Copy/update `~/.overdeck/agents/agent-<issue-id>/`
 
 7. **Cleanup (optional)**
    - Delete VM: `ExeProvider.deleteVm()`

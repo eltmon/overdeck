@@ -40,7 +40,7 @@ import { httpHandler } from './http-handler.js';
 
 async function loadRemoteWorkspaceMetadata(issueId: string): Promise<unknown | null> {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  const metadataPath = join(homedir(), '.panopticon', 'workspaces', `${normalizedId}.yaml`);
+  const metadataPath = join(homedir(), '.overdeck', 'workspaces', `${normalizedId}.yaml`);
   const content = await readFile(metadataPath, 'utf-8').catch(() => null);
   if (!content) return null;
   try {
@@ -51,7 +51,7 @@ async function loadRemoteWorkspaceMetadata(issueId: string): Promise<unknown | n
 }
 
 async function listRemoteWorkspaceMetadata(): Promise<unknown[]> {
-  const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
+  const workspacesDir = join(homedir(), '.overdeck', 'workspaces');
   const files = await readdir(workspacesDir).catch(() => [] as string[]);
   const yamlFiles = files.filter(f => f.endsWith('.yaml'));
 

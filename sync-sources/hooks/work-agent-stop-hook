@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/work-agent-stop-hook  (PAN-800)
+# ~/.overdeck/bin/work-agent-stop-hook  (PAN-800)
 #
 # Detects work agents that forgot to call `pan work done` after finishing their
 # implementation, and nudges them via tmux. Writes the lifecycle resolution
@@ -15,7 +15,7 @@
 #
 # The model used for the completion-check LLM is configurable via
 # OVERDECK_COMPLETION_CHECK_MODEL or the completion-check-hook override
-# in ~/.panopticon/config.yaml.
+# in ~/.overdeck/config.yaml.
 
 set +e
 
@@ -39,15 +39,15 @@ esac
 
 ISSUE_ID=$(echo "$AGENT_ID" | sed 's/^agent-//' | tr '[:lower:]' '[:upper:]')
 
-AGENT_STATE_DIR="$HOME/.panopticon/agents/$AGENT_ID"
-LOG_DIR="$HOME/.panopticon/logs"
+AGENT_STATE_DIR="$HOME/.overdeck/agents/$AGENT_ID"
+LOG_DIR="$HOME/.overdeck/logs"
 mkdir -p "$LOG_DIR"
 
 COMPLETED_FILE="$AGENT_STATE_DIR/completed"
 [ -f "$COMPLETED_FILE" ] && exit 0
 
 # Skip if the issue is actively flowing through the specialist pipeline.
-REVIEW_STATUS_FILE="$HOME/.panopticon/review-status.json"
+REVIEW_STATUS_FILE="$HOME/.overdeck/review-status.json"
 if [ -f "$REVIEW_STATUS_FILE" ]; then
   IN_ACTIVE_PIPELINE=$(python3 -c "
 import json, sys
@@ -339,7 +339,7 @@ fi
 # ── Phase 3: LLM fallback ────────────────────────────────────────────────
 COMPLETION_MODEL="${OVERDECK_COMPLETION_CHECK_MODEL:-}"
 if [ -z "$COMPLETION_MODEL" ]; then
-  CONFIG_FILE="$HOME/.panopticon/config.yaml"
+  CONFIG_FILE="$HOME/.overdeck/config.yaml"
   if [ -f "$CONFIG_FILE" ]; then
     COMPLETION_MODEL=$(grep 'completion-check-hook:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "")
   fi

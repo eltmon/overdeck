@@ -42,7 +42,7 @@
   **runtime-control verbs** — `SettingsWriter` owns them because the only durable
   fact each persists is an `app_settings` flag.
 - **Config (the read-only domain)** — project definitions in the **`projects.yaml`
-  file** (`~/.panopticon/projects.yaml`, `src/lib/projects.ts:18`). The resolver
+  file** (`~/.overdeck/projects.yaml`, `src/lib/projects.ts:18`). The resolver
   is the mtime-cached parse `loadProjectsConfigSync` (`projects.ts:198`). **There
   is no Config DB table and no Config DB writer** — edits are file edits
   ([audit §4](../investigations/orchestration-config-audit.md)). `ConfigResolver`
@@ -144,9 +144,9 @@ Control/Settings *data* domain.
 
 | Current endpoint (file:line) | r/w | New home | Reason / backing store |
 |---|---|---|---|
-| `GET /api/settings` (`settings.ts:152`) | reads | **FILE-CONFIG** (config.yaml door) | `loadSettingsApi` → `loadConfigSync` (`settings-api.ts:589`) = `~/.panopticon/config.yaml` (CFG), **not** AS. Preserved as a file door; not a resolver method. |
+| `GET /api/settings` (`settings.ts:152`) | reads | **FILE-CONFIG** (config.yaml door) | `loadSettingsApi` → `loadConfigSync` (`settings-api.ts:589`) = `~/.overdeck/config.yaml` (CFG), **not** AS. Preserved as a file door; not a resolver method. |
 | `PUT /api/settings` (`settings.ts:869`) | writes | **FILE-CONFIG** | `saveSettingsApi` writes CFG. Not an AS write. |
-| `PUT /api/settings/ui-theme` (`settings.ts:903`) | writes | **FILE-CONFIG** (`ui-theme.json`) | `setUiTheme` → `~/.panopticon/ui-theme.json` (`ui-theme.ts:31`). A file, not AS. |
+| `PUT /api/settings/ui-theme` (`settings.ts:903`) | writes | **FILE-CONFIG** (`ui-theme.json`) | `setUiTheme` → `~/.overdeck/ui-theme.json` (`ui-theme.ts:31`). A file, not AS. |
 | `GET /api/settings/available-models` (`settings.ts:163`) | reads | **FILE-CONFIG / catalog** | Model catalog from config + providers. Not AS. |
 | `GET /api/settings/optimal-defaults` (`settings.ts:174`) | reads | **FILE-CONFIG / catalog** | Derived defaults. Not AS. |
 | `GET /api/settings/minimax-defaults` (`settings.ts:185`) | reads | **FILE-CONFIG / catalog** | Derived defaults. Not AS. |
@@ -194,7 +194,7 @@ Agents-health read.
 | `POST /api/cloister/brake` (`cloister.ts:113`) | writes | **`SettingsWriter.brake()` → delegates AgentWriter.stop ×N** | Trims work agents to the cap (`emergencyBrake()` + per-agent `agent.stopped`, 113-137). Agent lifecycle = AgentWriter. No AS flag. (Headline residue.) |
 | `POST /api/cloister/resume-spawns` (`cloister.ts:141`) | writes | **RESIDUE → `CloisterRuntime.resumeSpawns()`** (§1J item 2) | `service.resumeSpawns()` — in-memory spawn-pause toggle on the live service; no durable store. |
 | `GET /api/cloister/spawn-status` (`cloister.ts:155`) | reads | **RESIDUE → `CloisterRuntime.isSpawnPaused()`** (§1J item 2) | `service.isSpawnPaused()` — in-memory flag read. |
-| `GET /api/cloister/config` (`cloister.ts:169`) | reads | **FILE-CONFIG** (`cloister.toml`) | `loadCloisterConfigSync()` → `~/.panopticon/cloister.toml` (`cloister/config.ts:15,450`). A file, not AS. |
+| `GET /api/cloister/config` (`cloister.ts:169`) | reads | **FILE-CONFIG** (`cloister.toml`) | `loadCloisterConfigSync()` → `~/.overdeck/cloister.toml` (`cloister/config.ts:15,450`). A file, not AS. |
 | `PUT /api/cloister/config` (`cloister.ts:180`) | writes | **FILE-CONFIG** | `saveCloisterConfigSync(updates)` + `service.reloadConfig()` (TOML). Not AS. |
 | `GET /api/cloister/agents/health` (`cloister.ts:198`) | reads | **RELOCATE → Agents (health)** | `service.getAllAgentHealth()` — per-agent health (API-SURFACE §G Agents/health). |
 

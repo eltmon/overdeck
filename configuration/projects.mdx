@@ -11,7 +11,7 @@ Overdeck's project registry enables multi-project management with intelligent is
 
 ## Overview
 
-Projects are registered in `~/.panopticon/projects.yaml`. Each project can have:
+Projects are registered in `~/.overdeck/projects.yaml`. Each project can have:
 
 - **Issue routing rules** - Route issues to different subdirectories based on labels
 - **Custom workspace commands** - For complex polyrepo setups
@@ -29,7 +29,7 @@ While `projects.yaml` is the source of truth, much of this configuration is also
   Overdeck manages both the workflow pipeline and the agents and conversations
   that move issues through it. The Settings page is where model routing for those
   agents lives, while per-project routing and workspace rules below are edited in
-  `~/.panopticon/projects.yaml`.
+  `~/.overdeck/projects.yaml`.
 </Note>
 
 ## Registering Projects
@@ -47,7 +47,7 @@ pan project remove myproject
 
 ## Project Configuration
 
-Projects are defined in `~/.panopticon/projects.yaml`:
+Projects are defined in `~/.overdeck/projects.yaml`:
 
 ```yaml
 projects:
@@ -63,9 +63,9 @@ projects:
       - default: true
         path: /home/user/projects/myn
 
-  panopticon:
+  overdeck:
     name: "Overdeck"
-    path: /home/user/projects/panopticon
+    path: /home/user/projects/overdeck
     issue_prefix: PAN
 ```
 
@@ -98,7 +98,7 @@ Issues are routed to different subdirectories based on their labels:
 
 ## Linear Project Mapping
 
-If you have multiple Linear projects, configure which local directory each maps to. Create/edit `~/.panopticon/project-mappings.json`:
+If you have multiple Linear projects, configure which local directory each maps to. Create/edit `~/.overdeck/project-mappings.json`:
 
 ```json
 [
@@ -200,7 +200,7 @@ projects:
       type: polyrepo
       progressive: true
       always_include: [meta]
-      groups_file: team-meta/panopticon/repo-groups.yaml
+      groups_file: team-meta/overdeck/repo-groups.yaml
       pr_target: qa
       repos:
         - name: meta

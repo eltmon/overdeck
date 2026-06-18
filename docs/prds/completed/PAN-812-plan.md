@@ -146,7 +146,7 @@ Overdeck Framework
 │   └── triggers.ts              → bd list --json -l ${issueId} --status closed
 ├── Skills (synced to ~/.claude/skills/)
 │   └── beads/SKILL.md           → v0.43.0 (outdated)
-│   └── beads-panopticon-guide/  → PAN-XXX filtering patterns
+│   └── beads-overdeck-guide/  → PAN-XXX filtering patterns
 │   └── beads/resources/         → ASYNC_GATES.md (wrong), AGENTS.md, etc.
 └── Templates
     └── claude-md/sections/beads.md  → Injected into workspace CLAUDE.md
@@ -169,7 +169,7 @@ Overdeck Framework (Post-Upgrade)
 │   └── gate coordination        → NEW: bd gate check before waking next specialist
 ├── Skills (synced to ~/.claude/skills/)
 │   └── beads/SKILL.md           → v1.0.0 (updated)
-│   └── beads-panopticon-guide/  → Updated patterns
+│   └── beads-overdeck-guide/  → Updated patterns
 │   └── beads/resources/         → Fixed ASYNC_GATES.md, added BATCH.md, RULES.md
 └── Templates
     └── claude-md/sections/beads.md  → Updated with blocker guidance, batch, gate basics
@@ -185,7 +185,7 @@ Overdeck Framework (Post-Upgrade)
 | `skills/beads/resources/ASYNC_GATES.md` | Rewrite: remove `bd gate create`, document correct `bd create --type gate` flow; add `bd gate check`; add `bd gate resolve`; add custom type registration |
 | `skills/beads/resources/BATCH.md` | NEW: Document `bd batch` syntax, supported commands, atomicity guarantees |
 | `skills/beads/resources/RULES.md` | NEW: Document `bd rules audit` and `bd rules compact` |
-| `skills/beads-panopticon-guide/SKILL.md` | Update version reference; add PAN-XXX batch example; add gate patterns |
+| `skills/beads-overdeck-guide/SKILL.md` | Update version reference; add PAN-XXX batch example; add gate patterns |
 | `templates/claude-md/sections/beads.md` | Add blocker guidance (`bd dep tree` before close); mention `bd batch` for bulk ops; clarify `bd sync` |
 | `AGENTS.md` | Standardize on `bd sync` (remove `bd dolt push`); add gate quick-ref; add batch quick-ref |
 
@@ -224,7 +224,7 @@ Phase 2: Update skills and documentation
 │ 2a. Rewrite beads/SKILL.md (v1.0.0)                           │
 │ 2b. Fix ASYNC_GATES.md                                        │
 │ 2c. Create BATCH.md and RULES.md                              │
-│ 2d. Update beads-panopticon-guide                             │
+│ 2d. Update beads-overdeck-guide                             │
 │ 2e. Update templates/claude-md/sections/beads.md              │
 │ 2f. Update AGENTS.md                                          │
 │ 2g. Sync skills to ~/.claude/skills/                          │
@@ -307,18 +307,18 @@ Phase 5: Optional gate integration (Phase 2+)
 | Beads ID | Title | Difficulty | Blocked By |
 |----------|-------|------------|------------|
 | `pan-569-xlj` | Investigation: beads v1.0.2 features | — | — (done) |
-| `panopticon-812a` | Install beads v1.0.2 and verify compat | simple | — |
-| `panopticon-812b` | Update beads skill to v1.0.0 | medium | 812a |
-| `panopticon-812c` | Fix ASYNC_GATES.md and add BATCH.md/RULES.md | medium | 812a |
-| `panopticon-812d` | Update beads-panopticon-guide | simple | 812b |
-| `panopticon-812e` | Update AGENTS.md and CLAUDE.md template | simple | 812b |
-| `panopticon-812f` | Refactor done-preflight.ts to use bd batch | simple | 812a |
-| `panopticon-812g` | Add pan admin beads doctor | simple | 812a |
-| `panopticon-812h` | Full test flow validation | medium | 812b–812g |
-| `panopticon-812i` | Design gate integration for specialists (Phase 2) | complex | 812h |
+| `overdeck-812a` | Install beads v1.0.2 and verify compat | simple | — |
+| `overdeck-812b` | Update beads skill to v1.0.0 | medium | 812a |
+| `overdeck-812c` | Fix ASYNC_GATES.md and add BATCH.md/RULES.md | medium | 812a |
+| `overdeck-812d` | Update beads-overdeck-guide | simple | 812b |
+| `overdeck-812e` | Update AGENTS.md and CLAUDE.md template | simple | 812b |
+| `overdeck-812f` | Refactor done-preflight.ts to use bd batch | simple | 812a |
+| `overdeck-812g` | Add pan admin beads doctor | simple | 812a |
+| `overdeck-812h` | Full test flow validation | medium | 812b–812g |
+| `overdeck-812i` | Design gate integration for specialists (Phase 2) | complex | 812h |
 
 **Ready to start (no blockers):**
-- `panopticon-812a` - Install and verify (simple)
+- `overdeck-812a` - Install and verify (simple)
 
 **Parallelization:**
 - Phase 1: `812a` (install/verify)
@@ -332,7 +332,7 @@ Phase 5: Optional gate integration (Phase 2+)
 - Issue: https://github.com/eltmon/overdeck/issues/812
 - Beads repo: https://github.com/gastownhall/beads
 - Current beads skill: `skills/beads/SKILL.md`
-- Overdeck beads guide: `skills/beads-panopticon-guide/SKILL.md`
+- Overdeck beads guide: `skills/beads-overdeck-guide/SKILL.md`
 - ASYNC_GATES.md: `skills/beads/resources/ASYNC_GATES.md`
 - done-preflight.ts: `src/lib/work/done-preflight.ts`
 - beads CLI command: `src/cli/commands/beads.ts`

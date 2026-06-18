@@ -5,7 +5,7 @@ import { join } from 'path';
 import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
 
 // Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
-// from ~/.panopticon/ui-theme.json) deterministically uses the dark default
+// from ~/.overdeck/ui-theme.json) deterministically uses the dark default
 // regardless of the developer machine's synced dashboard theme.
 let tempHome: string;
 let prevHome: string | undefined;
@@ -95,7 +95,7 @@ describe('generateLauncherScript', () => {
       role: 'plan',
       workingDir: '/workspace/project',
       setTerminalEnv: true,
-      panopticonEnv: { agentId: 'plan-abc', issueId: 'PAN-824', sessionType: 'planning' },
+      overdeckEnv: { agentId: 'plan-abc', issueId: 'PAN-824', sessionType: 'planning' },
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       promptFile: '/tmp/init-prompt.txt',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
@@ -141,7 +141,7 @@ describe('generateLauncherScript', () => {
       setPipefail: true,
       unsetProviderEnv: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
-      panopticonEnv: { agentId: 'spec-123', issueId: 'PAN-824', sessionType: 'correctness-review' },
+      overdeckEnv: { agentId: 'spec-123', issueId: 'PAN-824', sessionType: 'correctness-review' },
       cavemanExports: 'export CAVEMAN_DEFAULT_MODE="active"\n',
       promptFile: '/tmp/prompt.md',
       baseCommand: 'claude',
@@ -290,7 +290,7 @@ describe('generateLauncherScript', () => {
       spawnMode: 'conversation',
       workingDir: '/workspace/project',
       setTerminalEnv: true,
-      panopticonEnv: { issueId: 'PAN-824' },
+      overdeckEnv: { issueId: 'PAN-824' },
       extraEnvExports: ['export ANTHROPIC_BASE_URL="http://proxy"'],
       trapHup: true,
       baseCommand: 'claude',
@@ -462,11 +462,11 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --agent pan-work-agent',
       appendSystemPromptFiles: [
         '/workspace/project/.pan/context/workspace.md',
-        '/home/u/.panopticon/session-context.md',
+        '/home/u/.overdeck/session-context.md',
       ],
     });
 
-    expect(script).toContain("--append-system-prompt-file '/workspace/project/.pan/context/workspace.md' --append-system-prompt-file '/home/u/.panopticon/session-context.md'");
+    expect(script).toContain("--append-system-prompt-file '/workspace/project/.pan/context/workspace.md' --append-system-prompt-file '/home/u/.overdeck/session-context.md'");
     expect(script).not.toMatch(/--model/);
   });
 
@@ -737,7 +737,7 @@ describe('generateLauncherWrapper', () => {
         channelsBridgeMcpConfig: '/tmp/agent-x/.mcp.json',
       });
       expect(script).toContain(
-        "--mcp-config '/tmp/agent-x/.mcp.json' --dangerously-load-development-channels server:panopticon-bridge --session-id 'sess-abc'",
+        "--mcp-config '/tmp/agent-x/.mcp.json' --dangerously-load-development-channels server:overdeck-bridge --session-id 'sess-abc'",
       );
       // Must NOT enable strict-mcp-config (project MCP servers must keep loading)
       expect(script).not.toContain('--strict-mcp-config');
@@ -750,7 +750,7 @@ describe('generateLauncherWrapper', () => {
         channelsBridgeServerName: 'custom-bridge',
       });
       expect(script).toContain('server:custom-bridge');
-      expect(script).not.toContain('server:panopticon-bridge');
+      expect(script).not.toContain('server:overdeck-bridge');
     });
 
     it('flag-on for review role: same flags applied before session/model', () => {
@@ -763,7 +763,7 @@ describe('generateLauncherWrapper', () => {
         channelsBridgeMcpConfig: '/tmp/agent-y/.mcp.json',
       });
       expect(script).toContain(
-        "claude --mcp-config '/tmp/agent-y/.mcp.json' --dangerously-load-development-channels server:panopticon-bridge --session-id 'sess-spec' --model 'claude-sonnet-4-6'",
+        "claude --mcp-config '/tmp/agent-y/.mcp.json' --dangerously-load-development-channels server:overdeck-bridge --session-id 'sess-spec' --model 'claude-sonnet-4-6'",
       );
       expect(script).not.toContain('--strict-mcp-config');
     });
@@ -778,8 +778,8 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       harness: 'pi',
       model: 'anthropic/claude-sonnet-4-6',
       piExtensionPath: '/abs/packages/pi-extension/dist/index.js',
-      piFifoPath: '/home/u/.panopticon/agents/agent-pan-636/rpc.in',
-      piSessionDir: '/home/u/.panopticon/agents/agent-pan-636/sessions',
+      piFifoPath: '/home/u/.overdeck/agents/agent-pan-636/rpc.in',
+      piSessionDir: '/home/u/.overdeck/agents/agent-pan-636/sessions',
       // Pi has no permission system — these flags must be DROPPED (AC4).
       permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
       promptFile: '/tmp/prompt.txt',
@@ -793,9 +793,9 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/--extension '\/abs\/packages\/pi-extension\/dist\/index\.js'/);
     // AC2: stdin redirected from the fifo via bash read-write redirection so
     // opening the FIFO does not block before Pi can write its ready marker.
-    expect(script).toMatch(/<> '\/home\/u\/\.panopticon\/agents\/agent-pan-636\/rpc\.in'/);
+    expect(script).toMatch(/<> '\/home\/u\/\.overdeck\/agents\/agent-pan-636\/rpc\.in'/);
     // Defensive: read-only redirection would deadlock; assert it is NOT used.
-    expect(script).not.toMatch(/[^<]< '\/home\/u\/\.panopticon\/agents\/agent-pan-636\/rpc\.in'/);
+    expect(script).not.toMatch(/[^<]< '\/home\/u\/\.overdeck\/agents\/agent-pan-636\/rpc\.in'/);
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
@@ -803,7 +803,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/prompt.txt')
-      exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
+      exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.overdeck/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.overdeck/agents/agent-pan-636/rpc.in'
       "
     `);
   });
@@ -1004,9 +1004,9 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       role: 'work',
       harness: 'codex',
       model: 'codex-4o',
-      codexHome: '/home/user/.panopticon/agents/agent-1/codex-home',
+      codexHome: '/home/user/.overdeck/agents/agent-1/codex-home',
     });
-    expect(script).toMatch(/export CODEX_HOME='\/home\/user\/.panopticon\/agents\/agent-1\/codex-home'/);
+    expect(script).toMatch(/export CODEX_HOME='\/home\/user\/.overdeck\/agents\/agent-1\/codex-home'/);
   });
 
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {

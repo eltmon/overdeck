@@ -77,12 +77,12 @@ export class RallyRestApi {
 
 | Bead ID | Task | Description |
 |---------|------|-------------|
-| panopticon-kqx0.1 | Create rally-api.ts | REST client with fetch, typed responses |
-| panopticon-kqx0.2 | Update rally.ts | Replace SDK with new client, simplify Promise handling |
-| panopticon-kqx0.3 | Update rally.test.ts | Mock new client class |
-| panopticon-kqx0.4 | Remove rally dependency | Update package.json, run npm install |
-| panopticon-kqx0.5 | Verify clean | Run `npm ls core-js`, confirm empty |
-| panopticon-kqx0.6 | Run tests | Ensure all tests pass |
+| overdeck-kqx0.1 | Create rally-api.ts | REST client with fetch, typed responses |
+| overdeck-kqx0.2 | Update rally.ts | Replace SDK with new client, simplify Promise handling |
+| overdeck-kqx0.3 | Update rally.test.ts | Mock new client class |
+| overdeck-kqx0.4 | Remove rally dependency | Update package.json, run npm install |
+| overdeck-kqx0.5 | Verify clean | Run `npm ls core-js`, confirm empty |
+| overdeck-kqx0.6 | Run tests | Ensure all tests pass |
 
 **Dependency chain:** `.1` → `.2` → `.3` → `.4` → `.5` → `.6` (sequential)
 

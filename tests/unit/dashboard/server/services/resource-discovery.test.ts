@@ -198,7 +198,7 @@ describe('resource-discovery session prefix allowlist', () => {
 
   it('ignores unrelated tmux sessions', () => {
     expect(isDiscoverableAgentSession('conv-371')).toBe(false);
-    expect(isDiscoverableAgentSession('panopticon')).toBe(false);
+    expect(isDiscoverableAgentSession('overdeck')).toBe(false);
     expect(isDiscoverableAgentSession('0')).toBe(false);
   });
 });

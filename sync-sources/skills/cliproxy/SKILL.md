@@ -33,10 +33,10 @@ models via ChatGPT subscription OAuth tokens. Overdeck agents talk to it via
 ss -tlnp | grep 8317
 
 # Check PID file
-cat ~/.panopticon/cliproxy/cliproxy.pid 2>/dev/null
+cat ~/.overdeck/cliproxy/cliproxy.pid 2>/dev/null
 
 # Verify process is alive
-kill -0 $(cat ~/.panopticon/cliproxy/cliproxy.pid 2>/dev/null) 2>/dev/null && echo "alive" || echo "dead"
+kill -0 $(cat ~/.overdeck/cliproxy/cliproxy.pid 2>/dev/null) 2>/dev/null && echo "alive" || echo "dead"
 ```
 
 ## Restart CLIProxy
@@ -44,12 +44,12 @@ kill -0 $(cat ~/.panopticon/cliproxy/cliproxy.pid 2>/dev/null) 2>/dev/null && ec
 ```bash
 # Kill any existing instance
 lsof -ti:8317 2>/dev/null | xargs -r kill 2>/dev/null || true
-rm -f ~/.panopticon/cliproxy/cliproxy.pid
+rm -f ~/.overdeck/cliproxy/cliproxy.pid
 
 # Start fresh
-nohup ~/.panopticon/bin/cliproxy -config ~/.panopticon/cliproxy/config.yaml \
-  >> ~/.panopticon/cliproxy/cliproxy.log 2>&1 &
-echo $! > ~/.panopticon/cliproxy/cliproxy.pid
+nohup ~/.overdeck/bin/cliproxy -config ~/.overdeck/cliproxy/config.yaml \
+  >> ~/.overdeck/cliproxy/cliproxy.log 2>&1 &
+echo $! > ~/.overdeck/cliproxy/cliproxy.pid
 
 # Confirm it's up (give it 2 seconds)
 sleep 2 && ss -tlnp | grep 8317
@@ -59,29 +59,29 @@ sleep 2 && ss -tlnp | grep 8317
 
 ```bash
 # Last 30 lines of cliproxy log
-tail -30 ~/.panopticon/cliproxy/cliproxy.log
+tail -30 ~/.overdeck/cliproxy/cliproxy.log
 
 # Watch live
-tail -f ~/.panopticon/cliproxy/cliproxy.log
+tail -f ~/.overdeck/cliproxy/cliproxy.log
 ```
 
 ## Config and Auth
 
 | Path | Purpose |
 |---|---|
-| `~/.panopticon/bin/cliproxy` | Binary (v6.9.24, built from eltmon/cliproxy fork) |
-| `~/.panopticon/cliproxy/config.yaml` | Server config (host, port, auth-dir, api-keys) |
-| `~/.panopticon/cliproxy/auth/codex-primary.json` | Codex OAuth credentials (bridged from `~/.codex/auth.json`) |
-| `~/.panopticon/cliproxy/cliproxy.pid` | PID file written on manual start |
-| `~/.panopticon/cliproxy/cliproxy.log` | Append-only log |
+| `~/.overdeck/bin/cliproxy` | Binary (v6.9.24, built from eltmon/cliproxy fork) |
+| `~/.overdeck/cliproxy/config.yaml` | Server config (host, port, auth-dir, api-keys) |
+| `~/.overdeck/cliproxy/auth/codex-primary.json` | Codex OAuth credentials (bridged from `~/.codex/auth.json`) |
+| `~/.overdeck/cliproxy/cliproxy.pid` | PID file written on manual start |
+| `~/.overdeck/cliproxy/cliproxy.log` | Append-only log |
 
 Config contents:
 ```yaml
 host: "127.0.0.1"
 port: 8317
-auth-dir: "~/.panopticon/cliproxy/auth"
+auth-dir: "~/.overdeck/cliproxy/auth"
 api-keys:
-  - "panopticon-local-cliproxy-key"
+  - "overdeck-local-cliproxy-key"
 debug: false
 ```
 
@@ -89,7 +89,7 @@ debug: false
 
 Overdeck's `startCliproxy()` in `src/lib/cliproxy.ts` handles:
 1. Ensuring binary is installed
-2. Writing `~/.panopticon/cliproxy/config.yaml`
+2. Writing `~/.overdeck/cliproxy/config.yaml`
 3. Bridging `~/.codex/auth.json` → `auth/codex-primary.json`
 4. Spawning the process detached with a PID file
 
@@ -130,7 +130,7 @@ ChatGPT subscription tokens expire. This avoids requiring the user to run
    session name and status token every 3 s. The session is considered complete when
    the tmux pane exits.
 5. **Bridge** — On completion, the backend calls `bridgeCodexAuthToCliproxyAsync()`
-   to rewrite `~/.panopticon/cliproxy/auth/codex-primary.json` from the fresh
+   to rewrite `~/.overdeck/cliproxy/auth/codex-primary.json` from the fresh
    `~/.codex/auth.json`, then returns the updated auth status.
 6. **Auto-retry** — If an agent spawn was blocked by expired auth, the frontend
    automatically retries `POST /api/agents` once auth becomes valid.

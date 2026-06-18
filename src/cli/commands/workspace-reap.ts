@@ -8,7 +8,7 @@ import { getOverdeckHome } from '../../lib/paths.js';
 import { getAgentStateSync } from '../../lib/agents.js';
 
 const execFileAsync = promisify(execFile);
-const WORKSPACE_PROJECT_PREFIX = 'panopticon-feature-';
+const WORKSPACE_PROJECT_PREFIX = 'overdeck-feature-';
 const ACTIVE_AGENT_STATUSES = new Set(['running', 'starting']);
 
 export interface WorkspaceReapOptions {

@@ -1,4 +1,4 @@
-# PAN-1884 — Migrate panopticon agent operational rules from memory into the scope:dev rule/role layer
+# PAN-1884 — Migrate overdeck agent operational rules from memory into the scope:dev rule/role layer
 
 **Status:** in progress on `main` (operator-authorized direct implementation, 2026-06-14).
 **Scope:** immediate. Executed together with PAN-1883 and PAN-1877.
@@ -9,7 +9,7 @@
 > are committed to git; **(B) local Claude memory mutation** (`~/.claude/projects/.../memory/*.md`)
 > is **machine-local, NOT in the repo** — it is not captured by any git commit. "Commit immediately"
 > applies to (A) only. Sequence: do (A), `pan sync`, verify, **commit (A)**; then do (B) and **report
-> it separately**. Also: `pan sync` writes to `~/.claude/CLAUDE.md` and `~/.panopticon/context/*` —
+> it separately**. Also: `pan sync` writes to `~/.claude/CLAUDE.md` and `~/.overdeck/context/*` —
 > **outside the repo**; in a sandboxed harness this may need a permission grant. Treat a permission
 > prompt as expected, not a code failure.
 
@@ -30,7 +30,7 @@
 
 ## Requirements
 
-- **FR-1** — Each qualifying memory (panopticon agent operational rule) is materialized as a
+- **FR-1** — Each qualifying memory (overdeck agent operational rule) is materialized as a
   `scope: dev` bundled rule under `sync-sources/rules/`, OR added to the flywheel instruction surfaces
   if it is flywheel-orchestrator-specific.
 - **FR-2** — Flywheel-orchestrator rules are added to **both** `roles/flywheel.md` **and**
@@ -42,7 +42,7 @@
   memory mutation (B) is performed and **reported separately** (not implied to be in the git commit).
 - **NFR-1** — Rules are tight (they cost context every dev session); condense the verbose memory prose.
   Match the voice of existing `sync-sources/rules/`.
-- **NFR-2** — Scope guard: migrate ONLY panopticon-dev rules designed for/by agents. New bundled rules
+- **NFR-2** — Scope guard: migrate ONLY overdeck-dev rules designed for/by agents. New bundled rules
   must NOT contradict existing bundled rules (see WI-1 wording cautions).
 
 ---
@@ -105,8 +105,8 @@ neighbors first per the rule-authoring rule). **Wording cautions (must not contr
   context usage — durable docs may be terse, operator messages may not."
 - **self-verify-rendering.md** — "Verify dashboard/terminal rendering yourself; don't ask the operator
   to eyeball it. Playwright screenshots are readable (`browser_take_screenshot` → PNG in repo root →
-  `Read` it). For terminal ANSI, `tmux -L panopticon capture-pane -t <s> -e -p`. Preview in a
-  throwaway `panopticon`-socket session, not by attaching to (and resizing) a live one."
+  `Read` it). For terminal ANSI, `tmux -L overdeck capture-pane -t <s> -e -p`. Preview in a
+  throwaway `overdeck`-socket session, not by attaching to (and resizing) a live one."
 - **no-inspection-policy.md** — "When the operator sets a no-inspection policy on an issue,
   `requiresInspection` must be false on every bead AND no `pan inspect` path may run — including
   PostToolUse hooks or other auto-triggers. If a bead would need inspection to pass, mark it blocked.
@@ -150,7 +150,7 @@ index line. **This is local machine state — report it; it is NOT part of the g
 ### WI-4 — Sync, verify, commit (A); then mutate memory (B)
 
 1. After WI-1 + WI-2: `pan sync`. Verify the new bundled rules rendered into `~/.claude/CLAUDE.md`
-   (managed region), `~/.panopticon/context/pi-global.md`, `~/.panopticon/context/codex-global.md`.
+   (managed region), `~/.overdeck/context/pi-global.md`, `~/.overdeck/context/codex-global.md`.
    **(These paths are outside the repo — expect a possible permission prompt; not a code failure.)**
 2. `git status --short`; stage and commit **only** the intended tracked files (`sync-sources/rules/*`,
    `roles/flywheel.md`, `docs/flywheel-brief.md`, and `MEMORY.md` IF it is tracked — verify; the
@@ -173,7 +173,7 @@ index line. **This is local machine state — report it; it is NOT part of the g
 - **AC-4 (WI-4)** — rendered context files contain the new rules; the git commit contains **only**
   tracked repo files (verified via `git status --short` pre-commit); local memory edits are reported
   separately, not implied to be in git.
-- **AC-5 (NFR-2)** — diff touches no non-panopticon or "Explicitly NOT migrated" memory.
+- **AC-5 (NFR-2)** — diff touches no non-overdeck or "Explicitly NOT migrated" memory.
 
 ---
 

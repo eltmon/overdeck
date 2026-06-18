@@ -18,7 +18,7 @@ import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
 export interface ServerConfigShape {
   /** HTTP port for the dashboard API (API_PORT || PORT, default 3011) */
   readonly port: number;
-  /** Dashboard host (HOST, default '0.0.0.0' so the panopticon-traefik docker container can reach the host process; set HOST=127.0.0.1 to lock down to loopback) */
+  /** Dashboard host (HOST, default '0.0.0.0' so the overdeck-traefik docker container can reach the host process; set HOST=127.0.0.1 to lock down to loopback) */
   readonly host: string;
   /** Optional Linear API key (null if not set) */
   readonly linearApiKey: string | null;
@@ -27,7 +27,7 @@ export interface ServerConfigShape {
   /** Dashboard base URL for self-referencing links */
   readonly dashboardUrl: string;
   /** Overdeck home directory */
-  readonly panopticonHome: string;
+  readonly overdeckHome: string;
 
   /** Typed error: get Linear API key or fail */
   readonly requireLinearApiKey: Effect.Effect<string, ServerConfigError>;
@@ -47,19 +47,19 @@ export class ServerConfigError extends Error {
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
 export class ServerConfig extends Context.Service<ServerConfig, ServerConfigShape>()(
-  'panopticon/dashboard/ServerConfig',
+  'overdeck/dashboard/ServerConfig',
 ) {}
 
 // ─── Layer ────────────────────────────────────────────────────────────────────
 
 /**
  * Build the ServerConfig layer by reading env vars.
- * Loads ~/.panopticon.env first (idempotent — won't override existing vars).
+ * Loads ~/.overdeck.env first (idempotent — won't override existing vars).
  */
 export const ServerConfigLayer = Layer.effect(
   ServerConfig,
   Effect.sync((): ServerConfigShape => {
-    // Load .panopticon.env (idempotent)
+    // Load .overdeck.env (idempotent)
     loadOverdeckEnvSync();
 
     const portStr = process.env['API_PORT'] ?? process.env['PORT'] ?? '3011';
@@ -84,11 +84,11 @@ export const ServerConfigLayer = Layer.effect(
         `To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
         `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
       );
-      console.error(`[panopticon] ${msg}`);
+      console.error(`[overdeck] ${msg}`);
       throw new ServerConfigError('API_PORT', msg);
     }
 
-    // Default to 0.0.0.0 so the panopticon-traefik docker container can reach the
+    // Default to 0.0.0.0 so the overdeck-traefik docker container can reach the
     // dashboard via host-gateway routing. Binding to 127.0.0.1 leaves Traefik
     // returning 502 because it sees the host as 172.17.0.1 (docker bridge gateway)
     // which won't hit a loopback-only listener. Operators who need to lock the
@@ -97,8 +97,8 @@ export const ServerConfigLayer = Layer.effect(
     const linearApiKey = process.env['LINEAR_API_KEY'] || null;
     const anthropicApiKey = process.env['ANTHROPIC_API_KEY'] || null;
     const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
-    const panopticonHome =
-      process.env['OVERDECK_HOME'] ?? `${process.env['HOME'] ?? homedir()}/.panopticon`;
+    const overdeckHome =
+      process.env['OVERDECK_HOME'] ?? `${process.env['HOME'] ?? homedir()}/.overdeck`;
 
     return {
       port,
@@ -106,7 +106,7 @@ export const ServerConfigLayer = Layer.effect(
       linearApiKey,
       anthropicApiKey,
       dashboardUrl,
-      panopticonHome,
+      overdeckHome,
 
       requireLinearApiKey: linearApiKey
         ? Effect.succeed(linearApiKey)

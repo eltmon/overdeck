@@ -19,7 +19,7 @@ function writeLock(holder: { pid: number; ts: number; caller: string }) {
 
 describe('restart lock', () => {
   beforeEach(() => {
-    testHome = join(tmpdir(), `panopticon-restart-lock-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testHome = join(tmpdir(), `overdeck-restart-lock-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     process.env.OVERDECK_HOME = testHome;
   });
 

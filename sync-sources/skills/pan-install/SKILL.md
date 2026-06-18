@@ -2,9 +2,9 @@
 name: pan-install
 description: Guide through installing Overdeck prerequisites
 triggers:
-  - install panopticon
-  - setup panopticon dependencies
-  - panopticon installation
+  - install overdeck
+  - setup overdeck dependencies
+  - overdeck installation
 allowed-tools:
   - Bash
   - Read
@@ -145,7 +145,7 @@ export PATH="$PATH:$(pwd)/node_modules/.bin"
 pan init
 ```
 
-This creates `~/.panopticon.env` with default configuration.
+This creates `~/.overdeck.env` with default configuration.
 
 ### Step 5: Verify Installation
 
@@ -313,10 +313,10 @@ After successful installation:
 ## Configuration Files
 
 After installation, you'll have:
-- `~/.panopticon.env` - Main configuration
-- `~/.panopticon/skills/` - Synced skills
-- `~/.panopticon/agents/` - Agent state
-- `~/.panopticon/workspaces/` - Workspace metadata
+- `~/.overdeck.env` - Main configuration
+- `~/.overdeck/skills/` - Synced skills
+- `~/.overdeck/agents/` - Agent state
+- `~/.overdeck/workspaces/` - Workspace metadata
 
 ## Next Steps
 

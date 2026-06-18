@@ -4,7 +4,7 @@ import { Effect } from 'effect';
  *
  * Exercises the real getShadowState function with real shadow-state files.
  * Follows the pattern in tests/lib/shadow-state.test.ts: write unique-prefix
- * files to the real ~/.panopticon/shadow-state dir and clean up after.
+ * files to the real ~/.overdeck/shadow-state dir and clean up after.
  *
  * Health path tests mock getRuntimeForAgent + getAgentHealth (cloister) so
  * there is no in-memory runtime required in the test environment.

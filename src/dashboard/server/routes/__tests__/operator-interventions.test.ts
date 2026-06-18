@@ -209,8 +209,8 @@ describe('operator.intervention dashboard routes', () => {
     tmuxMocks.killSession.mockReturnValue(Effect.succeed(undefined));
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
     projectMocks.extractTeamPrefix.mockReturnValue('PAN');
-    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectName: 'panopticon' });
-    projectMocks.findProjectByTeamSync.mockReturnValue({ name: 'panopticon', workspace: {} });
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectName: 'overdeck' });
+    projectMocks.findProjectByTeamSync.mockReturnValue({ name: 'overdeck', workspace: {} });
     trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
     trackerMocks.resolveTrackerTypeSync.mockReturnValue('github');
     issueServiceMock.getIssueSource.mockReturnValue('github');

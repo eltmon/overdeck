@@ -528,7 +528,7 @@ footer .gh { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
         <span class="num">03</span>
         <span>
           <strong>Home Tab + Live Session Briefing</strong>
-          The dashboard's new landing route surfaces running agents, paused gates, recent merges, failed verifications, and a time-bucketed activity feed across every workspace. <code>~/.panopticon/session-context.md</code> updates on every state change and re-injects when newer than session start — so context stays live, not stale.
+          The dashboard's new landing route surfaces running agents, paused gates, recent merges, failed verifications, and a time-bucketed activity feed across every workspace. <code>~/.overdeck/session-context.md</code> updates on every state change and re-injects when newer than session start — so context stays live, not stale.
         </span>
       </li>
       <li>
@@ -583,7 +583,7 @@ footer .gh { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
     <details class="faq">
       <summary>What changes for an existing Overdeck user?</summary>
       <div class="answer">
-        <p><code>pan install</code> migrates <code>~/Projects/.claude/{skills,agents,CLAUDE.md}</code> to <code>~/.panopticon/context/global/</code>. Existing projects under <code>~/Projects/</code> are auto-registered with the new project system. Existing workspaces continue to work; the new briefing file injects automatically on the next session start. No code changes required in your projects.</p>
+        <p><code>pan install</code> migrates <code>~/Projects/.claude/{skills,agents,CLAUDE.md}</code> to <code>~/.overdeck/context/global/</code>. Existing projects under <code>~/Projects/</code> are auto-registered with the new project system. Existing workspaces continue to work; the new briefing file injects automatically on the next session start. No code changes required in your projects.</p>
       </div>
     </details>
     <details class="faq">
@@ -652,7 +652,7 @@ footer .gh { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
       <div class="answer">
         <p>The epic is failure-isolated:</p>
         <ul>
-          <li><strong>PAN-1201</strong> (distribution) is the only one with a hard downstream dependency. PAN-1204 prefers to write <code>session-context.md</code> inside the new <code>~/.panopticon/context/global/</code> directory; if PAN-1201 fails, PAN-1204 falls back to <code>~/.panopticon/session-context.md</code> at the root and is migratable later.</li>
+          <li><strong>PAN-1201</strong> (distribution) is the only one with a hard downstream dependency. PAN-1204 prefers to write <code>session-context.md</code> inside the new <code>~/.overdeck/context/global/</code> directory; if PAN-1201 fails, PAN-1204 falls back to <code>~/.overdeck/session-context.md</code> at the root and is migratable later.</li>
           <li><strong>PAN-1203</strong> and <strong>PAN-1205</strong> are independent; either can ship without the others.</li>
           <li><strong>PAN-1204</strong> depends on <strong>PAN-1052</strong> (memory store), which is already on main and verified.</li>
         </ul>
@@ -734,7 +734,7 @@ footer .gh { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
   <ul>
     <li>All four children merged to main (#1201, #1203, #1204, #1205)</li>
     <li><code>pan sync</code> no longer references <code>sync.devroot</code></li>
-    <li><code>~/.panopticon/context/global.md</code> round-trips to <code>~/.claude/CLAUDE.md</code> and Pi's equivalent</li>
+    <li><code>~/.overdeck/context/global.md</code> round-trips to <code>~/.claude/CLAUDE.md</code> and Pi's equivalent</li>
     <li>A newly-spawned agent in any registered project receives the live session-context briefing</li>
     <li>Asking an agent <em>"how do I X in Overdeck?"</em> triggers docs-RAG injection</li>
     <li>An agent can produce an HTML artifact, validate it, publish it, and the dashboard renders the workspace-record card linking to it</li>
@@ -769,12 +769,12 @@ footer .gh { font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
     }
     label.textContent = LABELS[mode];
     icon.innerHTML = ICONS[mode];
-    try { localStorage.setItem('panopticon-prfaq-theme', mode); } catch (e) {}
+    try { localStorage.setItem('overdeck-prfaq-theme', mode); } catch (e) {}
   }
 
   let current = 'auto';
   try {
-    const saved = localStorage.getItem('panopticon-prfaq-theme');
+    const saved = localStorage.getItem('overdeck-prfaq-theme');
     if (saved && ORDER.includes(saved)) current = saved;
   } catch (e) {}
   apply(current);

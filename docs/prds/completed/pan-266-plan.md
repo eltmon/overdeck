@@ -4,7 +4,7 @@
 
 Overdeck's current skill distribution has three critical problems:
 
-1. **Stale copies** — `pan install` copies skills to `~/.panopticon/skills/` once and never updates them. `pan sync` only recreates symlinks. Users run stale versions indefinitely.
+1. **Stale copies** — `pan install` copies skills to `~/.overdeck/skills/` once and never updates them. `pan sync` only recreates symlinks. Users run stale versions indefinitely.
 2. **Symlink discovery bug** — Claude Code ([#14836](https://github.com/anthropics/claude-code/issues/14836)) doesn't list symlinked skills in `/skills`, even though they work when invoked directly. Causes repeated confusion.
 3. **Wrong priority level** — Skills at `~/.claude/skills/` (personal level) silently override project-specific customizations in workspaces. Claude Code precedence: personal > project. This makes project template overrides invisible.
 
@@ -32,7 +32,7 @@ JSON manifests at devroot and workspace levels track what Overdeck placed (file 
 Running workspaces are never updated. Skills are installed at `pan workspace create` time only. Explicit `pan workspace update` for refreshing existing workspaces.
 
 ### D6: Configurable devroot
-`devroot: ~/Projects` in `~/.panopticon/config.yaml`. Set to `null` to disable devroot placement (skills only go to workspaces).
+`devroot: ~/Projects` in `~/.overdeck/config.yaml`. Set to `null` to disable devroot placement (skills only go to workspaces).
 
 ### D7: Conflict resolution
 Default: warning messages. `--force` to overwrite. `--diff` to show changes. Never silently skip or overwrite.
@@ -55,7 +55,7 @@ REPO SOURCE (overdeck/)
         │
         │ pan sync (COPY, keeps fresh)
         ▼
-PANOPTICON CACHE (~/.panopticon/)
+PANOPTICON CACHE (~/.overdeck/)
   skills/           Full copies (always up-to-date)
   agents/
   rules/
@@ -65,7 +65,7 @@ PANOPTICON CACHE (~/.panopticon/)
         │                               skills/    (all Overdeck skills)
         │                               agents/    (all Overdeck agents)
         │                               rules/     (all Overdeck rules)
-        │                               .panopticon-manifest.json
+        │                               .overdeck-manifest.json
         │
         └─── pan workspace create ───► WORKSPACE (workspace/.claude/)
                                         skills/    (Overdeck + project template)
@@ -93,11 +93,11 @@ workspace/.claude/skills/      Project (workspace) — for workspace agents
 ```json
 {
   "version": 1,
-  "managed_by": "panopticon",
+  "managed_by": "overdeck",
   "installed": {
     "skills/beads/SKILL.md": {
       "hash": "sha256:abc123...",
-      "source": "panopticon",
+      "source": "overdeck",
       "installed_at": "2026-02-24T10:30:00Z"
     },
     "skills/session-health/SKILL.md": {
@@ -128,7 +128,7 @@ For each file to install:
 ### Devroot Configuration
 
 ```yaml
-# ~/.panopticon/config.yaml
+# ~/.overdeck/config.yaml
 devroot: ~/Projects        # where you launch Claude Code from
                             # set to null to disable devroot skill placement
 ```
@@ -138,7 +138,7 @@ devroot: ~/Projects        # where you launch Claude Code from
 ```
 pan workspace create MIN-678
   │
-  ├── 1. Copy Overdeck defaults from ~/.panopticon/ cache
+  ├── 1. Copy Overdeck defaults from ~/.overdeck/ cache
   │      skills/ → workspace/.claude/skills/
   │      agents/ → workspace/.claude/agents/
   │      rules/  → workspace/.claude/rules/
@@ -149,7 +149,7 @@ pan workspace create MIN-678
   │      e.g., MYN's no-localias added (MYN-only skill)
   │
   ├── 3. Write workspace/.claude/.manifest.json
-  │      Records hash + source (panopticon vs project-template) for each file
+  │      Records hash + source (overdeck vs project-template) for each file
   │
   ├── 4. Generate workspace CLAUDE.md
   │      (existing generateClaudeMd() — unchanged)
@@ -164,7 +164,7 @@ pan workspace create MIN-678
 | File | Change | Difficulty |
 |------|--------|-----------|
 | `src/lib/sync.ts` | Rewrite `planSync()` and `executeSync()` — copy to devroot instead of symlink to `~/.claude/`, add manifest tracking, add `--force`/`--diff` flags | **hard** |
-| `src/lib/sync.ts` | Add `refreshCache()` — copy from repo source to `~/.panopticon/` (replaces stale `pan install` copy) | medium |
+| `src/lib/sync.ts` | Add `refreshCache()` — copy from repo source to `~/.overdeck/` (replaces stale `pan install` copy) | medium |
 | `src/lib/sync.ts` | Add manifest read/write/compare utilities | medium |
 | `src/cli/commands/sync.ts` | Wire `--force` and `--diff` CLI flags | simple |
 
@@ -185,7 +185,7 @@ pan workspace create MIN-678
 
 | File | Change | Difficulty |
 |------|--------|-----------|
-| `src/cli/commands/install.ts` | Remove skip-if-exists logic (line 254), always refresh `~/.panopticon/` cache from repo | medium |
+| `src/cli/commands/install.ts` | Remove skip-if-exists logic (line 254), always refresh `~/.overdeck/` cache from repo | medium |
 | `src/lib/config.ts` or config schema | Add `devroot` setting to config | simple |
 
 ### Migration
@@ -199,14 +199,14 @@ pan workspace create MIN-678
 | File | Change | Difficulty |
 |------|--------|-----------|
 | `myn/infra/.agent-template/.claude/commands/` → `skills/` | Convert 8+ legacy commands to skills format | medium |
-| `~/.panopticon/projects.yaml` | Update MYN template config (remove `symlinks:` key) | simple |
+| `~/.overdeck/projects.yaml` | Update MYN template config (remove `symlinks:` key) | simple |
 
 ### Rules Distribution
 
 | File | Change | Difficulty |
 |------|--------|-----------|
 | `src/lib/sync.ts` | Add rules to the same copy + manifest pipeline as skills/agents | simple (same mechanism) |
-| `~/.panopticon/rules/` | Create directory, add initial rules (if PAN-263 is done) | simple |
+| `~/.overdeck/rules/` | Create directory, add initial rules (if PAN-263 is done) | simple |
 
 ## Implementation Phases
 
@@ -214,7 +214,7 @@ pan workspace create MIN-678
 **Goal**: Fix stale copies and build manifest infrastructure.
 
 1. Implement manifest read/write/compare utilities in `sync.ts`
-2. Rewrite `refreshCache()` — always copy from repo to `~/.panopticon/`, generate `~/.panopticon/.manifest.json`
+2. Rewrite `refreshCache()` — always copy from repo to `~/.overdeck/`, generate `~/.overdeck/.manifest.json`
 3. Fix `pan install` to always refresh (remove skip-if-exists)
 4. Tests: verify cache is always fresh after sync
 
@@ -265,7 +265,7 @@ pan workspace create MIN-678
 ## Acceptance Criteria
 
 - [ ] `pan sync` copies skills/agents/rules to devroot (no symlinks anywhere)
-- [ ] `pan sync` refreshes `~/.panopticon/` cache from repo source (no more stale copies)
+- [ ] `pan sync` refreshes `~/.overdeck/` cache from repo source (no more stale copies)
 - [ ] `pan sync` writes manifest at devroot, warns on conflicts
 - [ ] `pan sync --force` overwrites modified files
 - [ ] `pan sync --diff` shows changes between installed and current
@@ -302,15 +302,15 @@ Phase 6 (commands → skills) → can run in parallel after Phase 4
 
 | Phase | Bead ID | Title |
 |-------|---------|-------|
-| 1 | panopticon-4xt3 | Manifest read/write/compare utilities |
-| 1 | panopticon-80aa | Rewrite cache refresh — copy from repo to ~/.panopticon/ |
-| 2 | panopticon-nasm | Add devroot config setting |
-| 2 | panopticon-vocj | Rewrite executeSync() for devroot distribution |
-| 2 | panopticon-eig5 | Add --force and --diff CLI flags to pan sync |
-| 3 | panopticon-ifu3 | Migration — detect and remove old symlinks from ~/.claude/ |
-| 4 | panopticon-mgeh | Rewrite workspace skill/agent installation — copies + overlay |
-| 5 | panopticon-pkxo | Implement pan workspace update command |
-| 6 | panopticon-24pm | Commands → skills migration for MYN |
+| 1 | overdeck-4xt3 | Manifest read/write/compare utilities |
+| 1 | overdeck-80aa | Rewrite cache refresh — copy from repo to ~/.overdeck/ |
+| 2 | overdeck-nasm | Add devroot config setting |
+| 2 | overdeck-vocj | Rewrite executeSync() for devroot distribution |
+| 2 | overdeck-eig5 | Add --force and --diff CLI flags to pan sync |
+| 3 | overdeck-ifu3 | Migration — detect and remove old symlinks from ~/.claude/ |
+| 4 | overdeck-mgeh | Rewrite workspace skill/agent installation — copies + overlay |
+| 5 | overdeck-pkxo | Implement pan workspace update command |
+| 6 | overdeck-24pm | Commands → skills migration for MYN |
 
 ## References
 

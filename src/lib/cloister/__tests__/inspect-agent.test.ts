@@ -109,7 +109,7 @@ describe('spawnInspectAgent', () => {
     mocks.isIssueClosed.mockResolvedValue(true);
 
     const result = await Effect.runPromise(spawnInspectAgent({
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
       beadId: 'workspace-b95lw',
@@ -128,7 +128,7 @@ describe('spawnInspectAgent', () => {
 
   it('spawns inspect normally when the issue is open', async () => {
     const result = await Effect.runPromise(spawnInspectAgent({
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
       beadId: 'workspace-b95lw',
@@ -153,7 +153,7 @@ describe('spawnInspectAgent', () => {
 
   it('writes a minimal state.json so the inspect agent is enumerable', async () => {
     await Effect.runPromise(spawnInspectAgent({
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
       beadId: 'workspace-b95lw',

@@ -34,7 +34,7 @@ cd /home/eltmon/Projects/overdeck
   echo
   echo "Now produce the audit comment for PAN-${ISSUE}. Use tools to verify each AC. Save any UI screenshots to /tmp/audit-pass3/screenshots/PAN-${ISSUE}-<view>.png."
 } | ANTHROPIC_BASE_URL="http://127.0.0.1:8317" \
-    ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key" \
+    ANTHROPIC_AUTH_TOKEN="overdeck-local-cliproxy-key" \
     timeout 600 claude --print --model gpt-5.5 --permission-mode bypassPermissions \
     > "$RESULT" 2> "$ERR"
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/ask-user-question-hook  (PAN-1520)
+# ~/.overdeck/bin/ask-user-question-hook  (PAN-1520)
 #
 # PreToolUse hook on AskUserQuestion — denies the tool call to prevent the
 # upstream Claude Code silent-corruption bug (anthropics/claude-code#10229,

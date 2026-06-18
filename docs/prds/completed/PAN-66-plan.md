@@ -132,6 +132,6 @@ These are alternative invocation patterns for common operations:
 
 ## Notes
 
-- Skills are defined in `~/.panopticon/skills/` and symlinked to `~/.claude/skills/`
+- Skills are defined in `~/.overdeck/skills/` and symlinked to `~/.claude/skills/`
 - The Skill tool definition in the system prompt is the authoritative source for available skills
 - Some skills are AI-initiated (knowledge-capture, refactor-radar) and don't appear in user-invocable lists

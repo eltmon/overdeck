@@ -3,35 +3,35 @@
 ## Summary
 
 Implement the repo artifact design from `docs/REPO-ARTIFACTS.md`. This consolidates
-project-level directory renames (`.panopticon/` → `.pan/`), config file renames
-(`.panopticon.yaml` → `.pan.yaml`), archive structure changes (flat → per-issue subdir),
+project-level directory renames (`.overdeck/` → `.pan/`), config file renames
+(`.overdeck.yaml` → `.pan.yaml`), archive structure changes (flat → per-issue subdir),
 and multi-tool skill sync into one cohesive feature.
 
 ## Decisions Made
 
-### 1. `.panopticon/` → `.pan/` (project-level only)
+### 1. `.overdeck/` → `.pan/` (project-level only)
 
-All project-level references to `.panopticon/` change to `.pan/`. The global tool directory
-`~/.panopticon/` is **unchanged**.
+All project-level references to `.overdeck/` change to `.pan/`. The global tool directory
+`~/.overdeck/` is **unchanged**.
 
 Affected files:
 - `src/lib/costs/wal.ts` — `DEFAULT_EVENTS_SUBDIR` → `.pan/events`
 - `src/lib/costs/sync-wal.ts` — `DEFAULT_EVENTS_SUBDIR` → `.pan/events`
-- `src/lib/convoy-templates.ts` — outputDir `.panopticon/triage` → `.pan/convoy`, `.panopticon/health` → `.pan/convoy`
-- `src/lib/convoy.ts` — default outputDir `.panopticon/convoy-output` → `.pan/convoy`
-- `src/lib/remote/remote-agents.ts` — `/workspace/.panopticon/prompts/` → `/workspace/.pan/prompts/`
-- `src/lib/projects.ts` — events_path default `.panopticon/events` → `.pan/events`
+- `src/lib/convoy-templates.ts` — outputDir `.overdeck/triage` → `.pan/convoy`, `.overdeck/health` → `.pan/convoy`
+- `src/lib/convoy.ts` — default outputDir `.overdeck/convoy-output` → `.pan/convoy`
+- `src/lib/remote/remote-agents.ts` — `/workspace/.overdeck/prompts/` → `/workspace/.pan/prompts/`
+- `src/lib/projects.ts` — events_path default `.overdeck/events` → `.pan/events`
 
 **Convoy unification**: Both triage and health outputs previously went to separate
-`.panopticon/triage` and `.panopticon/health` directories. They now unify under `.pan/convoy`.
+`.overdeck/triage` and `.overdeck/health` directories. They now unify under `.pan/convoy`.
 
-### 2. `.panopticon.yaml` → `.pan.yaml`
+### 2. `.overdeck.yaml` → `.pan.yaml`
 
 - `loadProjectConfig()` in `config-yaml.ts` looks for `.pan.yaml` first, falls back to
-  `.panopticon.yaml` with a **stderr deprecation warning**
+  `.overdeck.yaml` with a **stderr deprecation warning**
 - `hasProjectConfig()` and `getProjectConfigPath()` updated to check both
-- Workspace setup code generates `.pan.yaml` instead of `.panopticon.yaml`
-- Backwards compat: `.panopticon.yaml` continues to work, just warns
+- Workspace setup code generates `.pan.yaml` instead of `.overdeck.yaml`
+- Backwards compat: `.overdeck.yaml` continues to work, just warns
 
 ### 3. Archive structure: flat → per-issue subdirectory
 
@@ -61,11 +61,11 @@ archive of legacy-named workspaces.
 `sync.ts` updated to include `.pan/skills/` from the project repo with precedence:
 1. `.claude/skills/<name>/` already in project → **skip, never overwrite**
 2. `.pan/skills/<name>/` in project repo → write to tool dirs
-3. `~/.panopticon/skills/<name>/` → global fallback
+3. `~/.overdeck/skills/<name>/` → global fallback
 
 ### 6. Multi-tool sync (all 6 tools)
 
-Read `tools.also_sync` from `~/.panopticon/config.yaml` (global) merged with `.pan.yaml`
+Read `tools.also_sync` from `~/.overdeck/config.yaml` (global) merged with `.pan.yaml`
 (per-project, additive only). For each configured tool, write skills/rules:
 
 | Tool | Target |
@@ -93,7 +93,7 @@ When creating/updating a workspace, ensure these paths are in `.gitignore`:
 
 ### 8. Workspace migration safety
 
-When `pan sync` or `pan install` encounters an existing `.panopticon/` subdir, migration:
+When `pan sync` or `pan install` encounters an existing `.overdeck/` subdir, migration:
 1. Check old path exists
 2. Verify new `.pan/` path does NOT already exist
 3. Move old → new
@@ -111,7 +111,7 @@ cleanup needed.
 
 ## Out of Scope
 
-- `~/.panopticon/` global tool directory — unchanged
+- `~/.overdeck/` global tool directory — unchanged
 - Tracker routing in `src/lib/agents.ts` — that is PAN-489 scope
 - `.planning/` gitignore — `.planning/` stays committed on feature branches
 - Migrating existing flat archives to subdirectory format (leave as-is)

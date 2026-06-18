@@ -129,7 +129,7 @@ describe('scanner', () => {
     writeFileSync(p, SESSION_JSONL, 'utf8');
 
     await scan({ mode: 'system', watchDirs: [] });
-    expect(findDiscoveredSessions().find((s) => s.jsonlPath === p)?.panopticonManaged).toBe(false);
+    expect(findDiscoveredSessions().find((s) => s.jsonlPath === p)?.overdeckManaged).toBe(false);
 
     insertCostEventSync({
       ts: '2025-01-01T10:02:00Z',
@@ -151,7 +151,7 @@ describe('scanner', () => {
 
     const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
     expect(result.updated).toBeGreaterThan(0);
-    expect(session?.panopticonManaged).toBe(true);
+    expect(session?.overdeckManaged).toBe(true);
     expect(session?.panIssueId).toBe('PAN-457');
     expect(session?.panAgentId).toBe('agent-late');
   });
@@ -287,7 +287,7 @@ describe('scanner', () => {
 
     expect(result.warnings?.some((warning) => warning.includes('differs from cost_events'))).toBe(true);
     const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
-    expect(session?.panopticonManaged).toBe(true);
+    expect(session?.overdeckManaged).toBe(true);
     expect(session?.panIssueId).toBe('PAN-457');
     expect(session?.panAgentId).toBe('agent-cost');
   });

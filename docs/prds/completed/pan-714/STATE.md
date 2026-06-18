@@ -14,14 +14,14 @@ Two unrelated gaps surfaced by the PAN-705 command taxonomy reorg (PR #708):
 The repo tracks 26 skill directories under `.claude/skills/` (separate from the canonical `skills/` source-of-truth distributed by `pan sync`). These drifted:
 
 - **Stale command refs** — files reference `pan work list` (renamed to `pan issues`), `pan cloister start` / `pan specialists wake` (moved under `pan admin *`). Affected: `pan-tracker`, `pan-help`, `pan-setup`, `pan-quickstart`, `pan-projects`, `pan-up`, `pan-plan`, `pan-issue`, `test-specialist-workflow`.
-- **Orphan skills** — 5 entries only exist in `.claude/skills/` and were removed from canonical `skills/`: `hume-evi`, `pan-dashboard-restart`, `rebase-and-submit`, `test-specialist-workflow`, `update-panopticon-docs`.
+- **Orphan skills** — 5 entries only exist in `.claude/skills/` and were removed from canonical `skills/`: `hume-evi`, `pan-dashboard-restart`, `rebase-and-submit`, `test-specialist-workflow`, `update-overdeck-docs`.
 - **Missing new skills** — 56 canonical skills in `skills/` are NOT mirrored into `.claude/skills/`, including every new PAN-705 name (`pan-issues`, `pan-admin`, etc.).
 - **Structural bugs** — nested duplicates: `pan-new-project/pan-new-project/SKILL.md`, `work-complete/work-complete/SKILL.md`.
 - **Content drift** — `plan`, `pan-oversee`, `pan-skill-creator`, `pan-new-project` differ between the two trees.
 
 **Root cause:** `pan sync` only maintains `~/.claude/skills/` (user-level). It does not touch project-level `.claude/skills/`. The project tree is hand-maintained and decays silently.
 
-**User intent verified:** All 26 tracked entries under `.claude/skills/` are panopticon-managed — no user-authored or non-panopticon skills exist in that tree, so deleting/overwriting is safe.
+**User intent verified:** All 26 tracked entries under `.claude/skills/` are overdeck-managed — no user-authored or non-overdeck skills exist in that tree, so deleting/overwriting is safe.
 
 ### 2. No unit tests for `doneCommand` / `approveCommand`
 
@@ -69,7 +69,7 @@ User chose "both" over "helpers only" or "command-level only". Plan:
 
 - **No scope creep.** This is a cleanup issue. Do not rewrite `doneCommand`; only extract pre-flight checks. Do not restructure `approveCommand`; only export and test the helpers it already has.
 - **Preserve existing behavior exactly.** Pre-flight extraction must produce identical failure output and exit codes. Add a snapshot/golden-output test for one failing-pre-flight run to lock this in.
-- **Don't break `pan sync` for non-panopticon projects.** The new project-level `.claude/skills/` mirror must only activate when a top-level `./skills/` directory exists with at least one `SKILL.md` descendant. Every other project behaves exactly as before.
+- **Don't break `pan sync` for non-overdeck projects.** The new project-level `.claude/skills/` mirror must only activate when a top-level `./skills/` directory exists with at least one `SKILL.md` descendant. Every other project behaves exactly as before.
 - **Keep `.gitignore` inside `.claude/skills/`** — it ignores Overdeck-managed symlinks created by older `pan sync` versions.
 - **Vitest + existing test conventions only.** No new test frameworks.
 

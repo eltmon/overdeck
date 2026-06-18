@@ -1,5 +1,5 @@
 ---
-name: beads-panopticon-guide
+name: beads-overdeck-guide
 description: >
   Overdeck-specific beads usage patterns. Covers common mistakes agents make
   when filtering beads by issue number (PAN-XXX) and working with Linear-synced beads.
@@ -10,12 +10,12 @@ triggers:
   - "find beads"
   - "filter by issue"
   - "PAN-"
-  - "panopticon-"
+  - "overdeck-"
 ---
 
 # Beads Quick Reference for Overdeck Agents
 
-**Context:** Overdeck uses beads to track tasks for Linear issues (PAN-XXX). Each Linear issue spawns multiple bead tasks with IDs like `panopticon-abc`.
+**Context:** Overdeck uses beads to track tasks for Linear issues (PAN-XXX). Each Linear issue spawns multiple bead tasks with IDs like `overdeck-abc`.
 
 ## ⚠️ Common Mistakes
 
@@ -39,7 +39,7 @@ bd search "PAN-116"
 
 ## Finding Beads for a Overdeck Issue
 
-**Pattern:** Linear issue `PAN-XXX` → Multiple beads `panopticon-{random}`
+**Pattern:** Linear issue `PAN-XXX` → Multiple beads `overdeck-{random}`
 
 ```bash
 # Find ALL beads for PAN-116 (including closed)
@@ -49,7 +49,7 @@ bd list --title-contains "PAN-116" --all
 bd list --title-contains "PAN-116" --status open
 
 # Get details about a specific bead
-bd show panopticon-abc
+bd show overdeck-abc
 
 # Find unblocked work for PAN-116
 bd ready | grep -i "PAN-116"
@@ -87,16 +87,16 @@ Never run `bd init` inside a redirect-managed worktree. If `.beads/redirect` exi
 
 ```bash
 # Start work on a bead
-bd update panopticon-abc --status in_progress
+bd update overdeck-abc --status in_progress
 
 # Add progress notes (CRITICAL for crash recovery)
-bd comments add panopticon-abc "Implemented parseClaudeSession refactor"
+bd comments add overdeck-abc "Implemented parseClaudeSession refactor"
 
 # Complete a bead
-bd close panopticon-abc --reason "Per-message costing implemented"
+bd close overdeck-abc --reason "Per-message costing implemented"
 
 # Check dependencies
-bd dep tree panopticon-abc
+bd dep tree overdeck-abc
 ```
 
 ## Bead ID vs Issue ID
@@ -104,7 +104,7 @@ bd dep tree panopticon-abc
 | Type | Example | Where Used |
 |------|---------|------------|
 | **Linear Issue ID** | `PAN-116` | GitHub issues, titles, labels |
-| **Bead ID** | `panopticon-abc` | bd commands (`bd show`, `bd update`) |
+| **Bead ID** | `overdeck-abc` | bd commands (`bd show`, `bd update`) |
 
 **Key insight:** `bd list --id` expects bead IDs, not Linear IDs.
 
@@ -113,7 +113,7 @@ bd dep tree panopticon-abc
 bd list --id PAN-116
 
 # ✅ CORRECT
-bd list --id panopticon-abc,panopticon-xyz
+bd list --id overdeck-abc,overdeck-xyz
 ```
 
 ## Invalid Commands (NEVER use these)
@@ -146,7 +146,7 @@ The following commands do NOT exist. Agents frequently hallucinate them:
 | Use Case | Filter Flag | Example |
 |----------|-------------|---------|
 | Search by Linear issue number | `--title-contains` | `--title-contains "PAN-116"` |
-| Filter by specific bead IDs | `--id` | `--id panopticon-abc,panopticon-xyz` |
+| Filter by specific bead IDs | `--id` | `--id overdeck-abc,overdeck-xyz` |
 | Filter by label | `--label` | `--label PAN-116` (if labeled) |
 | Full text search | Use `bd search` | `bd search "PAN-116"` |
 
@@ -160,7 +160,7 @@ For complete beads documentation, see the main `beads` skill:
 ## Remember
 
 1. **No `--issue` flag exists** - Use `--title-contains` instead
-2. **`--id` expects bead IDs** (panopticon-abc), not Linear IDs (PAN-116)
+2. **`--id` expects bead IDs** (overdeck-abc), not Linear IDs (PAN-116)
 3. **Always add comments** - They survive compaction and help the next agent
 4. **Persist at session end** - `bd dolt commit -m "session update"` commits pending local Dolt changes
 5. **NEVER use `bd claim`** - Use `bd update <id> --claim` instead
@@ -174,22 +174,22 @@ For complete beads documentation, see the main `beads` skill:
 bd list --title-contains "PAN-116" --all
 
 # Output shows:
-#   panopticon-abc [open] - PAN-116: Refactor parseClaudeSession
-#   panopticon-xyz [open] - PAN-116: Add multi-model tests
+#   overdeck-abc [open] - PAN-116: Refactor parseClaudeSession
+#   overdeck-xyz [open] - PAN-116: Add multi-model tests
 
 # 2. Pick first unblocked task
-bd show panopticon-abc
+bd show overdeck-abc
 
 # 3. Start work
-bd update panopticon-abc --status in_progress
+bd update overdeck-abc --status in_progress
 
 # 4. Do the work...
 
 # 5. Add progress notes
-bd comments add panopticon-abc "Implemented per-message costing logic"
+bd comments add overdeck-abc "Implemented per-message costing logic"
 
 # 6. Complete
-bd close panopticon-abc --reason "Refactored parseClaudeSession to calculate cost per-message"
+bd close overdeck-abc --reason "Refactored parseClaudeSession to calculate cost per-message"
 
 # 7. Persist pending Dolt changes
 bd dolt commit -m "PAN-116 session update"

@@ -707,15 +707,15 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }
 
   // Check environment variables
-  const envFile = join(homedir(), '.panopticon.env');
+  const envFile = join(homedir(), '.overdeck.env');
   if (existsSync(envFile)) {
-    checks.push({ name: 'Config File', status: 'ok', message: '~/.panopticon.env exists' });
+    checks.push({ name: 'Config File', status: 'ok', message: '~/.overdeck.env exists' });
   } else {
     checks.push({
       name: 'Config File',
       status: 'warn',
-      message: '~/.panopticon.env not found',
-      fix: 'Create ~/.panopticon.env with LINEAR_API_KEY=...',
+      message: '~/.overdeck.env not found',
+      fix: 'Create ~/.overdeck.env with LINEAR_API_KEY=...',
     });
   }
 
@@ -731,7 +731,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
         name: 'LINEAR_API_KEY',
         status: 'warn',
         message: 'Not configured',
-        fix: 'Add LINEAR_API_KEY to ~/.panopticon.env',
+        fix: 'Add LINEAR_API_KEY to ~/.overdeck.env',
       });
     }
   } else {
@@ -739,7 +739,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       name: 'LINEAR_API_KEY',
       status: 'warn',
       message: 'Not configured',
-      fix: 'Set LINEAR_API_KEY environment variable or add to ~/.panopticon.env',
+      fix: 'Set LINEAR_API_KEY environment variable or add to ~/.overdeck.env',
     });
   }
 
@@ -769,13 +769,13 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Check smee-client webhook relay
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
-    const smeeUrlPath = join(homedir(), '.panopticon', 'github-app', 'smee-url');
+    const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
         name: 'smee-client Webhook Relay',
         status: 'warn',
         message: 'Not configured (optional)',
-        fix: 'Create ~/.panopticon/github-app/smee-url with your smee.io channel URL',
+        fix: 'Create ~/.overdeck/github-app/smee-url with your smee.io channel URL',
       });
     } else if (isSmeeProcessRunningSync()) {
       checks.push({

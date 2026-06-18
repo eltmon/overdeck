@@ -56,7 +56,7 @@ describe('discovered-sessions-db', () => {
     expect(session.toolsUsed).toEqual(['Read', 'Edit']);
     expect(session.filesTouched).toEqual(['/home/user/Projects/foo.ts']);
     expect(session.enrichmentLevel).toBe(0);
-    expect(session.panopticonManaged).toBe(false);
+    expect(session.overdeckManaged).toBe(false);
     expect(session.scannedAt).toBeTruthy();
   });
 
@@ -94,14 +94,14 @@ describe('discovered-sessions-db', () => {
     const { upsertDiscoveredSession, findDiscoveredSessions } = await import(
       '../discovered-sessions-db.js'
     );
-    upsertDiscoveredSession({ jsonlPath: '/a.jsonl', panopticonManaged: true });
-    upsertDiscoveredSession({ jsonlPath: '/b.jsonl', panopticonManaged: false });
+    upsertDiscoveredSession({ jsonlPath: '/a.jsonl', overdeckManaged: true });
+    upsertDiscoveredSession({ jsonlPath: '/b.jsonl', overdeckManaged: false });
     const managed = findDiscoveredSessions({ managed: true });
     expect(managed.length).toBe(1);
-    expect(managed[0].panopticonManaged).toBe(true);
+    expect(managed[0].overdeckManaged).toBe(true);
     const unmanaged = findDiscoveredSessions({ unmanaged: true });
     expect(unmanaged.length).toBe(1);
-    expect(unmanaged[0].panopticonManaged).toBe(false);
+    expect(unmanaged[0].overdeckManaged).toBe(false);
   });
 
   it('findDiscoveredSessions filters by enriched/notEnriched', async () => {
@@ -382,7 +382,7 @@ describe('discovered-sessions-db', () => {
   it('getDiscoveredStats returns correct counts', async () => {
     const { upsertDiscoveredSession, updateEnrichment, insertEmbedding, getDiscoveredStats } =
       await import('../discovered-sessions-db.js');
-    const s1 = upsertDiscoveredSession({ jsonlPath: '/s1.jsonl', panopticonManaged: true });
+    const s1 = upsertDiscoveredSession({ jsonlPath: '/s1.jsonl', overdeckManaged: true });
     upsertDiscoveredSession({ jsonlPath: '/s2.jsonl' });
     updateEnrichment(s1.id, { enrichmentLevel: 1, enrichmentModel: 'haiku', summary: 'test' });
     insertEmbedding(s1.id, 'text-embedding-3-small', new Float32Array([0.5, 0.5]));

@@ -5,7 +5,7 @@ triggers:
   - pan help
   - pan commands
   - what can pan do
-  - panopticon help
+  - overdeck help
 allowed-tools:
   - Bash
   - Read

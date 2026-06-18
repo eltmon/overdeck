@@ -1,7 +1,7 @@
 services:
   traefik:
     image: traefik:latest
-    container_name: panopticon-traefik
+    container_name: overdeck-traefik
     restart: unless-stopped
     ports:
       - "80:80"       # HTTP (redirects to HTTPS)
@@ -19,7 +19,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
     networks:
-      - panopticon
+      - overdeck
 
     labels:
       - "traefik.enable=true"
@@ -38,6 +38,6 @@ services:
       - "host.docker.internal:host-gateway"
 
 networks:
-  panopticon:
-    name: panopticon
+  overdeck:
+    name: overdeck
     external: true  # Network created by 'pan install'

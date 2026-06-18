@@ -52,11 +52,11 @@ The core attribution problem: given a transcript file `<uuid>.jsonl`, which Over
 
 ### Where the Mapping Is Stored
 
-**Runtime state** (`~/.panopticon/agents/<agent-id>/runtime.json`):
+**Runtime state** (`~/.overdeck/agents/<agent-id>/runtime.json`):
 - The heartbeat hook fires on every tool use and receives both `session_id` (from Claude Code) and `OVERDECK_AGENT_ID` (from env)
 - It writes the current active `session_id` to `runtime.json` — this is the "what's active now" mapping
 
-**Session history** (`~/.panopticon/agents/<agent-id>/sessions.json`):
+**Session history** (`~/.overdeck/agents/<agent-id>/sessions.json`):
 - Append-only list of all Claude Code session UUIDs this agent has ever used
 - The heartbeat hook appends new session IDs as they appear
 - This is the "what sessions belong to this agent historically" mapping — exactly what the reconciler needs
@@ -134,15 +134,15 @@ This is the hot path that records costs as agents work.
 
 1. Claude Code fires a `PostToolUse` hook after every tool use
 2. The hook payload includes `session_id` and `transcript_path`
-3. `~/.panopticon/bin/heartbeat-hook` (bash) receives this, does heartbeat/activity tracking, then calls `record-cost-event.js`
+3. `~/.overdeck/bin/heartbeat-hook` (bash) receives this, does heartbeat/activity tracking, then calls `record-cost-event.js`
 4. `record-cost-event.js` (tsdown-bundled TypeScript):
-   - Reads the byte offset it last processed for this session from `~/.panopticon/costs/state/<session-id>.offset`
+   - Reads the byte offset it last processed for this session from `~/.overdeck/costs/state/<session-id>.offset`
    - Opens the transcript JSONL file and reads only NEW bytes from that offset
    - Parses each new line looking for `type: "assistant"` entries with `message.usage`
-   - Deduplicates by `requestId` (tracks seen IDs in `~/.panopticon/costs/state/<session-id>.seen`)
+   - Deduplicates by `requestId` (tracks seen IDs in `~/.overdeck/costs/state/<session-id>.seen`)
    - Calculates cost using pricing tables
    - Calls `appendCostEvent()` which triple-writes:
-     - `~/.panopticon/costs/events.jsonl` (append-only JSONL log)
+     - `~/.overdeck/costs/events.jsonl` (append-only JSONL log)
      - SQLite `cost_events` table (via `INSERT OR IGNORE` with `request_id` dedup)
      - Per-project WAL file (for cross-developer sharing via git)
    - Saves the new byte offset
@@ -166,7 +166,7 @@ The hook resolves issue IDs in this order:
 
 The `record-cost-event.js` script is bundled with tsdown (`scripts/tsdown.config.ts`). It uses the shared SQLite driver adapter, which selects the runtime's built-in SQLite implementation instead of a native npm addon:
 - `shims: true` — keeps ESM output compatible with any remaining CJS dependencies
-- Everything is bundled (the script runs standalone from `~/.panopticon/bin/` where `node_modules` is not available)
+- Everything is bundled (the script runs standalone from `~/.overdeck/bin/` where `node_modules` is not available)
 
 ### Error Handling Concern
 
@@ -184,7 +184,7 @@ The reconciler is a periodic sweep that ensures completeness. It catches anythin
 The reconciler scans `~/.claude/projects/` directly — no indirection through agent state files:
 
 1. Scan all directories under `~/.claude/projects/`
-2. Build a reverse session-to-agent index from `~/.panopticon/agents/*/sessions.json` files
+2. Build a reverse session-to-agent index from `~/.overdeck/agents/*/sessions.json` files
 3. For each directory, list all `.jsonl` transcript files
 4. For each transcript file, check `processed_sessions` for existing byte offset
 5. Read only new bytes, extract cost events with `requestId`
@@ -307,9 +307,9 @@ The heartbeat hook and record-cost-event.ts only matched `pan|min|aud` in git br
 | File | Purpose |
 |------|---------|
 | `scripts/record-cost-event.ts` | Live recording script source |
-| `scripts/record-cost-event.js` | Built bundle (deployed to `~/.panopticon/bin/`) |
+| `scripts/record-cost-event.js` | Built bundle (deployed to `~/.overdeck/bin/`) |
 | `scripts/tsdown.config.ts` | tsdown config for the recording script |
-| `scripts/heartbeat-hook` | Bash hook source (deployed to `~/.panopticon/bin/`) |
+| `scripts/heartbeat-hook` | Bash hook source (deployed to `~/.overdeck/bin/`) |
 | `src/lib/costs/events.ts` | `appendCostEvent()` — triple-write to JSONL, SQLite, WAL |
 | `src/lib/costs/migration.ts` | Original one-time migration (preserved, superseded by reconciler) |
 | `src/lib/costs/reconciler.ts` | Periodic catch-up sweep (v1 — agent state.json based) |
@@ -347,14 +347,14 @@ Claude Code Agent (tmux session)
   │     │                       ├─► SQLite cost_events (INSERT OR IGNORE on request_id)
   │     │                       └─► per-project WAL (for git sharing)
   │     │
-  │     └─► offset file: ~/.panopticon/costs/state/<session>.offset
+  │     └─► offset file: ~/.overdeck/costs/state/<session>.offset
   │
   └─ (transcript persists after workspace cleanup)
 
 Reconciler (periodic sweep — safety net)
   │
   ├─ scans ~/.claude/projects/ directly (ALL transcript files)
-  ├─ builds reverse index from ~/.panopticon/agents/*/sessions.json
+  ├─ builds reverse index from ~/.overdeck/agents/*/sessions.json
   ├─ reads state.json for phase (session_type attribution)
   ├─ infers issue ID from directory path as fallback
   │

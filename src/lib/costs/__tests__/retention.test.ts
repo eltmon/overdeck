@@ -11,14 +11,14 @@ import { appendCostEventSync, readEventsSync, CostEvent, getEventsFilePath } fro
 import { rebuildCacheSync, loadCacheSync } from '../aggregator.js';
 
 // Redirect process.env.HOME to an isolated temp dir so the running dashboard
-// server (which writes to the real ~/.panopticon/costs) cannot pollute tests.
+// server (which writes to the real ~/.overdeck/costs) cannot pollute tests.
 let TEST_HOME: string;
 let COSTS_DIR: string;
 const REAL_HOME = process.env.HOME;
 
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `retention-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  COSTS_DIR = join(TEST_HOME, '.panopticon', 'costs');
+  COSTS_DIR = join(TEST_HOME, '.overdeck', 'costs');
   mkdirSync(COSTS_DIR, { recursive: true });
   process.env.HOME = TEST_HOME;
 });

@@ -6,7 +6,7 @@ const runRoot = process.env.OVERDECK_TEST_HOME_ROOT ?? join(tmpdir(), `pan-test-
 process.env.OVERDECK_TEST_HOME_ROOT = runRoot;
 
 const workerId = process.env.VITEST_POOL_ID ?? '0';
-const panopticonHome = join(runRoot, `worker-${workerId}`);
+const overdeckHome = join(runRoot, `worker-${workerId}`);
 
-process.env.OVERDECK_HOME = panopticonHome;
-mkdirSync(panopticonHome, { recursive: true });
+process.env.OVERDECK_HOME = overdeckHome;
+mkdirSync(overdeckHome, { recursive: true });

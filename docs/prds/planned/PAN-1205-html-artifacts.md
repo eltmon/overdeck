@@ -34,7 +34,7 @@ Add a first-class HTML artifacts capability:
 
 - **Self-contained files** — no external deps, no relative paths, no local assets
 - **Tamper-evident** — content hash tracks edits; `pendingChanges` is automatic
-- **Stakeholder-shareable** — `panopticon.localhost/s/<slug>` (with dashboard chrome) and `panopticon.localhost/a/<slug>` (raw, sandboxed) are first-class
+- **Stakeholder-shareable** — `overdeck.localhost/s/<slug>` (with dashboard chrome) and `overdeck.localhost/a/<slug>` (raw, sandboxed) are first-class
 - **Provenance-rich** — every artifact knows who made it, when, for which issue
 - **Safe by default** — secret scanner catches accidental leaks; size cap enforced; assets locked down
 
@@ -93,7 +93,7 @@ All commands emit JSON when `--json` is passed (machine-readable for agents).
 
 ### Provenance Metadata
 
-Every artifact entry in `~/.panopticon/artifacts/index.sqlite`:
+Every artifact entry in `~/.overdeck/artifacts/index.sqlite`:
 
 ```sql
 CREATE TABLE artifacts (
@@ -129,22 +129,22 @@ Dashboard serves two routes via Traefik:
 
 | Route | Origin | Purpose | Auth |
 |---|---|---|---|
-| `panopticon.localhost/s/<slug>` | `panopticon.localhost` | Wrapper page: dashboard chrome, "Made by Bender for PAN-1052", comment thread, Open Artifact button | Inherits dashboard auth |
-| `panopticon.localhost/a/<slug>` | `artifacts.panopticon.localhost` (separate Traefik route on a separate subdomain) | Raw artifact HTML, served in sandbox iframe via the wrapper | No auth; CSP `default-src 'self' 'unsafe-inline' data: https:` |
+| `overdeck.localhost/s/<slug>` | `overdeck.localhost` | Wrapper page: dashboard chrome, "Made by Bender for PAN-1052", comment thread, Open Artifact button | Inherits dashboard auth |
+| `overdeck.localhost/a/<slug>` | `artifacts.overdeck.localhost` (separate Traefik route on a separate subdomain) | Raw artifact HTML, served in sandbox iframe via the wrapper | No auth; CSP `default-src 'self' 'unsafe-inline' data: https:` |
 
 The separate origin prevents the artifact's JavaScript from accessing wrapper-domain cookies or localStorage. Traefik dynamic config:
 
 ```yaml
 http:
   routers:
-    panopticon-artifacts:
-      rule: "Host(`artifacts.panopticon.localhost`)"
-      service: panopticon-dashboard
+    overdeck-artifacts:
+      rule: "Host(`artifacts.overdeck.localhost`)"
+      service: overdeck-dashboard
       tls:
         certResolver: mkcert
-    panopticon-dashboard:
-      rule: "Host(`panopticon.localhost`)"
-      service: panopticon-dashboard
+    overdeck-dashboard:
+      rule: "Host(`overdeck.localhost`)"
+      service: overdeck-dashboard
       tls:
         certResolver: mkcert
 ```
@@ -163,7 +163,7 @@ The dashboard server serves both: `/a/<slug>` returns raw artifact HTML with str
 
 ### Sandbox Isolation Verification
 
-Test: create an artifact with JavaScript that does `try { document.cookie } catch (e) { … }` and `try { localStorage.getItem('x') } catch (e) { … }`. Embedding it in the wrapper page, the artifact's JS sees no cookies or storage from `panopticon.localhost`. Verified by Playwright assertion in integration test.
+Test: create an artifact with JavaScript that does `try { document.cookie } catch (e) { … }` and `try { localStorage.getItem('x') } catch (e) { … }`. Embedding it in the wrapper page, the artifact's JS sees no cookies or storage from `overdeck.localhost`. Verified by Playwright assertion in integration test.
 
 ### Sharing Beyond localhost (Phase 2 placeholder)
 
@@ -202,7 +202,7 @@ $ pan artifacts validate comparison.html --json
 
 # Publish (validate + create in one)
 $ pan artifacts create comparison.html --issue PAN-1052 --agent-role work
-{"artifactId":"01HXYZ…","slug":"k3p9m2qr","url":"https://panopticon.localhost/s/k3p9m2qr","published":true}
+{"artifactId":"01HXYZ…","slug":"k3p9m2qr","url":"https://overdeck.localhost/s/k3p9m2qr","published":true}
 
 # Later: edit file, check status
 $ pan artifacts status comparison.html
@@ -212,21 +212,21 @@ pendingChanges: true
 
 # Republish
 $ pan artifacts publish comparison.html
-{"published":true,"url":"https://panopticon.localhost/s/k3p9m2qr"}
+{"published":true,"url":"https://overdeck.localhost/s/k3p9m2qr"}
 ```
 
 ## Acceptance Criteria
 
 - `pan artifacts validate` rejects: files with AWS/GitHub/OpenAI/Anthropic secrets, files > 1MB, files with `<img src="./…">`, files with `<script src="../…">`, files with `<link href="http://…">` (non-HTTPS)
-- `pan artifacts create` publishes successfully to `panopticon.localhost/s/<slug>`
+- `pan artifacts create` publishes successfully to `overdeck.localhost/s/<slug>`
 - The wrapper page shows correct provenance metadata
-- The raw page at `/a/<slug>` is served from a different origin (`artifacts.panopticon.localhost`)
+- The raw page at `/a/<slug>` is served from a different origin (`artifacts.overdeck.localhost`)
 - `pendingChanges: true` correctly detected when file hash differs from last published; `false` otherwise
 - `pan artifacts publish` updates the published hash on success
 - `pan artifacts unshare` disables the URL (returns 410 Gone) but preserves file + DB record
 - `pan artifacts list --workspace <id>` shows correct subset
 - Dashboard workspace inspector renders Artifacts tab with thumbnails and quick actions
-- Sandbox isolation: artifact's JS cannot access `panopticon.localhost` cookies (Playwright assertion passes)
+- Sandbox isolation: artifact's JS cannot access `overdeck.localhost` cookies (Playwright assertion passes)
 - `--strict` mode catches: high-entropy strings, inline event handlers (`onclick="…"` without CSP), missing alt text on images
 - New tests: validator regex coverage, hash comparison, slug uniqueness, sandbox isolation, provenance metadata, `pendingChanges` detection
 
@@ -261,7 +261,7 @@ Integration:
 - `src/dashboard/frontend/src/components/ArtifactsTab.tsx` (new)
 - `src/dashboard/frontend/src/components/ArtifactWrapper.tsx` (new) — the `/s/<slug>` React component
 - `packages/contracts/src/types.ts` — `Artifact`, `ArtifactValidationResult`, `ArtifactStatus`
-- `infra/traefik/dynamic/artifacts.toml` (new) — `artifacts.panopticon.localhost` route
+- `infra/traefik/dynamic/artifacts.toml` (new) — `artifacts.overdeck.localhost` route
 - `dist/scripts/render-thumbnail.ts` (new) — Playwright headless thumbnail generator
 - `tests/lib/artifacts/*.test.ts` (new) — validator, publish, sandbox
 - `tests/integration/artifacts-lifecycle.test.ts` (new)

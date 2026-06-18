@@ -11,35 +11,35 @@ hooks:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
+          command: "$HOME/.overdeck/bin/pre-tool-hook"
     - matcher: "Read"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/tldr-read-enforcer"
+          command: "$HOME/.overdeck/bin/tldr-read-enforcer"
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/gh-issue-trailer-hook"
+          command: "$HOME/.overdeck/bin/gh-issue-trailer-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/rtk-bash-filter"
+          command: "$HOME/.overdeck/bin/rtk-bash-filter"
   PostToolUse:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
+          command: "$HOME/.overdeck/bin/heartbeat-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
+          command: "$HOME/.overdeck/bin/permission-event-hook"
     - matcher: "Edit|Write"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/tldr-post-edit"
+          command: "$HOME/.overdeck/bin/tldr-post-edit"
   Stop:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
+          command: "$HOME/.overdeck/bin/stop-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
+          command: "$HOME/.overdeck/bin/permission-event-hook"
 ---
 
 # Overdeck Work Role

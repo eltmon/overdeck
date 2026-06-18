@@ -12,7 +12,7 @@
       // Flash prevention: Apply theme class before React mounts.
       // Default is dark — add .dark unless user chose light.
       (function() {
-        var theme = localStorage.getItem('panopticon.ui.theme') || 'dark';
+        var theme = localStorage.getItem('overdeck.ui.theme') || 'dark';
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         }

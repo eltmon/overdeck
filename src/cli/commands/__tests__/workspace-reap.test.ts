@@ -20,11 +20,11 @@ describe('workspace reap', () => {
     const candidates = collectWorkspaceReapCandidatesFromInspect([
       {
         Id: 'init-id',
-        Name: '/panopticon-feature-pan-1140-init-1',
+        Name: '/overdeck-feature-pan-1140-init-1',
         Created: '2026-05-01T12:00:00.000000000Z',
         Config: {
           Labels: {
-            'com.docker.compose.project': 'panopticon-feature-pan-1140',
+            'com.docker.compose.project': 'overdeck-feature-pan-1140',
             'com.docker.compose.project.config_files': '/repo/workspaces/feature-pan-1140/.devcontainer/docker-compose.devcontainer.yml',
             'com.docker.compose.project.working_dir': '/repo/workspaces/feature-pan-1140/.devcontainer',
           },
@@ -33,33 +33,33 @@ describe('workspace reap', () => {
       },
       {
         Id: 'server-id',
-        Name: '/panopticon-feature-pan-1140-server-1',
+        Name: '/overdeck-feature-pan-1140-server-1',
         Created: '2026-05-01T12:00:00.000000000Z',
         Config: {
           Labels: {
-            'com.docker.compose.project': 'panopticon-feature-pan-1140',
+            'com.docker.compose.project': 'overdeck-feature-pan-1140',
           },
         },
         State: { Status: 'exited', ExitCode: 127 },
       },
       {
         Id: 'healthy-id',
-        Name: '/panopticon-feature-pan-1-server-1',
+        Name: '/overdeck-feature-pan-1-server-1',
         Created: '2026-05-01T12:00:00.000000000Z',
         Config: {
           Labels: {
-            'com.docker.compose.project': 'panopticon-feature-pan-1',
+            'com.docker.compose.project': 'overdeck-feature-pan-1',
           },
         },
         State: { Status: 'running', ExitCode: 0 },
       },
       {
         Id: 'fresh-id',
-        Name: '/panopticon-feature-pan-2-init-1',
+        Name: '/overdeck-feature-pan-2-init-1',
         Created: '2026-05-15T12:00:00.000000000Z',
         Config: {
           Labels: {
-            'com.docker.compose.project': 'panopticon-feature-pan-2',
+            'com.docker.compose.project': 'overdeck-feature-pan-2',
           },
         },
         State: { Status: 'created', ExitCode: 0 },
@@ -68,7 +68,7 @@ describe('workspace reap', () => {
 
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
-      project: 'panopticon-feature-pan-1140',
+      project: 'overdeck-feature-pan-1140',
       issueId: 'pan-1140',
       ageDays: 15,
     });

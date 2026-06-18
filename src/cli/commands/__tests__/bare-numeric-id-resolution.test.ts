@@ -198,7 +198,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     tmuxMocks.sessionExistsSync.mockReset();
     tmuxMocks.sessionExistsSync.mockReturnValue(false);
     projectMocks.resolveProjectFromIssueSync.mockReset();
-    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectKey: 'panopticon' });
+    projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project', projectKey: 'overdeck' });
     projectMocks.extractTeamPrefix.mockReset();
     projectMocks.extractTeamPrefix.mockReturnValue(null);
     projectMocks.findProjectByTeamSync.mockReset();
@@ -224,7 +224,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     trackerMocks.resolveGitHubIssueSync.mockReset();
     trackerMocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 9999 });
     fsMocks.existsSync.mockReset();
-    fsMocks.existsSync.mockImplementation((path: string) => !path.endsWith('.panopticon.env'));
+    fsMocks.existsSync.mockImplementation((path: string) => !path.endsWith('.overdeck.env'));
     fsMocks.readFileSync.mockReset();
     fsMocks.readFileSync.mockReturnValue('');
     childProcessMocks.spawn.mockReset();
@@ -345,7 +345,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
-    expect(fetch).toHaveBeenCalledWith('http://dashboard.test/api/specialists/panopticon/PAN-9999/review/restart', expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith('http://dashboard.test/api/specialists/overdeck/PAN-9999/review/restart', expect.any(Object));
   });
 
   it('prints the shared unresolved-ID error path for pan kill', async () => {

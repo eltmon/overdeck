@@ -18,9 +18,9 @@ Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 
 ### Full Pipeline
 
-![Overdeck Specialist Pipeline](./diagrams/panopticon-specialist-pipeline.png)
+![Overdeck Specialist Pipeline](./diagrams/overdeck-specialist-pipeline.png)
 
-Source: [`docs/diagrams/panopticon-specialist-pipeline.excalidraw`](./diagrams/panopticon-specialist-pipeline.excalidraw)
+Source: [`docs/diagrams/overdeck-specialist-pipeline.excalidraw`](./diagrams/overdeck-specialist-pipeline.excalidraw)
 
 ## Inspect Specialist (PAN-382)
 
@@ -68,7 +68,7 @@ Inspections use commit checkpoints to scope diffs:
 - On PASS: current HEAD saved as new checkpoint
 - On BLOCKED: same checkpoint, agent fixes and re-requests
 
-Checkpoints stored at: `~/.panopticon/specialists/<project>/inspect-agent/checkpoints/<ISSUE>.json`
+Checkpoints stored at: `~/.overdeck/specialists/<project>/inspect-agent/checkpoints/<ISSUE>.json`
 
 ### CLI Reference
 
@@ -135,7 +135,7 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
    b. Commits .pan/ artifacts to git
    c. Determines phase: .pan/spec.vbrief.json exists → 'implementation', otherwise → 'exploration'
    d. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
-   e. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.panopticon/agents/agent-<id>/lifecycle.log` and `spawn.log`
+   e. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.overdeck/agents/agent-<id>/lifecycle.log` and `spawn.log`
 
 4. Dashboard UI shows `Starting...` / `Resuming...` immediately, then switches to the normal running controls once the work agent is actually live
 
@@ -339,7 +339,7 @@ interface ReviewResult {
 ```
 
 Review results are:
-- Written to `~/.panopticon/specialists/review-agent/history.jsonl`
+- Written to `~/.overdeck/specialists/review-agent/history.jsonl`
 - Posted as GitHub PR review comments
 
 ### Test Agent Results
@@ -400,7 +400,7 @@ pan specialists reset review-agent
 
 ## Configuration
 
-Specialists can be configured in `~/.panopticon/cloister.toml`:
+Specialists can be configured in `~/.overdeck/cloister.toml`:
 
 ```toml
 [specialists.review_agent]
@@ -430,7 +430,7 @@ auto_wake = true
 
 ### For Specialist Configuration
 
-1. **Monitor history logs**: Check `~/.panopticon/specialists/<name>/history.jsonl`
+1. **Monitor history logs**: Check `~/.overdeck/specialists/<name>/history.jsonl`
 2. **Configure test commands**: Override auto-detection for custom test setups
 
 ## Session Lifecycle
@@ -630,7 +630,7 @@ test_command = "npm test"
 Check merge history:
 
 ```bash
-cat ~/.panopticon/specialists/merge-agent/history.jsonl | tail -1 | jq
+cat ~/.overdeck/specialists/merge-agent/history.jsonl | tail -1 | jq
 ```
 
 Review agent logs for specific errors.

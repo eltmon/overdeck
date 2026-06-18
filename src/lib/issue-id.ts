@@ -133,7 +133,7 @@ export function resolveIssueIdSync(input: string): string {
  * Strategy:
  *   1. If input already has a prefix (PAN-1148, agent-pan-1148, F29698, etc.),
  *      delegate to resolveIssueId and return.
- *   2. If input is bare digits, scan ~/.panopticon/agents/ for state dirs
+ *   2. If input is bare digits, scan ~/.overdeck/agents/ for state dirs
  *      matching `agent-<prefix>-<num>` with a valid state.json. If exactly
  *      one matches, return `<PREFIX>-<num>`.
  *   3. If zero matches → return null (caller decides how to fail).
@@ -141,9 +141,9 @@ export function resolveIssueIdSync(input: string): string {
  *
  * Pure-sync, safe to call from CLI entry points. Reads filesystem only.
  */
-export function resolveBareNumericIdSync(input: string, panopticonHome?: string): string | null {
+export function resolveBareNumericIdSync(input: string, overdeckHome?: string): string | null {
   if (/^\d+$/.test(input)) {
-    const home = panopticonHome ?? `${process.env.HOME}/.panopticon`;
+    const home = overdeckHome ?? `${process.env.HOME}/.overdeck`;
     const agentsDir = `${home}/agents`;
     let dirents: string[];
     try {
@@ -230,9 +230,9 @@ export const resolveIssueId = (input: string): Effect.Effect<string> =>
 /** Resolve a bare numeric id by probing local agent state (sync FS). */
 export const resolveBareNumericId = (
   input: string,
-  panopticonHome?: string,
+  overdeckHome?: string,
 ): Effect.Effect<string | null> =>
-  Effect.sync(() => resolveBareNumericIdSync(input, panopticonHome));
+  Effect.sync(() => resolveBareNumericIdSync(input, overdeckHome));
 
 /** Extract prefix from a standard `PREFIX-NUMBER` id only. Pure. */
 export const extractStandardPrefix = (

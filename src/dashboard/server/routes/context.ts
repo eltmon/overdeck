@@ -72,10 +72,10 @@ const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
 const decodeSaveRequest = Schema.decodeUnknownSync(ContextLayerSaveRequest);
 
-function globalContextFile(panopticonHome = getOverdeckHome()): string {
-  return panopticonHome === getOverdeckHome()
+function globalContextFile(overdeckHome = getOverdeckHome()): string {
+  return overdeckHome === getOverdeckHome()
     ? defaultGlobalContextFile()
-    : join(panopticonHome, 'context', 'global.md');
+    : join(overdeckHome, 'context', 'global.md');
 }
 
 function contextDirForFile(file: string): string {
@@ -279,11 +279,11 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
 
 export async function buildContextLayerState(
   projects: ProjectEntry[],
-  panopticonHome = getOverdeckHome(),
+  overdeckHome = getOverdeckHome(),
 ): Promise<ContextLayerState> {
   const catalog = await buildContextCatalog(projects);
   const resolvedLayers: ResolvedLayer[] = [
-    await layerRecord(globalContextFile(panopticonHome), { kind: 'global' }),
+    await layerRecord(globalContextFile(overdeckHome), { kind: 'global' }),
   ];
 
   for (const project of catalog.projects) {
@@ -313,9 +313,9 @@ export async function buildContextLayerState(
 
 export async function loadContextLayers(
   projects: ProjectEntry[],
-  panopticonHome = getOverdeckHome(),
+  overdeckHome = getOverdeckHome(),
 ): Promise<ContextLayersResponse> {
-  const { resolvedLayers: _resolvedLayers, ...response } = await buildContextLayerState(projects, panopticonHome);
+  const { resolvedLayers: _resolvedLayers, ...response } = await buildContextLayerState(projects, overdeckHome);
   return response;
 }
 
@@ -441,13 +441,13 @@ function diagnosticsForLayers(layers: readonly ResolvedLayer[], drafts: Readonly
 export async function previewContextLayers(
   projects: ProjectEntry[],
   request: ContextPreviewRequest,
-  panopticonHome?: string,
+  overdeckHome?: string,
 ): Promise<ContextPreviewResponse>;
 export async function previewContextLayers(
   projects: ProjectEntry[],
   selectedLayer: ContextLayerTarget,
   drafts: readonly ContextLayerDraft[],
-  panopticonHome?: string,
+  overdeckHome?: string,
 ): Promise<ContextPreviewResponse>;
 export async function previewContextLayers(
   projects: ProjectEntry[],
@@ -462,10 +462,10 @@ export async function previewContextLayers(
         selectedLayer: requestOrSelectedLayer,
         drafts: Array.isArray(maybeDraftsOrOverdeckHome) ? maybeDraftsOrOverdeckHome : [],
       };
-  const panopticonHome = typeof maybeDraftsOrOverdeckHome === 'string'
+  const overdeckHome = typeof maybeDraftsOrOverdeckHome === 'string'
     ? maybeDraftsOrOverdeckHome
     : maybeOverdeckHome;
-  const state = await buildContextLayerState(projects, panopticonHome);
+  const state = await buildContextLayerState(projects, overdeckHome);
   requireLayer(state, request.selectedLayer);
   const drafts = draftContentByTarget(state, request.drafts);
   const layers = applicableLayers(state, request.selectedLayer);
@@ -488,13 +488,13 @@ export async function previewContextLayers(
 export async function saveContextLayer(
   projects: ProjectEntry[],
   request: ContextLayerSaveRequest,
-  panopticonHome?: string,
+  overdeckHome?: string,
 ): Promise<ContextLayerSaveResponse>;
 export async function saveContextLayer(
   projects: ProjectEntry[],
   target: ContextLayerTarget,
   content: string,
-  panopticonHome?: string,
+  overdeckHome?: string,
 ): Promise<ContextLayerSaveResponse>;
 export async function saveContextLayer(
   projects: ProjectEntry[],
@@ -509,10 +509,10 @@ export async function saveContextLayer(
         target: requestOrTarget,
         content: maybeContentOrOverdeckHome ?? '',
       };
-  const panopticonHome = 'operation' in requestOrTarget
+  const overdeckHome = 'operation' in requestOrTarget
     ? maybeContentOrOverdeckHome ?? maybeOverdeckHome
     : maybeOverdeckHome;
-  const state = await buildContextLayerState(projects, panopticonHome);
+  const state = await buildContextLayerState(projects, overdeckHome);
   const layer = requireLayer(state, request.target);
   if (!pathWithin(layer.dir, layer.file)) {
     throw new Error(`Context layer path escapes its directory: ${layer.file}`);

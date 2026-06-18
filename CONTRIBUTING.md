@@ -51,7 +51,7 @@ npm link
 Copy the example env and fill in secrets:
 
 ```bash
-cp .env.example ~/.panopticon.env
+cp .env.example ~/.overdeck.env
 ```
 
 Required secrets are documented in `.env.example`. API keys for Claude, GitHub, and any issue trackers you want to connect.
@@ -62,7 +62,7 @@ Beads is the task tracking system agents use. The binary is installed by `pan in
 
 ```bash
 cd /path/to/overdeck
-bd init --prefix panopticon
+bd init --prefix overdeck
 ```
 
 Without this, agents cannot start even when planning succeeds. `pan sync` attempts this automatically for registered projects, but running it once manually on first setup is recommended.

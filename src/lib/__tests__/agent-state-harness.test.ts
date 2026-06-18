@@ -61,7 +61,7 @@ describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
   const ORIGINAL = process.env.PAN_YOLO
 
   // Pin PAN_YOLO=false so the resolver returns 'auto' regardless of whatever
-  // claude.permissionMode the developer has set in ~/.panopticon/config.yaml.
+  // claude.permissionMode the developer has set in ~/.overdeck/config.yaml.
   // Previously this block deleted PAN_YOLO and relied on the resolver falling
   // through to YAML config — flaky: a dev who sets `permissionMode: bypass`
   // locally would see this assertion fail with "expected auto, got bypass" on

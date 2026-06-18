@@ -119,7 +119,7 @@ The sync `sendKeys` function two entries above this one (line 391-404) demonstra
 
 ### Fix 1 — Make tmux argument builders pure
 
-Remove `ensureTmuxContextPreparedSync` from `getTmuxBaseArgs` and `ensureTmuxContextPreparedAsync` from `tmuxExecAsync` / `tmuxExecSync`. The argument-builders become pure functions that return `['-L', 'panopticon', '-f', <configPath>, ...args]`.
+Remove `ensureTmuxContextPreparedSync` from `getTmuxBaseArgs` and `ensureTmuxContextPreparedAsync` from `tmuxExecAsync` / `tmuxExecSync`. The argument-builders become pure functions that return `['-L', 'overdeck', '-f', <configPath>, ...args]`.
 
 Prep runs exactly once per process lifetime via an awaited call from `src/dashboard/server/main.ts` before `server.listen`:
 
@@ -135,7 +135,7 @@ CLI commands (which run in their own short-lived process) continue to work: the 
 
 ### Fix 2 — Drop the redundant per-call `source-file`
 
-Every tmux invocation already passes `-L panopticon -f <configPath>`. The tmux server reads the config on first connect to that socket. The explicit `source-file` only matters for the edge case of a pre-existing `panopticon` socket server inherited from a previous process, so it runs exactly once during startup init. Per-call `source-file` is deleted.
+Every tmux invocation already passes `-L overdeck -f <configPath>`. The tmux server reads the config on first connect to that socket. The explicit `source-file` only matters for the edge case of a pre-existing `overdeck` socket server inherited from a previous process, so it runs exactly once during startup init. Per-call `source-file` is deleted.
 
 `start-server` is also idempotent and unnecessary as a separate step — the first real tmux command against the socket starts the server automatically. Keep the explicit `start-server` only inside the one-time init if we want clear error surfacing for "tmux not installed".
 

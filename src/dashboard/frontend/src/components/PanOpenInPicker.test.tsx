@@ -38,7 +38,7 @@ describe('PanOpenInPicker keyboard shortcut', () => {
   });
 
   it('opens the preferred editor from Ctrl+Shift+O while mounted', async () => {
-    localStorage.setItem('panopticon:last-editor', 'vscode');
+    localStorage.setItem('overdeck:last-editor', 'vscode');
     render(<PanOpenInPicker openInCwd="/tmp/workspace" />);
     await screen.findByRole('button', { name: 'VS Code' });
 

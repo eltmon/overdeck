@@ -14,17 +14,17 @@
 
 ### DO NOT rely on MYN infrastructure:
 - ❌ `/home/eltmon/projects/myn/infra/` - MYN-specific, not portable
-- ❌ `myn-traefik` container - Should be `panopticon-traefik`
+- ❌ `myn-traefik` container - Should be `overdeck-traefik`
 - ❌ `*.localhost` domains - Project-specific, users will have their own
 
 ### Overdeck MUST be self-contained:
-- ✅ All Traefik config in `~/.panopticon/traefik/`
-- ✅ All certs in `~/.panopticon/traefik/certs/`
+- ✅ All Traefik config in `~/.overdeck/traefik/`
+- ✅ All certs in `~/.overdeck/traefik/certs/`
 - ✅ Generic domain patterns (e.g., `*.pan.localhost` or configurable)
 - ✅ `pan install` sets up everything needed
 
 ### Migration checklist (from MYN):
-- [ ] Traefik static config (`traefik.yml`) - DONE in `~/.panopticon/traefik/`
+- [ ] Traefik static config (`traefik.yml`) - DONE in `~/.overdeck/traefik/`
 - [ ] Traefik dynamic config templates - Need per-project generation
 - [ ] SSL cert generation (`mkcert`) - Need `pan doctor` to verify
 - [ ] `/etc/hosts` management - Need `pan workspace create` to handle
@@ -123,7 +123,7 @@ Overdeck sits **above** individual projects and manages them:
 
 ### Unified Architecture
 
-![Overdeck System Architecture](./diagrams/panopticon-architecture.png)
+![Overdeck System Architecture](./diagrams/overdeck-architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -271,7 +271,7 @@ In Gastown, the **Mayor** is the orchestration entity that dispatches work. In O
 #### What `pan sync` Syncs
 
 ```
-~/.panopticon/
+~/.overdeck/
 ├── skills/           # Comprehensive skill library (Gastown molecules + more)
 ├── commands/         # All commands (/work-issue, /pan:*, etc.)
 └── templates/
@@ -352,7 +352,7 @@ This means:
 
 ### Success Metrics
 
-1. **Single source of truth** - All agent tooling in `~/.panopticon/`
+1. **Single source of truth** - All agent tooling in `~/.overdeck/`
 2. **Zero friction sync** - `pan sync` updates Claude Code instantly
 3. **Project isolation** - Each project has its own workspaces/agents
 4. **Crash recovery** - Beads tracks state, agents can resume
@@ -401,7 +401,7 @@ return `Output written to ${outputFile}. Use tail/grep to inspect.`;
 **The Solution:** Write conversation history to searchable files.
 
 ```
-~/.panopticon/history/
+~/.overdeck/history/
 ├── sessions/
 │   ├── 2026-01-17-min-648/
 │   │   ├── transcript.md      # Full conversation
@@ -421,7 +421,7 @@ Agents can `grep` their own history to recover context after compaction.
 **Proposed:** Index skill metadata separately from definitions.
 
 ```
-~/.panopticon/skills/
+~/.overdeck/skills/
 ├── index.json               # Names + descriptions only
 ├── definitions/             # Full skill definitions
 │   ├── beads-tracking.md
@@ -439,7 +439,7 @@ Agents receive only the index. When they need a skill, they `grep` for its defin
 **Proposed:** Sync MCP tool descriptions to filesystem.
 
 ```
-~/.panopticon/mcp/
+~/.overdeck/mcp/
 ├── servers/
 │   ├── linear/
 │   │   ├── tools.json       # Tool names + short descriptions
@@ -463,7 +463,7 @@ Benefits:
 **Proposed:** Sync terminal sessions to filesystem.
 
 ```
-~/.panopticon/terminals/
+~/.overdeck/terminals/
 ├── agent-min-648/
 │   ├── output.log           # Full session log
 │   ├── recent.log           # Last 100 lines (rotated)
@@ -504,7 +504,7 @@ function loadContext(agent: Agent, budget: ContextBudget): Context {
     ctx.add(fullHistory);
   } else {
     ctx.add(summarizedHistory);
-    ctx.addDiscoveryHint("Full history at ~/.panopticon/history/...");
+    ctx.addDiscoveryHint("Full history at ~/.overdeck/history/...");
   }
 
   // Work state (always critical)
@@ -548,7 +548,7 @@ Every Overdeck agent gets a **hook** - a persistent work queue backed by Beads:
 
 ```bash
 # Hook structure
-~/.panopticon/agents/
+~/.overdeck/agents/
 ├── min-648/
 │   ├── hook.json            # Active work item
 │   ├── mail/                # Incoming messages
@@ -570,17 +570,17 @@ Every action tracked to the agent that performed it:
 {
   "id": "beads-abc",
   "title": "Implement login flow",
-  "created_by": "panopticon/agent-min-648",
-  "assignee": "panopticon/agent-min-648",
+  "created_by": "overdeck/agent-min-648",
+  "assignee": "overdeck/agent-min-648",
   "commits": [
     {
       "sha": "abc123",
-      "author": "panopticon/agent-min-648 <noreply@panopticon.local>",
+      "author": "overdeck/agent-min-648 <noreply@overdeck.local>",
       "message": "feat: add login endpoint"
     }
   ],
   "events": [
-    { "type": "status_change", "actor": "panopticon/agent-min-648", "from": "open", "to": "in_progress" }
+    { "type": "status_change", "actor": "overdeck/agent-min-648", "from": "open", "to": "in_progress" }
   ]
 }
 ```
@@ -590,9 +590,9 @@ Every action tracked to the agent that performed it:
 Track agent performance over time:
 
 ```bash
-bd stats --actor=panopticon/agent-min-648
+bd stats --actor=overdeck/agent-min-648
 
-Agent: panopticon/agent-min-648
+Agent: overdeck/agent-min-648
 ─────────────────────────────
 Issues completed: 47
 Success rate:     94%
@@ -725,7 +725,7 @@ Instructions in markdown...
 │              (Unified Format - Works Everywhere!)                │
 └─────────────────────────────────────────────────────────────────┘
 
-~/.panopticon/skills/              # Canonical skill source (master)
+~/.overdeck/skills/              # Canonical skill source (master)
 ├── feature-work/
 │   └── SKILL.md                   # How to implement features
 ├── bug-fix/
@@ -743,10 +743,10 @@ Instructions in markdown...
 ~/.codex/skills/                   # Codex
 ~/.gemini/skills/                  # Gemini CLI
 ~/.gemini/antigravity/skills/      # Google Antigravity
-├── feature-work → ~/.panopticon/skills/feature-work
-├── bug-fix → ~/.panopticon/skills/bug-fix
-├── code-review → ~/.panopticon/skills/code-review
-└── release → ~/.panopticon/skills/release
+├── feature-work → ~/.overdeck/skills/feature-work
+├── bug-fix → ~/.overdeck/skills/bug-fix
+├── code-review → ~/.overdeck/skills/code-review
+└── release → ~/.overdeck/skills/release
 
          │
          │  Auto-discovered by ALL FIVE tools!
@@ -760,7 +760,7 @@ Instructions in markdown...
 
 Agent workspaces also get skills:
 ├── workspaces/feature-min-648/.claude/skills/
-│   └── (symlinks to ~/.panopticon/skills/*)
+│   └── (symlinks to ~/.overdeck/skills/*)
 └── workspaces/feature-min-649/.claude/skills/
     └── (same structure)
 ```
@@ -772,7 +772,7 @@ Agent workspaces also get skills:
 
 ```bash
 # Skills tell the agent HOW to work
-~/.panopticon/skills/feature-work/SKILL.md
+~/.overdeck/skills/feature-work/SKILL.md
 
 # Beads track WHAT work is done
 bd create "MIN-648: Understand requirements" --type task
@@ -824,7 +824,7 @@ Thanks to format convergence, `pan sync` is beautifully simple:
 pan sync
 
 # What it does:
-# 1. Reads ~/.panopticon/skills/
+# 1. Reads ~/.overdeck/skills/
 # 2. Creates/updates symlinks to all tool locations:
 #    - ~/.claude/skills/           (Claude Code + Cursor)
 #    - ~/.codex/skills/            (Codex)
@@ -851,10 +851,10 @@ Symlinks provide instant propagation without copying:
 
 ```bash
 # Edit a skill in the canonical location
-vim ~/.panopticon/skills/feature-work/SKILL.md
+vim ~/.overdeck/skills/feature-work/SKILL.md
 
 # All agents immediately see the update (no sync needed!)
-# Because .claude/skills/feature-work → ~/.panopticon/skills/feature-work
+# Because .claude/skills/feature-work → ~/.overdeck/skills/feature-work
 ```
 
 ### Skill Interoperability
@@ -867,7 +867,7 @@ vim ~/.panopticon/skills/feature-work/SKILL.md
 └─────────────────────────────────────────────────────────────────┘
 
 Overdeck Canonical Source:
-~/.panopticon/skills/feature-work/SKILL.md
+~/.overdeck/skills/feature-work/SKILL.md
 
         │
         │ pan sync (symlinks to all tool locations!)
@@ -1377,7 +1377,7 @@ Last activity: 2026-01-17 08:40 — Completed resource reviews
 ## Context References
 
 - Workspace: /home/eltmon/projects/myn/workspaces/feature-min-648
-- PRD: docs/prds/planned/MIN-630-panopticon-architecture-prd.md
+- PRD: docs/prds/planned/MIN-630-overdeck-architecture-prd.md
 - Beads: doc-review-0c3 (drafting)
 
 ## Session Continuity
@@ -1414,7 +1414,7 @@ Each completed piece of work produces a summary:
 
 ## Files Created/Modified
 
-- Created: panopticon-architecture-expanded-thoughts.md
+- Created: overdeck-architecture-expanded-thoughts.md
 ```
 
 ### Context File Lifecycle
@@ -1507,7 +1507,7 @@ const RUNTIMES: Record<string, Runtime> = {
 ### Runtime Configuration Files
 
 ```toml
-# ~/.panopticon/runtimes/claude.toml
+# ~/.overdeck/runtimes/claude.toml
 [runtime]
 name = "claude"
 command = "claude"
@@ -1516,7 +1516,7 @@ prompt_mode = "none"
 ```
 
 ```toml
-# ~/.panopticon/runtimes/codex.toml
+# ~/.overdeck/runtimes/codex.toml
 [runtime]
 name = "codex"
 command = "codex"
@@ -1698,10 +1698,10 @@ async function handleStuckAgent(agentId: string) {
 
 ## Part 8: Directory Structure and Configuration
 
-### Global Overdeck Home (`~/.panopticon/`)
+### Global Overdeck Home (`~/.overdeck/`)
 
 ```
-~/.panopticon/
+~/.overdeck/
 ├── config.toml              # Global configuration
 ├── projects.toml            # Registry of managed projects
 ├── .beads/                  # Beads database for all work tracking
@@ -1756,10 +1756,10 @@ async function handleStuckAgent(agentId: string) {
     └── ...
 ```
 
-### Project-Level Config (`.panopticon/` in each project)
+### Project-Level Config (`.overdeck/` in each project)
 
 ```
-~/projects/myn/.panopticon/
+~/projects/myn/.overdeck/
 ├── project.toml             # Project-specific config
 ├── workspaces/              # Feature branch workspaces
 │   ├── feature-min-630/
@@ -1768,10 +1768,10 @@ async function handleStuckAgent(agentId: string) {
     └── agent-min-630.state  # Agent state (for crash recovery)
 ```
 
-### Global Config (`~/.panopticon/config.toml`)
+### Global Config (`~/.overdeck/config.toml`)
 
 ```toml
-[panopticon]
+[overdeck]
 version = "1.0.0"
 default_runtime = "claude"
 
@@ -1805,7 +1805,7 @@ consecutive_failures = 3
 cooldown = "5m"
 ```
 
-### Project Registry (`~/.panopticon/projects.toml`)
+### Project Registry (`~/.overdeck/projects.toml`)
 
 ```toml
 [[projects]]
@@ -1817,8 +1817,8 @@ linear_team = "MIN"
 workspace_pattern = "workspaces/feature-{issue}"
 
 [[projects]]
-name = "panopticon"
-path = "/home/eltmon/projects/panopticon"  # After extraction
+name = "overdeck"
+path = "/home/eltmon/projects/overdeck"  # After extraction
 type = "standalone"
 is_self = true  # Overdeck manages itself
 
@@ -1828,7 +1828,7 @@ path = "/home/eltmon/projects/househunt"
 type = "standalone"
 ```
 
-### Project Config (`project/.panopticon/project.toml`)
+### Project Config (`project/.overdeck/project.toml`)
 
 ```toml
 [project]
@@ -1864,9 +1864,9 @@ project = "eltmon/mind-your-now"
 ### Example: Open Source Project Config
 
 ```toml
-# panopticon/.panopticon/project.toml
+# overdeck/.overdeck/project.toml
 [project]
-name = "panopticon"
+name = "overdeck"
 description = "Multi-agent orchestration for Claude Code"
 
 [trackers]
@@ -1877,7 +1877,7 @@ secondary = "github"    # Community bug reports, feature requests
 team = "PAN"            # Overdeck Linear team
 
 [trackers.github]
-repo = "eltmon/panopticon"
+repo = "eltmon/overdeck"
 auto_sync = false       # Manual triage
 ```
 
@@ -1889,7 +1889,7 @@ auto_sync = false       # Manual triage
 
 | Command | Description |
 |---------|-------------|
-| `pan init` | Initialize Overdeck globally (`~/.panopticon/`) |
+| `pan init` | Initialize Overdeck globally (`~/.overdeck/`) |
 | `pan projects add <path>` | Register a project with Overdeck |
 | `pan projects list` | List all managed projects |
 | `pan project <subcommand>` | Compatibility alias for `pan projects <subcommand>` |
@@ -1966,15 +1966,15 @@ echo 'alias ccr="source ~/projects/ccr"' >> ~/.bashrc
 
 #### What Gets Synced
 
-When you run `pan sync`, Overdeck creates symlinks from `~/.panopticon/` to all supported tool locations:
+When you run `pan sync`, Overdeck creates symlinks from `~/.overdeck/` to all supported tool locations:
 
 ```
-~/.panopticon/skills/*     →  ~/.claude/skills/           # Claude Code + Cursor
+~/.overdeck/skills/*     →  ~/.claude/skills/           # Claude Code + Cursor
                            →  ~/.codex/skills/            # Codex
                            →  ~/.gemini/skills/           # Gemini CLI
                            →  ~/.gemini/antigravity/skills/ # Google Antigravity
 
-~/.panopticon/commands/*   →  ~/.claude/commands/         # Claude Code only (commands not universal)
+~/.overdeck/commands/*   →  ~/.claude/commands/         # Claude Code only (commands not universal)
 ```
 
 **Note:** Cursor auto-discovers from `~/.claude/skills/`, so a single symlink covers both Claude Code and Cursor.
@@ -1991,7 +1991,7 @@ With `auto_sync = true`, sync happens automatically when:
 ```toml
 [sync]
 strategy = "symlink"  # or "copy"
-# symlink: Changes in ~/.panopticon/ immediately available
+# symlink: Changes in ~/.overdeck/ immediately available
 # copy: Explicit sync required
 ```
 
@@ -2004,7 +2004,7 @@ strategy = "symlink"  # or "copy"
 ```typescript
 type SyncTargetState =
   | 'empty'           // Directory doesn't exist or is empty
-  | 'panopticon'      // Already our symlinks (safe to overwrite)
+  | 'overdeck'      // Already our symlinks (safe to overwrite)
   | 'user-content'    // User's custom content (needs backup/confirmation)
   | 'mixed'           // Some ours, some theirs (needs careful handling)
 
@@ -2015,10 +2015,10 @@ function detectTargetState(path: string): SyncTargetState {
   if (items.length === 0) return 'empty';
 
   const ourSymlinks = items.filter(item =>
-    isSymlink(item) && readlink(item).startsWith('~/.panopticon/')
+    isSymlink(item) && readlink(item).startsWith('~/.overdeck/')
   );
 
-  if (ourSymlinks.length === items.length) return 'panopticon';
+  if (ourSymlinks.length === items.length) return 'overdeck';
   if (ourSymlinks.length === 0) return 'user-content';
   return 'mixed';
 }
@@ -2029,7 +2029,7 @@ function detectTargetState(path: string): SyncTargetState {
 | State | Default Behavior | User Sees |
 |-------|------------------|-----------|
 | `empty` | Proceed silently | Nothing |
-| `panopticon` | Proceed silently | Nothing (updating our own symlinks) |
+| `overdeck` | Proceed silently | Nothing (updating our own symlinks) |
 | `user-content` | **Backup + prompt** | Warning with backup location |
 | `mixed` | **Backup + prompt** | Warning listing affected files |
 
@@ -2044,7 +2044,7 @@ Checking ~/.claude/skills/...
       - company-internal/
       - experimental/
 
-  These will be backed up to: ~/.panopticon/backups/2026-01-17T22:30:00/
+  These will be backed up to: ~/.overdeck/backups/2026-01-17T22:30:00/
 
   Options:
     [B] Backup and continue (default)
@@ -2054,7 +2054,7 @@ Checking ~/.claude/skills/...
 
   Choice [B]:
 
-  ✓ Backed up to ~/.panopticon/backups/2026-01-17T22:30:00/claude-skills/
+  ✓ Backed up to ~/.overdeck/backups/2026-01-17T22:30:00/claude-skills/
   ✓ Synced 47 skills to ~/.claude/skills/
 
 Checking ~/.claude/commands/...
@@ -2077,7 +2077,7 @@ pan sync --skip <target>    # Skip specific target (e.g., --skip ~/.claude/skill
 **Backup Structure:**
 
 ```
-~/.panopticon/backups/
+~/.overdeck/backups/
 ├── 2026-01-17T22:30:00/
 │   ├── manifest.json        # What was backed up and why
 │   ├── claude-skills/       # Original ~/.claude/skills/ contents
@@ -2092,7 +2092,7 @@ pan sync --skip <target>    # Skip specific target (e.g., --skip ~/.claude/skill
 {
   "timestamp": "2026-01-17T22:30:00Z",
   "reason": "pan sync detected user content",
-  "panopticon_version": "1.0.0",
+  "overdeck_version": "1.0.0",
   "backed_up": [
     {
       "source": "~/.claude/skills/",
@@ -2140,14 +2140,14 @@ merge_strategy = "prompt"          # "prompt" | "backup" | "merge" | "overwrite"
 `pan install` uses the same detection:
 
 ```bash
-$ npx panopticon install
+$ npx overdeck install
 
 Checking existing configuration...
   ~/.claude/skills/: 5 custom skills found
   ~/.claude/commands/: 2 custom commands found
 
 Overdeck will backup your existing configuration before installing.
-Backup location: ~/.panopticon/backups/2026-01-17T22:30:00/
+Backup location: ~/.overdeck/backups/2026-01-17T22:30:00/
 
 Continue with installation? [Y/n]:
 ```
@@ -2165,10 +2165,10 @@ Layer 1: Git Repository (project-specific)
 └── .claude/skills/project-foo/       # Project-specific skill
 
 Layer 2: Overdeck (generic tooling)
-├── ~/.panopticon/skills/beads/              # Task tracking
-├── ~/.panopticon/skills/react-best-practices/
-├── ~/.panopticon/skills/session-health/
-└── ~/.panopticon/skills/web-design-guidelines/
+├── ~/.overdeck/skills/beads/              # Task tracking
+├── ~/.overdeck/skills/react-best-practices/
+├── ~/.overdeck/skills/session-health/
+└── ~/.overdeck/skills/web-design-guidelines/
 ```
 
 **Detection Enhancement:**
@@ -2176,13 +2176,13 @@ Layer 2: Overdeck (generic tooling)
 ```typescript
 type ContentOrigin =
   | 'git-tracked'      // File exists in git index (git ls-files)
-  | 'panopticon'       // Our symlink pointing to ~/.panopticon/
+  | 'overdeck'       // Our symlink pointing to ~/.overdeck/
   | 'user-untracked'   // User content not in git (needs backup)
 
 function detectContentOrigin(path: string): ContentOrigin {
   // Check if it's our symlink
-  if (isSymlink(path) && readlink(path).includes('.panopticon')) {
-    return 'panopticon';
+  if (isSymlink(path) && readlink(path).includes('.overdeck')) {
+    return 'overdeck';
   }
 
   // Check if git tracks this file
@@ -2218,10 +2218,10 @@ Overdeck skills to add:
 
 # 4. Add Overdeck symlinks alongside git content
 Adding Overdeck skills...
-  ✓ beads/ → ~/.panopticon/skills/beads/
-  ✓ react-best-practices/ → ~/.panopticon/skills/react-best-practices/
-  ✓ session-health/ → ~/.panopticon/skills/session-health/
-  ✓ web-design-guidelines/ → ~/.panopticon/skills/web-design-guidelines/
+  ✓ beads/ → ~/.overdeck/skills/beads/
+  ✓ react-best-practices/ → ~/.overdeck/skills/react-best-practices/
+  ✓ session-health/ → ~/.overdeck/skills/session-health/
+  ✓ web-design-guidelines/ → ~/.overdeck/skills/web-design-guidelines/
 
 # 5. Result
 Workspace ready: workspaces/feature-xyz/
@@ -2232,7 +2232,7 @@ Workspace ready: workspaces/feature-xyz/
 
 ```typescript
 // If same skill name exists in both git and Overdeck
-if (gitTrackedSkills.includes(skillName) && panopticonSkills.includes(skillName)) {
+if (gitTrackedSkills.includes(skillName) && overdeckSkills.includes(skillName)) {
   // Git wins - project-specific takes precedence
   console.log(`Skipping ${skillName}: project has custom version (git-tracked)`);
 }
@@ -2244,10 +2244,10 @@ if (gitTrackedSkills.includes(skillName) && panopticonSkills.includes(skillName)
 workspaces/feature-xyz/.claude/skills/
 ├── myn-standards/           # git-tracked (from repo)
 ├── company-internal/        # git-tracked (from repo)
-├── beads -> ~/.panopticon/skills/beads/                    # symlink
-├── react-best-practices -> ~/.panopticon/skills/react-best-practices/
-├── session-health -> ~/.panopticon/skills/session-health/
-└── web-design-guidelines -> ~/.panopticon/skills/web-design-guidelines/
+├── beads -> ~/.overdeck/skills/beads/                    # symlink
+├── react-best-practices -> ~/.overdeck/skills/react-best-practices/
+├── session-health -> ~/.overdeck/skills/session-health/
+└── web-design-guidelines -> ~/.overdeck/skills/web-design-guidelines/
 ```
 
 **Key Principles:**
@@ -2348,7 +2348,7 @@ Each project uses **one issue tracker**. This keeps things simple and avoids con
 **Configuration:**
 
 ```toml
-# ~/.panopticon/projects.toml
+# ~/.overdeck/projects.toml
 
 [projects.myn]
 path = "/home/user/projects/myn"
@@ -2358,8 +2358,8 @@ default_branch = "main"           # Branch to base feature branches on
 workspace_type = "monorepo"       # "monorepo" | "simple"
 workspace_subdirs = ["fe", "api"] # For monorepo: subdirs that are worktrees
 
-[projects.panopticon]
-path = "/home/user/projects/panopticon"
+[projects.overdeck]
+path = "/home/user/projects/overdeck"
 tracker = "linear"
 linear_team = "PAN"
 default_branch = "main"
@@ -2442,7 +2442,7 @@ Overdeck uses a **richer workflow** than most trackers provide out of the box. W
 #### State Mapping Configuration
 
 ```yaml
-# ~/.panopticon/state-mappings.yaml
+# ~/.overdeck/state-mappings.yaml
 
 # Overdeck's canonical states (source of truth)
 canonical_states:
@@ -2573,10 +2573,10 @@ trackers:
 Overdeck maintains its **own state tracking** as the source of truth:
 
 ```typescript
-// ~/.panopticon/issue-states.json
+// ~/.overdeck/issue-states.json
 {
   "MIN-645": {
-    "panopticonState": "planning",      // Our canonical state
+    "overdeckState": "planning",      // Our canonical state
     "trackerState": "In Progress",       // What's in Linear (may differ)
     "lastSyncedAt": "2026-01-19T05:00:00Z",
     "syncStatus": "synced",              // synced | pending | conflict
@@ -2610,7 +2610,7 @@ interface StateManager {
 
 interface TransitionResult {
   success: boolean;
-  panopticonState: CanonicalState;
+  overdeckState: CanonicalState;
   trackerState: string;
   fallbacksUsed: string[];
   warnings: string[];
@@ -2765,7 +2765,7 @@ Features already implemented:
 
 ```bash
 # 1. Install Overdeck
-npm install -g panopticon-dashboard
+npm install -g overdeck-dashboard
 
 # 2. Initialize
 pan init
@@ -2834,8 +2834,8 @@ Overdeck manages itself as a project:
 ```toml
 # In projects.toml
 [[projects]]
-name = "panopticon"
-path = "/home/eltmon/projects/panopticon"
+name = "overdeck"
+path = "/home/eltmon/projects/overdeck"
 is_self = true
 ```
 
@@ -2853,7 +2853,7 @@ Changes are immediately available in Claude Code (if using symlinks).
 ### Phase 1: Core Foundation (Saturday Morning)
 
 - [ ] Extract Overdeck to standalone repo
-- [ ] Set up `~/.panopticon/` directory structure
+- [ ] Set up `~/.overdeck/` directory structure
 - [ ] Implement `pan init` and `pan sync` (symlink-based)
 - [ ] Create 10 high-value SKILL.md files
 - [ ] Test skill discovery across Claude Code, Codex, Cursor, Gemini CLI, Antigravity
@@ -2919,7 +2919,7 @@ Plus **Traefik** runs as a shared global container routing all workspaces via fr
 
 ```bash
 # First time - zero install
-npx panopticon init
+npx overdeck init
 
 # After init, 'pan' alias is created automatically
 pan sync
@@ -2930,32 +2930,32 @@ pan workspace create min-648
 How the alias works:
 ```bash
 # pan init adds to ~/.bashrc or ~/.zshrc:
-export PATH="$HOME/.panopticon/bin:$PATH"
+export PATH="$HOME/.overdeck/bin:$PATH"
 
-# ~/.panopticon/bin/pan is a small shell script:
+# ~/.overdeck/bin/pan is a small shell script:
 #!/bin/bash
-node ~/.panopticon/cli/index.js "$@"
+node ~/.overdeck/cli/index.js "$@"
 ```
 
 #### Secondary: Global npm Install
 
 ```bash
-npm install -g panopticon
+npm install -g overdeck
 pan --version
 ```
 
 #### Future: Homebrew/apt (v2)
 
 ```bash
-brew install panopticon      # macOS
-apt install panopticon       # Linux (via PPA)
-choco install panopticon     # Windows
+brew install overdeck      # macOS
+apt install overdeck       # Linux (via PPA)
+choco install overdeck     # Windows
 ```
 
 ### Installation Flow
 
 ```bash
-npx panopticon install
+npx overdeck install
 
 # Output:
 ╔══════════════════════════════════════════════════════════════╗
@@ -2975,14 +2975,14 @@ Installing mkcert for local HTTPS...
 
 Generating wildcard certificates...
   → mkcert "*.pan.localhost" "*.localhost"
-  ✓ Certificates saved to ~/.panopticon/certs/
+  ✓ Certificates saved to ~/.overdeck/certs/
 
 Creating Docker network...
-  → docker network create panopticon-public
+  → docker network create overdeck-public
   ✓ Network created
 
 Starting Traefik...
-  → docker compose -f ~/.panopticon/traefik/docker-compose.yml up -d
+  → docker compose -f ~/.overdeck/traefik/docker-compose.yml up -d
   ✓ Traefik running at https://traefik.pan.localhost:8080
 
 Setting up DNS...
@@ -3011,7 +3011,7 @@ Setting up CLI...
 For users who don't want/need Traefik:
 
 ```bash
-npx panopticon install --minimal
+npx overdeck install --minimal
 
 # Uses port-based routing instead:
 # http://localhost:3010 (dashboard frontend)
@@ -3042,7 +3042,7 @@ ls
 # Initialize Overdeck in this project
 pan init
 
-# Creates .panopticon/ with project config
+# Creates .overdeck/ with project config
 # Does NOT modify your docker-compose.yml
 
 # Create a workspace for a feature
@@ -3073,7 +3073,7 @@ services:
     # ports removed - Traefik handles routing
     networks:
       - devnet
-      - panopticon-public
+      - overdeck-public
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.app-my-feature-123.rule=Host(`my-feature-123.my-saas.localhost`)"
@@ -3083,17 +3083,17 @@ services:
 
   # Injected by Overdeck
   dev:
-    image: panopticon/dev-container:latest
+    image: overdeck/dev-container:latest
     volumes:
       - ../:/workspace:cached
     command: sleep infinity
     networks:
       - devnet
-      - panopticon-public
+      - overdeck-public
 
 networks:
   devnet:
-  panopticon-public:
+  overdeck-public:
     external: true
 ```
 
@@ -3115,7 +3115,7 @@ pan workspace create my-feature --template node-fullstack
 #### Template Structure
 
 ```
-~/.panopticon/templates/
+~/.overdeck/templates/
 ├── minimal/
 │   ├── template.toml           # Metadata
 │   └── docker-compose.yml
@@ -3170,7 +3170,7 @@ For Overdeck to be open source, we need to separate these concerns.
 ┌─────────────────────────────────────────────────────────────────┐
 │  CLAUDE.md Assembly                                              │
 │                                                                  │
-│  ~/.panopticon/templates/claude-md/     (Overdeck provides)    │
+│  ~/.overdeck/templates/claude-md/     (Overdeck provides)    │
 │  ├── base.md.template                                            │
 │  └── sections/                                                   │
 │      ├── workspace-info.md      # {{FEATURE_FOLDER}}, URLs       │
@@ -3178,7 +3178,7 @@ For Overdeck to be open source, we need to separate these concerns.
 │      ├── commands-skills.md     # How to edit commands/skills    │
 │      └── warnings.md            # Common warnings                │
 │                                                                  │
-│  project/.panopticon/claude-md/         (Project provides)       │
+│  project/.overdeck/claude-md/         (Project provides)       │
 │  ├── project.md.template        # Project philosophy/principles  │
 │  └── sections/                                                   │
 │      ├── dev-commands.md        # ./dev up, ./dev api, etc.     │
@@ -3194,23 +3194,23 @@ For Overdeck to be open source, we need to separate these concerns.
 #### Project Configuration
 
 ```toml
-# .panopticon/project.toml
+# .overdeck/project.toml
 
 [claude_md]
 # Sections to include, in order
-# Prefix "panopticon:" = from ~/.panopticon/templates/claude-md/sections/
-# Prefix "project:" = from .panopticon/claude-md/sections/
-# No prefix = literal filename in .panopticon/claude-md/
+# Prefix "overdeck:" = from ~/.overdeck/templates/claude-md/sections/
+# Prefix "project:" = from .overdeck/claude-md/sections/
+# No prefix = literal filename in .overdeck/claude-md/
 
 sections = [
-  "panopticon:workspace-info",   # Generic workspace variables
+  "overdeck:workspace-info",   # Generic workspace variables
   "project:principles",          # MYN Principles (project-specific)
   "project:dev-commands",        # ./dev up, ./dev api (project-specific)
-  "panopticon:beads",            # Beads commands (generic)
+  "overdeck:beads",            # Beads commands (generic)
   "project:testing",             # Test users, fixtures (project-specific)
   "project:reference-guides",    # Links to docs (project-specific)
-  "panopticon:commands-skills",  # How to edit commands/skills (generic)
-  "panopticon:warnings",         # Common warnings (generic)
+  "overdeck:commands-skills",  # How to edit commands/skills (generic)
+  "overdeck:warnings",         # Common warnings (generic)
 ]
 
 [variables]
@@ -3241,7 +3241,7 @@ Overdeck automatically provides these variables for substitution:
 #### Example: Overdeck-Provided Section
 
 ```markdown
-<!-- ~/.panopticon/templates/claude-md/sections/workspace-info.md -->
+<!-- ~/.overdeck/templates/claude-md/sections/workspace-info.md -->
 
 ## Workspace Info
 
@@ -3256,7 +3256,7 @@ Overdeck automatically provides these variables for substitution:
 #### Example: Project-Provided Section
 
 ```markdown
-<!-- .panopticon/claude-md/sections/principles.md -->
+<!-- .overdeck/claude-md/sections/principles.md -->
 
 ## THE FOUNDATION: {{PROJECT_NAME}} Principles
 
@@ -3276,7 +3276,7 @@ This is the soul of the product. Everything we build serves these principles:
 ```bash
 pan workspace create min-648
 
-# 1. Read section order from .panopticon/project.toml
+# 1. Read section order from .overdeck/project.toml
 # 2. Load each section file
 # 3. Concatenate in order
 # 4. Substitute all {{VARIABLES}}
@@ -3285,7 +3285,7 @@ pan workspace create min-648
 
 #### Fallback Behavior
 
-- If project doesn't have `.panopticon/claude-md/`, use only Overdeck sections
+- If project doesn't have `.overdeck/claude-md/`, use only Overdeck sections
 - If a referenced section file doesn't exist, skip it with a warning
 - If no `[claude_md]` config, use default section order
 
@@ -3294,7 +3294,7 @@ pan workspace create min-648
 Overdeck manages Traefik configuration automatically:
 
 ```
-~/.panopticon/
+~/.overdeck/
 ├── traefik/
 │   ├── docker-compose.yml      # Traefik container definition
 │   ├── traefik.yml             # Static config
@@ -3311,7 +3311,7 @@ Overdeck manages Traefik configuration automatically:
 When a workspace starts, Overdeck generates:
 
 ```yaml
-# ~/.panopticon/traefik/dynamic/feature-min-648.yml
+# ~/.overdeck/traefik/dynamic/feature-min-648.yml
 http:
   routers:
     fe-min-648:
@@ -3383,7 +3383,7 @@ dnsmasq provides wildcard DNS resolution inside WSL2. All `*.localhost` domains 
 **Reference Implementation:** `infra/setup-dns.sh`
 
 ```bash
-# Key configuration (written to /etc/dnsmasq.d/panopticon.conf)
+# Key configuration (written to /etc/dnsmasq.d/overdeck.conf)
 address=/localhost/127.0.0.1
 
 # This makes *.pan.localhost, *.myn.localhost, etc. all resolve to 127.0.0.1
@@ -3395,7 +3395,7 @@ address=/localhost/127.0.0.1
 sudo apt-get install dnsmasq
 
 # 2. Configure wildcard resolution
-echo "address=/localhost/127.0.0.1" | sudo tee /etc/dnsmasq.d/panopticon.conf
+echo "address=/localhost/127.0.0.1" | sudo tee /etc/dnsmasq.d/overdeck.conf
 
 # 3. Configure systemd-resolved to use dnsmasq
 # Edit /etc/systemd/resolved.conf to add DNS=127.0.0.1
@@ -3414,7 +3414,7 @@ Windows doesn't see dnsmasq, so we sync explicit hosts entries.
 ```powershell
 # Reads ~/.wsl2hosts from WSL2
 # Syncs entries to C:\Windows\System32\drivers\etc\hosts
-# Marks entries with comment: # panopticon-auto
+# Marks entries with comment: # overdeck-auto
 
 # Format of ~/.wsl2hosts:
 # 127.0.0.1 myn.localhost
@@ -3445,7 +3445,7 @@ When creating new workspaces, hosts need to be updated without password prompts.
 #!/bin/bash
 echo "127.0.0.1 $1" >> ~/.wsl2hosts
 
-# /etc/sudoers.d/panopticon (created during pan install)
+# /etc/sudoers.d/overdeck (created during pan install)
 # %sudo ALL=(ALL) NOPASSWD: /usr/local/bin/pan-add-host *
 ```
 
@@ -3495,7 +3495,7 @@ These existing scripts will be referenced when building Overdeck's installer:
 
 | Feature | Status |
 |---------|--------|
-| `npx panopticon` CLI | ✅ Implement |
+| `npx overdeck` CLI | ✅ Implement |
 | Auto-aliasing (`pan` command) | ✅ Implement |
 | `pan install` with mkcert + Traefik | ✅ Implement |
 | `pan install --minimal` (no Traefik) | ✅ Implement |
@@ -3518,10 +3518,10 @@ These existing scripts will be referenced when building Overdeck's installer:
 
 ### Configuration Reference
 
-#### Global Config (~/.panopticon/config.toml)
+#### Global Config (~/.overdeck/config.toml)
 
 ```toml
-[panopticon]
+[overdeck]
 version = "1.0.0"
 auto_update = true
 
@@ -3532,7 +3532,7 @@ domain = "pan.localhost"
 
 [templates]
 default = "minimal"
-custom_path = "~/.panopticon/templates"
+custom_path = "~/.overdeck/templates"
 
 [cli]
 alias = "pan"
@@ -3549,7 +3549,7 @@ targets = [
 ]
 ```
 
-#### Project Config (.panopticon/project.toml)
+#### Project Config (.overdeck/project.toml)
 
 ```toml
 [project]
@@ -3558,7 +3558,7 @@ domain = "my-saas.localhost"
 
 [docker]
 compose_file = "docker-compose.yml"
-network = "panopticon-public"
+network = "overdeck-public"
 
 [workspaces]
 path = "workspaces"
@@ -3583,7 +3583,7 @@ Many projects have scripts that use relative paths. For example, MYN's `vsync` s
 #### Hook Configuration
 
 ```toml
-# .panopticon/project.toml
+# .overdeck/project.toml
 
 [hooks]
 # Simple form - runs from project root
@@ -3647,7 +3647,7 @@ MYN's `vsync` script syncs `package.json` version to:
 - Android `build.gradle` (Capacitor)
 
 ```toml
-# /home/eltmon/projects/myn/.panopticon/project.toml
+# /home/eltmon/projects/myn/.overdeck/project.toml
 
 [project]
 name = "myn"
@@ -3706,7 +3706,7 @@ Overdeck is distributed via npm for easy installation via `npx`.
 
 | Name | Status | Usage |
 |------|--------|-------|
-| `panopticon` | **Taken** | (Cluster monitoring lib from 2015) |
+| `overdeck` | **Taken** | (Cluster monitoring lib from 2015) |
 | `@overdeck/cli` | **Available** ✅ | `npx @overdeck/cli` |
 | `@mindyournow/*` | **Reserved** | For MYN-specific packages |
 
@@ -3819,7 +3819,7 @@ permissions:
   },
   "bin": {
     "pan": "./dist/cli.js",
-    "panopticon": "./dist/cli.js"
+    "overdeck": "./dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -4034,7 +4034,7 @@ When Overdeck spawns an agent for an issue, it records the session ID in the age
 1. **Parses the JSONL file** for that session ID
 2. **Sums all token usage** across messages
 3. **Calculates cost** using model-specific pricing
-4. **Stores cost data** in `~/.panopticon/costs/<issue-id>.json`
+4. **Stores cost data** in `~/.overdeck/costs/<issue-id>.json`
 5. **Updates the bead** with cost metadata
 
 ### Cost Calculation
@@ -4154,7 +4154,7 @@ Gastown is excellent but represents a different paradigm. It's a complete replac
 | Aspect | Overdeck | Vibe Kanban |
 |--------|------------|-------------|
 | **Language** | TypeScript/Node.js | Rust + React |
-| **Install** | `npm install -g panopticon` | `npx vibe-kanban` |
+| **Install** | `npm install -g overdeck` | `npx vibe-kanban` |
 | **Database** | Git (Beads) | SQLite |
 | **Task Source** | Linear (primary) | Local kanban board |
 | **Agent Runtimes** | Claude Code, Codex, Cursor, Gemini CLI, Antigravity | Claude, Codex, Gemini, Amp |
@@ -4274,12 +4274,12 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
 ### Resolved ✅
 
 1. ~~**npm vs standalone binary?**~~ → **npm with npx + auto-aliasing** (See Part 14)
-   - `npx panopticon init` for first run, then `pan` alias works
+   - `npx overdeck init` for first run, then `pan` alias works
    - Homebrew/apt packages in v2 (MIN-650)
 
 2. ~~**How to handle Claude Code updates?**~~ → **Symlinks are safe**
    - Claude Code doesn't overwrite symlinks in `~/.claude/skills/`
-   - Canonical source stays in `~/.panopticon/skills/`
+   - Canonical source stays in `~/.overdeck/skills/`
 
 3. ~~**Project templates?**~~ → **"Bring Your Own Docker" + starter templates** (See Part 14)
    - Users provide their own docker-compose, Overdeck injects Traefik labels
@@ -4320,7 +4320,7 @@ Beads is a standalone Git-backed tracking system. Both tools can read/write to t
 
 10. ~~**Config format**~~ → **TOML** (See Part 14 Configuration Reference)
     - Consistent with Beads, Gastown, and Rust ecosystem
-    - `~/.panopticon/config.toml` and `.panopticon/project.toml`
+    - `~/.overdeck/config.toml` and `.overdeck/project.toml`
 
 11. ~~**npm package structure**~~ → **Single repo, single package.json**
     - Overdeck is one application, not a library ecosystem

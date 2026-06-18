@@ -105,7 +105,7 @@ describe('gh issue trailer hook', () => {
       OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
       OVERDECK_FLYWHEEL_AGENT_ROLE: 'work',
       OVERDECK_AGENT_ID: 'agent-pan-1487',
-      OVERDECK_HOME: join(tmpdir(), 'missing-panopticon-home'),
+      OVERDECK_HOME: join(tmpdir(), 'missing-overdeck-home'),
     });
     const command = updatedCommand(result);
 

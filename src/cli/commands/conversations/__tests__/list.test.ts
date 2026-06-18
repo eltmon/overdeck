@@ -46,7 +46,7 @@ async function seedSessions(count: number, workspace = '/home/user/Projects/alph
       estimatedCost: 0.01,
       toolsUsed: [],
       filesTouched: [],
-      panopticonManaged: false,
+      overdeckManaged: false,
       panIssueId: null,
       panAgentId: null,
       fileSize: 512,

@@ -113,7 +113,7 @@ For local stack startup, Deacon/Cloister should be running before starting or re
 Run artifacts live under the Flywheel home:
 
 ```text
-${OVERDECK_HOME:-~/.panopticon}/flywheel/runs/<RUN-ID>/
+${OVERDECK_HOME:-~/.overdeck}/flywheel/runs/<RUN-ID>/
   latest.json      # latest validated FlywheelStatus
   report.md        # end-of-run report, when complete
   opened-pr.json   # optional merge/report metadata

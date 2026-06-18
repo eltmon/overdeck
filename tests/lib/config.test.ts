@@ -22,7 +22,7 @@ describe('config', () => {
       const { getDefaultConfigSync } = await import('../../src/lib/config.js');
       const config = getDefaultConfigSync();
 
-      expect(config.panopticon.version).toBe('1.0.0');
+      expect(config.overdeck.version).toBe('1.0.0');
       expect(config.sync.backup_before_sync).toBe(true);
       expect(config.sync.backup_before_sync).toBe(true);
       expect(config.trackers.primary).toBe('linear');
@@ -56,7 +56,7 @@ describe('config', () => {
       const config = getDefaultConfigSync();
 
       // Type checking - these should all exist
-      expect(config.panopticon).toBeDefined();
+      expect(config.overdeck).toBeDefined();
       expect(config.sync).toBeDefined();
       expect(config.trackers).toBeDefined();
       expect(config.dashboard).toBeDefined();

@@ -103,7 +103,7 @@ SYSTEM
 - Expanded width: `256px` (matches T3Code's `--sidebar-width: 16rem`)
 - Collapsed width: `48px` (icon-only, matches T3Code's `--sidebar-width-icon: 3rem`)
 - Toggle: click collapse button or keyboard shortcut `[`
-- Persist state: `localStorage.setItem('panopticon.ui.sidebarCollapsed', 'true')`
+- Persist state: `localStorage.setItem('overdeck.ui.sidebarCollapsed', 'true')`
 - Background: `var(--card)` (slightly lighter than page background)
 - Group labels: `text-xs uppercase tracking-wider text-muted-foreground` with `mb-1 mt-4` spacing
 - Active item: `2px left border-primary`, `bg-accent` background, `text-accent-foreground`

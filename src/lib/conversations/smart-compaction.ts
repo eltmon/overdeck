@@ -640,7 +640,7 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 // ============================================================================
 
 async function runPiModelSummary(prompt: string, model: string, timeoutMs?: number): Promise<string> {
-  const sessionDir = await mkdtemp(join(tmpdir(), 'panopticon-pi-summary-'));
+  const sessionDir = await mkdtemp(join(tmpdir(), 'overdeck-pi-summary-'));
   const effectiveTimeout = timeoutMs ?? SUMMARY_TIMEOUT_MS;
   const spawnEnv = await buildSpawnEnvForModel(model);
 

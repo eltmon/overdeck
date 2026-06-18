@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-const STORAGE_KEY = 'panopticon.ui.preferences';
-const CHANGE_EVENT = 'panopticon:ui-prefs-changed';
+const STORAGE_KEY = 'overdeck.ui.preferences';
+const CHANGE_EVENT = 'overdeck:ui-prefs-changed';
 
 export interface UIPreferences {
   /** Shimmer animation on "READY TO MERGE" badges. Default: true */

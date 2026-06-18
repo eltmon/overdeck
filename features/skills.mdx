@@ -124,15 +124,15 @@ When you invoke a skill, the AI tool injects the skill's prompt into the convers
 
 ## Creating Custom Skills
 
-Skills are markdown files stored in `~/.panopticon/skills/`. Create your own with:
+Skills are markdown files stored in `~/.overdeck/skills/`. Create your own with:
 
 ```bash
 # Use the guided skill creator
 /pan-skill-creator
 
 # Or manually create a skill
-mkdir -p ~/.panopticon/skills/my-custom-skill
-cat > ~/.panopticon/skills/my-custom-skill/skill.md <<'EOF'
+mkdir -p ~/.overdeck/skills/my-custom-skill
+cat > ~/.overdeck/skills/my-custom-skill/skill.md <<'EOF'
 # My Custom Skill
 
 Brief description of what this skill does.
@@ -198,8 +198,8 @@ See the [skill-creator skill](/cli/core-commands) or use `/pan-skill-creator` fo
 
 Skills can be distributed via:
 
-1. **Project-specific** - Store in `.panopticon/skills/` in your repo
-2. **User-specific** - Store in `~/.panopticon/skills/` (synced to AI tools)
+1. **Project-specific** - Store in `.overdeck/skills/` in your repo
+2. **User-specific** - Store in `~/.overdeck/skills/` (synced to AI tools)
 3. **Team-shared** - Commit to version control and share via git
 4. **Public packages** - Distribute via npm or GitHub
 
@@ -217,7 +217,7 @@ pan sync --dry-run
 ```
 
 The `pan sync` command:
-- Copies skills from `~/.panopticon/skills/` to each AI tool's config directory
+- Copies skills from `~/.overdeck/skills/` to each AI tool's config directory
 - Updates existing skills if versions differ
 - Preserves local customizations (doesn't overwrite modified files)
 

@@ -32,8 +32,8 @@ The dashboard the browser talks to is the **pre-built `dist/dashboard/server.js`
 
 1. **Never `pkill -f` a pattern that appears in your own command.** `pkill -f 'dashboard/server.js'` matches your *own* shell's argv and kills it mid-run (exit 144). **Always kill by explicit PID** found via `ss`/`ps`.
 2. **`pan up`/`pan restart` health-check the configured port (`dashboardApiPort`, default 3011 — or 3010 on some setups), but the server binds `process.env.PORT`.** If `PORT` differs, the wrapper waits forever on the wrong port, never daemonizes, and leaves the server parented to a stuck wrapper — kill that wrapper and the dashboard dies with it. Detached start (below) avoids this entirely.
-3. **Exactly ONE server.** Two servers = two deacons racing the same `~/.panopticon` state (the duel), and the PAN-1625 janitor reaps/churns extras. A single port-owner is left alone.
-4. **Work-agent tmux sessions survive a dashboard restart** — they are separate processes on the `panopticon` socket. Restarting the dashboard does NOT kill agents; the new deacon reconciles them as running.
+3. **Exactly ONE server.** Two servers = two deacons racing the same `~/.overdeck` state (the duel), and the PAN-1625 janitor reaps/churns extras. A single port-owner is left alone.
+4. **Work-agent tmux sessions survive a dashboard restart** — they are separate processes on the `overdeck` socket. Restarting the dashboard does NOT kill agents; the new deacon reconciles them as running.
 5. **Run from the primary repo**, not a workspace. If `readlink /proc/<pid>/cwd` is a `workspaces/feature-*` path, a workspace dashboard hijacked the port — kill it and restart from the primary checkout.
 
 ## Procedure
@@ -79,7 +79,7 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
 
 - `pan.localhost/api/health` returns `{"status":"ok"}` and `curl http://localhost:<port>/api/health` returns 200.
 - Exactly one **host-level** `node dist/dashboard/server.js` process; its `/proc/<pid>/cwd` is the primary repo.
-  **Do not count workspace-container servers.** Each running workspace devcontainer has its own `server` service whose `dist/dashboard/server.js` process is visible in host `ps` — those are legitimate read/UI peers (cwd `/workspaces/panopticon`, parent `containerd-shim`, `OVERDECK_DISABLE_DEACON=1`), NOT duplicate dashboards and NOT a single-deacon hazard. Seeing N+1 server processes with N containers up is the healthy state. Container-aware census:
+  **Do not count workspace-container servers.** Each running workspace devcontainer has its own `server` service whose `dist/dashboard/server.js` process is visible in host `ps` — those are legitimate read/UI peers (cwd `/workspaces/overdeck`, parent `containerd-shim`, `OVERDECK_DISABLE_DEACON=1`), NOT duplicate dashboards and NOT a single-deacon hazard. Seeing N+1 server processes with N containers up is the healthy state. Container-aware census:
   ```bash
   for pid in $(pgrep -f 'node .*dist/dashboard/server.js'); do
     grep -qE 'docker|containerd|kubepods|libpod' /proc/$pid/cgroup 2>/dev/null \
@@ -88,7 +88,7 @@ readlink -f /proc/$NEW/cwd      # must be the primary repo path
   done
   ```
   Exactly one `HOST` line, with cwd = the primary repo, is success. Multiple `HOST` lines = a real orphan (the deacon's orphan-server reaper, PAN-1625, will also catch it).
-- Agent tmux sessions (`tmux -L panopticon list-sessions`) are intact.
+- Agent tmux sessions (`tmux -L overdeck list-sessions`) are intact.
 - The deacon log (`/tmp/pan-dash.log` or the dashboard log) shows a single `Deacon started` and patrols advancing — no `received SIGTERM` loop.
 
 ## Related

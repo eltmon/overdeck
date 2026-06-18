@@ -3556,7 +3556,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         setReviewStatus(issueId, { readyForMerge: true });
         console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
 
-        // Post panopticon/tests=success so the CI test job self-skips on this
+        // Post overdeck/tests=success so the CI test job self-skips on this
         // commit. Mirrors what verification-runner does at the pre-review gate.
         yield* Effect.promise(async () => {
           try {
@@ -3571,7 +3571,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
             const { postOverdeckTestsStatus } = await import('../../../lib/github-app.js');
             await postOverdeckTestsStatus(wsInfo.localPath, owner!, name!, 'success', 'Test specialist passed');
           } catch (err: any) {
-            console.warn(`[review-status] Failed to post panopticon/tests for ${issueId}: ${err.message}`);
+            console.warn(`[review-status] Failed to post overdeck/tests for ${issueId}: ${err.message}`);
           }
         });
 
@@ -4915,8 +4915,8 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           );
           const sha = stdout.trim();
           if (sha) {
-            await reportCommitStatus('eltmon', 'overdeck', sha, 'success', 'panopticon/review', 'Review passed');
-            await reportCommitStatus('eltmon', 'overdeck', sha, 'success', 'panopticon/test', 'Tests passed');
+            await reportCommitStatus('eltmon', 'overdeck', sha, 'success', 'overdeck/review', 'Review passed');
+            await reportCommitStatus('eltmon', 'overdeck', sha, 'success', 'overdeck/test', 'Tests passed');
             console.log(`[merge] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
           }
         }
@@ -5576,8 +5576,8 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
         const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
         const sha = prState.headSha.trim();
         if (sha) {
-          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'panopticon/review', 'Review passed');
-          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'panopticon/test', 'Tests passed');
+          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/review', 'Review passed');
+          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/test', 'Tests passed');
           console.log(`[merge] Reported commit statuses on post-rebase HEAD for ${issueId} (${sha.slice(0, 8)})`);
         }
       }

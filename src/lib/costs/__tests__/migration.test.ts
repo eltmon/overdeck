@@ -13,10 +13,10 @@ import { readEventsSync, eventsFileExists, getLastEventMetadataSync } from '../e
 import { loadCacheSync, rebuildCacheSync } from '../aggregator.js';
 
 // Test directory setup
-const TEST_ROOT = join(tmpdir(), `panopticon-test-${Date.now()}`);
-const TEST_AGENTS_DIR = join(TEST_ROOT, '.panopticon', 'agents');
+const TEST_ROOT = join(tmpdir(), `overdeck-test-${Date.now()}`);
+const TEST_AGENTS_DIR = join(TEST_ROOT, '.overdeck', 'agents');
 const TEST_CLAUDE_DIR = join(TEST_ROOT, '.claude', 'projects');
-const TEST_COSTS_DIR = join(TEST_ROOT, '.panopticon', 'costs');
+const TEST_COSTS_DIR = join(TEST_ROOT, '.overdeck', 'costs');
 
 // Mock homedir to use test directory
 const originalHomedir = process.env.HOME;

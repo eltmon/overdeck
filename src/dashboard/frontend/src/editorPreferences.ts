@@ -1,6 +1,6 @@
 import type { EditorId } from '@overdeck/contracts';
 
-const STORAGE_KEY = 'panopticon:last-editor';
+const STORAGE_KEY = 'overdeck:last-editor';
 
 export function getPreferredEditor(): EditorId | null {
   try {

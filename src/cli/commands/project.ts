@@ -263,7 +263,7 @@ export async function projectAddCommand(
   console.log('');
 
   // Documentation reference
-  console.log(chalk.dim('Documentation: https://github.com/eltmon/panopticon#what-your-project-needs-to-provide'));
+  console.log(chalk.dim('Documentation: https://github.com/eltmon/overdeck#what-your-project-needs-to-provide'));
 }
 
 interface ListOptions {

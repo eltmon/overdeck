@@ -427,7 +427,7 @@ CREATE TABLE `discovered_sessions` (
 	`enrichment_model` text,
 	`enriched_at` integer,
 	`enrichment_failed` integer NOT NULL DEFAULT 0,
-	`panopticon_managed` integer NOT NULL DEFAULT 0,
+	`overdeck_managed` integer NOT NULL DEFAULT 0,
 	`pan_issue_id` text,
 	`pan_agent_id` text,
 	`file_size` integer,
@@ -437,7 +437,7 @@ CREATE TABLE `discovered_sessions` (
 CREATE INDEX `idx_discovered_workspace` ON `discovered_sessions` (`workspace_path`);--> statement-breakpoint
 CREATE INDEX `idx_discovered_last_ts` ON `discovered_sessions` (`last_ts`);--> statement-breakpoint
 CREATE INDEX `idx_discovered_enrichment` ON `discovered_sessions` (`enrichment_level`,`enriched_at`);--> statement-breakpoint
-CREATE INDEX `idx_discovered_managed` ON `discovered_sessions` (`panopticon_managed`,`pan_issue_id`);--> statement-breakpoint
+CREATE INDEX `idx_discovered_managed` ON `discovered_sessions` (`overdeck_managed`,`pan_issue_id`);--> statement-breakpoint
 CREATE INDEX `idx_discovered_model` ON `discovered_sessions` (`primary_model`);--> statement-breakpoint
 CREATE INDEX `idx_discovered_session_id` ON `discovered_sessions` (`session_id`) WHERE session_id IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `discovered_session_tags` (

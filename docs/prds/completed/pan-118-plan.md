@@ -196,8 +196,8 @@ export class WorkTypeRouter {
   /**
    * Get model for a specific work type
    * Resolution order:
-   * 1. Per-project override (.panopticon.yaml)
-   * 2. Global override (~/.panopticon/config.yaml)
+   * 1. Per-project override (.overdeck.yaml)
+   * 2. Global override (~/.overdeck/config.yaml)
    * 3. Preset default
    * 4. Fallback if provider disabled
    */
@@ -220,7 +220,7 @@ export class WorkTypeRouter {
 
 #### 1.5 Config File Schema
 
-**Global**: `~/.panopticon/config.yaml`
+**Global**: `~/.overdeck/config.yaml`
 ```yaml
 models:
   # Preset selection
@@ -244,7 +244,7 @@ models:
     google: $GOOGLE_API_KEY
 ```
 
-**Per-Project**: `.panopticon.yaml` (project root)
+**Per-Project**: `.overdeck.yaml` (project root)
 ```yaml
 models:
   preset: premium  # Override global preset for this project

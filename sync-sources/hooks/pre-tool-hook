@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/pre-tool-hook  (PAN-800)
+# ~/.overdeck/bin/pre-tool-hook  (PAN-800)
 #
 # Fires on Claude Code PreToolUse. POSTs agent.activity_changed(working, tool)
 # to the dashboard. No runtime.json writes — AgentStateService's

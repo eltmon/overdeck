@@ -16,7 +16,7 @@ Update the dashboard's Handoffs tab and metrics to reflect the new queue-based s
 **Rationale:** The existing model handoff data (cost escalations) is still valuable for understanding when agents need more capable models. The specialist handoffs (work passing between agents) is a different concept that deserves its own section.
 
 ### 2. Handoff Tracking
-**Decision:** Create a new log file `~/.panopticon/specialist-handoffs.json` to persist specialist handoff events.
+**Decision:** Create a new log file `~/.overdeck/specialist-handoffs.json` to persist specialist handoff events.
 
 **Rationale:** Queue items are cleared after completion, but we need historical data for the handoffs display. Creating a dedicated log (similar to `handoff-logger.ts` for model escalations) provides clean separation and query capabilities.
 

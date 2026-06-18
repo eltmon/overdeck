@@ -52,9 +52,9 @@ function consumeDashboardBootstrapToken(): string | null {
   const hash = window.location.hash.replace(/^#/, '')
   if (!hash) return null
   const params = new URLSearchParams(hash)
-  const token = params.get('panopticon_token') ?? params.get('token')
+  const token = params.get('overdeck_token') ?? params.get('token')
   if (!token) return null
-  params.delete('panopticon_token')
+  params.delete('overdeck_token')
   params.delete('token')
   const nextHash = params.toString()
   window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ''}`)
@@ -67,7 +67,7 @@ export function ensureDashboardSession(url?: string): Promise<void> {
   dashboardSessionPromise ??= fetch(dashboardSessionUrl(url), {
     method: 'POST',
     credentials: 'include',
-    headers: token ? { 'x-panopticon-internal-token': token } : undefined,
+    headers: token ? { 'x-overdeck-internal-token': token } : undefined,
   }).then(async (response) => {
     if (response.status === 401) return
     if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
@@ -85,7 +85,7 @@ export async function dashboardMutationJsonHeaders(url?: string): Promise<Record
   if (!dashboardCsrfToken) throw new Error('Dashboard CSRF token unavailable')
   return {
     'Content-Type': 'application/json',
-    'x-panopticon-csrf-token': dashboardCsrfToken,
+    'x-overdeck-csrf-token': dashboardCsrfToken,
   }
 }
 

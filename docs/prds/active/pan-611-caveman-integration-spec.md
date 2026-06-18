@@ -8,9 +8,9 @@ Output tokens are the dominant cost driver for long-running Overdeck agents. Wor
 
 ### Must Have
 
-- Caveman hook JS files installed at `~/.panopticon/hooks/caveman/` (one-time setup, part of `pan up` or `pan install`)
+- Caveman hook JS files installed at `~/.overdeck/hooks/caveman/` (one-time setup, part of `pan up` or `pan install`)
 - Caveman hooks injected into each workspace's `.claude/settings.json` at workspace creation time, based on config
-- Per-agent-type intensity configured via `~/.panopticon/config.yaml` (and per-project `.panopticon.yaml` override)
+- Per-agent-type intensity configured via `~/.overdeck/config.yaml` (and per-project `.overdeck.yaml` override)
 - `CAVEMAN_DEFAULT_MODE` env var set at agent spawn time so caveman reads the right intensity from day one
 - Planning agents excluded entirely (no hooks injected for planning sessions)
 - Inspect agent excluded entirely — its `INSPECTION PASSED` / `INSPECTION BLOCKED` sentinel strings are parsed by Cloister and must not be compressed
@@ -47,7 +47,7 @@ Caveman uses a `SessionStart` hook + `UserPromptSubmit` hook, not prompt injecti
 4. No pollution of workspace CLAUDE.md or specialist prompts
 5. The global flag file (`~/.claude/.caveman-active`) is not a collision risk for Overdeck — autonomous agents never issue `/caveman` mode commands; all agents boot with the same configured intensity
 
-**Hook files location:** `~/.panopticon/hooks/caveman/`
+**Hook files location:** `~/.overdeck/hooks/caveman/`
 - `caveman-activate.js` — SessionStart hook (from JuliusBrussee/caveman repo)
 - `caveman-mode-tracker.js` — UserPromptSubmit hook
 
@@ -56,10 +56,10 @@ Caveman uses a `SessionStart` hook + `UserPromptSubmit` hook, not prompt injecti
 {
   "hooks": {
     "SessionStart": [{
-      "hooks": [{"type": "command", "command": "node ~/.panopticon/hooks/caveman/caveman-activate.js", "timeout": 5}]
+      "hooks": [{"type": "command", "command": "node ~/.overdeck/hooks/caveman/caveman-activate.js", "timeout": 5}]
     }],
     "UserPromptSubmit": [{
-      "hooks": [{"type": "command", "command": "node ~/.panopticon/hooks/caveman/caveman-mode-tracker.js", "timeout": 5}]
+      "hooks": [{"type": "command", "command": "node ~/.overdeck/hooks/caveman/caveman-mode-tracker.js", "timeout": 5}]
     }]
   }
 }
@@ -70,7 +70,7 @@ Caveman uses a `SessionStart` hook + `UserPromptSubmit` hook, not prompt injecti
 ### Config Schema
 
 ```yaml
-# ~/.panopticon/config.yaml
+# ~/.overdeck/config.yaml
 agents:
   caveman:
     enabled: true          # master switch
@@ -82,7 +82,7 @@ agents:
     merge: full
 ```
 
-Per-project override in `.panopticon.yaml` uses the same schema; project config wins over global.
+Per-project override in `.overdeck.yaml` uses the same schema; project config wins over global.
 
 ### Hard-Rule Caveman Override Block
 

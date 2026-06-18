@@ -49,7 +49,7 @@ npm install -g @overdeck/cli && pan install && pan up
    - Install dependencies (ttyd, beads)
    - Set up Traefik for local HTTPS
    - Generate SSL certificates (if mkcert is installed)
-   - Create `~/.panopticon/` directory structure
+   - Create `~/.overdeck/` directory structure
 
 3. **Sync skills to Claude Code:**
    ```bash
@@ -61,7 +61,7 @@ npm install -g @overdeck/cli && pan install && pan up
    cd /path/to/your-project
    bd init --prefix <project-name>
    ```
-   For example: `bd init --prefix panopticon`
+   For example: `bd init --prefix overdeck`
 
    This creates the Dolt database that agents use for task tracking. Without it, agents
    can't start even if planning succeeds. `pan sync` will attempt this automatically for
@@ -121,7 +121,7 @@ Overdeck uses `gh` and `glab` CLIs instead of raw API tokens because:
 
 ### Environment File
 
-Create `~/.panopticon.env`:
+Create `~/.overdeck.env`:
 
 ```bash
 LINEAR_API_KEY=lin_api_xxxxx
@@ -135,10 +135,10 @@ Overdeck supports multiple issue trackers:
 
 | Tracker | Role | Configuration |
 |---------|------|---------------|
-| **Linear** | Primary tracker | `LINEAR_API_KEY` in `.panopticon.env` |
+| **Linear** | Primary tracker | `LINEAR_API_KEY` in `.overdeck.env` |
 | **GitHub Issues** | Secondary tracker | `GITHUB_TOKEN` or `gh auth login` |
 | **GitLab Issues** | Secondary tracker | `glab auth login` |
-| **Rally** | Secondary tracker | `RALLY_API_KEY` in `.panopticon.env` |
+| **Rally** | Secondary tracker | `RALLY_API_KEY` in `.overdeck.env` |
 
 Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
 
@@ -192,18 +192,18 @@ Overdeck supports multiple AI model providers through direct Anthropic-compatibl
 
 | File | Purpose |
 |------|---------|
-| `~/.panopticon/config.yaml` | Global model settings, provider enable/disable |
-| `~/.panopticon.env` | API keys and sensitive credentials |
-| `.pan.yaml` | Per-project config (optional, overrides global; `.panopticon.yaml` still accepted with deprecation warning) |
+| `~/.overdeck/config.yaml` | Global model settings, provider enable/disable |
+| `~/.overdeck.env` | API keys and sensitive credentials |
+| `.pan.yaml` | Per-project config (optional, overrides global; `.overdeck.yaml` still accepted with deprecation warning) |
 
 **Security:** Restrict file permissions:
 ```bash
-chmod 600 ~/.panopticon/config.yaml ~/.panopticon.env
+chmod 600 ~/.overdeck/config.yaml ~/.overdeck.env
 ```
 
-**Environment Variables:** API keys are loaded from `~/.panopticon.env`:
+**Environment Variables:** API keys are loaded from `~/.overdeck.env`:
 ```bash
-# ~/.panopticon.env
+# ~/.overdeck.env
 KIMI_API_KEY="sk-kimi-..."
 OPENAI_API_KEY="sk-..."
 GOOGLE_AI_KEY="AIza..."
@@ -241,7 +241,7 @@ compatibility alias.
 
 ### Map Linear Projects to Local Directories
 
-Configure which local directory each Linear project maps to. Create/edit `~/.panopticon/project-mappings.json`:
+Configure which local directory each Linear project maps to. Create/edit `~/.overdeck/project-mappings.json`:
 
 ```json
 [
@@ -255,7 +255,7 @@ Configure which local directory each Linear project maps to. Create/edit `~/.pan
     "linearProjectId": "def456",
     "linearProjectName": "Overdeck",
     "linearPrefix": "PAN",
-    "localPath": "/home/user/projects/panopticon"
+    "localPath": "/home/user/projects/overdeck"
   }
 ]
 ```
@@ -271,7 +271,7 @@ Configure which local directory each Linear project maps to. Create/edit `~/.pan
 pan up
 
 # Start server + open in system browser (no Electron)
-npx panopticon serve
+npx overdeck serve
 
 # Stop dashboard
 pan down
@@ -312,8 +312,8 @@ pan status
 pan logs agent-pan-123
 
 # Inspect raw agent runtime logs directly
-less ~/.panopticon/agents/agent-pan-123/lifecycle.log
-less ~/.panopticon/agents/agent-pan-123/spawn.log
+less ~/.overdeck/agents/agent-pan-123/lifecycle.log
+less ~/.overdeck/agents/agent-pan-123/spawn.log
 
 # Send message to agent
 pan tell agent-pan-123 "Your message"
@@ -416,7 +416,7 @@ pan workspace create PAN-45
 ### Workspace Structure
 
 ```
-~/.panopticon/workspaces/
+~/.overdeck/workspaces/
 └── feature-pan-123/
     ├── .planning/          # Planning state
     │   ├── STATE.md        # Current implementation state
@@ -500,10 +500,10 @@ Step-by-step instructions for AI agents...
 
 ```bash
 # Create skill directory
-mkdir -p ~/.panopticon/skills/my-skill
+mkdir -p ~/.overdeck/skills/my-skill
 
 # Create SKILL.md
-cat > ~/.panopticon/skills/my-skill/SKILL.md << 'EOF'
+cat > ~/.overdeck/skills/my-skill/SKILL.md << 'EOF'
 ---
 name: my-skill
 description: Custom workflow
@@ -544,7 +544,7 @@ lsof -i :3011
 
 # Kill conflicting processes
 pan down
-pkill -f panopticon
+pkill -f overdeck
 ```
 
 ### HTTPS Certificate Issues
@@ -570,10 +570,10 @@ pan restart
 pan logs agent-pan-123
 
 # Check detailed start/resume lifecycle events
-less ~/.panopticon/agents/agent-pan-123/lifecycle.log
+less ~/.overdeck/agents/agent-pan-123/lifecycle.log
 
 # Check detached spawn stdout/stderr if start was requested but no session appeared
-less ~/.panopticon/agents/agent-pan-123/spawn.log
+less ~/.overdeck/agents/agent-pan-123/spawn.log
 ```
 
 If the dashboard shows a stopped/starting placeholder agent but no tmux session appears, `lifecycle.log` should show the last successful step (`agent.start_requested`, container wait, spawn request, process spawned/closed). `spawn.log` captures the detached `pan start <id> --local --phase <phase>` subprocess output that was previously lost when stdout/stderr were sent to `ignore`.
@@ -630,7 +630,7 @@ curl -H "Authorization: Bearer $LINEAR_API_KEY" \
 docker ps | grep traefik
 
 # Restart Traefik
-docker restart panopticon-traefik
+docker restart overdeck-traefik
 
 # Check DNS resolution
 ping feature-pan-123.localhost
@@ -672,7 +672,7 @@ pan workspace connect feature-pan-123
 Define custom work types for model routing:
 
 ```yaml
-# ~/.panopticon/work-types.yaml
+# ~/.overdeck/work-types.yaml
 custom_work_types:
   - name: security-audit
     complexity: expert
@@ -689,7 +689,7 @@ Configure Claude Code hooks for real-time agent monitoring:
 ```json
 // ~/.claude/hooks.json
 {
-  "on_tool_result": "~/.panopticon/hooks/heartbeat.sh"
+  "on_tool_result": "~/.overdeck/hooks/heartbeat.sh"
 }
 ```
 
@@ -703,7 +703,7 @@ The Overdeck desktop app wraps the dashboard in a native Electron window with sy
 
 ### Installation
 
-- **Linux**: Download the `.AppImage` from the releases page. `pan up` detects it automatically if placed at `~/.local/bin/panopticon` or in `~/Applications/`.
+- **Linux**: Download the `.AppImage` from the releases page. `pan up` detects it automatically if placed at `~/.local/bin/overdeck` or in `~/Applications/`.
 - **macOS**: Open the `.dmg` and drag `Overdeck.app` to `/Applications/`. `pan up` launches it automatically.
 
 ### Key Features
@@ -720,7 +720,7 @@ The Overdeck desktop app wraps the dashboard in a native Electron window with sy
 
 `pan up` checks for the desktop app before starting the server:
 
-1. Linux: `~/.local/bin/panopticon`, then `~/Applications/Overdeck*.AppImage`
+1. Linux: `~/.local/bin/overdeck`, then `~/Applications/Overdeck*.AppImage`
 2. macOS: `/Applications/Overdeck.app`
 3. Windows: `%LOCALAPPDATA%\Programs\Overdeck`
 
@@ -731,7 +731,7 @@ If found, it spawns the app detached and exits — the desktop app handles serve
 To skip Electron and use the system browser instead:
 
 ```bash
-npx panopticon serve
+npx overdeck serve
 ```
 
 This starts the server and opens it in your default browser after 1.5 seconds. Useful on headless servers or if you prefer the browser experience.

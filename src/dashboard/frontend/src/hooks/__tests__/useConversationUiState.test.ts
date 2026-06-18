@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useConversationUiState } from '../useConversationUiState';
 
-const STORAGE_KEY = 'panopticon:conversation-ui:v1';
+const STORAGE_KEY = 'overdeck:conversation-ui:v1';
 
 describe('useConversationUiState', () => {
   beforeEach(() => {

@@ -8,7 +8,7 @@ import { cn } from '../lib/utils'
 
 export type DiffPanelMode = 'inline' | 'sheet' | 'sidebar'
 
-const STORAGE_KEY = 'panopticon.ui.diffPanelWidth'
+const STORAGE_KEY = 'overdeck.ui.diffPanelWidth'
 const DEFAULT_WIDTH = 560
 const MIN_WIDTH = 320
 const MAX_WIDTH_RATIO = 0.75

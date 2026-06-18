@@ -184,7 +184,7 @@ Analyzes existing codebase and extracts patterns/conventions into documented sta
 Uses an `index.yml` to match relevant standards to the current task, injecting only what's needed rather than the full CLAUDE.md. This is smart context management — our work agents get the full CLAUDE.md regardless of what they're working on.
 
 **Profiles:**
-Named collections of standards for different contexts. Maps to our per-project `.panopticon.yaml` but could be more granular — different standard sets for frontend vs backend vs infrastructure work.
+Named collections of standards for different contexts. Maps to our per-project `.overdeck.yaml` but could be more granular — different standard sets for frontend vs backend vs infrastructure work.
 
 **Verdict:** Standards injection with contextual filtering is the key concept. We already have the per-project config structure; adding intelligent context filtering would reduce prompt bloat.
 
@@ -402,7 +402,7 @@ The `Delta` narrative uses a structured format: `MODIFY|ADD|REMOVE <path>: <desc
 
 **What:** Index CLAUDE.md sections and project conventions by domain. Inject only relevant sections based on the files being modified.
 
-**How:** Create a lightweight `standards-index.yaml` in `.panopticon/`:
+**How:** Create a lightweight `standards-index.yaml` in `.overdeck/`:
 
 ```yaml
 domains:
@@ -670,7 +670,7 @@ src/cli/commands/
 src/lib/lifecycle/
   └── workflows.ts          (MODIFY — add drift detection + retrospective to post-merge)
 
-.panopticon/
+.overdeck/
   └── standards-index.yaml  (NEW — Enhancement 7, per-project)
 ```
 

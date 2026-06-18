@@ -4,9 +4,9 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-// Load ~/.panopticon.env before any other imports
+// Load ~/.overdeck.env before any other imports
 // This makes API keys and other env vars available to all commands
-const OVERDECK_ENV_FILE = join(homedir(), '.panopticon.env');
+const OVERDECK_ENV_FILE = join(homedir(), '.overdeck.env');
 if (existsSync(OVERDECK_ENV_FILE)) {
   try {
     const envContent = readFileSync(OVERDECK_ENV_FILE, 'utf-8');
@@ -26,7 +26,7 @@ if (existsSync(OVERDECK_ENV_FILE)) {
     }
   } catch (error) {
     // Non-fatal: warn but continue
-    console.warn('Warning: Failed to load ~/.panopticon.env:', (error as Error).message);
+    console.warn('Warning: Failed to load ~/.overdeck.env:', (error as Error).message);
   }
 }
 
@@ -200,7 +200,7 @@ program
 
 program
   .command('init')
-  .description('Initialize Overdeck (~/.panopticon/)')
+  .description('Initialize Overdeck (~/.overdeck/)')
   .action(initCommand);
 
 program
@@ -624,7 +624,7 @@ program
     const srcDashboard = join(__dirname, '..', '..', 'src', 'dashboard');
 
     // Check if Traefik is enabled
-    const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
+    const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
     let traefikEnabled = false;
     let traefikDomain = 'pan.localhost';
     let dashboardPort = 3010;
@@ -716,7 +716,7 @@ program
       ];
       for (const varName of providerVars) {
         try {
-          execSync(`tmux -L panopticon set-environment -gu ${varName}`, { stdio: 'ignore' });
+          execSync(`tmux -L overdeck set-environment -gu ${varName}`, { stdio: 'ignore' });
         } catch {
           // No server running or var not set — fine
         }
@@ -763,10 +763,10 @@ program
       // Detect orphaned Traefik container
       try {
         const containerCheck = execSync(
-          'docker ps --filter "name=panopticon-traefik" --format "{{.Names}}" 2>/dev/null',
+          'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
           { encoding: 'utf-8' }
         ).trim();
-        if (containerCheck.includes('panopticon-traefik')) {
+        if (containerCheck.includes('overdeck-traefik')) {
           console.log(chalk.yellow('⚠ Traefik container is running but traefik.enabled is not set in config'));
           console.log(chalk.yellow('  Run `pan install` to configure Traefik, or `pan down` to stop it\n'));
         }
@@ -777,17 +777,17 @@ program
 
     // Start Traefik if enabled
     if (traefikEnabled && !options.skipTraefik) {
-      const traefikDir = join(process.env.HOME || '', '.panopticon', 'traefik');
+      const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
       if (existsSync(traefikDir)) {
         try {
           // Ensure network is marked as external (migration for older installs)
           const composeFile = join(traefikDir, 'docker-compose.yml');
           if (existsSync(composeFile)) {
             const content = readFileSync(composeFile, 'utf-8');
-            if (!content.includes('external: true') && content.includes('panopticon:')) {
+            if (!content.includes('external: true') && content.includes('overdeck:')) {
               const patched = content.replace(
-                /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n\s*driver: bridge/,
-                'networks:\n  panopticon:\n    name: panopticon\n    external: true  # Network created by \'pan install\''
+                /networks:\s*\n\s*overdeck:\s*\n\s*name: overdeck\s*\n\s*driver: bridge/,
+                'networks:\n  overdeck:\n    name: overdeck\n    external: true  # Network created by \'pan install\''
               );
               const { writeFileSync } = await import('fs');
               writeFileSync(composeFile, patched);
@@ -843,10 +843,10 @@ program
       if (process.platform === 'linux') {
         // Installed AppImage or symlink in standard locations
         candidates.push(
-          join(home, '.local', 'bin', 'panopticon'),
-          join(home, '.local', 'share', 'applications', 'panopticon'),
-          '/usr/local/bin/panopticon',
-          '/opt/panopticon/panopticon',
+          join(home, '.local', 'bin', 'overdeck'),
+          join(home, '.local', 'share', 'applications', 'overdeck'),
+          '/usr/local/bin/overdeck',
+          '/opt/overdeck/overdeck',
         );
         // Glob-style: $HOME/Applications/Overdeck*.AppImage
         try {
@@ -868,7 +868,7 @@ program
         );
       } else if (process.platform === 'win32') {
         const localApp = process.env.LOCALAPPDATA || '';
-        candidates.push(join(localApp, 'Programs', 'panopticon', 'Overdeck.exe'));
+        candidates.push(join(localApp, 'Programs', 'overdeck', 'Overdeck.exe'));
       }
 
       return candidates.find((p) => existsSync(p)) ?? null;
@@ -1147,7 +1147,7 @@ program
     }
 
     // Read config for ports and Traefik settings
-    const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
+    const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
     let traefikEnabled = false;
     let dashboardPort = 3010;
     let dashboardApiPort = 3011;
@@ -1199,7 +1199,7 @@ program
 
     // Stop Traefik if enabled
     if (traefikEnabled && !options.skipTraefik) {
-      const traefikDir = join(process.env.HOME || '', '.panopticon', 'traefik');
+      const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
       if (existsSync(traefikDir)) {
         console.log(chalk.dim('Stopping Traefik...'));
         try {
@@ -1346,10 +1346,10 @@ program
 // Cost tracking commands (pan cost today, pan cost sync, etc.)
 program.addCommand(createCostCommand());
 
-// ─── npx panopticon — server + browser launcher ───────────────────────────────
+// ─── npx overdeck — server + browser launcher ───────────────────────────────
 // Low-friction entry point: no Electron required.
 // Starts the dashboard server and opens the browser to the dashboard URL.
-// Usage: npx panopticon  (or: npx panopticon serve)
+// Usage: npx overdeck  (or: npx overdeck serve)
 
 program
   .command('serve')
@@ -1382,7 +1382,7 @@ program
     const port = parseInt(options.port, 10) || 3011;
     const url = `http://localhost:${port}`;
     const internalToken = process.env.OVERDECK_INTERNAL_TOKEN || randomBytes(32).toString('hex');
-    const browserUrl = `${url}#panopticon_token=${encodeURIComponent(internalToken)}`;
+    const browserUrl = `${url}#overdeck_token=${encodeURIComponent(internalToken)}`;
 
     if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
       console.error(chalk.red('Error: Dashboard bundle not found.'));
@@ -1422,7 +1422,7 @@ program
 
 // Default action: show help (Commander default) unless no args → serve
 if (process.argv.length === 2) {
-  // npx panopticon with no args → act as serve
+  // npx overdeck with no args → act as serve
   process.argv.push('serve');
 }
 

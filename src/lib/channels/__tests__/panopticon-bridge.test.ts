@@ -14,10 +14,10 @@ import {
   getSocketPath,
   getBridgeLogPath,
   getOverdeckHome,
-} from '../panopticon-bridge.js';
+} from '../overdeck-bridge.js';
 
 const REPO_ROOT = process.cwd();
-const BRIDGE_ENTRY = join(REPO_ROOT, 'src/lib/channels/panopticon-bridge.ts');
+const BRIDGE_ENTRY = join(REPO_ROOT, 'src/lib/channels/overdeck-bridge.ts');
 
 let tmpHome: string;
 
@@ -92,7 +92,7 @@ describe('pushChannelNotification (in-process protocol)', () => {
     expect(frames).toHaveLength(1);
     expect(frames[0].method).toBe('notifications/claude/channel');
     const params = frames[0].params as { source: string; content: string; meta?: Record<string, string> };
-    expect(params.source).toBe('panopticon-bridge');
+    expect(params.source).toBe('overdeck-bridge');
     expect(params.content).toBe('hello world');
     expect(params.meta).toEqual({ agent_id: 'a-1' });
   });
@@ -220,7 +220,7 @@ describe('pushChannelNotification (in-process protocol)', () => {
  * node:net HTTP/1.1 client used by deliverAgentMessage. Skipped automatically
  * if `bun` is not available so this test file remains green on minimal CI.
  */
-describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
+describe('overdeck-bridge subprocess (Bun.serve unix listener)', () => {
   let proc: ChildProcess | null = null;
 
   beforeEach(() => {

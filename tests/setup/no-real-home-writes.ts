@@ -3,7 +3,7 @@ import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { vi } from 'vitest';
 
-const realOverdeckHome = resolve(homedir(), '.panopticon');
+const realOverdeckHome = resolve(homedir(), '.overdeck');
 const allowedRealHomeWrites = new Set<string>();
 
 function pathString(value: unknown): string | null {
@@ -27,7 +27,7 @@ function assertNotRealOverdeckHome(targets: unknown[]): void {
   for (const target of targets) {
     const blocked = blockedRealHomeTarget(target);
     if (blocked) {
-      throw new Error(`[test-guard] write to REAL ~/.panopticon blocked: ${blocked} — set OVERDECK_HOME to a temp dir`);
+      throw new Error(`[test-guard] write to REAL ~/.overdeck blocked: ${blocked} — set OVERDECK_HOME to a temp dir`);
     }
   }
 }

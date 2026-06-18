@@ -14,10 +14,10 @@ import { FsError } from '../errors.js';
 import type { RemoteWorkspaceMetadata } from './interface.js';
 
 // Path for workspace metadata
-export const WORKSPACES_DIR = join(homedir(), '.panopticon', 'workspaces');
+export const WORKSPACES_DIR = join(homedir(), '.overdeck', 'workspaces');
 
 /**
- * Save workspace metadata to ~/.panopticon/workspaces/{issueId}.yaml
+ * Save workspace metadata to ~/.overdeck/workspaces/{issueId}.yaml
  */
 export function saveWorkspaceMetadataSync(metadata: RemoteWorkspaceMetadata): void {
   if (!existsSync(WORKSPACES_DIR)) {
@@ -29,7 +29,7 @@ export function saveWorkspaceMetadataSync(metadata: RemoteWorkspaceMetadata): vo
 }
 
 /**
- * Load workspace metadata from ~/.panopticon/workspaces/{issueId}.yaml
+ * Load workspace metadata from ~/.overdeck/workspaces/{issueId}.yaml
  */
 export function loadWorkspaceMetadataSync(issueId: string): RemoteWorkspaceMetadata | null {
   const normalizedId = issueId.toLowerCase().replace(/[^a-z0-9-]/g, '-');

@@ -9,7 +9,7 @@ it after a DB wipe* — not whether it merely exists. Matches the rigor of
 
 **Method:** every table traced by `git grep` of its name + its DB-module accessors
 across `src/` (non-test). Row counts and live schemas read from the running
-`~/.panopticon/panopticon.db` via `node:sqlite`. The test for a KEEP is a
+`~/.overdeck/panopticon.db` via `node:sqlite`. The test for a KEEP is a
 *branch-read* (an `if`/`filter`/comparison that changes behavior), exactly as in
 the review-state audit.
 
@@ -167,7 +167,7 @@ state — keep it only if success metrics are NEED, and class it CACHE-of-GitHub
 
 | Surface | Rows | Source of truth? | Class |
 | --- | --- | --- | --- |
-| `projects.yaml` (`~/.panopticon/projects.yaml`) | n/a (file) | **YES** | **SOURCE-OF-TRUTH (file, not DB)** |
+| `projects.yaml` (`~/.overdeck/projects.yaml`) | n/a (file) | **YES** | **SOURCE-OF-TRUTH (file, not DB)** |
 | `app_settings` | 7 | runtime control flags | **SOURCE-OF-TRUTH, acceptable-to-reset** |
 | `api_cache` (main DB) | 0 | — | **DEAD** (real one in `cache.db`) |
 
@@ -206,7 +206,7 @@ genuinely DB-resident SOURCE-OF-TRUTH (nothing rebuilds it). It belongs to the
 
 1. **`api_cache` and `rate_limits` are doubly-defined, and the main-DB copies are
    pure orphans.** `cache-service.ts` opens a **separate database file**
-   (`~/.panopticon/cache.db`, `CACHE_DB_PATH`) and creates its *own* `api_cache`
+   (`~/.overdeck/cache.db`, `CACHE_DB_PATH`) and creates its *own* `api_cache`
    and `rate_limits` with **different schemas**. The copies in the main
    `schema.ts` (different column shapes) have **zero readers/writers**. They must
    be **deleted from `schema.ts`** or `overdeck.db` will faithfully recreate two
@@ -220,7 +220,7 @@ genuinely DB-resident SOURCE-OF-TRUTH (nothing rebuilds it). It belongs to the
    last touched 2026-04/05, one with a `1970-01-01` epoch-zero `last_synced_at`).
    It was an early SQLite "shadow state" prototype, **superseded by the
    filesystem-based `shadow-state`** (`src/lib/shadow-state.ts`, JSON under
-   `~/.panopticon/shadow-state/`). Pure DEAD weight.
+   `~/.overdeck/shadow-state/`). Pure DEAD weight.
 
 3. **Orchestration's two real domains are already at the target shape.**
    `app-settings.ts` (one typed accessor over `app_settings`) and `merge-set.ts`

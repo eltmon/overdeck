@@ -25,7 +25,7 @@ The Universal Context System has four parts that ship together:
 
 **2. Overdeck Documentation RAG.** Every install ships a prebuilt FTS5 + embedding index of Overdeck's own docs. When an agent's prompt mentions concepts like *"pan sync"*, *"workspace"*, or *"cloister"*, a UserPromptSubmit hook injects the top-k most relevant doc snippets — no first-run indexing cost, no model dependency at install, no token blowout (per-conversation cap, per-injection cap, telemetry for tuning).
 
-**3. Home Tab + Live Session Briefing.** The dashboard's new landing route surfaces running agents, paused gates, recent merges, failed verifications, and a time-bucketed activity feed across every workspace. The same content writes to `~/.panopticon/session-context.md` on every state change (debounced 500ms), and every harness session injects the file at start. A UserPromptSubmit hook re-injects when the file is newer than session start — so context stays live, not stale. Includes a knowledge registry (LLM-classified on issue creation) showing which workspace owns which feature, and an advisory compliance audit hook that nudges agents toward memory-first behavior when past-tense triggers appear in user prompts.
+**3. Home Tab + Live Session Briefing.** The dashboard's new landing route surfaces running agents, paused gates, recent merges, failed verifications, and a time-bucketed activity feed across every workspace. The same content writes to `~/.overdeck/session-context.md` on every state change (debounced 500ms), and every harness session injects the file at start. A UserPromptSubmit hook re-injects when the file is newer than session start — so context stays live, not stale. Includes a knowledge registry (LLM-classified on issue creation) showing which workspace owns which feature, and an advisory compliance audit hook that nudges agents toward memory-first behavior when past-tense triggers appear in user prompts.
 
 **4. HTML Artifacts.** Agents can now publish their output as inspectable HTML artifacts via `pan artifacts`. Real validation — secret scanning, size cap, asset path linting — gates publication. Artifacts get isolated origins (`/s/<slug>` and `/a/<slug>`) and full provenance (`{issueId, agentRole, runId, harness, supersedes}`). Share with one URL, audit at any time.
 
@@ -41,7 +41,7 @@ Source: https://github.com/eltmon/overdeck
 
 ### What changes for an existing Overdeck user?
 
-`pan install` migrates `~/Projects/.claude/{skills,agents,CLAUDE.md}` to `~/.panopticon/context/global/`. Existing projects under `~/Projects/` are auto-registered with the new project system. Existing workspaces continue to work; the new briefing file injects automatically on the next session start. No code changes required in your projects.
+`pan install` migrates `~/Projects/.claude/{skills,agents,CLAUDE.md}` to `~/.overdeck/context/global/`. Existing projects under `~/Projects/` are auto-registered with the new project system. Existing workspaces continue to work; the new briefing file injects automatically on the next session start. No code changes required in your projects.
 
 ### Does this work with my non-Anthropic model?
 
@@ -87,7 +87,7 @@ All four issues planned in parallel with **GPT-5.5** (`pan plan --auto --model g
 
 The epic is failure-isolated:
 
-- **PAN-1201** (distribution) is the only one with a hard downstream dependency. PAN-1204 prefers to write `session-context.md` inside the new `~/.panopticon/context/global/` directory; if PAN-1201 fails, PAN-1204 falls back to `~/.panopticon/session-context.md` at the root and is migratable later.
+- **PAN-1201** (distribution) is the only one with a hard downstream dependency. PAN-1204 prefers to write `session-context.md` inside the new `~/.overdeck/context/global/` directory; if PAN-1201 fails, PAN-1204 falls back to `~/.overdeck/session-context.md` at the root and is migratable later.
 - **PAN-1203** (docs RAG) and **PAN-1205** (artifacts) are independent; either can ship without the others.
 - **PAN-1204** depends on **PAN-1052** (memory store), which is already on main. PAN-1052 has been verified end-to-end against requirements; the APIs PAN-1204 needs (`writeObservation`, `readCurrentStatus`, `readRecentObservations`, `searchMemory`, `memory.observation_created` event) are all present.
 
@@ -144,7 +144,7 @@ User-explicit override of the standing humans-only-merge rule. The orchestration
 
 - All four children merged to main (#1201, #1203, #1204, #1205)
 - `pan sync` no longer references `sync.devroot`
-- `~/.panopticon/context/global.md` round-trips to `~/.claude/CLAUDE.md` and Pi's equivalent
+- `~/.overdeck/context/global.md` round-trips to `~/.claude/CLAUDE.md` and Pi's equivalent
 - A newly-spawned agent in any registered project receives the live session-context briefing
 - Asking an agent *"how do I X in Overdeck?"* triggers docs-RAG injection
 - An agent can produce an HTML artifact, validate it, publish it, and the dashboard renders the workspace-record card linking to it

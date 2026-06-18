@@ -2,9 +2,9 @@
  * Tracker Configuration Readers
  *
  * Extracted from server/index.ts for reuse by IssueDataService.
- * Priority: config.yaml (Settings page) > ~/.panopticon.env > environment variables
+ * Priority: config.yaml (Settings page) > ~/.overdeck.env > environment variables
  *
- * NOTE: .panopticon.env content is cached at startup to avoid blocking FS reads
+ * NOTE: .overdeck.env content is cached at startup to avoid blocking FS reads
  * during request handling (PAN-70 type issue). See initTrackerConfigCache().
  */
 
@@ -21,7 +21,7 @@ let cachedTrackedRepos: Array<{ owner: string; repo: string; prefix?: string }> 
 
 export async function initTrackerConfigCache(): Promise<void> {
   try {
-    const envFile = join(homedir(), '.panopticon.env');
+    const envFile = join(homedir(), '.overdeck.env');
     if (existsSync(envFile)) {
       cachedEnvContent = await readFile(envFile, 'utf-8');
     }
@@ -59,7 +59,7 @@ export interface RallyConfig {
 
 /**
  * Load Linear API key.
- * Priority: config.yaml > ~/.panopticon.env > env var
+ * Priority: config.yaml > ~/.overdeck.env > env var
  */
 export function getLinearApiKey(): string | null {
   // 1. Check config.yaml (Settings page)
@@ -68,7 +68,7 @@ export function getLinearApiKey(): string | null {
     if (yamlConfig.config.trackerKeys.linear) return yamlConfig.config.trackerKeys.linear;
   } catch { /* ignore */ }
 
-  // 2. Check cached ~/.panopticon.env (populated at startup to avoid blocking FS read)
+  // 2. Check cached ~/.overdeck.env (populated at startup to avoid blocking FS read)
   if (cachedEnvContent) {
     const match = cachedEnvContent.match(/LINEAR_API_KEY=(.+)/);
     if (match) return match[1].trim();
@@ -80,7 +80,7 @@ export function getLinearApiKey(): string | null {
 
 /**
  * Load Rally configuration.
- * Priority: config.yaml > ~/.panopticon.env > env var
+ * Priority: config.yaml > ~/.overdeck.env > env var
  */
 export function getRallyConfig(): RallyConfig | null {
   let apiKey: string | undefined;
@@ -94,7 +94,7 @@ export function getRallyConfig(): RallyConfig | null {
     if (yamlConfig.config.trackerKeys.rally) apiKey = yamlConfig.config.trackerKeys.rally;
   } catch { /* ignore */ }
 
-  // 2. Check cached ~/.panopticon.env (also get server/workspace/project from here)
+  // 2. Check cached ~/.overdeck.env (also get server/workspace/project from here)
   if (cachedEnvContent) {
     if (!apiKey) {
       const apiKeyMatch = cachedEnvContent.match(/RALLY_API_KEY=(.+)/);
@@ -144,7 +144,7 @@ export function validateRallyConfig(config: RallyConfig): {
 
 /**
  * Load GitHub configuration.
- * Priority: config.yaml > ~/.panopticon.env > env var
+ * Priority: config.yaml > ~/.overdeck.env > env var
  */
 export function getGitHubConfig(): GitHubConfig | null {
   let token: string | undefined;
@@ -156,7 +156,7 @@ export function getGitHubConfig(): GitHubConfig | null {
     if (yamlConfig.config.trackerKeys.github) token = yamlConfig.config.trackerKeys.github;
   } catch { /* ignore */ }
 
-  // 2. Check cached ~/.panopticon.env (also get repos from here)
+  // 2. Check cached ~/.overdeck.env (also get repos from here)
   if (cachedEnvContent) {
     if (!token) {
       const tokenMatch = cachedEnvContent.match(/GITHUB_TOKEN=(.+)/);

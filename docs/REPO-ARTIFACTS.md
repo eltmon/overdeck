@@ -11,14 +11,14 @@ All future work must conform to these decisions.
 
 The repo is the source of truth. If an artifact is useful to a future agent, a future
 developer, or a team member on a different machine, it belongs in the repo. Ephemeral
-runtime state (tmux sessions, agent PIDs, caches) stays in `~/.panopticon/`.
+runtime state (tmux sessions, agent PIDs, caches) stays in `~/.overdeck/`.
 
 ---
 
 ## `.pan/` — Project-Level Overdeck Content
 
 Each project repo may contain a `.pan/` directory for project-specific Overdeck content.
-This is the project-facing counterpart to the global `~/.panopticon/`.
+This is the project-facing counterpart to the global `~/.overdeck/`.
 
 ```
 project-repo/
@@ -46,9 +46,9 @@ project-repo/
 
 ### Naming
 
-`.pan/` was chosen over `.panopticon/` for brevity, and because `.panopticon/` already
+`.pan/` was chosen over `.overdeck/` for brevity, and because `.overdeck/` already
 appeared in the codebase as a project-level runtime output directory (now also renamed to
-`.pan/`). The global tool directory (`~/.panopticon/`) is unchanged.
+`.pan/`). The global tool directory (`~/.overdeck/`) is unchanged.
 
 ---
 
@@ -59,9 +59,9 @@ project-repo/
 └── .pan.yaml            Per-project Overdeck configuration
 ```
 
-(Previously `.panopticon.yaml` — renamed for consistency with `.pan/`.)
+(Previously `.overdeck.yaml` — renamed for consistency with `.pan/`.)
 
-Overrides global `~/.panopticon/config.yaml` settings for this project. Key fields:
+Overrides global `~/.overdeck/config.yaml` settings for this project. Key fields:
 
 ```yaml
 models:
@@ -86,7 +86,7 @@ When `pan sync` writes skills to a project's tool directories, it respects this 
 |----------|--------|------|
 | **1 (highest)** | `.claude/skills/<name>/` already in project repo | **Never touched.** User owns it. |
 | **2** | `.pan/skills/<name>/` in project repo | Project-specific. Written by `pan sync`. |
-| **3 (lowest)** | `~/.panopticon/skills/<name>/` | Global Overdeck skills. |
+| **3 (lowest)** | `~/.overdeck/skills/<name>/` | Global Overdeck skills. |
 
 If a `.claude/skills/<name>/` directory already exists in the project, `pan sync` skips
 it entirely — it never overwrites user-managed skills.
@@ -94,11 +94,11 @@ it entirely — it never overwrites user-managed skills.
 ### Multi-Tool Sync Targets
 
 `pan sync` can write skills and rules to multiple AI tool directories. The target tool
-is configured globally in `~/.panopticon/config.yaml`, with per-project additions in
+is configured globally in `~/.overdeck/config.yaml`, with per-project additions in
 `.pan.yaml`.
 
 ```yaml
-# ~/.panopticon/config.yaml
+# ~/.overdeck/config.yaml
 tools:
   primary: claude-code
   also_sync:
@@ -306,10 +306,10 @@ If yes → root. If no → find or create the appropriate `docs/` subdirectory.
 
 | Artifact | Where it lives | Why |
 |---------|---------------|-----|
-| Global skills cache | `~/.panopticon/skills/` | Machine-local, refreshed by `pan sync` |
-| Agent state dirs | `~/.panopticon/agents/<id>/` | Runtime state, not portable. Includes `state.json`, `health.json`, `lifecycle.log`, `spawn.log`, `output.log`, launcher scripts, and saved Claude session metadata. |
-| Specialist sessions | `~/.panopticon/specialists/` | Runtime state |
-| Issue archives (runtime) | `~/.panopticon/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope vBRIEFs remain in `.pan/specs/` with `status: "completed"`. |
-| Traefik config | `~/.panopticon/traefik/` | Infrastructure, not project content |
-| Cost database | `~/.panopticon/panopticon.db` | Aggregated across all projects |
-| Shadow state | `~/.panopticon/shadow-state/` | Derived from tracker, not authoritative |
+| Global skills cache | `~/.overdeck/skills/` | Machine-local, refreshed by `pan sync` |
+| Agent state dirs | `~/.overdeck/agents/<id>/` | Runtime state, not portable. Includes `state.json`, `health.json`, `lifecycle.log`, `spawn.log`, `output.log`, launcher scripts, and saved Claude session metadata. |
+| Specialist sessions | `~/.overdeck/specialists/` | Runtime state |
+| Issue archives (runtime) | `~/.overdeck/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope vBRIEFs remain in `.pan/specs/` with `status: "completed"`. |
+| Traefik config | `~/.overdeck/traefik/` | Infrastructure, not project content |
+| Cost database | `~/.overdeck/panopticon.db` | Aggregated across all projects |
+| Shadow state | `~/.overdeck/shadow-state/` | Derived from tracker, not authoritative |

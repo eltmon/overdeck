@@ -26,9 +26,9 @@ foreign keys, god-tables, unbounded caches, duplicated entities).
 - **Sacred data:** the code (git) and the JSONL transcripts (`~/.claude/projects/.../*.jsonl`).
   Everything else in the DB is a rebuildable cache or junk. The only non-derivable DB data worth
   preserving is `conversations` + `favorites` (see PAN-1937).
-- **Big-bang cutover:** a fresh `overdeck.db`; the old `~/.panopticon/panopticon.db` stays untouched as
+- **Big-bang cutover:** a fresh `overdeck.db`; the old `~/.overdeck/panopticon.db` stays untouched as
   rollback.
-- **Inspect the live DB read-only** (`~/.panopticon/panopticon.db`) or on a copy — never mutate it.
+- **Inspect the live DB read-only** (`~/.overdeck/panopticon.db`) or on a copy — never mutate it.
 - **Tenet (locked):** one canonical resolver per domain; no direct store access; **"state" is NOT a
   domain.** (`sync-sources/rules/single-source-of-truth.md`)
 - Recoverable actions only (no force-push / history rewrite / deletes of JSONL or branches).
@@ -37,11 +37,11 @@ foreign keys, god-tables, unbounded caches, duplicated entities).
 
 - **Master epic:** PAN-1938 (umbrella: problem, end-state, workstreams).
 - **API surface map + end-state diagram + write audit:** `docs/API-SURFACE.md`.
-- **ERD of the current 34-table schema:** `docs/panopticon-db-erd.excalidraw` (open in Excalidraw — a
+- **ERD of the current 34-table schema:** `docs/overdeck-db-erd.excalidraw` (open in Excalidraw — a
   live canvas with it loaded is at http://localhost:3000, or open the file directly).
 - **Tenet:** `sync-sources/rules/single-source-of-truth.md`.
 - **State model:** `reference/state-model.mdx`.  ·  **Export design:** PAN-1937.
-- **Live DB:** `~/.panopticon/panopticon.db` (SQLite; read-only). Schema = 34 tables; inspect with
+- **Live DB:** `~/.overdeck/panopticon.db` (SQLite; read-only). Schema = 34 tables; inspect with
   `python3 -m sqlite3`.
 
 ## Where the prior conversation landed (a draft to challenge)

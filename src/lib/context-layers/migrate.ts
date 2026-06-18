@@ -3,12 +3,12 @@
  *
  * Before PAN-1201, `pan sync` distributed skills/agents/CLAUDE.md out of
  * `<devroot>/.claude/` (devroot defaulting to ~/Projects). The layered model
- * replaces that with `~/.panopticon/context/`. `pan context migrate` lifts
+ * replaces that with `~/.overdeck/context/`. `pan context migrate` lifts
  * the old content across:
  *
- *   <devroot>/.claude/CLAUDE.md  →  ~/.panopticon/context/global.md
- *   <devroot>/.claude/skills/    →  ~/.panopticon/context/global/skills/
- *   <devroot>/.claude/agents/    →  ~/.panopticon/context/global/agents/
+ *   <devroot>/.claude/CLAUDE.md  →  ~/.overdeck/context/global.md
+ *   <devroot>/.claude/skills/    →  ~/.overdeck/context/global/skills/
+ *   <devroot>/.claude/agents/    →  ~/.overdeck/context/global/agents/
  *
  * It never overwrites an existing target (idempotent — safe to re-run) and
  * never deletes the source. The CLI prints the "delete when ready" hint.

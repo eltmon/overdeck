@@ -248,7 +248,7 @@ Research needed:
 **Owner:** Pending  
 **Deliverable:** Migration + cleanup
 
-Heartbeat JSON files (`~/.panopticon/heartbeats/<id>.json`) would be eliminated, with `lastActivity` moving to `runtime.json`.
+Heartbeat JSON files (`~/.overdeck/heartbeats/<id>.json`) would be eliminated, with `lastActivity` moving to `runtime.json`.
 
 Research needed:
 - What writes heartbeat files? (`src/cli/commands/setup/hooks.ts`?)
@@ -613,7 +613,7 @@ Research needed:
      ```json
      {"result":"success","resolvedFiles":["src/conflict.ts"],"failedFiles":[],"tests":"pass","validation":"passed","ts":"..."}
      ```
-  4. **Discovery:** Merge agent writes to workspace root or `.panopticon/agents/<id>/` — store path in runtime.json
+  4. **Discovery:** Merge agent writes to workspace root or `.overdeck/agents/<id>/` — store path in runtime.json
   5. **Polling:** Merge agent polls for file existence instead of tmux text (5s poll, 15m timeout)
 
 - **Impact:**
@@ -626,14 +626,14 @@ Research needed:
 ### #12 — Heartbeat File Deprecation Plan
 
 - **Finding:**
-  - Heartbeat files at `~/.panopticon/heartbeats/<sessionname>.json` written by hooks on PostToolUse
+  - Heartbeat files at `~/.overdeck/heartbeats/<sessionname>.json` written by hooks on PostToolUse
   - Consumers: deacon.ts:260 (reads via `checkHeartbeat()`), mission-control.ts (activity display)
   - **Both redundant with `runtime.json.lastActivity`** — heartbeat just contains timestamp, which runtime.json already has
   - No semantic difference between heartbeat timestamp and lastActivity
 
 - **Decision:**
   1. **Migrate all heartbeat readers to `runtime.json.lastActivity`**
-  2. **Cleanup:** Delete `~/.panopticon/heartbeats/` directory after migration
+  2. **Cleanup:** Delete `~/.overdeck/heartbeats/` directory after migration
   3. **Hook removal:** Stop writing heartbeat files entirely
   4. **Single source of truth:** `runtime.json` becomes the only agent state file
 

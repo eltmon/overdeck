@@ -42,7 +42,7 @@ export interface DiscoveredSession {
   enrichmentModel: string | null;
   enrichedAt: string | null;
   enrichmentFailed: boolean;
-  panopticonManaged: boolean;
+  overdeckManaged: boolean;
   panIssueId: string | null;
   panAgentId: string | null;
   fileSize: number | null;
@@ -66,7 +66,7 @@ export interface UpsertDiscoveredSessionOpts {
   toolsUsed?: string[];
   filesTouched?: string[];
   tags?: string[];
-  panopticonManaged?: boolean;
+  overdeckManaged?: boolean;
   panIssueId?: string | null;
   panAgentId?: string | null;
   fileSize?: number | null;
@@ -151,7 +151,7 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
     enrichmentModel: (row['enrichment_model'] as string | null) ?? null,
     enrichedAt: (row['enriched_at'] as string | null) ?? null,
     enrichmentFailed: Boolean(row['enrichment_failed']),
-    panopticonManaged: Boolean(row['panopticon_managed']),
+    overdeckManaged: Boolean(row['overdeck_managed']),
     panIssueId: (row['pan_issue_id'] as string | null) ?? null,
     panAgentId: (row['pan_agent_id'] as string | null) ?? null,
     fileSize: (row['file_size'] as number | null) ?? null,
@@ -276,10 +276,10 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
     params.push(filter.primaryModel);
   }
   if (filter.managed === true) {
-    conditions.push(`${col('panopticon_managed')} = 1`);
+    conditions.push(`${col('overdeck_managed')} = 1`);
   }
   if (filter.unmanaged === true) {
-    conditions.push(`${col('panopticon_managed')} = 0`);
+    conditions.push(`${col('overdeck_managed')} = 0`);
   }
   if (filter.since !== undefined) {
     conditions.push(`${col('last_ts')} >= ?`);
@@ -520,7 +520,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        message_count, first_ts, last_ts, models_used, primary_model,
        token_input, token_output, estimated_cost,
        tools_used, files_touched, tags,
-       panopticon_managed, pan_issue_id, pan_agent_id,
+       overdeck_managed, pan_issue_id, pan_agent_id,
        file_size, file_mtime, scanned_at
      ) VALUES (
        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
@@ -540,7 +540,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        tools_used         = excluded.tools_used,
        files_touched      = excluded.files_touched,
        tags               = CASE WHEN ? = 1 THEN excluded.tags ELSE discovered_sessions.tags END,
-       panopticon_managed = excluded.panopticon_managed,
+       overdeck_managed = excluded.overdeck_managed,
        pan_issue_id       = excluded.pan_issue_id,
        pan_agent_id       = excluded.pan_agent_id,
        file_size          = excluded.file_size,
@@ -562,7 +562,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     JSON.stringify(opts.toolsUsed ?? []),
     JSON.stringify(opts.filesTouched ?? []),
     JSON.stringify(opts.tags ?? []),
-    opts.panopticonManaged ? 1 : 0,
+    opts.overdeckManaged ? 1 : 0,
     opts.panIssueId ?? null,
     opts.panAgentId ?? null,
     opts.fileSize ?? null,
@@ -922,7 +922,7 @@ export function getDiscoveredStats(): {
   ).n;
   const managedCount = (
     db
-      .prepare(`SELECT COUNT(*) AS n FROM discovered_sessions WHERE panopticon_managed = 1`)
+      .prepare(`SELECT COUNT(*) AS n FROM discovered_sessions WHERE overdeck_managed = 1`)
       .get() as { n: number }
   ).n;
   const embeddingModels = db

@@ -84,7 +84,7 @@ function getAgentDir(agentId: string): string {
 }
 
 function getManagedTmuxSocketName(): string {
-  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'panopticon';
+  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'overdeck';
 }
 
 function listLiveTmuxSessionNames(): Set<string> {

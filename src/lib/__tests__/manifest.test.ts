@@ -59,24 +59,24 @@ describe('createEmptyManifest', () => {
   it('creates valid empty manifest', () => {
     const m = createEmptyManifest();
     expect(m.version).toBe(1);
-    expect(m.managed_by).toBe('panopticon');
+    expect(m.managed_by).toBe('overdeck');
     expect(m.installed).toEqual({});
   });
 });
 
 describe('readManifest / writeManifest', () => {
   it('round-trips a manifest', () => {
-    const manifestPath = join(TEST_DIR, '.panopticon-manifest.json');
+    const manifestPath = join(TEST_DIR, '.overdeck-manifest.json');
     const manifest = createEmptyManifest();
-    setManifestEntry(manifest, 'skills/beads/SKILL.md', 'sha256:abc123', 'panopticon');
+    setManifestEntry(manifest, 'skills/beads/SKILL.md', 'sha256:abc123', 'overdeck');
 
     writeManifestSync(manifestPath, manifest);
     const loaded = readManifestSync(manifestPath);
 
     expect(loaded.version).toBe(1);
-    expect(loaded.managed_by).toBe('panopticon');
+    expect(loaded.managed_by).toBe('overdeck');
     expect(loaded.installed['skills/beads/SKILL.md'].hash).toBe('sha256:abc123');
-    expect(loaded.installed['skills/beads/SKILL.md'].source).toBe('panopticon');
+    expect(loaded.installed['skills/beads/SKILL.md'].source).toBe('overdeck');
   });
 
   it('returns empty manifest for nonexistent file', () => {
@@ -108,16 +108,16 @@ describe('readManifest / writeManifest', () => {
 describe('setManifestEntry / removeManifestEntry', () => {
   it('adds entries', () => {
     const m = createEmptyManifest();
-    setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:aaa', 'panopticon');
+    setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:aaa', 'overdeck');
     expect(m.installed['skills/foo/SKILL.md']).toBeDefined();
     expect(m.installed['skills/foo/SKILL.md'].hash).toBe('sha256:aaa');
-    expect(m.installed['skills/foo/SKILL.md'].source).toBe('panopticon');
+    expect(m.installed['skills/foo/SKILL.md'].source).toBe('overdeck');
     expect(m.installed['skills/foo/SKILL.md'].installed_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('overwrites existing entries', () => {
     const m = createEmptyManifest();
-    setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:old', 'panopticon');
+    setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:old', 'overdeck');
     setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:new', 'project-template');
     expect(m.installed['skills/foo/SKILL.md'].hash).toBe('sha256:new');
     expect(m.installed['skills/foo/SKILL.md'].source).toBe('project-template');
@@ -125,7 +125,7 @@ describe('setManifestEntry / removeManifestEntry', () => {
 
   it('removes entries', () => {
     const m = createEmptyManifest();
-    setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:aaa', 'panopticon');
+    setManifestEntry(m, 'skills/foo/SKILL.md', 'sha256:aaa', 'overdeck');
     removeManifestEntry(m, 'skills/foo/SKILL.md');
     expect(m.installed['skills/foo/SKILL.md']).toBeUndefined();
   });
@@ -164,7 +164,7 @@ describe('compareFileToManifest', () => {
     const filePath = join(TEST_DIR, 'managed.md');
     writeFileSync(filePath, 'managed content');
     const hash = hashFileSync(filePath);
-    setManifestEntry(manifest, 'skills/managed/SKILL.md', hash, 'panopticon');
+    setManifestEntry(manifest, 'skills/managed/SKILL.md', hash, 'overdeck');
 
     const result = compareFileToManifest(filePath, 'skills/managed/SKILL.md', manifest);
     expect(result.action).toBe('update');
@@ -174,7 +174,7 @@ describe('compareFileToManifest', () => {
     const filePath = join(TEST_DIR, 'modified.md');
     writeFileSync(filePath, 'original content');
     const originalHash = hashFileSync(filePath);
-    setManifestEntry(manifest, 'skills/mod/SKILL.md', originalHash, 'panopticon');
+    setManifestEntry(manifest, 'skills/mod/SKILL.md', originalHash, 'overdeck');
 
     // User modifies the file
     writeFileSync(filePath, 'user modified this');
@@ -231,18 +231,18 @@ describe('buildManifestFromDirectory', () => {
     writeFileSync(join(TEST_DIR, 'skills', 'beads', 'SKILL.md'), 'beads content');
     writeFileSync(join(TEST_DIR, 'agents', 'code-reviewer.md'), 'reviewer content');
 
-    const manifest = buildManifestFromDirectory(TEST_DIR, ['skills', 'agents'], 'panopticon');
+    const manifest = buildManifestFromDirectory(TEST_DIR, ['skills', 'agents'], 'overdeck');
 
     expect(manifest.installed['skills/beads/SKILL.md']).toBeDefined();
-    expect(manifest.installed['skills/beads/SKILL.md'].source).toBe('panopticon');
+    expect(manifest.installed['skills/beads/SKILL.md'].source).toBe('overdeck');
     expect(manifest.installed['skills/beads/SKILL.md'].hash).toMatch(/^sha256:/);
 
     expect(manifest.installed['agents/code-reviewer.md']).toBeDefined();
-    expect(manifest.installed['agents/code-reviewer.md'].source).toBe('panopticon');
+    expect(manifest.installed['agents/code-reviewer.md'].source).toBe('overdeck');
   });
 
   it('skips nonexistent categories', () => {
-    const manifest = buildManifestFromDirectory(TEST_DIR, ['skills', 'rules'], 'panopticon');
+    const manifest = buildManifestFromDirectory(TEST_DIR, ['skills', 'rules'], 'overdeck');
     expect(Object.keys(manifest.installed)).toHaveLength(0);
   });
 
@@ -251,7 +251,7 @@ describe('buildManifestFromDirectory', () => {
     const filePath = join(TEST_DIR, 'skills', 'test', 'SKILL.md');
     writeFileSync(filePath, 'test content');
 
-    const manifest = buildManifestFromDirectory(TEST_DIR, ['skills'], 'panopticon');
+    const manifest = buildManifestFromDirectory(TEST_DIR, ['skills'], 'overdeck');
     const expectedHash = hashFileSync(filePath);
     expect(manifest.installed['skills/test/SKILL.md'].hash).toBe(expectedHash);
   });

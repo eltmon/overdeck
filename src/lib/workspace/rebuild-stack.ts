@@ -52,7 +52,7 @@ function declaredComposeProjectName(content: string, featureFolder: string): str
  */
 export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
   const featureFolder = `feature-${issueId.toLowerCase()}`;
-  const fallback = `panopticon-${featureFolder}`;
+  const fallback = `overdeck-${featureFolder}`;
   for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
     if (!existsSync(devPath)) continue;
     try {

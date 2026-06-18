@@ -13,7 +13,7 @@ Here's the full picture.
 - `agent-enrichment-service.ts` — background polling
 - `metrics.ts`, `reopen.ts`, `review-status-json.ts`
 
-**heartbeats** (`~/.panopticon/heartbeats/<agentId>.json`):
+**heartbeats** (`~/.overdeck/heartbeats/<agentId>.json`):
 - `claude-code.ts` (`getHeartbeat()`) — runtime reads its own hook-written JSON
 - `deacon.ts` (`checkHeartbeat()`) — determines if a specialist is responsive vs stale
 - `mission-control.ts` — ActivityView includes heartbeat age in agent status

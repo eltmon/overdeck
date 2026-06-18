@@ -93,7 +93,7 @@ export function WorkspaceCard({ issueId }: { issueId: string }) {
       </div>
       {ws.agentSessionId && (
         <KV k="Attach">
-          <span className="font-mono text-[11px] text-muted-foreground" title={`tmux -L panopticon attach -t ${ws.agentSessionId}`}>
+          <span className="font-mono text-[11px] text-muted-foreground" title={`tmux -L overdeck attach -t ${ws.agentSessionId}`}>
             {ws.agentSessionId}
           </span>
         </KV>

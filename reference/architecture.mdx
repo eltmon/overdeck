@@ -54,10 +54,10 @@ Because the `projects.yaml` registry (see [Directory Structure](#directory-struc
 
 ## Directory Structure
 
-Overdeck stores all runtime state in `~/.panopticon/`:
+Overdeck stores all runtime state in `~/.overdeck/`:
 
 ```
-~/.panopticon/
+~/.overdeck/
   config.yaml           # Main configuration
   projects.yaml         # Multi-project registry with issue routing
   project-mappings.json # Linear project → local path mappings (legacy)
@@ -99,7 +99,7 @@ Overdeck stores all runtime state in `~/.panopticon/`:
 
 ## Agent State Management
 
-Each agent's state is tracked in `~/.panopticon/agents/{agent-id}/state.json`:
+Each agent's state is tracked in `~/.overdeck/agents/{agent-id}/state.json`:
 
 ```json
 {
@@ -155,7 +155,7 @@ pan work wipe MIN-123 -y -w     # Skip confirmation
 
 **Deep wipe cleans up:**
 - Tmux sessions (`planning-min-123`, `agent-min-123`)
-- Agent state directories (`~/.panopticon/agents/planning-*`, `agent-*`)
+- Agent state directories (`~/.overdeck/agents/planning-*`, `agent-*`)
 - Legacy planning directories (`project/.planning/min-123/`)
 - Workspace (if `-w` flag is used)
 - Issue tracker status (reset to Backlog/Open)
@@ -204,7 +204,7 @@ FPP ensures agents are self-propelling:
 Overdeck uses a **shared config, switchable CLI** approach:
 
 ```
-~/.panopticon/           # Shared by both dev and prod
+~/.overdeck/           # Shared by both dev and prod
 ├── config.yaml          # Settings
 ├── projects.yaml        # Registered projects
 ├── project-mappings.json # Linear → local path mappings

@@ -316,7 +316,7 @@ export function startSubstrateBugPoller(options: SubstrateBugPollerOptions = {})
   if (activePoller) return;
   activePoller = createSubstrateBugPoller(options);
   activePoller.start();
-  (options.log ?? console).log('[panopticon] SubstrateBugPoller started');
+  (options.log ?? console).log('[overdeck] SubstrateBugPoller started');
 }
 
 export function stopSubstrateBugPoller(): void {

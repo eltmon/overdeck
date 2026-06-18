@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import panopticonPiExtension, {
+import overdeckPiExtension, {
   handleSessionStart,
   handleToolExecutionEnd,
   handleTurnEnd,
   handlePanDone,
   handleSessionBriefingContext,
   handleWorkspaceContext,
-  panopticonPathsFor,
+  overdeckPathsFor,
   type PiExtensionAPI,
   type PiCommand,
 } from '../index.js'
@@ -58,12 +58,12 @@ describe('handleSessionStart', () => {
   beforeEach(() => { h = makeFakeHome() })
   afterEach(() => h.cleanup())
 
-  it('writes ~/.panopticon/agents/<id>/ready.json with sessionId and pid', async () => {
+  it('writes ~/.overdeck/agents/<id>/ready.json with sessionId and pid', async () => {
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-abc' },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.readyPath)).toBe(true)
     const body = JSON.parse(readFileSync(paths.readyPath, 'utf8'))
     expect(body).toEqual({
@@ -75,12 +75,12 @@ describe('handleSessionStart', () => {
     })
   })
 
-  it('AC1 (PAN-636 workspace-3119): also writes ~/.panopticon/agents/<id>/session.id with the Pi session id', async () => {
+  it('AC1 (PAN-636 workspace-3119): also writes ~/.overdeck/agents/<id>/session.id with the Pi session id', async () => {
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-resume-target' },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.sessionIdPath)).toBe(true)
     expect(readFileSync(paths.sessionIdPath, 'utf8').trim()).toBe('sess-resume-target')
   })
@@ -90,7 +90,7 @@ describe('handleSessionStart', () => {
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new' /* sessionId omitted */ },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.sessionIdPath)).toBe(false)
   })
 
@@ -115,15 +115,15 @@ describe('handleSessionStart', () => {
   })
 
   it('attaches the internal token when one is available', async () => {
-    mkdirSync(join(h.home, '.panopticon'), { recursive: true })
-    writeFileSync(join(h.home, '.panopticon', 'internal-token'), 'test-token\n')
+    mkdirSync(join(h.home, '.overdeck'), { recursive: true })
+    writeFileSync(join(h.home, '.overdeck', 'internal-token'), 'test-token\n')
 
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-abc' },
     )
 
-    expect(fetchCalls[0]!.headers['x-panopticon-internal-token']).toBe('test-token')
+    expect(fetchCalls[0]!.headers['x-overdeck-internal-token']).toBe('test-token')
   })
 
   it('buffers to pending-events.jsonl when dashboard returns 503', async () => {
@@ -132,7 +132,7 @@ describe('handleSessionStart', () => {
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-abc' },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.pendingEventsPath)).toBe(true)
     const lines = readFileSync(paths.pendingEventsPath, 'utf8').trim().split('\n')
     expect(lines.length).toBe(2)
@@ -142,8 +142,8 @@ describe('handleSessionStart', () => {
 
   it('caps pending event replay to a bounded tail when dashboard remains unavailable', async () => {
     fetchResponse = { status: 503 }
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
-    mkdirSync(join(h.home, '.panopticon', 'agents', 'agent-pan-636'), { recursive: true })
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
+    mkdirSync(join(h.home, '.overdeck', 'agents', 'agent-pan-636'), { recursive: true })
     const lines = Array.from({ length: 350 }, (_, index) => JSON.stringify({ kind: 'activity', activity: 'idle', sequence: index }))
     writeFileSync(paths.pendingEventsPath, `${lines.join('\n')}\n`)
 
@@ -164,7 +164,7 @@ describe('handleSessionStart', () => {
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-abc' },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.pendingEventsPath)).toBe(true)
 
     // Second call succeeds — should drain pending first, then POST new events.
@@ -192,7 +192,7 @@ describe('handleSessionStart', () => {
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-abc' },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.pendingEventsPath)).toBe(false)
   })
 
@@ -233,12 +233,12 @@ describe('handleToolExecutionEnd', () => {
   beforeEach(() => { h = makeFakeHome() })
   afterEach(() => h.cleanup())
 
-  it('writes ~/.panopticon/heartbeats/<id>.json with tool name', async () => {
+  it('writes ~/.overdeck/heartbeats/<id>.json with tool name', async () => {
     await handleToolExecutionEnd(
       { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
       { toolName: 'Bash', isError: false },
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     const body = JSON.parse(readFileSync(paths.heartbeatPath, 'utf8'))
     expect(body).toEqual({
       agent_id: 'agent-pan-636',
@@ -255,7 +255,7 @@ describe('handleToolExecutionEnd', () => {
       { toolName: 'Bash', isError: true },
     )
     const body = JSON.parse(
-      readFileSync(panopticonPathsFor('agent-pan-636', h.home).heartbeatPath, 'utf8'),
+      readFileSync(overdeckPathsFor('agent-pan-636', h.home).heartbeatPath, 'utf8'),
     )
     expect(body.last_action).toBe('tool_error')
   })
@@ -293,7 +293,7 @@ describe('handleTurnEnd', () => {
       {},
     )
     const body = JSON.parse(
-      readFileSync(panopticonPathsFor('agent-pan-636', h.home).heartbeatPath, 'utf8'),
+      readFileSync(overdeckPathsFor('agent-pan-636', h.home).heartbeatPath, 'utf8'),
     )
     expect(body.last_action).toBe('turn_end')
     expect(body.tool_name).toBe('turn_end')
@@ -385,7 +385,7 @@ describe('handleTurnEnd', () => {
   })
 
   it('posts specialist auto-complete with trusted runtime metadata when a specialist marker appears', async () => {
-    const paths = panopticonPathsFor('agent-pan-636-review', h.home)
+    const paths = overdeckPathsFor('agent-pan-636-review', h.home)
     mkdirSync(paths.agentDir, { recursive: true })
     writeFileSync(paths.sessionIdPath, 'pi-session-123\n')
 
@@ -409,7 +409,7 @@ describe('handlePanDone', () => {
       { agentId: 'agent-pan-636', home: h.home, now },
       '   Implementation complete   ',
     )
-    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
     const body = JSON.parse(readFileSync(paths.completedPath, 'utf8'))
     expect(body).toEqual({
       agentId: 'agent-pan-636',
@@ -421,7 +421,7 @@ describe('handlePanDone', () => {
   it('writes summary=null when args is empty', async () => {
     await handlePanDone({ agentId: 'agent-pan-636', home: h.home, now }, '')
     const body = JSON.parse(
-      readFileSync(panopticonPathsFor('agent-pan-636', h.home).completedPath, 'utf8'),
+      readFileSync(overdeckPathsFor('agent-pan-636', h.home).completedPath, 'utf8'),
     )
     expect(body.summary).toBeNull()
   })
@@ -450,8 +450,8 @@ describe('two extension instances with different agent IDs do not collide', () =
       { toolName: 'Bash' },
     )
 
-    const a = panopticonPathsFor('agent-A', h.home)
-    const b = panopticonPathsFor('agent-B', h.home)
+    const a = overdeckPathsFor('agent-A', h.home)
+    const b = overdeckPathsFor('agent-B', h.home)
     expect(a.readyPath).not.toBe(b.readyPath)
     expect(a.heartbeatPath).not.toBe(b.heartbeatPath)
     expect(JSON.parse(readFileSync(a.readyPath, 'utf8')).sessionId).toBe('sess-A')
@@ -489,7 +489,7 @@ describe('default export — Pi extension wiring', () => {
       on: (event: string, handler) => { handlers[event] = handler },
       registerCommand: (name, command) => { commands[name] = command },
     }
-    panopticonPiExtension(pi)
+    overdeckPiExtension(pi)
     expect(Object.keys(handlers)).toHaveLength(0)
     expect(Object.keys(commands)).toHaveLength(0)
   })
@@ -502,7 +502,7 @@ describe('default export — Pi extension wiring', () => {
       on: (event: string, handler) => { handlers[event] = handler },
       registerCommand: (name, command) => { commands[name] = command },
     }
-    panopticonPiExtension(pi)
+    overdeckPiExtension(pi)
     expect(Object.keys(handlers).sort()).toEqual(['session_start', 'tool_execution_end', 'turn_end'])
     expect(Object.keys(commands)).toEqual(['pan-done'])
   })

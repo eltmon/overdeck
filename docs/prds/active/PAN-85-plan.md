@@ -3,14 +3,14 @@
 ## Current State Analysis
 
 ### Problem
-- **748 agent directories** in `~/.panopticon/agents/` (includes agent-*, planning-*, specialist-*, test-*, etc.)
+- **748 agent directories** in `~/.overdeck/agents/` (includes agent-*, planning-*, specialist-*, test-*, etc.)
 - These accumulate indefinitely after work completes
 - Directories dating back to Jan 20 (5+ days old)
 
 ### Blocker Status: RESOLVED ✓
 **PAN-81** (Event-sourced cost tracking) is **CLOSED**. Infrastructure exists:
-- `~/.panopticon/costs/events.jsonl` - Real-time hook-based collection (63KB)
-- `~/.panopticon/costs/by-issue.json` - Pre-computed aggregation cache
+- `~/.overdeck/costs/events.jsonl` - Real-time hook-based collection (63KB)
+- `~/.overdeck/costs/by-issue.json` - Pre-computed aggregation cache
 - Hook-based tracking captures costs without needing agent directories
 
 **However**: `/api/costs/by-issue` endpoint NOT migrated yet - still parses workspace session files on every request (lines 7972-8080 in server/index.ts).
@@ -46,12 +46,12 @@ export interface AgentState {
 
 ### 1. Cleanup Strategy: **Delete Permanently**
 - No archive directory - simply remove old agent directories
-- Cost data is safe in `~/.panopticon/costs/events.jsonl`
+- Cost data is safe in `~/.overdeck/costs/events.jsonl`
 - Simpler implementation, no disk bloat from archives
 
 ### 2. Age Threshold: **7 Days (Configurable)**
 - Default: 7 days (weekly cleanup)
-- Configurable via `~/.panopticon.env`: `CLEANUP_AGENT_DAYS=7`
+- Configurable via `~/.overdeck.env`: `CLEANUP_AGENT_DAYS=7`
 - Can be overridden in dashboard or via CLI flag
 
 ### 3. Directory Types to Clean
@@ -116,14 +116,14 @@ export interface AgentState {
 
 **Task 1.3**: Add config support for age threshold
 - File: `src/lib/paths.ts` or `src/lib/config.ts`
-- Read `CLEANUP_AGENT_DAYS` from `~/.panopticon.env` (default: 7)
+- Read `CLEANUP_AGENT_DAYS` from `~/.overdeck.env` (default: 7)
 - Difficulty: **trivial**
 
 ### Phase 2: Cost Endpoint Migration (Medium)
 **Task 2.1**: Migrate `/api/costs/by-issue` to read from cache
 - File: `src/dashboard/server/index.ts` (lines 7972-8080)
 - Change from: Parse all agent workspace sessions
-- Change to: Read `~/.panopticon/costs/by-issue.json`
+- Change to: Read `~/.overdeck/costs/by-issue.json`
 - Fallback: Legacy session-map.json for historical data
 - Performance: <10ms instead of 5-30s
 - Difficulty: **medium** (needs careful testing, fallback logic)
@@ -182,7 +182,7 @@ export interface AgentState {
 - [ ] Auto-cleanup runs on dashboard startup (background)
 - [ ] Cost queries use by-issue.json cache (<100ms)
 - [ ] Cost data remains accessible after agent cleanup
-- [ ] Config: `CLEANUP_AGENT_DAYS` in `~/.panopticon.env`
+- [ ] Config: `CLEANUP_AGENT_DAYS` in `~/.overdeck.env`
 - [ ] Completed agents marked via `pan done`
 - [ ] Tests cover cleanup logic and patterns
 

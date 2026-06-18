@@ -16,7 +16,7 @@ vi.mock('../../../../lib/agents.js', () => ({
   getAgentStateSync: vi.fn(() => null),
 }));
 
-const PROJECT_KEY = 'panopticon';
+const PROJECT_KEY = 'overdeck';
 const ISSUE_ID = 'pan-830';
 const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
 
@@ -25,7 +25,7 @@ let agentsDir: string;
 
 beforeEach(async () => {
   testDir = join(tmpdir(), `pan-reviewer-tree-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  agentsDir = join(testDir, 'panopticon', 'agents');
+  agentsDir = join(testDir, 'overdeck', 'agents');
   await mkdir(agentsDir, { recursive: true });
 });
 

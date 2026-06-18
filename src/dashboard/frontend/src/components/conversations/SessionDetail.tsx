@@ -31,7 +31,7 @@ interface Session {
   summaryDetailed?: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
-  panopticonManaged: boolean;
+  overdeckManaged: boolean;
   panIssueId: string | null;
 }
 
@@ -115,7 +115,7 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): Session {
     summaryDetailed: session.summaryDetailed ?? null,
     enrichmentLevel: session.enrichmentLevel as 0 | 1 | 2 | 3,
     enrichmentFailed: session.enrichmentFailed,
-    panopticonManaged: session.panopticonManaged,
+    overdeckManaged: session.overdeckManaged,
     panIssueId: session.panIssueId ?? null,
   };
 }
@@ -192,12 +192,12 @@ export function SessionDetail({ session, onClose }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-gray-300">Session #{displaySession.id}</span>
           <span
-            className={displaySession.panopticonManaged
+            className={displaySession.overdeckManaged
               ? 'rounded border border-emerald-500/40 bg-emerald-950/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300'
               : 'rounded border border-amber-500/40 bg-amber-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300'}
-            title={displaySession.panopticonManaged ? 'Overdeck-managed session' : 'Ad-hoc discovered session'}
+            title={displaySession.overdeckManaged ? 'Overdeck-managed session' : 'Ad-hoc discovered session'}
           >
-            {displaySession.panopticonManaged ? `Managed${displaySession.panIssueId ? ` · ${displaySession.panIssueId}` : ''}` : 'Ad-hoc'}
+            {displaySession.overdeckManaged ? `Managed${displaySession.panIssueId ? ` · ${displaySession.panIssueId}` : ''}` : 'Ad-hoc'}
           </span>
         </div>
         <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition-colors">

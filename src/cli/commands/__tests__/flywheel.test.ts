@@ -266,7 +266,7 @@ describe('flywheel CLI commands', () => {
       method: 'POST',
       headers: expect.objectContaining({
         'Content-Type': 'application/json',
-        'x-panopticon-internal-token': expect.any(String),
+        'x-overdeck-internal-token': expect.any(String),
       }),
       body: JSON.stringify(validStatus),
     }));
@@ -308,7 +308,7 @@ describe('flywheel CLI commands', () => {
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PRs merged: 4'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Awaiting UAT: 5'));
     // PAN-1528: agentsActive is now overlaid with the live work-agent count
-    // from disk. The test panopticonHome has no agents, so the count is 0.
+    // from disk. The test overdeckHome has no agents, so the count is 0.
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Active agents: 0/8'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('RAM: 1024 MiB used / 4096 MiB total'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Last tick: 2026-05-18T12:00:00.000Z'));
@@ -336,7 +336,7 @@ describe('flywheel CLI commands', () => {
     await flywheelStatsCommand({});
 
     expect(fetchMock).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/stats?window=30d', expect.objectContaining({
-      headers: expect.objectContaining({ 'x-panopticon-internal-token': expect.any(String) }),
+      headers: expect.objectContaining({ 'x-overdeck-internal-token': expect.any(String) }),
     }));
     const output = logSpy.mock.calls[0][0] as string;
     expect(output).toContain('Flywheel stats (30d)');

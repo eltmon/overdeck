@@ -47,7 +47,7 @@ describe('copyOverdeckSettingsToWorkspace', () => {
     mkdirSync(homeDir, { recursive: true });
     mkdirSync(workspaceDir, { recursive: true });
     mkdirSync(join(homeDir, '.claude'), { recursive: true });
-    mkdirSync(join(homeDir, '.panopticon'), { recursive: true });
+    mkdirSync(join(homeDir, '.overdeck'), { recursive: true });
 
     mockExecAsync.mockReset();
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
@@ -237,7 +237,7 @@ describe('stopWorkspaceDocker', () => {
   it('uses the canonical rendered compose project name for teardown', async () => {
     writeFileSync(
       join(workspaceDir, '.devcontainer', 'dev'),
-      'FEATURE_FOLDER="feature-pan-1140"\nexport COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"\n',
+      'FEATURE_FOLDER="feature-pan-1140"\nexport COMPOSE_PROJECT_NAME="overdeck-${FEATURE_FOLDER}"\n',
       'utf8',
     );
 
@@ -245,7 +245,7 @@ describe('stopWorkspaceDocker', () => {
     await Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'));
 
     const composeCall = mockExecAsync.mock.calls.find(([command]) => String(command).startsWith('docker compose'));
-    expect(composeCall?.[0]).toContain('-p "panopticon-feature-pan-1140" down -v --remove-orphans');
+    expect(composeCall?.[0]).toContain('-p "overdeck-feature-pan-1140" down -v --remove-orphans');
   });
 
   it('rejects workspace-controlled compose project name mismatches before teardown', async () => {
@@ -257,7 +257,7 @@ describe('stopWorkspaceDocker', () => {
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
     await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
-      'declares COMPOSE_PROJECT_NAME=victim-project, expected panopticon-feature-pan-1140',
+      'declares COMPOSE_PROJECT_NAME=victim-project, expected overdeck-feature-pan-1140',
     );
     expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('docker compose'), expect.anything());
   });

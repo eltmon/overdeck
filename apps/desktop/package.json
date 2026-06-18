@@ -50,7 +50,7 @@
     "vitest": "^4.0.18"
   },
   "build": {
-    "appId": "com.panopticon.app",
+    "appId": "com.overdeck.app",
     "productName": "Overdeck",
     "publish": {
       "provider": "github",

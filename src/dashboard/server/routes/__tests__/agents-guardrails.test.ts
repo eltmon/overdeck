@@ -37,8 +37,8 @@ function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {})
       leakedSpecialistCount: 0,
       containerCount: 1,
       containerMemoryBytes: 2 * GIB,
-      panopticonMemoryBytes: 4 * GIB,
-      panopticonMemoryPercent: 6.25,
+      overdeckMemoryBytes: 4 * GIB,
+      overdeckMemoryPercent: 6.25,
     },
     thresholds: {
       memoryAvailableWarningBytes: 4 * GIB,

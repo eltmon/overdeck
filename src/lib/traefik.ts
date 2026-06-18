@@ -41,7 +41,7 @@ export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikR
 }
 
 /**
- * Generate panopticon.yml from template using current config values.
+ * Generate overdeck.yml from template using current config values.
  * Safe to call multiple times (idempotent).
  * Returns true if file was written, false if template not found.
  *
@@ -50,7 +50,7 @@ export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikR
  * which is the production layout. See template header for the full rationale.
  */
 export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boolean {
-  const templatePath = join(SYNC_SOURCES.traefikTemplates, 'dynamic', 'panopticon.yml.template');
+  const templatePath = join(SYNC_SOURCES.traefikTemplates, 'dynamic', 'overdeck.yml.template');
   if (!existsSync(templatePath)) {
     return false;
   }
@@ -74,7 +74,7 @@ export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boo
   }
 
   mkdirSync(TRAEFIK_DYNAMIC_DIR, { recursive: true });
-  const outputPath = join(TRAEFIK_DYNAMIC_DIR, 'panopticon.yml');
+  const outputPath = join(TRAEFIK_DYNAMIC_DIR, 'overdeck.yml');
   writeFileSync(outputPath, content, 'utf-8');
   return true;
 }
@@ -84,7 +84,7 @@ export function generateOverdeckTraefikConfigSync(mode?: TraefikRenderMode): boo
  * Called after copyDirectoryRecursive in pan install.
  */
 export function cleanupTemplateFilesSync(): void {
-  const copiedTemplate = join(TRAEFIK_DYNAMIC_DIR, 'panopticon.yml.template');
+  const copiedTemplate = join(TRAEFIK_DYNAMIC_DIR, 'overdeck.yml.template');
   if (existsSync(copiedTemplate)) {
     unlinkSync(copiedTemplate);
   }
@@ -225,8 +225,8 @@ export function cleanupStaleTlsSectionsSync(): void {
     }
   }
 
-  // Clean dynamic panopticon.yml (regenerated from template, but also clean runtime copy)
-  const dynamicConfig = join(TRAEFIK_DYNAMIC_DIR, 'panopticon.yml');
+  // Clean dynamic overdeck.yml (regenerated from template, but also clean runtime copy)
+  const dynamicConfig = join(TRAEFIK_DYNAMIC_DIR, 'overdeck.yml');
   if (existsSync(dynamicConfig)) {
     const content = readFileSync(dynamicConfig, 'utf-8');
     // Remove standalone tls: section (not nested under http: routers)

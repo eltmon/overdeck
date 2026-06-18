@@ -239,7 +239,7 @@ async function sendNotification(result: TestRunResult): Promise<void> {
     : `${result.totalFailures} suite(s) failed. Check report: ${result.reportFile}`;
 
   // Try to use notify-complete if available
-  const notifyScript = join(homedir(), '.panopticon', 'bin', 'notify-complete');
+  const notifyScript = join(homedir(), '.overdeck', 'bin', 'notify-complete');
   if (existsSync(notifyScript)) {
     try {
       await execAsync(`"${notifyScript}" "${result.target}" "${message}"`);

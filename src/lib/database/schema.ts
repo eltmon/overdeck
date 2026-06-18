@@ -88,7 +88,7 @@ export function initDiscoveredSessionsSchema(db: SqliteDatabase): void {
       enrichment_model  TEXT,
       enriched_at       TEXT,
       enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      overdeck_managed INTEGER NOT NULL DEFAULT 0,
       pan_issue_id      TEXT,
       pan_agent_id      TEXT,
       file_size         INTEGER,
@@ -99,7 +99,7 @@ export function initDiscoveredSessionsSchema(db: SqliteDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
     CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
     CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
     CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
     CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
 
@@ -651,7 +651,7 @@ export function initSchema(db: SqliteDatabase): void {
       enrichment_model  TEXT,
       enriched_at       TEXT,
       enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      overdeck_managed INTEGER NOT NULL DEFAULT 0,
       pan_issue_id      TEXT,
       pan_agent_id      TEXT,
       file_size         INTEGER,
@@ -669,7 +669,7 @@ export function initSchema(db: SqliteDatabase): void {
       ON discovered_sessions(enrichment_level, enriched_at);
 
     CREATE INDEX IF NOT EXISTS idx_discovered_managed
-      ON discovered_sessions(panopticon_managed, pan_issue_id);
+      ON discovered_sessions(overdeck_managed, pan_issue_id);
 
     CREATE INDEX IF NOT EXISTS idx_discovered_model
       ON discovered_sessions(primary_model);
@@ -1024,7 +1024,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
         enrichment_model  TEXT,
         enriched_at       TEXT,
         enrichment_failed INTEGER NOT NULL DEFAULT 0,
-        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        overdeck_managed INTEGER NOT NULL DEFAULT 0,
         pan_issue_id      TEXT,
         pan_agent_id      TEXT,
         file_size         INTEGER,
@@ -1034,7 +1034,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
       CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
       CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
@@ -1232,7 +1232,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
         enrichment_model  TEXT,
         enriched_at       TEXT,
         enrichment_failed INTEGER NOT NULL DEFAULT 0,
-        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        overdeck_managed INTEGER NOT NULL DEFAULT 0,
         pan_issue_id      TEXT,
         pan_agent_id      TEXT,
         file_size         INTEGER,
@@ -1242,7 +1242,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
       CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
       CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
       CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(

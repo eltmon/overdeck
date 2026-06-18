@@ -88,7 +88,7 @@ rawdb=$(
 #    opening the OLD db behind the gate's back (the event-store evasion). The
 #    only sanctioned reference is the read-only cutover seed in dashboard main.ts.
 panloc=$(
-  { git grep -nE --untracked -e "panopticon\\.db" \
+  { git grep -nE --untracked -e "overdeck\\.db" \
       -- "${INCLUDES[@]}" "${EXCLUDES[@]}" ':!src/dashboard/server/main.ts'; } || true
 )
 

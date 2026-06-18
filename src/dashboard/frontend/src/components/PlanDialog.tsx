@@ -77,13 +77,13 @@ function resolveSettingsModelRef(
 
 // Default for startDocker - can be overridden by localStorage
 const getDefaultStartDocker = (): boolean => {
-  const stored = localStorage.getItem('panopticon.planning.startDocker');
+  const stored = localStorage.getItem('overdeck.planning.startDocker');
   return stored !== null ? stored === 'true' : false; // Default to false — planning agents don't need Docker
 };
 
 // Default for workspace location - can be overridden by localStorage
 const getDefaultWorkspaceLocation = (): 'local' | 'remote' => {
-  const stored = localStorage.getItem('panopticon.planning.workspaceLocation');
+  const stored = localStorage.getItem('overdeck.planning.workspaceLocation');
   return stored === 'remote' ? 'remote' : 'local'; // Default to local
 };
 
@@ -786,7 +786,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                                 checked={workspaceLocation === 'local'}
                                 onChange={() => {
                                   setWorkspaceLocation('local');
-                                  localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
+                                  localStorage.setItem('overdeck.planning.workspaceLocation', 'local');
                                 }}
                                 className="w-4 h-4 border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                               />
@@ -800,7 +800,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                                 checked={workspaceLocation === 'remote'}
                                 onChange={() => {
                                   setWorkspaceLocation('remote');
-                                  localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
+                                  localStorage.setItem('overdeck.planning.workspaceLocation', 'remote');
                                 }}
                                 className="w-4 h-4 border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                               />
@@ -842,7 +842,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                             checked={startDocker}
                             onChange={(e) => {
                               setStartDocker(e.target.checked);
-                              localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
+                              localStorage.setItem('overdeck.planning.startDocker', String(e.target.checked));
                             }}
                             className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />

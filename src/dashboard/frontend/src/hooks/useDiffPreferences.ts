@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 
-const STORAGE_KEY = 'panopticon.ui.diff.preferences'
-const CHANGE_EVENT = 'panopticon:diff-prefs-changed'
+const STORAGE_KEY = 'overdeck.ui.diff.preferences'
+const CHANGE_EVENT = 'overdeck:diff-prefs-changed'
 
 export type DiffRenderMode = 'stacked' | 'split'
 export type LineDiffType = 'word-alt' | 'word' | 'char' | 'none'

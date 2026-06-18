@@ -20,7 +20,7 @@ from collections import Counter, deque
 from pathlib import Path
 from typing import Any
 
-DB_PATH = os.path.expanduser("~/.panopticon/panopticon.db")
+DB_PATH = os.path.expanduser("~/.overdeck/panopticon.db")
 
 
 def record_resolver_error(info: dict[str, Any], message: str) -> None:

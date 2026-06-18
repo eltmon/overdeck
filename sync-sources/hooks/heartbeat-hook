@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/heartbeat-hook  (PAN-800)
+# ~/.overdeck/bin/heartbeat-hook  (PAN-800)
 #
 # Fires on Claude Code PostToolUse. POSTs agent.activity_changed(working, tool)
 # to the dashboard, then records the cost event.
@@ -46,7 +46,7 @@ fi
 pan_emit_event "$AGENT_ID" "$BODY"
 
 # ── Activity log (retained for forensics) ─────────────────────────────────
-AGENT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
+AGENT_DIR="$HOME/.overdeck/agents/$AGENT_ID"
 mkdir -p "$AGENT_DIR" 2>/dev/null
 if [ "$HAVE_JQ" = "1" ]; then
   ENTRY=$(jq -n --arg ts "$TS" --arg tool "$TOOL_NAME" --arg action "$TOOL_INPUT" \
@@ -78,8 +78,8 @@ fi
 
 # ── Cost-event recording (unchanged, its own flock-serialized path) ──────
 COST_SCRIPT=""
-if [ -f "$HOME/.panopticon/bin/record-cost-event.js" ]; then
-  COST_SCRIPT="$HOME/.panopticon/bin/record-cost-event.js"
+if [ -f "$HOME/.overdeck/bin/record-cost-event.js" ]; then
+  COST_SCRIPT="$HOME/.overdeck/bin/record-cost-event.js"
 elif [ -f "$SCRIPT_DIR/record-cost-event.js" ]; then
   COST_SCRIPT="$SCRIPT_DIR/record-cost-event.js"
 fi
@@ -101,7 +101,7 @@ if [ -n "$COST_SCRIPT" ] && [ -n "$CLAUDE_SESSION_ID" ]; then
   export OVERDECK_ISSUE_ID="${OVERDECK_ISSUE_ID:-UNKNOWN}"
   export OVERDECK_SESSION_TYPE="${OVERDECK_SESSION_TYPE:-implementation}"
 
-  STATE_DIR="$HOME/.panopticon/costs/state"
+  STATE_DIR="$HOME/.overdeck/costs/state"
   mkdir -p "$STATE_DIR" 2>/dev/null
   LOCK_FILE="$STATE_DIR/${CLAUDE_SESSION_ID}.lock"
   {

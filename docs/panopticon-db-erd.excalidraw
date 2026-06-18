@@ -1,7 +1,7 @@
 {
  "type": "excalidraw",
  "version": 2,
- "source": "panopticon-erd-gen",
+ "source": "overdeck-erd-gen",
  "elements": [
   {
    "id": "el1",
@@ -1753,13 +1753,13 @@
    "link": null,
    "locked": false,
    "type": "text",
-   "text": "id\njsonl_path\nsession_id\nworkspace_path\nworkspace_hash\nmessage_count\nfirst_ts\nlast_ts\nmodels_used\nprimary_model\ntoken_input\ntoken_output\nestimated_cost\ntools_used\nfiles_touched\ntags\nsummary\nsummary_detailed\nenrichment_level\nenrichment_model\nenriched_at\nenrichment_failed\npanopticon_managed\npan_issue_id\npan_agent_id\nfile_size\nfile_mtime\nscanned_at",
+   "text": "id\njsonl_path\nsession_id\nworkspace_path\nworkspace_hash\nmessage_count\nfirst_ts\nlast_ts\nmodels_used\nprimary_model\ntoken_input\ntoken_output\nestimated_cost\ntools_used\nfiles_touched\ntags\nsummary\nsummary_detailed\nenrichment_level\nenrichment_model\nenriched_at\nenrichment_failed\noverdeck_managed\npan_issue_id\npan_agent_id\nfile_size\nfile_mtime\nscanned_at",
    "fontSize": 12,
    "fontFamily": 3,
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "id\njsonl_path\nsession_id\nworkspace_path\nworkspace_hash\nmessage_count\nfirst_ts\nlast_ts\nmodels_used\nprimary_model\ntoken_input\ntoken_output\nestimated_cost\ntools_used\nfiles_touched\ntags\nsummary\nsummary_detailed\nenrichment_level\nenrichment_model\nenriched_at\nenrichment_failed\npanopticon_managed\npan_issue_id\npan_agent_id\nfile_size\nfile_mtime\nscanned_at",
+   "originalText": "id\njsonl_path\nsession_id\nworkspace_path\nworkspace_hash\nmessage_count\nfirst_ts\nlast_ts\nmodels_used\nprimary_model\ntoken_input\ntoken_output\nestimated_cost\ntools_used\nfiles_touched\ntags\nsummary\nsummary_detailed\nenrichment_level\nenrichment_model\nenriched_at\nenrichment_failed\noverdeck_managed\npan_issue_id\npan_agent_id\nfile_size\nfile_mtime\nscanned_at",
    "lineHeight": 1.25,
    "baseline": 438
   },
@@ -4135,13 +4135,13 @@
    "link": null,
    "locked": false,
    "type": "text",
-   "text": "CROSS-CUTTING JOIN KEYS (not drawn \u2014 they'd be a hairball):\n  \u2022 issue_id  \u2192 references a GitHub issue (NOT a local table \u2014 issues live in GitHub)\n  \u2022 agent_id  \u2192 agents\n  \u2022 session_id \u2192 discovered_sessions\n  \u2022 conversation name/id \u2192 conversations\n\nSMELLS TO DISCUSS:\n  \u2022 review_status: 44 columns \u2014 kitchen-sink table mixing verdict, merge, inspect, stuck, PR, deacon flags\n  \u2022 merge state spread across review_status + merge_sets + merge_set_repos + merge_queue + pending_auto_merges + auto_merge\n  \u2022 cost duplicated: cost_events (detail) vs agents.cost_so_far / conversations.total_cost rollups\n  \u2022 conversations vs discovered_sessions overlap (same session, two tables)\n  \u2022 agents table (45 cols) duplicates ~/.panopticon/agents/<id>/state.json on disk",
+   "text": "CROSS-CUTTING JOIN KEYS (not drawn \u2014 they'd be a hairball):\n  \u2022 issue_id  \u2192 references a GitHub issue (NOT a local table \u2014 issues live in GitHub)\n  \u2022 agent_id  \u2192 agents\n  \u2022 session_id \u2192 discovered_sessions\n  \u2022 conversation name/id \u2192 conversations\n\nSMELLS TO DISCUSS:\n  \u2022 review_status: 44 columns \u2014 kitchen-sink table mixing verdict, merge, inspect, stuck, PR, deacon flags\n  \u2022 merge state spread across review_status + merge_sets + merge_set_repos + merge_queue + pending_auto_merges + auto_merge\n  \u2022 cost duplicated: cost_events (detail) vs agents.cost_so_far / conversations.total_cost rollups\n  \u2022 conversations vs discovered_sessions overlap (same session, two tables)\n  \u2022 agents table (45 cols) duplicates ~/.overdeck/agents/<id>/state.json on disk",
    "fontSize": 13,
    "fontFamily": 3,
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "CROSS-CUTTING JOIN KEYS (not drawn \u2014 they'd be a hairball):\n  \u2022 issue_id  \u2192 references a GitHub issue (NOT a local table \u2014 issues live in GitHub)\n  \u2022 agent_id  \u2192 agents\n  \u2022 session_id \u2192 discovered_sessions\n  \u2022 conversation name/id \u2192 conversations\n\nSMELLS TO DISCUSS:\n  \u2022 review_status: 44 columns \u2014 kitchen-sink table mixing verdict, merge, inspect, stuck, PR, deacon flags\n  \u2022 merge state spread across review_status + merge_sets + merge_set_repos + merge_queue + pending_auto_merges + auto_merge\n  \u2022 cost duplicated: cost_events (detail) vs agents.cost_so_far / conversations.total_cost rollups\n  \u2022 conversations vs discovered_sessions overlap (same session, two tables)\n  \u2022 agents table (45 cols) duplicates ~/.panopticon/agents/<id>/state.json on disk",
+   "originalText": "CROSS-CUTTING JOIN KEYS (not drawn \u2014 they'd be a hairball):\n  \u2022 issue_id  \u2192 references a GitHub issue (NOT a local table \u2014 issues live in GitHub)\n  \u2022 agent_id  \u2192 agents\n  \u2022 session_id \u2192 discovered_sessions\n  \u2022 conversation name/id \u2192 conversations\n\nSMELLS TO DISCUSS:\n  \u2022 review_status: 44 columns \u2014 kitchen-sink table mixing verdict, merge, inspect, stuck, PR, deacon flags\n  \u2022 merge state spread across review_status + merge_sets + merge_set_repos + merge_queue + pending_auto_merges + auto_merge\n  \u2022 cost duplicated: cost_events (detail) vs agents.cost_so_far / conversations.total_cost rollups\n  \u2022 conversations vs discovered_sessions overlap (same session, two tables)\n  \u2022 agents table (45 cols) duplicates ~/.overdeck/agents/<id>/state.json on disk",
    "lineHeight": 1.25,
    "baseline": 146
   }

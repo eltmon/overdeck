@@ -32,7 +32,7 @@ Three connected mechanisms:
 
 ### Home Tab
 
-New route at `panopticon.localhost/` (becomes default landing).
+New route at `overdeck.localhost/` (becomes default landing).
 
 Sections:
 
@@ -61,7 +61,7 @@ Click target: workspace card → workspace overview page (not a specific convers
 
 ### Live `session-context.md`
 
-The dashboard server writes `~/.panopticon/session-context.md` on every state change, debounced ~500ms. Content structure (borrowed from Subspace's four-section pattern, with our honesty pass):
+The dashboard server writes `~/.overdeck/session-context.md` on every state change, debounced ~500ms. Content structure (borrowed from Subspace's four-section pattern, with our honesty pass):
 
 ```markdown
 # Working Inside Overdeck
@@ -116,7 +116,7 @@ The rest is context.
 
 ## Knowledge Registry
 
-[auto-assembled from ~/.panopticon/registry/features.sqlite]
+[auto-assembled from ~/.overdeck/registry/features.sqlite]
 
 ## Memory-First Triggers
 
@@ -147,8 +147,8 @@ on new tabs, but switching tabs still doesn't focus."
 `pan workspace create` generates a launcher that includes:
 
 ```bash
-claude --append-system-prompt-file "$HOME/.panopticon/session-context.md" \
-       --append-system-prompt-file "$WORKSPACE/.panopticon/context/workspace.md" \
+claude --append-system-prompt-file "$HOME/.overdeck/session-context.md" \
+       --append-system-prompt-file "$WORKSPACE/.overdeck/context/workspace.md" \
        "$@"
 ```
 
@@ -160,22 +160,22 @@ Pi extension reads both files at `session_start` and appends to system prompt.
 
 **Live re-injection (the key differentiator vs Subspace):**
 
-A UserPromptSubmit hook checks if `~/.panopticon/session-context.md` has a newer mtime than the session start time. If so, it prepends the latest file content as a system-level note:
+A UserPromptSubmit hook checks if `~/.overdeck/session-context.md` has a newer mtime than the session start time. If so, it prepends the latest file content as a system-level note:
 
 ```bash
 # dist/hooks/briefing-refresh.sh
 prompt=$(cat)
-briefing_mtime=$(stat -c %Y "$HOME/.panopticon/session-context.md")
-session_start_mtime=$(cat "$HOME/.panopticon/sessions/$SESSION_ID/started.txt")
+briefing_mtime=$(stat -c %Y "$HOME/.overdeck/session-context.md")
+session_start_mtime=$(cat "$HOME/.overdeck/sessions/$SESSION_ID/started.txt")
 if [ "$briefing_mtime" -gt "$session_start_mtime" ]; then
   echo "$prompt"
   echo ""
-  echo "<panopticon-briefing-update>"
+  echo "<overdeck-briefing-update>"
   echo "Briefing was updated since session start. Latest state below."
-  cat "$HOME/.panopticon/session-context.md"
-  echo "</panopticon-briefing-update>"
+  cat "$HOME/.overdeck/session-context.md"
+  echo "</overdeck-briefing-update>"
   # Mark refreshed to avoid re-injection until next file change
-  touch "$HOME/.panopticon/sessions/$SESSION_ID/briefing-refreshed.txt"
+  touch "$HOME/.overdeck/sessions/$SESSION_ID/briefing-refreshed.txt"
 else
   echo "$prompt"
 fi
@@ -185,7 +185,7 @@ fi
 
 ### Knowledge Registry
 
-`~/.panopticon/registry/features.sqlite`:
+`~/.overdeck/registry/features.sqlite`:
 
 ```sql
 CREATE TABLE features (
@@ -259,7 +259,7 @@ async function onStopHook(turn: TurnRecord) {
 [Overdeck nudge] Last turn included a memory-first trigger phrase ("we recently fixed the focus issue") but `pan memory search` wasn't called. Consider searching memory first next time — it has the decision trail and reasoning that git doesn't.
 ```
 
-**Modes** (configurable in `~/.panopticon/config.yaml`):
+**Modes** (configurable in `~/.overdeck/config.yaml`):
 
 | Mode | Behavior |
 |---|---|
@@ -267,7 +267,7 @@ async function onStopHook(turn: TurnRecord) {
 | `advisory` (v1 default) | Log misses, prepend soft warning next prompt |
 | `enforcing` (Phase 2) | Block git/grep/Read tool calls until memory search runs |
 
-Telemetry written to `~/.panopticon/compliance/telemetry.jsonl` for tuning trigger phrases.
+Telemetry written to `~/.overdeck/compliance/telemetry.jsonl` for tuning trigger phrases.
 
 ## CLI Surface
 
@@ -291,9 +291,9 @@ pan compliance triggers add "<phrase>"
 ## Acceptance Criteria
 
 - Home tab is the dashboard landing route; header summary, activity feed, workspace cards, knowledge registry all render
-- `~/.panopticon/session-context.md` is written by dashboard server on state change (debounced ~500ms)
+- `~/.overdeck/session-context.md` is written by dashboard server on state change (debounced ~500ms)
 - Both Claude Code and Pi wrapper scripts inject the file as a system-prompt-append at session start
-- UserPromptSubmit hook re-injects (as `<panopticon-briefing-update>`) if file is newer than session start
+- UserPromptSubmit hook re-injects (as `<overdeck-briefing-update>`) if file is newer than session start
 - Knowledge registry: LLM classification fires on issue creation; section appears in briefing; `pan registry list` shows entries; `pan registry tag` writes manually
 - Compliance audit hook logs `compliance.miss` observations correctly when trigger matches and memory search wasn't first
 - Next-prompt soft-warning prepend works for advisory mode

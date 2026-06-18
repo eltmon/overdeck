@@ -19,13 +19,13 @@
 - **Tests:** Vitest (`npm test` = root + frontend projects). Fake timers
   mandatory for delay-based logic. Playwright MCP for browser UAT.
 - **Lint:** ESLint + `scripts/lint-skills.sh` (skill/CLI drift) via `npm run lint`.
-- **Agent substrate:** tmux on a dedicated `panopticon` socket
-  (`tmux -L panopticon`); per-agent state under `~/.panopticon/agents/`;
+- **Agent substrate:** tmux on a dedicated `overdeck` socket
+  (`tmux -L overdeck`); per-agent state under `~/.overdeck/agents/`;
   harnesses: claude-code (default), pi (multi-provider, FIFO rpc.in), codex
   (OpenAI, `codex exec`).
 - **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
   beads (`bd`) for in-repo task tracking; vBRIEF v0.5/0.6 specs in `.pan/specs/`.
-- **Config:** YAML at `~/.panopticon/` (settings, projects.yaml), normalized by
+- **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 

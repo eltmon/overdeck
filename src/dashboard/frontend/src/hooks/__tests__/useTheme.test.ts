@@ -111,7 +111,7 @@ describe('useTheme', () => {
         result.current.toggleTheme();
       });
 
-      expect(localStorage.setItem).toHaveBeenCalledWith('panopticon.ui.theme', 'light');
+      expect(localStorage.setItem).toHaveBeenCalledWith('overdeck.ui.theme', 'light');
     });
 
     it('should toggle DOM dark class via classList.toggle', () => {

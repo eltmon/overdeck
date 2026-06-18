@@ -15,7 +15,7 @@ Ran `grep -rn "pan work\|pan cloister\|pan specialists" .claude/skills/` against
 - L165: `pan specialists wake merge-agent` → `pan admin specialists wake merge-agent`
 - L174: `pan specialists wake test-agent --task "..."` → `pan admin specialists wake test-agent --task "..."`
 
-### 2. `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md` (1 ref)
+### 2. `.claude/skills/update-overdeck-docs/resources/EXAMPLES.md` (1 ref)
 - L294: `pan work --help` → `pan --help` (in Pattern 6's verify step; the collapsed taxonomy no longer has a `work` namespace — all lifecycle verbs are top-level: `pan start`, `pan done`, `pan kill`, etc.)
 
 ## Current taxonomy (verified against `pan --help` on feature/pan-712)
@@ -38,7 +38,7 @@ Two small, independently-reviewable doc edits. Each bead owns one file, uses Edi
 ## Decomposition
 
 1. **Bead 1:** Fix `test-specialist-workflow/SKILL.md` — rewrite 5 occurrences (1× `pan cloister start`, 4× `pan specialists wake ...`) to `pan admin ...` equivalents. Difficulty: `trivial`.
-2. **Bead 2:** Fix `update-panopticon-docs/resources/EXAMPLES.md` — replace L294 `pan work --help` with `pan --help` and update surrounding Pattern 6 prose if it still implies a `pan work` namespace. Difficulty: `trivial`.
+2. **Bead 2:** Fix `update-overdeck-docs/resources/EXAMPLES.md` — replace L294 `pan work --help` with `pan --help` and update surrounding Pattern 6 prose if it still implies a `pan work` namespace. Difficulty: `trivial`.
 
 Both beads share one final AC: `grep -rn -E "\bpan (work|cloister|specialists)\b" .claude/skills/` returns nothing (excluding `pan workspace`, which is matched by `\b` anchors). Beads are independent — either can land on its own. No edges.
 

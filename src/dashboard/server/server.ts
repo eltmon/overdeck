@@ -132,7 +132,7 @@ function allowDashboardSessionCors(
         'true',
       ),
       'Access-Control-Allow-Headers',
-      'x-panopticon-internal-token, x-panopticon-csrf-token, authorization, content-type',
+      'x-overdeck-internal-token, x-overdeck-csrf-token, authorization, content-type',
     ),
     'Vary',
     'Origin',
@@ -397,7 +397,7 @@ export const makeServerLayer = Layer.unwrap(
       Effect.gen(function* () {
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
-          console.log(`[panopticon] Dashboard listening on http://${config.host}:${config.port}`);
+          console.log(`[overdeck] Dashboard listening on http://${config.host}:${config.port}`);
           const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';
           emitActivityEntrySync({
             source: 'dashboard',

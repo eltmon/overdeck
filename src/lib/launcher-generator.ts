@@ -39,7 +39,7 @@ export interface LauncherConfig {
   piMode?: 'rpc' | 'tui';
   /** Absolute path to packages/pi-extension/dist/index.js. Required for harness='pi'. */
   piExtensionPath?: string;
-  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi' + piMode='rpc'. */
+  /** Absolute path to ~/.overdeck/agents/<id>/rpc.in. Required for harness='pi' + piMode='rpc'. */
   piFifoPath?: string;
   /** Absolute path to per-agent Pi session-dir (Pi --session-dir). Required for harness='pi'. */
   piSessionDir?: string;
@@ -52,7 +52,7 @@ export interface LauncherConfig {
    */
   codexMode?: 'exec' | 'tui' | 'work-tui';
   /**
-   * Per-agent CODEX_HOME directory path (e.g. ~/.panopticon/agents/<id>/codex-home).
+   * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
    */
   codexHome?: string;
@@ -126,7 +126,7 @@ export interface LauncherConfig {
   providerExports?: string;
   unsetProviderEnv?: boolean;
   cavemanExports?: string;
-  panopticonEnv?: { agentId?: string; issueId?: string; sessionType?: string };
+  overdeckEnv?: { agentId?: string; issueId?: string; sessionType?: string };
   unsetOverdeckEnv?: boolean;
   extraEnvExports?: string[];
 
@@ -150,7 +150,7 @@ export interface LauncherConfig {
   fileMode?: number;
 
   /**
-   * Absolute path to a per-agent .mcp.json that wires the panopticon-bridge
+   * Absolute path to a per-agent .mcp.json that wires the overdeck-bridge
    * (and any other custom MCP servers) into the claude invocation. When set
    * together with channelsBridgeServerName, the launcher appends
    *   --mcp-config <path> --dangerously-load-development-channels server:<name>
@@ -166,7 +166,7 @@ export interface LauncherConfig {
 
   /**
    * Server name from the per-agent .mcp.json that should be loaded as a
-   * Claude Code Channel. Defaults to 'panopticon-bridge' when
+   * Claude Code Channel. Defaults to 'overdeck-bridge' when
    * channelsBridgeMcpConfig is set; ignored when the MCP config path is
    * not also provided.
    */
@@ -196,7 +196,7 @@ function shellQuote(value: string): string {
  */
 function buildChannelsArgs(config: LauncherConfig): string {
   if (!config.channelsBridgeMcpConfig) return '';
-  const serverName = config.channelsBridgeServerName ?? 'panopticon-bridge';
+  const serverName = config.channelsBridgeServerName ?? 'overdeck-bridge';
   return ` --mcp-config ${shellQuote(config.channelsBridgeMcpConfig)} --dangerously-load-development-channels server:${serverName}`;
 }
 
@@ -265,17 +265,17 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   const explicitlySetOverdeckKeys = new Set<string>();
 
   // Overdeck env vars
-  if (config.panopticonEnv) {
-    if (config.panopticonEnv.agentId != null) {
-      lines.push(`export OVERDECK_AGENT_ID=${shellQuote(config.panopticonEnv.agentId)}`);
+  if (config.overdeckEnv) {
+    if (config.overdeckEnv.agentId != null) {
+      lines.push(`export OVERDECK_AGENT_ID=${shellQuote(config.overdeckEnv.agentId)}`);
       explicitlySetOverdeckKeys.add('OVERDECK_AGENT_ID');
     }
-    if (config.panopticonEnv.issueId != null) {
-      lines.push(`export OVERDECK_ISSUE_ID=${shellQuote(config.panopticonEnv.issueId)}`);
+    if (config.overdeckEnv.issueId != null) {
+      lines.push(`export OVERDECK_ISSUE_ID=${shellQuote(config.overdeckEnv.issueId)}`);
       explicitlySetOverdeckKeys.add('OVERDECK_ISSUE_ID');
     }
-    if (config.panopticonEnv.sessionType != null) {
-      lines.push(`export OVERDECK_SESSION_TYPE=${shellQuote(config.panopticonEnv.sessionType)}`);
+    if (config.overdeckEnv.sessionType != null) {
+      lines.push(`export OVERDECK_SESSION_TYPE=${shellQuote(config.overdeckEnv.sessionType)}`);
       explicitlySetOverdeckKeys.add('OVERDECK_SESSION_TYPE');
     }
   }

@@ -16,8 +16,8 @@
   },
   "favicon": "/favicon.svg",
   "logo": {
-    "light": "/logo/panopticon-light.svg",
-    "dark": "/logo/panopticon-dark.svg"
+    "light": "/logo/overdeck-light.svg",
+    "dark": "/logo/overdeck-dark.svg"
   },
   "topbarLinks": [
     {

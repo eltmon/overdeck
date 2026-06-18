@@ -13,12 +13,12 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = dirname(__dirname);
-const BIN_DIR = join(homedir(), '.panopticon', 'bin');
+const BIN_DIR = join(homedir(), '.overdeck', 'bin');
 // PAN-1201: hook scripts live under sync-sources/hooks/, not scripts/.
 const HOOKS_SOURCE_DIR = join(PACKAGE_ROOT, 'sync-sources', 'hooks');
 
 function syncHooksIfInitialized() {
-  if (!existsSync(join(homedir(), '.panopticon'))) {
+  if (!existsSync(join(homedir(), '.overdeck'))) {
     console.log('Overdeck not initialized yet. Run `pan init` to set up.');
     return;
   }
@@ -27,7 +27,7 @@ function syncHooksIfInitialized() {
   mkdirSync(BIN_DIR, { recursive: true });
 
   // Copy hook scripts (extensionless executables + .sh helpers) to
-  // ~/.panopticon/bin/. Built artifacts (record-cost-event.js), build config
+  // ~/.overdeck/bin/. Built artifacts (record-cost-event.js), build config
   // (tsdown.config.ts, *.ts), and the git-hooks/ subdir are skipped — those
   // are not Claude Code hooks. `pan sync` handles record-cost-event.js.
   if (!existsSync(HOOKS_SOURCE_DIR)) return;
@@ -50,7 +50,7 @@ function syncHooksIfInitialized() {
   }
 
   if (synced > 0) {
-    console.log(`✓ Synced ${synced} hooks to ~/.panopticon/bin/`);
+    console.log(`✓ Synced ${synced} hooks to ~/.overdeck/bin/`);
   }
 }
 

@@ -9,7 +9,7 @@
  * Override precedence (highest wins):
  *   1. PAN_YOLO env var ("1"/"true"/"yes" → bypass, "0"/"false"/"no" → auto)
  *   2. ClaudePermissionMode argument (callers that have already resolved CLI/env)
- *   3. config.claude.permissionMode in ~/.panopticon/config.yaml
+ *   3. config.claude.permissionMode in ~/.overdeck/config.yaml
  *   4. 'auto' (default — uses Claude Code's classifier instead of full bypass)
  *
  * `auto` mode requires `skipAutoPermissionPrompt: true` in ~/.claude/settings.json.
@@ -51,7 +51,7 @@ export function readYoloEnv(env: NodeJS.ProcessEnv = process.env): ClaudePermiss
  * decided at RUNTIME by this resolver, whose inputs are, in order:
  *   1. `PAN_YOLO` env on the *launching* process (e.g. the dashboard server) — not your shell
  *   2. an explicit `--yolo` flag
- *   3. `config.claude.permissionMode` in `~/.panopticon/config.yaml`
+ *   3. `config.claude.permissionMode` in `~/.overdeck/config.yaml`
  *   4. default `auto`
  * So a perfectly clean codebase still launches every agent with DSP if the
  * effective config value is `bypass`. To verify DSP is actually off, check the

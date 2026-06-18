@@ -68,7 +68,7 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
  */
 export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult {
   const claudeDir = join(workspacePath, '.claude');
-  const manifestPath = join(claudeDir, '.panopticon-manifest.json');
+  const manifestPath = join(claudeDir, '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
 
   const result: MergeResult = {
@@ -108,14 +108,14 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
           // File doesn't exist at target — copy it
           mkdirSync(dirname(targetPath), { recursive: true });
           copyFileSync(file.absolutePath, targetPath);
-          setManifestEntry(manifest, relativePath, sourceHash, 'panopticon');
+          setManifestEntry(manifest, relativePath, sourceHash, 'overdeck');
           result.added.push(relativePath);
           break;
 
         case 'update':
           // File exists and matches manifest — safe to overwrite with latest
           copyFileSync(file.absolutePath, targetPath);
-          setManifestEntry(manifest, relativePath, sourceHash, 'panopticon');
+          setManifestEntry(manifest, relativePath, sourceHash, 'overdeck');
           result.updated.push(relativePath);
           break;
 
@@ -155,7 +155,7 @@ export function applyProjectTemplateOverlaySync(
   templates?: Array<{ source: string; target: string }>,
 ): string[] {
   const claudeDir = join(workspacePath, '.claude');
-  const manifestPath = join(claudeDir, '.panopticon-manifest.json');
+  const manifestPath = join(claudeDir, '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
   const overlayed: string[] = [];
 
@@ -297,7 +297,7 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
   if (!existsSync(panSkillsDir)) return result;
 
   const claudeSkillsDir = join(workspacePath, '.claude', 'skills');
-  const manifestPath = join(workspacePath, '.claude', '.panopticon-manifest.json');
+  const manifestPath = join(workspacePath, '.claude', '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
 
   const skillDirs = readdirSync(panSkillsDir, { withFileTypes: true })

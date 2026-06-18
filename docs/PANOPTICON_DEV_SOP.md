@@ -10,7 +10,7 @@ Use `pan up` after a reboot or when you want the normal local Overdeck stack.
 pan up
 ```
 
-`pan up` starts the bundled dashboard from `dist/dashboard/server.js` under Node 22. This is the only supported production-like dashboard path. It also starts the supervisor sidecar, which provides restart fallback and watchdog recovery. If `tts.daemon.autoStart: true` is set in `~/.panopticon/config.yaml`, `pan up` also starts the Qwen TTS daemon.
+`pan up` starts the bundled dashboard from `dist/dashboard/server.js` under Node 22. This is the only supported production-like dashboard path. It also starts the supervisor sidecar, which provides restart fallback and watchdog recovery. If `tts.daemon.autoStart: true` is set in `~/.overdeck/config.yaml`, `pan up` also starts the Qwen TTS daemon.
 
 Do not start the dashboard with Bun. The terminal WebSocket depends on a native Node PTY addon, and the built bundle avoids source-mode ESM cycle failures.
 
@@ -67,7 +67,7 @@ Check the restart-status line first. It shows the latest dashboard restart trigg
 If `pan status` shows a watchdog failure or give-up, inspect the supervisor log next.
 
 ```bash
-less ~/.panopticon/logs/supervisor.log
+less ~/.overdeck/logs/supervisor.log
 ```
 
 The supervisor log records watchdog polling, skipped restarts due to the restart lock, spawned restart PIDs, and give-up messages.
@@ -75,7 +75,7 @@ The supervisor log records watchdog polling, skipped restarts due to the restart
 If the supervisor triggered a restart but the dashboard stayed unhealthy, inspect the dashboard log.
 
 ```bash
-less ~/.panopticon/logs/dashboard.log
+less ~/.overdeck/logs/dashboard.log
 ```
 
 The dashboard log contains startup failures, runtime exceptions, and health-check failures from the bundled server process.

@@ -42,7 +42,7 @@ export function parseGitHubReposSync(): GitHubRepoConfig[] {
   const repos: GitHubRepoConfig[] = [];
 
   // 1. Check GITHUB_REPOS env var
-  const envFile = join(homedir(), '.panopticon.env');
+  const envFile = join(homedir(), '.overdeck.env');
   if (existsSync(envFile)) {
     const content = readFileSync(envFile, 'utf-8');
     const reposMatch = content.match(/GITHUB_REPOS=(.+)/);

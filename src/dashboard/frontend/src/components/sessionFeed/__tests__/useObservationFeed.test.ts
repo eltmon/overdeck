@@ -6,7 +6,7 @@ function observation(overrides: Partial<MemoryObservation>): MemoryObservation {
   return {
     id: 'obs-1',
     timestamp: '2026-05-23T01:00:00.000Z',
-    projectId: 'panopticon',
+    projectId: 'overdeck',
     workspaceId: 'workspace-a',
     issueId: 'PAN-1389',
     runId: 'run-1',

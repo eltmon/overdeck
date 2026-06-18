@@ -129,7 +129,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     .replace(/\{\{resultStatus\}\}/g, '${RESULT_STATUS}')
     .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');
 
-  return `<!-- panopticon:orchestration-context-start -->\n${prompt}\n<!-- panopticon:orchestration-context-end -->`;
+  return `<!-- overdeck:orchestration-context-start -->\n${prompt}\n<!-- overdeck:orchestration-context-end -->`;
 }async function spawnInspectAgentPromise(
   context: InspectContext,
   opts: { deep?: boolean } = {},
@@ -185,7 +185,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     }
 
     // Per-agent dir for prompt + launcher artifacts.
-    const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
+    const agentDir = join(homedir(), '.overdeck', 'agents', tmuxSession);
     mkdirSync(agentDir, { recursive: true });
 
     const promptFile = join(agentDir, 'task-prompt.md');
@@ -203,7 +203,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
         providerExports: Object.entries(providerEnv)
           .map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\"'\"'")}'`)
           .join('\n') + (Object.keys(providerEnv).length ? '\n' : ''),
-        panopticonEnv: {
+        overdeckEnv: {
           agentId: tmuxSession,
           issueId: context.issueId,
           sessionType: subRole,

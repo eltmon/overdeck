@@ -321,7 +321,7 @@ export function parseContainerServiceName(fullName: string): string {
   // Examples:
   //   myn-feature-min-846-api-1      → api
   //   myn-feature-min-846-postgres-1  → postgres
-  //   panopticon-traefik              → traefik (no instance suffix)
+  //   overdeck-traefik              → traefik (no instance suffix)
   //
   // Strategy: strip the last segment if it's a number (instance),
   // then strip everything up to and including the issue ID.
@@ -634,6 +634,6 @@ Add to `src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.mo
 - **Unit tests**: Add tests for `parseContainerServiceName()` covering:
   - `myn-feature-min-846-api-1` → `api`
   - `myn-feature-min-846-postgres-1` → `postgres`
-  - `panopticon-traefik` → `traefik`
+  - `overdeck-traefik` → `traefik`
   - `devcontainer-frontend-1` → `frontend` (no issue ID match, fallback)
 - **Visual verification**: Use Playwright MCP to verify the tree renders correctly with containers expanded, status dots animate, and sparklines display data.

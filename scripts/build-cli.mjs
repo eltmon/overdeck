@@ -7,7 +7,7 @@ const distDir = join(projectRoot, 'dist');
 const dashboardDir = join(distDir, 'dashboard');
 const promptsDir = join(distDir, 'prompts');
 const cliPromptsDir = join(distDir, 'cli', 'prompts');
-const preservedRoot = join(projectRoot, '.tmp', `panopticon-dashboard-${process.pid}-${Date.now()}`);
+const preservedRoot = join(projectRoot, '.tmp', `overdeck-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
 
 const moveDirSync = (src, dst) => {

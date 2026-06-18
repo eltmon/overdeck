@@ -13,7 +13,7 @@ const baseIssue = {
   url: `https://example.test/issues/${ISSUE_ID}`,
   createdAt: '2026-05-18T00:00:00.000Z',
   updatedAt: '2026-05-18T00:00:00.000Z',
-  project: { id: 'panopticon', name: 'Overdeck', color: '#a855f7' },
+  project: { id: 'overdeck', name: 'Overdeck', color: '#a855f7' },
   source: 'github',
 };
 
@@ -56,7 +56,7 @@ const transport = {
 export function getTransport() { return transport; }
 export function resetTransport() {}
 export function ensureDashboardSession() { return Promise.resolve(); }
-export async function dashboardMutationJsonHeaders() { return { 'Content-Type': 'application/json', 'x-panopticon-csrf-token': 'test-csrf' }; }
+export async function dashboardMutationJsonHeaders() { return { 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test-csrf' }; }
 export class WsTransport {}
 `,
   }));

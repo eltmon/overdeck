@@ -7,7 +7,7 @@
     {
       "id": "deploy-script",
       "title": "Create post-merge deploy script",
-      "description": "New script at scripts/post-merge-deploy.sh that: (1) runs npm run build && npm link from repo root, (2) kills server processes on ports 3010/3011/3012, (3) detects runtime mode (bun dev vs node prod) and starts new server, (4) polls /api/health with 30s timeout. Accepts args: REPO_ROOT, ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH. Logs to /tmp/panopticon-deploy.log.",
+      "description": "New script at scripts/post-merge-deploy.sh that: (1) runs npm run build && npm link from repo root, (2) kills server processes on ports 3010/3011/3012, (3) detects runtime mode (bun dev vs node prod) and starts new server, (4) polls /api/health with 30s timeout. Accepts args: REPO_ROOT, ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH. Logs to /tmp/overdeck-deploy.log.",
       "difficulty": "simple",
       "files": [
         "scripts/post-merge-deploy.sh"
@@ -57,7 +57,7 @@
     {
       "id": "lifecycle-step0",
       "title": "Add deploy step 0 to postMergeLifecycle",
-      "description": "Modify postMergeLifecycle() in src/lib/cloister/merge-agent.ts to: (1) write {issueId, projectPath, sourceBranch, timestamp} to ~/.panopticon/pending-post-merge.json, (2) spawn scripts/post-merge-deploy.sh as detached process, (3) return immediately. If spawn fails, log warning and fall through to existing lifecycle (best-effort). Must use execAsync/spawn (no execSync per CLAUDE.md rules).",
+      "description": "Modify postMergeLifecycle() in src/lib/cloister/merge-agent.ts to: (1) write {issueId, projectPath, sourceBranch, timestamp} to ~/.overdeck/pending-post-merge.json, (2) spawn scripts/post-merge-deploy.sh as detached process, (3) return immediately. If spawn fails, log warning and fall through to existing lifecycle (best-effort). Must use execAsync/spawn (no execSync per CLAUDE.md rules).",
       "difficulty": "medium",
       "files": [
         "src/lib/cloister/merge-agent.ts"
@@ -119,7 +119,7 @@
     {
       "id": "startup-hook",
       "title": "Add pending lifecycle startup hook to server",
-      "description": "Modify src/dashboard/server/main.ts to check for ~/.panopticon/pending-post-merge.json after server is ready. If found: read contents, delete file, validate timestamp (ignore if > 1 hour old), then schedule postMergeLifecycle(issueId, projectPath) after 3s delay. Also call notifyTldrDaemon if sourceBranch is present. Use fs/promises (no sync FS calls per CLAUDE.md rules).",
+      "description": "Modify src/dashboard/server/main.ts to check for ~/.overdeck/pending-post-merge.json after server is ready. If found: read contents, delete file, validate timestamp (ignore if > 1 hour old), then schedule postMergeLifecycle(issueId, projectPath) after 3s delay. Also call notifyTldrDaemon if sourceBranch is present. Use fs/promises (no sync FS calls per CLAUDE.md rules).",
       "difficulty": "medium",
       "files": [
         "src/dashboard/server/main.ts"

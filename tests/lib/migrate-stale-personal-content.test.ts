@@ -2,7 +2,7 @@
  * Tests for migrateStalePersonalContent — ~/.claude symlink cleanup.
  *
  * Covers:
- *  - Symlinks to .panopticon paths are removed
+ *  - Symlinks to .overdeck paths are removed
  *  - Symlinks to overdeck paths are removed
  *  - Symlinks to unrelated paths are preserved
  *  - Plain directories with a same-name devroot entry are preserved (not deleted)
@@ -75,9 +75,9 @@ describe('migrateStalePersonalContent', () => {
     rmSync(tmpBase, { recursive: true, force: true });
   });
 
-  it('removes a symlink pointing to a .panopticon path', () => {
+  it('removes a symlink pointing to a .overdeck path', () => {
     const skillsDir = join(fakeHome, '.claude', 'skills');
-    symlinkSync('/home/user/.panopticon/skills/pan-help', join(skillsDir, 'pan-help'));
+    symlinkSync('/home/user/.overdeck/skills/pan-help', join(skillsDir, 'pan-help'));
 
     const result = migrateStalePersonalContent();
 
@@ -154,8 +154,8 @@ describe('migrateStalePersonalContent', () => {
   });
 
   it('handles multiple subdirs (skills, commands, agents) in one pass', () => {
-    symlinkSync('/home/user/.panopticon/commands/my-cmd', join(fakeHome, '.claude', 'commands', 'my-cmd'));
-    symlinkSync('/home/user/.panopticon/agents/my-agent', join(fakeHome, '.claude', 'agents', 'my-agent'));
+    symlinkSync('/home/user/.overdeck/commands/my-cmd', join(fakeHome, '.claude', 'commands', 'my-cmd'));
+    symlinkSync('/home/user/.overdeck/agents/my-agent', join(fakeHome, '.claude', 'agents', 'my-agent'));
     mkdirSync(join(fakeHome, '.claude', 'skills', 'user-skill'), { recursive: true });
 
     const result = migrateStalePersonalContent();

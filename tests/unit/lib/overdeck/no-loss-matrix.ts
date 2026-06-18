@@ -373,7 +373,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/resources/docker/container/:id/logs',      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Docker resource management; outside 8 remodel domains' },
 
   // ── settings.ts ───────────────────────────────────────────────────────────
-  { surface: 'GET /api/settings',                                    kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG (~/.panopticon/config.yaml)' },
+  { surface: 'GET /api/settings',                                    kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG (~/.overdeck/config.yaml)' },
   { surface: 'GET /api/settings/available-models',                   kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG/catalog' },
   { surface: 'GET /api/settings/optimal-defaults',                   kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG/catalog' },
   { surface: 'GET /api/settings/minimax-defaults',                   kind: 'http', disposition: 'READ',        door: 'FILE-CONFIG/catalog' },

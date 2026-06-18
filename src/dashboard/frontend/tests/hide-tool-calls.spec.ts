@@ -81,7 +81,7 @@ test.describe('Hide tool calls toggle', () => {
       await route.fulfill({ json: { running: false, lastCheck: null, summary: { active: 0, stale: 0, warning: 0, stuck: 0, total: 0 }, agentsNeedingAttention: [] } });
     });
     await page.route('**/api/system/health', async (route) => {
-      await route.fulfill({ json: { status: 'ok', severity: 'none', summary: { cpuPercent: 0, loadAverage1m: 0, loadPerCore1m: 0, totalMemoryBytes: 64 * 1024 ** 3, usedMemoryBytes: 0, availableMemoryBytes: 64 * 1024 ** 3, memoryUsedPercent: 0, swapTotalBytes: 0, swapUsedBytes: 0, swapUsedPercent: 0, overcommitPercent: 0, agentCount: 0, workAgentCount: 0, planningAgentCount: 0, specialistSessionCount: 0, leakedSpecialistCount: 0, containerCount: 0, containerMemoryBytes: 0, panopticonMemoryBytes: 0, panopticonMemoryPercent: 0 }, thresholds: {}, reasons: [], agents: [], leakedSpecialists: [], topConsumers: [] } });
+      await route.fulfill({ json: { status: 'ok', severity: 'none', summary: { cpuPercent: 0, loadAverage1m: 0, loadPerCore1m: 0, totalMemoryBytes: 64 * 1024 ** 3, usedMemoryBytes: 0, availableMemoryBytes: 64 * 1024 ** 3, memoryUsedPercent: 0, swapTotalBytes: 0, swapUsedBytes: 0, swapUsedPercent: 0, overcommitPercent: 0, agentCount: 0, workAgentCount: 0, planningAgentCount: 0, specialistSessionCount: 0, leakedSpecialistCount: 0, containerCount: 0, containerMemoryBytes: 0, overdeckMemoryBytes: 0, overdeckMemoryPercent: 0 }, thresholds: {}, reasons: [], agents: [], leakedSpecialists: [], topConsumers: [] } });
     });
     await page.route('**/api/version', async (route) => {
       await route.fulfill({ json: { version: '0.0.0-test' } });
@@ -141,7 +141,7 @@ test.describe('Hide tool calls toggle', () => {
 
     // Verify localStorage was updated
     const ls = await page.evaluate(() => {
-      const raw = localStorage.getItem('panopticon:conversation-ui:v1');
+      const raw = localStorage.getItem('overdeck:conversation-ui:v1');
       return raw ? JSON.parse(raw) : null;
     });
     expect(ls).toEqual({ hideToolCallsById: { 'test-conv-toolcalls': true } });

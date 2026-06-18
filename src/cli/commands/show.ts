@@ -50,13 +50,13 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
 
   // Normalize input: accept bare numbers (1148), prefixed issue IDs (PAN-1148),
   // and prefixed agent IDs (agent-pan-1148). Bare numbers are resolved by probing
-  // ~/.panopticon/agents/ for a unique state dir, since the CLI doesn't otherwise
+  // ~/.overdeck/agents/ for a unique state dir, since the CLI doesn't otherwise
   // know which project a bare number belongs to.
   const resolved = resolveBareNumericIdSync(id);
   if (!resolved) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
-      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
     return;
   }

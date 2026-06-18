@@ -2,7 +2,7 @@
 
 **Reference for Overdeck's parallel-dispatch system: per-item DAG readiness, synthesis agents at convergence points, file-overlap serialization, and slot-merge auto-advance.**
 
-PAN-970 shipped wave-based swarm v1. PAN-977 evolves the dispatcher to per-item readiness and moves runtime state out of the `~/.panopticon/swarms/*.json` sidecar into the continue vBRIEF.
+PAN-970 shipped wave-based swarm v1. PAN-977 evolves the dispatcher to per-item readiness and moves runtime state out of the `~/.overdeck/swarms/*.json` sidecar into the continue vBRIEF.
 
 ---
 
@@ -122,7 +122,7 @@ Read-only swarm runtime state for the dashboard's swarm view.
 
 ## Continue vBRIEF (Runtime State)
 
-The PAN-970 sidecar `~/.panopticon/swarms/<issueId>.json` is gone. Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.vbrief.json` under `ContinueState.swarmRuntime`, defined in `src/lib/vbrief/continue-state.ts`.
+The PAN-970 sidecar `~/.overdeck/swarms/<issueId>.json` is gone. Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.vbrief.json` under `ContinueState.swarmRuntime`, defined in `src/lib/vbrief/continue-state.ts`.
 
 ```ts
 interface SwarmRuntime {

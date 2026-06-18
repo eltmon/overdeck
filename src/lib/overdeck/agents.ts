@@ -728,7 +728,7 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
 }
 
 function getManagedTmuxSocketName(): string {
-  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'panopticon';
+  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'overdeck';
 }
 
 function listLiveTmuxSessionNamesSync(): Set<string> {
@@ -773,7 +773,7 @@ export interface BackfillAgentsSyncResult {
 }
 
 /**
- * Read each agent's state.json from ~/.panopticon/agents/ and upsert rows into
+ * Read each agent's state.json from ~/.overdeck/agents/ and upsert rows into
  * the overdeck agents table. Reconciles running/starting agents against live
  * tmux sessions.
  *

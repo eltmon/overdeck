@@ -124,7 +124,7 @@ export interface GitHubClientShape {
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
 export class GitHubClient extends Context.Service<GitHubClient, GitHubClientShape>()(
-  'panopticon/dashboard/GitHubClient',
+  'overdeck/dashboard/GitHubClient',
 ) {}
 
 // ─── Live layer ───────────────────────────────────────────────────────────────

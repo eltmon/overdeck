@@ -78,70 +78,70 @@ describe('migrateOverdeckToPan', () => {
   beforeEach(() => { dir = makeTmp(); });
   afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
-  it('returns empty result when no .panopticon/ subdirs exist', () => {
+  it('returns empty result when no .overdeck/ subdirs exist', () => {
     const result = migrateOverdeckToPanSync(dir);
     expect(result.migrated).toHaveLength(0);
     expect(result.skipped).toHaveLength(0);
     expect(result.errors).toHaveLength(0);
   });
 
-  it('migrates .panopticon/events to .pan/events', () => {
-    const oldDir = join(dir, '.panopticon', 'events');
+  it('migrates .overdeck/events to .pan/events', () => {
+    const oldDir = join(dir, '.overdeck', 'events');
     mkdirSync(oldDir, { recursive: true });
     writeFileSync(join(oldDir, 'PAN-1.jsonl'), '{}', 'utf-8');
 
     const result = migrateOverdeckToPanSync(dir);
-    expect(result.migrated.some(m => m.includes('.panopticon/events'))).toBe(true);
+    expect(result.migrated.some(m => m.includes('.overdeck/events'))).toBe(true);
     expect(existsSync(join(dir, '.pan', 'events', 'PAN-1.jsonl'))).toBe(true);
-    expect(existsSync(join(dir, '.panopticon', 'events'))).toBe(false);
+    expect(existsSync(join(dir, '.overdeck', 'events'))).toBe(false);
   });
 
-  it('migrates .panopticon/triage to .pan/review', () => {
-    mkdirSync(join(dir, '.panopticon', 'triage'), { recursive: true });
-    writeFileSync(join(dir, '.panopticon', 'triage', 'out.md'), 'triage', 'utf-8');
+  it('migrates .overdeck/triage to .pan/review', () => {
+    mkdirSync(join(dir, '.overdeck', 'triage'), { recursive: true });
+    writeFileSync(join(dir, '.overdeck', 'triage', 'out.md'), 'triage', 'utf-8');
 
     migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
-  it('migrates .panopticon/health to .pan/review', () => {
-    mkdirSync(join(dir, '.panopticon', 'health'), { recursive: true });
-    writeFileSync(join(dir, '.panopticon', 'health', 'out.md'), 'health', 'utf-8');
+  it('migrates .overdeck/health to .pan/review', () => {
+    mkdirSync(join(dir, '.overdeck', 'health'), { recursive: true });
+    writeFileSync(join(dir, '.overdeck', 'health', 'out.md'), 'health', 'utf-8');
 
     migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.pan', 'review'))).toBe(true);
   });
 
-  it('migrates .panopticon/prompts to .pan/prompts', () => {
-    mkdirSync(join(dir, '.panopticon', 'prompts'), { recursive: true });
-    writeFileSync(join(dir, '.panopticon', 'prompts', 'agent.md'), 'prompt', 'utf-8');
+  it('migrates .overdeck/prompts to .pan/prompts', () => {
+    mkdirSync(join(dir, '.overdeck', 'prompts'), { recursive: true });
+    writeFileSync(join(dir, '.overdeck', 'prompts', 'agent.md'), 'prompt', 'utf-8');
 
     migrateOverdeckToPanSync(dir);
     expect(existsSync(join(dir, '.pan', 'prompts', 'agent.md'))).toBe(true);
   });
 
   it('skips migration when .pan/<subdir> already exists, adds to skipped list', () => {
-    mkdirSync(join(dir, '.panopticon', 'events'), { recursive: true });
+    mkdirSync(join(dir, '.overdeck', 'events'), { recursive: true });
     mkdirSync(join(dir, '.pan', 'events'), { recursive: true });
 
     const result = migrateOverdeckToPanSync(dir);
-    expect(result.skipped).toContain('.panopticon/events');
+    expect(result.skipped).toContain('.overdeck/events');
     // Old dir not removed
-    expect(existsSync(join(dir, '.panopticon', 'events'))).toBe(true);
+    expect(existsSync(join(dir, '.overdeck', 'events'))).toBe(true);
   });
 
   it('never touches paths outside the project directory', () => {
-    // Verify ~/.panopticon is untouched by confirming migration only checks project path
+    // Verify ~/.overdeck is untouched by confirming migration only checks project path
     const result = migrateOverdeckToPanSync(dir);
-    // No errors from attempting to access global ~/.panopticon/
+    // No errors from attempting to access global ~/.overdeck/
     expect(result.errors).toHaveLength(0);
   });
 
-  it('removes empty .panopticon/ directory after migration', () => {
-    mkdirSync(join(dir, '.panopticon', 'events'), { recursive: true });
+  it('removes empty .overdeck/ directory after migration', () => {
+    mkdirSync(join(dir, '.overdeck', 'events'), { recursive: true });
 
     migrateOverdeckToPanSync(dir);
-    expect(existsSync(join(dir, '.panopticon'))).toBe(false);
+    expect(existsSync(join(dir, '.overdeck'))).toBe(false);
   });
 });
 

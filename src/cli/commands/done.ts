@@ -81,7 +81,7 @@ async function updateLinearToInReview(apiKey: string, issueIdentifier: string, c
 }
 
 function getGitHubConfig(): { token: string; repos: { owner: string; repo: string; prefix: string }[] } | null {
-  const envFile = join(homedir(), '.panopticon.env');
+  const envFile = join(homedir(), '.overdeck.env');
   if (!existsSync(envFile)) return null;
   const content = readFileSync(envFile, 'utf-8');
   const tokenMatch = content.match(/GITHUB_TOKEN=(.+)/);

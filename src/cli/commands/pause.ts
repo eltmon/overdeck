@@ -14,7 +14,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   if (!agentId) {
     console.error(chalk.red(`Could not resolve agent target "${id}"`));
     console.error(chalk.dim(
-      'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.panopticon/agents/',
+      'Pass an issue ID like "PAN-1148" or a full agent ID like "strike-pan-1723"; the state dir must exist under ~/.overdeck/agents/',
     ));
     process.exit(1);
   }

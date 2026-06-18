@@ -207,11 +207,11 @@ describe('buildMiniMaxFormData', () => {
   it('preserves existing conversations settings from formData', () => {
     const existing: SettingsConfig = {
       ...MINIMAX_DEFAULTS,
-      conversations: { compaction_model: 'claude-haiku-4-5', manual_compact_mode: 'panopticon-native', rich_compaction: true },
+      conversations: { compaction_model: 'claude-haiku-4-5', manual_compact_mode: 'overdeck-native', rich_compaction: true },
     };
     const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
     expect(result.conversations?.compaction_model).toBe('claude-haiku-4-5');
-    expect(result.conversations?.manual_compact_mode).toBe('panopticon-native');
+    expect(result.conversations?.manual_compact_mode).toBe('overdeck-native');
     expect(result.conversations?.rich_compaction).toBe(true);
   });
 

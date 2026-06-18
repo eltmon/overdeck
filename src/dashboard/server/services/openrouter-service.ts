@@ -67,7 +67,7 @@ export interface OpenRouterServiceShape {
 export class OpenRouterService extends Context.Service<
   OpenRouterService,
   OpenRouterServiceShape
->()('panopticon/dashboard/OpenRouterService') {}
+>()('overdeck/dashboard/OpenRouterService') {}
 
 // ─── Cache TTL ────────────────────────────────────────────────────────────────
 

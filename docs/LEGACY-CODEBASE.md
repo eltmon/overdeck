@@ -140,7 +140,7 @@ Shadow mode lets you run Overdeck agents without updating your issue tracker. Th
 
 When shadow mode is enabled, agents run normally — they plan, implement, review, and commit code — but all issue tracker updates (status changes, comments, assignments) are suppressed. The work proceeds, but it stays invisible to your tracker.
 
-Shadow state is persisted to `~/.panopticon/shadow/` so it survives restarts. Each issue has its own shadow state: once an issue enters shadow mode, it stays shadowed for all subsequent operations.
+Shadow state is persisted to `~/.overdeck/shadow/` so it survives restarts. Each issue has its own shadow state: once an issue enters shadow mode, it stays shadowed for all subsequent operations.
 
 When shadow mode ends, you can replay the suppressed updates or simply let the next non-shadow run update the tracker normally.
 
@@ -153,14 +153,14 @@ pan start MIN-123 --shadow
 
 **Per-project (config file):**
 ```yaml
-# In <project>/.panopticon.yaml
+# In <project>/.overdeck.yaml
 shadow:
   enabled: true
 ```
 
 **Globally (config file):**
 ```yaml
-# In ~/.panopticon/config.yaml
+# In ~/.overdeck/config.yaml
 shadow:
   enabled: true
 ```
@@ -172,7 +172,7 @@ SHADOW_MODE=true pan start MIN-123
 
 **Per-tracker override:**
 ```yaml
-# In .panopticon.yaml — only shadow Linear, not GitHub
+# In .overdeck.yaml — only shadow Linear, not GitHub
 shadow:
   enabled: false
   trackers:
@@ -185,8 +185,8 @@ shadow:
 Shadow mode respects a priority chain (highest to lowest):
 1. `--shadow` / `--no-shadow` CLI flag
 2. Existing shadow state for the issue (once shadowed, always shadowed)
-3. Per-project `.panopticon.yaml` `shadow.enabled`
-4. Global `~/.panopticon/config.yaml` `shadow.enabled`
+3. Per-project `.overdeck.yaml` `shadow.enabled`
+4. Global `~/.overdeck/config.yaml` `shadow.enabled`
 5. `SHADOW_MODE` environment variable
 6. Default: disabled
 

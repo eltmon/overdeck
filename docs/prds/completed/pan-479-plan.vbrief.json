@@ -87,7 +87,7 @@
           },
           {
             "id": "provider-integration.ac2",
-            "title": "OPENROUTER_API_KEY is loaded from ~/.panopticon.env and config.yaml with correct priority",
+            "title": "OPENROUTER_API_KEY is loaded from ~/.overdeck.env and config.yaml with correct priority",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },

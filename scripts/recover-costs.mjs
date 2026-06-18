@@ -4,7 +4,7 @@
  *
  * Scans ~/.claude/projects/ for transcript JSONL files,
  * infers issue ID from directory path, extracts usage data,
- * and inserts into the panopticon SQLite database.
+ * and inserts into the overdeck SQLite database.
  *
  * Deduplication is handled by the UNIQUE index on request_id.
  */
@@ -15,7 +15,7 @@ import { homedir } from 'os';
 import { openNodeSqliteDatabase } from './sqlite.mjs';
 
 const CLAUDE_PROJECTS = join(homedir(), '.claude', 'projects');
-const DB_PATH = join(homedir(), '.panopticon', 'panopticon.db');
+const DB_PATH = join(homedir(), '.overdeck', 'panopticon.db');
 
 // Pricing table (same as record-cost-event.js)
 const PRICING = [

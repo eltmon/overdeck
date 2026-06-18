@@ -5,7 +5,7 @@
 > state architecture. It is preserved for historical reference only; current agents should
 > read `docs/AGENT-STATE-PLANES.md`, `docs/VBRIEF.md`, and `CLAUDE.md`.
 
-> Compiled 2026-06-14 from the live system (`~/.panopticon`, `tmux -L panopticon`)
+> Compiled 2026-06-14 from the live system (`~/.overdeck`, `tmux -L overdeck`)
 > and the source tree (`src/lib/agents.ts`, `workspace-manager.ts`, `cloister/uat-*`,
 > `roles/`). Entries marked **(code)** were confirmed against a constructing line;
 > **(observed)** were confirmed from live state but not pinned to a constructor.
@@ -18,8 +18,8 @@ agent id == the state-dir name.** Get the prefix table right and the rest follow
 
 ## 1. tmux sessions
 
-- **Socket:** all agents live on the `panopticon` socket — always
-  `tmux -L panopticon …`. The default socket (`/tmp/tmux-1000/default`) is unused
+- **Socket:** all agents live on the `overdeck` socket — always
+  `tmux -L overdeck …`. The default socket (`/tmp/tmux-1000/default`) is unused
   by Overdeck; `tmux list-sessions` with no `-L` will say "no server running".
 - **The session name IS the agent id.** Liveness = "does a session with this name
   exist?" — this is the source of truth, **not** `state.json.status` (which drifts).
@@ -40,12 +40,12 @@ agent id == the state-dir name.** Get the prefix table right and the rest follow
 | `inspect-<issue>-workspace-<hash>` | per-bead inspection agent | **(observed)** |
 | `conv-<YYYYMMDD>-<XXXX>` | conversation agent (`XXXX` = 4-char id) | **(observed: `conv-20260614-1216`)** |
 | `flywheel-orchestrator` | the conversation-level Fix-All Flywheel | fixed name |
-| `panopticon-init` | bootstrap/init session (not an agent) | fixed name |
+| `overdeck-init` | bootstrap/init session (not an agent) | fixed name |
 
 **To select "all pipeline agents, leaving conversations + infra alone":**
 ```bash
-tmux -L panopticon list-sessions -F '#{session_name}' \
-  | grep -vE '^(conv-|flywheel-orchestrator$|panopticon-init$)'
+tmux -L overdeck list-sessions -F '#{session_name}' \
+  | grep -vE '^(conv-|flywheel-orchestrator$|overdeck-init$)'
 ```
 
 ---
@@ -69,7 +69,7 @@ roles/handoff.md  handoff-external.md  handoff-external-pi.md
 
 ---
 
-## 3. `~/.panopticon` (OVERDECK_HOME) top-level layout
+## 3. `~/.overdeck` (OVERDECK_HOME) top-level layout
 
 State directory shared by the host orchestrator. **Never mount this into a
 workspace container** (single-Deacon invariant). Top level (observed):
@@ -95,7 +95,7 @@ workspace container** (single-Deacon invariant). Top level (observed):
 
 ---
 
-## 4. Per-agent state directory — `~/.panopticon/agents/<agent-id>/`
+## 4. Per-agent state directory — `~/.overdeck/agents/<agent-id>/`
 
 Observed contents (a planning agent):
 
@@ -122,7 +122,7 @@ pty-token            # (supervisor-wired agents) per-agent auth token for the PT
 
 ---
 
-## 5. Sockets & tokens — `~/.panopticon/sockets/`
+## 5. Sockets & tokens — `~/.overdeck/sockets/`
 
 | Path | Purpose |
 |---|---|
@@ -248,10 +248,10 @@ draft (.pan/drafts/*.md) → proposed → approved → active/running → comple
 | **universal rule** | `sync-sources/rules/<name>.md`, `scope: universal` (ships to every machine/project) |
 | **dev rule** | `sync-sources/rules/<name>.md`, `scope: dev` (overdeck checkout only) |
 | **project rule** | `<root>/.pan/context/project.md` |
-| **machine rule** | `~/.panopticon/context/global.md` |
+| **machine rule** | `~/.overdeck/context/global.md` |
 
 Rendered (never edit directly): `~/.claude/CLAUDE.md` managed region, project
-`CLAUDE.md`/`AGENTS.md`, `~/.panopticon/context/pi-global.md`, `…/codex-global.md`.
+`CLAUDE.md`/`AGENTS.md`, `~/.overdeck/context/pi-global.md`, `…/codex-global.md`.
 Run `pan sync` after editing; changes reach **new** sessions only.
 
 ---
@@ -301,8 +301,8 @@ planning-<issue>                                plan
 strike-<issue>                                  strike (bypass → main)
 inspect-<issue>-workspace-<hash>                inspection
 conv-<YYYYMMDD>-<XXXX>                           conversation
-flywheel-orchestrator / panopticon-init          infra (leave alone)
+flywheel-orchestrator / overdeck-init          infra (leave alone)
 workspaces/feature-<issue>/  +  branch feature/<issue>     workspace
 uat/<label>-<codename>-<MMDD>                    UAT candidate branch
-~/.panopticon/agents/<agent-id>/state.json       agent state (NOT the liveness oracle)
+~/.overdeck/agents/<agent-id>/state.json       agent state (NOT the liveness oracle)
 ```

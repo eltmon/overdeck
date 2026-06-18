@@ -51,13 +51,13 @@ curl -s -X POST "http://localhost:3011/api/agents/${OVERDECK_AGENT_ID}/heartbeat
 #!/bin/bash
 # Log tool completion to activity file
 echo '{"timestamp":"'"$(date -Iseconds)"'","tool":"'"${CLAUDE_TOOL_NAME}"'","action":"completed"}' \
-  >> ~/.panopticon/agents/${OVERDECK_AGENT_ID}/activity.jsonl
+  >> ~/.overdeck/agents/${OVERDECK_AGENT_ID}/activity.jsonl
 ```
 
 Also write to disk for persistence:
-- `~/.panopticon/agents/{id}/state.json` - Current state (active/idle/suspended)
-- `~/.panopticon/agents/{id}/activity.jsonl` - Activity log (last 100 entries)
-- `~/.panopticon/agents/{id}/session.id` - Claude session ID for resume
+- `~/.overdeck/agents/{id}/state.json` - Current state (active/idle/suspended)
+- `~/.overdeck/agents/{id}/activity.jsonl` - Activity log (last 100 entries)
+- `~/.overdeck/agents/{id}/session.id` - Claude session ID for resume
 
 ### 2. New Agent States
 
@@ -113,7 +113,7 @@ async function suspendAgent(agentId: string) {
   const sessionId = await getClaudeSessionId(agentId);
 
   // 2. Save session ID for later resume
-  await writeFile(`~/.panopticon/agents/${agentId}/session.id`, sessionId);
+  await writeFile(`~/.overdeck/agents/${agentId}/session.id`, sessionId);
 
   // 3. Kill tmux session
   await exec(`tmux kill-session -t ${agentId}`);
@@ -133,7 +133,7 @@ async function resumeAgent(agentId: string, message?: string) {
   }
 
   // 1. Get saved session ID
-  const sessionId = await readFile(`~/.panopticon/agents/${agentId}/session.id`);
+  const sessionId = await readFile(`~/.overdeck/agents/${agentId}/session.id`);
 
   // 2. Get workspace path
   const workspace = state.workspace;
@@ -160,7 +160,7 @@ Auto-resume triggers:
 
 ### 6. Activity Log
 
-JSONL format at `~/.panopticon/agents/{id}/activity.jsonl`:
+JSONL format at `~/.overdeck/agents/{id}/activity.jsonl`:
 
 ```json
 {"ts":"2026-01-23T10:30:00Z","tool":"Bash","action":"git status","state":"active"}
@@ -171,7 +171,7 @@ JSONL format at `~/.panopticon/agents/{id}/activity.jsonl`:
 On write, prune to last 100 entries:
 ```typescript
 async function appendActivity(agentId: string, entry: ActivityEntry) {
-  const file = `~/.panopticon/agents/${agentId}/activity.jsonl`;
+  const file = `~/.overdeck/agents/${agentId}/activity.jsonl`;
   const lines = await readLines(file);
   lines.push(JSON.stringify(entry));
 

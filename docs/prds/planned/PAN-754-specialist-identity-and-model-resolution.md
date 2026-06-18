@@ -83,7 +83,7 @@ function getTmuxSessionName(specialistType: string, projectKey: string): string 
 ### Registry shape
 
 ```
-~/.panopticon/specialists/registry.json
+~/.overdeck/specialists/registry.json
 {
   "projects": {
     "<projectKey>": {
@@ -143,7 +143,7 @@ function getTmuxSessionName(
 **Registry shape becomes 3-level:**
 
 ```
-~/.panopticon/specialists/registry.json
+~/.overdeck/specialists/registry.json
 {
   "projects": {
     "<projectKey>": {

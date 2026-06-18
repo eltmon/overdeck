@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/specialist-stop-hook
+# ~/.overdeck/bin/specialist-stop-hook
 # Called when a specialist agent goes idle - detects completion patterns
 #
 # This hook is chained from stop-hook and only runs for specialist agents.
@@ -78,7 +78,7 @@ if [ -z "$STATUS" ]; then
 fi
 
 # Get current issue from specialist state file
-STATE_FILE="$HOME/.panopticon/agents/$AGENT_ID/state.json"
+STATE_FILE="$HOME/.overdeck/agents/$AGENT_ID/state.json"
 ISSUE_ID=""
 
 if [ -f "$STATE_FILE" ] && command -v jq &> /dev/null; then
@@ -100,7 +100,7 @@ if curl -s -f --max-time 0.5 "http://localhost:3011/health" > /dev/null 2>&1; th
 
   # Log the completion detection
   echo "[specialist-stop-hook] Detected completion: $SPECIALIST_TYPE -> $ISSUE_ID -> $STATUS" \
-    >> "$HOME/.panopticon/logs/hooks.log" 2>/dev/null || true
+    >> "$HOME/.overdeck/logs/hooks.log" 2>/dev/null || true
 fi
 
 exit 0

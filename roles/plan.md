@@ -11,27 +11,27 @@ hooks:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
+          command: "$HOME/.overdeck/bin/pre-tool-hook"
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/gh-issue-trailer-hook"
+          command: "$HOME/.overdeck/bin/gh-issue-trailer-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/rtk-bash-filter"
+          command: "$HOME/.overdeck/bin/rtk-bash-filter"
   PostToolUse:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
+          command: "$HOME/.overdeck/bin/heartbeat-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
+          command: "$HOME/.overdeck/bin/permission-event-hook"
   Stop:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
+          command: "$HOME/.overdeck/bin/stop-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
+          command: "$HOME/.overdeck/bin/permission-event-hook"
 ---
 
 # Overdeck Planning Agent

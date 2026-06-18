@@ -27,7 +27,7 @@ The PAN-722 PRD itself says "we spawn N ephemeral specialists in parallel" (line
 
 ### 1.2 Inverted model priority — Sonnet lurking under every config
 
-`src/lib/cloister/config.ts:246` hardcodes `specialist_models.review_agent: 'sonnet'`. That default sits at a priority level that shadows `models.overrides.specialist-review-agent` in `~/.panopticon.env`-derived config. User sets `gpt-5.4` in Settings; reviewer runs on `sonnet`. Silent.
+`src/lib/cloister/config.ts:246` hardcodes `specialist_models.review_agent: 'sonnet'`. That default sits at a priority level that shadows `models.overrides.specialist-review-agent` in `~/.overdeck.env`-derived config. User sets `gpt-5.4` in Settings; reviewer runs on `sonnet`. Silent.
 
 This is a **priority-inversion bug expressed in configuration layers** — the deeper, older config wins over the newer user-facing one. No resolution trace is surfaced to the UI.
 

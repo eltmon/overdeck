@@ -40,13 +40,13 @@ beforeEach(() => {
   mkdirSync(CONFIG_HOME, { recursive: true });
   process.env.OVERDECK_HOME = TEST_HOME;
   process.env.HOME = CONFIG_HOME;
-  mkdirSync(join(CONFIG_HOME, '.panopticon'), { recursive: true });
+  mkdirSync(join(CONFIG_HOME, '.overdeck'), { recursive: true });
   writeFileSync(
-    join(CONFIG_HOME, '.panopticon', 'config.yaml'),
+    join(CONFIG_HOME, '.overdeck', 'config.yaml'),
     [
       'conversations:',
       '  compaction_model: claude-haiku-4-5',
-      '  manual_compact_mode: panopticon-native',
+      '  manual_compact_mode: overdeck-native',
       '',
     ].join('\n')
   );

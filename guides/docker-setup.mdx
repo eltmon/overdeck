@@ -38,10 +38,10 @@ pan doctor  # Verify setup
 
 ## Traefik Configuration
 
-Overdeck manages Traefik configuration in `~/.panopticon/traefik/`:
+Overdeck manages Traefik configuration in `~/.overdeck/traefik/`:
 
 ```
-~/.panopticon/traefik/
+~/.overdeck/traefik/
 ├── traefik.yml           # Static configuration
 ├── dynamic/              # Dynamic route configs (per-workspace)
 │   └── feature-min-123.yml
@@ -52,7 +52,7 @@ Overdeck manages Traefik configuration in `~/.panopticon/traefik/`:
 
 ### Static Configuration
 
-The main Traefik config (`~/.panopticon/traefik/traefik.yml`):
+The main Traefik config (`~/.overdeck/traefik/traefik.yml`):
 
 ```yaml
 api:
@@ -125,7 +125,7 @@ http:
 
 ```bash
 # Generate certificates for localhost domains
-cd ~/.panopticon/traefik/certs
+cd ~/.overdeck/traefik/certs
 mkcert localhost "*.localhost" 127.0.0.1 ::1
 
 # Rename to expected names
@@ -195,12 +195,12 @@ pan up
 ```bash
 # Start Traefik container
 docker run -d \
-  --name panopticon-traefik \
-  --network panopticon \
+  --name overdeck-traefik \
+  --network overdeck \
   -p 80:80 -p 443:443 -p 8080:8080 \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -v ~/.panopticon/traefik:/etc/traefik:ro \
-  -v ~/.panopticon/traefik/certs:/certs:ro \
+  -v ~/.overdeck/traefik:/etc/traefik:ro \
+  -v ~/.overdeck/traefik/certs:/certs:ro \
   traefik:v2.10
 ```
 
@@ -224,7 +224,7 @@ services:
       - "traefik.http.routers.{{FEATURE_FOLDER}}-fe.tls=true"
       - "traefik.http.services.{{FEATURE_FOLDER}}-fe.loadbalancer.server.port=3000"
     networks:
-      - panopticon
+      - overdeck
 
   api:
     build:
@@ -239,10 +239,10 @@ services:
       - "traefik.http.routers.{{FEATURE_FOLDER}}-api.tls=true"
       - "traefik.http.services.{{FEATURE_FOLDER}}-api.loadbalancer.server.port=8080"
     networks:
-      - panopticon
+      - overdeck
 
 networks:
-  panopticon:
+  overdeck:
     external: true
 ```
 
@@ -251,7 +251,7 @@ networks:
 Create the shared Overdeck network:
 
 ```bash
-docker network create panopticon
+docker network create overdeck
 ```
 
 All workspaces and Traefik connect to this network for routing.
@@ -267,12 +267,12 @@ All workspaces and Traefik connect to this network for routing.
 
 2. Check Traefik logs:
    ```bash
-   docker logs panopticon-traefik
+   docker logs overdeck-traefik
    ```
 
 3. Verify certificates exist:
    ```bash
-   ls ~/.panopticon/traefik/certs/
+   ls ~/.overdeck/traefik/certs/
    ```
 
 ### "Certificate not trusted" warnings
@@ -286,9 +286,9 @@ All workspaces and Traefik connect to this network for routing.
 
 ### Workspace containers not routable
 
-1. Verify containers are on the panopticon network:
+1. Verify containers are on the overdeck network:
    ```bash
-   docker network inspect panopticon
+   docker network inspect overdeck
    ```
 
 2. Check container labels:

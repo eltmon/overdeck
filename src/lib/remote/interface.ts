@@ -96,7 +96,7 @@ export interface RemoteProvider {
 
 /**
  * Remote workspace metadata
- * Stored in ~/.panopticon/workspaces/{issueId}.yaml
+ * Stored in ~/.overdeck/workspaces/{issueId}.yaml
  */
 export interface RemoteWorkspaceMetadata {
   id: string;

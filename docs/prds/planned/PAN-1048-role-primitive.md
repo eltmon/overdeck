@@ -157,7 +157,7 @@ Once roles and sub-roles exist, the user faces a new problem: there are ~12 plac
 When a new model ships (`claude-opus-4-8`, `kimi-k2.7`), the user updates `workhorses.expensive` once and every `workhorse:expensive` reference upgrades automatically. No grep, no audit, no missed slot. The 3 slots also make the *intent* of each role legible: **plan and review use "the expensive one"** (planning is foundational — errors cascade through every downstream bead, so the strongest model goes there; review is the decision-maker — it gates merge, so the strongest model goes there too), inspect-every-bead uses "the cheap one," everything else uses "the mid one." If the user wants to A/B a cheaper model across the whole pipeline, they flip the `mid` slot and watch the whole graph downshift while planning and review stay pinned to their tier.
 
 ```yaml
-# ~/.panopticon/config.yaml — defaults
+# ~/.overdeck/config.yaml — defaults
 workhorses:
   expensive: claude-opus-4-7
   mid:       claude-sonnet-4-7
@@ -308,7 +308,7 @@ Removed: `runtime`, `type`, `agentPhase`, `phase`, `workType`, `complexity`, `ha
 5 roles, each with a default model that points at one of the 3 workhorse slots. Sub-roles (work.inspect, review.security, etc.) likewise resolve through workhorses by default. Override in settings:
 
 ```yaml
-# ~/.panopticon/config.yaml
+# ~/.overdeck/config.yaml
 workhorses:
   expensive: claude-opus-4-7
   mid:       claude-sonnet-4-7
@@ -628,7 +628,7 @@ function stateToRole(state: string): Role | null {
 
 **`POST /api/settings`** — Accept role model overrides and write to config.yaml.
 
-### Config schema (`~/.panopticon/config.yaml`)
+### Config schema (`~/.overdeck/config.yaml`)
 
 Add `workhorses` and `roles` sections:
 
@@ -792,7 +792,7 @@ Backend dead-code deletion
   └─ Delete LauncherAgentType branches (specialist-dispatch, specialist-init)
 
 Enum deletions (each its own bead — TypeScript surfaces every callsite)
-  ├─ OverdeckAgentType + panopticonAgentName()
+  ├─ OverdeckAgentType + overdeckAgentName()
   ├─ SpecialistType + SpecialistMetadata + SpecialistStatus
   ├─ LauncherAgentType (replace with Role + spawnMode field)
   ├─ WorkTypeId (already orphaned by work-types.ts deletion; this confirms zero refs)

@@ -44,7 +44,7 @@ async function seedSession(opts: { id: number; workspace?: string; cost?: number
     estimatedCost: opts.cost ?? 0.01,
     toolsUsed: [],
     filesTouched: [],
-    panopticonManaged: false,
+    overdeckManaged: false,
     panIssueId: null,
     panAgentId: null,
     fileSize: 512,

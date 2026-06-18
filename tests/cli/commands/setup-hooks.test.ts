@@ -185,7 +185,7 @@ describe('PAN-1137 round-trip: unknown top-level keys survive', () => {
     const settings = readSettingsOrAbortSync(path);
     if (!settings['hooks']) settings['hooks'] = {};
     settings['hooks'].SessionStart = [
-      { matcher: '.*', hooks: [{ type: 'command', command: '/home/eltmon/.panopticon/bin/session-start-hook' }] },
+      { matcher: '.*', hooks: [{ type: 'command', command: '/home/eltmon/.overdeck/bin/session-start-hook' }] },
     ];
     backupSettingsSync(path);
     atomicWriteJsonSync(path, settings);
@@ -200,7 +200,7 @@ describe('PAN-1137 round-trip: unknown top-level keys survive', () => {
     expect(after.mcpServers).toEqual(original.mcpServers);
     expect(after.skipDangerousModePermissionPrompt).toBe(true);
     // The mutation we intended actually landed.
-    expect(after.hooks.SessionStart[0].hooks[0].command).toBe('/home/eltmon/.panopticon/bin/session-start-hook');
+    expect(after.hooks.SessionStart[0].hooks[0].command).toBe('/home/eltmon/.overdeck/bin/session-start-hook');
 
     // A backup was created.
     const backups = readdirSync(h.dir).filter((f) => f.startsWith(`${basename(path)}.pan-backup-`));

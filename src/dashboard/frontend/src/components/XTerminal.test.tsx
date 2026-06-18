@@ -219,7 +219,7 @@ describe('XTerminal', () => {
     await user.click(checkbox);
 
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
-      'panopticon.terminal.autoCopyOnSelect',
+      'overdeck.terminal.autoCopyOnSelect',
       expect.any(String)
     );
   });
@@ -257,7 +257,7 @@ describe('XTerminal', () => {
 
     // Should use prop value (true) instead of reading the auto-copy key.
     // (Unrelated localStorage reads — e.g. the optional profiling flag — are fine.)
-    expect(localStorageMock.getItem).not.toHaveBeenCalledWith('panopticon.terminal.autoCopyOnSelect');
+    expect(localStorageMock.getItem).not.toHaveBeenCalledWith('overdeck.terminal.autoCopyOnSelect');
   });
 
   it('sends attach with measured dimensions on connect', async () => {

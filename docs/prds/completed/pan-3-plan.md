@@ -17,7 +17,7 @@ Skills help AI assistants:
 ### 2. Naming Convention
 **Decision:** Use `pan-*` (dashes) for directory names.
 
-- Directory: `~/.panopticon/skills/pan-help/`
+- Directory: `~/.overdeck/skills/pan-help/`
 - Skill name in SKILL.md: Can use `pan:help` or `pan-help` (both work for invocation)
 - Matches existing skills: `bug-fix`, `feature-work`, `code-review-*`
 
@@ -28,7 +28,7 @@ Skills help AI assistants:
 ```
 repo/skills/pan-*/           ← SOURCE OF TRUTH (version controlled)
        ↓ pan init / npm postinstall
-~/.panopticon/skills/pan-*/  ← Runtime copy (user's machine)
+~/.overdeck/skills/pan-*/  ← Runtime copy (user's machine)
        ↓ pan sync
 ~/.claude/skills/pan-*/      ← Symlinked for AI tools
 ```
@@ -36,17 +36,17 @@ repo/skills/pan-*/           ← SOURCE OF TRUTH (version controlled)
 **Workflow for creating/updating skills (for agents working on PAN-3):**
 1. Create/edit skill in feature branch: `skills/{name}/SKILL.md`
 2. Commit to feature branch (`feature/pan-3`)
-3. Test locally by copying to `~/.panopticon/skills/` and running `pan sync`
+3. Test locally by copying to `~/.overdeck/skills/` and running `pan sync`
 4. When done with phase, PR/review
 5. Merge to main
 6. On release: `npm publish` includes skills in package
-7. Users run `pan init` or update → skills copied to `~/.panopticon/skills/`
+7. Users run `pan init` or update → skills copied to `~/.overdeck/skills/`
 
-**Current workspace path:** `/home/eltmon/projects/panopticon/workspaces/feature-pan-3/`
+**Current workspace path:** `/home/eltmon/projects/overdeck/workspaces/feature-pan-3/`
 **Skills directory:** `./skills/` (relative to workspace root)
 
 **Note:** Phase 1 skills already exist in both:
-- `~/.panopticon/skills/pan-*/` (working now via `pan sync`)
+- `~/.overdeck/skills/pan-*/` (working now via `pan sync`)
 - `./skills/pan-*/` (committed to repo)
 
 **Project-specific skills** (not Overdeck generic):
@@ -146,8 +146,8 @@ name: pan-help
 description: Overview of all Overdeck commands and capabilities
 triggers:
   - pan help
-  - panopticon help
-  - what can panopticon do
+  - overdeck help
+  - what can overdeck do
 allowed-tools:
   - Bash
   - Read
@@ -233,18 +233,18 @@ All 9 Phase 1 skills have been created:
 
 | Skill | Location | Status |
 |-------|----------|--------|
-| `pan-help` | `~/.panopticon/skills/pan-help/` | ✅ Created & synced |
-| `pan-install` | `~/.panopticon/skills/pan-install/` | ✅ Created & synced |
-| `pan-setup` | `~/.panopticon/skills/pan-setup/` | ✅ Created & synced |
-| `pan-quickstart` | `~/.panopticon/skills/pan-quickstart/` | ✅ Created & synced |
-| `pan-up` | `~/.panopticon/skills/pan-up/` | ✅ Created & synced |
-| `pan-down` | `~/.panopticon/skills/pan-down/` | ✅ Created & synced |
-| `pan-status` | `~/.panopticon/skills/pan-status/` | ✅ Created & synced |
-| `pan-plan` | `~/.panopticon/skills/pan-plan/` | ✅ Created & synced |
-| `pan-issue` | `~/.panopticon/skills/pan-issue/` | ✅ Created & synced |
+| `pan-help` | `~/.overdeck/skills/pan-help/` | ✅ Created & synced |
+| `pan-install` | `~/.overdeck/skills/pan-install/` | ✅ Created & synced |
+| `pan-setup` | `~/.overdeck/skills/pan-setup/` | ✅ Created & synced |
+| `pan-quickstart` | `~/.overdeck/skills/pan-quickstart/` | ✅ Created & synced |
+| `pan-up` | `~/.overdeck/skills/pan-up/` | ✅ Created & synced |
+| `pan-down` | `~/.overdeck/skills/pan-down/` | ✅ Created & synced |
+| `pan-status` | `~/.overdeck/skills/pan-status/` | ✅ Created & synced |
+| `pan-plan` | `~/.overdeck/skills/pan-plan/` | ✅ Created & synced |
+| `pan-issue` | `~/.overdeck/skills/pan-issue/` | ✅ Created & synced |
 
 Skills are:
-- ✅ Working in `~/.panopticon/skills/` (usable now via `pan sync`)
+- ✅ Working in `~/.overdeck/skills/` (usable now via `pan sync`)
 - ✅ Committed to repo in `skills/` directory (commit `073b520`)
 
 ### Remaining Work
@@ -318,38 +318,38 @@ description: Overview of all Overdeck commands and capabilities
 
 | Phase | Task ID | Description |
 |-------|---------|-------------|
-| 1 | panopticon-jh0 | pan-help skill (entry point) |
-| 1 | panopticon-24l | pan-install skill |
-| 1 | panopticon-ekw | pan-setup skill |
-| 1 | panopticon-n3d | pan-quickstart skill |
-| 1 | panopticon-le2 | pan-up skill |
-| 1 | panopticon-3py | pan-down skill |
-| 1 | panopticon-n05 | pan-status skill |
-| 1 | panopticon-yn9 | pan-plan skill |
-| 1 | panopticon-3c8 | pan-issue skill |
-| 2 | panopticon-83g | pan-config skill |
-| 2 | panopticon-d57 | pan-tracker skill |
-| 2 | panopticon-5l2 | pan-projects skill |
-| 2 | panopticon-5h2 | pan-sync skill |
-| 3 | panopticon-drg | Docker template: spring-boot |
-| 3 | panopticon-hqi | Docker template: react-vite |
-| 3 | panopticon-6pu | Docker template: nextjs |
-| 3 | panopticon-det | Docker template: dotnet |
-| 3 | panopticon-5zp | Docker template: python-fastapi |
-| 3 | panopticon-2f6 | Docker template: monorepo |
-| 3 | panopticon-20h | pan-docker skill |
-| 3 | panopticon-aze | pan-network skill |
-| 4 | panopticon-wch | pan-approve skill |
-| 4 | panopticon-0gu | pan-tell skill |
-| 4 | panopticon-6tw | pan-kill skill |
-| 4 | panopticon-d0e | pan-health skill |
-| 4 | panopticon-82r | pan-diagnose skill |
-| 5 | panopticon-0mg | pan-logs skill |
-| 5 | panopticon-6kx | pan-rescue skill |
+| 1 | overdeck-jh0 | pan-help skill (entry point) |
+| 1 | overdeck-24l | pan-install skill |
+| 1 | overdeck-ekw | pan-setup skill |
+| 1 | overdeck-n3d | pan-quickstart skill |
+| 1 | overdeck-le2 | pan-up skill |
+| 1 | overdeck-3py | pan-down skill |
+| 1 | overdeck-n05 | pan-status skill |
+| 1 | overdeck-yn9 | pan-plan skill |
+| 1 | overdeck-3c8 | pan-issue skill |
+| 2 | overdeck-83g | pan-config skill |
+| 2 | overdeck-d57 | pan-tracker skill |
+| 2 | overdeck-5l2 | pan-projects skill |
+| 2 | overdeck-5h2 | pan-sync skill |
+| 3 | overdeck-drg | Docker template: spring-boot |
+| 3 | overdeck-hqi | Docker template: react-vite |
+| 3 | overdeck-6pu | Docker template: nextjs |
+| 3 | overdeck-det | Docker template: dotnet |
+| 3 | overdeck-5zp | Docker template: python-fastapi |
+| 3 | overdeck-2f6 | Docker template: monorepo |
+| 3 | overdeck-20h | pan-docker skill |
+| 3 | overdeck-aze | pan-network skill |
+| 4 | overdeck-wch | pan-approve skill |
+| 4 | overdeck-0gu | pan-tell skill |
+| 4 | overdeck-6tw | pan-kill skill |
+| 4 | overdeck-d0e | pan-health skill |
+| 4 | overdeck-82r | pan-diagnose skill |
+| 5 | overdeck-0mg | pan-logs skill |
+| 5 | overdeck-6kx | pan-rescue skill |
 
 ## References
 
-- Existing skills structure: `~/.panopticon/skills/bug-fix/SKILL.md`
+- Existing skills structure: `~/.overdeck/skills/bug-fix/SKILL.md`
 - CLI commands: `pan --help`, `pan work --help`
 - Traefik setup: `templates/traefik/`
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD.md`
+- PRD: `/home/eltmon/projects/overdeck/docs/PRD.md`

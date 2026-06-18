@@ -242,7 +242,7 @@ describe('overdeck timestamp units — integer epoch-milliseconds (PAN-1961)', (
     await Effect.runPromise(
       MemoryWriter.pipe(
         Effect.flatMap((writer) => writer.createResetMarker({
-          projectId: 'panopticon',
+          projectId: 'overdeck',
           scope: 'issue',
           scopeId: 'PAN-TS-5',
           fromTimestamp: from.toISOString(),

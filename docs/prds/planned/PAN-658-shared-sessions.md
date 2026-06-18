@@ -251,7 +251,7 @@ There is no fixed-duration link expiry — link lifetime = conversation lifetime
   assertion. This is why a viewer's claimed GitHub identity is trustworthy in the lobby.
 - **Host identity:** the host is a participant too (shown in presence). The host's Overdeck
   performs a one-time GitHub **device-flow** OAuth the first time it shares; the resulting identity
-  is cached at `~/.panopticon/github-identity.json`. No repeated logins.
+  is cached at `~/.overdeck/github-identity.json`. No repeated logins.
 
 GitHub OAuth supplies *identity/accountability*. The lobby + block list supply *authorization*.
 Both are required; neither alone is sufficient.

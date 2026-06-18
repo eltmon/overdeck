@@ -6,7 +6,7 @@ import { FsError } from './errors.js';
 
 import { getOverdeckHome } from './paths.js';
 
-export const BRIDGE_TOKEN_HEADER = 'x-panopticon-bridge-token';
+export const BRIDGE_TOKEN_HEADER = 'x-overdeck-bridge-token';
 
 function bridgeTokensDir(): string {
   return join(getOverdeckHome(), 'bridge-tokens');

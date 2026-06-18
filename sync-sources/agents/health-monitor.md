@@ -73,10 +73,10 @@ OUTPUT2=$(tmux capture-pane -t agent-<id> -p | tail -5)
 
 ```bash
 # Agent output file (if using file logging)
-Read file_path=".panopticon/agents/agent-<id>/output.log"
+Read file_path=".overdeck/agents/agent-<id>/output.log"
 
 # System logs
-Read file_path="/var/log/panopticon/agent-<id>.log"
+Read file_path="/var/log/overdeck/agent-<id>.log"
 
 # Recent errors
 tmux capture-pane -t agent-<id> -p | grep -i "error\|exception\|failed"
@@ -449,7 +449,7 @@ ps aux | grep claude | awk '{sum+=$4} END {print sum "%"}'
 ps aux | grep claude | awk '{sum+=$3} END {print sum "%"}'
 
 # Disk usage in workspaces
-du -sh ~/.panopticon/workspaces/* | sort -rh | head -5
+du -sh ~/.overdeck/workspaces/* | sort -rh | head -5
 ```
 
 ## Intervention Guide
@@ -528,7 +528,7 @@ Measure over time:
 
 Write health report to:
 - Console (for immediate visibility)
-- `.panopticon/health/report-<timestamp>.md`
+- `.overdeck/health/report-<timestamp>.md`
 - Dashboard API (if integrated)
 
 ## When Complete

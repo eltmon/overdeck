@@ -204,11 +204,11 @@ docker logs <container-name>
 # - Missing environment variables
 ```
 
-### "No such network: panopticon"
+### "No such network: overdeck"
 
 ```bash
 # Create the network
-docker network create panopticon
+docker network create overdeck
 ```
 
 ### Permission denied on mounted volumes
@@ -232,12 +232,12 @@ services:
 
 1. Check certificates exist:
    ```bash
-   ls ~/.panopticon/traefik/certs/
+   ls ~/.overdeck/traefik/certs/
    ```
 
 2. Regenerate if missing:
    ```bash
-   cd ~/.panopticon/traefik/certs
+   cd ~/.overdeck/traefik/certs
    mkcert localhost "*.localhost" 127.0.0.1 ::1
    ```
 
@@ -278,7 +278,7 @@ pan work issue MIN-123
 Check the handoff count in state.json. If it's high, the task may be too complex:
 
 ```bash
-cat ~/.panopticon/agents/agent-min-123/state.json | jq .handoffCount
+cat ~/.overdeck/agents/agent-min-123/state.json | jq .handoffCount
 ```
 
 Consider:
@@ -389,12 +389,12 @@ pan doctor
 pan status
 
 # Recent logs
-tail -50 ~/.panopticon/logs/*.log
+tail -50 ~/.overdeck/logs/*.log
 ```
 
 ### Resources
 
-- **GitHub Issues:** https://github.com/eltmon/panopticon/issues
+- **GitHub Issues:** https://github.com/eltmon/overdeck/issues
 - **Documentation:** https://www.overdeck.ai
 - **CLI Help:** `pan --help` or `pan <command> --help`
 

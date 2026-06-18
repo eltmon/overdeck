@@ -18,7 +18,7 @@ table** — `transcript_checkpoints` (14 columns, 830 live rows, 84 distinct
 issues). **All 14 columns are CACHE; 11 KEEP (real dedup/lease/rate-limit
 state), 3 DROP (1 never-read field + 2 timestamps with no branch).** The
 *irreplaceable* Memory state — the observations themselves, status snapshots,
-reset markers — lives **on disk as files** under `~/.panopticon/memory/`
+reset markers — lives **on disk as files** under `~/.overdeck/memory/`
 (170 MB), entirely outside `panopticon.db`. A per-project FTS index
 (`memory-search.db`) is 100% CACHE but has **no rebuilder** — a NEED gap.
 
@@ -27,7 +27,7 @@ reset markers — lives **on disk as files** under `~/.panopticon/memory/`
 > irreplaceable Memory artifact is already **file-resident outside the DB-wipe
 > scope** — so unlike Conversations (PAN-1937), Memory needs **no DB export
 > target**. The real "first-class Memory" gaps are different: (1) is
-> `~/.panopticon/memory/` in the backup surface, and (2) it is per-machine /
+> `~/.overdeck/memory/` in the backup surface, and (2) it is per-machine /
 > non-portable. And the FTS search index can be deleted but **nothing today can
 > rebuild it from the JSONL** it indexes.
 
@@ -38,14 +38,14 @@ reset markers — lives **on disk as files** under `~/.panopticon/memory/`
   `packages/contracts/src/memory.ts:22`). The unit of Memory. Stored append-only
   as a line in a per-day JSONL file.
 - **The memory store** — NOT a database. It is a **file tree** on disk under
-  `~/.panopticon/memory/<projectId>/<issueId>/` containing `observations/*.jsonl`
+  `~/.overdeck/memory/<projectId>/<issueId>/` containing `observations/*.jsonl`
   (the records), `observations/*.md` (a human mirror), `status.json` (the current
   rolled-up status), `archive/*.json` (prior statuses), `summaries/*.md`,
   `pending/*.json` (un-rolled turns), `rag-runs/*.jsonl` (injection decision
   log), `health.json`, and `reset-markers.json`. Path layout in
   `src/lib/memory/paths.ts`.
 - **`memory-search.db`** — a **separate** per-project SQLite file at
-  `~/.panopticon/memory/<projectId>/memory-search.db` (NOT `panopticon.db`).
+  `~/.overdeck/memory/<projectId>/memory-search.db` (NOT `panopticon.db`).
   Holds the FTS5 search index (`memory_fts`), a byte-offset lookup
   (`observation_index`), and a `reset_markers` table. Schema in
   `src/lib/memory/fts-operations.ts:55`. The read engine for injection.
@@ -101,8 +101,8 @@ layers. Only the **first** lives in `panopticon.db`.
 | Layer | Where | What | In `panopticon.db`? |
 | --- | --- | --- | --- |
 | **A. Checkpoint cursor** | `panopticon.db` → `transcript_checkpoints` | byte-offset + claim lease + mid-turn rate-limit, per session | **YES (the only one)** |
-| **B. The memory store (files)** | `~/.panopticon/memory/<proj>/<issue>/` | observations JSONL+MD, status.json, archive, summaries, pending, rag-runs, health, reset-markers.json | No |
-| **C. Search index** | `~/.panopticon/memory/<proj>/memory-search.db` | `memory_fts` (FTS5), `observation_index`, `reset_markers` | No (separate SQLite file) |
+| **B. The memory store (files)** | `~/.overdeck/memory/<proj>/<issue>/` | observations JSONL+MD, status.json, archive, summaries, pending, rag-runs, health, reset-markers.json | No |
+| **C. Search index** | `~/.overdeck/memory/<proj>/memory-search.db` | `memory_fts` (FTS5), `observation_index`, `reset_markers` | No (separate SQLite file) |
 
 **The observations are NOT in the database.** This is the single most important
 structural fact and it makes the central verdict for Memory *different* from
@@ -188,7 +188,7 @@ not apply to them in the same way. But the *first-class Memory* question
 ("must survive a wipe / needs a durable home") does — so they are classified
 here against the broader source-of-truth test.
 
-### Layer B — the memory store (files under `~/.panopticon/memory/`)
+### Layer B — the memory store (files under `~/.overdeck/memory/`)
 
 | Artifact | Path | Writer | Reconstruct after source transcript gone? | Class |
 | --- | --- | --- | --- | --- |
@@ -239,7 +239,7 @@ projectId · workspaceId · issueId · runId · sessionId · agentRole · agentH
   It is also the `agents.session_id` an Agent resolves its transcript by, and the
   scope key for session-level reset markers.
 - **`projectId` + `issueId`** is the **directory key** for the file store:
-  `~/.panopticon/memory/<projectId>/<issueId>/` (`paths.ts:resolveIssueMemoryRoot`).
+  `~/.overdeck/memory/<projectId>/<issueId>/` (`paths.ts:resolveIssueMemoryRoot`).
   `projectId` is the search-DB partition (`resolveFtsDbPath`).
 - **`issueId`** is how Memory nests under the operator's issue mental model — the
   same key the dashboard issue view uses. `pan memory search --issue PAN-1234`
@@ -331,12 +331,12 @@ Read-side status/identity resolvers are already single (`rollup.ts:readCurrentSt
    irreplaceable state is already file-resident.
 
 2. **…which means the durable-home answer is a different question.** The
-   "first-class Memory" gaps are: **(a)** is `~/.panopticon/memory/` (170 MB
+   "first-class Memory" gaps are: **(a)** is `~/.overdeck/memory/` (170 MB
    today) in the **backup** surface? and **(b)** it is **per-machine and
    non-portable** — keyed by local `projectId`/`sessionId`, living under
    `$OVERDECK_HOME`, with nothing syncing it across machines. If Memory is to
    be first-class, *that* is the work: a durable/portable home for the
-   `~/.panopticon/memory/` tree, not a DB column export.
+   `~/.overdeck/memory/` tree, not a DB column export.
 
 3. **The FTS search index has no rebuilder.** `memory_fts` is written *only*
    incrementally as each observation is created (`indexObservation`). There is no

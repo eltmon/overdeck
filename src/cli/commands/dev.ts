@@ -43,7 +43,7 @@ function resolveNode22(): string {
 }
 
 function readConfig() {
-  const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
+  const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
   const defaults = {
     traefikEnabled: false,
     traefikDomain: 'pan.localhost',
@@ -290,7 +290,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
     try {
       const { ensureBaseDomain, detectDnsSyncMethod, syncDnsToWindows } = await import('../../lib/dns.js');
-      const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
+      const configFile = join(process.env.HOME || '', '.overdeck', 'config.toml');
       const dnsMethod =
         (existsSync(configFile) ? (parse(readFileSync(configFile, 'utf-8')) as any).traefik?.dns_sync_method : null) ||
         detectDnsSyncMethod();
@@ -302,7 +302,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       console.log(chalk.yellow(`Warning: Could not ensure DNS for ${config.traefikDomain}`));
     }
 
-    const traefikDir = join(process.env.HOME || '', '.panopticon', 'traefik');
+    const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
     if (existsSync(traefikDir)) {
       try {
         console.log(chalk.dim('Starting Traefik...'));
@@ -618,12 +618,12 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   await startSidecars();
 
   // ── URLs ───────────────────────────────────────────────────────────────────
-  // The dashboard mints its session from a one-time #panopticon_token=<internal
+  // The dashboard mints its session from a one-time #overdeck_token=<internal
   // token> in the URL hash (consumeDashboardBootstrapToken). Without it the
   // browser can't authenticate and every gated API call 401s, so surface the
   // Frontend URL WITH the token (PAN-1607).
   const internalToken = getInternalTokenSync();
-  const authFragment = internalToken ? `#panopticon_token=${encodeURIComponent(internalToken)}` : '';
+  const authFragment = internalToken ? `#overdeck_token=${encodeURIComponent(internalToken)}` : '';
   const frontendBase = config.traefikEnabled
     ? `https://${config.traefikDomain}`
     : `http://localhost:${config.dashboardPort}`;

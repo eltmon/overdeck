@@ -43,7 +43,7 @@ PAN-1052 (in progress) is the **memory-and-observations substrate**: per-turn LL
 │   ──────── system-prompt-append flag ──────────                         │
 │                  │              │                                       │
 │                  ▼              ▼                                       │
-│       ~/.panopticon/session-context.md  ◄── live-updated by dashboard  │
+│       ~/.overdeck/session-context.md  ◄── live-updated by dashboard  │
 │            (assembled from PAN-1052 status + workspace state)           │
 └─────────────────────────────────────────────────────────────────────────┘
                           │
@@ -54,7 +54,7 @@ PAN-1052 (in progress) is the **memory-and-observations substrate**: per-turn LL
                                          (Child 3)
         │                 │                  │                  │
         ▼                 ▼                  ▼                  ▼
-  ~/.panopticon/    ~/.panopticon/    ~/.panopticon/      ~/.panopticon/
+  ~/.overdeck/    ~/.overdeck/    ~/.overdeck/      ~/.overdeck/
   context/          docs/             session-context.md  artifacts/
   ├─ global.md      ├─ index.sqlite                       └─ index.sqlite
   ├─ skills/                                              + /s/<slug>
@@ -63,7 +63,7 @@ PAN-1052 (in progress) is the **memory-and-observations substrate**: per-turn LL
                           │
                           ▼
                     PAN-1052 memory store (existing)
-                    ~/.panopticon/memory/<projectId>/<issueId>/
+                    ~/.overdeck/memory/<projectId>/<issueId>/
                     ├─ memory-search.db (FTS5)
                     ├─ status.json
                     └─ observations/
@@ -103,10 +103,10 @@ Borrows the briefing structure and HTML-artifacts mechanism from Subspace, with 
 The epic is complete when all four children are merged and:
 
 - `pan sync` no longer references `sync.devroot`; the config field is deprecated with a warning on read
-- `~/.panopticon/context/global.md` round-trips to `~/.claude/CLAUDE.md` (and Pi's equivalent) via `pan sync`
+- `~/.overdeck/context/global.md` round-trips to `~/.claude/CLAUDE.md` (and Pi's equivalent) via `pan sync`
 - A newly-spawned agent in any registered project receives the live session-context briefing on first turn
 - Asking any agent "how do I X in Overdeck?" triggers docs-RAG injection (when X matches the configured trigger set)
-- An agent can produce an HTML artifact, validate it, publish it to `panopticon.localhost/s/<slug>`, and the dashboard renders the workspace-record artifacts tab linking to it
+- An agent can produce an HTML artifact, validate it, publish it to `overdeck.localhost/s/<slug>`, and the dashboard renders the workspace-record artifacts tab linking to it
 - Compliance audit hook fires when past-tense triggers match without preceding memory search; misses logged to PAN-1052's store; next-turn soft warning prepended
 
 ## Open Questions

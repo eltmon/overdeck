@@ -18,7 +18,7 @@ function withFakeHome(): { home: string; cleanup: () => void } {
   const originalHome = process.env['HOME']
   const originalOverdeckHome = process.env.OVERDECK_HOME
   process.env['HOME'] = home
-  process.env.OVERDECK_HOME = join(home, '.panopticon')
+  process.env.OVERDECK_HOME = join(home, '.overdeck')
   return {
     home,
     cleanup: () => {
@@ -94,7 +94,7 @@ describe('PiRuntime.getHeartbeat (AC4)', () => {
 
   it('returns active-heartbeat source when the heartbeat file is fresh', () => {
     const r = new PiRuntimeSync()
-    const beats = join(h.home, '.panopticon', 'heartbeats')
+    const beats = join(h.home, '.overdeck', 'heartbeats')
     mkdirSync(beats, { recursive: true })
     writeFileSync(
       join(beats, 'agent-A.json'),
@@ -115,7 +115,7 @@ describe('PiRuntime.getHeartbeat (AC4)', () => {
 
   it('falls back to jsonl mtime when heartbeat is stale', () => {
     const r = new PiRuntimeSync()
-    const beats = join(h.home, '.panopticon', 'heartbeats')
+    const beats = join(h.home, '.overdeck', 'heartbeats')
     mkdirSync(beats, { recursive: true })
     // 5 minutes ago — past 60s TTL.
     writeFileSync(
@@ -127,7 +127,7 @@ describe('PiRuntime.getHeartbeat (AC4)', () => {
       }),
     )
     // Provide a session jsonl so jsonl source has something to point at.
-    const sessRoot = join(h.home, '.panopticon', 'agents', 'agent-B', 'sessions')
+    const sessRoot = join(h.home, '.overdeck', 'agents', 'agent-B', 'sessions')
     mkdirSync(sessRoot, { recursive: true })
     writeFileSync(join(sessRoot, '2026-05-05_x.jsonl'), '{"type":"session"}\n')
 
@@ -150,7 +150,7 @@ describe('PiRuntime.getSessionCost (AC5)', () => {
 
   it('returns a CostBreakdown derived from parsePiSession on the active session', () => {
     const r = new PiRuntimeSync()
-    const sessRoot = join(h.home, '.panopticon', 'agents', 'agent-D', 'sessions')
+    const sessRoot = join(h.home, '.overdeck', 'agents', 'agent-D', 'sessions')
     mkdirSync(sessRoot, { recursive: true })
     // Reuse the linear fixture we built earlier to verify total flows through.
     const content = require('node:fs').readFileSync(FIXTURE_LINEAR, 'utf-8')
@@ -198,7 +198,7 @@ vi.mock('child_process', async () => {
 })
 
 // ── PiRuntime resume behavior (PAN-636 workspace-3119) ──────────────────────
-// The pi-extension persists ~/.panopticon/agents/<id>/session.id on every
+// The pi-extension persists ~/.overdeck/agents/<id>/session.id on every
 // session_start with a non-null sessionId; PiRuntime.spawnAgent reads that
 // file and forwards it as `pi --session <id>` so the next spawn lands in the
 // same Pi session. We mock tmux out so we can drive spawnAgent end-to-end
@@ -226,7 +226,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
   })
 
   function preCreateReady(agentId: string): void {
-    const dir = join(h.home, '.panopticon', 'agents', agentId)
+    const dir = join(h.home, '.overdeck', 'agents', agentId)
     mkdirSync(dir, { recursive: true })
     // waitForReady polls existsSync(ready.json) — pre-create so spawnAgent
     // returns immediately instead of polling for 30s.
@@ -235,7 +235,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
 
   it('AC2: re-spawning after a kill emits `pi --session <id>` when session.id is present', async () => {
     const agentId = 'agent-resume-1'
-    const dir = join(h.home, '.panopticon', 'agents', agentId)
+    const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
     // Simulate a prior spawn that already wrote session.id and one .jsonl
@@ -257,7 +257,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
 
   it('AC3: omits --session and warns when sessions/*.jsonl exists but session.id is missing', async () => {
     const agentId = 'agent-resume-2'
-    const dir = join(h.home, '.panopticon', 'agents', agentId)
+    const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
@@ -304,8 +304,8 @@ describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', 
   it('removes rpc.in, ready.json, completed, and heartbeat — but NEVER session JSONL files', async () => {
     const r = new PiRuntimeSync()
     await Effect.runPromise(createPiFifo('agent-K'))
-    const agentDir = join(h.home, '.panopticon', 'agents', 'agent-K')
-    const heartbeatsRoot = join(h.home, '.panopticon', 'heartbeats')
+    const agentDir = join(h.home, '.overdeck', 'agents', 'agent-K')
+    const heartbeatsRoot = join(h.home, '.overdeck', 'heartbeats')
     const sessRoot = join(agentDir, 'sessions')
     require('node:fs').mkdirSync(sessRoot, { recursive: true })
     require('node:fs').mkdirSync(heartbeatsRoot, { recursive: true })

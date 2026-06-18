@@ -17,7 +17,7 @@ Trivial single-file addition. The value is in exercising the pipeline, not the f
 ## Acceptance Criteria
 1. `docs/prd-pipeline-test-marker.md` exists with the specified content
 2. Planning artifacts land in `docs/prds/active/pan-655/` (lowercase)
-3. After merge, artifacts move to `docs/prds/completed/pan-655/` and `~/.panopticon/archives/pan-655/`
+3. After merge, artifacts move to `docs/prds/completed/pan-655/` and `~/.overdeck/archives/pan-655/`
 
 ## Difficulty
 `trivial` — single file, exact content specified, no logic.

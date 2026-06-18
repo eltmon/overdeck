@@ -23,7 +23,7 @@ PAN_CURL_TIMEOUT="${OVERDECK_HOOK_TIMEOUT:-0.5}"
 # regression).
 PAN_INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 if [ -z "$PAN_INTERNAL_TOKEN" ]; then
-  _pan_token_path="${OVERDECK_HOME:-$HOME/.panopticon}/internal-token"
+  _pan_token_path="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
   [ -f "$_pan_token_path" ] && PAN_INTERNAL_TOKEN=$(cat "$_pan_token_path" 2>/dev/null || true)
 fi
 
@@ -65,7 +65,7 @@ pan_emit_event() {
   local body="$2"
   [ -z "$agent_id" ] || [ -z "$body" ] && return 0
 
-  local dir="$HOME/.panopticon/agents/$agent_id"
+  local dir="$HOME/.overdeck/agents/$agent_id"
   mkdir -p "$dir" 2>/dev/null || return 0
 
   local url="$PAN_DASHBOARD_URL/api/agents/$agent_id/heartbeat"
@@ -80,7 +80,7 @@ pan_emit_event() {
   local http_code
   http_code=$(curl -s -m "$PAN_CURL_TIMEOUT" -o /dev/null -w '%{http_code}' \
     -X POST "$url" -H 'Content-Type: application/json' \
-    -H "x-panopticon-internal-token: $PAN_INTERNAL_TOKEN" --data "$body" 2>/dev/null || echo '000')
+    -H "x-overdeck-internal-token: $PAN_INTERNAL_TOKEN" --data "$body" 2>/dev/null || echo '000')
 
   if [[ "$http_code" =~ ^2 ]]; then
     return 0
@@ -131,7 +131,7 @@ pan__drain_pending() {
       local code
       code=$(curl -s -m "$PAN_CURL_TIMEOUT" -o /dev/null -w '%{http_code}' \
         -X POST "$url" -H 'Content-Type: application/json' \
-        -H "x-panopticon-internal-token: $PAN_INTERNAL_TOKEN" --data "$line" 2>/dev/null || echo '000')
+        -H "x-overdeck-internal-token: $PAN_INTERNAL_TOKEN" --data "$line" 2>/dev/null || echo '000')
       if [[ "$code" =~ ^2 ]]; then
         : # drained successfully
       elif [[ "$code" =~ ^4 ]]; then

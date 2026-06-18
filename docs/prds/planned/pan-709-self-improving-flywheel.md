@@ -167,7 +167,7 @@ If PAN-709's retro process proposes a new operator-audience skill, it **must** f
 - `.planning/STATE.md` — narrative of what happened
 - `.planning/plan.vbrief.json` — plan vs. actual delta
 - `feedback/*.md` — every review/test feedback file written during the run
-- Last 200 lines of each tmux session history from `~/.panopticon/agents/<id>/`
+- Last 200 lines of each tmux session history from `~/.overdeck/agents/<id>/`
 - This issue's row in `FLYWHEEL-STATE.md` (cycle count, runs stuck, blocker history)
 - PR review comments via `gh pr view --comments`
 - Merge commit + list of commits on the feature branch
@@ -397,16 +397,16 @@ The rendered public version at `overdeck.ai/flywheel` uses this file as its sour
   - Every 24 hours: full flywheel cycle (inventory, diagnose, file issues, synthesize, report)
 - **Resource-aware:**
   - Back off when user is active in a Claude Code session on the same machine (check for recent session activity)
-  - Back off during declared "quiet hours" (configurable in `~/.panopticon/config.yaml`)
+  - Back off during declared "quiet hours" (configurable in `~/.overdeck/config.yaml`)
   - Never interrupt a running planning agent that's in `waiting-on-human` state
 
 **What it never does:**
 - Edit skill files directly (always files issues)
 - Edit non-blocker substrate code directly (always files issues)
 - Wake the user outside quiet hours unless a P0 hotfix is filed
-- Run more than one flywheel cycle concurrently (mutex via `~/.panopticon/flywheel.lock`)
+- Run more than one flywheel cycle concurrently (mutex via `~/.overdeck/flywheel.lock`)
 
-**Configurable in `~/.panopticon/config.yaml`:**
+**Configurable in `~/.overdeck/config.yaml`:**
 
 ```yaml
 flywheel:
@@ -481,7 +481,7 @@ See retro-agent prompt above for the full schema.
 
 Append-only. One section per run. See section 4 schema above.
 
-### `~/.panopticon/config.yaml` — new `flywheel` section
+### `~/.overdeck/config.yaml` — new `flywheel` section
 
 ```yaml
 flywheel:
@@ -552,7 +552,7 @@ Extend the existing agent state enum. Store in `runtime.json` as `state: "waitin
 **Mitigation:**
 - Active-session detection (any Claude Code session touched a file in the last 10 min → backoff)
 - Quiet hours enforced
-- Mutex on `~/.panopticon/flywheel.lock`
+- Mutex on `~/.overdeck/flywheel.lock`
 - Daemon only ever files issues and runs read-only diagnosis — never directly edits main code except for blocker-tier substrate fixes (which are explicitly gated)
 
 ### Risk 5: Q&A detection false positives (agent gets marked `waiting-on-human` when it's actually stuck)

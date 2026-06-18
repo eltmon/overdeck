@@ -16,14 +16,14 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash && \
 
 # Use existing node user (UID/GID 1000) from base image
 # Set working directory
-WORKDIR /workspaces/panopticon
+WORKDIR /workspaces/overdeck
 
 # Pre-create directories with correct ownership
 # Only root node_modules is shadowed by a named volume — Bun hoists all deps there.
 # Host and container each run their own `bun install` independently.
-RUN mkdir -p /workspaces/panopticon/node_modules \
+RUN mkdir -p /workspaces/overdeck/node_modules \
     /home/node/.npm && \
-    chown -R node:node /workspaces/panopticon /home/node/.npm
+    chown -R node:node /workspaces/overdeck /home/node/.npm
 
 # Switch to non-root user
 USER node

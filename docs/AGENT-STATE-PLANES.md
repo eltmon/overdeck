@@ -19,11 +19,11 @@ Overdeck splits every piece of agent and pipeline state into exactly one of thre
 
 **Where it is written.** `src/lib/pan-dir/records.ts` builds records, `src/lib/pan-dir/auto-commit.ts` queues commits. Each project declares the repo and subpath below.
 
-### 2. Runtime plane — local SQLite `~/.panopticon/panopticon.db`
+### 2. Runtime plane — local SQLite `~/.overdeck/panopticon.db`
 
 **What lives here:** machine-local, process-local state for agents running *on this host now*.
 
-- `agents` table — authoritative runtime registry. Replaces reading `~/.panopticon/agents/<id>/state.json` for enumeration and status.
+- `agents` table — authoritative runtime registry. Replaces reading `~/.overdeck/agents/<id>/state.json` for enumeration and status.
 - `review_status` table — ephemeral columns such as retry counters, stuck flags, inspection bead id, and recovery timestamps.
 - `events` table — append-only lifecycle event log that drives reactive consumers.
 - `conversations` table — remains machine-local; not made portable here.
@@ -32,11 +32,11 @@ Overdeck splits every piece of agent and pipeline state into exactly one of thre
 
 **Rebuild path.** `pan admin db rebuild-agents` reconstructs the `agents` table from the rollback `state.json` files + live tmux reconciliation. The permanent record plus tmux is sufficient to restore the runtime view.
 
-### 3. Liveness oracle — tmux on the `panopticon` socket
+### 3. Liveness oracle — tmux on the `overdeck` socket
 
 **What lives here:** the answer to "is this agent actually running?"
 
-- A tmux session named after the agent id exists on socket `-L panopticon`.
+- A tmux session named after the agent id exists on socket `-L overdeck`.
 - Lifecycle events project agent status, but tmux remains the ground truth for physical presence.
 
 ## Infra-repo configuration (`pan_records`)
@@ -85,11 +85,11 @@ State changes are pushed to the event store and projected into the `agents` tabl
 - `agent.stopped` — agent stopped.
 - `agent.heartbeat_dead` — heartbeat missed, agent is orphaned.
 
-Deacon handlers subscribe to these events instead of reading `~/.panopticon/agents/`. A thin 60s patrol remains as a dropped-event safety net.
+Deacon handlers subscribe to these events instead of reading `~/.overdeck/agents/`. A thin 60s patrol remains as a dropped-event safety net.
 
 ## What is NOT here anymore
 
-- `~/.panopticon/agents/<id>/state.json` is no longer read for enumeration or status. It is still written as a rollback/rebuild source and kept until the new registry is proven.
+- `~/.overdeck/agents/<id>/state.json` is no longer read for enumeration or status. It is still written as a rollback/rebuild source and kept until the new registry is proven.
 - `preSpawnStashRef`, `preSpawnStashMessage`, `preSpawnBaselineHead`, and `codexMode` were removed from the runtime serialization path; they were dead or single-valued.
 - `review_status` durable verdict columns are mirrored into the per-issue permanent record's `pipeline` block; ephemeral columns stay in SQLite.
 

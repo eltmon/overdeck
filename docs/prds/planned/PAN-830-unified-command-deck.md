@@ -134,14 +134,14 @@ This section is the full data map. Every field a junior dev might wonder "where 
 | Current tool (Read, Edit, Bash, Grep, …) | `AgentRuntimeSnapshot.currentTool` | **Yes** | `agent.activity_changed` |
 | Thinking state | `AgentRuntimeSnapshot.thinking.since`, `lastToolAt` | **Yes** | `agent.thinking_started/stopped` |
 | Waiting state (tool_permission / user_question / disambiguation / other) | `AgentRuntimeSnapshot.waiting.{reason, message, startedAt}` | **Yes** | `agent.waiting_started/cleared` |
-| Round number (1 / 2 / 3 …) | reviewer round artifacts (`~/.panopticon/agents/<id>/round-*.json`) | **Yes** | `pipeline.review-started` |
+| Round number (1 / 2 / 3 …) | reviewer round artifacts (`~/.overdeck/agents/<id>/round-*.json`) | **Yes** | `pipeline.review-started` |
 | Round history (per-round verdict, finding count, duration, cost) | round-N.json files | **Yes** | `pipeline.review-completed` |
 | Elapsed timer | `Agent.startedAt` + `useNow(1000)` for live sessions | **Yes** | 1s ticker |
 | Per-session cost | `IssueCostData.sessions[].cost` | **Yes** | `cost.event_recorded` |
 | Per-session token counts (input/output) | `IssueCostData.sessions[].tokenCount` | **Yes** | `cost.event_recorded` |
 | Cost rate ($/min currently) | derived: cost diff over time window | **Yes** | computed from cost stream |
 | Model name | `Agent.model` | No | Snapshot |
-| Process PID | from `~/.panopticon/agents/<id>/state.json` | No | Snapshot |
+| Process PID | from `~/.overdeck/agents/<id>/state.json` | No | Snapshot |
 | tmux session name | `SessionNode.tmuxSession` | No | Snapshot |
 | Claude session ID (for JSONL) | `state.json:claudeSessionId` | No | Snapshot |
 | Last assistant message timestamp | `AgentRuntimeSnapshot.lastMessageAt` | **Yes** | `agent.message_received` |
@@ -173,7 +173,7 @@ When the user clicks the issue row in the tree (or selects "Overview" explicitly
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║ ZONE A · ISSUE HEADER  (~96px tall when expanded; always visible)        ║
 ║                                                                          ║
-║  PAN-540 ↗  · panopticon · feature/PAN-540 · [In Review · Round 2]      ║
+║  PAN-540 ↗  · overdeck · feature/PAN-540 · [In Review · Round 2]      ║
 ║  Remove convoy abstraction, inline parallel review directly into…        ║
 ║  ◷ started 3d ago · $4.32  · 6 / 9 acceptance · ▁▂▄▆▅▃▂  (sparkline)    ║
 ║                                                                          ║
@@ -215,7 +215,7 @@ The mock locks this in; it's the look we're shipping:
 
 - **`PAN-540 ↗`** — issue ID rendered in the **mono font** (`SF Mono`), `text-[11px]`, **`font-semibold`**, color `text-primary`. The arrow is `lucide-react` `ExternalLink` at 11px, opens the tracker URL in a new tab. *Bold matters here* — it's an anchor users scan to.
 - **·** separator dots — `text-content-subtle`.
-- **`panopticon · feature/PAN-540`** — `text-[11px] text-content-muted`. Branch is shown only when it's the conventional `feature/<issueId>` form (i.e. always; if a non-conventional branch is in use, render in `font-mono` with a small warning glyph).
+- **`overdeck · feature/PAN-540`** — `text-[11px] text-content-muted`. Branch is shown only when it's the conventional `feature/<issueId>` form (i.e. always; if a non-conventional branch is in use, render in `font-mono` with a small warning glyph).
 - **Status tag** — pill with `inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-medium`. Color tokens vary by state:
   - `In Review` → `badge-bg-review badge-border-review text-review-fg` (purple family)
   - `Working` → `badge-bg-info badge-border-info text-info-fg` (blue)
@@ -515,10 +515,10 @@ The dividers are rendered outside the virtualizer (the timeline already mixes vi
 
 ### Composer addressing
 
-The composer addresses the *selected session*. The `name` prop passed to `ComposerFooter` is the canonical tmux session name (e.g. `specialist-panopticon-540-review-correctness`). Below the composer, a small `text-[10.5px] text-content-subtle` line shows:
+The composer addresses the *selected session*. The `name` prop passed to `ComposerFooter` is the canonical tmux session name (e.g. `specialist-overdeck-540-review-correctness`). Below the composer, a small `text-[10.5px] text-content-subtle` line shows:
 
 ```
-addressing: specialist-panopticon-540-review-correctness     2 / 8000
+addressing: specialist-overdeck-540-review-correctness     2 / 8000
 ```
 
 ### Session-tab strip (NEW)
@@ -844,9 +844,9 @@ This is **one tmux session per canonical role per issue**, for the lifetime of t
 
 | Round | Old (PAN-821 behavior) | New (PAN-830) |
 |---|---|---|
-| 1 | `review-540-1714000000-correctness` | `specialist-panopticon-540-review-correctness` |
-| 2 | `review-540-1714003600-correctness` | `specialist-panopticon-540-review-correctness` *(same session)* |
-| 3 | `review-540-1714007200-correctness` | `specialist-panopticon-540-review-correctness` *(same session)* |
+| 1 | `review-540-1714000000-correctness` | `specialist-overdeck-540-review-correctness` |
+| 2 | `review-540-1714003600-correctness` | `specialist-overdeck-540-review-correctness` *(same session)* |
+| 3 | `review-540-1714007200-correctness` | `specialist-overdeck-540-review-correctness` *(same session)* |
 
 ## Reviewer resumption mechanism
 
@@ -871,7 +871,7 @@ async function runReviewerRound(role: ReviewerRole, ctx: ReviewContext): Promise
 }
 ```
 
-The reviewer's Claude Code session is **resumed** (the JSONL grows; it's the same conversation UUID). The `claudeSessionId` in `~/.panopticon/agents/review-{issueId}-{role}/state.json` is written once on first spawn and never overwritten.
+The reviewer's Claude Code session is **resumed** (the JSONL grows; it's the same conversation UUID). The `claudeSessionId` in `~/.overdeck/agents/review-{issueId}-{role}/state.json` is written once on first spawn and never overwritten.
 
 Side effect: reviewer state dirs are no longer destroyed by `cleanupReviewerStateDirs`. That function is renamed to `archiveReviewerRound` and instead writes `round-N.json` artifacts (model, duration, cost, verdict, finding count) into the reviewer's state dir, leaving JSONL and tmux alive.
 
@@ -903,7 +903,7 @@ Side effect: reviewer state dirs are no longer destroyed by `cleanupReviewerStat
 
 ```typescript
 async function resolveJsonlPath(session: SessionDescriptor): Promise<string | null> {
-  // 1. Look up claudeSessionId from agent state (~/.panopticon/agents/<id>/state.json)
+  // 1. Look up claudeSessionId from agent state (~/.overdeck/agents/<id>/state.json)
   const claudeSessionId = await readAgentClaudeSessionId(session.id);
   if (!claudeSessionId) return null;
 
@@ -1123,7 +1123,7 @@ Add the parity smoke test at the end of this phase.
 ### Reviewer canonical naming + resumption
 
 - [ ] Reviewers reuse the same tmux session and same JSONL across rounds. Round 2 of `review-correctness` does not spawn a new tmux session.
-- [ ] `getReviewerSessionName('correctness', 'panopticon', '540')` returns `specialist-panopticon-540-review-correctness`.
+- [ ] `getReviewerSessionName('correctness', 'overdeck', '540')` returns `specialist-overdeck-540-review-correctness`.
 - [ ] `claudeSessionId` in `state.json` is written once on first spawn and never overwritten.
 - [ ] Session tree shows exactly 6 reviewer nodes for an issue with N review rounds (1 orchestrator + 5 roles), regardless of N.
 - [ ] `archiveReviewerRound` writes `round-N.json` to the reviewer's state dir; JSONL and tmux session remain.
@@ -1183,7 +1183,7 @@ Add the parity smoke test at the end of this phase.
 | Density triage hides actions a user wants | Every contextual-only action is also reachable from a stable overflow `…` menu. The triage is about default visibility, not access. |
 | Round divider hurts scroll virtualization | Inject as a non-virtualized row outside the virtualizer (existing pattern: timeline already mixes virtualized + non-virtualized for the last 8 rows). |
 | Action parity drifts as kanban / inspector evolve | Parity smoke test asserts each existing surface label is reachable in Command Deck. Cheap to keep current, catches drift before the future kanban revamp. |
-| Removing `cleanupReviewerStateDirs` accumulates JSONL | Reviewer state dirs are bounded by the issue lifecycle. On `merge` complete, archive the issue's reviewer state dirs to `~/.panopticon/agents/.archive/<issue-id>/`. |
+| Removing `cleanupReviewerStateDirs` accumulates JSONL | Reviewer state dirs are bounded by the issue lifecycle. On `merge` complete, archive the issue's reviewer state dirs to `~/.overdeck/agents/.archive/<issue-id>/`. |
 | Liveness motion overwhelms users / is distracting | Honor `prefers-reduced-motion: reduce`. Cap simultaneous animations per zone at 2. Use low-amplitude breathing rather than punchy effects for ambient state. |
 | Re-render storms from event-driven motion | Build the live components (LiveCounter, ToolFlash, ActivitySparkline) with stable refs and `useMemo`/`useRef` over event subscriptions; assert with React Profiler that idle issues cause <5 re-renders/sec in Zone A and Zone B. |
 | Issue-selected Overview becomes a dumping ground | Constrain Overview to the 7 sections listed; new sections require a PRD update. |

@@ -12,12 +12,12 @@ services:
       dockerfile: Dockerfile
     user: node
     volumes:
-      - ../:/workspaces/panopticon:cached
-      - ${HOME}/.cache/panopticon-devcontainer/bun:/home/node/.bun/install/cache
+      - ../:/workspaces/overdeck:cached
+      - ${HOME}/.cache/overdeck-devcontainer/bun:/home/node/.bun/install/cache
     command: sleep infinity
     networks:
       - devnet
-      - panopticon
+      - overdeck
 
   # Init service: runs bun install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
@@ -26,7 +26,7 @@ services:
       context: .
       dockerfile: Dockerfile
     user: node
-    working_dir: /workspaces/panopticon
+    working_dir: /workspaces/overdeck
     environment:
       - NODE_ENV=development
       - HUSKY=0
@@ -48,21 +48,21 @@ services:
         echo 'Init complete'
       "
     volumes:
-      - ../:/workspaces/panopticon:cached
+      - ../:/workspaces/overdeck:cached
       # Shared host-side bun package cache (PAN-1764). Services run as `user: node`
       # (HOME=/home/node) — the old `bun-store:/root/...` named volume was never
       # read, and `docker compose down -v` (workspace rebuild) wiped it anyway.
       # A host bind mount survives rebuilds and is shared across all stacks.
-      - ${HOME}/.cache/panopticon-devcontainer/bun:/home/node/.bun/install/cache
+      - ${HOME}/.cache/overdeck-devcontainer/bun:/home/node/.bun/install/cache
       # npm cache incl. prebuild-install's _prebuilds — once better-sqlite3's
       # prebuilt binary is cached, init never needs github.com again (PAN-1764:
       # a transient DNS failure on that fetch hard-failed init; the node-gyp
       # fallback is dead on alpine with no python3/make/g++).
-      - ${HOME}/.cache/panopticon-devcontainer/npm:/home/node/.npm
+      - ${HOME}/.cache/overdeck-devcontainer/npm:/home/node/.npm
       # Shadow root node_modules with a named volume so container deps
       # don't conflict with host deps (host uses bun install independently).
       # Bun hoists all workspace deps here — no per-workspace volumes needed.
-      - container-node-modules:/workspaces/panopticon/node_modules
+      - container-node-modules:/workspaces/overdeck/node_modules
     networks:
       - devnet
 
@@ -74,7 +74,7 @@ services:
       context: .
       dockerfile: Dockerfile
     user: node
-    working_dir: /workspaces/panopticon/src/dashboard/frontend
+    working_dir: /workspaces/overdeck/src/dashboard/frontend
     command: sh -c "bun run dev -- --host 0.0.0.0"
     depends_on:
       init:
@@ -84,17 +84,17 @@ services:
         limits:
           cpus: '1.5'
     volumes:
-      - ../:/workspaces/panopticon:cached
-      - ${HOME}/.cache/panopticon-devcontainer/bun:/home/node/.bun/install/cache
+      - ../:/workspaces/overdeck:cached
+      - ${HOME}/.cache/overdeck-devcontainer/bun:/home/node/.bun/install/cache
       # Shadow root node_modules only — Bun hoists all deps here
-      - container-node-modules:/workspaces/panopticon/node_modules
+      - container-node-modules:/workspaces/overdeck/node_modules
     environment:
       - CI=true
       - CONTAINER_MODE=true
       - VITE_API_URL=https://api-{{FEATURE_FOLDER}}.pan.localhost
     networks:
       - devnet
-      - panopticon
+      - overdeck
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.pan-fe-{{FEATURE_FOLDER}}.rule=Host(`{{FEATURE_FOLDER}}.pan.localhost`)"
@@ -111,7 +111,7 @@ services:
       context: .
       dockerfile: Dockerfile
     user: node
-    working_dir: /workspaces/panopticon
+    working_dir: /workspaces/overdeck
     command: sh -c "node dist/dashboard/server.js"
     depends_on:
       init:
@@ -121,12 +121,12 @@ services:
         limits:
           cpus: '1.5'
     volumes:
-      - ../:/workspaces/panopticon:cached
-      - ${HOME}/.cache/panopticon-devcontainer/bun:/home/node/.bun/install/cache
+      - ../:/workspaces/overdeck:cached
+      - ${HOME}/.cache/overdeck-devcontainer/bun:/home/node/.bun/install/cache
       # Shadow root node_modules only — Bun hoists all deps here
-      - container-node-modules:/workspaces/panopticon/node_modules
+      - container-node-modules:/workspaces/overdeck/node_modules
       # Mount required host paths for workspace/agent management.
-      # NOTE: Do NOT mount ${HOME}/.panopticon into workspace containers — the container's
+      # NOTE: Do NOT mount ${HOME}/.overdeck into workspace containers — the container's
       # dashboard server would run its own Deacon patrol against shared host agent state
       # using a different tmux server, marking every host agent as "orphaned" and racing
       # auto-resume against the host. (Bug originally observed in PAN-821 loop on
@@ -140,7 +140,7 @@ services:
       # it, subscription-only models (e.g. gpt-5.5) are correctly but confusingly
       # locked in the workspace picker while the host has them available.
       # Read-only is safe: the host owns token refresh and the bind mount reflects
-      # refreshes live. Unlike ${HOME}/.panopticon, ${HOME}/.codex carries no
+      # refreshes live. Unlike ${HOME}/.overdeck, ${HOME}/.codex carries no
       # Deacon/agent state, so this does NOT engage the single-deacon invariant.
       # The dashboard server runs as user `node` (HOME=/home/node). (PAN-1619)
       - ${HOME}/.codex:/home/node/.codex:ro
@@ -160,7 +160,7 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     networks:
       - devnet
-      - panopticon
+      - overdeck
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.pan-api-{{FEATURE_FOLDER}}.rule=Host(`api-{{FEATURE_FOLDER}}.pan.localhost`)"
@@ -178,5 +178,5 @@ volumes:
 
 networks:
   devnet:
-  panopticon:
+  overdeck:
     external: true

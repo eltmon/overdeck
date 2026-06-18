@@ -26,7 +26,7 @@
   Agents cache (`agents` + `health_events`). Returns validated `Agent` entities.
 - **Writer / write door** — the one `Context.Service` allowed to *mutate* the
   Agents cache. Per-verb durability mode (see the **hybrid writer** note below).
-- **Liveness oracle** — tmux on socket `-L panopticon`. The ground truth for
+- **Liveness oracle** — tmux on socket `-L overdeck`. The ground truth for
   whether an agent process is actually running; `agents.status` is a *cache* of
   it, reconciled every patrol (`reconcileAgentStatus`, agents-state-audit
   surprise #1). There is no operator verb that sets `status` arbitrarily.
@@ -164,7 +164,7 @@ Legend used in reasons: **AUDIT** = [`../investigations/agents-state-audit.md`](
 | `GET /api/agents/:id/runtime` (a.ts:1531) | reads | **`AgentsResolver.getRuntime(id)`** | Live activity/idle/currentTool from the **`runtime.json` plane** behind the pointer — a separate file, read like `IssuesResolver.getPlan` reads `.pan/specs`; NOT a cache column (AUDIT caveat, lines 174-179). |
 | `GET /api/agents/:id/health-history` (a.ts:1128) | reads | **`AgentsResolver.getHealthHistory(id)`** | Folds the `health_events` projection ([`../overdeck-schema.ts`](../overdeck-schema.ts) 81-88); one read over the Agent's health rows. |
 | `GET /api/agents/:id/cloister-health` (a.ts:2197) | reads | **`AgentsResolver.getHealthHistory(id)`** | Duplicate health door (the deacon's view of the same `health_events`) → folded into the one read. |
-| `GET /api/agents/:id/tmux-alive` (a.ts:3593) | reads | **`AgentsResolver.isAlive(id)`** | Liveness oracle probe; the resolver consults tmux `-L panopticon`. |
+| `GET /api/agents/:id/tmux-alive` (a.ts:3593) | reads | **`AgentsResolver.isAlive(id)`** | Liveness oracle probe; the resolver consults tmux `-L overdeck`. |
 | `GET /api/agents/:id/has-session` (a.ts:3646) | reads | **`AgentsResolver.isAlive(id)`** | Same liveness probe under a second name → folded. |
 | `GET /api/agents/:id/git-info` (a.ts:1555) | reads | **RELOCATE → git/Workspace** | Branch/HEAD of the worktree; a git op, not the agent entity (`branch` is DERIVE, AUDIT row 73). |
 | `GET /api/agents/:id/activity` (a.ts:1594) | reads | **RELOCATE → Transcripts / runtime** | Activity feed derived from the JSONL transcript + runtime.json, not an `agents` column. |
@@ -537,7 +537,7 @@ export class AgentsResolver extends Context.Service<AgentsResolver, {
 
 export const AgentsResolverLayer = Layer.effect(AgentsResolver, Effect.gen(function* () {
   const { q } = yield* Db        // Drizzle handle — appears ONLY in resolver/writer Layer R
-  const tmux  = yield* Tmux      // liveness oracle (-L panopticon)
+  const tmux  = yield* Tmux      // liveness oracle (-L overdeck)
 
   const decode       = Schema.decodeUnknown(Agent)
   const decodeHealth = Schema.decodeUnknown(HealthEvent)
@@ -822,7 +822,7 @@ const AgentsDomainLayer = Layer.mergeAll(
   Layer.provide(DbLive),        // the ONLY place the agents/health_events handles are provided
   Layer.provide(RecordsLive),   // git .pan/records — harness/model mirror ONLY
   Layer.provide(EventBusLive),
-  Layer.provide(TmuxLive),      // liveness oracle (-L panopticon)
+  Layer.provide(TmuxLive),      // liveness oracle (-L overdeck)
 )
 
 const HttpLive = HttpApiBuilder.serve(OverdeckApi).pipe(

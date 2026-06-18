@@ -143,7 +143,7 @@ export interface ApiSettingsConfig {
   conversationSearch?: ConversationSearchConfig;
   conversations?: {
     compaction_model?: ModelId;
-    manual_compact_mode?: 'claude-code' | 'panopticon-native';
+    manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
     watch_dirs?: string[];
@@ -229,7 +229,7 @@ export interface ApiSettingsConfig {
    * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
    * 'bypass'         → --permission-mode bypassPermissions (DSP flag removed)
    *
-   * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
+   * Persisted under `claude.permissionMode` in `~/.overdeck/config.yaml`.
    * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
    */
   claude?: {
@@ -243,7 +243,7 @@ export interface ApiSettingsConfig {
    * 'auto-review' → approval_policy=on-request + approvals_reviewer=auto_review + sandbox_mode=workspace-write
    * 'full-access' → approval_policy=never + sandbox_mode=danger-full-access
    *
-   * Persisted under `codex.permissionMode` in `~/.panopticon/config.yaml`.
+   * Persisted under `codex.permissionMode` in `~/.overdeck/config.yaml`.
    */
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
@@ -256,7 +256,7 @@ export interface ApiSettingsConfig {
    * `max_concurrent_agents` caps how many remote work agents may run at once
    * (0 = unlimited).
    *
-   * Persisted under `remote` in `~/.panopticon/config.yaml`.
+   * Persisted under `remote` in `~/.overdeck/config.yaml`.
    */
   remote?: {
     resiliency_tier?: 'ephemeral' | 'durable';

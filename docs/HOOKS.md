@@ -22,7 +22,7 @@ Claude Code exposes nine lifecycle hook events. Overdeck registers shell scripts
 
 ## Hook Registration
 
-All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install` and `pan admin hooks install` install the hook scripts into `~/.panopticon/bin/` and idempotently add any missing registrations to settings.json.
+All nine Claude Code hook events live in global `~/.claude/settings.json`. `pan install` and `pan admin hooks install` install the hook scripts into `~/.overdeck/bin/` and idempotently add any missing registrations to settings.json.
 
 The global registry is the single source of truth for `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`, `Notification`, `PreCompact`, `PostCompact`, `UserPromptSubmit`, and `PermissionRequest`. Role files under `roles/` and synced agent definitions under `sync-sources/agents/` do not declare `hooks:` frontmatter.
 
@@ -42,7 +42,7 @@ No PAN-1402 pruning is needed. The old PAN-982 `removeIfPresent(...)` block was 
 Claude Code fires hook
         |
         v
-Hook script in ~/.panopticon/bin/
+Hook script in ~/.overdeck/bin/
         |
         v
 pan_emit_event() (from pan-hook-lib.sh)
@@ -103,7 +103,7 @@ The unavailable rows are API gaps rather than missing Overdeck code. Pi agents c
 
 The Pi extension POSTs directly to `/api/agents/:id/heartbeat`, using the same validation path as Claude Code hooks. Network and 5xx failures buffer to `pending-events.jsonl` in the agent state directory and flush on the next successful POST; 4xx responses are treated as invalid payloads and are not replayed. Heartbeat bodies flow through `bodyToEvent → decodeDomainEvent → AgentStateService.emit`, so Pi and Claude Code update the same runtime snapshot and event store.
 
-Pi also writes local compatibility files under `~/.panopticon/agents/<agent-id>/` and `~/.panopticon/heartbeats/`:
+Pi also writes local compatibility files under `~/.overdeck/agents/<agent-id>/` and `~/.overdeck/heartbeats/`:
 
 | File | Writer | Purpose |
 |---|---|---|
@@ -127,6 +127,6 @@ Specialist Pi agents use the same `turn_end` surface to detect review, test, mer
 
 ## Harness-Aware Installation
 
-`pan admin hooks install --harness <claude-code|pi|both>` targets Claude Code, Pi, or both harnesses. With no explicit `--harness`, the installer detects available `claude` and `pi` binaries and chooses the installed harnesses. Claude Code installation copies shell hooks into `~/.panopticon/bin/` and mutates `~/.claude/settings.json`; Pi installation verifies that `packages/pi-extension/dist/index.js` exists so launcher-generated Pi commands can load it with `pi --extension`.
+`pan admin hooks install --harness <claude-code|pi|both>` targets Claude Code, Pi, or both harnesses. With no explicit `--harness`, the installer detects available `claude` and `pi` binaries and chooses the installed harnesses. Claude Code installation copies shell hooks into `~/.overdeck/bin/` and mutates `~/.claude/settings.json`; Pi installation verifies that `packages/pi-extension/dist/index.js` exists so launcher-generated Pi commands can load it with `pi --extension`.
 
 `pan admin hooks status` reports the detected harness binaries and Pi extension build status.

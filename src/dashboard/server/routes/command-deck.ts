@@ -271,7 +271,7 @@ export async function fetchActivityDataWithContext(
 
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
-  const agentsDir = join(homedir(), '.panopticon', 'agents');
+  const agentsDir = join(homedir(), '.overdeck', 'agents');
 
   let hasPlanningSection = false;
 
@@ -382,7 +382,7 @@ export async function fetchActivityDataWithContext(
   // Build specialist sections from review-status history
   const centralStatus = getReviewStatusSync(issueId.toUpperCase());
   if (centralStatus?.history && centralStatus.history.length > 0) {
-    const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
+    const tasksDir = join(homedir(), '.overdeck', 'specialists', 'tasks');
     const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };
 
     // Use shared task file contents if provided, else read once and cache (PAN-821)
@@ -505,7 +505,7 @@ export async function fetchActivityDataWithContext(
       // PAN-830: For review sections, emit the four canonical convoy reviewer
       // nodes exactly once (anchored to the latest review section in history). Earlier
       // review sections are absorbed into the round metadata read from
-      // `~/.panopticon/agents/<reviewer-id>/round-N.json`.
+      // `~/.overdeck/agents/<reviewer-id>/round-N.json`.
       if (ss.type === 'review') {
         if (i !== lastReviewIndex) continue;
         const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);

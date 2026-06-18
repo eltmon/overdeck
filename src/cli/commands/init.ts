@@ -16,7 +16,7 @@ const BUNDLED_SKILLS_DIR = join(PACKAGE_ROOT, 'skills');
 const BUNDLED_AGENTS_DIR = join(PACKAGE_ROOT, 'agents');
 
 /**
- * Copy bundled skills from package to ~/.panopticon/skills/
+ * Copy bundled skills from package to ~/.overdeck/skills/
  * Returns the number of skills copied
  */
 function copyBundledSkills(): number {
@@ -46,7 +46,7 @@ function copyBundledSkills(): number {
 }
 
 /**
- * Copy bundled agents from package to ~/.panopticon/agents/
+ * Copy bundled agents from package to ~/.overdeck/agents/
  * Returns the number of agents copied
  */
 function copyBundledAgents(): number {
@@ -138,7 +138,7 @@ export async function initCommand(): Promise<void> {
         console.log(chalk.green('✓') + ` Installed ${agentsCopied} bundled agents`);
       }
       console.log(chalk.yellow('!') + ' Could not detect shell. Add alias manually:');
-      console.log(chalk.dim('    alias pan="panopticon"'));
+      console.log(chalk.dim('    alias pan="overdeck"'));
     }
 
     console.log('');

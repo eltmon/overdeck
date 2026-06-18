@@ -42,11 +42,11 @@ function rebuildMenu(): void {
   Menu.setApplicationMenu(menu);
 
   // Re-attach workspace submenu refresh listener
-  const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
-  if (panopticonMenu?.submenu) {
-    panopticonMenu.submenu.on("menu-will-show", () => {
+  const overdeckMenu = menu.items.find((item) => item.label === "Overdeck");
+  if (overdeckMenu?.submenu) {
+    overdeckMenu.submenu.on("menu-will-show", () => {
       void fetchActiveWorkspaces().then((workspaces) => {
-        const wsItem = panopticonMenu.submenu?.items.find(
+        const wsItem = overdeckMenu.submenu?.items.find(
           (i) => i.id === "open-workspace-submenu",
         );
         if (wsItem) {
@@ -238,11 +238,11 @@ export function configureApplicationMenu(): void {
   Menu.setApplicationMenu(menu);
 
   // Refresh workspace submenu when the Overdeck menu is about to open
-  const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
-  if (panopticonMenu?.submenu) {
-    panopticonMenu.submenu.on("menu-will-show", () => {
+  const overdeckMenu = menu.items.find((item) => item.label === "Overdeck");
+  if (overdeckMenu?.submenu) {
+    overdeckMenu.submenu.on("menu-will-show", () => {
       void fetchActiveWorkspaces().then((workspaces) => {
-        const wsItem = panopticonMenu.submenu?.items.find(
+        const wsItem = overdeckMenu.submenu?.items.find(
           (i) => i.id === "open-workspace-submenu",
         );
         if (wsItem) {

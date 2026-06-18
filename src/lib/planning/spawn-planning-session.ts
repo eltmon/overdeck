@@ -166,9 +166,9 @@ export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<
 
 async function ensureTmuxRunning(): Promise<void> {
   try {
-    const exists = await Effect.runPromise(sessionExists('panopticon-init'));
+    const exists = await Effect.runPromise(sessionExists('overdeck-init'));
     if (!exists) {
-      await Effect.runPromise(createSession('panopticon-init', homedir(), undefined));
+      await Effect.runPromise(createSession('overdeck-init', homedir(), undefined));
       console.log('Started tmux server');
     }
   } catch (startErr) {
@@ -176,7 +176,7 @@ async function ensureTmuxRunning(): Promise<void> {
   }
   // Strip env vars from tmux global environment that should NOT leak into
   // agent sessions. The tmux server inherits the dashboard's process.env
-  // (which includes all of .panopticon.env), but agents should only receive
+  // (which includes all of .overdeck.env), but agents should only receive
   // explicitly-passed provider-specific vars via createSession().
   const varsToStrip = [
     'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
@@ -422,7 +422,7 @@ export async function resolvePlanningSessionHarness(planningModel: string, expli
  * Spawn a planning agent session in the background.
  *
  * Creates workspace (if needed), writes planning prompt, and spawns Claude Code
- * in a tmux session. The agent state directory at ~/.panopticon/agents/<sessionName>/
+ * in a tmux session. The agent state directory at ~/.overdeck/agents/<sessionName>/
  * must already exist with a preliminary state.json (status: 'starting').
  *
  * This function is designed to run as fire-and-forget after the API response
@@ -431,7 +431,7 @@ export async function resolvePlanningSessionHarness(planningModel: string, expli
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
   const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, probe, autoSpawnOnFinalize, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
-  const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+  const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
 
   const TOTAL_STEPS = 5;
   const progress = (step: number, label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
@@ -635,7 +635,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         role: 'plan',
         workingDir: workspacePath,
         setTerminalEnv: true,
-        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
+        overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         promptFile,
         baseCommand: cmdWithArgs,

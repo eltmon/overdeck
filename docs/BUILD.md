@@ -26,14 +26,14 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 - **Format**: ESM
 - **Output**: `dist/cli/index.js`, `dist/index.js`, plus type declarations
 - **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname` for ESM→CJS interop
-- **`deps.alwaysBundle`**: Workspace packages (`@panopticon/*`) are bundled into the output
+- **`deps.alwaysBundle`**: Workspace packages (`@overdeck/*`) are bundled into the output
 - **`clean: true`**: Wipes `dist/` before building (dashboard build runs after)
 
 **Dashboard Server** — `src/dashboard/server/tsdown.config.ts`
 - **Entry point**: `main.ts` → `dist/dashboard/server.js`
 - **Format**: ESM, platform: node
 - **`shims: true`**: Auto-injects `createRequire`, `__filename`, `__dirname`
-- **`deps.alwaysBundle`**: `@panopticon/*` workspace packages
+- **`deps.alwaysBundle`**: `@overdeck/*` workspace packages
 - **`deps.neverBundle`**: Native bindings (`node-pty`, `ssh2`) and Bun-specific modules (`bun:*`, `@effect/platform-bun/*`)
 - **`clean: false`**: Preserves `dist/dashboard/public/` (frontend build output)
 - **Code-split**: Rolldown produces multiple chunks (entry + shared modules)
@@ -47,7 +47,7 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 
 **Cost Script** — `scripts/tsdown.config.ts`
 - **Entry point**: `record-cost-event.ts` → `scripts/record-cost-event.js`
-- **Standalone**: Bundles the script and shared SQLite driver adapter for deployment to `~/.panopticon/bin/`
+- **Standalone**: Bundles the script and shared SQLite driver adapter for deployment to `~/.overdeck/bin/`
 
 ### Vite (Dashboard Frontend)
 
@@ -177,7 +177,7 @@ Run all commands from `apps/desktop/` (or use workspace syntax: `bun run --cwd a
 - **Format**: CJS (required by Electron's main process)
 - **Output**: `dist-electron/main.js`, `dist-electron/preload.js`
 - **`deps.neverBundle: ["electron"]`** — Electron is provided by the runtime, never bundled
-- **`deps.alwaysBundle`**: `@panopticon/*` workspace packages (contracts etc.)
+- **`deps.alwaysBundle`**: `@overdeck/*` workspace packages (contracts etc.)
 
 ### Native Addon Rebuild
 
@@ -210,7 +210,7 @@ cd apps/desktop && npm run dev:bundle
 cd apps/desktop && npm run dev:electron
 ```
 
-In dev mode, the `BrowserWindow` loads from `VITE_DEV_SERVER_URL` (Vite HMR). In packaged mode it loads `panopticon://app/index.html` from bundled static assets.
+In dev mode, the `BrowserWindow` loads from `VITE_DEV_SERVER_URL` (Vite HMR). In packaged mode it loads `overdeck://app/index.html` from bundled static assets.
 
 📖 **[Full desktop app reference →](./DESKTOP-APP.md)**
 

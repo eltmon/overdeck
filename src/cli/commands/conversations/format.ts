@@ -31,7 +31,7 @@ export function formatTable(sessions: DiscoveredSession[]): void {
     const lastTs = s.lastTs ? formatDate(s.lastTs) : '—';
     const tags = s.tags.length > 0 ? s.tags.slice(0, 4).join(', ') : '';
 
-    const managed = s.panopticonManaged ? chalk.cyan('●') : ' ';
+    const managed = s.overdeckManaged ? chalk.cyan('●') : ' ';
     const enriched = s.enrichmentLevel > 0 ? chalk.green('✓') : chalk.dim('·');
 
     console.log(

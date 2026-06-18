@@ -304,7 +304,7 @@ api_keys:
     it('should return path to global config', () => {
       // This test is safe as it only checks the path structure, not file existence
       const path = getGlobalConfigPath();
-      expect(path).toContain('.panopticon');
+      expect(path).toContain('.overdeck');
       expect(path).toContain('config.yaml');
     });
   });

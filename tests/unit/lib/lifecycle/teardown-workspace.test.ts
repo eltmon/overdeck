@@ -34,8 +34,8 @@ vi.mock('../../../../src/lib/tmux.js', async () => {
 });
 
 vi.mock('../../../../src/lib/paths.js', () => ({
-  AGENTS_DIR: join(tmpdir(), 'panopticon-test-agents'),
-  OVERDECK_HOME: join(tmpdir(), 'panopticon-test-home'),
+  AGENTS_DIR: join(tmpdir(), 'overdeck-test-agents'),
+  OVERDECK_HOME: join(tmpdir(), 'overdeck-test-home'),
   PROJECT_PRDS_SUBDIR: 'prds',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
@@ -59,7 +59,7 @@ describe('teardown-workspace', () => {
   let agentsDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `panopticon-teardown-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = join(tmpdir(), `overdeck-teardown-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
 
     agentsDir = AGENTS_DIR;

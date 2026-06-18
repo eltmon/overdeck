@@ -111,7 +111,7 @@ export function formatDocsQueryMarkdown(result: DocsQueryResult): string {
     const anchor = item.sectionAnchor ? ` (#${item.sectionAnchor})` : '';
     return `## ${item.docPath}${heading}${anchor}\n\n${sanitizeDocsSnippet(item.content)}`;
   });
-  return `<panopticon-docs>\n${sections.join('\n\n---\n\n')}\n</panopticon-docs>`;
+  return `<overdeck-docs>\n${sections.join('\n\n---\n\n')}\n</overdeck-docs>`;
 }
 
 export function formatDocsQueryJson(result: DocsQueryResult): string {
@@ -280,5 +280,5 @@ function countTokens(text: string): number {
 }
 
 function sanitizeDocsSnippet(content: string): string {
-  return content.replace(/<\/panopticon-docs>/gi, '&lt;/panopticon-docs&gt;');
+  return content.replace(/<\/overdeck-docs>/gi, '&lt;/overdeck-docs&gt;');
 }

@@ -12,7 +12,7 @@ const execAsync = promisify(exec);
  * `pre-spawn`, `review-temp`) are no longer created by Overdeck code, but
  * `parseCanonicalStashMessage` still recognizes them so existing stashes in
  * `refs/stash` parse correctly during cleanup. Only `salvageable` may be
- * created going forward — see /home/eltmon/.panopticon/context/global.md
+ * created going forward — see /home/eltmon/.overdeck/context/global.md
  * "Stash Discipline" and docs/MERGE-WORKFLOW.md.
  */
 export type CanonicalStashKind = 'salvageable';

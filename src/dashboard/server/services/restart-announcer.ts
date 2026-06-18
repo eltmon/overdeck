@@ -5,7 +5,7 @@
  * separate processes and cannot reach the dashboard's in-process event store —
  * and mid-restart the dashboard is the very thing being killed. So the
  * (re)started server announces instead: it reads
- * `~/.panopticon/restart-status.json` on boot and polls it afterward, emitting
+ * `~/.overdeck/restart-status.json` on boot and polls it afterward, emitting
  * one activity entry per new restart-status `ts`. Polling also catches the
  * boot race (the watchdog writes the status a few seconds AFTER the new server
  * is already up) and watchdog give-ups that never restarted anything.

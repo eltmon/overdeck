@@ -3,7 +3,7 @@
 Generate docs/overdeck-db-erd.excalidraw (+ .mmd) from
 drizzle/overdeck/0000_overdeck_init.sql.
 
-Idiom matches docs/panopticon-db-erd.excalidraw: rounded domain-colored
+Idiom matches docs/overdeck-db-erd.excalidraw: rounded domain-colored
 rectangle per table + title text + monospaced columns text. Adds explicit
 TYPE / PK / FK / NN markers + indexes (the old ERD listed names only; this
 one renders types because types are the point of the review).

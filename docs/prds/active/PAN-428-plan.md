@@ -16,7 +16,7 @@ The 15,793-line monolithic `src/dashboard/server/index.ts` with 185 Express rout
 
 1. **Effect 4.0.0-beta.43** (pinned exact) — required for `unstable/http` and RPC APIs. T3Code is the canary.
 2. **Bun** as package manager + dev runtime, Node 22 for production (npm distribution).
-3. **Shared contracts package** (`packages/contracts/` → `@panopticon/contracts`) — event schemas, RPC definitions, shared types.
+3. **Shared contracts package** (`packages/contracts/` → `@overdeck/contracts`) — event schemas, RPC definitions, shared types.
 4. **Event-driven architecture** — SQLite event store + PubSub for live streaming, Zustand store on frontend with pure event reducers.
 5. **Single multiplexed WebSocket** — replaces socket.io + raw WS + HTTP polling.
 6. **12 parallel route modules** — each agent creates one file, B18 wires them together.
@@ -34,7 +34,7 @@ Full PRD scope: 22 beads (B0–B21) as specified in `docs/prds/planned/pan-428-d
 
 ### In Scope
 - Bun toolchain migration (package manager, dev runtime, workspace config)
-- `@panopticon/contracts` package (event schemas, RPC definitions, shared types)
+- `@overdeck/contracts` package (event schemas, RPC definitions, shared types)
 - SQLite event store with PubSub
 - Effect.js HTTP server with dual-runtime support (Bun dev, Node prod)
 - WebSocket RPC (subscribeDomainEvents, subscribeTerminal, subscribeAgentOutput, getSnapshot, etc.)

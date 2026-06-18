@@ -136,7 +136,7 @@ const DiscoveredSessionResponseSchema = Schema.Struct({
   enrichmentModel: Schema.NullOr(Schema.String),
   enrichedAt: Schema.NullOr(Schema.String),
   enrichmentFailed: Schema.Boolean,
-  panopticonManaged: Schema.Boolean,
+  overdeckManaged: Schema.Boolean,
   panIssueId: Schema.NullOr(Schema.String),
   panAgentId: Schema.NullOr(Schema.String),
   fileSize: Schema.NullOr(Schema.Number),

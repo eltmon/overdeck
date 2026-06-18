@@ -2,7 +2,7 @@
 /**
  * Update existing GitHub App webhook configuration (PAN-905).
  *
- * Reads credentials from ~/.panopticon/github-app/, generates a JWT,
+ * Reads credentials from ~/.overdeck/github-app/, generates a JWT,
  * creates/reuses a smee.io channel, and updates the app via GitHub API.
  *
  * Usage:
@@ -15,7 +15,7 @@ import { homedir } from 'node:os';
 import { createSign } from 'node:crypto';
 import SmeeClient from 'smee-client';
 
-const APP_DIR = join(homedir(), '.panopticon', 'github-app');
+const APP_DIR = join(homedir(), '.overdeck', 'github-app');
 
 if (process.env.OVERDECK_DEV_WEBHOOKS !== '1') {
   console.error('Refusing to configure a third-party webhook relay outside dev mode.');

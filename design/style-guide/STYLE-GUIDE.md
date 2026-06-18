@@ -729,7 +729,7 @@ Collapsed mode:
 Toggle:
   Click collapse button in footer
   Keyboard shortcut: [ (left bracket)
-  State persisted to localStorage('panopticon.ui.sidebarCollapsed')
+  State persisted to localStorage('overdeck.ui.sidebarCollapsed')
 
 Mobile:
   Sidebar becomes Sheet (slide from left)
@@ -801,7 +801,7 @@ Minimal, unobtrusive scrollbars:
 
 ### Implementation
 
-- Store theme in `localStorage('panopticon.ui.theme')` — values: `'light'` | `'dark'`
+- Store theme in `localStorage('overdeck.ui.theme')` — values: `'light'` | `'dark'`
 - Toggle by adding/removing `.dark` class on `<html>`
 - Default: dark mode
 
@@ -812,7 +812,7 @@ Apply theme before React mounts (in `index.html`):
 ```html
 <script>
   (function() {
-    var theme = localStorage.getItem('panopticon.ui.theme') || 'dark';
+    var theme = localStorage.getItem('overdeck.ui.theme') || 'dark';
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     }

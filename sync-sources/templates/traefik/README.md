@@ -5,11 +5,11 @@ Traefik reverse proxy for local development with HTTPS.
 ## Directory Structure
 
 ```
-~/.panopticon/traefik/
+~/.overdeck/traefik/
 ├── docker-compose.yml      # Traefik container definition
 ├── traefik.yml             # Static configuration
 ├── dynamic/                # Dynamic routing configs
-│   └── panopticon.yml      # Dashboard routing
+│   └── overdeck.yml      # Dashboard routing
 ├── certs/                  # mkcert SSL certificates
 │   ├── _wildcard.pan.localhost.pem
 │   └── _wildcard.pan.localhost-key.pem
@@ -32,7 +32,7 @@ Traefik reverse proxy for local development with HTTPS.
 - Configures file provider for dynamic configs
 - Sets up TLS with wildcard certificates
 
-### Dynamic Configuration (`dynamic/panopticon.yml`)
+### Dynamic Configuration (`dynamic/overdeck.yml`)
 - Routes `https://pan.localhost` to dashboard frontend (port 3001)
 - Routes `https://pan.localhost/api/*` to dashboard API (port 3002)
 - Uses `host.docker.internal` to access host-based services
@@ -41,7 +41,7 @@ Traefik reverse proxy for local development with HTTPS.
 - Runs Traefik v3.0 in a container
 - Exposes ports 80, 443, 8080
 - Mounts configuration files and certificates
-- Uses `panopticon` network for container communication
+- Uses `overdeck` network for container communication
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ Traefik reverse proxy for local development with HTTPS.
    ```bash
    mkcert "*.pan.localhost" "*.localhost" localhost 127.0.0.1 ::1
    ```
-   Certificates should be in `~/.panopticon/traefik/certs/`
+   Certificates should be in `~/.overdeck/traefik/certs/`
 
 2. **DNS/Hosts configuration**:
    - Add to `/etc/hosts`: `127.0.0.1 pan.localhost`
@@ -59,19 +59,19 @@ Traefik reverse proxy for local development with HTTPS.
 
 Start Traefik:
 ```bash
-cd ~/.panopticon/traefik
+cd ~/.overdeck/traefik
 docker-compose up -d
 ```
 
 Stop Traefik:
 ```bash
-cd ~/.panopticon/traefik
+cd ~/.overdeck/traefik
 docker-compose down
 ```
 
 View logs:
 ```bash
-docker logs -f panopticon-traefik
+docker logs -f overdeck-traefik
 ```
 
 ## Managed by CLI

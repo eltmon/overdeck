@@ -231,7 +231,7 @@ labels:
 
 1. Start Traefik (if not running):
    ```bash
-   cd /path/to/panopticon/templates/traefik
+   cd /path/to/overdeck/templates/traefik
    docker compose up -d
    ```
 

@@ -35,13 +35,13 @@ describe('setup hooks', () => {
     const first = addOverdeckHookIfMissing(
       settings,
       'PermissionRequest',
-      '/home/user/.panopticon/bin',
+      '/home/user/.overdeck/bin',
       'permission-event-hook',
     );
     const second = addOverdeckHookIfMissing(
       settings,
       'PermissionRequest',
-      '/home/user/.panopticon/bin',
+      '/home/user/.overdeck/bin',
       'permission-event-hook',
     );
 
@@ -50,7 +50,7 @@ describe('setup hooks', () => {
     expect(settings.hooks?.PermissionRequest).toEqual([
       {
         matcher: '.*',
-        hooks: [{ type: 'command', command: '/home/user/.panopticon/bin/permission-event-hook' }],
+        hooks: [{ type: 'command', command: '/home/user/.overdeck/bin/permission-event-hook' }],
       },
     ]);
   });
@@ -71,14 +71,14 @@ describe('setup hooks', () => {
     const first = addOverdeckHookIfMissing(
       settings,
       hookType,
-      '/home/user/.panopticon/bin',
+      '/home/user/.overdeck/bin',
       scriptName,
       matcher,
     );
     const second = addOverdeckHookIfMissing(
       settings,
       hookType,
-      '/home/user/.panopticon/bin',
+      '/home/user/.overdeck/bin',
       scriptName,
       matcher,
     );
@@ -88,7 +88,7 @@ describe('setup hooks', () => {
     expect(settings.hooks?.[hookType]).toEqual([
       {
         matcher,
-        hooks: [{ type: 'command', command: `/home/user/.panopticon/bin/${scriptName}` }],
+        hooks: [{ type: 'command', command: `/home/user/.overdeck/bin/${scriptName}` }],
       },
     ]);
   });
@@ -104,48 +104,48 @@ describe('setup hooks', () => {
       expect(settings.hooks?.PreToolUse).toEqual(expect.arrayContaining([
         {
           matcher: '.*',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'pre-tool-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'pre-tool-hook') }],
         },
         {
           matcher: 'Bash',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'gh-issue-trailer-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'gh-issue-trailer-hook') }],
         },
         {
           matcher: 'AskUserQuestion',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'ask-user-question-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'ask-user-question-hook') }],
         },
       ]));
       expect(settings.hooks?.PostToolUse).toEqual(expect.arrayContaining([
         {
           matcher: '.*',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'heartbeat-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'heartbeat-hook') }],
         },
         {
           matcher: '.*',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'permission-event-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'permission-event-hook') }],
         },
       ]));
       expect(settings.hooks?.Stop).toEqual(expect.arrayContaining([
         {
           matcher: '.*',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'stop-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'stop-hook') }],
         },
         {
           matcher: '.*',
-          hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'permission-event-hook') }],
+          hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'permission-event-hook') }],
         },
       ]));
       if (settings.hooks?.PreToolUse?.some((entry) => entry.hooks.some((hook) => hook.command.endsWith('/tldr-read-enforcer')))) {
         expect(settings.hooks.PreToolUse).toEqual(expect.arrayContaining([
           {
             matcher: 'Read',
-            hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'tldr-read-enforcer') }],
+            hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'tldr-read-enforcer') }],
           },
         ]));
         expect(settings.hooks?.PostToolUse).toEqual(expect.arrayContaining([
           {
             matcher: 'Edit|Write',
-            hooks: [{ type: 'command', command: join(home, '.panopticon', 'bin', 'tldr-post-edit') }],
+            hooks: [{ type: 'command', command: join(home, '.overdeck', 'bin', 'tldr-post-edit') }],
           },
         ]));
       }
@@ -154,13 +154,13 @@ describe('setup hooks', () => {
     }
   });
 
-  it('treats legacy panopticon/bin hook commands as already configured', () => {
+  it('treats legacy overdeck/bin hook commands as already configured', () => {
     const settings: ClaudeSettings = {
       hooks: {
         PermissionRequest: [
           {
             matcher: '.*',
-            hooks: [{ type: 'command', command: '$HOME/.panopticon/bin/permission-event-hook' }],
+            hooks: [{ type: 'command', command: '$HOME/.overdeck/bin/permission-event-hook' }],
           },
         ],
       },
@@ -169,7 +169,7 @@ describe('setup hooks', () => {
     const added = addOverdeckHookIfMissing(
       settings,
       'PermissionRequest',
-      '/home/user/.panopticon/bin',
+      '/home/user/.overdeck/bin',
       'permission-event-hook',
     );
 

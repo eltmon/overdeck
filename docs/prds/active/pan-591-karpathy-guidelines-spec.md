@@ -189,7 +189,7 @@ Add `~/.claude/skills/karpathy-guidelines/SKILL.md` (verbatim from source repo w
 ### Config Schema
 
 ```yaml
-# ~/.panopticon/config.yaml
+# ~/.overdeck/config.yaml
 experimental:
   karpathy_guidelines:
     enabled: true      # true | false | ab_test

@@ -849,7 +849,7 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
     }
 
     // Write status to specialist's state directory
-    const specialistDir = join(homedir(), '.panopticon', 'specialists', name);
+    const specialistDir = join(homedir(), '.overdeck', 'specialists', name);
     yield* Effect.promise(() => mkdir(specialistDir, { recursive: true }));
 
     const statusFile = join(specialistDir, `${issueId}-status.json`);
@@ -1007,7 +1007,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 // ─── Route: GET /api/specialists/:project/:issueId/:type/status ───────────────
 //
 // PAN-1048 review feedback 003 (REQ-16): the legacy specialist-status route
-// returned metadata sourced from ~/.panopticon/specialists/registry.json, which
+// returned metadata sourced from ~/.overdeck/specialists/registry.json, which
 // the role-primitive refactor explicitly retires. The startup cleanup in
 // service.ts deletes that directory on every boot; preserving the read path
 // would silently recreate it via getRunMetadata() → loadRegistry()/saveRegistry().
@@ -1472,7 +1472,7 @@ const getProjectSpecialistLatestLogRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    const runsDir = join(homedir(), '.panopticon', 'specialists', project, type, 'runs');
+    const runsDir = join(homedir(), '.overdeck', 'specialists', project, type, 'runs');
     if (!existsSync(runsDir)) {
       return jsonResponse({ log: null, message: 'No runs found' });
     }

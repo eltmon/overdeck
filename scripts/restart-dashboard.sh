@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DASHBOARD_DIR="$SCRIPT_DIR/../src/dashboard"
-LOG_FILE="/tmp/panopticon-dashboard.log"
+LOG_FILE="/tmp/overdeck-dashboard.log"
 
 echo "Stopping dashboard..."
 
@@ -17,7 +17,7 @@ done
 
 # Also kill any npm/node processes that might be orphaned
 pkill -9 -f "npm.*dashboard" 2>/dev/null || true
-pkill -9 -f "node.*panopticon.*dashboard" 2>/dev/null || true
+pkill -9 -f "node.*overdeck.*dashboard" 2>/dev/null || true
 pkill -9 -f "vite.*301" 2>/dev/null || true
 pkill -9 -f "concurrently.*dev:server" 2>/dev/null || true
 

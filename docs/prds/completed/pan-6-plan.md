@@ -10,7 +10,7 @@ Create 8 subagent templates for common orchestration patterns with full convoy i
 |----------|--------|-----------|
 | Usage Model | Task tool delegation + Convoy integration | Subagents work both ways: auto-delegation via Task tool AND convoy orchestration |
 | Scope | All 8 agents + orchestration skill | Full implementation with convoy integration |
-| Source Location | `repo/agents/` | Mirror skills pattern: `repo/agents/` -> `~/.panopticon/agents/` -> `~/.claude/agents/` |
+| Source Location | `repo/agents/` | Mirror skills pattern: `repo/agents/` -> `~/.overdeck/agents/` -> `~/.claude/agents/` |
 | Sync Approach | Full SYNC_TARGETS integration | Modify paths.ts, sync.ts for consistency with skills/commands pattern |
 | Synthesis Flow | Skills-based orchestration | A skill (`pan-code-review`) spawns reviewers via Task, waits, then spawns synthesis |
 | Convoy Integration | Yes - in this PR | Convoy can specify subagent templates for parallel work |
@@ -37,21 +37,21 @@ repo/skills/
 │   └── SKILL.md                     # Spawns 3 reviewers + synthesis
 └── [existing skills...]
 
-~/.panopticon/agents/                # Runtime copy (from `pan init`)
+~/.overdeck/agents/                # Runtime copy (from `pan init`)
 └── [copied on install/update]
 
 ~/.claude/agents/                    # Target (from `pan sync`)
-└── [symlinked from ~/.panopticon/agents/]
+└── [symlinked from ~/.overdeck/agents/]
 ```
 
 ### Sync Flow
 
 ```
 pan init / npm postinstall
-    └── copies repo/agents/* to ~/.panopticon/agents/
+    └── copies repo/agents/* to ~/.overdeck/agents/
 
 pan sync
-    └── symlinks ~/.panopticon/agents/* to ~/.claude/agents/*
+    └── symlinks ~/.overdeck/agents/* to ~/.claude/agents/*
 ```
 
 ### Convoy Integration
@@ -123,7 +123,7 @@ export const SYNC_TARGETS = {
 - Include agents in backup directories
 - Report agents in sync results
 
-**5. init command** - Copy agents from package to ~/.panopticon/agents/
+**5. init command** - Copy agents from package to ~/.overdeck/agents/
 - Similar to how skills are copied
 
 **6. convoy.ts / convoy command** - Add template-based convoy support

@@ -2,7 +2,7 @@
 
 ## Problem
 
-Onboarding a new project into Overdeck requires manually editing `~/.panopticon/projects.yaml` with detailed YAML configuration — workspace type, repo paths, branch names, tracker settings, quality gates, DNS, Docker, and more. This is:
+Onboarding a new project into Overdeck requires manually editing `~/.overdeck/projects.yaml` with detailed YAML configuration — workspace type, repo paths, branch names, tracker settings, quality gates, DNS, Docker, and more. This is:
 
 1. **Error-prone**: YAML indentation, field names, and path references are easy to get wrong. A typo in a repo path silently breaks workspace creation.
 2. **Undiscoverable**: Users must read documentation to learn what fields exist. There's no guidance on which fields are relevant for their project type.
@@ -106,7 +106,7 @@ Step 7: Review & Save
   Here's your configuration:
   [YAML preview]
   
-  Save to ~/.panopticon/projects.yaml? [Y/n]: _
+  Save to ~/.overdeck/projects.yaml? [Y/n]: _
   
   Done! Next steps:
   - Run 'pan workspace create F29698' to test workspace creation
@@ -230,7 +230,7 @@ templates/project-types/
         │   └── .claude/
         │       ├── CLAUDE.md   # Placeholder with sections to fill
         │       └── skills/
-        ├── panopticon/
+        ├── overdeck/
         │   └── repo-groups.yaml  # Placeholder
         ├── docs/
         │   ├── repo-map.md       # Placeholder
@@ -400,7 +400,7 @@ team-meta/
 │       ├── skills/               # Team-specific skills
 │       ├── commands/             # Team-specific commands
 │       └── agents/               # Custom agent definitions
-├── panopticon/                   # Overdeck-specific config
+├── overdeck/                   # Overdeck-specific config
 │   ├── repo-groups.yaml          # Repo group definitions
 │   └── templates/                # Project-specific templates (optional)
 ├── docs/                         # Architecture and reference docs

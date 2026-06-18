@@ -124,7 +124,7 @@ function checkpointIdentity(checkpoint: TranscriptCheckpoint): MemoryIdentity {
 }
 
 function inferCheckpointHarness(transcriptPath: string): string {
-  if (transcriptPath.includes('/.panopticon/agents/') && transcriptPath.includes('/sessions/')) {
+  if (transcriptPath.includes('/.overdeck/agents/') && transcriptPath.includes('/sessions/')) {
     return 'pi';
   }
   if (transcriptPath.includes('/codex-home/sessions/') && transcriptPath.includes('rollout-')) {

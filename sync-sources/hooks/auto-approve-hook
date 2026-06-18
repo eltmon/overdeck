@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/auto-approve-hook
+# ~/.overdeck/bin/auto-approve-hook
 #
 # PreToolUse hook that returns permissionDecision: "allow" — but ONLY for the
 # fully-autonomous, headless pipeline agents that have no human to answer Claude
@@ -41,7 +41,7 @@
 
 set +e
 
-LOG_DIR="$HOME/.panopticon/logs"
+LOG_DIR="$HOME/.overdeck/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 INPUT=$(cat 2>/dev/null || echo '{}')

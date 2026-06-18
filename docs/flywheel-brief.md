@@ -136,7 +136,7 @@ Never merge without explicit human approval. Do not invoke the merge flow yourse
 
 ## Status vs State
 
-Pipeline truth lives in SQLite and is surfaced through the CLI/API, not raw files. Use `pan review pending --ready`, `GET /api/flywheel/merge-blockers`, and dashboard review snapshots for runtime review/test/merge state. Durable verdicts are mirrored to the per-issue permanent record under the infra repo's `.pan/` records path. `~/.panopticon/review-status.json` is legacy/test-only scratch; an empty or stale file means nothing and must never be used to judge pipeline state.
+Pipeline truth lives in SQLite and is surfaced through the CLI/API, not raw files. Use `pan review pending --ready`, `GET /api/flywheel/merge-blockers`, and dashboard review snapshots for runtime review/test/merge state. Durable verdicts are mirrored to the per-issue permanent record under the infra repo's `.pan/` records path. `~/.overdeck/review-status.json` is legacy/test-only scratch; an empty or stale file means nothing and must never be used to judge pipeline state.
 
 These are different artifacts. Do not conflate them.
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/pre-compact-hook
+# ~/.overdeck/bin/pre-compact-hook
 #
 # Fires on Claude Code PreCompact. Emits agent.activity_changed(working, tool=compact)
 # so the dashboard shows a "compacting" indicator while context is being summarised.

@@ -1,6 +1,6 @@
 /**
  * Reproduces the cutover crash (PAN-1938): on a fresh empty overdeck.db,
- * backfillAgentsSync reads each ~/.panopticon/agents/<id>/state.json and inserts agents,
+ * backfillAgentsSync reads each ~/.overdeck/agents/<id>/state.json and inserts agents,
  * but agents.issue_id FKs to issues(id) and the issues table is empty → the boot
  * crash-looped on `FOREIGN KEY constraint failed`. The smoke tests missed this
  * because they ran against a throwaway home with NO state.json files.

@@ -92,7 +92,7 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
 
         // Spawn in tmux session using a launcher script (safer for prompts with special chars)
         const sessionName = `agent-${id}`;
-        const agentDir = join(homedir(), '.panopticon', 'agents', sessionName);
+        const agentDir = join(homedir(), '.overdeck', 'agents', sessionName);
         mkdirSync(agentDir, { recursive: true });
 
         // Write prompt to file

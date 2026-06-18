@@ -96,7 +96,7 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 // ── Test scaffolding ──────────────────────────────────────────────────────────
 
-// Statuses are held in-memory (not on the real ~/.panopticon/review-status.json)
+// Statuses are held in-memory (not on the real ~/.overdeck/review-status.json)
 // so this file never races other deacon test files that share that path.
 let currentStatuses: Record<string, unknown> = {};
 function writeStatusFile(statuses: Record<string, unknown>): void {
@@ -145,7 +145,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
   it('dead session + passed artifact → auto-completes testStatus passed', async () => {
     const projectPath = makeWorkspace('pan-1455', { status: 'passed', notes: 'all gates green' });
     tmpRoots.push(projectPath);
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: projectPath });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(false); // dead/missing test session
     writeStatusFile({ 'PAN-1455': { issueId: 'PAN-1455', reviewStatus: 'passed', testStatus: 'pending' } });
 
@@ -158,7 +158,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
   it('dead session + failed artifact → auto-completes testStatus failed', async () => {
     const projectPath = makeWorkspace('pan-1455', { status: 'failed', notes: '3 tests red' });
     tmpRoots.push(projectPath);
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: projectPath });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(false);
     writeStatusFile({ 'PAN-1455': { issueId: 'PAN-1455', reviewStatus: 'passed', testStatus: 'testing' } });
 
@@ -173,7 +173,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
   it('alive + idle + artifact → nudges once, then auto-completes on the next pass', async () => {
     const projectPath = makeWorkspace('pan-1242', { status: 'passed', notes: 'ok' });
     tmpRoots.push(projectPath);
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: projectPath });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(true); // live test session
     mockIsPaneDead.mockResolvedValue(false);
     mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
@@ -195,7 +195,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
   it('alive + idle + NO artifact → nudges to write+POST but never fabricates a verdict', async () => {
     const projectPath = makeWorkspace('pan-1242'); // no artifact seeded
     tmpRoots.push(projectPath);
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: projectPath });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(true);
     mockIsPaneDead.mockResolvedValue(false);
     mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });

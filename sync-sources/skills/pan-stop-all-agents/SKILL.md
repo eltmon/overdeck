@@ -4,10 +4,10 @@ description: "Drain Overdeck: kill every running work agent and its review/test 
 triggers:
   - stop all agents
   - kill all agents
-  - drain panopticon
-  - shut down panopticon
+  - drain overdeck
+  - shut down overdeck
   - stop dashboard and kill agents
-  - panopticon shutdown
+  - overdeck shutdown
 allowed-tools:
   - Bash
   - Read
@@ -21,7 +21,7 @@ Cleanly stops every running work agent plus its associated review-coordinators a
 
 ## When to Use
 
-- User says "stop all agents", "kill all agents", "drain panopticon"
+- User says "stop all agents", "kill all agents", "drain overdeck"
 - User says "stop dashboard and kill all agents"
 - Memory pressure / pre-reboot drain
 - Wanting a clean slate without losing chat history
@@ -34,7 +34,7 @@ Cleanly stops every running work agent plus its associated review-coordinators a
 | `review-coordinator-*`       | **kill**    | Review pipeline tied to a work agent |
 | `specialist-*-test-agent`    | **kill**    | Test specialist tied to a work agent |
 | `conv-*`                     | **PRESERVE**| Conversation tmux for `pan.localhost/conv/<id>` — these are user-facing chats, not work runs |
-| `panopticon` (server)        | **PRESERVE** unless stopping dashboard |
+| `overdeck` (server)        | **PRESERVE** unless stopping dashboard |
 | CLIProxy, Traefik, TLDR      | **PRESERVE** — shared sidecars |
 
 The dashboard is treated as a separate axis: stop it explicitly only if asked.
@@ -48,7 +48,7 @@ user has already explicitly said "kill all agents".
 
 ```bash
 # List live tmux sessions, classified
-tmux -L panopticon ls 2>/dev/null | awk -F: '{print }' | sort | awk '
+tmux -L overdeck ls 2>/dev/null | awk -F: '{print }' | sort | awk '
   /^agent-/                  { agents[++a] =  }
   /^review-coordinator-/     { reviews[++r] =  }
   /^specialist-/             { specs[++s] =  }
@@ -71,7 +71,7 @@ the session name: `agent-pan-895` → `pan kill PAN-895`, `agent-min-215` → `p
 
 ```bash
 # Loop over agent sessions and kill each via pan
-tmux -L panopticon ls 2>/dev/null \
+tmux -L overdeck ls 2>/dev/null \
   | awk -F: '/^agent-/ {print }' \
   | sed 's/^agent-//' \
   | tr 'a-z' 'A-Z' \
@@ -83,11 +83,11 @@ tmux -L panopticon ls 2>/dev/null \
 If `pan kill` fails (e.g., agent is in a broken state.json), fall back to tmux:
 
 ```bash
-tmux -L panopticon kill-session -t agent-<issue>
+tmux -L overdeck kill-session -t agent-<issue>
 ```
 
 …and **fix the broken state.json as a real bug** (do not ignore it — see CLAUDE.md
-"No Bandaids"). State files live at `~/.panopticon/agents/<id>/state.json`. The most
+"No Bandaids"). State files live at `~/.overdeck/agents/<id>/state.json`. The most
 common breakage is a doubled trailing `}` from a partial write.
 
 ### 3. Kill review coordinators and test specialists
@@ -97,10 +97,10 @@ session is the right move; their lifecycle is fully derived from the work agent.
 
 ```bash
 for prefix in review-coordinator- specialist-; do
-  tmux -L panopticon ls 2>/dev/null \
+  tmux -L overdeck ls 2>/dev/null \
     | awk -F: -v p="^$prefix" ' { print  }' \
     | while read sess; do
-        tmux -L panopticon kill-session -t "$sess" || true
+        tmux -L overdeck kill-session -t "$sess" || true
       done
 done
 ```
@@ -108,8 +108,8 @@ done
 ### 4. Verify only conversations and the server remain
 
 ```bash
-tmux -L panopticon ls 2>/dev/null | awk -F: '{print }' | sort
-# Expect only: conv-* sessions, plus possibly the panopticon control session.
+tmux -L overdeck ls 2>/dev/null | awk -F: '{print }' | sort
+# Expect only: conv-* sessions, plus possibly the overdeck control session.
 ```
 
 ### 5. (Optional) Stop the dashboard

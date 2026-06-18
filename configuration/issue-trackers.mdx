@@ -12,15 +12,15 @@ Overdeck integrates with popular issue tracking systems to provide unified proje
 | Tracker | Configuration |
 |---------|---------------|
 | **GitHub Issues** | `GITHUB_TOKEN` or `gh auth login` |
-| **Linear** | `LINEAR_API_KEY` in `.panopticon.env` |
+| **Linear** | `LINEAR_API_KEY` in `.overdeck.env` |
 | **GitLab Issues** | `GITLAB_TOKEN` or `glab auth login` |
-| **Rally** | `RALLY_API_KEY` in `.panopticon.env` |
+| **Rally** | `RALLY_API_KEY` in `.overdeck.env` |
 
 All trackers are equal — configure whichever your projects use. The dashboard displays issues from all configured trackers in a unified Kanban board.
 
 ## Configuration
 
-Create `~/.panopticon.env`:
+Create `~/.overdeck.env`:
 
 ```bash
 GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects
@@ -71,7 +71,7 @@ GitHub Issues provides full integration with PRs, status updates, and automated 
 # Authenticate with GitHub CLI (recommended)
 gh auth login
 
-# Or set a token in .panopticon.env
+# Or set a token in .overdeck.env
 GITHUB_TOKEN=ghp_xxxxx
 ```
 
@@ -110,14 +110,14 @@ Linear provides full integration with cycles, labels, and status updates.
 ### Setup
 
 1. Generate an API key at https://linear.app/settings/api
-2. Add to `~/.panopticon.env`:
+2. Add to `~/.overdeck.env`:
    ```bash
    LINEAR_API_KEY=lin_api_xxxxx
    ```
 
 ### Team Mapping
 
-Map Linear teams to local projects in `~/.panopticon/projects.yaml`:
+Map Linear teams to local projects in `~/.overdeck/projects.yaml`:
 
 ```yaml
 projects:
@@ -163,7 +163,7 @@ Rally (CA Agile Central) is supported for enterprises using Rally for project ma
 ### Setup
 
 1. Generate a Rally API key from your Rally workspace settings
-2. Add to `~/.panopticon.env`:
+2. Add to `~/.overdeck.env`:
    ```bash
    RALLY_API_KEY=_xxxxx
    ```
@@ -173,7 +173,7 @@ Rally (CA Agile Central) is supported for enterprises using Rally for project ma
 Configure Rally workspace mapping:
 
 ```yaml
-# ~/.panopticon/projects.yaml
+# ~/.overdeck/projects.yaml
 projects:
   enterprise-app:
     name: "Enterprise Application"
@@ -233,7 +233,7 @@ If you see errors like `Could not parse: Error parsing expression`, check:
 
 1. **Workspace and Project Configuration**
    ```bash
-   # In ~/.panopticon.env
+   # In ~/.overdeck.env
    RALLY_WORKSPACE=/workspace/12345
    RALLY_PROJECT=/project/67890
    ```

@@ -22,7 +22,7 @@ Everything Overdeck needs — to show you a board, run the pipeline, or recover 
 
 ## The local database is a cache
 
-Overdeck uses a local SQLite database (`~/.panopticon/panopticon.db`) for two jobs:
+Overdeck uses a local SQLite database (`~/.overdeck/panopticon.db`) for two jobs:
 
 1. **A uniform read/write API** for the dashboard, the deacon, and the CLI — so every component talks to state the same way instead of each parsing files.
 2. **A materialized view of the pipeline** — so the board renders instantly instead of re-scanning every workspace on each page load.

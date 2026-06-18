@@ -242,7 +242,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
   spinner.succeed('Directories initialized');
 
-  // Step 2b: Refresh cache — copy all skills/agents/rules from repo to ~/.panopticon/
+  // Step 2b: Refresh cache — copy all skills/agents/rules from repo to ~/.overdeck/
   spinner.start('Refreshing skill cache...');
   try {
     const cacheResult = refreshCacheSync();
@@ -259,7 +259,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   // into ~/.claude/CLAUDE.md; seed it here so it exists right after install.
   try {
     if (ensureGlobalLayer()) {
-      console.log(chalk.dim('  Seeded ~/.panopticon/context/global.md (starter template)'));
+      console.log(chalk.dim('  Seeded ~/.overdeck/context/global.md (starter template)'));
     }
   } catch {
     // Non-fatal — `pan sync` / `pan context edit` will seed it later.
@@ -271,7 +271,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   if (!options.skipDocker) {
     spinner.start('Creating Docker network...');
     try {
-      execSync('docker network create panopticon 2>/dev/null || true', { stdio: 'pipe' });
+      execSync('docker network create overdeck 2>/dev/null || true', { stdio: 'pipe' });
       spinner.succeed('Docker network ready');
     } catch (error) {
       spinner.warn('Docker network setup failed (may already exist)');
@@ -540,9 +540,9 @@ async function installCommand(options: InstallOptions): Promise<void> {
         spinner.info('Traefik static config already exists (skipping)');
       }
 
-      // Always regenerate panopticon.yml from template to pick up config changes
+      // Always regenerate overdeck.yml from template to pick up config changes
       if (generateOverdeckTraefikConfigSync()) {
-        spinner.succeed('Traefik dynamic config generated (panopticon.yml)');
+        spinner.succeed('Traefik dynamic config generated (overdeck.yml)');
       }
 
       // Always regenerate tls.yml from discovered certs
@@ -554,11 +554,11 @@ async function installCommand(options: InstallOptions): Promise<void> {
       const existingCompose = join(TRAEFIK_DIR, 'docker-compose.yml');
       if (existsSync(existingCompose)) {
         const content = readFileSync(existingCompose, 'utf-8');
-        if (content.includes('panopticon:') && !content.includes('external: true')) {
+        if (content.includes('overdeck:') && !content.includes('external: true')) {
           // Patch the file to add external: true
           const patched = content.replace(
-            /networks:\s*\n\s*panopticon:\s*\n\s*name: panopticon\s*\n\s*driver: bridge/,
-            'networks:\n  panopticon:\n    name: panopticon\n    external: true  # Network created by \'pan install\''
+            /networks:\s*\n\s*overdeck:\s*\n\s*name: overdeck\s*\n\s*driver: bridge/,
+            'networks:\n  overdeck:\n    name: overdeck\n    external: true  # Network created by \'pan install\''
           );
           writeFileSync(existingCompose, patched);
           spinner.info('Migrated Traefik config (added external: true to network)');
@@ -696,7 +696,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
 
   console.log(`  4. In each project root, initialize beads task tracking:`);
   console.log(`     ${chalk.cyan('cd /path/to/your-project && bd init --prefix <project-name>')}`);
-  console.log(`     ${chalk.dim('e.g. bd init --prefix panopticon  (enables agent task tracking for this project)')}`);
+  console.log(`     ${chalk.dim('e.g. bd init --prefix overdeck  (enables agent task tracking for this project)')}`);
   console.log(`  5. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
   console.log('');
 }

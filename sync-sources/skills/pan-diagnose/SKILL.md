@@ -3,10 +3,10 @@ name: pan-diagnose
 description: Troubleshoot common Overdeck issues
 triggers:
   - pan diagnose
-  - troubleshoot panopticon
-  - debug panopticon
-  - panopticon not working
-  - fix panopticon
+  - troubleshoot overdeck
+  - debug overdeck
+  - overdeck not working
+  - fix overdeck
 allowed-tools:
   - Bash
   - Read
@@ -37,13 +37,13 @@ This skill helps diagnose and fix common issues with Overdeck installation, conf
 
 ```bash
 # Check if installed
-npm list -g panopticon
+npm list -g overdeck
 
 # Install globally
-npm install -g panopticon
+npm install -g overdeck
 
 # Or use npx
-npx panopticon doctor
+npx overdeck doctor
 
 # Check PATH
 echo $PATH | tr ':' '\n' | grep npm
@@ -53,11 +53,11 @@ echo $PATH | tr ':' '\n' | grep npm
 
 ```bash
 # Reinstall dependencies
-npm install -g panopticon --force
+npm install -g overdeck --force
 
 # Clear npm cache if needed
 npm cache clean --force
-npm install -g panopticon
+npm install -g overdeck
 ```
 
 ### Node.js version issues
@@ -80,13 +80,13 @@ nvm use 18
 
 ```bash
 # Check config file exists
-cat ~/.panopticon.env
+cat ~/.overdeck.env
 
 # Create/update config
-echo "LINEAR_API_KEY=lin_api_xxx" >> ~/.panopticon.env
+echo "LINEAR_API_KEY=lin_api_xxx" >> ~/.overdeck.env
 
 # Verify
-grep LINEAR_API_KEY ~/.panopticon.env
+grep LINEAR_API_KEY ~/.overdeck.env
 ```
 
 ### "Invalid Linear API key"
@@ -115,7 +115,7 @@ curl -H "Authorization: token ghp_xxx" \
 
 ```bash
 # Fix permissions (should be readable only by owner)
-chmod 600 ~/.panopticon.env
+chmod 600 ~/.overdeck.env
 ```
 
 ---
@@ -197,7 +197,7 @@ kill $(lsof -t -i:3010) 2>/dev/null
 kill $(lsof -t -i:3011) 2>/dev/null
 
 # Start fresh
-cd ~/.panopticon/dashboard
+cd ~/.overdeck/dashboard
 npm run dev
 ```
 
@@ -218,7 +218,7 @@ curl http://localhost:3011/api/health
 ```bash
 # Restart the API server
 pkill -f "node.*dashboard.*server"
-cd ~/.panopticon/dashboard/server && npm run dev
+cd ~/.overdeck/dashboard/server && npm run dev
 
 # Hard refresh browser
 # Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux)
@@ -228,7 +228,7 @@ cd ~/.panopticon/dashboard/server && npm run dev
 
 ```bash
 # Check server logs
-cd ~/.panopticon/dashboard/server
+cd ~/.overdeck/dashboard/server
 npm run dev 2>&1 | grep -i websocket
 
 # Check firewall
@@ -249,7 +249,7 @@ pan skills
 pan sync --force
 
 # Verify symlinks
-ls -la ~/.claude/skills/ | grep panopticon
+ls -la ~/.claude/skills/ | grep overdeck
 
 # Check Claude Code recognizes them
 # Restart Claude Code after syncing
@@ -269,7 +269,7 @@ ls -la ~/.claude/skills/skill-name
 
 ```bash
 # Check trigger patterns in SKILL.md
-cat ~/.panopticon/skills/skill-name/SKILL.md | head -20
+cat ~/.overdeck/skills/skill-name/SKILL.md | head -20
 
 # Ensure you're using exact trigger phrases
 # Try: /skill-name instead of natural language
@@ -336,7 +336,7 @@ npm --version >> diagnostics.txt
 
 # Config (redact secrets!)
 echo "=== Config ===" >> diagnostics.txt
-cat ~/.panopticon.env | sed 's/=.*/=REDACTED/' >> diagnostics.txt
+cat ~/.overdeck.env | sed 's/=.*/=REDACTED/' >> diagnostics.txt
 
 # Status
 echo "=== Doctor ===" >> diagnostics.txt
@@ -348,7 +348,7 @@ tmux list-sessions >> diagnostics.txt 2>&1
 
 # Skills
 echo "=== Skills ===" >> diagnostics.txt
-ls -la ~/.panopticon/skills/ >> diagnostics.txt
+ls -la ~/.overdeck/skills/ >> diagnostics.txt
 ls -la ~/.claude/skills/ >> diagnostics.txt
 
 cat diagnostics.txt

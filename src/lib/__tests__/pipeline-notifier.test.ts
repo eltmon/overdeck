@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../internal-token.js', () => ({
-  INTERNAL_TOKEN_HEADER: 'x-panopticon-internal-token',
+  INTERNAL_TOKEN_HEADER: 'x-overdeck-internal-token',
   getInternalToken: vi.fn(() => 'test-token'),
   getInternalTokenSync: vi.fn(() => 'test-token'),
 }));
@@ -43,7 +43,7 @@ describe('notifyPipeline', () => {
         method: 'POST',
         headers: expect.objectContaining({
           'content-type': 'application/json',
-          'x-panopticon-internal-token': 'test-token',
+          'x-overdeck-internal-token': 'test-token',
         }),
         body: JSON.stringify({ type: 'review.approved', issueId: 'PAN-1381' }),
       }),

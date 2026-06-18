@@ -46,7 +46,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   bridgeGeminiAuthToCliproxyProgram: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
-    ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
+    ANTHROPIC_AUTH_TOKEN: 'overdeck-local-cliproxy-key',
   }),
   startCliproxy: vi.fn(),
 }));
@@ -115,7 +115,7 @@ describe('agents auth routing', () => {
     expect(mockGetProviderEnv).not.toHaveBeenCalled();
     expect(env).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
-      ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
+      ANTHROPIC_AUTH_TOKEN: 'overdeck-local-cliproxy-key',
     });
   });
 
@@ -164,7 +164,7 @@ describe('agents auth routing', () => {
     expect(mockGetProviderEnv).not.toHaveBeenCalled();
     expect(env).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
-      ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
+      ANTHROPIC_AUTH_TOKEN: 'overdeck-local-cliproxy-key',
     });
   });
 
@@ -245,6 +245,6 @@ describe('agents auth routing', () => {
     const result = await getProviderExportsForModel('gpt-5.4');
     expect(result).toContain('unset ANTHROPIC_API_KEY');
     expect(result).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"');
-    expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key"');
+    expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="overdeck-local-cliproxy-key"');
   });
 });

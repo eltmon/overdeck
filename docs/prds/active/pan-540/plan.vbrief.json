@@ -19,7 +19,7 @@
     ],
     "tags": ["refactor", "cleanup", "review-agent", "dashboard"],
     "narratives": {
-      "Problem": "The convoy abstraction exists solely to let review-agent.ts spawn 4 parallel reviewers + synthesis in a fixed order. The generic template registry, state persistence in ~/.panopticon/convoys/, CLI commands, dashboard panel/hook/nav, and convoy:* model router keys are all overhead for a single use case. The intended multi-issue fleet runner was never built.",
+      "Problem": "The convoy abstraction exists solely to let review-agent.ts spawn 4 parallel reviewers + synthesis in a fixed order. The generic template registry, state persistence in ~/.overdeck/convoys/, CLI commands, dashboard panel/hook/nav, and convoy:* model router keys are all overhead for a single use case. The intended multi-issue fleet runner was never built.",
       "Proposal": "Inline the parallel-review pipeline directly into review-agent.ts and delete the convoy abstraction entirely. Keep the 4+1 reviewer pipeline (correctness, security, performance, requirements + synthesis) hardcoded — no new YAML config schema. Rename convoy:* model router keys to review:* as a clean break. Delete all convoy CLI, API, and dashboard surface immediately."
     },
     "items": [

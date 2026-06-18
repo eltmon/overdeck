@@ -23,8 +23,8 @@
 | [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
 | [AGENT-STATE-PLANES.md](./AGENT-STATE-PLANES.md) | Three-plane state model: permanent git records, local SQLite runtime registry, and tmux liveness oracle |
 | [PAN-1908-POST-MERGE-RUNBOOK.md](./PAN-1908-POST-MERGE-RUNBOOK.md) | Post-merge close-out runbook for superseded/narrowed issues tracked by PAN-1908 |
-| [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Overdeck system architecture (UI → Core → Agents → Infrastructure → Pipeline)
-| [Specialist Pipeline Diagram](./diagrams/panopticon-specialist-pipeline.png) | Visual overview of the work-agent → verification gate → specialist handoff flow |
+| [Architecture Diagram](./diagrams/overdeck-architecture.png) | Visual overview of Overdeck system architecture (UI → Core → Agents → Infrastructure → Pipeline)
+| [Specialist Pipeline Diagram](./diagrams/overdeck-specialist-pipeline.png) | Visual overview of the work-agent → verification gate → specialist handoff flow |
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Overdeck agent roles, categories, and where they appear in the workflow |
 | [ROLES.md](./ROLES.md) | Mental model for Roles, sub-roles, and the three on-disk file shapes (`roles/*.md`, `agents/pan-*-agent.md`, `.claude/agents/*.md`) — what each is, when to use it, and how a run actually gets its instructions |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
@@ -221,9 +221,9 @@
 - **"electron"** / **"desktop"** / **"AppImage"** / **"DMG"** / **"electron-builder"** → DESKTOP-APP.md, BUILD.md
 - **"tray"** / **"system tray"** / **"notification"** / **"auto-start"** / **"nag"** → DESKTOP-APP.md
 - **"command palette"** / **"Cmd+K"** / **"Ctrl+K"** → DESKTOP-APP.md
-- **"contextBridge"** / **"IPC bridge"** / **"panopticonBridge"** / **"preload"** → DESKTOP-APP.md
-- **"panopticon://"** / **"custom protocol"** / **"path traversal"** → DESKTOP-APP.md
-- **"npx panopticon serve"** / **"browser-only"** → DESKTOP-APP.md, USAGE.md
+- **"contextBridge"** / **"IPC bridge"** / **"overdeckBridge"** / **"preload"** → DESKTOP-APP.md
+- **"overdeck://"** / **"custom protocol"** / **"path traversal"** → DESKTOP-APP.md
+- **"npx overdeck serve"** / **"browser-only"** → DESKTOP-APP.md, USAGE.md
 
 ### Testing
 - **"test"** / **"testing"** → TESTING.md, E2E_TEST_PLAN.md, TESTING-PROVIDERS.md

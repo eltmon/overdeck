@@ -10,8 +10,8 @@ import {
 // window. These tests lock the policy: never reap an active workspace, honor the
 // grace window, and only stop the matched UI containers.
 
-const SERVER = (id: string) => `panopticon-feature-${id}-server-1`;
-const FRONTEND = (id: string) => `panopticon-feature-${id}-frontend-1`;
+const SERVER = (id: string) => `overdeck-feature-${id}-server-1`;
+const FRONTEND = (id: string) => `overdeck-feature-${id}-frontend-1`;
 
 function makeDeps(over: Partial<IdleStackReaperDeps> & {
   containers?: string[];
@@ -123,8 +123,8 @@ describe('reconcileIdleWorkspaceStacks (PAN-1817)', () => {
     const stopped: string[][] = [];
     const deps: Partial<IdleStackReaperDeps> = {
       listContainerNames: async () => [
-        `panopticon-feature-pan-9006-dev-1`,   // attach container — never reaped
-        `panopticon-feature-pan-9006-init-1`,
+        `overdeck-feature-pan-9006-dev-1`,   // attach container — never reaped
+        `overdeck-feature-pan-9006-init-1`,
         `some-unrelated-container`,
       ],
       listSessions: async () => [],

@@ -24,8 +24,8 @@ const mockSystemHealth = {
     leakedSpecialistCount: 1,
     containerCount: 1,
     containerMemoryBytes: 2 * 1024 ** 3,
-    panopticonMemoryBytes: 10 * 1024 ** 3,
-    panopticonMemoryPercent: 15.6,
+    overdeckMemoryBytes: 10 * 1024 ** 3,
+    overdeckMemoryPercent: 15.6,
   },
   thresholds: {
     memoryAvailableWarningBytes: 4 * 1024 ** 3,
@@ -64,7 +64,7 @@ const mockSystemHealth = {
     },
     {
       id: 'abcdef123456',
-      label: 'panopticon-feature-pan-455-api-1',
+      label: 'overdeck-feature-pan-455-api-1',
       type: 'container',
       memoryBytes: 2 * 1024 ** 3,
       memoryGb: 2,
@@ -145,7 +145,7 @@ test.describe('System health pill (PAN-455)', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: 'Kill' }).click();
     await expect.poll(() => requests.length).toBe(2);
 
-    await page.getByTitle('Remove container panopticon-feature-pan-455-api-1').click();
+    await page.getByTitle('Remove container overdeck-feature-pan-455-api-1').click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Remove' }).click();
 
     await expect.poll(() => requests.length).toBe(3);

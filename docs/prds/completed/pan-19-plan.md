@@ -176,12 +176,12 @@ const child = spawn('npm', ['run', 'dev'], {
 
 | ID | Title | Status | Blocked By |
 |----|-------|--------|------------|
-| panopticon-324n | Add shell: true to foreground spawn | open | - |
-| panopticon-rsb1 | Add shell: true to background spawn | open | - |
-| panopticon-qdu3 | Add npm pre-flight check | open | - |
-| panopticon-pxqm | Add error handling for background spawn | open | panopticon-rsb1 |
-| panopticon-zppl | Test on macOS with nvm | open | 324n, rsb1, qdu3, pxqm |
-| panopticon-nnic | Test on Linux (verify no regression) | open | 324n, rsb1 |
+| overdeck-324n | Add shell: true to foreground spawn | open | - |
+| overdeck-rsb1 | Add shell: true to background spawn | open | - |
+| overdeck-qdu3 | Add npm pre-flight check | open | - |
+| overdeck-pxqm | Add error handling for background spawn | open | overdeck-rsb1 |
+| overdeck-zppl | Test on macOS with nvm | open | 324n, rsb1, qdu3, pxqm |
+| overdeck-nnic | Test on Linux (verify no regression) | open | 324n, rsb1 |
 
 ## References
 

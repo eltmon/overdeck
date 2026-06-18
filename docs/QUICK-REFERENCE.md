@@ -58,8 +58,8 @@ See what's happening — in aggregate and for specific issues.
 | `pan show <id> --context` | Context engineering state |
 | `pan show <id> --health` | Health + heartbeat only |
 | `pan logs <agent-id\|dashboard>` | Tail high-level dashboard or agent logs |
-| `less ~/.panopticon/agents/agent-<id>/lifecycle.log` | Inspect exact start/resume/stop lifecycle steps |
-| `less ~/.panopticon/agents/agent-<id>/spawn.log` | Inspect detached `pan start <id> --local --phase <phase>` stdout/stderr |
+| `less ~/.overdeck/agents/agent-<id>/lifecycle.log` | Inspect exact start/resume/stop lifecycle steps |
+| `less ~/.overdeck/agents/agent-<id>/spawn.log` | Inspect detached `pan start <id> --local --phase <phase>` stdout/stderr |
 | Dashboard Start/Resume action | Shows `Starting...` / `Resuming...` first, then flips to live controls once the tmux-backed agent is actually running |
 | `pan review pending` | Completed work awaiting review |
 | `pan review request <id>` | Request re-review after fixing feedback |
@@ -142,7 +142,7 @@ Stable tags publish npm `latest`; canary tags publish npm `canary` and create Gi
 ## 6. First-run & maintenance
 
 ```
-pan init              Initialize ~/.panopticon/
+pan init              Initialize ~/.overdeck/
 pan install           Install prerequisites (ttyd, beads, Traefik, mkcert)
 pan setup             Interactive setup wizard
 pan doctor            Check system health and dependencies

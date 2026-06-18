@@ -44,7 +44,7 @@ export function SkillsList() {
   }
 
   // Group skills by source
-  const panopticonSkills = skills.filter((s) => s.source === 'panopticon');
+  const overdeckSkills = skills.filter((s) => s.source === 'overdeck');
   const claudeSkills = skills.filter((s) => s.source === 'claude');
 
   return (
@@ -65,7 +65,7 @@ export function SkillsList() {
           <Folder className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No skills found</p>
           <p className="text-sm mt-2">
-            Add skills to ~/.panopticon/skills/ or ~/.claude/skills/
+            Add skills to ~/.overdeck/skills/ or ~/.claude/skills/
           </p>
         </div>
       ) : (
@@ -75,14 +75,14 @@ export function SkillsList() {
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-primary" />
               <h3 className="font-medium text-foreground">
-                Overdeck ({panopticonSkills.length})
+                Overdeck ({overdeckSkills.length})
               </h3>
             </div>
             <div className="space-y-2">
-              {panopticonSkills.map((skill) => (
+              {overdeckSkills.map((skill) => (
                 <SkillCard key={skill.path} skill={skill} />
               ))}
-              {panopticonSkills.length === 0 && (
+              {overdeckSkills.length === 0 && (
                 <p className="text-muted-foreground text-sm">No Overdeck skills</p>
               )}
             </div>
@@ -113,7 +113,7 @@ export function SkillsList() {
         <div className="text-sm text-muted-foreground space-y-1">
           <p>
             <span className="text-primary">Overdeck:</span>{' '}
-            ~/.panopticon/skills/
+            ~/.overdeck/skills/
           </p>
           <p>
             <span className="text-signal-review">Claude:</span> ~/.claude/skills/

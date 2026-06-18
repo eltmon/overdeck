@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * panopticon-bridge — per-agent MCP server that proxies orchestrator messages
+ * overdeck-bridge — per-agent MCP server that proxies orchestrator messages
  * into a Claude Code work-agent session via the research-preview Channels
  * capability.
  *
@@ -9,12 +9,12 @@
  * because tsx has documented delivery bugs and Node lacks first-class
  * shebang support for TypeScript. Run as:
  *
- *     OVERDECK_AGENT_ID=<id> bun run src/lib/channels/panopticon-bridge.ts
+ *     OVERDECK_AGENT_ID=<id> bun run src/lib/channels/overdeck-bridge.ts
  *
  * Reference: https://code.claude.com/docs/en/channels
  *
  * Lifecycle:
- *   - Spawned by `claude --dangerously-load-development-channels server:panopticon-bridge`
+ *   - Spawned by `claude --dangerously-load-development-channels server:overdeck-bridge`
  *     using the per-agent MCP config the launcher writes alongside the
  *     workspace. OVERDECK_AGENT_ID is supplied through the MCP config's
  *     env block; this script fail-fasts if the variable is missing.
@@ -63,7 +63,7 @@ function resolveAgentIdOrExit(): string {
   const id = process.env.OVERDECK_AGENT_ID;
   if (!id) {
     process.stderr.write(
-      'panopticon-bridge: OVERDECK_AGENT_ID env var is required. ' +
+      'overdeck-bridge: OVERDECK_AGENT_ID env var is required. ' +
         'It is normally supplied by the per-agent MCP config; if you are running this script ' +
         'manually for development, set it explicitly.\n',
     );
@@ -76,7 +76,7 @@ const INSTRUCTIONS = [
   'Overdeck orchestrator bridge.',
   '',
   'When you receive a `notifications/channel` message with `params.source` set',
-  'to `panopticon-bridge`, the body is operator-supplied text from the',
+  'to `overdeck-bridge`, the body is operator-supplied text from the',
   'Overdeck dashboard or CLI that is being delivered out-of-band of the',
   'normal user-prompt input stream. Treat the body as if the user had typed',
   'it into the prompt and continue the conversation accordingly.',
@@ -167,7 +167,7 @@ function normalizePermissionRequest(
 
 export const server: Server = new Server(
   {
-    name: 'panopticon-bridge',
+    name: 'overdeck-bridge',
     version: '0.1.0',
   },
   {
@@ -203,7 +203,7 @@ function installPermissionRequestHandler(mcp: Server): void {
     _notificationHandlers?: Map<string, (notification: unknown) => Promise<void>>;
   })._notificationHandlers;
   if (!handlers) {
-    throw new Error('panopticon-bridge: MCP server does not expose notification handlers map');
+    throw new Error('overdeck-bridge: MCP server does not expose notification handlers map');
   }
 
   handlers.set('notifications/claude/channel/permission_request', async (notification) => {
@@ -219,10 +219,10 @@ installPermissionRequestHandler(server);
 
 /**
  * Resolve OVERDECK_HOME with the same fallback semantics as the rest of the
- * codebase: env var first, then ~/.panopticon.
+ * codebase: env var first, then ~/.overdeck.
  */
 export function getOverdeckHome(): string {
-  return process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
+  return process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
 }
 
 export function getSocketPath(agentId: string): string {
@@ -294,7 +294,7 @@ export async function pushChannelNotification(
   await mcp.notification({
     method: 'notifications/claude/channel',
     params: {
-      source: 'panopticon-bridge',
+      source: 'overdeck-bridge',
       content,
       ...(meta ? { meta } : {}),
     },
@@ -440,8 +440,8 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
   const bunGlobal = (globalThis as unknown as { Bun?: BunGlobal }).Bun;
   if (!bunGlobal || typeof bunGlobal.serve !== 'function') {
     throw new Error(
-      'panopticon-bridge: Bun.serve is required for the Unix socket listener. ' +
-        'Run this script under Bun (bun run src/lib/channels/panopticon-bridge.ts).',
+      'overdeck-bridge: Bun.serve is required for the Unix socket listener. ' +
+        'Run this script under Bun (bun run src/lib/channels/overdeck-bridge.ts).',
     );
   }
 
@@ -484,13 +484,13 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
     await new Promise((r) => setTimeout(r, 50));
   }
   if (!existsSync(socketPath)) {
-    throw new Error(`panopticon-bridge: Unix socket ${socketPath} did not appear after 2.5s`);
+    throw new Error(`overdeck-bridge: Unix socket ${socketPath} did not appear after 2.5s`);
   }
   await chmod(socketPath, 0o600);
   const socketStat = await stat(socketPath);
   if ((socketStat.mode & 0o777) !== 0o600) {
     throw new Error(
-      `panopticon-bridge: Unix socket ${socketPath} mode is ${(socketStat.mode & 0o777).toString(8)} instead of 600 after chmod`
+      `overdeck-bridge: Unix socket ${socketPath} mode is ${(socketStat.mode & 0o777).toString(8)} instead of 600 after chmod`
     );
   }
   return httpServer;
@@ -499,7 +499,7 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
 async function main(): Promise<void> {
   const agentId = resolveAgentIdOrExit();
   if (!readBridgeTokenSync(agentId)) {
-    throw new Error(`panopticon-bridge: bridge token missing for ${agentId}`);
+    throw new Error(`overdeck-bridge: bridge token missing for ${agentId}`);
   }
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -536,7 +536,7 @@ const isDirectInvocation =
 if (isDirectInvocation) {
   main().catch((err) => {
     process.stderr.write(
-      `panopticon-bridge: fatal error during MCP server startup: ${err instanceof Error ? err.message : String(err)}\n`,
+      `overdeck-bridge: fatal error during MCP server startup: ${err instanceof Error ? err.message : String(err)}\n`,
     );
     process.exit(1);
   });

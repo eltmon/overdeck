@@ -46,7 +46,7 @@ export function generateClaudeMdSync(
     }
   }
 
-  // PAN-1899: the legacy per-project section read (<projectRoot>/.panopticon/
+  // PAN-1899: the legacy per-project section read (<projectRoot>/.overdeck/
   // claude-md/sections/*.md) has been retired. Project-specific context now
   // lives in the canonical project layer (<projectRoot>/.pan/context/project.md),
   // composed into the workspace by assembleWorkspaceContext (PAN-1201).

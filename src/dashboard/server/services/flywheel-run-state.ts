@@ -15,7 +15,7 @@ import { countAgentsByStatusRole } from '../../../lib/overdeck/agents.js';
 export type FlywheelRunStatus = 'running' | 'paused' | 'complete' | 'aborted';
 
 export interface FlywheelRunStateOptions {
-  panopticonHome?: string;
+  overdeckHome?: string;
 }
 
 export interface FlywheelRunListOptions extends FlywheelRunStateOptions {
@@ -109,7 +109,7 @@ async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number
 }
 
 export function getFlywheelHome(options: FlywheelRunStateOptions = {}): string {
-  return join(options.panopticonHome ?? process.env['OVERDECK_HOME'] ?? join(homedir(), '.panopticon'), 'flywheel');
+  return join(options.overdeckHome ?? process.env['OVERDECK_HOME'] ?? join(homedir(), '.overdeck'), 'flywheel');
 }
 
 export function getFlywheelRunsDir(options: FlywheelRunStateOptions = {}): string {

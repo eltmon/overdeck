@@ -68,7 +68,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
     _resetInternalTokenCacheForTests();
     projectPath = await mkdtemp(join(tmpdir(), 'pan-inspect-route-'));
     resolveProjectFromIssueMock.mockReturnValue({
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectName: 'Overdeck',
       projectPath,
       linearTeam: 'PAN',
@@ -100,7 +100,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
       tmuxSession: 'inspect-pan-1331-workspace-f1q5',
     });
     expect(spawnInspectAgentMock).toHaveBeenCalledWith({
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectPath,
       issueId: 'PAN-1331',
       beadId: 'workspace-f1q5',

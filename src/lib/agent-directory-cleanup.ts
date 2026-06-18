@@ -7,7 +7,7 @@
  *
  * Legacy directories (eligible for cleanup when no tmux session is running):
  *   - conv-*             — old conversation directories (conversations now live in
- *                          ~/.panopticon/conversations/)
+ *                          ~/.overdeck/conversations/)
  *   - work-<issueId>, review-<issueId>, test-<issueId>, merge-<issueId>
  *   - agent-<number>, agent-agent-*, agent-* with uppercase prefix
  *   - specialist-*
@@ -78,8 +78,8 @@ export function isValidAgentDirectoryName(name: string): boolean {
 /**
  * Check whether a directory name is a legacy conv-* directory.
  *
- * Conversations now store state in ~/.panopticon/conversations/, so any
- * conv-* directory under ~/.panopticon/agents/ is legacy.
+ * Conversations now store state in ~/.overdeck/conversations/, so any
+ * conv-* directory under ~/.overdeck/agents/ is legacy.
  */
 export function isLegacyConversationDirectory(name: string): boolean {
   return name.startsWith('conv-');

@@ -72,7 +72,7 @@ export interface DiscoveredSession {
   enrichmentModel: string | null;
   enrichedAt: string | null;
   enrichmentFailed: boolean;
-  panopticonManaged: boolean;
+  overdeckManaged: boolean;
   panIssueId: string | null;
   panAgentId: string | null;
   fileSize: number | null;
@@ -154,7 +154,7 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
     enrichmentModel: (row['enrichment_model'] as string | null) ?? null,
     enrichedAt: toIso(row['enriched_at'] as number | null),
     enrichmentFailed: Boolean(row['enrichment_failed']),
-    panopticonManaged: Boolean(row['panopticon_managed']),
+    overdeckManaged: Boolean(row['overdeck_managed']),
     panIssueId: (row['pan_issue_id'] as string | null) ?? null,
     panAgentId: (row['pan_agent_id'] as string | null) ?? null,
     fileSize: (row['file_size'] as number | null) ?? null,
@@ -190,8 +190,8 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
 
   if (filter.workspacePath !== undefined) { conditions.push(`${col('workspace_path')} = ?`); params.push(filter.workspacePath); }
   if (filter.primaryModel !== undefined) { conditions.push(`${col('primary_model')} = ?`); params.push(filter.primaryModel); }
-  if (filter.managed === true) conditions.push(`${col('panopticon_managed')} = 1`);
-  if (filter.unmanaged === true) conditions.push(`${col('panopticon_managed')} = 0`);
+  if (filter.managed === true) conditions.push(`${col('overdeck_managed')} = 1`);
+  if (filter.unmanaged === true) conditions.push(`${col('overdeck_managed')} = 0`);
   if (filter.since !== undefined) { conditions.push(`${col('last_ts')} >= ?`); params.push(toMillis(filter.since)); }
   if (filter.before !== undefined) { conditions.push(`${col('last_ts')} < ?`); params.push(toMillis(filter.before)); }
   if (filter.after !== undefined) { conditions.push(`${col('first_ts')} >= ?`); params.push(toMillis(filter.after)); }
@@ -305,7 +305,7 @@ export function getDiscoveredStats(): {
   const total = (db.prepare(`SELECT COUNT(*) AS n FROM discovered_sessions`).get() as { n: number }).n;
   const enriched = (db.prepare(`SELECT COUNT(*) AS n FROM discovered_sessions WHERE enrichment_level > 0`).get() as { n: number }).n;
   const embedded = (db.prepare(`SELECT COUNT(DISTINCT session_id) AS n FROM session_embeddings`).get() as { n: number }).n;
-  const managedCount = (db.prepare(`SELECT COUNT(*) AS n FROM discovered_sessions WHERE panopticon_managed = 1`).get() as { n: number }).n;
+  const managedCount = (db.prepare(`SELECT COUNT(*) AS n FROM discovered_sessions WHERE overdeck_managed = 1`).get() as { n: number }).n;
   const embeddingModels = db.prepare(
     `SELECT model, COUNT(DISTINCT session_id) AS embedded FROM session_embeddings GROUP BY model ORDER BY embedded DESC, model ASC`,
   ).all() as Array<{ model: string; embedded: number }>;
@@ -366,7 +366,7 @@ export interface UpsertDiscoveredSessionOpts {
   toolsUsed?: string[];
   filesTouched?: string[];
   tags?: string[];
-  panopticonManaged?: boolean;
+  overdeckManaged?: boolean;
   panIssueId?: string | null;
   panAgentId?: string | null;
   fileSize?: number | null;
@@ -446,7 +446,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        message_count, first_ts, last_ts, models_used, primary_model,
        token_input, token_output, estimated_cost,
        tools_used, files_touched, tags,
-       panopticon_managed, pan_issue_id, pan_agent_id,
+       overdeck_managed, pan_issue_id, pan_agent_id,
        file_size, file_mtime, scanned_at
      ) VALUES (
        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
@@ -466,7 +466,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        tools_used         = excluded.tools_used,
        files_touched      = excluded.files_touched,
        tags               = CASE WHEN ? = 1 THEN excluded.tags ELSE discovered_sessions.tags END,
-       panopticon_managed = excluded.panopticon_managed,
+       overdeck_managed = excluded.overdeck_managed,
        pan_issue_id       = excluded.pan_issue_id,
        pan_agent_id       = excluded.pan_agent_id,
        file_size          = excluded.file_size,
@@ -488,7 +488,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     JSON.stringify(opts.toolsUsed ?? []),
     JSON.stringify(opts.filesTouched ?? []),
     JSON.stringify(opts.tags ?? []),
-    opts.panopticonManaged ? 1 : 0,
+    opts.overdeckManaged ? 1 : 0,
     opts.panIssueId ?? null,
     opts.panAgentId ?? null,
     opts.fileSize ?? null,

@@ -81,15 +81,15 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../src/lib/paths.js', () => ({
-  OVERDECK_HOME: '/tmp/panopticon-test',
-  AGENTS_DIR: '/tmp/panopticon-test/agents',
-  getOverdeckHome: vi.fn(() => '/tmp/panopticon-test'),
+  OVERDECK_HOME: '/tmp/overdeck-test',
+  AGENTS_DIR: '/tmp/overdeck-test/agents',
+  getOverdeckHome: vi.fn(() => '/tmp/overdeck-test'),
   PROJECT_DOCS_SUBDIR: 'docs',
   PROJECT_PRDS_SUBDIR: 'prds',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
   PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
-  packageRoot: '/tmp/panopticon-test',
+  packageRoot: '/tmp/overdeck-test',
 }));
 
 vi.mock('../../../src/lib/tracker-utils.js', () => ({
@@ -142,7 +142,7 @@ import { postMergeLifecycle, resetPostMergeState } from '../../../src/lib/cloist
 const ISSUE_ID = 'PAN-444';
 const PROJECT_PATH = '/tmp/test-project';
 const SOURCE_BRANCH = 'feature/pan-444';
-const PENDING_FILE = '/tmp/panopticon-test/pending-post-merge.json';
+const PENDING_FILE = '/tmp/overdeck-test/pending-post-merge.json';
 
 describe('postMergeLifecycle — step 0 deploy handoff', () => {
   beforeEach(() => {

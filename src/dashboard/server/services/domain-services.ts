@@ -38,7 +38,7 @@ export interface EventStoreServiceShape {
 export class EventStoreService extends Context.Service<
   EventStoreService,
   EventStoreServiceShape
->()('panopticon/dashboard/EventStoreService') {}
+>()('overdeck/dashboard/EventStoreService') {}
 
 /** Map a domain event to a detailed activity log entry. Returns null for uninteresting events. */
 function shouldRefreshSessionContext(type: string): boolean {

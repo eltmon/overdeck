@@ -27,7 +27,7 @@ Guide for testing Overdeck's provider routing with both the Claude Code and Pi h
 ### For CLIProxy Providers (OpenAI, Google)
 
 - OpenAI: Codex/ChatGPT subscription (OAuth) or OpenAI API key
-- Google: `GOOGLE_API_KEY` configured in Settings or `~/.panopticon.env`
+- Google: `GOOGLE_API_KEY` configured in Settings or `~/.overdeck.env`
 - CLIProxyAPI sidecar runs automatically with the dashboard
 
 ### For Pi Harness Testing
@@ -42,7 +42,7 @@ Guide for testing Overdeck's provider routing with both the Claude Code and Pi h
 
 **Setup:**
 ```bash
-# Add Kimi API key to ~/.panopticon.env
+# Add Kimi API key to ~/.overdeck.env
 export KIMI_API_KEY="sk-kimi-YOUR_KEY_HERE"
 # or KIMI_CODING_API_KEY for coding-endpoint keys
 ```
@@ -53,7 +53,7 @@ export KIMI_API_KEY="sk-kimi-YOUR_KEY_HERE"
 pan start PAN-999 --model kimi-k2.5
 
 # Verify env in tmux session
-tmux -L panopticon show-environment -t agent-pan-999 | grep ANTHROPIC
+tmux -L overdeck show-environment -t agent-pan-999 | grep ANTHROPIC
 # Expected: ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic (or api.kimi.com/coding for sk-kimi-* keys)
 # Expected: ANTHROPIC_AUTH_TOKEN=sk-kimi-YOUR_KEY_HERE
 ```
@@ -64,7 +64,7 @@ tmux -L panopticon show-environment -t agent-pan-999 | grep ANTHROPIC
 pan start PAN-999 --harness pi --model kimi-k2.5
 
 # Verify env in tmux session
-tmux -L panopticon show-environment -t agent-pan-999 | grep KIMI_API_KEY
+tmux -L overdeck show-environment -t agent-pan-999 | grep KIMI_API_KEY
 # Expected: KIMI_API_KEY=sk-kimi-YOUR_KEY_HERE
 ```
 
@@ -74,7 +74,7 @@ tmux -L panopticon show-environment -t agent-pan-999 | grep KIMI_API_KEY
 
 **Setup:**
 ```bash
-# Add Z.AI API key to ~/.panopticon.env
+# Add Z.AI API key to ~/.overdeck.env
 export ZAI_API_KEY="YOUR_ZAI_API_KEY"
 ```
 
@@ -146,7 +146,7 @@ pan doctor
 pan start PAN-995 --harness pi --model kimi-k2.5
 
 # Attach to tmux session and inspect env
-tmux -L panopticon show-environment -t agent-pan-995
+tmux -L overdeck show-environment -t agent-pan-995
 # Should contain: KIMI_API_KEY=...
 ```
 
@@ -220,9 +220,9 @@ pan start PAN-995 --model gpt-5.4
 - For GLM: Ensure API_TIMEOUT_MS is set
 
 **Problem:** "No API key found for kimi-coding" (Pi)
-- Verify `KIMI_API_KEY` is set in `~/.panopticon.env` or dashboard Settings
+- Verify `KIMI_API_KEY` is set in `~/.overdeck.env` or dashboard Settings
 - Verify the agent was spawned with `--harness pi`
-- Check `tmux -L panopticon show-environment -t agent-<id>` for `KIMI_API_KEY`
+- Check `tmux -L overdeck show-environment -t agent-<id>` for `KIMI_API_KEY`
 
 ### CLIProxy Provider Issues
 
@@ -246,7 +246,7 @@ pan down && pan up
 
 ### Direct Provider Testing
 ```
-[ ] API key configured in Settings or ~/.panopticon.env
+[ ] API key configured in Settings or ~/.overdeck.env
 [ ] Claude Code harness test successful
 [ ] Pi harness test successful (if applicable)
 [ ] Agent spawning with provider works

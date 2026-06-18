@@ -2,7 +2,7 @@
  * Tests for dashboard health API filtering
  *
  * sessionExistsAsync is mocked because it uses the managed tmux socket
- * (-L panopticon), which is separate from the default socket. Tests that
+ * (-L overdeck), which is separate from the default socket. Tests that
  * previously created real tmux sessions on the default socket would always
  * see them as missing when checked on the managed socket (CI / managed mode).
  */
@@ -24,8 +24,8 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sessionExistsSync: (name: string) => Effect.succeed(activeSessions.has(name)),
   capturePane: vi.fn(() => Effect.succeed('')),
   getTmuxConfigMode: vi.fn(() => 'inherit-user'),
-  getManagedTmuxSocketName: vi.fn(() => 'panopticon'),
-  getManagedTmuxConfigPath: vi.fn(() => '/tmp/panopticon.tmux.conf'),
+  getManagedTmuxSocketName: vi.fn(() => 'overdeck'),
+  getManagedTmuxConfigPath: vi.fn(() => '/tmp/overdeck.tmux.conf'),
   getTmuxBaseArgs: vi.fn(() => []),
   buildTmuxArgs: vi.fn((args: string[]) => args),
   getTmuxCommand: vi.fn((args: string[]) => ({ command: 'tmux', args })),
@@ -42,7 +42,7 @@ let testDir: string;
 beforeEach(() => {
   activeSessions.clear();
   testDir = mkdtempSync(join(tmpdir(), 'health-api-test-'));
-  mkdirSync(join(testDir, '.panopticon', 'agents'), { recursive: true });
+  mkdirSync(join(testDir, '.overdeck', 'agents'), { recursive: true });
 });
 
 afterEach(() => {
@@ -52,7 +52,7 @@ afterEach(() => {
 
 // Helper to create agent directory with state.json
 function createAgent(name: string, status?: string, lastActivity?: string): string {
-  const agentDir = join(testDir, '.panopticon', 'agents', name);
+  const agentDir = join(testDir, '.overdeck', 'agents', name);
   mkdirSync(agentDir, { recursive: true });
 
   if (status !== undefined) {

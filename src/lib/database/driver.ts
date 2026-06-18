@@ -51,7 +51,7 @@ type RawDatabase = {
 type EmitWarningArgs = Parameters<typeof process.emitWarning>;
 
 const _require = createRequire(import.meta.url);
-const SQLITE_WARNING_FILTER = Symbol.for('panopticon.sqliteWarningFilterInstalled');
+const SQLITE_WARNING_FILTER = Symbol.for('overdeck.sqliteWarningFilterInstalled');
 
 function isBunRuntime(): boolean {
   return typeof Bun !== 'undefined';
@@ -236,7 +236,7 @@ function wrapDatabase(raw: RawDatabase): SqliteDatabase {
           }
         }
 
-        const savepoint = `panopticon_tx_${++savepointId}`;
+        const savepoint = `overdeck_tx_${++savepointId}`;
         raw.exec(`SAVEPOINT ${savepoint}`);
         transactionDepth++;
         let released = false;

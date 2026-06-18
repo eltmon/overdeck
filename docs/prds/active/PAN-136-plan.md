@@ -36,7 +36,7 @@ complexity.expert        = 'claude-opus-4-6'
 
 **Files:** `tests/lib/tracker/factory.test.ts`, `src/lib/tracker/factory.ts`, `src/lib/config-yaml.ts`
 
-**Cause:** Tests clear environment variables (`LINEAR_API_KEY`, `GITHUB_TOKEN`) in `beforeEach`, but `createTracker()` calls `getTrackerKeyFromConfig()` which reads `~/.panopticon/config.yaml` via `loadYamlConfig()`. If the test runner has a config file with stored tracker keys, the credential check passes and no `TrackerAuthError` is thrown.
+**Cause:** Tests clear environment variables (`LINEAR_API_KEY`, `GITHUB_TOKEN`) in `beforeEach`, but `createTracker()` calls `getTrackerKeyFromConfig()` which reads `~/.overdeck/config.yaml` via `loadYamlConfig()`. If the test runner has a config file with stored tracker keys, the credential check passes and no `TrackerAuthError` is thrown.
 
 **Fix:** Mock `loadYamlConfig` (from `config-yaml.ts`) in the test to return empty `trackerKeys`, ensuring full isolation from the filesystem.
 

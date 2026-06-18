@@ -492,7 +492,7 @@ function getSyncTargetBranch(
     });
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
-    // Post panopticon/tests=success so the GitHub CI test job can self-skip
+    // Post overdeck/tests=success so the GitHub CI test job can self-skip
     // its redundant vitest run on this exact commit. Non-fatal on failure.
     void (async () => {
       try {
@@ -503,7 +503,7 @@ function getSyncTargetBranch(
         const { postOverdeckTestsStatus } = await import('../github-app.js');
         await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed');
       } catch (err: any) {
-        console.warn(`[${logPrefix}] Failed to post panopticon/tests status: ${err.message}`);
+        console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }
     })();
     return { outcome: 'passed' };

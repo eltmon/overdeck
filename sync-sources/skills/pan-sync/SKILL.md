@@ -6,7 +6,7 @@ triggers:
   - sync skills
   - update skills
   - refresh skills
-  - sync panopticon
+  - sync overdeck
 allowed-tools:
   - Bash
   - Read
@@ -16,7 +16,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through syncing Overdeck skills to AI coding assistants. The sync process creates symlinks from `~/.panopticon/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
+This skill guides you through syncing Overdeck skills to AI coding assistants. The sync process creates symlinks from `~/.overdeck/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
 
 ## Auto-Sync
 
@@ -29,7 +29,7 @@ This skill guides you through syncing Overdeck skills to AI coding assistants. T
 ## How Sync Works
 
 ```
-~/.panopticon/skills/          (Overdeck skills - source)
+~/.overdeck/skills/          (Overdeck skills - source)
         ↓ pan sync (creates symlinks)
 ~/.claude/skills/              (Claude Code)
 ~/.codex/skills/               (Codex)
@@ -37,7 +37,7 @@ This skill guides you through syncing Overdeck skills to AI coding assistants. T
 ~/.gemini/skills/              (Gemini CLI)
 ~/.opencode/skills/            (OpenCode)
 
-~/.panopticon/workspaces/       (Workspace directories)
+~/.overdeck/workspaces/       (Workspace directories)
         ↓ pan sync (copies CLAUDE.md)
 ~/.opencode/cl-aude-md/        (CLAUDE.md files)
         ↓
@@ -51,7 +51,7 @@ This skill guides you through syncing Overdeck skills to AI coding assistants. T
 - Changes to source immediately reflect in all tools
 - Project-specific skills in `{project}/.claude/skills/` are NOT touched
 - Conflicts are detected and reported
-- CLAUDE.md files are copied from `~/.panopticon/workspaces/` to `~/.opencode/cl-aude-md/`
+- CLAUDE.md files are copied from `~/.overdeck/workspaces/` to `~/.opencode/cl-aude-md/`
 
 ## Commands
 
@@ -103,7 +103,7 @@ Creates a backup without syncing.
 
 ## Sync Targets
 
-Configure which tools to sync to in `~/.panopticon/config.toml`:
+Configure which tools to sync to in `~/.overdeck/config.toml`:
 
 ```toml
 [sync]
@@ -172,7 +172,7 @@ pan sync
 
 ```bash
 # 1. Add skill to Overdeck directory
-mkdir -p ~/.panopticon/skills/my-skill
+mkdir -p ~/.overdeck/skills/my-skill
 # Create SKILL.md with proper frontmatter
 
 # 2. Sync to all tools
@@ -202,7 +202,7 @@ By default, Overdeck creates backups before syncing.
 ### Backup Location
 
 ```
-~/.panopticon/backups/
+~/.overdeck/backups/
   2024-01-15T10-30-00/
     claude/
       skills/
@@ -214,16 +214,16 @@ By default, Overdeck creates backups before syncing.
 
 ```bash
 # List backups
-ls ~/.panopticon/backups/
+ls ~/.overdeck/backups/
 
 # Restore specific backup (manual)
-cp -r ~/.panopticon/backups/2024-01-15T10-30-00/claude/skills/* ~/.claude/skills/
+cp -r ~/.overdeck/backups/2024-01-15T10-30-00/claude/skills/* ~/.claude/skills/
 ```
 
 ### Disable Backups
 
 ```toml
-# In ~/.panopticon/config.toml
+# In ~/.overdeck/config.toml
 [sync]
 backup_before_sync = false
 ```
@@ -233,7 +233,7 @@ backup_before_sync = false
 **Problem:** Skills not appearing in AI tool
 **Solution:**
 1. Run `pan sync` (not just `pan init`)
-2. Check target is in config: `cat ~/.panopticon/config.toml`
+2. Check target is in config: `cat ~/.overdeck/config.toml`
 3. Verify symlinks exist: `ls -la ~/.claude/skills/`
 
 **Problem:** CLAUDE.md files not available in opencode

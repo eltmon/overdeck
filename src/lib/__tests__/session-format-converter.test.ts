@@ -80,8 +80,8 @@ describe('convertConversationTranscript — round-trip to codex', () => {
     const cwd = join(tmpBase, 'workspace');
     mkdirSync(cwd, { recursive: true });
 
-    // Ensure the panopticon agent dir exists (writeThreadId writes here)
-    const agentDir = join(tmpBase, '.panopticon', 'agents', tmuxSession);
+    // Ensure the overdeck agent dir exists (writeThreadId writes here)
+    const agentDir = join(tmpBase, '.overdeck', 'agents', tmuxSession);
     mkdirSync(agentDir, { recursive: true });
 
     const result = await Effect.runPromise(
@@ -102,7 +102,7 @@ describe('convertConversationTranscript — round-trip to codex', () => {
     expect(existsSync(result.targetSessionFile)).toBe(true);
 
     // The thread-id file should be persisted
-    const threadIdPath = join(tmpBase, '.panopticon', 'agents', tmuxSession, 'codex-thread-id');
+    const threadIdPath = join(tmpBase, '.overdeck', 'agents', tmuxSession, 'codex-thread-id');
     expect(existsSync(threadIdPath)).toBe(true);
     const storedThreadId = readFileSync(threadIdPath, 'utf-8').trim();
     expect(storedThreadId).toBe(result.sessionId);

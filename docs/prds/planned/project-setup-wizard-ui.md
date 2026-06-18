@@ -32,7 +32,7 @@ This is a serious adoption blocker:
 1. **First-run cliff.** A user installs Overdeck, runs `pan up`, opens the dashboard, and... sees nothing. There's no project, no kanban, no agents. The "create your first project" moment lives in a CLI command they didn't know to run.
 2. **No dogfooding loop.** We have a CLAUDE.md rule that says "always dogfood the dashboard, never curl APIs manually." But for project creation we ourselves drop to the CLI because the dashboard can't do it.
 3. **Setup Agent is invisible.** The Setup Agent spawns in tmux like a planning agent, but unlike planning agents it has no row in the agent list, no terminal panel, no progress events. Users running `pan setup` from the CLI literally cannot see the agent's reasoning except by tmux-attaching.
-4. **Editing is YAML-only.** Once a project exists, changing branch names, adding repos, toggling specialists, configuring quality gates, or rotating tracker config means opening `~/.panopticon/projects.yaml` in a text editor. Every Overdeck power-user has corrupted this file at least once.
+4. **Editing is YAML-only.** Once a project exists, changing branch names, adding repos, toggling specialists, configuring quality gates, or rotating tracker config means opening `~/.overdeck/projects.yaml` in a text editor. Every Overdeck power-user has corrupted this file at least once.
 5. **Multi-project teams have no overview.** A user with 5 projects (Overdeck, MYN, Auricle, Krux, etc.) has no place in the dashboard to see them side-by-side, see which is healthy, jump between them, or trigger setup re-runs.
 
 The CLI wizard is a faithful onboarding tool for terminal-native users, but Overdeck's identity is the dashboard. This feature has to live there too.
@@ -45,7 +45,7 @@ The CLI wizard is a faithful onboarding tool for terminal-native users, but Over
 4. **Full feature parity across front-ends.** Every prompt, every detection step, every template choice, every Setup Agent invocation is reachable from both the dashboard and `pan setup`. CLI and UI are two front-ends for the same backend pipeline.
 5. **The Setup Agent is a first-class agent.** It appears in the agent list, has a terminal panel, streams progress events through the existing RPC, and supports the same lifecycle controls (stop, restart, view logs) as planning agents.
 6. **Project management lives in the dashboard.** A "Projects" page lists every configured project, shows health, lets the user edit config visually, re-run setup, and remove projects.
-7. **Edits round-trip safely.** Anything edited in the UI writes valid YAML to `~/.panopticon/projects.yaml` with the same schema validation the CLI uses. Anything edited in YAML is reflected in the UI on next load.
+7. **Edits round-trip safely.** Anything edited in the UI writes valid YAML to `~/.overdeck/projects.yaml` with the same schema validation the CLI uses. Anything edited in YAML is reflected in the UI on next load.
 8. **Dogfoodable.** We can use the dashboard wizard to onboard a new project end-to-end — including cloning a remote repo or creating a brand-new one — without ever opening a terminal.
 
 ## Non-goals
@@ -146,7 +146,7 @@ The setup backend does not exist yet (see Status correction). We **build** `src/
         └─────────────────────────────────────────────┘
                               │
                               ▼
-                 ~/.panopticon/projects.yaml
+                 ~/.overdeck/projects.yaml
 ```
 
 The CLI wrapper uses `inquirer`-style prompts but delegates every business operation to `src/lib/setup/`. The dashboard never reaches into `src/cli/`; both call the lib. Because no CLI logic exists to preserve, the "byte-identical YAML" invariant is enforced from day one rather than after an extraction.
@@ -212,11 +212,11 @@ A new `src/cli/commands/setup-wizard.ts` (registered as `pan setup`) is a thin w
 
 ### Setup Agent as a first-class agent
 
-The Setup Agent is modeled on the planning agent: a Claude Code session in a tmux session on the `panopticon` socket. It does not exist yet — we build it here alongside the dashboard plumbing. It is spawned through the standard launcher, which means it inherits the project-wide permission model: **`--permission-mode auto` by default** (Claude Code's built-in classifier blocks destructive ops), with `--dangerously-skip-permissions --permission-mode bypassPermissions` only when the user has opted into `bypass` (`PAN_YOLO=true` or `claude.permissionMode: bypass`). See `src/lib/claude-permissions.ts` — the wizard must **not** hardcode a permission flag; it goes through the same resolution path as every other agent. We treat it exactly like a planning agent:
+The Setup Agent is modeled on the planning agent: a Claude Code session in a tmux session on the `overdeck` socket. It does not exist yet — we build it here alongside the dashboard plumbing. It is spawned through the standard launcher, which means it inherits the project-wide permission model: **`--permission-mode auto` by default** (Claude Code's built-in classifier blocks destructive ops), with `--dangerously-skip-permissions --permission-mode bypassPermissions` only when the user has opted into `bypass` (`PAN_YOLO=true` or `claude.permissionMode: bypass`). See `src/lib/claude-permissions.ts` — the wizard must **not** hardcode a permission flag; it goes through the same resolution path as every other agent. We treat it exactly like a planning agent:
 
 1. **Agent record.** When the wizard spawns the Setup Agent, a row is inserted in the agents table with `kind: 'setup-agent'`. The dashboard's `AgentList.tsx` already iterates over agent kinds; we add a filter chip for "Setup".
 2. **Terminal streaming.** The Setup Agent's tmux session is reachable at `/ws/terminal?session=<setup-session-name>` via the existing raw WebSocket terminal endpoint (`ws-terminal.ts`). No new code path — the wizard component just opens an `XTerminal` pointed at the right session name.
-3. **Progress events.** The agent writes structured progress to a JSONL file in `~/.panopticon/agents/<id>/setup-progress.jsonl`. A file watcher in `src/dashboard/server/services/` tails this file and emits `SetupAgentEvent` over `subscribeDomainEvents`. The wizard's progress panel subscribes via the existing event router.
+3. **Progress events.** The agent writes structured progress to a JSONL file in `~/.overdeck/agents/<id>/setup-progress.jsonl`. A file watcher in `src/dashboard/server/services/` tails this file and emits `SetupAgentEvent` over `subscribeDomainEvents`. The wizard's progress panel subscribes via the existing event router.
 4. **Lifecycle controls.** Stop / restart / done all reuse the planning-agent equivalents. The Setup Agent's session is configured with `remain-on-exit on` so the user can review its terminal output even after it finishes.
 
 This means the Setup Agent inherits everything we already built for planning: cost tracking, health monitoring, the inspector panel, the run log, the budget widget. Zero net-new agent infrastructure.
@@ -308,7 +308,7 @@ The wizard is a single full-page route at `/projects/new` with a fixed left rail
 | 2 | **Type** | Shows detection result. User can override the detected type. Each type has a one-line "best for" caption. |
 | 3 | **Template** | Card grid of templates returned by `listTemplates`. Each card: name, description, "recommended" badge if matching detection heuristics. Selecting a card loads the template's prompt schema for Step 4. |
 | 4 | **Repos** | Shows detected repos in a sortable table: name, path, default branch, language, has-tests, has-CI. Inline editable per row. "Group repos" button opens a side panel where the user can drag repos into named groups (groups become `repo-groups.yaml`). |
-| 5 | **Tracker** | Tracker selector (Linear, GitHub, Rally, GitLab, None). Each option expands to its config fields. Linear: team prefix + API key (read from `~/.panopticon.env` if present, otherwise prompt). GitHub: org/repo, App credentials. Rally: project name, artifact types. |
+| 5 | **Tracker** | Tracker selector (Linear, GitHub, Rally, GitLab, None). Each option expands to its config fields. Linear: team prefix + API key (read from `~/.overdeck.env` if present, otherwise prompt). GitHub: org/repo, App credentials. Rally: project name, artifact types. |
 | 6 | **Setup Agent** | Optional. Toggle: "Spawn Setup Agent to analyze the codebase and generate docs." If on, shows a "Spawn agent" button. Clicking spawns the agent and the right panel splits into terminal (top) + event log (bottom). Cancel anytime. |
 | 7 | **Review** | YAML preview (Monaco, read-only) of `projects.yaml` entry. Tabs for generated files if Setup Agent ran. Per-file accept/reject. "Open in editor" button for the YAML escape hatch. |
 | 8 | **Save** | Final confirm. Shows what will be written and where. "Save project" commits via `commitProject` RPC. On success, redirects to project detail. |
@@ -584,7 +584,7 @@ Phased so each phase ships value, but per CLAUDE.md "deliver complete features,"
 - `RedetectDiffDialog` with synthetic diffs.
 
 ### End-to-end (Playwright)
-- **Zero-project onboarding.** Tear down `~/.panopticon/projects.yaml`, open the dashboard, click through the welcome → wizard → save flow, assert the project appears in the list.
+- **Zero-project onboarding.** Tear down `~/.overdeck/projects.yaml`, open the dashboard, click through the welcome → wizard → save flow, assert the project appears in the list.
 - **Sidebar `+` entry point.** With one project already, click the `+` on the PROJECTS sidebar header, assert it routes to `/projects/new` without toggling section collapse.
 - **Clone source.** In Step 1, choose "Clone from a remote", point at a local bare-repo fixture (no network), assert clone progress streams and detection runs on the clone.
 - **Brand-new project.** Choose "Start a brand-new project" into a temp dir with git-init checked, complete the wizard, assert the directory exists, `git log` has the initial commit, and the project is registered.
@@ -601,7 +601,7 @@ Per CLAUDE.md, every UI change is verified with Playwright. Every flow above MUS
 
 ## Open Questions
 
-1. **Where does the Setup Agent's Claude Code session actually run?** It runs in a tmux session on the `panopticon` socket on the user's machine, spawned through the standard launcher so it inherits the resolved permission model — **`--permission-mode auto` by default**, `bypass` only on explicit opt-in (`src/lib/claude-permissions.ts`). The wizard must not invent its own permission flag or a second execution model. There is no `spawn-setup-session.ts` today; we build it in Phase 4 modeled on the planning-agent launcher, and it must be callable from a server-side RPC handler (the dashboard server and `pan up` run on the same host, so a host-local tmux spawn is fine — Docker workspaces are out of scope, matching the PTY-supervisor exclusion).
+1. **Where does the Setup Agent's Claude Code session actually run?** It runs in a tmux session on the `overdeck` socket on the user's machine, spawned through the standard launcher so it inherits the resolved permission model — **`--permission-mode auto` by default**, `bypass` only on explicit opt-in (`src/lib/claude-permissions.ts`). The wizard must not invent its own permission flag or a second execution model. There is no `spawn-setup-session.ts` today; we build it in Phase 4 modeled on the planning-agent launcher, and it must be callable from a server-side RPC handler (the dashboard server and `pan up` run on the same host, so a host-local tmux spawn is fine — Docker workspaces are out of scope, matching the PTY-supervisor exclusion).
 2. **Multi-user dashboards.** Today, the dashboard assumes one local user. When a setup wizard is in progress, should we lock `projects.yaml` against other dashboard sessions / CLI invocations? *(Probable answer: optimistic, last-write-wins, with a "config changed externally" toast on conflict — same as we'd do for any file-backed config.)*
 3. **Template authoring UX.** Do we want a "create custom template" UI in this PRD, or is "edit YAML in your meta repo" the answer? *(Recommended: out of scope. Add a `templates/` browser later.)*
 4. **Dashboard project switcher placement.** It currently doesn't exist. Header dropdown vs. left rail vs. command palette? *(Recommended: header dropdown to match every other tool in this category.)*

@@ -10,8 +10,8 @@ const CLI_DIST = join(ROOT, 'dist/cli/index.js');
 const CONTRACTS_DIST = join(ROOT, 'packages/contracts/dist/index.mjs');
 
 export default function setup() {
-  const panopticonTestRoot = mkdtempSync(join(tmpdir(), 'pan-test-root-'));
-  process.env.OVERDECK_TEST_HOME_ROOT = panopticonTestRoot;
+  const overdeckTestRoot = mkdtempSync(join(tmpdir(), 'pan-test-root-'));
+  process.env.OVERDECK_TEST_HOME_ROOT = overdeckTestRoot;
 
   if (!existsSync(CONTRACTS_DIST)) {
     console.log('[global-setup] packages/contracts/dist/index.mjs missing — building contracts...');
@@ -24,6 +24,6 @@ export default function setup() {
   }
 
   return () => {
-    rmSync(panopticonTestRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    rmSync(overdeckTestRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   };
 }

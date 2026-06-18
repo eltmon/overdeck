@@ -32,7 +32,7 @@ There is no first-class notion of "the project I'm working in." The Stage (tabbe
 
 ## 3. Users & primary workflows
 
-Single power user orchestrating many agents across a few projects (panopticon, mind-your-now, auricle). Primary flows: (a) glance at a project's running agents and issue pipeline; (b) open/continue conversations with project context; (c) drive an issue's work/review/test/ship from its tree; (d) spawn terminals/files/web/commits panes as needed.
+Single power user orchestrating many agents across a few projects (overdeck, mind-your-now, auricle). Primary flows: (a) glance at a project's running agents and issue pipeline; (b) open/continue conversations with project context; (c) drive an issue's work/review/test/ship from its tree; (d) spawn terminals/files/web/commits panes as needed.
 
 ## 4. Current state (the code as it is today)
 
@@ -57,7 +57,7 @@ Four columns. Selecting a project reveals the conversations+tree column and open
 ┌───────────┬───────────────────────┬──────────────────────────┬───────────────┐
 │ Sidebar   │ Conversations + Tree  │ Deck (project-scoped)    │ Activity feed │
 │ ⌂ Home    │ CONVERSATIONS         │ [⌘1 HOME][PAN-1561][…] + │ ACTIVITY      │
-│ 🌀 Flywheel│  • <conv TITLE>   2m  │  # panopticon            │ Just Now      │
+│ 🌀 Flywheel│  • <conv TITLE>   2m  │  # overdeck            │ Just Now      │
 │ PROJECTS  │  • <conv TITLE>   8m  │  main · set parent       │  • <status>   │
 │ ● panopt. │ ISSUES   All·Alive·…  │  🕐19d ⇄+1.5k 📁7 💬6    │ Earlier Today │
 │   myn     │  ▾ PAN-1561 ● [work] │  ┌ Launch, search, run ┐ │  • …          │
@@ -86,7 +86,7 @@ Four columns. Selecting a project reveals the conversations+tree column and open
 
 #### 6.3.1 The Home tab is PROJECT-SCOPED (a change, not a verbatim keep)
 - **Reuse** the existing launch composition: `Launcher` (omnibox), `AgentDock`, `ActionDock`, `Timeline`, `StatChips`.
-- **Change the header** from today's issue style (`WorkspaceHeader`: icon tile + issue name + `feature/<id>`) to the **project style: `# <project>` + `main`** (e.g. `# panopticon`, `main`), as in the mockup.
+- **Change the header** from today's issue style (`WorkspaceHeader`: icon tile + issue name + `feature/<id>`) to the **project style: `# <project>` + `main`** (e.g. `# overdeck`, `main`), as in the mockup.
 - **Change the data scope** to the project: project-level stats and **project-scoped conversations** in the timeline (not one issue's).
 - The current Home is issue-scoped and **will not match the mockup until this re-scope is done.**
 

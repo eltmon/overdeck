@@ -50,7 +50,7 @@ same way.
 
 ## How it works
 
-Every Overdeck conversation is tracked in the SQLite database at `~/.panopticon/panopticon.db` in the `conversations` table. Use the first-class CLI resolver to map a conversation ID to its Claude Code JSONL transcript:
+Every Overdeck conversation is tracked in the SQLite database at `~/.overdeck/panopticon.db` in the `conversations` table. Use the first-class CLI resolver to map a conversation ID to its Claude Code JSONL transcript:
 
 ```bash
 pan conv jsonl <id>        # alias: pan conv transcript <id>
@@ -221,10 +221,10 @@ For direct database queries, use Python's built-in sqlite3 CLI — the standalon
 
 ```bash
 # Find conversation by ID
-python3 -m sqlite3 ~/.panopticon/panopticon.db "SELECT id, name, status, claude_session_id, cwd, title, model, created_at FROM conversations WHERE id = 108;"
+python3 -m sqlite3 ~/.overdeck/panopticon.db "SELECT id, name, status, claude_session_id, cwd, title, model, created_at FROM conversations WHERE id = 108;"
 
 # Search by keyword in title
-python3 -m sqlite3 ~/.panopticon/panopticon.db "SELECT id, claude_session_id, cwd, title FROM conversations WHERE title LIKE '%lexerra%';"
+python3 -m sqlite3 ~/.overdeck/panopticon.db "SELECT id, claude_session_id, cwd, title FROM conversations WHERE title LIKE '%lexerra%';"
 ```
 
 (`python3 -m sqlite3 <db> "<sql>"` requires Python ≥3.12, which is the baseline here. If a plain `sqlite3` binary happens to be on PATH it works the same.)

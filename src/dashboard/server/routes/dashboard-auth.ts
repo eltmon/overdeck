@@ -9,8 +9,8 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/intern
 import { jsonResponse } from '../http-helpers.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
 
-export const DASHBOARD_SESSION_COOKIE = 'panopticon_session';
-export const DASHBOARD_CSRF_HEADER = 'x-panopticon-csrf-token';
+export const DASHBOARD_SESSION_COOKIE = 'overdeck_session';
+export const DASHBOARD_CSRF_HEADER = 'x-overdeck-csrf-token';
 // Session cookie lifetime. Without Max-Age the cookie was a *session* cookie that
 // died when the browser fully closed — so a reopened tab on a trusted origin had
 // no cookie, its mint 401'd, and every mutation failed with "CSRF token
@@ -42,7 +42,7 @@ function getDashboardSessionToken(): string {
   // auth gate already 503s before the session token is ever consulted.
   const internal = getInternalTokenSync();
   browserSessionToken = internal
-    ? createHmac('sha256', internal).update('panopticon-dashboard-session-v1').digest('base64url')
+    ? createHmac('sha256', internal).update('overdeck-dashboard-session-v1').digest('base64url')
     : randomBytes(32).toString('base64url');
   return browserSessionToken;
 }
@@ -62,7 +62,7 @@ export function dashboardCsrfToken(): string {
   // session token.
   const internal = getInternalTokenSync();
   browserCsrfToken = internal
-    ? createHmac('sha256', internal).update('panopticon-dashboard-csrf-v1').digest('base64url')
+    ? createHmac('sha256', internal).update('overdeck-dashboard-csrf-v1').digest('base64url')
     : randomBytes(32).toString('base64url');
   return browserCsrfToken;
 }
@@ -265,7 +265,7 @@ const runningInContainer = existsSync('/.dockerenv');
  * a literal-loopback check alone silently breaks the zero-step bootstrap for
  * every pan.localhost user — their session mint 401s and no cookie is ever set.
  *
- * This is the auto-bootstrap that removes the manual one-time #panopticon_token
+ * This is the auto-bootstrap that removes the manual one-time #overdeck_token
  * step: any browser on pan.localhost gets a session with no user action. It is
  * NOT a security downgrade for the LAN — the raw API ports bind 0.0.0.0, but a
  * direct LAN hit has a non-loopback, non-Docker-bridge peer and is rejected. We

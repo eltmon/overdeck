@@ -64,7 +64,7 @@ pan close PAN-1711 --force || true
 
 ### Pipeline-row cleanup checklist for all §12a issues
 
-If the `pan admin db clear-*` commands do not exist, run the equivalent SQL directly against `~/.panopticon/panopticon.db`:
+If the `pan admin db clear-*` commands do not exist, run the equivalent SQL directly against `~/.overdeck/panopticon.db`:
 
 ```sql
 DELETE FROM review_status WHERE issue_id = '<ISSUE>';

@@ -1262,7 +1262,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 /**
  * Clean up stale agent state directories (PAN-154)
  *
- * Scans ~/.panopticon/agents/ for directories that:
+ * Scans ~/.overdeck/agents/ for directories that:
  * - Have no active tmux session
  * - Are older than the configured retention threshold (default: 30 days)
  * - Don't have a recently processed completion marker
@@ -1463,7 +1463,7 @@ const ORPHAN_REVIEWER_AGE_MS = 60 * 60 * 1000; // 1 hour
 async function loadTmuxSessionsWithCreationTimes(): Promise<{ sessions: string[]; creationTimes: Map<string, number> } | null> {
   try {
     const { stdout } = await execAsync(
-      `tmux -L panopticon -f ${join(OVERDECK_HOME, 'tmux', 'panopticon.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
+      `tmux -L overdeck -f ${join(OVERDECK_HOME, 'tmux', 'overdeck.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
       { encoding: 'utf-8' },
     );
     const lines = stdout.split('\n').filter(l => l.trim());
@@ -4067,8 +4067,8 @@ async function reconcileAndCheckIfMerged(
 
   try {
     const { createTracker } = await import('../tracker/factory.js');
-    const panopticonConfig = await import('../config.js');
-    const globalTrackerConfig = panopticonConfig.loadConfigSync().trackers;
+    const overdeckConfig = await import('../config.js');
+    const globalTrackerConfig = overdeckConfig.loadConfigSync().trackers;
 
     let trackerConfig: TrackerConfig | null = null;
     if (project.tracker === 'github' && project.github_repo) {
@@ -4649,7 +4649,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
   try {
     // Find all workspace-related containers that are exited (crashed)
     const { stdout } = await execAsync(
-      'docker ps -a --filter "status=exited" --filter "name=panopticon-feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
+      'docker ps -a --filter "status=exited" --filter "name=overdeck-feature-" --format "{{.Names}}|{{.Status}}" 2>/dev/null || true',
       { encoding: 'utf-8', timeout: 10000 },
     );
     const crashed = stdout.trim().split('\n').filter(Boolean);
@@ -4668,7 +4668,7 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       // Init containers are one-shot by design — they run setup, exit, and stay exited.
       // Restarting them is meaningless and floods agents with bogus "container crashed" alerts.
       // Match service containers only (frontend/server), not init.
-      const match = name.match(/panopticon-feature-([\w-]+?)-(frontend|server)-/);
+      const match = name.match(/overdeck-feature-([\w-]+?)-(frontend|server)-/);
       if (!match) continue;
 
       // Skip clean shutdowns (exit code 0). Status format: "Exited (N) X minutes ago".

@@ -43,7 +43,7 @@ const initialLayersResponse: ContextLayersResponse = {
   layers: [
     {
       kind: 'global',
-      file: '/home/user/.panopticon/context/global.md',
+      file: '/home/user/.overdeck/context/global.md',
       exists: true,
       content: 'global context',
       editable: true,
@@ -177,7 +177,7 @@ describe('ContextPage', () => {
     renderWithQuery(<ContextPage />);
 
     expect(await screen.findByDisplayValue('global context')).toBeTruthy();
-    expect(screen.getByText('~/.panopticon/context/global.md')).toBeTruthy();
+    expect(screen.getByText('~/.overdeck/context/global.md')).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith('/api/context/layers', expect.objectContaining({ method: 'GET' }));
   });
 

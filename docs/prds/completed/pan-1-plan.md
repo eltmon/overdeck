@@ -107,7 +107,7 @@ export class RallyTracker implements IssueTracker {
    - Test error handling (auth, not found)
 
 2. **Integration test** (manual)
-   - Configure Rally in `~/.panopticon/config.toml`
+   - Configure Rally in `~/.overdeck/config.toml`
    - Run `pan work list` and verify Rally issues appear
    - Test `pan work issue` spawns agent for Rally item
    - Verify dashboard shows Rally issues

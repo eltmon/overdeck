@@ -6,14 +6,14 @@ import type { CacheService } from '../../src/dashboard/server/services/cache-ser
 
 describe('CacheService - getSuspensionMs', () => {
   let testDir: string;
-  let panopticonHome: string;
+  let overdeckHome: string;
   let cache: CacheService;
 
   beforeEach(async () => {
     testDir = mkdtempSync(join(tmpdir(), 'cache-suspension-test-'));
-    panopticonHome = join(testDir, '.panopticon');
-    mkdirSync(panopticonHome, { recursive: true });
-    vi.stubEnv('OVERDECK_HOME', panopticonHome);
+    overdeckHome = join(testDir, '.overdeck');
+    mkdirSync(overdeckHome, { recursive: true });
+    vi.stubEnv('OVERDECK_HOME', overdeckHome);
     vi.resetModules();
     const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
     cache = new CacheService();

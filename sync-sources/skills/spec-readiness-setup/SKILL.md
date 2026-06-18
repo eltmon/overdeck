@@ -26,7 +26,7 @@ This skill creates a customized wrapper for the `spec-readiness` core skill. The
 ## What Gets Created
 
 ```
-~/.panopticon/skills/spec-readiness-{name}/
+~/.overdeck/skills/spec-readiness-{name}/
   SKILL.md       # Wrapper skill that invokes the core with your config
   config.yaml    # Branding, tracker bindings, field mappings, conventions
 ```
@@ -272,7 +272,7 @@ This is a branded wrapper for the `spec-readiness` core skill.
 
 - **Tracker:** {tracker_type}
 - **Branding:** {company_name}
-- **Config:** ~/.panopticon/skills/spec-readiness-{name}/config.yaml
+- **Config:** ~/.overdeck/skills/spec-readiness-{name}/config.yaml
 
 ## Usage
 
@@ -291,18 +291,18 @@ readiness check {example_id}
 3. Reports are generated with {company_name} branding
 
 **To modify configuration**, edit:
-`~/.panopticon/skills/spec-readiness-{name}/config.yaml`
+`~/.overdeck/skills/spec-readiness-{name}/config.yaml`
 
 **To update the scoring model**, the core skill at
-`~/.panopticon/skills/spec-readiness/SKILL.md` controls all scoring logic.
+`~/.overdeck/skills/spec-readiness/SKILL.md` controls all scoring logic.
 ```
 
 ### Step 5: Write Files
 
 ```bash
-mkdir -p ~/.panopticon/skills/spec-readiness-{name}
-write config.yaml to ~/.panopticon/skills/spec-readiness-{name}/config.yaml
-write SKILL.md to ~/.panopticon/skills/spec-readiness-{name}/SKILL.md
+mkdir -p ~/.overdeck/skills/spec-readiness-{name}
+write config.yaml to ~/.overdeck/skills/spec-readiness-{name}/config.yaml
+write SKILL.md to ~/.overdeck/skills/spec-readiness-{name}/SKILL.md
 ```
 
 ### Step 6: Verify and Report
@@ -313,7 +313,7 @@ write SKILL.md to ~/.panopticon/skills/spec-readiness-{name}/SKILL.md
 ```
 Created spec-readiness wrapper: spec-readiness-{name}
 
-  Location: ~/.panopticon/skills/spec-readiness-{name}/
+  Location: ~/.overdeck/skills/spec-readiness-{name}/
   Tracker:  {tracker_type}
   Branding: {company_name} ({primary_color})
 
@@ -325,7 +325,7 @@ Created spec-readiness wrapper: spec-readiness-{name}
     spec readiness {example_id}
 
   To customize further, edit:
-    ~/.panopticon/skills/spec-readiness-{name}/config.yaml
+    ~/.overdeck/skills/spec-readiness-{name}/config.yaml
 ```
 
 3. Ask if they want to run a test assessment on a real issue to verify the setup

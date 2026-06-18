@@ -550,10 +550,10 @@ let updateDownloaded = false;
 function rebuildMenu() {
 	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
 	electron.Menu.setApplicationMenu(menu);
-	const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
-	if (panopticonMenu?.submenu) panopticonMenu.submenu.on("menu-will-show", () => {
+	const overdeckMenu = menu.items.find((item) => item.label === "Overdeck");
+	if (overdeckMenu?.submenu) overdeckMenu.submenu.on("menu-will-show", () => {
 		fetchActiveWorkspaces().then((workspaces) => {
-			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
+			const wsItem = overdeckMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
 			if (wsItem) wsItem.label = workspaces.length ? `Open Workspace (${workspaces.length})` : "Open Workspace";
 		});
 	});
@@ -682,10 +682,10 @@ function buildMenuTemplate() {
 function configureApplicationMenu() {
 	const menu = electron.Menu.buildFromTemplate(buildMenuTemplate());
 	electron.Menu.setApplicationMenu(menu);
-	const panopticonMenu = menu.items.find((item) => item.label === "Overdeck");
-	if (panopticonMenu?.submenu) panopticonMenu.submenu.on("menu-will-show", () => {
+	const overdeckMenu = menu.items.find((item) => item.label === "Overdeck");
+	if (overdeckMenu?.submenu) overdeckMenu.submenu.on("menu-will-show", () => {
 		fetchActiveWorkspaces().then((workspaces) => {
-			const wsItem = panopticonMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
+			const wsItem = overdeckMenu.submenu?.items.find((i) => i.id === "open-workspace-submenu");
 			if (wsItem) wsItem.label = workspaces.length ? `Open Workspace (${workspaces.length})` : "Open Workspace";
 		});
 	});
@@ -789,14 +789,14 @@ function showFirstLaunchDialog() {
 //#endregion
 //#region src/protocol.ts
 /**
-* panopticon:// custom protocol for serving static frontend assets in packaged builds.
+* overdeck:// custom protocol for serving static frontend assets in packaged builds.
 *
 * In dev mode:
 *   BrowserWindow loads from Vite dev server URL (VITE_DEV_SERVER_URL env var).
 *   HMR and source maps work normally.
 *
 * In packaged builds:
-*   BrowserWindow loads panopticon://app/index.html.
+*   BrowserWindow loads overdeck://app/index.html.
 *   This protocol handler serves files from the bundled dist/dashboard/public/.
 *   WebSocket connections (ws/rpc, ws/terminal) go to the embedded server port
 *   on localhost — the protocol handler only serves static assets.
@@ -833,7 +833,7 @@ function resolveStaticPath(staticRoot, requestUrl) {
 	return fallbackIndex;
 }
 /**
-* Register the panopticon:// protocol handler.
+* Register the overdeck:// protocol handler.
 * Must be called after app.ready (but registration via registerSchemesAsPrivileged
 * must happen before app.ready — done in main.ts).
 */
@@ -863,9 +863,9 @@ function registerDesktopProtocol() {
 const ROOT_DIR = node_path.resolve(__dirname, "../../..");
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
 const APP_DISPLAY_NAME = isDevelopment ? "Overdeck (Dev)" : "Overdeck";
-const APP_ID = "com.panopticon.app";
-const LINUX_WM_CLASS = isDevelopment ? "panopticon-dev" : "panopticon";
-const DESKTOP_SCHEME = "panopticon";
+const APP_ID = "com.overdeck.app";
+const LINUX_WM_CLASS = isDevelopment ? "overdeck-dev" : "overdeck";
+const DESKTOP_SCHEME = "overdeck";
 const IPC = {
 	GET_SERVER_URL: "pan:get-server-url",
 	GET_WS_URL: "pan:get-ws-url",

@@ -62,7 +62,7 @@ function mapSessionType(type: string): SessionNodeType {
 
 function sanitizeDisplayTitle(title: string): string {
   return title
-    .replace(/<!--\s*panopticon:[\s\S]*?-->/gi, '')
+    .replace(/<!--\s*overdeck:[\s\S]*?-->/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -18,7 +18,7 @@ describe('migrateDevroot', () => {
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'pan-migrate-'));
     prevHome = process.env.OVERDECK_HOME;
-    process.env.OVERDECK_HOME = join(home, '.panopticon');
+    process.env.OVERDECK_HOME = join(home, '.overdeck');
     projectsRoot = join(home, 'Projects');
     oldClaudeDir = join(projectsRoot, '.claude');
     mkdirSync(join(oldClaudeDir, 'skills', 'demo-skill'), { recursive: true });

@@ -12,7 +12,7 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
     config: {
       conversations: {
         compactionModel: 'claude-haiku-4-5',
-        manualCompactMode: 'panopticon-native',
+        manualCompactMode: 'overdeck-native',
         richCompaction: true,
       },
     },

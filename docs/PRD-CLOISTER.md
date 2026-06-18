@@ -33,7 +33,7 @@ Long-lived agents with persistent session IDs. Sleep until triggered, wake with 
 - Provides consistent merge workflow regardless of conflict presence
 
 **Characteristics:**
-- Persistent session ID stored in `~/.panopticon/specialists/<name>.session`
+- Persistent session ID stored in `~/.overdeck/specialists/<name>.session`
 - Accumulate context over time (merge patterns, project knowledge)
 - Never truly "die" - just sleep between tasks
 - Session rotation when context gets too large
@@ -428,7 +428,7 @@ async function wakeSpecialist(
   task: SpecialistTask
 ): Promise<Agent> {
   const specialistConfig = getSpecialistConfig(specialist);
-  const sessionFile = `~/.panopticon/specialists/${specialist}.session`;
+  const sessionFile = `~/.overdeck/specialists/${specialist}.session`;
 
   // Check if specialist has existing session
   const sessionId = existsSync(sessionFile)
@@ -517,7 +517,7 @@ ${task.additionalContext || ''}
 ### Handoff Trigger Configuration
 
 ```yaml
-# ~/.panopticon/cloister.yaml
+# ~/.overdeck/cloister.yaml
 
 handoffs:
   # Automatic triggers
@@ -700,7 +700,7 @@ interface HandoffEvent {
   errorMessage?: string;
 }
 
-// Stored in ~/.panopticon/handoffs.jsonl
+// Stored in ~/.overdeck/handoffs.jsonl
 ```
 
 ### Handoff API Endpoints
@@ -768,7 +768,7 @@ Dashboard shows:
 ### Configuration
 
 ```yaml
-# ~/.panopticon/cloister.yaml
+# ~/.overdeck/cloister.yaml
 
 model_selection:
   default_model: sonnet
@@ -899,7 +899,7 @@ interface SpawnConfig {
 Model routing is handled by `claude-code-router` (see `docs/WORK-TYPES.md`), not by switching runtimes. All agents run as Claude Code processes:
 
 ```yaml
-# ~/.panopticon/cloister.yaml
+# ~/.overdeck/cloister.yaml
 complexity_routing:
   trivial: { model: haiku }
   simple: { model: haiku }
@@ -960,14 +960,14 @@ Claude Code supports hooks that run on events. We can use `PostToolUse` hook to 
     "PostToolUse": [
       {
         "matcher": ".*",
-        "command": "~/.panopticon/bin/heartbeat-hook"
+        "command": "~/.overdeck/bin/heartbeat-hook"
       }
     ]
   }
 }
 ```
 
-**Heartbeat hook script** (`~/.panopticon/bin/heartbeat-hook`):
+**Heartbeat hook script** (`~/.overdeck/bin/heartbeat-hook`):
 ```bash
 #!/bin/bash
 # Called after every tool use with JSON on stdin
@@ -981,7 +981,7 @@ TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100]')
 AGENT_ID="${OVERDECK_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
 
 # Write heartbeat
-HEARTBEAT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
+HEARTBEAT_DIR="$HOME/.overdeck/agents/$AGENT_ID"
 mkdir -p "$HEARTBEAT_DIR"
 
 cat > "$HEARTBEAT_DIR/heartbeat.json" << EOF
@@ -1080,7 +1080,7 @@ When spawning an agent, Overdeck can:
 ### Configurable Thresholds
 
 ```yaml
-# ~/.panopticon/cloister.yaml
+# ~/.overdeck/cloister.yaml
 thresholds:
   stale_minutes: 5
   warning_minutes: 15
@@ -1302,7 +1302,7 @@ pan specialists reset <name> # Reset specialist session
 ### Default Config File
 
 ```yaml
-# ~/.panopticon/cloister.yaml
+# ~/.overdeck/cloister.yaml
 
 # Startup behavior
 startup:
@@ -1349,7 +1349,7 @@ specialists:
 
 ```bash
 # Override config file location
-CLOISTER_CONFIG=~/.panopticon/cloister.yaml
+CLOISTER_CONFIG=~/.overdeck/cloister.yaml
 
 # Quick overrides
 CLOISTER_AUTO_START=true
@@ -1368,7 +1368,7 @@ CLOISTER_AUTO_KILL=false
 - [ ] Cloister control bar in dashboard header
 - [ ] Agent health indicators in existing agents list
 - [ ] `pan cloister status` and `pan cloister emergency-stop` CLI
-- [ ] Configuration file (`~/.panopticon/cloister.yaml`)
+- [ ] Configuration file (`~/.overdeck/cloister.yaml`)
 - [ ] Auto-start option (start Cloister when dashboard starts)
 
 ### Phase 2: Agent Management UI
@@ -1385,7 +1385,7 @@ CLOISTER_AUTO_KILL=false
 
 ### Phase 3: Active Heartbeats & Hooks
 
-- [ ] Heartbeat hook script (`~/.panopticon/bin/heartbeat-hook`)
+- [ ] Heartbeat hook script (`~/.overdeck/bin/heartbeat-hook`)
 - [ ] `pan setup hooks` command to configure Claude Code
 - [ ] Agent ID environment variable injection
 - [ ] Rich heartbeat data (tool name, last action)
@@ -1410,7 +1410,7 @@ CLOISTER_AUTO_KILL=false
 
 ### Phase 5: Specialist Agents
 
-- [ ] Specialist registry (`~/.panopticon/specialists/`)
+- [ ] Specialist registry (`~/.overdeck/specialists/`)
 - [ ] Session persistence (store session IDs)
 - [ ] Initialize/Wake/Reset CLI commands
 - [ ] merge-agent implementation (Sonnet)

@@ -82,7 +82,7 @@ HTTP client for the Fizzy REST API. Based on the official API (`docs/API.md` in 
 - **Tags**: create, toggle on cards
 - **Webhooks**: register, list, delete
 
-Authentication via personal access token (Bearer header). Token stored in `~/.panopticon.env` as `FIZZY_API_TOKEN`.
+Authentication via personal access token (Bearer header). Token stored in `~/.overdeck.env` as `FIZZY_API_TOKEN`.
 
 This is a standalone HTTP client, NOT an `IssueTracker` implementation — Fizzy is a mirror, not a tracker backend.
 
@@ -136,7 +136,7 @@ Receives Fizzy webhook events, specifically `comment_created`:
 6. Deliver the comment body to the agent via `sendKeysAsync()` — equivalent to `pan tell`
 7. Post a confirmation reaction on the Fizzy comment (acknowledgment)
 
-Webhook signing secret stored in `~/.panopticon.env` as `FIZZY_WEBHOOK_SECRET`.
+Webhook signing secret stored in `~/.overdeck.env` as `FIZZY_WEBHOOK_SECRET`.
 
 #### 5. FizzyColumnResolver (`src/lib/fizzy/column-resolver.ts`)
 
@@ -146,26 +146,26 @@ Caches board column IDs on startup (columns rarely change). Maps pipeline stages
 
 ## Configuration
 
-In `~/.panopticon/config.yaml`:
+In `~/.overdeck/config.yaml`:
 
 ```yaml
 fizzy:
   enabled: true
   instance_url: https://fizzy.do        # or self-hosted URL
-  board_slug: panopticon                # board to mirror to
-  bot_username: panopticon-bot          # for loop prevention
+  board_slug: overdeck                # board to mirror to
+  bot_username: overdeck-bot          # for loop prevention
   token_env: FIZZY_API_TOKEN            # env var name for access token
   webhook_secret_env: FIZZY_WEBHOOK_SECRET  # env var name for webhook signing secret
 ```
 
-In `~/.panopticon.env`:
+In `~/.overdeck.env`:
 
 ```
 FIZZY_API_TOKEN=fizzy_pat_xxxxx
 FIZZY_WEBHOOK_SECRET=whsec_xxxxx
 ```
 
-Per-project override in `.panopticon.yaml`:
+Per-project override in `.overdeck.yaml`:
 
 ```yaml
 fizzy:
@@ -231,7 +231,7 @@ If no agent is currently running for that issue, the comment is stored in the is
 - Column resolver with caching
 - Card creation on `pan start`, column moves on state transitions
 - Specialist output posted as card comments
-- Configuration in config.yaml + .panopticon.env
+- Configuration in config.yaml + .overdeck.env
 - Board setup CLI command: `pan fizzy setup` (creates board + columns + webhook)
 
 ### Phase 2: Interactive Feedback

@@ -128,7 +128,7 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
 }
 
 /**
- * Load settings from ~/.panopticon/settings.json
+ * Load settings from ~/.overdeck/settings.json
  * Returns default settings if file doesn't exist or is invalid
  * Also loads API keys from environment variables as fallback
  */
@@ -149,7 +149,7 @@ export function loadSettingsSync(): SettingsConfig {
   }
 
   // Load API keys from environment variables as fallback
-  // This allows using ~/.panopticon.env for API keys
+  // This allows using ~/.overdeck.env for API keys
   const envApiKeys: ApiKeysConfig = {};
   if (process.env.OPENAI_API_KEY) envApiKeys.openai = process.env.OPENAI_API_KEY;
   if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
@@ -171,7 +171,7 @@ export function loadSettingsSync(): SettingsConfig {
 }
 
 /**
- * Save settings to ~/.panopticon/settings.json
+ * Save settings to ~/.overdeck/settings.json
  * Writes with pretty formatting (2-space indent)
  */
 export function saveSettingsSync(settings: SettingsConfig): void {

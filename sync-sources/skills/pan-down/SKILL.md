@@ -2,7 +2,7 @@
 name: pan-down
 description: "pan down — stop the Overdeck dashboard and services"
 triggers:
-  - stop panopticon
+  - stop overdeck
   - shutdown dashboard
   - pan down
   - stop services
@@ -23,7 +23,7 @@ This skill guides you through gracefully stopping all Overdeck services, includi
 - User needs to free up ports 3001/3002
 - User wants to restart services (stop then start)
 - System is shutting down or rebooting
-- User asks "how do I stop panopticon?"
+- User asks "how do I stop overdeck?"
 
 ## What Gets Stopped
 
@@ -61,7 +61,7 @@ pan status
 pan status
 
 # Check dashboard and API processes
-ps aux | grep panopticon
+ps aux | grep overdeck
 lsof -i :3001
 lsof -i :3002
 ```
@@ -120,7 +120,7 @@ pan status
 
 ## Configuration Options
 
-Edit `~/.panopticon.env` to customize shutdown behavior:
+Edit `~/.overdeck.env` to customize shutdown behavior:
 
 ```env
 # Graceful shutdown timeout (seconds)
@@ -148,7 +148,7 @@ ps aux | grep "api-server" | grep -v grep
 kill <PID>
 
 # Stop only Traefik
-docker-compose -f ~/.panopticon/traefik/docker-compose.yml down
+docker-compose -f ~/.overdeck/traefik/docker-compose.yml down
 ```
 
 ### Stop and Clean Up Workspaces
@@ -174,7 +174,7 @@ If services won't stop gracefully:
 pan down
 
 # Or manually force kill
-pkill -9 -f panopticon
+pkill -9 -f overdeck
 pkill -9 -f "dashboard"
 pkill -9 -f "api-server"
 ```
@@ -188,7 +188,7 @@ pkill -9 -f "api-server"
 **Solutions:**
 ```bash
 # Check for orphaned processes
-ps aux | grep panopticon | grep -v grep
+ps aux | grep overdeck | grep -v grep
 
 # Force kill by PID
 kill -9 <PID>
@@ -234,7 +234,7 @@ docker ps | grep traefik
 docker stop traefik
 
 # Or use Docker Compose
-cd ~/.panopticon/traefik/
+cd ~/.overdeck/traefik/
 docker-compose down
 
 # Force remove if stuck
@@ -267,10 +267,10 @@ tmux kill-server
 **Solutions:**
 ```bash
 # Remove stale PID files
-rm ~/.panopticon/pids/*.pid
+rm ~/.overdeck/pids/*.pid
 
 # Clean up lock files
-rm ~/.panopticon/locks/*.lock
+rm ~/.overdeck/locks/*.lock
 
 # Try starting again
 pan up
@@ -320,10 +320,10 @@ After stopping services, you may want to clean up:
 
 ```bash
 # Clean up log files
-rm ~/.panopticon/logs/*.log
+rm ~/.overdeck/logs/*.log
 
 # Clean up temporary files
-rm -rf ~/.panopticon/tmp/*
+rm -rf ~/.overdeck/tmp/*
 
 # Clean up old workspaces (careful!)
 pan workspace list
@@ -359,7 +359,7 @@ If using systemd service, it will stop automatically on shutdown.
 pan down
 
 # Stop after idle timeout (using systemd timer)
-# Create /etc/systemd/system/panopticon-idle.timer
+# Create /etc/systemd/system/overdeck-idle.timer
 ```
 
 ## Recovery After Ungraceful Shutdown
@@ -368,11 +368,11 @@ If services were killed ungracefully (power loss, crash):
 
 ```bash
 # Clean up stale resources
-rm ~/.panopticon/pids/*.pid
-rm ~/.panopticon/locks/*.lock
+rm ~/.overdeck/pids/*.pid
+rm ~/.overdeck/locks/*.lock
 
 # Check for orphaned Docker containers
-docker ps -a | grep panopticon
+docker ps -a | grep overdeck
 docker rm -f <container-id>
 
 # Clean up tmux sessions
@@ -394,7 +394,7 @@ Before shutting down:
 - [ ] Stop or notify agents: `pan tell <id> "Shutting down"`
 - [ ] Run graceful shutdown: `pan down`
 - [ ] Verify ports are free: `lsof -i :3001 :3002`
-- [ ] Check no orphaned processes: `ps aux | grep panopticon`
+- [ ] Check no orphaned processes: `ps aux | grep overdeck`
 - [ ] Verify tmux sessions stopped: `tmux list-sessions`
 
 ## Next Steps
@@ -402,7 +402,7 @@ Before shutting down:
 After stopping services:
 
 - **Restart**: Use `pan up` to start again
-- **Configuration**: Edit `~/.panopticon.env` while services are down
+- **Configuration**: Edit `~/.overdeck.env` while services are down
 - **Updates**: Run `pan update` to update Overdeck
 - **Cleanup**: Clean up logs and old workspaces
 
@@ -415,7 +415,7 @@ After stopping services:
 
 ## More Information
 
-- Configuration: `~/.panopticon.env`
-- Logs: `~/.panopticon/logs/`
-- PID files: `~/.panopticon/pids/`
+- Configuration: `~/.overdeck.env`
+- Logs: `~/.overdeck/logs/`
+- PID files: `~/.overdeck/pids/`
 - Run `pan down --help` for more options

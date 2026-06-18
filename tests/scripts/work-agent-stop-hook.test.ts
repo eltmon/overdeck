@@ -38,7 +38,7 @@ describe('work-agent-stop-hook structured channel replies', () => {
 
     mkdirSync(homeDir, { recursive: true })
     mkdirSync(mockBin, { recursive: true })
-    mkdirSync(join(homeDir, '.panopticon', 'agents', AGENT_ID), { recursive: true })
+    mkdirSync(join(homeDir, '.overdeck', 'agents', AGENT_ID), { recursive: true })
 
     writeFileSync(hookScriptPath, readFileSync(SCRIPT_PATH, 'utf-8'), 'utf-8')
     chmodSync(hookScriptPath, 0o755)
@@ -171,7 +171,7 @@ exit 99
   it('normalizes structured reply summaries before writing hooks.log', async () => {
     await runHook('done', 'Line 1\n\t[31mLine 2[0m\rFORGED')
 
-    const hooksLog = readFileSync(join(homeDir, '.panopticon', 'logs', 'hooks.log'), 'utf-8')
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
     expect(hooksLog).toContain('summary=Line 1 Line 2 FORGED')
     expect(hooksLog).not.toContain('\n\t[31m')
   })

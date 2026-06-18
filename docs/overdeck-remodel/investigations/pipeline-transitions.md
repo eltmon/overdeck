@@ -20,7 +20,7 @@
 - **Store** — a physical place a status value is persisted. Six exist:
   GitHub labels/issue-state, SQLite `review_status`, SQLite `agents`, SQLite
   `status_history` (append-only log), SQLite `events` (append-only log),
-  `.pan/<recordsPath>/<issue>.json` (git record), `~/.panopticon/agents/<id>/state.json`.
+  `.pan/<recordsPath>/<issue>.json` (git record), `~/.overdeck/agents/<id>/state.json`.
 - **Transition site** — a production code location that *writes* a stage-bearing
   value into at least one store.
 - **Reactive dispatch** — the autonomous half: a write to one store emits an

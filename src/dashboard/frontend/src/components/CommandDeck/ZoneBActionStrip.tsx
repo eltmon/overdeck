@@ -156,7 +156,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   };
 
   const handleOpenStateDir = useCallback(() => {
-    const path = `~/.panopticon/agents/${session.sessionId}/`;
+    const path = `~/.overdeck/agents/${session.sessionId}/`;
     navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
     setOverflowOpen(false);
   }, [session.sessionId]);
@@ -226,7 +226,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   }, [onViewTerminal]);
 
   const handleViewState = useCallback(() => {
-    const path = `~/.panopticon/agents/${session.sessionId}/`;
+    const path = `~/.overdeck/agents/${session.sessionId}/`;
     navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
     toast.success('State dir path copied');
     setOverflowOpen(false);

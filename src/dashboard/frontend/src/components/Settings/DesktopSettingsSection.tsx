@@ -6,8 +6,8 @@
  *   - Notifications: per-event-type toggles
  *   - Auto-start: enable/disable + reset nag counter
  *
- * Settings are persisted via panopticonBridge IPC to the main process.
- * Hidden entirely when window.panopticonBridge is undefined (browser mode).
+ * Settings are persisted via overdeckBridge IPC to the main process.
+ * Hidden entirely when window.overdeckBridge is undefined (browser mode).
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -22,7 +22,7 @@ type NotificationEventType = keyof DesktopSettings['notifications'];
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isDesktopApp(): boolean {
-  return window.panopticonBridge?.isDesktopApp() === true;
+  return window.overdeckBridge?.isDesktopApp() === true;
 }
 
 // ─── Toggle component ─────────────────────────────────────────────────────────
@@ -80,17 +80,17 @@ export function DesktopSettingsSection() {
       setLoading(false);
       return;
     }
-    window.panopticonBridge!.getDesktopSettings()
+    window.overdeckBridge!.getDesktopSettings()
       .then((s) => setSettings(s))
       .catch(() => toast.error('Failed to load desktop settings'))
       .finally(() => setLoading(false));
   }, []);
 
   const updateSetting = useCallback(async (key: string, value: unknown) => {
-    if (!window.panopticonBridge) return;
+    if (!window.overdeckBridge) return;
     setSaving(true);
     try {
-      await window.panopticonBridge.updateDesktopSetting(key, value);
+      await window.overdeckBridge.updateDesktopSetting(key, value);
       // Optimistically update local state
       setSettings((prev) => {
         if (!prev) return prev;

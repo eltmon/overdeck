@@ -23,7 +23,7 @@ resolves to it, and a write-side audit proving the Transcript layer is read-only
   agent appends to as the conversation runs. Claude Code, pi, codex, and
   kimi-via-CLIProxy each use a different on-disk shape. **Sacred:** Overdeck
   must read these but never mutate or delete them, and they are never committed
-  to git (they live under `~/.claude/` and `~/.panopticon/agents/`, both outside
+  to git (they live under `~/.claude/` and `~/.overdeck/agents/`, both outside
   any repo).
 - **Pointer** — the field(s) on a `conversations` row that locate the backing
   file. The canonical pointer is `claude_session_id` (claude-code); for pi/codex
@@ -82,7 +82,7 @@ conversation back — lose `claude_session_id` and the link is unreconstructable
 the other direction, but only as **cache**: it reads `(name, cwd, session_file,
 claude_session_id, issue_id)` from `conversations`, builds candidate paths
 (`session_file`, and `sessionFilePath(cwd, claude_session_id)` at line 52), and
-tags any discovered JSONL whose path matches as `panopticonManaged`. It also
+tags any discovered JSONL whose path matches as `overdeckManaged`. It also
 falls back to matching `cost_events.session_id`. The correlator **depends on**
 the pointer columns; it does not replace them.
 
@@ -98,14 +98,14 @@ the pointer columns; it does not replace them.
 
 ### 2.2 pi (and kimi-k2.* via CLIProxy)
 
-- **Location:** under the per-agent dir `~/.panopticon/agents/<agentId>/`. Pi writes the transcript as `<iso-timestamp>_<session-id>.jsonl` in **either** the `sessions/` subdir (**conversations**) **or** the **agent-dir root** (**work agents**, PAN-1908). Sibling files `cost-events.jsonl` / `activity.jsonl` in the same dir are **not** transcripts.
-- **Resolve from conversation:** `conv.harness === 'pi'` → `resolvePiSessionFile(conv.tmuxSession)` (`conversations.ts:755-756`), which globs `~/.panopticon/agents/<tmux>/sessions/` and returns the newest `.jsonl` (`conversations.ts:774-786`).
+- **Location:** under the per-agent dir `~/.overdeck/agents/<agentId>/`. Pi writes the transcript as `<iso-timestamp>_<session-id>.jsonl` in **either** the `sessions/` subdir (**conversations**) **or** the **agent-dir root** (**work agents**, PAN-1908). Sibling files `cost-events.jsonl` / `activity.jsonl` in the same dir are **not** transcripts.
+- **Resolve from conversation:** `conv.harness === 'pi'` → `resolvePiSessionFile(conv.tmuxSession)` (`conversations.ts:755-756`), which globs `~/.overdeck/agents/<tmux>/sessions/` and returns the newest `.jsonl` (`conversations.ts:774-786`).
 - **Resolve from agent (work/pipeline):** `resolvePiSessionPath(agentId)` (`jsonl-resolver.ts:204-229`) — checks **both** `<agentDir>/sessions/` and `<agentDir>` root, excludes `cost-events.jsonl`/`activity.jsonl`, returns freshest by mtime.
 - **kimi note:** kimi-k2.* routes through pi (provider-default routing), so kimi conversations are pi-shaped JSONL in the pi locations above — there is no separate "kimi" file shape. (No kimi/CLIProxy-specific transcript directory exists in the code; the CLIProxy is a request-time bridge, not a transcript writer.)
 
 ### 2.3 codex
 
-- **Location:** per-agent `CODEX_HOME` at `~/.panopticon/agents/<agentId>/codex-home/sessions/<YYYY>/<MM>/<DD>/rollout-<uuid>-<threadId>.jsonl` (OpenAI rollout schema). The resume pointer is the **thread-id**, persisted to `~/.panopticon/agents/<agentId>/codex-thread-id`.
+- **Location:** per-agent `CODEX_HOME` at `~/.overdeck/agents/<agentId>/codex-home/sessions/<YYYY>/<MM>/<DD>/rollout-<uuid>-<threadId>.jsonl` (OpenAI rollout schema). The resume pointer is the **thread-id**, persisted to `~/.overdeck/agents/<agentId>/codex-thread-id`.
 - **Resolve from conversation:** `conv.harness === 'codex'` → `resolveCodexRolloutPath(conv.tmuxSession)` (`conversations.ts:760-761`).
 - **Resolve from agent:** `resolveCodexRolloutPath(agentId)` (`jsonl-resolver.ts:178-195`) — fast path reads `codex-thread-id` → `findRolloutPath`; lazy fallback `findLatestRollout(codexHome)` (codex writes the rollout only on the first turn, so a spawn-time capture can miss it).
 
@@ -158,7 +158,7 @@ Six hits. Adjudication:
 | --- | --- | --- | --- |
 | 1 | `summary-fork.ts:649` `copySessionFromCompactBoundary` → `writeFile(destPath, …)` | **NEW** freshly-reserved `randomUUID()` file (`reserveSummaryForkSession` → `randomUUID()`, `summary-fork.ts:562,667`). Source read read-only via `readFile(sourcePath)`. | ✅ **Compliant — by design.** Forks create a fresh session file from a compact boundary; source is never touched. This is exactly PAN-1781's "fresh-session seeding, never boundary-JSON tweaks." |
 | 2 | `session-format-converter.ts:223,248,288` `writeFile(targetSessionFile, …)` | **NEW** `randomUUID()` files (codex rollout / pi session / claude session) for **harness switching**. Source read read-only (`readFile(opts.sourceSessionFile)`, line 190). | ✅ **Compliant.** Creates a new transcript in the target harness's shape; source preserved. |
-| 3 | `deacon.ts:5617` `rmSync(sessionFile)` | **NOT a transcript.** `sessionFile` here = `~/.panopticon/agents/<id>/session.id` — a tiny **pointer file** holding the resume UUID, deleted on signature-corruption recovery so `--resume` won't reattach the corrupted session. The sacred JSONL is untouched. | ✅ **Compliant** (misleading variable name). |
+| 3 | `deacon.ts:5617` `rmSync(sessionFile)` | **NOT a transcript.** `sessionFile` here = `~/.overdeck/agents/<id>/session.id` — a tiny **pointer file** holding the resume UUID, deleted on signature-corruption recovery so `--resume` won't reattach the corrupted session. The sacred JSONL is untouched. | ✅ **Compliant** (misleading variable name). |
 | 4 | `teardown-workspace.ts:302` `appendFile(projJsonl, …)` | **NOT a transcript.** `projJsonl` = `.beads/issues.jsonl` (the bd issue tracker), merging workspace beads into the project root. Unrelated to conversation transcripts. | ✅ **Out of scope.** |
 | 5 | **`conversation-compaction.ts:164`** `appendFile(sessionFile, …)` | **The LIVE existing claude backing JSONL.** Appends a Overdeck-authored `compact_boundary` system entry + an `isCompactSummary` user message **in place** into the conversation's own `~/.claude/projects/**/<uuid>.jsonl`. | ⚠️ **IN-PLACE MUTATION of a backing file** — see below. |
 
@@ -211,16 +211,16 @@ remodel; not changing behavior in this investigation.**
 ### 4.1 Metadata is DB-resident only
 
 The irreplaceable conversation metadata lives **only** in the local SQLite
-`conversations` table (`~/.panopticon/panopticon.db`) plus the `favorites` table —
+`conversations` table (`~/.overdeck/panopticon.db`) plus the `favorites` table —
 nowhere in the JSONL (the transcript never names the conversation, its title, its
 favorite status, its lineage) and nowhere in git. **Verified (not merely
 asserted):** a grep for any conversation `name`/`title`/`favorite`/lineage write
 to a **tracked** `.pan/` path (`.pan/continues|specs|drafts|records`) returns
 **nothing** — conversation DB writes go to SQLite via prepared statements (not
 files), and the only file a conversation writes is the handoff doc, which lands in
-`~/.panopticon/handoffs/` (`getHandoffsDir`, `paths.ts:26` — outside any repo) with
+`~/.overdeck/handoffs/` (`getHandoffsDir`, `paths.ts:26` — outside any repo) with
 the row holding only a *pointer* (`handoff_doc_path`) to it. The `~/.claude` and
-`~/.panopticon/agents` trees are likewise outside any repo. The
+`~/.overdeck/agents` trees are likewise outside any repo. The
 conversations-transcripts audit enumerates the exact 14-field
 EXPORT set + `favorites`; it is reproduced here as the export contract:
 
@@ -255,7 +255,7 @@ the audit/design docs, never source. PAN-1937 exists today as **design only**:
 above, written to a durable home **outside** the disposable DB. Two candidate
 targets named in the design: (a) a git `.pan/records`-style per-conversation
 artifact (recommended — travels across machines, matches the Issue-record
-pattern), or (b) a single conversations export file under `~/.panopticon/...`.
+pattern), or (b) a single conversations export file under `~/.overdeck/...`.
 The export's job is "preserve the pointer + the authored intent," **not** the
 transcript (sacred, on disk, never in git) and **not** the derived facts
 (rebuildable cache from JSONL/tmux/cost_events).
@@ -322,8 +322,8 @@ derived facts, dispatching on harness shape:
 
 | Layer | Home | In git? | On wipe |
 | --- | --- | --- | --- |
-| **Backing transcript** (claude/pi/codex JSONL) | `~/.claude/projects/…`, `~/.panopticon/agents/<id>/[sessions/]…` | **No** (sacred, on disk) | **Survives** — never touched by a DB wipe |
-| **Conversation metadata** (14 fields + favorites) | `conversations` / `favorites` in `~/.panopticon/panopticon.db` | **No** | **LOST unless exported** → PAN-1937 export (git `.pan/records` artifact recommended) |
+| **Backing transcript** (claude/pi/codex JSONL) | `~/.claude/projects/…`, `~/.overdeck/agents/<id>/[sessions/]…` | **No** (sacred, on disk) | **Survives** — never touched by a DB wipe |
+| **Conversation metadata** (14 fields + favorites) | `conversations` / `favorites` in `~/.overdeck/panopticon.db` | **No** | **LOST unless exported** → PAN-1937 export (git `.pan/records` artifact recommended) |
 | **Transcript-derived facts** (`discovered_sessions`, FTS, embeddings) | same DB | **No** | **Rebuilt** by the scan from the (surviving) backing files |
 
 The headline: **only the metadata needs the export.** The transcript is sacred

@@ -1,6 +1,6 @@
 # Test configuration fixture for Overdeck tests
 
-[panopticon]
+[overdeck]
 version = "1.0.0"
 
 [sync]

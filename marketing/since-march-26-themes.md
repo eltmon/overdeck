@@ -169,9 +169,9 @@ This is the demo. Issue → plan → work → review → test → merge → gree
 Overdeck ships as a **one-command-installable desktop app**.
 
 ### What we built
-- **Published as `panopticon` npm package**
-- **`npx panopticon serve`** — server + browser only
-- **`npx panopticon`** — full Electron desktop app
+- **Published as `overdeck` npm package**
+- **`npx overdeck serve`** — server + browser only
+- **`npx overdeck`** — full Electron desktop app
 - **System tray** with agent status color (green / yellow / red), right-click menu
 - **Native notifications**, each toggleable independently:
   - Input Needed
@@ -182,8 +182,8 @@ Overdeck ships as a **one-command-installable desktop app**.
 - **Auto-start on login** with gentle nag flow
 - **Cmd+K / Ctrl+K command palette** — jump to any running agent or view
 - **Menu bar (macOS)** with Cloister start/stop, Emergency Stop, workspace list
-- **IPC bridge** (`window.panopticonBridge`) for desktop-specific features
-- **Custom `panopticon://` protocol** for packaged builds
+- **IPC bridge** (`window.overdeckBridge`) for desktop-specific features
+- **Custom `overdeck://` protocol** for packaged builds
 - **Pure Node 22** runtime — no Bun assumption at runtime
 
 ### Marketing angle
@@ -345,8 +345,8 @@ Beads is the git-backed task tracker that backs the agent's working memory.
 ## Theme 16: Project Artifact Migration — `.pan/` (PAN-488)
 
 ### What we built
-- **`~/.panopticon/` → `~/.pan/`**
-- **`.panopticon.yaml` → `.pan.yaml`** with backwards-compat fallback
+- **`~/.overdeck/` → `~/.pan/`**
+- **`.overdeck.yaml` → `.pan.yaml`** with backwards-compat fallback
 - **Safe migration script** for existing installations
 - **Multi-tool skill sync** targets `.pan/skills/` for Claude Code, Cursor, Codex, and more
 
@@ -475,7 +475,7 @@ Overdeck doesn't have a "demo mode." The thing in the demo is the thing we build
 - **Theme 1 (vBRIEF)** — the deft.co partnership story
 
 ### For social / Twitter / LinkedIn
-- **Theme 7 (Desktop App)** — "`npx panopticon` and you're running"
+- **Theme 7 (Desktop App)** — "`npx overdeck` and you're running"
 - **Theme 4 (Multi-Provider)** — "Pick any model. Run any agent."
 - **Theme 24 (Dogfooding)** — commit count + bot author screenshots
 
@@ -493,7 +493,7 @@ Overdeck doesn't have a "demo mode." The thing in the demo is the thing we build
 - **The deft.co line**: "Overdeck is the first production multi-agent orchestrator built on vBRIEF — every issue, plan, task, and merge flows through deft.co's open planning standard."
 - **The technical line**: "Overdeck turns a GitHub issue into a squash-merged PR through a hardened review → test → merge specialist pipeline, with humans only clicking 'merge.'"
 - **The dogfooding line**: "765 commits in 17 days, written by Overdeck agents using Overdeck to build Overdeck."
-- **The desktop line**: "`npx panopticon`. System tray, native notifications, multi-provider, multi-project. One command."
+- **The desktop line**: "`npx overdeck`. System tray, native notifications, multi-provider, multi-project. One command."
 - **The investor line**: "We dogfood our own product 12 hours a day across four projects. Every commit is proof of work."
 
 ---

@@ -26,7 +26,7 @@ interface TriageState {
 }
 
 /**
- * Get tracker config by type from panopticon config
+ * Get tracker config by type from overdeck config
  */
 function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
   const config = loadConfigSync();
@@ -48,7 +48,7 @@ function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
 }
 
 function getTriageStatePath(): string {
-  return join(homedir(), '.panopticon', 'triage-state.json');
+  return join(homedir(), '.overdeck', 'triage-state.json');
 }
 
 function loadTriageState(): TriageState {
@@ -64,7 +64,7 @@ function loadTriageState(): TriageState {
 }
 
 function saveTriageState(state: TriageState): void {
-  const dir = join(homedir(), '.panopticon');
+  const dir = join(homedir(), '.overdeck');
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -86,7 +86,7 @@ export async function triageCommand(id?: string, options: TriageOptions = {}): P
       console.log('');
       console.log(chalk.bold('Setup Instructions:'));
       console.log('');
-      console.log('Add secondary tracker to ~/.panopticon/config.toml:');
+      console.log('Add secondary tracker to ~/.overdeck/config.toml:');
       console.log(chalk.dim(`
 [trackers]
 primary = "linear"

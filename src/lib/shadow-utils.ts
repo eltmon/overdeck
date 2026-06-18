@@ -17,7 +17,7 @@ import { FsError } from './errors.js';
  * Falls back to process.env.LINEAR_API_KEY if the config file is absent or unreadable.
  */
 export function getLinearApiKey(): Effect.Effect<string | null> {
-  const envFile = join(homedir(), '.panopticon.env');
+  const envFile = join(homedir(), '.overdeck.env');
   if (!existsSync(envFile)) {
     return Effect.succeed(process.env.LINEAR_API_KEY ?? null);
   }

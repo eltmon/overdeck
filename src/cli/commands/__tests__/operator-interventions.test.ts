@@ -251,7 +251,7 @@ describe('operator intervention CLI emission', () => {
   it('emits a deep-wipe intervention when pan wipe succeeds', async () => {
     fsMocks.existsSync.mockImplementation((path: string) => path.endsWith('projects.yaml'));
     fsMocks.readFileSync.mockReturnValue('projects: {}');
-    yamlMocks.load.mockReturnValue({ projects: { panopticon: { path: '/tmp/project', linear_team: 'PAN' } } });
+    yamlMocks.load.mockReturnValue({ projects: { overdeck: { path: '/tmp/project', linear_team: 'PAN' } } });
     projectMocks.getIssuePrefix.mockReturnValue('PAN');
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
 
@@ -277,7 +277,7 @@ describe('operator intervention CLI emission', () => {
   it('does not emit a deep-wipe intervention when pan wipe fails', async () => {
     fsMocks.existsSync.mockImplementation((path: string) => path.endsWith('projects.yaml'));
     fsMocks.readFileSync.mockReturnValue('projects: {}');
-    yamlMocks.load.mockReturnValue({ projects: { panopticon: { path: '/tmp/project', linear_team: 'PAN' } } });
+    yamlMocks.load.mockReturnValue({ projects: { overdeck: { path: '/tmp/project', linear_team: 'PAN' } } });
     projectMocks.getIssuePrefix.mockReturnValue('PAN');
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: false, steps: [] }));
 

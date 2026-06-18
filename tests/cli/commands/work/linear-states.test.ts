@@ -80,10 +80,10 @@ describe('linear-states', () => {
       expect(mod.cleanupStatesCommand).toBeDefined();
     });
 
-    it('should read API key from ~/.panopticon.env file', async () => {
+    it('should read API key from ~/.overdeck.env file', async () => {
       delete process.env.LINEAR_API_KEY;
       process.env.HOME = tempDir;
-      writeFileSync(join(tempDir, '.panopticon.env'), 'LINEAR_API_KEY=file-api-key\n');
+      writeFileSync(join(tempDir, '.overdeck.env'), 'LINEAR_API_KEY=file-api-key\n');
 
       const mod = await import('../../../../src/cli/commands/admin/tracker-handler.js');
       expect(mod).toBeDefined();

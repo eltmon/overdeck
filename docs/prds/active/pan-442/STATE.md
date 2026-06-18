@@ -23,7 +23,7 @@
 
 **Frontend loading: Hybrid approach**
 - **Dev mode:** BrowserWindow loads `http://localhost:<vite-port>` (Vite dev server with HMR)
-- **Packaged builds:** Custom `panopticon://` protocol serves static files from bundled `dist/dashboard/public/`
+- **Packaged builds:** Custom `overdeck://` protocol serves static files from bundled `dist/dashboard/public/`
 - Avoids localhost exposure in production, maintains dev ergonomics
 
 **Build system:** tsdown for main.ts + preload.ts (CJS output to `dist-electron/`)
@@ -65,7 +65,7 @@
 - Detection: check for app binary in standard install locations
 
 **npx launcher:**
-- `npx panopticon` starts the dashboard server and opens localhost in default browser
+- `npx overdeck` starts the dashboard server and opens localhost in default browser
 - No Electron download required — lowest friction for non-admin users
 - Separate from the Electron app distribution
 
@@ -86,6 +86,6 @@
 
 ## Technical Risks
 1. **Native addon rebuilds**: node-pty needs `electron-rebuild` for Electron's Node version
-2. **Custom protocol + WebSocket**: `panopticon://` protocol needs to handle WS connections to the embedded server correctly
+2. **Custom protocol + WebSocket**: `overdeck://` protocol needs to handle WS connections to the embedded server correctly
 3. **macOS code signing**: Unsigned apps trigger Gatekeeper warnings — acceptable for alpha, needs signing for distribution
 4. **Bundle size**: Electron adds ~150MB — acceptable tradeoff for native experience

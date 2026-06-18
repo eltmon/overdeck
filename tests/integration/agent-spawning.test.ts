@@ -243,7 +243,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let createdSupervisorStub = false;
 
   beforeAll(() => {
-    // PAN-1808: never touch the shared panopticon socket; use a throwaway
+    // PAN-1808: never touch the shared overdeck socket; use a throwaway
     // per-process socket and a harmless harness command as defense in depth.
     process.env.OVERDECK_TMUX_SOCKET_NAME = testTmuxSocketName;
     process.env.OVERDECK_TEST_HARNESS_COMMAND = 'true';

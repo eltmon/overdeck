@@ -29,7 +29,7 @@ import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.OVERDECK_SUPERVISOR_PORT || 3012);
 const PAN_BINARY = process.env.OVERDECK_PAN_BINARY || 'pan';
-const LOG_FILE = path.join(os.homedir(), '.panopticon', 'logs', 'supervisor.log');
+const LOG_FILE = path.join(os.homedir(), '.overdeck', 'logs', 'supervisor.log');
 const platformConfig = readPlatformConfigSync();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
 const ttsWatchdogConfig = readTtsWatchdogConfig(process.env);

@@ -4,7 +4,7 @@ description: Create Overdeck repo commits that satisfy commitlint and husky on t
 triggers:
   - commit these changes
   - create a commit
-  - commit in panopticon
+  - commit in overdeck
   - make a conventional commit
   - avoid commitlint failure
 allowed-tools:

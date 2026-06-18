@@ -33,7 +33,7 @@ import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 import { readRollbackAgentHarnessFromDir } from '../../../lib/overdeck/agent-rollback-state.js';
 
 export interface ResolveJsonlPathOptions {
-  /** Override the ~/.panopticon/agents directory (test hook). */
+  /** Override the ~/.overdeck/agents directory (test hook). */
   agentsDirOverride?: string;
   /** Override the ~/.claude/projects directory (test hook). */
   claudeProjectsDirOverride?: string;

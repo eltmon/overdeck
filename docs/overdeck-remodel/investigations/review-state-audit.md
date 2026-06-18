@@ -101,7 +101,7 @@ DROP/DERIVE collapse gets to shrink.
 | Listed | Reality |
 | --- | --- |
 | `reviewer_verdicts` | **Not a `review_status` column.** No CREATE TABLE entry, no migration, not in `DbReviewStatusRow`, not in the `ReviewStatus` interface. Exists ONLY as `reviewerVerdicts?: unknown` on the durable `PanIssuePipelineRecord` (record.ts:83), passed through at records.ts:110 via a cast that reads a property the source type doesn't even declare — so it is **always `undefined`** in practice. Dead pass-through. **DROP.** |
-| `lifetime_auto_requeue_count` | **Does not exist anywhere in code.** Zero hits in `src/` or `tests/`. Only mention is in two docs: `docs/panopticon-db-erd.excalidraw` and `docs/STATE-STORAGE-AUDIT.md`. The ERD diagram and the task field-list are stale. **N/A — nothing to drop.** |
+| `lifetime_auto_requeue_count` | **Does not exist anywhere in code.** Zero hits in `src/` or `tests/`. Only mention is in two docs: `docs/overdeck-db-erd.excalidraw` and `docs/STATE-STORAGE-AUDIT.md`. The ERD diagram and the task field-list are stale. **N/A — nothing to drop.** |
 
 ---
 
@@ -151,7 +151,7 @@ deacon's review monitor *during* a live review run.
    is a durable-record field (always `undefined` in practice — a dead cast),
    not a `review_status` column. `lifetime_auto_requeue_count` exists **only in
    the ERD diagram and a stale audit doc** — there is no such column or code.
-   The `docs/panopticon-db-erd.excalidraw` field list is out of date.
+   The `docs/overdeck-db-erd.excalidraw` field list is out of date.
 
 3. **`inspect_bead_id` is written but never read** — zero consumers anywhere.
    Pure dead weight.

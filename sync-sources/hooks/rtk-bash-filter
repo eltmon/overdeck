@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/rtk-bash-filter
+# ~/.overdeck/bin/rtk-bash-filter
 # PreToolUse hook on Bash — delegates command rewriting to rtk-ai/rtk so
 # expensive command output can be filtered before Claude Code runs the command.
 #
@@ -7,7 +7,7 @@
 #   - Non-Bash tool_name
 #   - jq unavailable or malformed PreToolUse JSON
 #   - OVERDECK_RTK_ENABLED is unset/false and agents.rtk.enabled is absent/false
-#   - ~/.panopticon/bin/rtk is missing or not executable
+#   - ~/.overdeck/bin/rtk is missing or not executable
 #   - rtk exits non-zero, emits no output, or emits an invalid PreToolUse response
 #   - rtk chooses not to rewrite a command, including commands whose output it
 #     expects to be too small to benefit from filtering
@@ -87,7 +87,7 @@ rtk_config_enabled_value() {
   if [ -n "${OVERDECK_CONFIG:-}" ]; then
     value=$(rtk_read_config_enabled "$OVERDECK_CONFIG")
   else
-    value=$(rtk_read_config_enabled "$HOME/.panopticon/config.yaml")
+    value=$(rtk_read_config_enabled "$HOME/.overdeck/config.yaml")
   fi
   [ -n "$value" ] && result="$value"
 
@@ -95,8 +95,8 @@ rtk_config_enabled_value() {
   if [ -n "$project_root" ]; then
     if [ -f "$project_root/.pan.yaml" ]; then
       config_path="$project_root/.pan.yaml"
-    elif [ -f "$project_root/.panopticon.yaml" ]; then
-      config_path="$project_root/.panopticon.yaml"
+    elif [ -f "$project_root/.overdeck.yaml" ]; then
+      config_path="$project_root/.overdeck.yaml"
     else
       config_path=""
     fi
@@ -108,7 +108,7 @@ rtk_config_enabled_value() {
   printf '%s\n' "$result"
 }
 
-RTK_BIN="$HOME/.panopticon/bin/rtk"
+RTK_BIN="$HOME/.overdeck/bin/rtk"
 
 if [ -n "${OVERDECK_RTK_ENABLED+x}" ]; then
   if ! rtk_truthy "$OVERDECK_RTK_ENABLED"; then

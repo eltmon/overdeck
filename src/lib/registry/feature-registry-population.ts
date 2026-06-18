@@ -248,6 +248,6 @@ function buildClassificationIdentity(issueId: string): MemoryIdentity {
     runId: 'feature-registry-classifier',
     sessionId: 'feature-registry-classifier',
     agentRole: 'plan',
-    agentHarness: 'panopticon',
+    agentHarness: 'overdeck',
   };
 }

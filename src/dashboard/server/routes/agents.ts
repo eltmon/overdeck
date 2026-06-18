@@ -179,7 +179,7 @@ function emitStartAgentPhase(
   });
 }
 
-const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token';
+const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token';
 
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
@@ -222,7 +222,7 @@ export async function validateAgentRuntimeEventAuth(
 }
 
 async function appendAgentLifecycleLog(agentId: string, event: string, details: Record<string, unknown> = {}): Promise<void> {
-  const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
+  const agentDir = join(homedir(), '.overdeck', 'agents', agentId);
   await mkdir(agentDir, { recursive: true });
   const logLine = JSON.stringify({
     ts: new Date().toISOString(),
@@ -414,7 +414,7 @@ function buildStoppedAgentLifecycle(
 }
 
 async function readRemoteAgentState(agentId: string): Promise<Record<string, unknown>> {
-  const remoteStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'remote-state.json');
+  const remoteStateFile = join(homedir(), '.overdeck', 'agents', agentId, 'remote-state.json');
   if (!existsSync(remoteStateFile)) return {};
   try {
     return JSON.parse(await readFile(remoteStateFile, 'utf-8')) as Record<string, unknown>;
@@ -465,7 +465,7 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
 
 async function getWorkspaceLocation(issueId: string): Promise<'local' | 'remote' | undefined> {
   try {
-    const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
+    const workspacesDir = join(homedir(), '.overdeck', 'workspaces');
     const variations = [issueId.toLowerCase(), issueId.toUpperCase(), issueId];
     for (const v of variations) {
       const yamlPath = join(workspacesDir, `${v}.yaml`);
@@ -710,7 +710,7 @@ const getAgentsRoute = HttpRouter.add(
             const isRemote = remoteState.location === 'remote';
             const runtimeData = await Effect.runPromise(getAgentRuntimeState(name));
             const startedAt = state.startedAt || (session ? new Date(session.created).toISOString() : new Date().toISOString());
-            const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
+            const healthFile = join(homedir(), '.overdeck', 'agents', name, 'health.json');
             let health: any = { killCount: 0 };
             if (existsSync(healthFile)) {
               try { health = { ...health, ...JSON.parse(await readFile(healthFile, 'utf-8')) }; } catch {}
@@ -828,7 +828,7 @@ const getAgentsRoute = HttpRouter.add(
 
             let contextPercent: number | null = null;
             let initialContextPercent: number | null = null;
-            const agentCtxDir = join(homedir(), '.panopticon', 'agents', name);
+            const agentCtxDir = join(homedir(), '.overdeck', 'agents', name);
             try {
               const ctxFile = join(agentCtxDir, 'context-pct');
               contextPercent = parseInt((await readFile(ctxFile, 'utf-8').catch(() => '')).trim(), 10) || null;
@@ -885,7 +885,7 @@ const getAgentOutputRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
         try {
-          const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+          const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
           const remoteStateFile = join(agentStateDir, 'remote-state.json');
           let isRemote = false;
           let vmName = '';
@@ -926,7 +926,7 @@ const getAgentOutputRoute = HttpRouter.add(
         } catch (error: unknown) {
           // Try saved log on error
           try {
-            const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+            const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
             const savedLog = join(agentStateDir, 'output.log');
             const logContent = await readFile(savedLog, 'utf-8').catch(() => null);
             if (logContent) return jsonResponse({ output: logContent });
@@ -971,7 +971,7 @@ const getAgentConversationRoute = HttpRouter.add(
 );
 
 async function sendAgentMessage(id: string, message: string) {
-  const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+  const agentStateDir = join(homedir(), '.overdeck', 'agents', id);
   const remoteStateFile = join(agentStateDir, 'remote-state.json');
   let isRemote = false;
 
@@ -3119,7 +3119,7 @@ const postAgentsRoute = HttpRouter.add(
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
       const activityId = `activity-${Date.now()}`;
-      const agentDir = join(homedir(), '.panopticon', 'agents', agentSessionName);
+      const agentDir = join(homedir(), '.overdeck', 'agents', agentSessionName);
       await mkdir(agentDir, { recursive: true });
       const spawnLogPath = join(agentDir, 'spawn.log');
       const spawnLogHandle = await open(spawnLogPath, 'a');
@@ -3199,7 +3199,7 @@ const postAgentsRoute = HttpRouter.add(
       if (dockerRunning) {
         const getComposeProjectName = async (id: string, wPath: string): Promise<string> => {
           const featureFolder = `feature-${id.toLowerCase()}`;
-          const expected = `panopticon-${featureFolder}`;
+          const expected = `overdeck-${featureFolder}`;
           const validate = (value: string, devPath: string): string => {
             if (value !== expected) {
               throw new Error(`Invalid COMPOSE_PROJECT_NAME in ${devPath}: expected ${expected}`);
@@ -3264,7 +3264,7 @@ const postAgentsRoute = HttpRouter.add(
 
         if (!containersReady && !allowHost) {
           const earlyAgentId = agentSessionName;
-          const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
+          const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
           // PAN-1048 R2: legacy `runtime` field removed; PAN-1055: persist user-picked harness.
           saveAgentStateSync({
@@ -3499,7 +3499,7 @@ const postAgentsRoute = HttpRouter.add(
     // and pan start calling saveAgentState(), during which the workspace detail
     // panel shows the stale planning-<id> session and "No saved output available."
     const earlyAgentId = agentSessionName; // e.g. "agent-pan-488"
-    const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
+    const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
     yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
     // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
     saveAgentStateSync({

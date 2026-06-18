@@ -27,7 +27,7 @@ Progressive workspaces are opt-in per-project via the `progressive: true` flag. 
 ## Configuration
 
 ```yaml
-# ~/.panopticon/projects.yaml
+# ~/.overdeck/projects.yaml
 projects:
   enterprise-integration:
     name: "Enterprise Integration"
@@ -38,7 +38,7 @@ projects:
       type: polyrepo
       progressive: true                  # Opt-in to progressive mode
       always_include: [meta]           # These repos always exist in workspace
-      groups_file: team-meta/panopticon/repo-groups.yaml  # Repo group definitions
+      groups_file: team-meta/overdeck/repo-groups.yaml  # Repo group definitions
       pr_target: qa                     # Default PR target for all repos
 
       repos:
@@ -82,7 +82,7 @@ projects:
 Repo groups let agents add multiple related repos at once. Groups are defined in a `repo-groups.yaml` file within your meta repo:
 
 ```yaml
-# team-meta/panopticon/repo-groups.yaml
+# team-meta/overdeck/repo-groups.yaml
 groups:
   simphony:
     - int-micros-simphony

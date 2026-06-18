@@ -16,8 +16,8 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { emitDashboardLifecycleSync } from '../../lib/activity-logger.js';
 
-export const PENDING_FILE = join(homedir(), '.panopticon', 'pending-post-merge.json');
-export const RESTART_MARKER = join(homedir(), '.panopticon', 'dashboard-restarting.json');
+export const PENDING_FILE = join(homedir(), '.overdeck', 'pending-post-merge.json');
+export const RESTART_MARKER = join(homedir(), '.overdeck', 'dashboard-restarting.json');
 export const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 export const LIFECYCLE_DELAY_MS = 3000; // 3s — let server become ready first
 
@@ -91,10 +91,10 @@ export async function processPendingLifecycle(options?: {
           issueId: marker.issueId,
           trigger: marker.trigger ?? 'deploy-script',
         });
-        console.log(`[panopticon] Detected planned restart (${marker.reason}) — lifecycle_started event emitted`);
+        console.log(`[overdeck] Detected planned restart (${marker.reason}) — lifecycle_started event emitted`);
       }
     } catch (err: any) {
-      console.warn(`[panopticon] Failed to process restart marker: ${err.message}`);
+      console.warn(`[overdeck] Failed to process restart marker: ${err.message}`);
     }
   }
 
@@ -114,13 +114,13 @@ export async function processPendingLifecycle(options?: {
 
     if (age > staleThresholdMs) {
       console.warn(
-        `[panopticon] Ignoring stale pending-post-merge.json (age: ${Math.round(age / 60000)}min) for ${pending.issueId}`
+        `[overdeck] Ignoring stale pending-post-merge.json (age: ${Math.round(age / 60000)}min) for ${pending.issueId}`
       );
       return;
     }
 
     console.log(
-      `[panopticon] Found pending post-merge lifecycle for ${pending.issueId} — scheduling in ${lifecycleDelayMs}ms`
+      `[overdeck] Found pending post-merge lifecycle for ${pending.issueId} — scheduling in ${lifecycleDelayMs}ms`
     );
 
     setTimeout(async () => {
@@ -132,7 +132,7 @@ export async function processPendingLifecycle(options?: {
           durationMs: Date.now() - startTime,
         });
       } catch (err: any) {
-        console.error(`[panopticon] Post-merge lifecycle failed for ${pending.issueId}: ${err.message}`);
+        console.error(`[overdeck] Post-merge lifecycle failed for ${pending.issueId}: ${err.message}`);
         emitDashboardLifecycleSync('failed', {
           reason: pending.reason ?? 'post-merge',
           issueId: pending.issueId,
@@ -141,6 +141,6 @@ export async function processPendingLifecycle(options?: {
       }
     }, lifecycleDelayMs);
   } catch (err: any) {
-    console.warn(`[panopticon] Failed to process pending-post-merge.json: ${err.message}`);
+    console.warn(`[overdeck] Failed to process pending-post-merge.json: ${err.message}`);
   }
 }

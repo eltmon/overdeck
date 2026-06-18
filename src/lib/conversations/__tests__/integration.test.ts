@@ -188,7 +188,7 @@ describe('Stage 1: scan', () => {
     await scan({ mode: 'system', watchDirs: [] });
     const myapp = findDiscoveredSessions({}).find((s) => s.jsonlPath === myappPath)!;
 
-    expect(myapp.panopticonManaged).toBe(true);
+    expect(myapp.overdeckManaged).toBe(true);
     expect(myapp.panIssueId).toBe('PAN-457');
   });
 

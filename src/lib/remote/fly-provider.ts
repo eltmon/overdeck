@@ -141,7 +141,7 @@ export class FlyProvider implements RemoteProvider {
    * inside other Effect-wrapped operations.
    */
   async resolveVm(vmName: string): Promise<{ appName: string; machineId: string }> {
-    const workspacesDir = join(homedir(), '.panopticon', 'workspaces');
+    const workspacesDir = join(homedir(), '.overdeck', 'workspaces');
     if (existsSync(workspacesDir)) {
       for (const file of readdirSync(workspacesDir)) {
         if (!file.endsWith('.yaml')) continue;
@@ -650,9 +650,9 @@ with open(path, "w") as f:
     }
   }
 
-  /** Copy essential skills from local ~/.panopticon/skills/ to remote VM */
+  /** Copy essential skills from local ~/.overdeck/skills/ to remote VM */
   async copySkillsToVm(vmName: string): Promise<void> {
-    const skillsDir = join(homedir(), '.panopticon', 'skills');
+    const skillsDir = join(homedir(), '.overdeck', 'skills');
     if (!existsSync(skillsDir)) return;
 
     await this.sshImpl(vmName, 'mkdir -p ~/.claude/skills');

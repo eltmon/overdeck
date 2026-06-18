@@ -41,7 +41,7 @@ Add all 5 to the `DomainEvent` union.
 
 ### Layer 3: No Frontend Changes Needed
 
-The shared reducer in `@panopticon/contracts` is used by both the server read model and the frontend Zustand store. Once the reducer handles the new events, the frontend reacts automatically via the existing WebSocket event stream.
+The shared reducer in `@overdeck/contracts` is used by both the server read model and the frontend Zustand store. Once the reducer handles the new events, the frontend reacts automatically via the existing WebSocket event stream.
 
 ## Files Changed
 

@@ -102,7 +102,7 @@ If the current trigger category is in the skip list, **do not prompt**.
 ### Step 1: Check Configuration
 
 ```bash
-cat .panopticon/knowledge-capture.json 2>/dev/null || echo "{}"
+cat .overdeck/knowledge-capture.json 2>/dev/null || echo "{}"
 ```
 
 **Default configuration** (if file doesn't exist):
@@ -212,10 +212,10 @@ After any interaction, update the config file:
 
 ```bash
 # Ensure directory exists
-mkdir -p .panopticon
+mkdir -p .overdeck
 
 # Write updated config
-cat > .panopticon/knowledge-capture.json << 'EOF'
+cat > .overdeck/knowledge-capture.json << 'EOF'
 {
   "enabled": true,
   "mode": "normal",
@@ -410,7 +410,7 @@ Prompt the user early:
 | File | Purpose |
 |------|---------|
 | `~/.claude/CLAUDE.md` | User preferences (category exclusions) |
-| `.panopticon/knowledge-capture.json` | Per-project configuration |
+| `.overdeck/knowledge-capture.json` | Per-project configuration |
 | `.claude/skills/project-knowledge/SKILL.md` | Captured knowledge as skill |
 | `.claude/skills/knowledge-capture/SKILL.md` | Override to permanently disable |
 | `.claude/CLAUDE.md` | Project-specific notes |
@@ -419,7 +419,7 @@ Prompt the user early:
 
 To reset knowledge capture for a project:
 ```bash
-rm .panopticon/knowledge-capture.json
+rm .overdeck/knowledge-capture.json
 ```
 
 To remove captured knowledge:

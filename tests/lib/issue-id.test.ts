@@ -21,8 +21,8 @@ function makeOverdeckHome(): string {
   return root;
 }
 
-function writeAgentState(panopticonHome: string, issueId: string): void {
-  const agentDir = join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`);
+function writeAgentState(overdeckHome: string, issueId: string): void {
+  const agentDir = join(overdeckHome, 'agents', `agent-${issueId.toLowerCase()}`);
   mkdirSync(agentDir, { recursive: true });
   writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ issueId }));
 }
@@ -272,40 +272,40 @@ describe('extractStandardNumber', () => {
 
 describe('resolveBareNumericIdSync (PAN-1173 regression)', () => {
   it('returns null when no agent state matches the bare number', () => {
-    const panopticonHome = makeOverdeckHome();
-    writeAgentState(panopticonHome, 'PAN-4');
+    const overdeckHome = makeOverdeckHome();
+    writeAgentState(overdeckHome, 'PAN-4');
 
-    expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
+    expect(resolveBareNumericIdSync('3', overdeckHome)).toBeNull();
   });
 
   it('returns null when multiple agent states match the bare number', () => {
-    const panopticonHome = makeOverdeckHome();
-    writeAgentState(panopticonHome, 'PAN-3');
-    writeAgentState(panopticonHome, 'MIN-3');
+    const overdeckHome = makeOverdeckHome();
+    writeAgentState(overdeckHome, 'PAN-3');
+    writeAgentState(overdeckHome, 'MIN-3');
 
-    expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
+    expect(resolveBareNumericIdSync('3', overdeckHome)).toBeNull();
   });
 
   it('returns the fully-prefixed issue ID from the single matching state file', () => {
-    const panopticonHome = makeOverdeckHome();
-    writeAgentState(panopticonHome, 'MIN-3');
+    const overdeckHome = makeOverdeckHome();
+    writeAgentState(overdeckHome, 'MIN-3');
 
-    expect(resolveBareNumericIdSync('3', panopticonHome)).toBe('MIN-3');
+    expect(resolveBareNumericIdSync('3', overdeckHome)).toBe('MIN-3');
   });
 
   it('delegates already-prefixed inputs without probing the agent state directory', () => {
-    const panopticonHome = makeOverdeckHome();
-    writeAgentState(panopticonHome, 'MIN-3');
+    const overdeckHome = makeOverdeckHome();
+    writeAgentState(overdeckHome, 'MIN-3');
 
-    expect(resolveBareNumericIdSync('PAN-3', panopticonHome)).toBe('PAN-3');
-    expect(resolveBareNumericIdSync('agent-pan-3', panopticonHome)).toBe('PAN-3');
-    expect(resolveBareNumericIdSync('F29698', panopticonHome)).toBe('F29698');
+    expect(resolveBareNumericIdSync('PAN-3', overdeckHome)).toBe('PAN-3');
+    expect(resolveBareNumericIdSync('agent-pan-3', overdeckHome)).toBe('PAN-3');
+    expect(resolveBareNumericIdSync('F29698', overdeckHome)).toBe('F29698');
   });
 
   it('returns null without throwing when the agents directory is absent', () => {
-    const panopticonHome = makeOverdeckHome();
+    const overdeckHome = makeOverdeckHome();
 
-    expect(resolveBareNumericIdSync('3', panopticonHome)).toBeNull();
+    expect(resolveBareNumericIdSync('3', overdeckHome)).toBeNull();
   });
 });
 

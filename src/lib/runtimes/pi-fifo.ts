@@ -53,8 +53,8 @@ export class PiNotReady extends Error {
 }
 
 export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
-  const panopticonHome = home === undefined ? getOverdeckHome() : join(home, '.panopticon')
-  const agentDir = join(panopticonHome, 'agents', agentId)
+  const overdeckHome = home === undefined ? getOverdeckHome() : join(home, '.overdeck')
+  const agentDir = join(overdeckHome, 'agents', agentId)
   return {
     agentDir,
     readyPath: join(agentDir, 'ready.json'),

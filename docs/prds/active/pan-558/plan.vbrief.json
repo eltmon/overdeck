@@ -19,7 +19,7 @@
     ],
     "tags": ["electron", "auto-update", "desktop", "electron-updater"],
     "narratives": {
-      "Problem": "When users run `npx panopticon`, they get the version published to npm, not the latest. No auto-update mechanism exists for installed desktop app copies.",
+      "Problem": "When users run `npx overdeck`, they get the version published to npm, not the latest. No auto-update mechanism exists for installed desktop app copies.",
       "Proposal": "Implement electron-updater with GitHub Releases as the update server. App checks for updates on startup and every 4 hours. Downloads update in background. Prompts user via Help menu to restart and apply. Stable channel only for v1."
     },
     "items": [

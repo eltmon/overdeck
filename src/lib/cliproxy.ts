@@ -10,7 +10,7 @@
  *
  * Responsibilities:
  *   - Download + install the cliproxy binary from GitHub releases
- *   - Maintain `~/.panopticon/cliproxy/config.yaml` + auth-dir
+ *   - Maintain `~/.overdeck/cliproxy/config.yaml` + auth-dir
  *   - Bridge `~/.codex/auth.json` into cliproxy's codex credential format
  *   - Start / stop / supervise the process via a pidfile
  */
@@ -43,7 +43,7 @@ export class CliproxyError extends Data.TaggedError('CliproxyError')<{
 
 export const CLIPROXY_HOST = '127.0.0.1';
 export const CLIPROXY_PORT = 8317;
-export const CLIPROXY_AUTH_TOKEN = 'panopticon-local-cliproxy-key';
+export const CLIPROXY_AUTH_TOKEN = 'overdeck-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
 const CLIPROXY_RELEASE_VERSION = 'v7.1.39';
@@ -142,7 +142,7 @@ export function decodeJwtPayload(token: string): Record<string, unknown> | null 
 
 /**
  * Read ~/.codex/auth.json and write cliproxy's credential file format into
- * ~/.panopticon/cliproxy/auth/codex-primary.json. Returns true if the file
+ * ~/.overdeck/cliproxy/auth/codex-primary.json. Returns true if the file
  * was written (including "already up-to-date" writes), false if the source
  * was missing or malformed.
  */
@@ -482,7 +482,7 @@ async function isCliproxyUpToDateTask(): Promise<boolean> {
 }
 
 /**
- * Download + extract the cliproxy binary into ~/.panopticon/bin/cliproxy.
+ * Download + extract the cliproxy binary into ~/.overdeck/bin/cliproxy.
  * Uses curl + tar because that's already a hard dep of pan install. Throws
  * with a clear message on unsupported platforms.
  */

@@ -64,7 +64,7 @@ if (!transcriptPath || !existsSync(transcriptPath)) {
 const sessionId = event?.session_id || 'unknown';
 
 // State tracking: byte offset per session to avoid re-processing
-const stateDir = join(process.env.HOME || homedir(), '.panopticon', 'costs', 'state');
+const stateDir = join(process.env.HOME || homedir(), '.overdeck', 'costs', 'state');
 mkdirSync(stateDir, { recursive: true });
 const stateFile = join(stateDir, `${sessionId}.offset`);
 

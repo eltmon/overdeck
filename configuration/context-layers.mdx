@@ -18,7 +18,7 @@ agents themselves are taught:
 | Term | Source file | Use for |
 | --- | --- | --- |
 | **Bundled rule** | `sync-sources/rules/<name>.md` (ships inside the overdeck package) | Engineering rules for **every machine** |
-| **Global layer** (machine context) | `~/.panopticon/context/global.md` | Genuinely **machine-specific** quirks |
+| **Global layer** (machine context) | `~/.overdeck/context/global.md` | Genuinely **machine-specific** quirks |
 | **Project layer** | `<projectRoot>/.pan/context/project.md` | Guidance for **one project**; committed to that repo |
 | **Workspace layer** | `<workspace>/.pan/context/workspace.md` | Auto-assembled per issue workspace; never hand-edited |
 
@@ -40,7 +40,7 @@ alone routes the content:
 | "add a **universal rule**: …" | every machine, every project | `sync-sources/rules/<name>.md`, `scope: universal` |
 | "add a **dev rule**: …" | Overdeck development only | `sync-sources/rules/<name>.md`, `scope: dev` |
 | "add a **project rule**: …" | one project | `<root>/.pan/context/project.md` |
-| "add a **machine rule**: …" | one machine | `~/.panopticon/context/global.md` |
+| "add a **machine rule**: …" | one machine | `~/.overdeck/context/global.md` |
 
 After any of them: `pan sync`, and the change reaches new sessions.
 
@@ -64,8 +64,8 @@ harness; spawn-time plumbing delivers it:
 | Harness | Rendered artifact | How the harness receives it |
 | --- | --- | --- |
 | **Claude Code** | managed region of `~/.claude/CLAUDE.md` | Claude Code natively reads `~/.claude/CLAUDE.md` at session start |
-| **Codex** | `~/.panopticon/context/codex-global.md` | At spawn, Overdeck seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
-| **Pi** | `~/.panopticon/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
+| **Codex** | `~/.overdeck/context/codex-global.md` | At spawn, Overdeck seeds the agent's `$CODEX_HOME/AGENTS.md` from this file — Codex natively reads `AGENTS.md`, never the render artifact itself |
+| **Pi** | `~/.overdeck/context/pi-global.md` | Injected into the session's system-prompt context at spawn. Pi does natively support a global `~/.pi/agent/AGENTS.md`; Overdeck deliberately does not write there — the global layer is delivered per-spawn instead, leaving `~/.pi/agent/` entirely yours |
 
 The `pi-global.md` / `codex-global.md` files are **Overdeck-owned render
 artifacts** — the harnesses do not know about them. They exist so the global
@@ -89,7 +89,7 @@ the `AGENTS.md` convention).
 Everything outside the markers — in `~/.claude/CLAUDE.md`, a project's
 `CLAUDE.md`, or a project's `AGENTS.md` — is preserved verbatim across every
 sync. The first sync that touches a file with pre-existing hand-authored
-content snapshots it into `~/.panopticon/backups/<timestamp>/context/` before
+content snapshots it into `~/.overdeck/backups/<timestamp>/context/` before
 writing. A project's files are touched only if its `.pan/context/project.md`
 exists.
 

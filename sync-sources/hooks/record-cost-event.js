@@ -3801,10 +3801,10 @@ const runSync = runSync$1;
 Service()("effect/Effect/Transaction");
 //#endregion
 //#region ../../src/lib/paths.ts
-const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), ".panopticon");
+const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), ".overdeck");
 /** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
 function getOverdeckHome() {
-	return process.env.OVERDECK_HOME || join(homedir(), ".panopticon");
+	return process.env.OVERDECK_HOME || join(homedir(), ".overdeck");
 }
 const CONFIG_DIR = OVERDECK_HOME;
 join(OVERDECK_HOME, "skills");
@@ -4201,7 +4201,7 @@ join(COSTS_DIR, "budgets.json");
 //#endregion
 //#region ../../src/lib/database/driver.ts
 const _require = createRequire(import.meta.url);
-const SQLITE_WARNING_FILTER = Symbol.for("panopticon.sqliteWarningFilterInstalled");
+const SQLITE_WARNING_FILTER = Symbol.for("overdeck.sqliteWarningFilterInstalled");
 function isBunRuntime() {
 	return typeof Bun !== "undefined";
 }
@@ -4332,7 +4332,7 @@ function wrapDatabase(raw) {
 						transactionDepth = 0;
 					}
 				}
-				const savepoint = `panopticon_tx_${++savepointId}`;
+				const savepoint = `overdeck_tx_${++savepointId}`;
 				raw.exec(`SAVEPOINT ${savepoint}`);
 				transactionDepth++;
 				let released = false;
@@ -4500,7 +4500,7 @@ const COLUMN_MAP = {
 	updatedAt: "updated_at"
 };
 function getManagedTmuxSocketName() {
-	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "panopticon";
+	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "overdeck";
 }
 function listLiveTmuxSessionNames() {
 	try {
@@ -4669,7 +4669,7 @@ function initDiscoveredSessionsSchema(db) {
       enrichment_model  TEXT,
       enriched_at       TEXT,
       enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      overdeck_managed INTEGER NOT NULL DEFAULT 0,
       pan_issue_id      TEXT,
       pan_agent_id      TEXT,
       file_size         INTEGER,
@@ -4680,7 +4680,7 @@ function initDiscoveredSessionsSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
     CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
     CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
     CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
     CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
 
@@ -5243,7 +5243,7 @@ function initSchema(db) {
       enrichment_model  TEXT,
       enriched_at       TEXT,
       enrichment_failed INTEGER NOT NULL DEFAULT 0,
-      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      overdeck_managed INTEGER NOT NULL DEFAULT 0,
       pan_issue_id      TEXT,
       pan_agent_id      TEXT,
       file_size         INTEGER,
@@ -5261,7 +5261,7 @@ function initSchema(db) {
       ON discovered_sessions(enrichment_level, enriched_at);
 
     CREATE INDEX IF NOT EXISTS idx_discovered_managed
-      ON discovered_sessions(panopticon_managed, pan_issue_id);
+      ON discovered_sessions(overdeck_managed, pan_issue_id);
 
     CREATE INDEX IF NOT EXISTS idx_discovered_model
       ON discovered_sessions(primary_model);
@@ -5516,7 +5516,7 @@ function runMigrations(db, dbPath) {
         enrichment_model  TEXT,
         enriched_at       TEXT,
         enrichment_failed INTEGER NOT NULL DEFAULT 0,
-        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        overdeck_managed INTEGER NOT NULL DEFAULT 0,
         pan_issue_id      TEXT,
         pan_agent_id      TEXT,
         file_size         INTEGER,
@@ -5526,7 +5526,7 @@ function runMigrations(db, dbPath) {
       CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
       CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
       CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
@@ -5694,7 +5694,7 @@ function runMigrations(db, dbPath) {
         enrichment_model  TEXT,
         enriched_at       TEXT,
         enrichment_failed INTEGER NOT NULL DEFAULT 0,
-        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        overdeck_managed INTEGER NOT NULL DEFAULT 0,
         pan_issue_id      TEXT,
         pan_agent_id      TEXT,
         file_size         INTEGER,
@@ -5704,7 +5704,7 @@ function runMigrations(db, dbPath) {
       CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
       CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
       CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
-      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(overdeck_managed, pan_issue_id);
       CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
       CREATE INDEX IF NOT EXISTS idx_discovered_session_id ON discovered_sessions(session_id) WHERE session_id IS NOT NULL;
       CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
@@ -6017,7 +6017,7 @@ function runMigrations(db, dbPath) {
 /**
 * Overdeck Unified Database
 *
-* Single panopticon.db at ~/.panopticon/panopticon.db.
+* Single panopticon.db at ~/.overdeck/panopticon.db.
 * Singleton pattern — one connection shared across the process.
 *
 * IMPORTANT: This module is safe to import in both server and CLI contexts.
@@ -12896,7 +12896,7 @@ function appendToWalSync(event) {
 * Manages the append-only events.jsonl log that records all cost events.
 */
 function getCostsDir() {
-	return join(process.env.HOME || homedir(), ".panopticon", "costs");
+	return join(process.env.HOME || homedir(), ".overdeck", "costs");
 }
 function getEventsFile() {
 	return join(getCostsDir(), "events.jsonl");
@@ -13076,7 +13076,7 @@ try {
 const transcriptPath = event?.transcript_path;
 if (!transcriptPath || !existsSync(transcriptPath)) process.exit(0);
 const sessionId = event?.session_id || "unknown";
-const stateDir = join(process.env.HOME || homedir(), ".panopticon", "costs", "state");
+const stateDir = join(process.env.HOME || homedir(), ".overdeck", "costs", "state");
 mkdirSync(stateDir, { recursive: true });
 const stateFile = join(stateDir, `${sessionId}.offset`);
 let lastOffset = 0;

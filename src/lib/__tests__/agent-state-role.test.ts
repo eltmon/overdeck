@@ -310,7 +310,7 @@ describe('AgentState role persistence', () => {
     const createSessionAsync = vi.fn();
     const emitActivityEntry = vi.fn();
     const resolvedProject = {
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectName: 'Overdeck',
       projectPath: workspace,
       linearTeam: 'PAN',
@@ -343,7 +343,7 @@ describe('AgentState role persistence', () => {
     const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
     recordDockerContainerLifecycleSnapshot([{
       id: 'abc123',
-      name: 'panopticon-feature-pan-1140-init-1',
+      name: 'overdeck-feature-pan-1140-init-1',
       status: 'Exited (1) 5 minutes ago',
       state: 'exited',
       createdAt: '2026-05-16T00:00:00.000Z',
@@ -356,7 +356,7 @@ describe('AgentState role persistence', () => {
       workspace,
       role: 'work',
       model: 'claude-sonnet-4-6',
-    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
+    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: overdeck-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
     // PAN-1618: an auto-rebuild is attempted first; when it fails the gate
@@ -376,7 +376,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/stack-health.js', () => ({
       getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
         healthy: false,
-        reasons: ['panopticon-feature-pan-1140-init init exited non-zero (1)'],
+        reasons: ['overdeck-feature-pan-1140-init init exited non-zero (1)'],
         lastObserved: '2026-05-16T00:00:00.000Z',
       })),
     }));
@@ -405,7 +405,7 @@ describe('AgentState role persistence', () => {
       workspace,
       role: 'work',
       model: 'claude-sonnet-4-6',
-    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
+    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: overdeck-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
 
     expect(createSessionAsync).not.toHaveBeenCalled();
     // PAN-1618: failed auto-rebuild → blocked with the failed-rebuild marker.
@@ -429,7 +429,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/stack-health.js', () => ({
       getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
         healthy: false,
-        reasons: ['panopticon-feature-pan-1140-server stuck Created for 180s'],
+        reasons: ['overdeck-feature-pan-1140-server stuck Created for 180s'],
         lastObserved: '2026-05-16T00:00:00.000Z',
       })),
     }));
@@ -513,7 +513,7 @@ describe('AgentState role persistence', () => {
     vi.doMock('../workspace/stack-health.js', () => ({
       getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
         healthy: false,
-        reasons: ['panopticon-feature-init-1 init exited non-zero (1)'],
+        reasons: ['overdeck-feature-init-1 init exited non-zero (1)'],
         lastObserved: '2026-06-08T00:00:00.000Z',
       })),
     }));

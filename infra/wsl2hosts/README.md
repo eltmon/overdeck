@@ -24,7 +24,7 @@ This will detect if the scheduled task is missing and offer to install it.
 From PowerShell (as Administrator):
 
 ```powershell
-cd \\wsl$\Ubuntu-20.04\home\eltmon\projects\panopticon\infra\wsl2hosts
+cd \\wsl$\Ubuntu-20.04\home\eltmon\projects\overdeck\infra\wsl2hosts
 .\install-scheduled-task.ps1
 ```
 
@@ -32,10 +32,10 @@ Or copy the files manually:
 
 ```powershell
 # Copy sync script
-Copy-Item "\\wsl$\Ubuntu-20.04\home\eltmon\projects\panopticon\infra\wsl2hosts\sync-wsl2hosts.ps1" "$env:USERPROFILE\.panopticon\"
+Copy-Item "\\wsl$\Ubuntu-20.04\home\eltmon\projects\overdeck\infra\wsl2hosts\sync-wsl2hosts.ps1" "$env:USERPROFILE\.overdeck\"
 
 # Create scheduled task (run as admin)
-$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$env:USERPROFILE\.panopticon\sync-wsl2hosts.ps1`""
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$env:USERPROFILE\.overdeck\sync-wsl2hosts.ps1`""
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
 Register-ScheduledTask -TaskName "OverdeckWsl2HostsSync" -Trigger $trigger -Action $action -RunLevel Highest
 ```
@@ -64,7 +64,7 @@ Start-ScheduledTask -TaskName "OverdeckWsl2HostsSync"
 Or run the script directly:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.panopticon\sync-wsl2hosts.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.overdeck\sync-wsl2hosts.ps1"
 ```
 
 ### Checking Status
@@ -74,7 +74,7 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.panopticon\sync-wsl2
 Get-ScheduledTask -TaskName "OverdeckWsl2HostsSync" | Get-ScheduledTaskInfo
 
 # View synced entries
-Get-Content C:\Windows\System32\drivers\etc\hosts | Select-String "panopticon-auto"
+Get-Content C:\Windows\System32\drivers\etc\hosts | Select-String "overdeck-auto"
 ```
 
 ## Troubleshooting
@@ -93,7 +93,7 @@ Get-Content C:\Windows\System32\drivers\etc\hosts | Select-String "panopticon-au
 
 3. Run the sync manually to see errors:
    ```powershell
-   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.panopticon\sync-wsl2hosts.ps1"
+   powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.overdeck\sync-wsl2hosts.ps1"
    ```
 
 ### Permission denied
@@ -108,4 +108,4 @@ The sync script automatically detects the current WSL IP on each run. If your IP
 
 If you have the old `SyncMynHosts` task, the installation script will automatically remove it and create the new `OverdeckWsl2HostsSync` task.
 
-The new task uses a different marker (`# panopticon-auto` instead of `# myn-auto`) but will continue to sync all entries from `~/.wsl2hosts`.
+The new task uses a different marker (`# overdeck-auto` instead of `# myn-auto`) but will continue to sync all entries from `~/.wsl2hosts`.

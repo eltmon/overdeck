@@ -22,13 +22,13 @@ Complete guide to configuring Overdeck's multi-model routing system.
 
 ## Quick Start
 
-1. **Choose a preset** (in `~/.panopticon/config.yaml`):
+1. **Choose a preset** (in `~/.overdeck/config.yaml`):
    ```yaml
    models:
      preset: balanced  # premium | balanced | budget
    ```
 
-2. **Add API keys** (in `~/.panopticon.env`):
+2. **Add API keys** (in `~/.overdeck.env`):
    ```env
    ANTHROPIC_API_KEY=sk-ant-...
    OPENAI_API_KEY=sk-...
@@ -44,11 +44,11 @@ Complete guide to configuring Overdeck's multi-model routing system.
 
 Overdeck uses two configuration file types:
 
-### Global Configuration: `~/.panopticon/config.yaml`
+### Global Configuration: `~/.overdeck/config.yaml`
 
 System-wide defaults applied to all projects.
 
-**Location**: `~/.panopticon/config.yaml`
+**Location**: `~/.overdeck/config.yaml`
 
 **Format**: YAML
 
@@ -86,11 +86,11 @@ claude:
   permissionMode: auto
 ```
 
-### Per-Project Configuration: `.panopticon.yaml`
+### Per-Project Configuration: `.overdeck.yaml`
 
 Project-specific overrides in the project root directory.
 
-**Location**: `.panopticon.yaml` (project root)
+**Location**: `.overdeck.yaml` (project root)
 
 **Format**: YAML
 
@@ -109,11 +109,11 @@ models:
     issue-agent:implementation: gpt-5.2-codex
 ```
 
-### API Keys: `~/.panopticon.env`
+### API Keys: `~/.overdeck.env`
 
 Sensitive API keys stored separately from configuration.
 
-**Location**: `~/.panopticon.env`
+**Location**: `~/.overdeck.env`
 
 **Format**: Shell environment variable syntax
 
@@ -178,16 +178,16 @@ direct API plans. Pro / Bedrock / Vertex / Foundry users may need to explicitly 
 ### Setting the mode
 
 **1. Dashboard Settings → Permissions** (easiest). Two radio options: Auto / Bypass.
-Saves to `~/.panopticon/config.yaml` automatically.
+Saves to `~/.overdeck/config.yaml` automatically.
 
-**2. Persist directly in `~/.panopticon/config.yaml`:**
+**2. Persist directly in `~/.overdeck/config.yaml`:**
 
 ```yaml
 claude:
   permissionMode: auto    # or 'bypass'
 ```
 
-`.panopticon.yaml` (per-project) accepts the same key and overrides the global setting for
+`.overdeck.yaml` (per-project) accepts the same key and overrides the global setting for
 that project only.
 
 **2. Override per-invocation with `--yolo` or `PAN_YOLO`:**
@@ -217,7 +217,7 @@ Highest wins:
 
 1. **`PAN_YOLO` env var** (`true`/`yes`/`on`/`1` → bypass; `false`/`no`/`off`/`0` → auto)
 2. **`--yolo` CLI flag** (normalized into `PAN_YOLO` before commander parses)
-3. **`claude.permissionMode` in config** (`~/.panopticon/config.yaml`, then `.panopticon.yaml`)
+3. **`claude.permissionMode` in config** (`~/.overdeck/config.yaml`, then `.overdeck.yaml`)
 4. **Default**: `auto`
 
 ### Caveats
@@ -366,7 +366,7 @@ models:
 
 ## Parallel Review Agents
 
-Overdeck's review specialist runs multiple reviewer agents in parallel before producing a synthesis report. You can customize which agents run, their models, and their focus areas via the `specialists.review_agents` list in `~/.panopticon/cloister.toml`.
+Overdeck's review specialist runs multiple reviewer agents in parallel before producing a synthesis report. You can customize which agents run, their models, and their focus areas via the `specialists.review_agents` list in `~/.overdeck/cloister.toml`.
 
 ### Default Reviewers
 
@@ -382,7 +382,7 @@ After all reviewers complete, a **synthesis** agent combines the findings.
 
 ### Configuration Schema
 
-In `~/.panopticon/cloister.toml`:
+In `~/.overdeck/cloister.toml`:
 
 ```toml
 # Each entry controls one parallel reviewer.
@@ -496,7 +496,7 @@ claude-sonnet-4-5 → claude-sonnet-4-6
 
 ### Example Migration
 
-**Before** (`~/.panopticon/config.yaml`):
+**Before** (`~/.overdeck/config.yaml`):
 ```yaml
 models:
   overrides:
@@ -512,7 +512,7 @@ models:
     issue-agent:implementation: claude-sonnet-4-6
 ```
 
-**Backup created**: `~/.panopticon/config.yaml.bak` (your original config, for safety)
+**Backup created**: `~/.overdeck/config.yaml.bak` (your original config, for safety)
 
 **Console output**:
 ```
@@ -543,7 +543,7 @@ When you open the Settings page with deprecated model IDs:
 If you need to restore your original configuration:
 
 ```bash
-cp ~/.panopticon/config.yaml.bak ~/.panopticon/config.yaml
+cp ~/.overdeck/config.yaml.bak ~/.overdeck/config.yaml
 ```
 
 **Note**: The backup file is overwritten on each migration, so it always contains the most recent pre-migration state.
@@ -599,13 +599,13 @@ Warning: Model gpt-5.2-codex requires openai API key - falling back to claude-so
 
 Use Overdeck with sensible defaults.
 
-**~/.panopticon/config.yaml**:
+**~/.overdeck/config.yaml**:
 ```yaml
 models:
   preset: balanced
 ```
 
-**~/.panopticon.env**:
+**~/.overdeck.env**:
 ```env
 ANTHROPIC_API_KEY=sk-ant-api03-...
 ```
@@ -618,7 +618,7 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 
 Use all providers for maximum flexibility.
 
-**~/.panopticon/config.yaml**:
+**~/.overdeck/config.yaml**:
 ```yaml
 models:
   preset: premium
@@ -630,7 +630,7 @@ models:
     zai: false  # Don't need Z.AI
 ```
 
-**~/.panopticon.env**:
+**~/.overdeck.env**:
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
@@ -645,7 +645,7 @@ GOOGLE_API_KEY=...
 
 Minimize costs with Gemini models.
 
-**~/.panopticon/config.yaml**:
+**~/.overdeck/config.yaml**:
 ```yaml
 models:
   preset: budget
@@ -667,7 +667,7 @@ models:
     review:performance: high
 ```
 
-**~/.panopticon.env**:
+**~/.overdeck.env**:
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=...
@@ -681,13 +681,13 @@ GOOGLE_API_KEY=...
 
 Override global defaults for a specific project.
 
-**~/.panopticon/config.yaml** (global):
+**~/.overdeck/config.yaml** (global):
 ```yaml
 models:
   preset: balanced  # Default for all projects
 ```
 
-**.panopticon.yaml** (project root):
+**.overdeck.yaml** (project root):
 ```yaml
 models:
   preset: premium  # This project is critical
@@ -707,7 +707,7 @@ models:
 
 Fine-tune Gemini thinking for cost/quality tradeoffs.
 
-**~/.panopticon/config.yaml**:
+**~/.overdeck/config.yaml**:
 ```yaml
 models:
   preset: budget  # Use Gemini everywhere
@@ -736,9 +736,9 @@ When multiple configuration sources exist, Overdeck resolves model selection in 
 
 ### Resolution Order
 
-1. **Per-project override** (`.panopticon.yaml` in project root)
-2. **Global override** (`~/.panopticon/config.yaml` overrides section)
-3. **Preset default** (`~/.panopticon/config.yaml` preset selection)
+1. **Per-project override** (`.overdeck.yaml` in project root)
+2. **Global override** (`~/.overdeck/config.yaml` overrides section)
+3. **Preset default** (`~/.overdeck/config.yaml` preset selection)
 4. **Fallback** (if provider disabled or API key missing)
 5. **Hardcoded default** (`claude-sonnet-4-5`)
 
@@ -753,7 +753,7 @@ models:
     issue-agent:exploration: claude-haiku-4-5  # Override: use Haiku
 ```
 
-**Project config** (`.panopticon.yaml`):
+**Project config** (`.overdeck.yaml`):
 ```yaml
 models:
   overrides:
@@ -791,7 +791,7 @@ Overdeck validates configuration on startup:
 
 ### Migration from settings.json
 
-If you have an existing `~/.panopticon/settings.json`:
+If you have an existing `~/.overdeck/settings.json`:
 
 ```bash
 # Automatic migration (coming soon in PAN-118-6)
@@ -915,13 +915,13 @@ automatically with the dashboard — no manual installation needed.
 
 ## External Service Integrations
 
-Overdeck can manage external service configurations as part of the workspace lifecycle. These are configured per-project in `~/.panopticon/projects.yaml` under the `workspace` section.
+Overdeck can manage external service configurations as part of the workspace lifecycle. These are configured per-project in `~/.overdeck/projects.yaml` under the `workspace` section.
 
 ## Project Registry Source Of Truth
 
-The runtime project registry is `~/.panopticon/projects.yaml`; `PROJECTS_CONFIG_FILE` resolves to that file and the dashboard reads it directly. The tracked `.panopticon/projects.yaml` in this repository is a portable seed/snapshot for Overdeck development workspaces, not the active runtime config.
+The runtime project registry is `~/.overdeck/projects.yaml`; `PROJECTS_CONFIG_FILE` resolves to that file and the dashboard reads it directly. The tracked `.overdeck/projects.yaml` in this repository is a portable seed/snapshot for Overdeck development workspaces, not the active runtime config.
 
-When Overdeck creates a workspace for this repo, `workspace-manager.ts` copies the live `~/.panopticon/projects.yaml` into `<workspace>/.panopticon/projects.yaml` so agents see the same project registry as the host. Keep the tracked snapshot aligned with intended defaults, but apply active-machine changes to `~/.panopticon/projects.yaml` by hand and restart/reload the dashboard when gate command behavior changes.
+When Overdeck creates a workspace for this repo, `workspace-manager.ts` copies the live `~/.overdeck/projects.yaml` into `<workspace>/.overdeck/projects.yaml` so agents see the same project registry as the host. Keep the tracked snapshot aligned with intended defaults, but apply active-machine changes to `~/.overdeck/projects.yaml` by hand and restart/reload the dashboard when gate command behavior changes.
 
 ### Change-Scoped Verification Gates
 
@@ -968,7 +968,7 @@ workspace:
 
 Automatically creates/deletes per-workspace Hume EVI configs for BYOLLM (Bring Your Own LLM). Each workspace gets its own Hume config with a workspace-specific callback URL, cloned from a production template config.
 
-**Prerequisites**: `HUME_API_KEY` in `~/.panopticon.env`
+**Prerequisites**: `HUME_API_KEY` in `~/.overdeck.env`
 
 **Config** (in `projects.yaml`):
 ```yaml

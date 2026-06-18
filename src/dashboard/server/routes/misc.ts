@@ -102,16 +102,16 @@ export async function readPackageVersion(): Promise<string> {
 
 // Lazy-initialized to avoid top-level await (which would make misc.ts an async ESM module,
 // risking ERR_REQUIRE_ASYNC_MODULE for any module that require()-chains through here).
-let _panopticonVersion: string | null = null;
+let _overdeckVersion: string | null = null;
 async function getOverdeckVersion(): Promise<string> {
-  if (_panopticonVersion === null) {
-    _panopticonVersion = await readPackageVersion();
+  if (_overdeckVersion === null) {
+    _overdeckVersion = await readPackageVersion();
   }
-  return _panopticonVersion;
+  return _overdeckVersion;
 }
 
 // Dev mode: true when running from the repo checkout (src/ directory exists)
-const panopticonDevMode: boolean = (() => {
+const overdeckDevMode: boolean = (() => {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 8; i++) {
     if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
@@ -133,7 +133,7 @@ function getIssueDataService(): IssueDataService {
 
 // ─── Project mappings helpers ─────────────────────────────────────────────────
 
-const PROJECT_MAPPINGS_FILE = join(homedir(), '.panopticon', 'project-mappings.json');
+const PROJECT_MAPPINGS_FILE = join(homedir(), '.overdeck', 'project-mappings.json');
 
 interface ProjectMapping {
   linearProjectId: string;
@@ -152,7 +152,7 @@ async function getProjectMappings(): Promise<ProjectMapping[]> {
 }
 
 async function saveProjectMappings(mappings: ProjectMapping[]): Promise<void> {
-  const dir = join(homedir(), '.panopticon');
+  const dir = join(homedir(), '.overdeck');
   await mkdir(dir, { recursive: true });
   await writeFile(PROJECT_MAPPINGS_FILE, JSON.stringify(mappings, null, 2));
 }
@@ -229,7 +229,7 @@ const checkPlanStatus = (
 
 // ─── Runtime metrics helpers ──────────────────────────────────────────────────
 
-const METRICS_FILE = join(homedir(), '.panopticon', 'runtime-metrics.json');
+const METRICS_FILE = join(homedir(), '.overdeck', 'runtime-metrics.json');
 
 async function loadRuntimeMetrics(): Promise<any> {
   try {
@@ -449,7 +449,7 @@ const getHealthAgentsRoute = HttpRouter.add(
   '/api/health/agents',
   Effect.promise(async () => {
     try {
-      const agentsDir = join(homedir(), '.panopticon', 'agents');
+      const agentsDir = join(homedir(), '.overdeck', 'agents');
       if (!existsSync(agentsDir)) {
         return jsonResponse([]);
       }
@@ -817,7 +817,7 @@ const getVersionRoute = HttpRouter.add(
     } catch {
       // supervisor module not available in this build — benign
     }
-    return jsonResponse({ version, isDev: panopticonDevMode, supervisorUrl });
+    return jsonResponse({ version, isDev: overdeckDevMode, supervisorUrl });
   }),
 );
 
@@ -914,7 +914,7 @@ const getSkillsRoute = HttpRouter.add(
       }> = [];
 
       const skillLocations = [
-        { path: join(homedir(), '.panopticon', 'skills'), source: 'panopticon' },
+        { path: join(homedir(), '.overdeck', 'skills'), source: 'overdeck' },
         { path: join(homedir(), '.claude', 'skills'), source: 'claude' },
       ];
 
@@ -1698,7 +1698,7 @@ const postShadowObserveRoute = HttpRouter.add(
 // Dev-only: runs `npm run build` in the project root and returns when done.
 
 // Find the project root (directory with package.json + src/dashboard)
-const panopticonProjectRoot: string | null = (() => {
+const overdeckProjectRoot: string | null = (() => {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 8; i++) {
     if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'src', 'dashboard'))) {
@@ -1715,13 +1715,13 @@ const postDevRebuildRoute = HttpRouter.add(
   'POST',
   '/api/dev/rebuild',
   Effect.gen(function* () {
-    if (!panopticonDevMode || !panopticonProjectRoot) {
+    if (!overdeckDevMode || !overdeckProjectRoot) {
       return jsonResponse({ error: 'Rebuild only available in dev mode' }, { status: 403 });
     }
     return yield* Effect.promise(async () => {
       try {
         const { stdout, stderr } = await execAsync('npm run build', {
-          cwd: panopticonProjectRoot,
+          cwd: overdeckProjectRoot,
           timeout: 120_000,
         });
         return jsonResponse({
@@ -1740,7 +1740,7 @@ const postDevRebuildRoute = HttpRouter.add(
 // POST /api/system/restart-dashboard — fire-and-forget restart of the dashboard
 // server. Spawns a detached `pan restart --dashboard` so the new process
 // outlives the SIGTERM that kills this server. Used by the browser fallback
-// path in App.tsx when window.panopticonBridge is not available.
+// path in App.tsx when window.overdeckBridge is not available.
 const postRestartDashboardRoute = HttpRouter.add(
   'POST',
   '/api/system/restart-dashboard',

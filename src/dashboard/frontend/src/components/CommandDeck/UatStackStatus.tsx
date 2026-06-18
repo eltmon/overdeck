@@ -58,7 +58,7 @@ function friendlyContainerName(name: string): string {
   if (lower.includes('api')) return 'api';
   if (lower.includes('frontend') || lower.includes('fe')) return 'frontend';
   if (lower.includes('server')) return 'server';
-  return name.replace(/^panopticon-feature-[^-]+-\d+-?/, '');
+  return name.replace(/^overdeck-feature-[^-]+-\d+-?/, '');
 }
 
 function containerSortKey([name]: [string, WorkspaceContainerStatus]): string {

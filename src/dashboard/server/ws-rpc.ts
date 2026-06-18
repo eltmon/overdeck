@@ -242,7 +242,7 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
     enrichmentModel: session.enrichmentModel ?? undefined,
     enrichedAt: session.enrichedAt ?? undefined,
     enrichmentFailed: session.enrichmentFailed,
-    panopticonManaged: session.panopticonManaged,
+    overdeckManaged: session.overdeckManaged,
     panIssueId: session.panIssueId ?? undefined,
     panAgentId: session.panAgentId ?? undefined,
     scannedAt: session.scannedAt,

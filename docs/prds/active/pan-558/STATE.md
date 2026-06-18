@@ -2,7 +2,7 @@
 
 ## Discovery Summary
 
-**Problem**: When users run `npx panopticon`, they get the version published to npm, not the latest. No auto-update mechanism exists for installed desktop app copies.
+**Problem**: When users run `npx overdeck`, they get the version published to npm, not the latest. No auto-update mechanism exists for installed desktop app copies.
 
 **Scope decision (confirmed with user)**:
 - Both Electron app auto-update via `electron-updater` AND `npx` latest-version awareness
@@ -28,7 +28,7 @@ GitHub Releases (no custom server needed). `electron-updater` supports GitHub Re
 5. Periodic check every 4 hours via `setInterval`
 
 ### npx latest version
-Separate from electron-updater. The `npm view @panopticon/desktop version` returns latest npm-published version. The CLI can warn if npm version < local version (for dev), but for installed desktop apps electron-updater handles everything.
+Separate from electron-updater. The `npm view @overdeck/desktop version` returns latest npm-published version. The CLI can warn if npm version < local version (for dev), but for installed desktop apps electron-updater handles everything.
 
 ### Menu Integration
 - Help menu → "Check for Updates…" → manual trigger
@@ -48,7 +48,7 @@ Current `release.yml` publishes to npm and creates a GitHub Release, but does NO
 - Beta/canary channel (stable only)
 - Custom update server
 - Rollback mechanism
-- Auto-update of the CLI (`pan`/`panopticon` npm package) — separate concern
+- Auto-update of the CLI (`pan`/`overdeck` npm package) — separate concern
 - Code signing certificates (build config ready, certs not provisioned)
 
 ## Difficulty Estimates

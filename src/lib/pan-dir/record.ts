@@ -3,7 +3,7 @@
  *
  * Replaces the dual "continues" plane (project-side `.pan/continues/` and
  * workspace-side `.pan/continue.json`) plus the harness/model data that only
- * lived in machine-local `~/.panopticon/agents/<id>/state.json`.
+ * lived in machine-local `~/.overdeck/agents/<id>/state.json`.
  *
  * The record lives on the feature branch at:
  *   `<workspace>/.pan/records/<issueId-lowercase>.json`

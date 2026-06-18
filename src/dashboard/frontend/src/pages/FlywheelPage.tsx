@@ -39,7 +39,7 @@ interface PendingAutoMerge {
   status: 'pending' | 'merging' | 'blocked' | 'failed' | 'merged' | 'cancelled';
 }
 
-const SPLIT_STORAGE_KEY = 'panopticon.ui.flywheelSplitWidth';
+const SPLIT_STORAGE_KEY = 'overdeck.ui.flywheelSplitWidth';
 const SPLIT_MIN_LEFT = 360;
 const SPLIT_MIN_RIGHT = 360;
 const SPLIT_DEFAULT_LEFT = 720;

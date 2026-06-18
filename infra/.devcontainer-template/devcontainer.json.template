@@ -4,7 +4,7 @@
     "docker-compose.devcontainer.yml"
   ],
   "service": "dev",
-  "workspaceFolder": "/workspaces/panopticon",
+  "workspaceFolder": "/workspaces/overdeck",
   "postCreateCommand": "bun install",
   "customizations": {
     "vscode": {

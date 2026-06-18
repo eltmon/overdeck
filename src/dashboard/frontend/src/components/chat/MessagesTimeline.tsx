@@ -1591,7 +1591,7 @@ function CompactBoundaryDivider({ boundary }: { boundary: CompactBoundary }) {
     ? `Compacted (${Math.round(boundary.preTokens / 1000)}k tokens)`
     : 'Conversation compacted';
   const detail = [
-    boundary.trigger && boundary.trigger !== 'panopticon-native' ? boundary.trigger : null,
+    boundary.trigger && boundary.trigger !== 'overdeck-native' ? boundary.trigger : null,
     boundary.model,
   ].filter(Boolean).join(' · ');
 

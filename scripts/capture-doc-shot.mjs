@@ -31,7 +31,7 @@
  *                      returns a promise.
  *   --scale <n>        Device scale factor for crisp output (default: 2)
  *
- * The dashboard stores its theme in localStorage under 'panopticon.ui.theme'.
+ * The dashboard stores its theme in localStorage under 'overdeck.ui.theme'.
  * This script seeds that key before navigation so the page renders in the
  * requested theme from first paint.
  */
@@ -39,7 +39,7 @@ import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-const THEME_STORAGE_KEY = 'panopticon.ui.theme';
+const THEME_STORAGE_KEY = 'overdeck.ui.theme';
 const THEMES = ['light', 'dark'];
 
 function parseArgs(argv) {

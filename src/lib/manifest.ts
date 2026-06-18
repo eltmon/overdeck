@@ -10,7 +10,7 @@ import { FsError } from './errors.js';
  */
 export interface ManifestEntry {
   hash: string;           // sha256:<hex>
-  source: string;         // "panopticon" | "project-template" | custom
+  source: string;         // "overdeck" | "project-template" | custom
   installed_at: string;   // ISO 8601 timestamp
 }
 
@@ -19,7 +19,7 @@ export interface ManifestEntry {
  */
 export interface Manifest {
   version: 1;
-  managed_by: 'panopticon';
+  managed_by: 'overdeck';
   installed: Record<string, ManifestEntry>;
 }
 
@@ -48,7 +48,7 @@ export function hashFileSync(filePath: string): string {
 export function createEmptyManifest(): Manifest {
   return {
     version: 1,
-    managed_by: 'panopticon',
+    managed_by: 'overdeck',
     installed: {},
   };
 }
@@ -63,7 +63,7 @@ export function readManifestSync(manifestPath: string): Manifest {
 
   try {
     const raw = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-    if (raw.version === 1 && raw.managed_by === 'panopticon' && typeof raw.installed === 'object') {
+    if (raw.version === 1 && raw.managed_by === 'overdeck' && typeof raw.installed === 'object') {
       return raw as Manifest;
     }
     return createEmptyManifest();
@@ -174,9 +174,9 @@ export function collectSourceFilesSync(
  * Build a manifest from a directory by hashing all files.
  * Useful for generating the initial cache manifest.
  *
- * @param baseDir - The directory to scan (e.g., ~/.panopticon/)
+ * @param baseDir - The directory to scan (e.g., ~/.overdeck/)
  * @param categories - Which subdirectories to include (e.g., ["skills", "agents", "rules"])
- * @param source - The source label for all entries (e.g., "panopticon")
+ * @param source - The source label for all entries (e.g., "overdeck")
  */
 export function buildManifestFromDirectory(
   baseDir: string,
@@ -221,7 +221,7 @@ export const readManifest = (manifestPath: string): Effect.Effect<Manifest, neve
       onSuccess: (raw) => {
         try {
           const parsed = JSON.parse(raw);
-          if (parsed.version === 1 && parsed.managed_by === 'panopticon' && typeof parsed.installed === 'object') {
+          if (parsed.version === 1 && parsed.managed_by === 'overdeck' && typeof parsed.installed === 'object') {
             return parsed as Manifest;
           }
         } catch { /* fall through */ }

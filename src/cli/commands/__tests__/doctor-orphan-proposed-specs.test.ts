@@ -68,7 +68,7 @@ describe('orphan proposed specs doctor check', () => {
     writeSpec(projectPath, 'PAN-2003', 2);
     writeBeads(projectPath, 'PAN-2003', 2);
 
-    const projects = [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }];
+    const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
     expect(findOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') })).toEqual([
       expect.objectContaining({ issueId: 'PAN-2001', reason: 'beads-zero', beadCount: 0, planItemCount: 2 }),
       expect.objectContaining({ issueId: 'PAN-2002', reason: 'beads-mismatch', beadCount: 1, planItemCount: 2 }),
@@ -77,7 +77,7 @@ describe('orphan proposed specs doctor check', () => {
 
     const result = checkOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') });
     expect(result.status).toBe('warn');
-    expect(result.message).toContain('panopticon (Overdeck CLI)');
+    expect(result.message).toContain('overdeck (Overdeck CLI)');
     expect(result.message).toContain('PAN-2001 beads-zero');
     expect(result.message).toContain('PAN-2002 beads-mismatch');
     expect(result.message).toContain('PAN-2003 no-agent-no-reason');
@@ -92,7 +92,7 @@ describe('orphan proposed specs doctor check', () => {
     writeSpec(projectPath, 'PAN-2004', 2);
     writeRedirectBeads(projectPath, 'PAN-2004', 2);
 
-    const projects = [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }];
+    const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
     expect(findOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') })).toEqual([
       expect.objectContaining({ issueId: 'PAN-2004', reason: 'no-agent-no-reason', beadCount: 2, planItemCount: 2 }),
     ]);

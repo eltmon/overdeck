@@ -34,12 +34,12 @@ import { summarizeToolInputForWorkLog } from './format-tool-input.js';
 export function isPiSessionFile(sessionFile: string): boolean {
   const normalized = sessionFile.replace(/\\/g, '/');
   // Conversations write their transcript into the agent's `sessions/` subdir.
-  if (/\/\.panopticon\/agents\/[^/]+\/sessions\//.test(normalized)) return true;
+  if (/\/\.overdeck\/agents\/[^/]+\/sessions\//.test(normalized)) return true;
   // Work agents (PAN-1908) write the transcript directly into the agent-dir
   // root as `<iso-timestamp>_<session-id>.jsonl`. Match the timestamped name so
   // sibling non-transcripts (cost-events.jsonl, activity.jsonl) don't qualify,
   // and codex rollouts (under codex-home/sessions/) keep their own detector.
-  return /\/\.panopticon\/agents\/[^/]+\/\d{4}-\d{2}-\d{2}T[^/]*\.jsonl$/.test(normalized);
+  return /\/\.overdeck\/agents\/[^/]+\/\d{4}-\d{2}-\d{2}T[^/]*\.jsonl$/.test(normalized);
 }
 
 interface PiUsage {

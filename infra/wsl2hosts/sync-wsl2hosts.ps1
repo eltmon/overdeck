@@ -15,7 +15,7 @@ if (-not $wslIp) {
 }
 
 # Marker for auto-generated entries (allows safe cleanup/refresh)
-$marker = "# panopticon-auto"
+$marker = "# overdeck-auto"
 $hosts = "C:\Windows\System32\drivers\etc\hosts"
 
 # Read current hosts file, filtering out our auto-generated entries

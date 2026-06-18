@@ -6,7 +6,7 @@
 OpenRouter is added as a first-class provider alongside Anthropic, OpenAI, Google, Kimi, Z.AI. This means:
 - `openrouter` added to `ModelProvider` enum
 - API key stored in `config.yaml` under `api_keys.openrouter`
-- Env fallback via `OPENROUTER_API_KEY` in `~/.panopticon.env`
+- Env fallback via `OPENROUTER_API_KEY` in `~/.overdeck.env`
 - Model capabilities stored per-model from OpenRouter API metadata
 
 ### Model Discovery: Dynamic Fetch + User Favorites

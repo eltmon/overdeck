@@ -34,7 +34,7 @@ This skill guides you through viewing, filtering, and analyzing logs from agents
 tmux capture-pane -t agent-ISSUE-123 -p | tail -100
 
 # View dashboard logs
-cat ~/.panopticon/logs/dashboard.log
+cat ~/.overdeck/logs/dashboard.log
 
 # View all recent activity
 pan logs
@@ -95,20 +95,20 @@ done
 ```bash
 # If running in foreground, logs go to stdout
 # If running as background process:
-cat ~/.panopticon/logs/server.log
+cat ~/.overdeck/logs/server.log
 
 # Tail live
-tail -f ~/.panopticon/logs/server.log
+tail -f ~/.overdeck/logs/server.log
 ```
 
 ### API Requests
 
 ```bash
 # Filter API calls
-grep "POST\|GET\|PUT\|DELETE" ~/.panopticon/logs/server.log
+grep "POST\|GET\|PUT\|DELETE" ~/.overdeck/logs/server.log
 
 # Filter by endpoint
-grep "/api/agents" ~/.panopticon/logs/server.log
+grep "/api/agents" ~/.overdeck/logs/server.log
 ```
 
 ## System Logs
@@ -117,7 +117,7 @@ grep "/api/agents" ~/.panopticon/logs/server.log
 
 ```bash
 # Command history (if configured)
-cat ~/.panopticon/logs/commands.log
+cat ~/.overdeck/logs/commands.log
 
 # Or check shell history
 history | grep "pan "
@@ -178,20 +178,20 @@ tmux capture-pane -t agent-ISSUE-123 -p -S - | \
 
 ```bash
 # Create log archive for an issue
-mkdir -p ~/.panopticon/archives/ISSUE-123
-tmux capture-pane -t agent-ISSUE-123 -p -S - > ~/.panopticon/archives/ISSUE-123/agent.log
-cp workspace/.pan/continue.json ~/.panopticon/archives/ISSUE-123/
-git -C workspace log --oneline -20 > ~/.panopticon/archives/ISSUE-123/commits.log
+mkdir -p ~/.overdeck/archives/ISSUE-123
+tmux capture-pane -t agent-ISSUE-123 -p -S - > ~/.overdeck/archives/ISSUE-123/agent.log
+cp workspace/.pan/continue.json ~/.overdeck/archives/ISSUE-123/
+git -C workspace log --oneline -20 > ~/.overdeck/archives/ISSUE-123/commits.log
 ```
 
 ### Clean Old Logs
 
 ```bash
 # Remove logs older than 7 days
-find ~/.panopticon/logs -type f -mtime +7 -delete
+find ~/.overdeck/logs -type f -mtime +7 -delete
 
 # Archive and compress old logs
-tar -czf logs-archive-$(date +%Y%m%d).tar.gz ~/.panopticon/logs/*.log
+tar -czf logs-archive-$(date +%Y%m%d).tar.gz ~/.overdeck/logs/*.log
 ```
 
 ## Configuring Log Output
@@ -210,7 +210,7 @@ In dashboard config:
 ```javascript
 // Enable verbose logging
 LOG_LEVEL=debug
-LOG_FILE=~/.panopticon/logs/dashboard.log
+LOG_FILE=~/.overdeck/logs/dashboard.log
 ```
 
 ## Troubleshooting
@@ -232,7 +232,7 @@ tmux list-panes -t agent-ISSUE-123
 
 ```bash
 # Truncate log file
-> ~/.panopticon/logs/server.log
+> ~/.overdeck/logs/server.log
 
 # Rotate logs
 mv server.log server.log.1

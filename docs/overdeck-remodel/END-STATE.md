@@ -55,7 +55,7 @@ them:
    rebuilt from the first three.
 
 A fifth source sits beside the four homes but is not a home, because it stores
-nothing durable: **tmux**, on the `panopticon` socket, is the **liveness
+nothing durable: **tmux**, on the `overdeck` socket, is the **liveness
 oracle** — the ground truth for whether a process is actually running right now.
 The cache mirrors what tmux reports; it never originates it.
 
@@ -165,7 +165,7 @@ table, with its real records living as files on disk.
 | 1 | **Issues** | `IssuesResolver` | `IssueWriter` | GitHub + git `.pan/records` | `issues` |
 | 2 | **Agents** | `AgentsResolver` | `AgentWriter` | tmux + git `.pan/records` | `agents`, `health_events` |
 | 3 | **Conversations** | `ConversationsResolver` | `ConversationWriter` | the DB itself (the one exception) + the sacred session files | `conversations`, `conversation_files`, `favorites` |
-| 4 | **Cost** | `CostResolver` | `CostWriter` | sacred transcripts + `~/.panopticon` cost archives | `cost_events` |
+| 4 | **Cost** | `CostResolver` | `CostWriter` | sacred transcripts + `~/.overdeck` cost archives | `cost_events` |
 | 5 | **Merge** | `MergeResolver` | `MergeWriter` | GitHub PR state + `projects.yaml` | `merge_sets`, `merge_set_repos`, `merge_queue`, `pending_auto_merges`, `uat_generations` |
 | 6 | **Control/Settings** | `SettingsResolver` | `SettingsWriter` | DB flags (reset at cutover) | `app_settings`, `issue_policy` |
 | 7 | **Memory** | memory service | memory service | observation files on disk | `transcript_checkpoints` |
@@ -413,7 +413,7 @@ Cost is pure cache, and **14 of its 20 columns are needed**; the other six are
 zero-populated `tldr_*` and `caveman_variant` fields, deleted. What makes Cost
 unusual is that it rebuilds from a **union of three durable artifacts**, not one:
 the reconciled `~/.claude` transcripts, the replayed
-`~/.panopticon/costs/events.jsonl`, and the imported per-project write-ahead
+`~/.overdeck/costs/events.jsonl`, and the imported per-project write-ahead
 logs, deduplicated on request id.
 
 Today there are four parallel cost stores and three are redundant. Overdeck keeps
@@ -487,7 +487,7 @@ audit kept 11 of its 14 columns and dropped 3 (one never-read field and two
 timestamps that branch nothing). Every column is cache.
 
 Memory's real records are not in any database. They are **observation files on
-disk** under `~/.panopticon/memory/` — append-only JSONL records, their human
+disk** under `~/.overdeck/memory/` — append-only JSONL records, their human
 mirrors, status rollups, reset markers — about 170 MB of them. These are the
 sacred files: irreplaceable, never altered. Because they are already files
 outside the database-wipe scope, Memory needs **no export target**, unlike
@@ -580,7 +580,7 @@ metrics turn out to be a need); and the duplicate `CREATE TABLE agents` block.
 
 A few stores stay outside `overdeck.db` entirely, because they live in their own
 homes: the sacred session files on disk, the Memory observation files under
-`~/.panopticon/memory`, the separate `cache.db` and `memory-search.db`, the cost
+`~/.overdeck/memory`, the separate `cache.db` and `memory-search.db`, the cost
 `events.jsonl` archive, and the git `.pan/records`.
 
 ## Cutover-critical findings
@@ -621,7 +621,7 @@ These are decisions for the operator, not gaps in the design:
    `conversation-compaction.ts` from appending into the live Claude JSONL to the
    fork pattern, so the Transcript layer is strictly read-only.
 3. **The backup surface for the on-disk sacred files.** Confirm that the session
-   transcripts and the Memory observation files under `~/.panopticon/memory` are
+   transcripts and the Memory observation files under `~/.overdeck/memory` are
    covered by the backup surface — they are irreplaceable and live outside git.
 4. **Memory's scope.** Decided **in**: Memory is a domain with one cache table,
    its truth in the observation files, and no export needed. What remains is

@@ -25,9 +25,9 @@ import { Effect } from 'effect';
 import { loadConfigSync } from './config.js';
 import { ProcessSpawnError } from './errors.js';
 
-const SMEE_URL_PATH = join(homedir(), '.panopticon', 'github-app', 'smee-url');
-const SMEE_PID_PATH = join(homedir(), '.panopticon', 'github-app', 'smee.pid');
-const SMEE_LOG_PATH = join(homedir(), '.panopticon', 'logs', 'smee.log');
+const SMEE_URL_PATH = join(homedir(), '.overdeck', 'github-app', 'smee-url');
+const SMEE_PID_PATH = join(homedir(), '.overdeck', 'github-app', 'smee.pid');
+const SMEE_LOG_PATH = join(homedir(), '.overdeck', 'logs', 'smee.log');
 const MAX_RESTART_ATTEMPTS = 5;
 const BASE_RESTART_DELAY_MS = 1_000;
 const MAX_RESTART_DELAY_MS = 30_000;
@@ -84,7 +84,7 @@ function scheduleRestart(): void {
 
   const smeeUrl = getSmeeUrl();
   if (!smeeUrl) {
-    console.warn('[smee] No smee-url configured at ~/.panopticon/github-app/smee-url — skipping webhook relay');
+    console.warn('[smee] No smee-url configured at ~/.overdeck/github-app/smee-url — skipping webhook relay');
     return;
   }
 

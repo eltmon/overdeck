@@ -114,7 +114,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Register panopticon:// custom protocol in main process to serve static files from bundled dist/dashboard/public/. In dev mode, load BrowserWindow from Vite dev server URL (VITE_DEV_SERVER_URL env). In packaged builds, load panopticon://app/index.html. Handle WebSocket connections (ws/rpc and ws/terminal) correctly in both modes — protocol handler serves static assets, WS connections go to localhost server port. Configure CSP headers appropriately for both modes."
+          "Action": "Register overdeck:// custom protocol in main process to serve static files from bundled dist/dashboard/public/. In dev mode, load BrowserWindow from Vite dev server URL (VITE_DEV_SERVER_URL env). In packaged builds, load overdeck://app/index.html. Handle WebSocket connections (ws/rpc and ws/terminal) correctly in both modes — protocol handler serves static assets, WS connections go to localhost server port. Configure CSP headers appropriately for both modes."
         },
         "subItems": [
           {
@@ -125,7 +125,7 @@
           },
           {
             "id": "hybrid-loading.ac2",
-            "title": "Packaged build loads from panopticon:// protocol without localhost exposure",
+            "title": "Packaged build loads from overdeck:// protocol without localhost exposure",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -342,7 +342,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Modify pan up in src/cli/index.ts to detect if the Electron app is installed (check standard install locations: /usr/local/bin/panopticon, /opt/Overdeck/, ~/Applications/Overdeck.app, /Applications/Overdeck.app). If found, launch the Electron app instead of spawning bare server + opening browser. Add --no-desktop flag to force bare server mode. Falls back gracefully if Electron app not found."
+          "Action": "Modify pan up in src/cli/index.ts to detect if the Electron app is installed (check standard install locations: /usr/local/bin/overdeck, /opt/Overdeck/, ~/Applications/Overdeck.app, /Applications/Overdeck.app). If found, launch the Electron app instead of spawning bare server + opening browser. Add --no-desktop flag to force bare server mode. Falls back gracefully if Electron app not found."
         },
         "subItems": [
           {
@@ -367,7 +367,7 @@
       },
       {
         "id": "npx-launcher",
-        "title": "npx panopticon server+browser launcher",
+        "title": "npx overdeck server+browser launcher",
         "status": "pending",
         "priority": "low",
         "created": "2026-04-07T18:00:00Z",
@@ -376,12 +376,12 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Ensure the panopticon npm package has a bin entry that starts the dashboard server and opens localhost in the default browser. This is essentially what pan up --no-desktop does, exposed as the default npx command. Verify the package.json bin field points to the right entry point and that the CLI detects the npx context correctly."
+          "Action": "Ensure the overdeck npm package has a bin entry that starts the dashboard server and opens localhost in the default browser. This is essentially what pan up --no-desktop does, exposed as the default npx command. Verify the package.json bin field points to the right entry point and that the CLI detects the npx context correctly."
         },
         "subItems": [
           {
             "id": "npx-launcher.ac1",
-            "title": "npx panopticon starts dashboard server and opens browser to localhost",
+            "title": "npx overdeck starts dashboard server and opens browser to localhost",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -478,12 +478,12 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Create preload.ts exposing a panopticonBridge object to the renderer via contextBridge.exposeInMainWorld. Bridge methods: getServerUrl(), getWsUrl(), pickFolder(), openExternal(url), showContextMenu(), setTheme(theme), getDesktopSettings(), updateDesktopSetting(key, value), onMenuAction(listener), isDesktopApp(). All methods use typed IPC channels. Main process registers corresponding ipcMain.handle handlers. Frontend detects desktop mode via window.panopticonBridge existence."
+          "Action": "Create preload.ts exposing a overdeckBridge object to the renderer via contextBridge.exposeInMainWorld. Bridge methods: getServerUrl(), getWsUrl(), pickFolder(), openExternal(url), showContextMenu(), setTheme(theme), getDesktopSettings(), updateDesktopSetting(key, value), onMenuAction(listener), isDesktopApp(). All methods use typed IPC channels. Main process registers corresponding ipcMain.handle handlers. Frontend detects desktop mode via window.overdeckBridge existence."
         },
         "subItems": [
           {
             "id": "preload-bridge.ac1",
-            "title": "panopticonBridge is available on window in renderer process",
+            "title": "overdeckBridge is available on window in renderer process",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },

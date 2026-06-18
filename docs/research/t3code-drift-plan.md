@@ -61,7 +61,7 @@ Plus a second breaking change in `RpcServer`: inside RPC handler middleware, `{ 
 3. Rebuild: `npm run build` (tsdown) — must pass.
 4. `npm run typecheck` — must pass clean.
 5. Smoke test: `pan up` + open dashboard + verify `/ws/rpc` snapshot loads + `/ws/terminal` renders a session.
-6. The `@panopticon/contracts` workspace also pulls Effect transitively; rebuild `packages/contracts` explicitly.
+6. The `@overdeck/contracts` workspace also pulls Effect transitively; rebuild `packages/contracts` explicitly.
 
 ### 0.4 Risk
 
@@ -106,7 +106,7 @@ Adopt t3code's architecture for terminal transport. Reasoning, not ranked:
 ### 1.4 Work breakdown
 
 1. Bump to beta.48 (section 0) first.
-2. In `@panopticon/contracts`, model `TerminalEvent` as a tagged schema union mirroring [`apps/server/src/terminal/Services/Manager.ts`](../../../t3code/apps/server/src/terminal/Services/Manager.ts) — `{ kind: "data" | "exit" | "resize" | "snapshot" | "ready" | "size", … }`.
+2. In `@overdeck/contracts`, model `TerminalEvent` as a tagged schema union mirroring [`apps/server/src/terminal/Services/Manager.ts`](../../../t3code/apps/server/src/terminal/Services/Manager.ts) — `{ kind: "data" | "exit" | "resize" | "snapshot" | "ready" | "size", … }`.
 3. Rewrite `TerminalService` in `src/dashboard/server/services/terminal-service.ts` around a `TerminalManager` contract: per-session history buffer (default 5000 lines), `subscribe()` returning `Stream<TerminalEvent>` that emits a snapshot frame then live deltas, server-owned PTY lifecycle independent of client connections.
 4. Wire `subscribeTerminal` in `ws-rpc.ts` to emit `TerminalEvent` through `RpcSerialization.layerJson`. Delete the unused `terminalOpen/Write/Resize/Close` RPC methods if the new `subscribe` returns a duplex, otherwise keep them and delete the stub implementations.
 5. Rewrite the frontend `XTerminal.tsx` to consume `subscribeTerminal` via `WsTransport.ts` instead of opening its own raw WebSocket.
@@ -193,7 +193,7 @@ Overdeck's 60 bundled skills in `~/.claude/skills/` are exactly the shape this d
 1. Add `ClaudeProvider` / `CodexProvider` modules under `src/dashboard/server/services/providers/` (if they don't exist yet — Overdeck currently launches the SDK through `src/lib/agent-runner.ts`). Wire `query().initializationResult()` + `settingSources: ["user","project","local"]`.
 2. Port `parseClaudeInitializationCommands` and `dedupeSlashCommands` verbatim.
 3. Add a `Cache.make` wrapper with 5-minute TTL keyed on `cwd`.
-4. Add `ProviderSkill` / `ProviderSlashCommand` schemas to `@panopticon/contracts`.
+4. Add `ProviderSkill` / `ProviderSlashCommand` schemas to `@overdeck/contracts`.
 5. Expose over RPC as `getProviderCapabilities(cwd)` — cache hit returns in µs, cache miss runs the probe.
 6. Frontend: extend the existing composer (`src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx`) with the `provider-slash-command` / `skill` item variants. Reuse `CommandGroup` structure from t3code.
 7. Ship `composerMenuHighlight.ts` + `composerSlashCommandSearch.ts` as-is with their tests.
@@ -324,7 +324,7 @@ User flagged in section 7 that this is conditional on the remote-dashboard story
 | `5b3b31b6` | Use dev proxy for loopback auth and environment requests | **Y** |
 | `b96308fc` | Prepare datamodel for multi-environment | **P** — Overdeck's "projects" are the equivalent; watch for schema ideas |
 | `e32077ce` | Persist client settings and saved environment secrets | **Y** |
-| `e3004ae8` | Harden secret store and resolve catalog overrides | **Y** (Overdeck has `~/.panopticon.env` — same concerns) |
+| `e3004ae8` | Harden secret store and resolve catalog overrides | **Y** (Overdeck has `~/.overdeck.env` — same concerns) |
 | `1a05d8ca` | Document remote server network access setup | **Y** (docs) |
 
 ### 6.6 Observability / tracing
@@ -404,7 +404,7 @@ Overdeck doesn't have a "thread" concept but does have "workspaces" and "issues"
 
 ### 6.11 Desktop (Electron) — mostly N/A
 
-Overdeck currently ships as a CLI + browser dashboard, not a desktop app. Some of these become relevant once the Electron shell lands (see `memory/panopticon-electron-npx.md`).
+Overdeck currently ships as a CLI + browser dashboard, not a desktop app. Some of these become relevant once the Electron shell lands (see `memory/overdeck-electron-npx.md`).
 
 | SHA | Title | Applies |
 | --- | --- | --- |

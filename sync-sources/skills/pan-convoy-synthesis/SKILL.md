@@ -45,7 +45,7 @@ For each completed agent in the convoy:
 
 ```bash
 # Check each workspace for changes
-cd ~/.panopticon/workspaces/<issue-id>
+cd ~/.overdeck/workspaces/<issue-id>
 git status
 git log --oneline -10
 git diff main...HEAD

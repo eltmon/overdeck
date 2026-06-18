@@ -10,7 +10,7 @@
  *   1. `ThreadId` is sourced locally (plain string) rather than @t3tools/contracts.
  *   2. storage uses window.localStorage with an in-memory fallback instead of
  *      t3code's ./lib/storage resolveStorage helper.
- *   3. the persisted-key namespace is `panopticon:` not `t3code:`.
+ *   3. the persisted-key namespace is `overdeck:` not `t3code:`.
  */
 
 import { create } from "zustand";
@@ -34,7 +34,7 @@ interface ThreadTerminalState {
 }
 
 // PAN-1561 SEAM 3: namespace.
-const TERMINAL_STATE_STORAGE_KEY = "panopticon:terminal-state:v1";
+const TERMINAL_STATE_STORAGE_KEY = "overdeck:terminal-state:v1";
 
 // PAN-1561 SEAM 2: localStorage with an in-memory fallback (replaces t3code's
 // resolveStorage(./lib/storage)).

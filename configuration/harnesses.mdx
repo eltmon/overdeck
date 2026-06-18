@@ -34,7 +34,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 ### Pi (alternative)
 
 - Adds RPC mode (`pi --mode rpc`) so Overdeck can write structured commands to
-  Pi's stdin via a named pipe (`mkfifo` at `~/.panopticon/agents/<agentId>/rpc.in`).
+  Pi's stdin via a named pipe (`mkfifo` at `~/.overdeck/agents/<agentId>/rpc.in`).
 - Vendored extension at `packages/pi-extension/` reports lifecycle events:
   `session_start` writes a `ready.json`, `tool_execution_end` updates a
   heartbeat, and a `/pan-done` slash command writes a completion marker.
@@ -76,7 +76,7 @@ so you do **not** need to configure auth separately in Pi for most providers.
 When you spawn a Pi agent with a Kimi, MiniMax, Z.AI, MiMo, OpenRouter, Nous,
 or DashScope model, Overdeck injects the native provider env var
 (`KIMI_API_KEY`, `MINIMAX_API_KEY`, etc.) automatically from your dashboard
-Settings or `~/.panopticon.env`.
+Settings or `~/.overdeck.env`.
 
 Providers that rely on OAuth / subscription auth (Anthropic, OpenAI Codex)
 still require you to log in through Pi directly (`/login` inside a Pi session)
@@ -168,13 +168,13 @@ version. The fix message includes the install/upgrade command.
 
 ### Pi spawns but the agent never reaches "ready"
 
-Check `~/.panopticon/agents/<id>/ready.json` — the vendored extension writes this
+Check `~/.overdeck/agents/<id>/ready.json` — the vendored extension writes this
 on `session_start`. If it never appears:
 
 1. Confirm `packages/pi-extension/dist/index.js` exists (`pan doctor` will warn).
-2. Tail the tmux session: `tmux -L panopticon attach -t agent-<id>`. Pi prints
+2. Tail the tmux session: `tmux -L overdeck attach -t agent-<id>`. Pi prints
    stdout to the pane; structural errors show up there.
-3. Verify the named pipe exists at `~/.panopticon/agents/<id>/rpc.in`. If a stale
+3. Verify the named pipe exists at `~/.overdeck/agents/<id>/rpc.in`. If a stale
    regular file is in its place, `createPiFifo` replaces it on next spawn.
 
 ### Pi heartbeat is stale but the agent is working
@@ -182,14 +182,14 @@ on `session_start`. If it never appears:
 `PiRuntime.getHeartbeat()` walks three sources in priority order: active
 heartbeat (&lt;60s old) → JSONL session mtime → tmux session created timestamp.
 If your dashboard shows a stale heartbeat, check
-`~/.panopticon/heartbeats/<id>.json` — Pi writes there on every
+`~/.overdeck/heartbeats/<id>.json` — Pi writes there on every
 `tool_execution_end`.
 
 ## Tradeoffs
 
 ### RPC over named pipe vs tmux paste-buffer
 
-Pi's harness uses a per-agent `mkfifo` (`~/.panopticon/agents/<id>/rpc.in`) for
+Pi's harness uses a per-agent `mkfifo` (`~/.overdeck/agents/<id>/rpc.in`) for
 command delivery. Claude Code uses tmux's `load-buffer` + `paste-buffer`
 pattern. The fifo path:
 

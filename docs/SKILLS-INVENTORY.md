@@ -16,7 +16,7 @@ Claude Code gives user-level skills precedence over project-level skills when na
 | `/backups` | User | Check and manage Backblaze B2 backups via restic. View snapshots, check timer status, run manual backups, restore files. Covers home directory and K8s database backups. |
 | `/beads` | User, Project | Git-backed issue tracker for multi-session work with dependencies and persistent memory across conversation compaction. Use when work spans sessions, has blockers, or needs context recovery after compaction. |
 | `/beads-completion-check` | User, Project | Verify all beads (tasks) in a workspace are closed before review completion. Use as final check in code review workflow. Returns PASS if no open beads, BLOCKED if open beads found. Triggers on "check beads", "verify tasks complete", "beads status", or as subagent in review workflow. |
-| `/beads-panopticon-guide` | User, Project | Overdeck-specific beads usage patterns. Covers common mistakes agents make when filtering beads by issue number (PAN-XXX) and working with Linear-synced beads. |
+| `/beads-overdeck-guide` | User, Project | Overdeck-specific beads usage patterns. Covers common mistakes agents make when filtering beads by issue number (PAN-XXX) and working with Linear-synced beads. |
 | `/benchmark` | Project | Create a benchmark issue to test Overdeck's agent pipeline. Creates a GitHub issue from a stored template with a scenario label for A/B comparison of models and approaches. |
 | `/bug-fix` | Project | Systematic approach to investigating and fixing bugs |
 | `/cco` | User | Open Claude Code Organizer dashboard to manage memories, skills, MCP servers across scopes |
@@ -133,7 +133,7 @@ These skills exist in both user and project scopes. Claude Code resolves those n
 
 - `/beads`
 - `/beads-completion-check`
-- `/beads-panopticon-guide`
+- `/beads-overdeck-guide`
 - `/clear-writing`
 
 ## Maintenance

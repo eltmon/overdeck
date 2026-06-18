@@ -95,7 +95,7 @@ interface ContextMenuState {
 }
 
 // Storage key for auto-copy preference
-const AUTOCOPY_STORAGE_KEY = 'panopticon.terminal.autoCopyOnSelect';
+const AUTOCOPY_STORAGE_KEY = 'overdeck.terminal.autoCopyOnSelect';
 
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
@@ -106,7 +106,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   // pin this one pane. Sessions spawned before a dashboard theme change keep
   // rendering their old Claude theme (Claude only detects via OSC 11 once, at
   // startup) — the toggle is the escape hatch for those panes.
-  const themeOverrideKey = `panopticon.terminal.theme.${sessionName}`;
+  const themeOverrideKey = `overdeck.terminal.theme.${sessionName}`;
   const [themeOverride, setThemeOverride] = useState<'auto' | 'dark' | 'light'>(() => {
     const stored = localStorage.getItem(themeOverrideKey);
     return stored === 'dark' || stored === 'light' ? stored : 'auto';

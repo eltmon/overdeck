@@ -5,8 +5,8 @@ triggers:
   - pan doctor
   - system health
   - health check
-  - panopticon status
-  - check panopticon
+  - overdeck status
+  - check overdeck
 allowed-tools:
   - Bash
   - Read
@@ -54,7 +54,7 @@ pan doctor
 
 ```bash
 # View current config
-cat ~/.panopticon.env
+cat ~/.overdeck.env
 
 # Required settings:
 # LINEAR_API_KEY=lin_api_xxx
@@ -72,7 +72,7 @@ curl -s http://localhost:3011/api/health || echo "Dashboard not running"
 tmux list-sessions | grep agent
 
 # Docker containers
-docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(traefik|panopticon)"
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "(traefik|overdeck)"
 ```
 
 ### 4. Check Skills
@@ -108,12 +108,12 @@ git --version
 
 | Component | Check Command | Expected |
 |-----------|---------------|----------|
-| Config | `cat ~/.panopticon.env` | File exists with keys |
+| Config | `cat ~/.overdeck.env` | File exists with keys |
 | Node.js | `node --version` | v18+ |
 | tmux | `tmux -V` | Any version |
 | Docker | `docker info` | Running |
-| Skills | `ls ~/.panopticon/skills/` | Skills present |
-| Symlinks | `ls -la ~/.claude/skills/` | Symlinks to panopticon |
+| Skills | `ls ~/.overdeck/skills/` | Skills present |
+| Symlinks | `ls -la ~/.claude/skills/` | Symlinks to overdeck |
 | Linear | `pan doctor` | API key valid |
 
 ## Component Status
@@ -122,7 +122,7 @@ git --version
 
 ```bash
 # Start dashboard
-cd ~/.panopticon/dashboard && npm run dev
+cd ~/.overdeck/dashboard && npm run dev
 
 # Check health endpoint
 curl http://localhost:3011/api/health
@@ -163,7 +163,7 @@ done
 pan init
 
 # Or manually
-cat > ~/.panopticon.env << 'EOF'
+cat > ~/.overdeck.env << 'EOF'
 LINEAR_API_KEY=your_key_here
 GITHUB_TOKEN=your_token_here
 WORKSPACE_ROOT=/home/user/workspaces
@@ -192,7 +192,7 @@ kill $(lsof -t -i:3010)
 kill $(lsof -t -i:3011)
 
 # Restart
-cd ~/.panopticon/dashboard && npm run dev
+cd ~/.overdeck/dashboard && npm run dev
 ```
 
 ### tmux Issues
@@ -211,7 +211,7 @@ tmux kill-session -t test
 ### Update Overdeck
 
 ```bash
-npm update -g panopticon
+npm update -g overdeck
 pan init  # Re-copy bundled skills
 pan sync  # Re-sync to AI tools
 ```
@@ -230,7 +230,7 @@ rm -rf $WORKSPACE_ROOT/old-issue/
 
 ```bash
 # Backup and reset
-cp ~/.panopticon.env ~/.panopticon.env.backup
+cp ~/.overdeck.env ~/.overdeck.env.backup
 pan init
 ```
 

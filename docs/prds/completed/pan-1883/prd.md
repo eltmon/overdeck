@@ -13,11 +13,11 @@
 
 ## Background (why this issue changed)
 
-The original PAN-1883 claimed `~/.panopticon/review-status.json` is the canonical review-status store
+The original PAN-1883 claimed `~/.overdeck/review-status.json` is the canonical review-status store
 and that a wipe stranded 11 in-review issues. **Both claims are false**, verified:
 
 - `src/lib/review-status.ts` — `loadReviewStatuses()` returns `getAllReviewStatusesFromDb()` (search
-  `getAllReviewStatusesFromDb`). **SQLite (`~/.panopticon/panopticon.db`, table `review_status`) is
+  `getAllReviewStatusesFromDb`). **SQLite (`~/.overdeck/panopticon.db`, table `review_status`) is
   authoritative.** The deacon/server never read the JSON file.
 - `src/lib/review-status-json.ts` writes the JSON file and is imported by **no production module**
   (only `tests/dashboard/review-status.test.ts`). It is test/CLI scratch.
@@ -37,8 +37,8 @@ state files or the DB directly.
 ## Glossary
 
 - **`review_status` table** — authoritative SQLite store of every issue's review/test/merge gate
-  state, in `~/.panopticon/panopticon.db`. Accessed via `src/lib/database/review-status-db.ts`.
-- **review-status.json** — `~/.panopticon/review-status.json`. **Legacy/test-only scratch.** Never read.
+  state, in `~/.overdeck/panopticon.db`. Accessed via `src/lib/database/review-status-db.ts`.
+- **review-status.json** — `~/.overdeck/review-status.json`. **Legacy/test-only scratch.** Never read.
 - **The surfaces** — sanctioned read paths: `pan review pending --ready` (CLI, SQLite); `GET
   /api/flywheel/merge-blockers` (`src/dashboard/server/routes/flywheel.ts`, search
   `getMergeBlockersPayload`); dashboard review snapshots.
@@ -77,9 +77,9 @@ In `roles/flywheel.md`, immediately above the merge-blockers bullet (search `GET
 
 ```markdown
    - **Pipeline truth lives in SQLite, surfaced via CLI/API — never read state files or the DB directly.**
-     Authoritative review/test/merge state is the `review_status` table in `~/.panopticon/panopticon.db`,
+     Authoritative review/test/merge state is the `review_status` table in `~/.overdeck/panopticon.db`,
      reached ONLY through `pan review pending --ready`, `GET /api/flywheel/merge-blockers`, and the
-     dashboard review snapshots. **`~/.panopticon/review-status.json` is legacy/test-only scratch — NOT
+     dashboard review snapshots. **`~/.overdeck/review-status.json` is legacy/test-only scratch — NOT
      the store, usually empty or stale, and must NEVER be read to judge pipeline state.** An empty or odd
      JSON file means nothing; query the surfaces. (RUN-34 misfiled a "review-status wiped" bug from
      spelunking this file while all 11 issues were healthy in SQLite, blocked only by merge_conflict/failing_checks.)

@@ -24,7 +24,7 @@ No automatic escalation to Opus or alternative approaches.
 ### 3. Session Mode
 **Decision:** Persistent session with `--resume`
 
-merge-agent maintains a single persistent Claude session ID stored in `~/.panopticon/specialists/merge-agent.session`. This allows:
+merge-agent maintains a single persistent Claude session ID stored in `~/.overdeck/specialists/merge-agent.session`. This allows:
 - Context accumulation across merges (learns project patterns)
 - More efficient token usage via context caching
 - Session rotation when context gets too large (manual for MVP)
@@ -67,8 +67,8 @@ merge-agent has 15 minutes to complete conflict resolution + tests before being 
 - [ ] Handle failure flow (abort, report, cleanup)
 
 **Persistence:**
-- [ ] Session ID storage in `~/.panopticon/specialists/merge-agent.session`
-- [ ] Merge history in `~/.panopticon/specialists/merge-agent/history.jsonl`
+- [ ] Session ID storage in `~/.overdeck/specialists/merge-agent.session`
+- [ ] Merge history in `~/.overdeck/specialists/merge-agent/history.jsonl`
 
 **Dashboard:**
 - [ ] Modify approve flow to show "Resolving conflicts..." status
@@ -218,16 +218,16 @@ Parse agent output for structured result markers:
 
 | ID | Title | Layer | Blocked By |
 |----|-------|-------|------------|
-| panopticon-m01 | Create merge-agent prompt template | 1 | - |
-| panopticon-m02 | Implement spawnMergeAgent with --resume | 1 | - |
-| panopticon-m03 | Implement result parsing | 1 | m02 |
-| panopticon-m04 | Modify approve API to detect conflicts | 2 | - |
-| panopticon-m05 | Integrate merge-agent in approve flow | 2 | m02, m03, m04 |
-| panopticon-m06 | Handle success flow (push, continue) | 2 | m05 |
-| panopticon-m07 | Handle failure flow (abort, report) | 2 | m05 |
-| panopticon-m08 | Add merge history logging | 3 | m06, m07 |
-| panopticon-m09 | Update dashboard for merge-agent status | 3 | m05 |
-| panopticon-m10 | Edge cases and error handling | 3 | m06, m07 |
+| overdeck-m01 | Create merge-agent prompt template | 1 | - |
+| overdeck-m02 | Implement spawnMergeAgent with --resume | 1 | - |
+| overdeck-m03 | Implement result parsing | 1 | m02 |
+| overdeck-m04 | Modify approve API to detect conflicts | 2 | - |
+| overdeck-m05 | Integrate merge-agent in approve flow | 2 | m02, m03, m04 |
+| overdeck-m06 | Handle success flow (push, continue) | 2 | m05 |
+| overdeck-m07 | Handle failure flow (abort, report) | 2 | m05 |
+| overdeck-m08 | Add merge history logging | 3 | m06, m07 |
+| overdeck-m09 | Update dashboard for merge-agent status | 3 | m05 |
+| overdeck-m10 | Edge cases and error handling | 3 | m06, m07 |
 
 ## Technical Notes
 
@@ -305,7 +305,7 @@ None - all decisions captured above.
 
 ## References
 
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 5: Specialist Agents)
-- Specialist infrastructure: `/home/eltmon/projects/panopticon/src/lib/cloister/specialists.ts`
-- Approve API: `/home/eltmon/projects/panopticon/src/dashboard/server/index.ts` (line ~2765)
+- PRD: `/home/eltmon/projects/overdeck/docs/PRD-CLOISTER.md` (Phase 5: Specialist Agents)
+- Specialist infrastructure: `/home/eltmon/projects/overdeck/src/lib/cloister/specialists.ts`
+- Approve API: `/home/eltmon/projects/overdeck/src/dashboard/server/index.ts` (line ~2765)
 - GitHub Issue: https://github.com/eltmon/overdeck/issues/29

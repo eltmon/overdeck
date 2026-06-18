@@ -1,7 +1,7 @@
 /**
  * Environment Variable Loader
  *
- * Loads environment variables from ~/.panopticon.env into process.env.
+ * Loads environment variables from ~/.overdeck.env into process.env.
  * This allows the settings system to access API keys configured in the .env file.
  */
 
@@ -14,7 +14,7 @@ import { FsError } from './errors.js';
 /**
  * Path to the Overdeck environment file
  */
-export const ENV_FILE_PATH = join(homedir(), '.panopticon.env');
+export const ENV_FILE_PATH = join(homedir(), '.overdeck.env');
 
 /**
  * Parse a .env file content into key-value pairs
@@ -43,7 +43,7 @@ function parseEnvFile(content: string): Record<string, string> {
 }
 
 /**
- * Load environment variables from ~/.panopticon.env
+ * Load environment variables from ~/.overdeck.env
  * Does not override existing environment variables.
  *
  * @returns Object with loaded variables and any errors
@@ -83,7 +83,7 @@ export function loadOverdeckEnvSync(): {
 }
 
 /**
- * Get API keys from environment (after loading ~/.panopticon.env)
+ * Get API keys from environment (after loading ~/.overdeck.env)
  */
 export function getApiKeysFromEnv(): {
   openai?: string;
@@ -102,7 +102,7 @@ export function getApiKeysFromEnv(): {
 }
 
 /**
- * Get shadow mode setting from environment (after loading ~/.panopticon.env)
+ * Get shadow mode setting from environment (after loading ~/.overdeck.env)
  * Returns true if SHADOW_MODE is set to 'true', '1', or 'yes' (case insensitive)
  */
 export function getShadowModeFromEnv(): boolean {
@@ -112,7 +112,7 @@ export function getShadowModeFromEnv(): boolean {
 }
 
 /**
- * Check if ~/.panopticon.env file exists
+ * Check if ~/.overdeck.env file exists
  */
 export function hasEnvFile(): boolean {
   return existsSync(ENV_FILE_PATH);

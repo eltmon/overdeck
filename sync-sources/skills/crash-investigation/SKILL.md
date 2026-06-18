@@ -153,7 +153,7 @@ After understanding what caused the crash, assess what work was in progress.
 #### Agent States
 ```bash
 # List all agents and their last state
-for agent_dir in ~/.panopticon/agents/*/; do
+for agent_dir in ~/.overdeck/agents/*/; do
   agent=$(basename "$agent_dir")
   state=$(cat "$agent_dir/state.json" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d.get(\"state\",\"unknown\")} @ {d.get(\"lastActivity\",\"?\")}')" 2>/dev/null || echo "no state")
   echo "$agent: $state"

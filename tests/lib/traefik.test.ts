@@ -49,18 +49,18 @@ describe('traefik config generation', () => {
 
     expect(generateOverdeckTraefikConfigSync()).toBe(true);
 
-    const rendered = readFileSync(join(tempDir, 'traefik', 'dynamic', 'panopticon.yml'), 'utf-8');
+    const rendered = readFileSync(join(tempDir, 'traefik', 'dynamic', 'overdeck.yml'), 'utf-8');
 
     expect(rendered).toContain('rule: "Host(`example.test`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`)"');
     expect(rendered).toContain('rule: "Host(`example.test`) && (PathPrefix(`/api`) || PathPrefix(`/ws`))"');
     expect(rendered).toContain('url: "http://host.docker.internal:4102"');
 
     const artifactRouter = rendered.slice(
-      rendered.indexOf('    panopticon-artifacts:'),
+      rendered.indexOf('    overdeck-artifacts:'),
       rendered.indexOf('  services:'),
     );
     expect(artifactRouter).toContain('rule: "Host(`artifacts.example.test`) && PathPrefix(`/a/`)"');
-    expect(artifactRouter).toContain('service: panopticon-api');
+    expect(artifactRouter).toContain('service: overdeck-api');
     expect(artifactRouter).toContain('- "*.example.test"');
   });
 });

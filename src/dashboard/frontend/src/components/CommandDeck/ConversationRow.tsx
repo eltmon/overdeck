@@ -223,7 +223,7 @@ export function ConversationRow({
       {conv.forkFallbackReason && !conv.forkStatus && (
         <span
           className={styles.conversationForkFailed}
-          title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.panopticon/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
+          title={`Intended handoff fell back to summary fork: ${conv.forkFallbackReason}. Look in ~/.overdeck/handoffs/ for the .rejected.md file to see what the authoring session emitted.`}
         >
           <TriangleAlert size={10} />
           <span>Fallback: {conv.forkFallbackReason}</span>

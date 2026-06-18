@@ -4,7 +4,7 @@ Date: 2026-06-12
 
 Acceptance criterion: `graceful-restart-60s.ac4`
 
-Live checkpoint executed against disposable managed tmux session `agent-pan-1787-live-checkpoint` on the `panopticon` socket.
+Live checkpoint executed against disposable managed tmux session `agent-pan-1787-live-checkpoint` on the `overdeck` socket.
 
 Command executed:
 

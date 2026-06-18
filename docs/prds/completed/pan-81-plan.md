@@ -43,7 +43,7 @@ The `/api/costs/by-issue` endpoint re-parses ALL Claude Code session files on EV
 │  Claude Code    │────▶───────────┤
 │  (subagent)     │                ▼
 └─────────────────┘     ┌──────────────────────┐
-                        │ ~/.panopticon/costs/ │
+                        │ ~/.overdeck/costs/ │
                         │  events.jsonl        │
                         │  by-issue.json       │
                         └──────────┬───────────┘
@@ -57,13 +57,13 @@ The `/api/costs/by-issue` endpoint re-parses ALL Claude Code session files on EV
 
 ## Data Formats
 
-### Event Log (`~/.panopticon/costs/events.jsonl`)
+### Event Log (`~/.overdeck/costs/events.jsonl`)
 ```jsonl
 {"ts":"2026-01-23T15:30:00","agent":"agent-pan-74","input":1234,"output":567,"cache_read":890,"cache_write":100,"model":"claude-sonnet-4"}
 {"ts":"2026-01-23T15:31:05","agent":"agent-pan-74-subagent-aa82e20","input":500,"output":100,"cache_read":200,"cache_write":0,"model":"claude-haiku-4-5"}
 ```
 
-### Aggregation Cache (`~/.panopticon/costs/by-issue.json`)
+### Aggregation Cache (`~/.overdeck/costs/by-issue.json`)
 ```json
 {
   "version": 2,
@@ -85,7 +85,7 @@ The `/api/costs/by-issue` endpoint re-parses ALL Claude Code session files on EV
 }
 ```
 
-### Error Log (`~/.panopticon/costs/errors.log`)
+### Error Log (`~/.overdeck/costs/errors.log`)
 ```
 2026-01-23T15:30:00 ERROR: Failed to parse usage JSON: <error details>
 2026-01-23T15:31:00 ERROR: Missing agent ID in environment

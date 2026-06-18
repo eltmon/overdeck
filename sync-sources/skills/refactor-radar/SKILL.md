@@ -111,7 +111,7 @@ If the current trigger category is in the skip list, **do not prompt**.
 ### Step 1: Check Configuration
 
 ```bash
-cat .panopticon/refactor-radar.json 2>/dev/null || echo "{}"
+cat .overdeck/refactor-radar.json 2>/dev/null || echo "{}"
 ```
 
 **Default configuration:**
@@ -226,8 +226,8 @@ Acknowledge: "Refactor Radar permanently disabled for this project. Delete `.cla
 ### Step 5: Update Configuration
 
 ```bash
-mkdir -p .panopticon
-cat > .panopticon/refactor-radar.json << 'EOF'
+mkdir -p .overdeck
+cat > .overdeck/refactor-radar.json << 'EOF'
 {
   "enabled": true,
   "mode": "normal",
@@ -450,7 +450,7 @@ Relationships exist in application code but lack DB constraints:
 | File | Purpose |
 |------|---------|
 | `~/.claude/CLAUDE.md` | User preferences (category exclusions/welcomes) |
-| `.panopticon/refactor-radar.json` | Per-project configuration |
+| `.overdeck/refactor-radar.json` | Per-project configuration |
 | `.claude/skills/refactor-radar/SKILL.md` | Override to permanently disable |
 
 ## Integration

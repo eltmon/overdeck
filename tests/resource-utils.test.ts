@@ -7,7 +7,7 @@ describe('parseIssueIdFromText', () => {
   });
 
   it('returns null when no issue ID present', () => {
-    expect(parseIssueIdFromTextSync('panopticon-traefik')).toBeNull();
+    expect(parseIssueIdFromTextSync('overdeck-traefik')).toBeNull();
   });
 });
 
@@ -21,7 +21,7 @@ describe('parseContainerServiceName', () => {
   });
 
   it('returns last segment when no issue ID and no instance number', () => {
-    expect(parseContainerServiceNameSync('panopticon-traefik')).toBe('traefik');
+    expect(parseContainerServiceNameSync('overdeck-traefik')).toBe('traefik');
   });
 
   it('returns last non-numeric segment as fallback for devcontainer', () => {

@@ -19,7 +19,7 @@ import { homedir } from 'os';
 
 const DASHBOARD_URL = 'http://localhost:3010';
 const API_URL = 'http://localhost:3011';
-const OVERDECK_HOME = join(homedir(), '.panopticon');
+const OVERDECK_HOME = join(homedir(), '.overdeck');
 const SETTINGS_FILE = join(OVERDECK_HOME, 'settings.json');
 const ROUTER_CONFIG = join(homedir(), '.claude-code-router', 'config.json');
 

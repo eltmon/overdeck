@@ -68,7 +68,7 @@ declare const Bun: unknown;
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
-console.log(`[panopticon] Boot gates: ${formatBootGateState(resolveBootGates())}`);
+console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
@@ -85,9 +85,9 @@ ensureInternalTokenSync();
 // `start-server`/`source-file` round-trips. Critical for terminal attach latency
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
-// Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
+// Cache .overdeck.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 await initTrackerConfigCache().catch(err => {
-  console.log('[tracker-config] Warning: failed to cache .panopticon.env:', err.message);
+  console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);
 });
 
 // Start the shared IssueDataService — fire and forget.
@@ -103,10 +103,10 @@ await initTrackerConfigCache().catch(err => {
 const isPeerDashboard = process.env.OVERDECK_DISABLE_DEACON === '1';
 if (isPeerDashboard) {
   void startSharedIssueService({ skipPolling: true });
-  console.log('[panopticon] IssueDataService started in CACHE-ONLY mode — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
+  console.log('[overdeck] IssueDataService started in CACHE-ONLY mode — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
 } else {
   void startSharedIssueService().then(() => {
-    console.log('[panopticon] IssueDataService background fetch complete');
+    console.log('[overdeck] IssueDataService background fetch complete');
     // Once the issue cache is warm, prune review-status rows for issues that
     // are CLOSED on the tracker. Without this, manually-closed issues
     // (`gh issue close` instead of `pan close`) leave stale review-state
@@ -115,40 +115,40 @@ if (isPeerDashboard) {
     // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
     // already calls clearReviewStatus on its own path.
     void pruneClosedIssueReviewStatuses().catch((err) => {
-      console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+      console.warn('[overdeck] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
     });
     void Effect.runPromise(cleanupClosedIssueAgentDirectories({
       issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
       force: true,
     })).then((result) => {
       if (result.removed.length > 0) {
-        console.log(`[panopticon] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+        console.log(`[overdeck] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
       }
       if (result.protected.length > 0) {
-        console.warn(`[panopticon] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
+        console.warn(`[overdeck] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
       }
     }).catch((err) => {
-      console.warn('[panopticon] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
+      console.warn('[overdeck] cleanupClosedIssueAgentDirectories failed:', err?.message ?? err);
     });
   });
-  console.log('[panopticon] IssueDataService started (non-blocking)');
+  console.log('[overdeck] IssueDataService started (non-blocking)');
 }
 
 // Start background enrichment poller — emits agent.enrichment_changed events
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
 startAgentEnrichmentService();
-console.log('[panopticon] AgentEnrichmentService started');
+console.log('[overdeck] AgentEnrichmentService started');
 
 // Start background agent output poller — emits agent.output_received domain events
 // so DrawerActiveAgent and other consumers receive live stream excerpts.
 startAgentOutputService();
-console.log('[panopticon] AgentOutputService started');
+console.log('[overdeck] AgentOutputService started');
 
 // Start merge-blocker reconcile poller (PAN-1620) — proactively refreshes GitHub
 // mergeability for readyForMerge PRs so a stale/conflicting one drops out of the
 // Awaiting-Merge queue (and its live MERGE button) before any click.
 startMergeBlockerReconcileService();
-console.log('[panopticon] MergeBlockerReconcileService started');
+console.log('[overdeck] MergeBlockerReconcileService started');
 
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
@@ -301,7 +301,7 @@ setPipelineHandlerSync((event) => {
     }
   }
 });
-console.log('[panopticon] Pipeline notifier → domain events wired');
+console.log('[overdeck] Pipeline notifier → domain events wired');
 
 function toAgentStatusPayload(status: AgentState['status'] | undefined) {
   return status === 'starting' || status === 'running' || status === 'stopped' || status === 'error'
@@ -379,7 +379,7 @@ setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
     console.error('[pipeline] Failed to append agent.status_changed event:', err);
   }
 });
-console.log('[panopticon] Agent stopped/status notifiers → domain events wired');
+console.log('[overdeck] Agent stopped/status notifiers → domain events wired');
 
 // Wire deacon merge-ready reminder → domain events so the frontend re-reads the
 // Awaiting Merge list when deacon fires its 1h staleness reminder.
@@ -400,11 +400,11 @@ setMergeReadyNotifier((issueId) => {
     }
   })();
 });
-console.log('[panopticon] Merge-ready notifier → domain events wired');
+console.log('[overdeck] Merge-ready notifier → domain events wired');
 
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
-console.log('[panopticon] ConversationLifecycleService started');
+console.log('[overdeck] ConversationLifecycleService started');
 
 startSubstrateBugPoller();
 
@@ -412,14 +412,14 @@ startSubstrateBugPoller();
 // times (gated per-tick on flywheel.merge_train_enabled; no-op without an
 // active flywheel run).
 startUatTrainReconciler();
-console.log('[panopticon] UAT batch-train reconciler started');
+console.log('[overdeck] UAT batch-train reconciler started');
 
 // Start cleanup for orphaned conversation attachments (1 min interval)
 const attachmentCleanupTimer = setInterval(() => {
   void cleanupOrphanedConversationAttachments();
 }, 60_000);
 void cleanupOrphanedConversationAttachments();
-console.log('[panopticon] Attachment cleanup started');
+console.log('[overdeck] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
 await refreshTtsRuntimeConfig();
@@ -430,12 +430,12 @@ void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] i
 void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })
   .catch(err => console.warn('[memory-reconciliation] startup sweep failed:', err?.message ?? err));
 startTranscriptPoller();
-console.log('[panopticon] Memory transcript poller started');
+console.log('[overdeck] Memory transcript poller started');
 
 const conversationSearchWatcher = startConversationSearchWatcher();
 console.log(conversationSearchWatcher
-  ? '[panopticon] Conversation search watcher started'
-  : '[panopticon] Conversation search watcher skipped (conversationSearch.enabled=false)');
+  ? '[overdeck] Conversation search watcher started'
+  : '[overdeck] Conversation search watcher skipped (conversationSearch.enabled=false)');
 
 void (async () => {
   const store = await initEventStore();
@@ -460,7 +460,7 @@ void (async () => {
 
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
-console.log('[panopticon] CLIProxy watchdog started (30s interval)');
+console.log('[overdeck] CLIProxy watchdog started (30s interval)');
 
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
@@ -482,14 +482,14 @@ let shuttingDown = false;
 const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`[panopticon] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
+  console.log(`[overdeck] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   emitShutdownActivity();
   const forkGrace = await waitForInFlightForkPipelines(10_000);
   if (forkGrace.count > 0) {
     if (forkGrace.completed) {
-      console.log(`[panopticon] Waited for ${forkGrace.count} in-flight fork pipeline(s) before shutdown`);
+      console.log(`[overdeck] Waited for ${forkGrace.count} in-flight fork pipeline(s) before shutdown`);
     } else {
-      console.warn(`[panopticon] ${forkGrace.count} in-flight fork pipeline(s) still running after shutdown grace window`);
+      console.warn(`[overdeck] ${forkGrace.count} in-flight fork pipeline(s) still running after shutdown grace window`);
     }
   }
   clearInterval(attachmentCleanupTimer);
@@ -516,7 +516,7 @@ process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
 // in the Awareness activity feed. Polls restart-status.json because the writer
 // processes can't reach this server's event store — see restart-announcer.ts.
 startRestartAnnouncer();
-console.log('[panopticon] Restart announcer started');
+console.log('[overdeck] Restart announcer started');
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();
@@ -526,12 +526,12 @@ setTimeout(() => {
   void recoverStuckForks()
     .then((n) => {
       if (n > 0) {
-        console.log(`[panopticon] Recovered ${n} stuck fork(s)`);
+        console.log(`[overdeck] Recovered ${n} stuck fork(s)`);
         emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Recovered ${n} stuck fork(s) on startup` });
       }
     })
     .catch((err) => {
-      console.warn('[panopticon] Failed to recover stuck forks:', err);
+      console.warn('[overdeck] Failed to recover stuck forks:', err);
       emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
     });
 }, 1000);
@@ -544,11 +544,11 @@ fixStuckCommentedReviews();
 void reconcileStaleGitHubBlockers()
   .then((n) => {
     if (n > 0) {
-      console.log(`[panopticon] Reconciled GitHub-native blockers for ${n} issue(s) on startup`);
+      console.log(`[overdeck] Reconciled GitHub-native blockers for ${n} issue(s) on startup`);
       emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Reconciled GitHub-native blockers for ${n} issue(s) on startup` });
     }
   })
-  .catch((err: any) => console.warn(`[panopticon] Startup blocker reconciliation failed: ${err.message}`));
+  .catch((err: any) => console.warn(`[overdeck] Startup blocker reconciliation failed: ${err.message}`));
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
@@ -556,12 +556,12 @@ try {
   const { resetProcessingToQueued } = await import('../../lib/overdeck/merge-sync.js');
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
-    console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
+    console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
     emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
   }
   await resumeQueuedMerges();
 } catch (err: any) {
-  console.warn(`[panopticon] Failed to reset merge queue: ${err.message}`);
+  console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
 }
 
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
@@ -579,21 +579,21 @@ await processPendingFeedbackDeliveries();
 // failure mode). The dashboard comes up clean; start cloister manually from
 // the UI once the workspace backlog is cleaned up.
 if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
-  console.log('[panopticon] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
+  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
 } else {
   startAutoMergeExecutor();
-  console.log('[panopticon] Auto-merge executor started');
+  console.log('[overdeck] Auto-merge executor started');
 }
 
 if (process.env.OVERDECK_DISABLE_DEACON === '1') {
-  console.log('[panopticon] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
+  console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
-    console.error('[panopticon] Cloister auto-start failed:', err);
+    console.error('[overdeck] Cloister auto-start failed:', err);
     emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
   });
-  console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
+  console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
   emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
 
@@ -629,7 +629,7 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
     }
   }
   if (removed > 0) {
-    console.log(`[panopticon] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
+    console.log(`[overdeck] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
   }
 }
 
@@ -646,18 +646,18 @@ await (async () => {
 
     if (!existsSync(overdeckDbPath)) {
       createOverdeckDatabase({ dbPath: overdeckDbPath });
-      console.log(`[panopticon] Created overdeck.db at ${overdeckDbPath}`);
+      console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
     }
 
     // PAN-1960: the legacy seed is opt-in. A normal boot leaves overdeck.db
     // empty; enable the import on demand with `pan up --seed-from-legacy`.
     if (process.env.OVERDECK_SEED_FROM_LEGACY !== '1') {
-      console.log('[panopticon] Overdeck seed skipped — empty DB (pass `pan up --seed-from-legacy` to import legacy conversations + in-flight state)');
+      console.log('[overdeck] Overdeck seed skipped — empty DB (pass `pan up --seed-from-legacy` to import legacy conversations + in-flight state)');
       return;
     }
 
     if (!existsSync(legacyDbPath)) {
-      console.log('[panopticon] No panopticon.db found; skipping overdeck seed');
+      console.log('[overdeck] No panopticon.db found; skipping overdeck seed');
       return;
     }
 
@@ -682,12 +682,12 @@ await (async () => {
       ),
     );
     console.log(
-      `[panopticon] Overdeck seed: ${result.conversationsExported} convs, ` +
+      `[overdeck] Overdeck seed: ${result.conversationsExported} convs, ` +
         `${result.agentsUpserted} agents, ${result.issuesUpserted} issues`,
     );
   } catch (err) {
     // Non-fatal: dashboard continues with whatever data is in overdeck.db.
-    console.warn('[panopticon] Overdeck boot seed failed (non-fatal):', err);
+    console.warn('[overdeck] Overdeck boot seed failed (non-fatal):', err);
   }
 })();
 

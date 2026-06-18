@@ -238,7 +238,7 @@ pan workspace create MIN-667 --remote
 
 7. **Record workspace metadata**
    ```yaml
-   # ~/.panopticon/workspaces/min-667.yaml
+   # ~/.overdeck/workspaces/min-667.yaml
    id: min-667
    issue: MIN-667
    remote:
@@ -370,7 +370,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     command:
-      - --providers.docker.network=panopticon
+      - --providers.docker.network=overdeck
       - --providers.docker.exposedbydefault=false
 ```
 
@@ -499,7 +499,7 @@ https://gitlab.com/owner/repo.git → git@gitlab.com:owner/repo.git
 
 Overdeck checks for SSH keys in this order:
 
-1. `~/.panopticon/ssh/exe-dev-key` (panopticon-specific, recommended)
+1. `~/.overdeck/ssh/exe-dev-key` (overdeck-specific, recommended)
 2. `~/.ssh/id_ed25519` (standard Ed25519 key)
 3. `~/.ssh/id_rsa` (legacy RSA key)
 
@@ -513,13 +513,13 @@ Your existing `~/.ssh/id_ed25519` or `~/.ssh/id_rsa` will be used automatically.
 
 1. **Generate a dedicated SSH key for exe.dev:**
    ```bash
-   mkdir -p ~/.panopticon/ssh
-   ssh-keygen -t ed25519 -C "exe.dev-panopticon" -f ~/.panopticon/ssh/exe-dev-key -N ""
+   mkdir -p ~/.overdeck/ssh
+   ssh-keygen -t ed25519 -C "exe.dev-overdeck" -f ~/.overdeck/ssh/exe-dev-key -N ""
    ```
 
 2. **Add the public key to your git host:**
    ```bash
-   cat ~/.panopticon/ssh/exe-dev-key.pub | pbcopy  # Copy to clipboard
+   cat ~/.overdeck/ssh/exe-dev-key.pub | pbcopy  # Copy to clipboard
 
    # GitHub: https://github.com/settings/ssh/new
    # GitLab: https://gitlab.com/-/user_settings/ssh_keys
@@ -528,10 +528,10 @@ Your existing `~/.ssh/id_ed25519` or `~/.ssh/id_rsa` will be used automatically.
 3. **Verify it works:**
    ```bash
    # For GitHub:
-   ssh -i ~/.panopticon/ssh/exe-dev-key -T git@github.com
+   ssh -i ~/.overdeck/ssh/exe-dev-key -T git@github.com
 
    # For GitLab:
-   ssh -i ~/.panopticon/ssh/exe-dev-key -T git@gitlab.com
+   ssh -i ~/.overdeck/ssh/exe-dev-key -T git@gitlab.com
    ```
 
 > **Note:** A dedicated key can be revoked without affecting your local development if needed.
@@ -590,7 +590,7 @@ pan workspace sync-auth <issue-id>
 
 ## Configuration
 
-### User Config (`~/.panopticon/config.toml`)
+### User Config (`~/.overdeck/config.toml`)
 
 ```toml
 [remote]
@@ -619,7 +619,7 @@ redis_host = "pan-infra"
 redis_port = 6379
 ```
 
-### Project Config (`.panopticon/remote.yaml`)
+### Project Config (`.overdeck/remote.yaml`)
 
 ```yaml
 # Project-specific remote settings
@@ -655,7 +655,7 @@ pan workspace create MIN-667             # Use default from config
 
 **Option 2: Config default**
 ```toml
-# ~/.panopticon/config.toml
+# ~/.overdeck/config.toml
 [remote]
 default_location = "remote"   # or "local"
 ```

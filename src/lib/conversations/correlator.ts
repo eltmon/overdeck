@@ -11,7 +11,7 @@ import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { sessionFilePath } from '../paths.js';
 
 export interface CorrelationResult {
-  panopticonManaged: boolean;
+  overdeckManaged: boolean;
   panIssueId: string | null;
   panAgentId: string | null;
   actualCost: number | null;
@@ -54,7 +54,7 @@ export function buildCorrelationMapSync(
       if (pathSet.has(path)) {
         const existing = map.get(path);
         map.set(path, {
-          panopticonManaged: true,
+          overdeckManaged: true,
           panIssueId: row.issue_id,
           panAgentId: row.name,
           actualCost: existing?.actualCost ?? null,
@@ -98,7 +98,7 @@ export function buildCorrelationMapSync(
       for (const path of paths) {
         const existing = map.get(path);
         map.set(path, {
-          panopticonManaged: true,
+          overdeckManaged: true,
           panIssueId: existing?.panIssueId ?? row.issue_id,
           panAgentId: existing?.panAgentId ?? row.agent_id,
           actualCost: row.actual_cost,

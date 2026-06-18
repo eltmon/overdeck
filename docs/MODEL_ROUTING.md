@@ -70,7 +70,7 @@ OpenRouter is a special provider that routes requests to models from multiple co
 
 The note above the catalog reads: *"Must star a model to assign it to an agent via Model Assignments"* — this is enforced by the model chooser: only favorited OpenRouter models will appear in the dropdown.
 
-Favorites are persisted on the server and synced to `~/.panopticon/config.yaml` when you save settings.
+Favorites are persisted on the server and synced to `~/.overdeck/config.yaml` when you save settings.
 
 ### Pricing
 
@@ -115,7 +115,7 @@ Below the card-based view, there's an expandable **Advanced: Work Type Overrides
 
 ## Configuration File
 
-Model assignments are persisted in your config file (`~/.panopticon/config.yaml`):
+Model assignments are persisted in your config file (`~/.overdeck/config.yaml`):
 
 ```yaml
 models:

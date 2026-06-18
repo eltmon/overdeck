@@ -96,7 +96,7 @@ For a project to work well with Overdeck:
 
 ### projects.json
 
-Located at `~/.panopticon/projects.json`:
+Located at `~/.overdeck/projects.json`:
 
 ```json
 [
@@ -110,7 +110,7 @@ Located at `~/.panopticon/projects.json`:
 
 ### project-mappings.json
 
-Located at `~/.panopticon/project-mappings.json`:
+Located at `~/.overdeck/project-mappings.json`:
 
 Maps tracker projects to local paths:
 
@@ -127,7 +127,7 @@ Maps tracker projects to local paths:
 
 For GitHub:
 ```bash
-# In ~/.panopticon.env
+# In ~/.overdeck.env
 GITHUB_LOCAL_PATHS=owner/repo=/home/user/projects/my-app
 ```
 
@@ -151,13 +151,13 @@ Create a `CLAUDE.md` file in your project root with:
 
 For Linear:
 ```bash
-# Edit ~/.panopticon/project-mappings.json
+# Edit ~/.overdeck/project-mappings.json
 # Add entry mapping Linear project to local path
 ```
 
 For GitHub:
 ```bash
-# Add to ~/.panopticon.env
+# Add to ~/.overdeck.env
 GITHUB_LOCAL_PATHS=owner/myrepo=/path/to/project
 ```
 
@@ -216,7 +216,7 @@ When you run `pan start ISSUE-1`, Overdeck will:
 **Problem:** `pan project add` fails
 **Solution:**
 - Ensure the path exists and is a git repository
-- Check you have write permissions to `~/.panopticon/`
+- Check you have write permissions to `~/.overdeck/`
 
 **Problem:** Workspaces created in wrong location
 **Solution:**

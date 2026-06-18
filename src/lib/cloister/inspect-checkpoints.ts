@@ -15,7 +15,7 @@ import { GitError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
-const OVERDECK_HOME = join(homedir(), '.panopticon');
+const OVERDECK_HOME = join(homedir(), '.overdeck');
 
 export interface InspectCheckpoint {
   beadId: string;

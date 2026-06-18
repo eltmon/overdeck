@@ -6,15 +6,15 @@
 $ErrorActionPreference = "Stop"
 
 $taskName = "OverdeckWsl2HostsSync"
-$scriptPath = "$env:USERPROFILE\.panopticon\sync-wsl2hosts.ps1"
-$panopticonDir = "$env:USERPROFILE\.panopticon"
+$scriptPath = "$env:USERPROFILE\.overdeck\sync-wsl2hosts.ps1"
+$overdeckDir = "$env:USERPROFILE\.overdeck"
 
-# Create .panopticon directory if needed
-if (-not (Test-Path $panopticonDir)) {
-    New-Item -ItemType Directory -Path $panopticonDir -Force | Out-Null
+# Create .overdeck directory if needed
+if (-not (Test-Path $overdeckDir)) {
+    New-Item -ItemType Directory -Path $overdeckDir -Force | Out-Null
 }
 
-# Copy sync script to .panopticon
+# Copy sync script to .overdeck
 $sourceScript = Join-Path $PSScriptRoot "sync-wsl2hosts.ps1"
 if (Test-Path $sourceScript) {
     Copy-Item $sourceScript $scriptPath -Force

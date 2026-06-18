@@ -40,7 +40,7 @@ vi.mock('../../../../lib/config-yaml.js', () => ({
       conversations: {
         titleModel: 'claude-haiku-4-5',
         compactionModel: 'claude-haiku-4-5',
-        manualCompactMode: 'panopticon-native',
+        manualCompactMode: 'overdeck-native',
         richCompaction: false,
       },
     },
@@ -122,7 +122,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     mkdirSync(testHome, { recursive: true });
     originalHome = process.env.HOME;
     process.env.HOME = testHome;
-    process.env.OVERDECK_HOME = join(testHome, '.panopticon');
+    process.env.OVERDECK_HOME = join(testHome, '.overdeck');
     mkdirSync(process.env.OVERDECK_HOME, { recursive: true });
 
     capturePaneMock.mockImplementation(() => Effect.succeed('Claude Fable 5 (claude-fable-5)\nctx 21%  cost $0.0000'));

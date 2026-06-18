@@ -430,7 +430,7 @@ If you see errors like `Could not parse: Error parsing expression`, check:
 
 1. **Workspace and Project Configuration**
    ```bash
-   # In ~/.panopticon.env
+   # In ~/.overdeck.env
    RALLY_WORKSPACE=/workspace/12345
    RALLY_PROJECT=/project/67890
    ```

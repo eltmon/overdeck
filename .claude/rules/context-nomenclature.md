@@ -14,7 +14,7 @@ scope word alone determines the destination:
 | **universal rule** | every machine, every project | bundled rule: `sync-sources/rules/<name>.md` in overdeck, `scope: universal` |
 | **dev rule** | Overdeck development only | bundled rule: `sync-sources/rules/<name>.md`, `scope: dev` |
 | **project rule** | one project | `<projectRoot>/.pan/context/project.md` (project layer) |
-| **machine rule** | this machine only | `~/.panopticon/context/global.md` (global layer) |
+| **machine rule** | this machine only | `~/.overdeck/context/global.md` (global layer) |
 
 After writing any of them, run `pan sync`. Changes reach **new** sessions only.
 

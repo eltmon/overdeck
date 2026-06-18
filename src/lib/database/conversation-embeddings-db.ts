@@ -1,7 +1,7 @@
 /**
  * Conversation Embeddings Sidecar Database (PAN-1395)
  *
- * Manages ~/.panopticon/conversations/embeddings.db:
+ * Manages ~/.overdeck/conversations/embeddings.db:
  *   - chunks source table keyed by (session_id, byte_offset)
  *   - FTS5 virtual table for BM25 keyword search
  *   - sqlite-vec vec0 virtual table for cosine ANN search

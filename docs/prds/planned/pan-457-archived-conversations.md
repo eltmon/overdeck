@@ -95,7 +95,7 @@ CREATE TABLE discovered_sessions (
   token_input INTEGER DEFAULT 0,
   token_output INTEGER DEFAULT 0,
   estimated_cost REAL DEFAULT 0,
-  panopticon_managed INTEGER DEFAULT 0,   -- 1 if joined to a conversations.session_id
+  overdeck_managed INTEGER DEFAULT 0,   -- 1 if joined to a conversations.session_id
   pan_issue_id TEXT,
   pan_agent_id TEXT,
   summary TEXT,                           -- L1 enrichment
@@ -113,7 +113,7 @@ CREATE TABLE discovered_sessions (
 
 CREATE INDEX idx_ds_workspace      ON discovered_sessions(workspace_path);
 CREATE INDEX idx_ds_last_message   ON discovered_sessions(last_message_at);
-CREATE INDEX idx_ds_managed        ON discovered_sessions(panopticon_managed);
+CREATE INDEX idx_ds_managed        ON discovered_sessions(overdeck_managed);
 CREATE INDEX idx_ds_project_hash   ON discovered_sessions(project_hash);
 CREATE INDEX idx_ds_enrichment     ON discovered_sessions(enrichment_level);
 ```
@@ -164,7 +164,7 @@ SELECT
   c.model_primary           AS model_primary,
   c.models_used             AS models_used,
   c.estimated_cost          AS estimated_cost,
-  1                         AS panopticon_managed,
+  1                         AS overdeck_managed,
   c.issue_id                AS pan_issue_id,
   c.agent_id                AS pan_agent_id,
   ds.summary                AS summary,
@@ -187,10 +187,10 @@ SELECT
   NULL                       AS archived_at,
   ds.first_message_at, ds.last_message_at, ds.duration_seconds,
   ds.message_count, ds.model_primary, ds.models_used, ds.estimated_cost,
-  ds.panopticon_managed, ds.pan_issue_id, ds.pan_agent_id,
+  ds.overdeck_managed, ds.pan_issue_id, ds.pan_agent_id,
   ds.summary, ds.summary_detailed, ds.tags, ds.tools_used, ds.files_touched,
   ds.enrichment_level, ds.has_embedding, ds.jsonl_path,
-  CASE WHEN ds.panopticon_managed = 1 THEN 'managed-active' ELSE 'discovered' END AS source
+  CASE WHEN ds.overdeck_managed = 1 THEN 'managed-active' ELSE 'discovered' END AS source
 FROM discovered_sessions ds
 WHERE ds.id NOT IN (SELECT session_id FROM conversations WHERE archived_at IS NOT NULL);
 ```
@@ -219,7 +219,7 @@ The scanner uses **only filesystem + JSON parsing**. No LLM calls during discove
 3. Stream-parse JSONL: first line, last line, line count, model/token fields
 4. Parse `tool_use` blocks → `tools_used` and `files_touched` arrays
 5. Apply per-model token pricing → `estimated_cost`
-6. Match `session_id` against `conversations` table → set `panopticon_managed`
+6. Match `session_id` against `conversations` table → set `overdeck_managed`
 7. Compare file size + mtime against stored values → skip unchanged files
 
 The JSONL parser already exists at `src/lib/cost-parsers/jsonl-parser.ts` and gets extended.
@@ -395,7 +395,7 @@ conversations:
   ollamaBaseUrl: http://localhost:11434
 ```
 
-API keys live in **`~/.panopticon.env`**, NEVER `config.yaml` (config may be in dotfiles repo).
+API keys live in **`~/.overdeck.env`**, NEVER `config.yaml` (config may be in dotfiles repo).
 
 ---
 
@@ -491,7 +491,7 @@ Validation:
 - Embeddings disabled → semantic search UI disabled with tooltip
 - Changing model after sessions are embedded → warning: "Existing embeddings used `<old>` (dim=N). Run `pan conversations embed --regenerate` — models cannot be mixed."
 
-API keys go to **`~/.panopticon.env`** via existing secrets path. NEVER `config.yaml`.
+API keys go to **`~/.overdeck.env`** via existing secrets path. NEVER `config.yaml`.
 
 ---
 
@@ -648,7 +648,7 @@ Domain events (already covered above) emit on `/ws/rpc`.
 - [ ] System scan adapts parallelism (SSD: cores, HDD: 2)
 - [ ] Re-scan skips unchanged files (size + mtime match)
 - [ ] Scan never deletes, truncates, or modifies any JSONL file
-- [ ] Scan correlates discovered sessions with existing `conversations` rows (`panopticon_managed = 1`)
+- [ ] Scan correlates discovered sessions with existing `conversations` rows (`overdeck_managed = 1`)
 - [ ] Hash resolution maps `~/.claude/projects/<hash>` back to original workspace path; unresolvable hashes leave `workspace_path = NULL`
 - [ ] Tools and files used by each session are extracted via JSON parsing (no LLM)
 
@@ -699,7 +699,7 @@ Domain events (already covered above) emit on `/ws/rpc`.
 - [ ] Provider change resets model dropdown
 - [ ] Save blocked when embeddings on + hosted provider + missing key
 - [ ] **Test connection** button hits provider with 1-token embed and reports
-- [ ] Keys written to `~/.panopticon.env`, NEVER `config.yaml`
+- [ ] Keys written to `~/.overdeck.env`, NEVER `config.yaml`
 - [ ] Disabling embeddings disables semantic search UI in Conversations page
 - [ ] Changing embedding model after sessions are embedded surfaces re-embed warning
 - [ ] CLI `pan config set` and `pan secrets set` paths work for every Settings field
@@ -798,7 +798,7 @@ Domain events (already covered above) emit on `/ws/rpc`.
 - conditional fields show/hide on provider switch
 - save blocked when key missing
 - test connection reports success/failure
-- keys land in ~/.panopticon.env, never config.yaml
+- keys land in ~/.overdeck.env, never config.yaml
 - semantic search disabled when embeddings off
 - model-change warning shown when sessions already embedded
 ```

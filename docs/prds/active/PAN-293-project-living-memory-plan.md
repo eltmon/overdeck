@@ -21,7 +21,7 @@ Overdeck has **zero semantic memory**. Every agent session generates valuable le
 | Skills (SKILL.md) | Static, no adaptation |
 | Beads | Task tracking only, no semantic content |
 | PRDs | Archived, never queried semantically |
-| Archives (~/.panopticon/archives/) | Never read again |
+| Archives (~/.overdeck/archives/) | Never read again |
 
 Agents repeatedly rediscover the same patterns, hit the same gotchas, and make the same mistakes — across every issue, every session.
 
@@ -33,7 +33,7 @@ A **per-project memory system** that stores agent-learned knowledge alongside th
 
 1. **Git-native**: Memories stored as JSONL in the repo — travel with the code, human-reviewable in PRs
 2. **Per-project**: Each project has its own memory store — no cross-contamination
-3. **Configurable location**: Memory path configured in `.panopticon.yaml` or `projects.yaml` — can live in the primary repo, a shared repo (like myn/infra), or a dedicated memory repo
+3. **Configurable location**: Memory path configured in `.overdeck.yaml` or `projects.yaml` — can live in the primary repo, a shared repo (like myn/infra), or a dedicated memory repo
 4. **Derived index**: sqlite-vec vector index is .gitignored, rebuilt from JSONL on demand (like node_modules from package.json)
 5. **Content-hash caching**: Embeddings cached by content hash — only new/changed memories re-embedded on rebuild
 
@@ -52,27 +52,27 @@ Derived index (.gitignored):
 
 ### Memory Path Resolution
 
-Configured per-project in `projects.yaml` or `.panopticon.yaml`:
+Configured per-project in `projects.yaml` or `.overdeck.yaml`:
 
 ```yaml
 # projects.yaml — monorepo (memory in same repo)
 projects:
   overdeck:
     memory:
-      path: .panopticon/memory/        # Relative to project root
+      path: .overdeck/memory/        # Relative to project root
 
 # projects.yaml — polyrepo (shared memory location)
   mind-your-now:
     memory:
       repo: infra                      # Which polyrepo sub-repo holds memory
-      path: .panopticon/memory/        # Path within that repo
+      path: .overdeck/memory/        # Path within that repo
 
-# .panopticon.yaml — per-project override
+# .overdeck.yaml — per-project override
 memory:
-  path: /home/eltmon/Projects/myn/infra/.panopticon/memory/  # Absolute path
+  path: /home/eltmon/Projects/myn/infra/.overdeck/memory/  # Absolute path
 ```
 
-**Default**: `.panopticon/memory/` in the project's primary repo (or first repo for polyrepos).
+**Default**: `.overdeck/memory/` in the project's primary repo (or first repo for polyrepos).
 
 ### JSONL Schema
 
@@ -353,7 +353,7 @@ AT SPAWN (Injection)
 projects:
   overdeck:
     memory:
-      path: .panopticon/memory/          # Default for monorepo
+      path: .overdeck/memory/          # Default for monorepo
       embedder: openai                    # or ollama, huggingface
       embedding_model: text-embedding-3-small
       extraction_model: haiku             # Cheap model for extraction/conflict resolution
@@ -364,7 +364,7 @@ projects:
   mind-your-now:
     memory:
       repo: infra                         # Polyrepo: memory lives in infra repo
-      path: .panopticon/memory/
+      path: .overdeck/memory/
 ```
 
 ### .gitignore additions (in memory directory)

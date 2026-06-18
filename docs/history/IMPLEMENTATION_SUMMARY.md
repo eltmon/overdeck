@@ -8,13 +8,13 @@ Successfully implemented Traefik reverse proxy with HTTPS for local Overdeck dev
 
 All 7 planned tasks completed:
 
-1. ✅ **Create Traefik configuration templates** (panopticon-1dg)
-2. ✅ **Implement mkcert wildcard certificate generation** (panopticon-5aw)
-3. ✅ **Update pan install to set up Traefik** (panopticon-6cl)
-4. ✅ **Update pan up/down to manage Traefik container** (panopticon-8ca)
-5. ✅ **Add traefik section to config.toml schema** (panopticon-dbt)
-6. ✅ **Document DNS/hosts setup for each platform** (panopticon-qpo)
-7. ✅ **End-to-end test plan and automation** (panopticon-d0o)
+1. ✅ **Create Traefik configuration templates** (overdeck-1dg)
+2. ✅ **Implement mkcert wildcard certificate generation** (overdeck-5aw)
+3. ✅ **Update pan install to set up Traefik** (overdeck-6cl)
+4. ✅ **Update pan up/down to manage Traefik container** (overdeck-8ca)
+5. ✅ **Add traefik section to config.toml schema** (overdeck-dbt)
+6. ✅ **Document DNS/hosts setup for each platform** (overdeck-qpo)
+7. ✅ **End-to-end test plan and automation** (overdeck-d0o)
 
 ## Files Created/Modified
 
@@ -31,7 +31,7 @@ All 7 planned tasks completed:
 - Enhanced to create Traefik configuration files inline:
   - `docker-compose.yml` with Docker socket mount and labels
   - `traefik.yml` with Docker provider for workspace containers
-  - `dynamic/panopticon.yml` with dashboard routing
+  - `dynamic/overdeck.yml` with dashboard routing
   - `README.md` with usage instructions
 - Generates wildcard mkcert certificates: `*.pan.localhost`, `*.localhost`
 - Adds `[traefik]` section to config.toml
@@ -52,7 +52,7 @@ All 7 planned tasks completed:
 **templates/traefik/** (reference templates)
 - `traefik.yml` - Static Traefik configuration
 - `docker-compose.yml` - Container definition
-- `dynamic/panopticon.yml` - Dashboard routing rules
+- `dynamic/overdeck.yml` - Dashboard routing rules
 
 ### Documentation
 

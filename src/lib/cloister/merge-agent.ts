@@ -31,7 +31,7 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
   // settings.json). It diverges from main constantly and must never enter a
   // feature branch — that was the source of the recurring projects.yaml sync
   // conflict.
-  '.panopticon/',
+  '.overdeck/',
 ];
 
 const SYNC_MAIN_MAIN_PREFERRED_PATHS = [

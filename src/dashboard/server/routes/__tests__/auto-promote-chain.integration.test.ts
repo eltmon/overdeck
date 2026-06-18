@@ -115,9 +115,9 @@ function countIssueBeads(projectPath: string, issueId: string): number {
     .length;
 }
 
-function writeWorkAgentState(panopticonHome: string, issueId: string, status: 'starting' | 'running' = 'running'): string {
+function writeWorkAgentState(overdeckHome: string, issueId: string, status: 'starting' | 'running' = 'running'): string {
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const stateDir = join(panopticonHome, 'agents', agentId);
+  const stateDir = join(overdeckHome, 'agents', agentId);
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(join(stateDir, 'state.json'), JSON.stringify({
     id: agentId,
@@ -128,9 +128,9 @@ function writeWorkAgentState(panopticonHome: string, issueId: string, status: 's
   return agentId;
 }
 
-function writePlanningAgentState(panopticonHome: string, issueId: string, autoSpawnOnFinalize: boolean): void {
+function writePlanningAgentState(overdeckHome: string, issueId: string, autoSpawnOnFinalize: boolean): void {
   const agentId = `planning-${issueId.toLowerCase()}`;
-  const stateDir = join(panopticonHome, 'agents', agentId);
+  const stateDir = join(overdeckHome, 'agents', agentId);
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(join(stateDir, 'state.json'), JSON.stringify({
     id: agentId,
@@ -174,8 +174,8 @@ describe('plan-finalize auto-promote chain regression', () => {
   it('finalizes planning, writes a proposed spec, materializes matching beads, and waits for manual start by default', async () => {
     vi.useFakeTimers();
     const issueId = 'PAN-3401';
-    const panopticonHome = join(testDir, 'panopticon-home');
-    process.env.OVERDECK_HOME = panopticonHome;
+    const overdeckHome = join(testDir, 'overdeck-home');
+    process.env.OVERDECK_HOME = overdeckHome;
     const { projectPath, workspacePath } = makeProject(issueId);
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -237,7 +237,7 @@ describe('plan-finalize auto-promote chain regression', () => {
     expect(specFiles).toHaveLength(1);
     expect(proposed.plan.status).toBe('proposed');
     expect(countIssueBeads(projectPath, issueId)).toBe(proposed.plan.items.length);
-    expect(existsSync(join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json'))).toBe(false);
+    expect(existsSync(join(overdeckHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json'))).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const activityEvents = mocks.emitActivityEntrySync.mock.calls.map(([event]) => event);
     expect(activityEvents).toEqual(expect.arrayContaining([
@@ -253,9 +253,9 @@ describe('plan-finalize auto-promote chain regression', () => {
   it('auto-spawns a work agent when the planning state is stamped', async () => {
     vi.useFakeTimers();
     const issueId = 'PAN-3406';
-    const panopticonHome = join(testDir, 'panopticon-home');
-    process.env.OVERDECK_HOME = panopticonHome;
-    writePlanningAgentState(panopticonHome, issueId, true);
+    const overdeckHome = join(testDir, 'overdeck-home');
+    process.env.OVERDECK_HOME = overdeckHome;
+    writePlanningAgentState(overdeckHome, issueId, true);
     const tmuxSessions = new Set<string>();
     const { projectPath, workspacePath } = makeProject(issueId);
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -291,7 +291,7 @@ describe('plan-finalize auto-promote chain regression', () => {
         fetchImpl: async (spawnInput, spawnInit) => {
           expect(String(spawnInput)).toBe('http://dashboard.test/api/agents');
           expect(JSON.parse(String(spawnInit?.body))).toEqual({ issueId, role: 'work' });
-          const agentId = writeWorkAgentState(panopticonHome, issueId, 'running');
+          const agentId = writeWorkAgentState(overdeckHome, issueId, 'running');
           tmuxSessions.add(agentId);
           return new Response(JSON.stringify({ success: true, agentId }), { status: 200 });
         },
@@ -310,7 +310,7 @@ describe('plan-finalize auto-promote chain regression', () => {
     await planFinalizeCommand({ workspace: workspacePath, json: true });
 
     const printed = JSON.parse(String(consoleLog.mock.calls.at(-1)?.[0] ?? '{}')) as Record<string, unknown>;
-    const agentStatePath = join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json');
+    const agentStatePath = join(overdeckHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json');
     const agentState = readJson<{ status: string }>(agentStatePath);
 
     expect(printed).toMatchObject({
@@ -383,7 +383,7 @@ describe('plan-finalize auto-promote chain regression', () => {
 
   it('spawns a work agent when the reconciler finds a planted orphan proposed spec with matching beads', async () => {
     const issueId = 'PAN-3403';
-    const panopticonHome = join(testDir, 'panopticon-home');
+    const overdeckHome = join(testDir, 'overdeck-home');
     const tmuxSessions = new Set<string>();
     const { projectPath } = makeProject(issueId);
     const specsDir = join(projectPath, '.pan', 'specs');
@@ -392,20 +392,20 @@ describe('plan-finalize auto-promote chain regression', () => {
     writeBeads(projectPath, issueId);
 
     await expect(reconcileOrphanProposedSpecs({
-      projects: [{ key: 'panopticon', config: { name: 'Overdeck CLI', path: projectPath } }],
+      projects: [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }],
       tmuxSessionNames: [],
       getAgentStateForIssue: async () => null,
       closedIssueIds: new Set(),
       now: new Date('2026-05-25T20:30:00.000Z'),
       config: { enabled: true, minAttemptIntervalMs: 5 * 60 * 1000 },
       spawnWorkAgent: async (candidateIssueId) => {
-        const agentId = writeWorkAgentState(panopticonHome, candidateIssueId, 'starting');
+        const agentId = writeWorkAgentState(overdeckHome, candidateIssueId, 'starting');
         tmuxSessions.add(agentId);
         return { spawned: true, agentId };
       },
     })).resolves.toEqual([`Spawned work agent for orphan proposed spec ${issueId}`]);
 
-    const agentState = readJson<{ status: string }>(join(panopticonHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json'));
+    const agentState = readJson<{ status: string }>(join(overdeckHome, 'agents', `agent-${issueId.toLowerCase()}`, 'state.json'));
     expect(agentState.status).toMatch(/^(starting|running)$/);
     expect(tmuxSessions.has(`agent-${issueId.toLowerCase()}`)).toBe(true);
   });

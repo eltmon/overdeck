@@ -143,8 +143,8 @@ async function newContext(): Promise<BrowserContext> {
           leakedSpecialistCount: 0,
           containerCount: 0,
           containerMemoryBytes: 0,
-          panopticonMemoryBytes: 128_000_000,
-          panopticonMemoryPercent: 1,
+          overdeckMemoryBytes: 128_000_000,
+          overdeckMemoryPercent: 1,
         },
         thresholds: {
           memoryAvailableWarningBytes: 4_000_000_000,
@@ -175,7 +175,7 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
-      if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Overdeck', path: '/tmp/panopticon' }]);
+      if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Overdeck', path: '/tmp/overdeck' }]);
       if (path === '/api/session-trees') return json({ trees: [] });
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/conversations') return json([]);

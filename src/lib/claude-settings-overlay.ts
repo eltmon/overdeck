@@ -49,7 +49,7 @@ interface OverlayResult {
 // a glob, but Bash takes a command-prefix string — different syntax.
 //
 // These patterns are best-effort: they catch the literal-prefix cases
-// (`rm .claude/agents/...`, `rm ~/.panopticon/...`). They cannot cover
+// (`rm .claude/agents/...`, `rm ~/.overdeck/...`). They cannot cover
 // `cd .claude && rm -rf agents/`. The proper guard is a PreToolUse hook
 // — tracked separately. These rules are the cheap belt-and-suspenders.
 const OVERDECK_INFRA_DENY_PATTERNS = [
@@ -65,19 +65,19 @@ const OVERDECK_INFRA_DENY_PATTERNS = [
   'Bash(rm -r .claude/hooks/:*)',
   'Edit(.claude/hooks/**)',
   'Write(.claude/hooks/**)',
-  // Overdeck installed binaries / hooks / config (~/.panopticon)
-  'Bash(rm ~/.panopticon/:*)',
-  'Bash(rm -rf ~/.panopticon/:*)',
-  'Bash(rm -r ~/.panopticon/:*)',
+  // Overdeck installed binaries / hooks / config (~/.overdeck)
+  'Bash(rm ~/.overdeck/:*)',
+  'Bash(rm -rf ~/.overdeck/:*)',
+  'Bash(rm -r ~/.overdeck/:*)',
   // Sacred conversation history — already documented as never-delete
   'Bash(rm ~/.claude/projects/:*)',
   'Bash(rm -rf ~/.claude/projects/:*)',
   'Bash(rm -r ~/.claude/projects/:*)',
   // Agents may observe tmux state, but they must not drive another session's input.
   'Bash(tmux send-keys:*)',
-  'Bash(tmux -L panopticon send-keys:*)',
+  'Bash(tmux -L overdeck send-keys:*)',
   'Bash(tmux paste-buffer:*)',
-  'Bash(tmux -L panopticon paste-buffer:*)',
+  'Bash(tmux -L overdeck paste-buffer:*)',
 ];
 
 // Legacy invalid patterns from PAN-1024 first-pass that Claude Code rejects
@@ -88,8 +88,8 @@ const INVALID_LEGACY_PATTERNS = new Set<string>([
   'Bash(rm:**/.claude/agents/**)',
   'Bash(rm:.claude/hooks/**)',
   'Bash(rm:**/.claude/hooks/**)',
-  'Bash(rm:~/.panopticon/**)',
-  'Bash(rm:**/.panopticon/**)',
+  'Bash(rm:~/.overdeck/**)',
+  'Bash(rm:**/.overdeck/**)',
   'Bash(rm:~/.claude/projects/**)',
   'Bash(rm:**/.claude/projects/**)',
 ]);

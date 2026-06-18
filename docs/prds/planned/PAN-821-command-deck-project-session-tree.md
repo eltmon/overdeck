@@ -182,7 +182,7 @@ GET /api/projects/:projectKey/session-tree
 
 Backed by:
 
-1. Reuse `fetchActivityData` per issue (already discovers planning/work/specialist sessions from `~/.panopticon/agents/` and `~/.panopticon/specialists/tasks/`).
+1. Reuse `fetchActivityData` per issue (already discovers planning/work/specialist sessions from `~/.overdeck/agents/` and `~/.overdeck/specialists/tasks/`).
 2. Add a `presence` field derived from `getAgentRuntimeStateAsync` + a recency check on tmux pane output (last activity within N seconds → `'active'`; alive but no recent output → `'idle'`; tmux session gone → `'ended'`).
 3. Add `jsonlPath` resolution by mapping `sessionId` → `~/.claude/projects/<encoded>/<sessionId>.jsonl` using the existing `encodeClaudeProjectDir()` helper from `src/lib/paths.ts`.
 4. Include `transcript` content for sessions that lack JSONL (fallback rendering).

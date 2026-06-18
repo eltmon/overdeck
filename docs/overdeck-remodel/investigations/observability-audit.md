@@ -12,7 +12,7 @@ empty) vs **DEAD** (no live consumer).
 **Method:** every column traced through its writers and readers across `src/`
 (non-test). The discriminator for a kept read is *does any read drive control
 flow* (an `if`/`filter`/gate/comparison), or is it transport (pub/sub fan-out) /
-display / analytics. Live DB counts captured from `~/.panopticon/panopticon.db`
+display / analytics. Live DB counts captured from `~/.overdeck/panopticon.db`
 on 2026-06-16. Both column lists were verified against the running schema with
 `PRAGMA table_info` (Node-22 production path through `schema.ts` migrations, not
 the Bun inline CREATE): `events` = exactly 4 columns, `health_events` = exactly 7.

@@ -190,7 +190,7 @@ function categorizeProcesses(processes: ClaudeProcess[]): void {
         if (convTmuxNames.has(session.name)) {
           try {
             const paneInfo = execSync(
-              `tmux -L panopticon list-panes -t ${session.name} -F '#{pane_tty}' 2>/dev/null`,
+              `tmux -L overdeck list-panes -t ${session.name} -F '#{pane_tty}' 2>/dev/null`,
               { encoding: 'utf-8' }
             ).trim();
             if (paneInfo.includes(`/dev/pts/${ttyNum}`)) {

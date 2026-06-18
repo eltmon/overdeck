@@ -38,7 +38,7 @@
   agent appends to as the conversation runs. Claude Code, pi, codex, and
   kimi-via-CLIProxy each use a different on-disk shape (backing-files §2).
   **Sacred:** Overdeck reads these, never mutates/deletes them, never commits
-  them to git. They live under `~/.claude/projects/` and `~/.panopticon/agents/`,
+  them to git. They live under `~/.claude/projects/` and `~/.overdeck/agents/`,
   both outside any repo.
 - **Pointer** — the field(s) that locate a backing file: `claude_session_id`
   (claude-code) **or** the per-agent locator keyed by `tmux_session` + `harness`
@@ -168,7 +168,7 @@ backing file (read-only) · **TX** = the disposable `transcripts` index (was
 | `GET /api/conversations/pending-input` (`conversations.ts:2277`) | reads | **RELOCATE → `ConversationRuntime.pendingInput`** (needs-you feed) | PAN-1705 live-liveness scan: filters tmux-alive convs + scans JSONL for a pending AskUserQuestion. It is a *runtime liveness + transcript-tail* read, not a metadata read; pairs with the tmux oracle, not the `conversations` cache. |
 | `GET /api/conversations/:name/messages` (`conversations.ts:3011`) | reads | **`TranscriptsResolver.parse(conv)`** | Parses the backing file across harness shapes (`getCachedMessages` → claude/pi/codex dispatch, `conversations.ts:541-547`). THE canonical transcript read. |
 | `GET /api/conversations/:name/message-locator` (`conversations.ts:3155`) | reads | **`TranscriptsResolver.resolveFile(conv)`** | Returns the resolved backing-file path for a message — the harness-aware resolver's path output. |
-| `GET /api/conversations/:name/handoff-doc` (`conversations.ts:2448`) | reads | **`ConversationsResolver.getHandoffDoc(name)`** | Reads the handoff doc the row's `handoff_doc_path` points at (under `~/.panopticon/handoffs/`, not git). Metadata-adjacent read keyed by the lineage edge. |
+| `GET /api/conversations/:name/handoff-doc` (`conversations.ts:2448`) | reads | **`ConversationsResolver.getHandoffDoc(name)`** | Reads the handoff doc the row's `handoff_doc_path` points at (under `~/.overdeck/handoffs/`, not git). Metadata-adjacent read keyed by the lineage edge. |
 | `GET /api/conversations/:name/about` (`conversations.ts:4835`) | reads | **aggregate → recomposed** (metadata + Transcripts facts) | "About this conversation" summary card; same compose as the list, single-row. |
 | `GET /api/conversations/:name/diffs` (`conversations.ts:4429`) | reads | **RELOCATE → Diffs** (`API-SURFACE.md` §H: "Diffs — `diffs.ts` (5) + `conversations/:name/diffs*`") | Per-turn workspace diffs are the Diffs domain; the conversation only supplies the name. |
 | `GET /api/conversations/:name/diffs/full` (`conversations.ts:4592`) | reads | **RELOCATE → Diffs** | Same. |
@@ -249,7 +249,7 @@ read door.
 | `pan conversations enrich [ids]` (`conversations/index.ts:134`) | writes (cache) | **`TranscriptsWriter.enrich`** | Opt-in LLM enrichment. |
 | `pan conversations embed [ids]` (`conversations/index.ts:121`) | writes (cache) | **`TranscriptsWriter.embed`** | Opt-in embeddings. |
 | `pan conversations format` (`conversations/index.ts`) | reads | **`TranscriptsResolver.serialize(conv)`** | Serializes the transcript to text (the adapter's `serializeTranscript`). |
-| `pan handoff [conv] [focus...]` (`index.ts:435`, `handoffCommand`) | writes | **`ConversationWriter.handoff(source, target, doc)`** (+ RELOCATE spawn) | Authors a handoff doc (to `~/.panopticon/handoffs/`), **creates a NEW conversation + new backing file** (fork primitive), records the lineage edge (`recordConversationHandoff`, `conversations-db.ts:739`). Spawn relocates. |
+| `pan handoff [conv] [focus...]` (`index.ts:435`, `handoffCommand`) | writes | **`ConversationWriter.handoff(source, target, doc)`** (+ RELOCATE spawn) | Authors a handoff doc (to `~/.overdeck/handoffs/`), **creates a NEW conversation + new backing file** (fork primitive), records the lineage edge (`recordConversationHandoff`, `conversations-db.ts:739`). Spawn relocates. |
 | `pan unarchive-conversation <query>` (`index.ts:446`) | writes | **`ConversationWriter.unarchive`** | Restore by name/title match. |
 
 ## 1D. RPC methods (`packages/contracts/src/rpc.ts`)

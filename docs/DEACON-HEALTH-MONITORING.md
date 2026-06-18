@@ -118,7 +118,7 @@ The deacon checks tmux sessions via:
 
 ## Configuration
 
-Health thresholds are configurable in `~/.panopticon/config.yaml`:
+Health thresholds are configurable in `~/.overdeck/config.yaml`:
 
 ```yaml
 cloister:
@@ -194,7 +194,7 @@ Deacon can auto-resume stopped work agents, but three gates suppress that path:
   The dashboard shows a top banner while active; restart without `--no-resume` to
   restore auto-resume.
 - **Manual pause:** `pan pause <id> [--reason <text>]` stores `paused`,
-  `pausedReason`, and `pausedAt` on `~/.panopticon/agents/<agent-id>/state.json`
+  `pausedReason`, and `pausedAt` on `~/.overdeck/agents/<agent-id>/state.json`
   and stops the live agent if it is running. Deacon skips paused agents. Use
   `pan unpause <id>` to clear the gate without spawning; `pan start <id> --force`
   clears the pause gate and starts immediately.

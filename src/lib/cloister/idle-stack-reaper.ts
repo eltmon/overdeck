@@ -40,8 +40,8 @@ const execAsync = promisify(exec);
 /** Idle duration before a workspace's UI stack is reaped. */
 const GRACE_MS = 10 * 60 * 1000; // 10 minutes
 
-/** `panopticon-feature-<issue>-server-1` / `-frontend-1`. */
-const UI_CONTAINER_RE = /^panopticon-feature-([a-z0-9]+-\d+)-(server|frontend)-1$/i;
+/** `overdeck-feature-<issue>-server-1` / `-frontend-1`. */
+const UI_CONTAINER_RE = /^overdeck-feature-([a-z0-9]+-\d+)-(server|frontend)-1$/i;
 
 /**
  * issueLower -> epoch ms first observed idle. Module-level so the grace clock
@@ -79,7 +79,7 @@ export function resetIdleStackGraceClock(issueLower: string): void {
 export interface IdleStackReaperDeps {
   /** Names of currently-running docker containers. */
   listContainerNames: () => Promise<string[]>;
-  /** Live tmux session names (host `panopticon` socket). */
+  /** Live tmux session names (host `overdeck` socket). */
   listSessions: () => Promise<readonly string[]>;
   /** Stop the given containers (light, reversible). */
   stopContainers: (names: string[]) => Promise<void>;

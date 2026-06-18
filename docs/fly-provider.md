@@ -42,9 +42,9 @@ endpoint; port tunnelling uses `fly proxy`.
    ```
 
    This checks that `flyctl` is installed, verifies authentication, and writes a default
-   `[remote.fly]` block to `~/.panopticon/config.toml`.
+   `[remote.fly]` block to `~/.overdeck/config.toml`.
 
-2. **Export your API token** (or add it to `~/.panopticon.env`):
+2. **Export your API token** (or add it to `~/.overdeck.env`):
 
    ```bash
    export FLY_API_TOKEN=<your-token>
@@ -62,7 +62,7 @@ endpoint; port tunnelling uses `fly proxy`.
    - Clone the repository and check out the feature branch
    - Install beads CLI and copy your local skills
    - Sync Claude Code and GitHub credentials from your local machine
-   - Save workspace metadata to `~/.panopticon/workspaces/<id>.yaml`
+   - Save workspace metadata to `~/.overdeck/workspaces/<id>.yaml`
 
 4. **Check status at any time:**
 
@@ -74,7 +74,7 @@ endpoint; port tunnelling uses `fly proxy`.
 
 ## Configuration
 
-Remote workspace settings live in `~/.panopticon/config.toml` under `[remote]` and
+Remote workspace settings live in `~/.overdeck/config.toml` under `[remote]` and
 `[remote.fly]`. `pan remote setup` writes sensible defaults; edit the file to tune them.
 
 ```toml
@@ -194,7 +194,7 @@ After creation the provider polls `GET /apps/:app/machines/:id/wait?state=starte
 up to 120 seconds. Once the machine is running, Overdeck runs setup commands over the
 exec endpoint (clone repo, install beads, sync credentials).
 
-Machine identity is stored in `~/.panopticon/workspaces/<issue-id>.yaml`:
+Machine identity is stored in `~/.overdeck/workspaces/<issue-id>.yaml`:
 
 ```yaml
 id: pan-42
@@ -274,9 +274,9 @@ Remote workspaces do not introduce a separate cost-tracking pipeline. Agent toke
 are recorded by the standard heartbeat hook regardless of where the agent runs.
 
 Every Claude API call made by a remote agent appends an event to
-`~/.panopticon/costs/events.jsonl` on the **local** machine (the hook runs locally and
+`~/.overdeck/costs/events.jsonl` on the **local** machine (the hook runs locally and
 receives usage via the agent's output stream). The pre-computed cache at
-`~/.panopticon/costs/by-issue.json` is updated in real time.
+`~/.overdeck/costs/by-issue.json` is updated in real time.
 
 Fly.io compute costs (machine uptime) are not tracked by Overdeck. Monitor those
 directly in the Fly.io dashboard or with `fly status -a pan-workspaces`.

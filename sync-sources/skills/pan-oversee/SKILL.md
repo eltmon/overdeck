@@ -71,21 +71,21 @@ echo "Dashboard: $DASHBOARD"
 
 # 2. Workspace exists?
 WS_PATH=""
-for dir in ~/.panopticon/workspaces/feature-$ISSUE_LOWER ~/Projects/*/workspaces/feature-$ISSUE_LOWER; do
+for dir in ~/.overdeck/workspaces/feature-$ISSUE_LOWER ~/Projects/*/workspaces/feature-$ISSUE_LOWER; do
   if [ -d "$dir" ]; then WS_PATH="$dir"; break; fi
 done
 echo "Workspace: ${WS_PATH:-NONE}"
 
 # 3. Agent state?
-AGENT_STATE=$(cat ~/.panopticon/agents/agent-$ISSUE_LOWER/state.json 2>/dev/null)
+AGENT_STATE=$(cat ~/.overdeck/agents/agent-$ISSUE_LOWER/state.json 2>/dev/null)
 echo "Agent state: ${AGENT_STATE:-NONE}"
 
 # 4. Tmux session?
-TMUX_SESSION=$(tmux -L panopticon list-sessions 2>/dev/null | grep -i "$ISSUE_LOWER" | head -1)
+TMUX_SESSION=$(tmux -L overdeck list-sessions 2>/dev/null | grep -i "$ISSUE_LOWER" | head -1)
 echo "Tmux: ${TMUX_SESSION:-NONE}"
 
 # 5. Completion marker?
-COMPLETED=$(ls ~/.panopticon/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
+COMPLETED=$(ls ~/.overdeck/agents/agent-$ISSUE_LOWER/completed 2>/dev/null)
 echo "Completed: ${COMPLETED:-NO}"
 
 # 6. Review/test/merge status?
@@ -177,7 +177,7 @@ Poll the agent's activity every 30-60 seconds. Watch for:
 **Signs of progress:**
 - tmux pane shows tool calls, file edits, test runs
 - `lastActivity` timestamp in state.json is updating
-- Heartbeat file is fresh: `~/.panopticon/heartbeats/agent-pan-{ID}.json`
+- Heartbeat file is fresh: `~/.overdeck/heartbeats/agent-pan-{ID}.json`
 
 **Signs of trouble:**
 - No output change for > 5 minutes → agent may be stuck
@@ -188,10 +188,10 @@ Poll the agent's activity every 30-60 seconds. Watch for:
 **Monitoring commands:**
 ```bash
 # Watch live output (non-blocking)
-tmux -L panopticon capture-pane -t agent-pan-{ID} -p -S -30
+tmux -L overdeck capture-pane -t agent-pan-{ID} -p -S -30
 
 # Check heartbeat freshness
-cat ~/.panopticon/heartbeats/agent-pan-{ID}.json 2>/dev/null | jq '{timestamp, tool_name, current_task}'
+cat ~/.overdeck/heartbeats/agent-pan-{ID}.json 2>/dev/null | jq '{timestamp, tool_name, current_task}'
 
 # Check activity log
 curl -s http://localhost:3011/api/agents/agent-pan-{ID}/activity | jq '.[-3:]'
@@ -208,7 +208,7 @@ The agent should eventually run `pan done PAN-{ID}`. Watch for:
 
 ```bash
 # Check if completed marker exists
-ls -la ~/.panopticon/agents/agent-pan-{ID}/completed 2>/dev/null
+ls -la ~/.overdeck/agents/agent-pan-{ID}/completed 2>/dev/null
 
 # Check review status (set by `pan done`)
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
@@ -239,7 +239,7 @@ Once review is triggered, the review-agent specialist should wake up:
 curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "review-agent")'
 
 # Watch review agent output
-tmux -L panopticon capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
+tmux -L overdeck capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
 
 # Check review status progression
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{reviewStatus, reviewNotes}'
@@ -271,7 +271,7 @@ If review returned feedback, the work agent should receive it and fix issues:
 
 ```bash
 # Check if work agent received feedback
-tmux -L panopticon capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
+tmux -L overdeck capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
 
 # Check auto-requeue count (circuit breaker: max 3)
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '.autoRequeueCount'
@@ -285,7 +285,7 @@ The work agent should:
 **If feedback not delivered:** This is a code bug to fix. Check:
 - `send-feedback-to-agent` skill
 - Dashboard's feedback delivery mechanism
-- Agent's message queue in `~/.panopticon/agents/agent-pan-{ID}/mail/`
+- Agent's message queue in `~/.overdeck/agents/agent-pan-{ID}/mail/`
 
 ### Phase 6: Monitor Test Agent
 
@@ -296,7 +296,7 @@ After review passes, test-agent should run:
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{testStatus, testNotes}'
 
 # Watch test agent
-tmux -L panopticon capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
+tmux -L overdeck capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
 ```
 
 **Expected:** `testStatus: "passed"` → ready for merge

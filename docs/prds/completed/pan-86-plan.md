@@ -6,8 +6,8 @@ Agents using the beads skill are getting confused between three different ID sys
 
 | System | Format | Example |
 |--------|--------|---------|
-| Beads | `repo-hash` | `panopticon-3eb7`, `panopticon-6ax` |
-| Beads (hierarchical) | `repo-hash.N` | `panopticon-3eb7.4` |
+| Beads | `repo-hash` | `overdeck-3eb7`, `overdeck-6ax` |
+| Beads (hierarchical) | `repo-hash.N` | `overdeck-3eb7.4` |
 | GitHub Issues | `PREFIX-number` | `PAN-84`, `PAN-73` |
 | Linear Issues | `PREFIX-number` | `MIN-123`, `HH-456` |
 
@@ -54,8 +54,8 @@ Replace the problematic example:
 bd dep add pan-5 pan-1 --type blocks
 
 # AFTER (clear)
-# Example: panopticon-abc1 is blocked by panopticon-def2
-bd dep add panopticon-abc1 panopticon-def2 --type blocks
+# Example: overdeck-abc1 is blocked by overdeck-def2
+bd dep add overdeck-abc1 overdeck-def2 --type blocks
 ```
 
 ### Task 3: Document External Tracker Linking
@@ -73,7 +73,7 @@ File issue in steveyegge/beads requesting:
 
 | File | Change |
 |------|--------|
-| `/home/eltmon/projects/panopticon/skills/beads/SKILL.md` | Add ID Systems section, fix example, document --external-ref |
+| `/home/eltmon/projects/overdeck/skills/beads/SKILL.md` | Add ID Systems section, fix example, document --external-ref |
 
 ## Out of Scope
 

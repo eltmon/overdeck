@@ -42,7 +42,7 @@ interface DiscoveredSession {
   summary: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
-  panopticonManaged: boolean;
+  overdeckManaged: boolean;
   panIssueId: string | null;
 }
 
@@ -267,7 +267,7 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
     summary: session.summary ?? null,
     enrichmentLevel: session.enrichmentLevel as 0 | 1 | 2 | 3,
     enrichmentFailed: session.enrichmentFailed,
-    panopticonManaged: session.panopticonManaged,
+    overdeckManaged: session.overdeckManaged,
     panIssueId: session.panIssueId ?? null,
   };
 }

@@ -25,7 +25,7 @@ pan wipe <issue-id> --force # skip confirmation
 Performs the canonical destructive reset-to-Todo for an issue:
 - Kills all tmux sessions and running processes for the issue
 - Removes the workspace directory (`workspaces/feature-<id>/`)
-- Removes agent state (`~/.panopticon/agents/<id>/`)
+- Removes agent state (`~/.overdeck/agents/<id>/`)
 - Deletes local and remote feature branches
 - Clears review status and issue beads
 - Resets issue status in the tracker to Todo

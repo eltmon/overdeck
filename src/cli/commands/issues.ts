@@ -37,7 +37,7 @@ const STATE_COLORS: Record<string, (s: string) => string> = {
 };
 
 /**
- * Get tracker config by type from panopticon config
+ * Get tracker config by type from overdeck config
  */
 function getTrackerConfig(trackerType: TrackerType): TrackerConfig | null {
   const config = loadConfigSync();
@@ -180,7 +180,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
     if (trackersToQuery.length === 0) {
       spinner.fail('No trackers configured');
-      console.log(chalk.dim('Configure trackers in ~/.panopticon/config.toml'));
+      console.log(chalk.dim('Configure trackers in ~/.overdeck/config.toml'));
       process.exit(1);
     }
 

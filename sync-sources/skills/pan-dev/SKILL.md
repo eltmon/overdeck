@@ -3,7 +3,7 @@ name: pan-dev
 description: Start Overdeck in development mode with Vite HMR for the frontend and the Node 22 server
 triggers:
   - pan dev
-  - start panopticon dev
+  - start overdeck dev
   - dev mode
   - start dashboard dev
 allowed-tools:
@@ -19,7 +19,7 @@ Start the dashboard server (Node 22, bundled) and the Vite frontend dev server (
 
 - User is actively developing the Overdeck dashboard (frontend or server)
 - User wants HMR for frontend changes
-- User says "start panopticon in dev mode", "pan dev", or "bring up dev"
+- User says "start overdeck in dev mode", "pan dev", or "bring up dev"
 
 ## Prerequisites
 
@@ -88,12 +88,12 @@ cd ~/Projects/overdeck && pan sync 2>&1 | tail -3
 
 Check config first:
 ```bash
-grep -A2 '\[traefik\]' ~/.panopticon/config.toml 2>/dev/null
+grep -A2 '\[traefik\]' ~/.overdeck/config.toml 2>/dev/null
 ```
 
 If Traefik is enabled:
 ```bash
-cd ~/.panopticon/traefik && docker compose up -d 2>&1
+cd ~/.overdeck/traefik && docker compose up -d 2>&1
 ```
 
 Regenerate the Traefik dynamic config in dev mode so the frontend route points
@@ -111,7 +111,7 @@ cd ~/Projects/overdeck && \
 
 Verify the rendered file has the frontend on port 3010:
 ```bash
-grep 'host.docker.internal' ~/.panopticon/traefik/dynamic/panopticon.yml
+grep 'host.docker.internal' ~/.overdeck/traefik/dynamic/overdeck.yml
 # Expected: 3010 (frontend) and 3011 (api). If both show 3011, the regen above
 # did not run with OVERDECK_DEV=1; check the env var.
 ```
@@ -130,7 +130,7 @@ If unsure, always rebuild — it takes ~2 seconds.
 ```bash
 cd ~/Projects/overdeck && \
   nohup node dist/dashboard/server.js \
-  > /tmp/panopticon-server.log 2>&1 &
+  > /tmp/overdeck-server.log 2>&1 &
 echo "Server PID: $!"
 ```
 
@@ -151,7 +151,7 @@ done
 ```bash
 cd ~/Projects/overdeck/src/dashboard/frontend && \
   nohup npx vite --host 0.0.0.0 --port 3010 \
-  > /tmp/panopticon-frontend.log 2>&1 &
+  > /tmp/overdeck-frontend.log 2>&1 &
 echo "Frontend PID: $!"
 ```
 
@@ -182,8 +182,8 @@ Print:
 - Server: `http://localhost:3011` (API)
 - Frontend: `http://localhost:3010` (Vite HMR)
 - Traefik: `https://pan.localhost` (if enabled, proxies to Vite on 3010)
-- Server log: `/tmp/panopticon-server.log`
-- Frontend log: `/tmp/panopticon-frontend.log`
+- Server log: `/tmp/overdeck-server.log`
+- Frontend log: `/tmp/overdeck-frontend.log`
 
 ## After Server Code Changes
 
@@ -193,7 +193,7 @@ The server runs pre-built JS, so after editing `src/dashboard/server/**`:
 cd ~/Projects/overdeck && npm run build:dashboard:server
 pkill -f "node.*dist/dashboard/server\.js"
 nohup node dist/dashboard/server.js \
-  > /tmp/panopticon-server.log 2>&1 &
+  > /tmp/overdeck-server.log 2>&1 &
 ```
 
 ## After Frontend Code Changes
@@ -203,7 +203,7 @@ Nothing needed — Vite HMR picks up changes automatically.
 ## Troubleshooting
 
 ### Vite can't proxy to server
-Server isn't running or crashed. Check `/tmp/panopticon-server.log`.
+Server isn't running or crashed. Check `/tmp/overdeck-server.log`.
 
 ### Terminal panel shows "Reconnecting"
 Server is running under wrong runtime. Verify: `ps aux | grep server.js` should show Node 22, not Bun.

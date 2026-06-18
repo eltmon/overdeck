@@ -40,7 +40,7 @@ describe('queryBeadsForIssuePromise', () => {
       callback(new Error('database is locked'), '', 'database is locked');
     });
     childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
-      callback(null, { stdout: JSON.stringify([{ id: 'panopticon-1', title: 'PAN-1094: Task', status: 'open', labels: ['pan-1094'] }]) }, '');
+      callback(null, { stdout: JSON.stringify([{ id: 'overdeck-1', title: 'PAN-1094: Task', status: 'open', labels: ['pan-1094'] }]) }, '');
     });
     const { queryBeadsForIssuePromise } = await import('../../../src/lib/beads-query.js');
 
@@ -51,7 +51,7 @@ describe('queryBeadsForIssuePromise', () => {
       random: () => 0,
       sleep: (ms) => vi.advanceTimersByTimeAsync(ms),
     })).resolves.toEqual({
-      beads: [{ id: 'panopticon-1', title: 'PAN-1094: Task', status: 'open', labels: ['pan-1094'] }],
+      beads: [{ id: 'overdeck-1', title: 'PAN-1094: Task', status: 'open', labels: ['pan-1094'] }],
     });
     expect(childProcessMocks.execFile).toHaveBeenCalledTimes(2);
   });

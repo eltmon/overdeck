@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { isPiSessionFile, parsePiConversationMessages } from '../pi-conversation-parser.js';
 
 describe('isPiSessionFile (PAN-1908)', () => {
-  const ROOT = '/home/u/.panopticon/agents/agent-pan-1908';
+  const ROOT = '/home/u/.overdeck/agents/agent-pan-1908';
 
   it('matches a conversation transcript in the sessions/ subdir', () => {
     expect(isPiSessionFile(`${ROOT}/sessions/2026-06-15T01-00-00-000Z_abc.jsonl`)).toBe(true);

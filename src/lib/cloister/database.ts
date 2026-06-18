@@ -55,7 +55,7 @@ let db: SqliteDatabase | null = null;
  * Safe to call multiple times - idempotent.
  */
 export function initHealthDatabase(): SqliteDatabase {
-  // Ensure panopticon home exists
+  // Ensure overdeck home exists
   if (!existsSync(OVERDECK_HOME)) {
     mkdirSync(OVERDECK_HOME, { recursive: true });
   }

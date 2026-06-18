@@ -20,7 +20,7 @@ const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'pan-issue-test-'));
-  process.env.OVERDECK_HOME = join(tmpDir, '.panopticon-home');
+  process.env.OVERDECK_HOME = join(tmpDir, '.overdeck-home');
   childProcessMocks.execFileSync.mockImplementation(() => {
     throw new Error('bd unavailable');
   });
@@ -53,7 +53,7 @@ describe('hasBeadsTasks', () => {
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     mkdirSync(join(tmpDir, '.beads'), { recursive: true });
     writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
-      id: 'panopticon-1',
+      id: 'overdeck-1',
       title: 'PAN-1093: Task',
       labels: ['pan-1093'],
     }) + '\n');
@@ -65,7 +65,7 @@ describe('hasBeadsTasks', () => {
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
     mkdirSync(join(tmpDir, '.beads'), { recursive: true });
     writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
-      id: 'panopticon-2',
+      id: 'overdeck-2',
       title: 'PAN-1094: Task',
       labels: ['pan-1094'],
     }) + '\n');
@@ -74,7 +74,7 @@ describe('hasBeadsTasks', () => {
   });
 
   it('returns true when bd reports a matching issue bead', async () => {
-    childProcessMocks.execFileSync.mockImplementation(() => JSON.stringify([{ id: 'panopticon-3' }]));
+    childProcessMocks.execFileSync.mockImplementation(() => JSON.stringify([{ id: 'overdeck-3' }]));
     const { hasBeadsTasks } = await import('../../../../src/cli/commands/start.js');
 
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
@@ -104,7 +104,7 @@ describe('hasBeadsTasks', () => {
     });
     mkdirSync(join(tmpDir, '.beads'), { recursive: true });
     writeFileSync(join(tmpDir, '.beads', 'issues.jsonl'), JSON.stringify({
-      id: 'panopticon-2',
+      id: 'overdeck-2',
       title: 'PAN-1094: Task',
       labels: ['pan-1094'],
     }) + '\n');
@@ -124,7 +124,7 @@ describe('hasBeadsTasks', () => {
       callback(new Error('database is locked'), '', 'database is locked');
     });
     childProcessMocks.execFile.mockImplementationOnce((_file: string, _args: string[], _options: unknown, callback: Function) => {
-      callback(null, { stdout: JSON.stringify([{ id: 'panopticon-4' }]) }, '');
+      callback(null, { stdout: JSON.stringify([{ id: 'overdeck-4' }]) }, '');
     });
     const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
 
@@ -147,7 +147,7 @@ describe('hasBeadsTasks', () => {
         callback(new Error('database is locked'), '', 'database is locked');
         return;
       }
-      callback(null, { stdout: JSON.stringify([{ id: `panopticon-${calls}` }]) }, '');
+      callback(null, { stdout: JSON.stringify([{ id: `overdeck-${calls}` }]) }, '');
     });
     const { countBeadsTasksDetailedWithRetry } = await import('../../../../src/cli/commands/start.js');
 
@@ -183,7 +183,7 @@ describe('hasBeadsTasks', () => {
       },
     }));
     writeFileSync(join(workspace, '.beads', 'issues.jsonl'), JSON.stringify({
-      id: 'panopticon-2',
+      id: 'overdeck-2',
       title: 'PAN-1094: One',
       labels: ['pan-1094'],
     }) + '\n');

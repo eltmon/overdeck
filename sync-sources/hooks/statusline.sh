@@ -154,7 +154,7 @@ fi
 
 # Write context % to agent dir for dashboard monitoring (non-blocking)
 if [ -n "$OVERDECK_AGENT_ID" ] && [ -n "$ctx_used_pct" ]; then
-  CTX_DIR="$HOME/.panopticon/agents/$OVERDECK_AGENT_ID"
+  CTX_DIR="$HOME/.overdeck/agents/$OVERDECK_AGENT_ID"
   if [ -d "$CTX_DIR" ]; then
     printf '%.0f' "$ctx_used_pct" > "$CTX_DIR/context-pct" 2>/dev/null || true
     # Capture initial context % (first time only)

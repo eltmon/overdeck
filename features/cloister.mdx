@@ -108,7 +108,7 @@ Additionally, **inspect-agent** runs during implementation (between beads), not 
 
 ### Queue Processing
 
-Each specialist has a task queue (`~/.panopticon/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
+Each specialist has a task queue (`~/.overdeck/specialists/{name}/hook.json`) managed via the FPP (Fixed Point Principle):
 
 ```
 1. Task arrives (via API or handoff)
@@ -228,7 +228,7 @@ When a handoff occurs, Cloister captures:
 }
 ```
 
-Handoff prompts are saved to `~/.panopticon/agents/{agent-id}/handoffs/` for debugging.
+Handoff prompts are saved to `~/.overdeck/agents/{agent-id}/handoffs/` for debugging.
 
 ## Heartbeat Monitoring
 
@@ -251,7 +251,7 @@ and process-health signals described below become operator-visible.
   alt="Agents page: a metric strip showing Running, Stuck, Cost 24h, Tokens 24h, runtime, and Queue over agent cards listing each agent's model, runtime, and last activity"
 />
 
-Heartbeat files are stored in `~/.panopticon/heartbeats/`:
+Heartbeat files are stored in `~/.overdeck/heartbeats/`:
 
 ```json
 {
@@ -266,7 +266,7 @@ Heartbeat files are stored in `~/.panopticon/heartbeats/`:
 
 ### Heartbeat Hook Installation
 
-The heartbeat hook is automatically synced to `~/.panopticon/bin/heartbeat-hook` via `pan sync`. It's also installed automatically when you install or upgrade Overdeck via npm.
+The heartbeat hook is automatically synced to `~/.overdeck/bin/heartbeat-hook` via `pan sync`. It's also installed automatically when you install or upgrade Overdeck via npm.
 
 **Manual installation:**
 ```bash
@@ -283,7 +283,7 @@ pan sync  # Syncs all skills, agents, AND hooks
         "hooks": [
           {
             "type": "command",
-            "command": "~/.panopticon/bin/heartbeat-hook"
+            "command": "~/.overdeck/bin/heartbeat-hook"
           }
         ]
       }
@@ -313,7 +313,7 @@ stuck-detection signals it produces.
 
 ## Configuration
 
-Cloister configuration lives in `~/.panopticon/cloister/config.json`:
+Cloister configuration lives in `~/.overdeck/cloister/config.json`:
 
 ```json
 {
@@ -375,7 +375,7 @@ Complexity is detected from multiple signals (in priority order):
 
 ### Configuring Model Routing
 
-Model routing is configured via the dashboard Settings page or `~/.panopticon/cloister/config.json`:
+Model routing is configured via the dashboard Settings page or `~/.overdeck/cloister/config.json`:
 
 ```json
 {

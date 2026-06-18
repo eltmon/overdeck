@@ -67,7 +67,7 @@ async function readProjectConfig(): Promise<YamlConfig | null> {
   const configPath = join(projectRoot, '.pan.yaml');
   if (await pathExists(configPath)) return stripProjectTtsEndpoint(await readYamlConfig(configPath));
 
-  const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
+  const legacyConfigPath = join(projectRoot, '.overdeck.yaml');
   if (await pathExists(legacyConfigPath)) return stripProjectTtsEndpoint(await readYamlConfig(legacyConfigPath));
 
   return null;

@@ -102,7 +102,7 @@ After `spawnConversationSession()`, kick off async session file discovery. Store
 | `EffortPicker.tsx` | Simplified from T3Code | ~80 |
 | `ConversationPanel.tsx` | New wrapper | ~200 |
 
-### New Types (in `@panopticon/contracts` or `types.ts`)
+### New Types (in `@overdeck/contracts` or `types.ts`)
 - `ChatMessage` — mirrors T3Code
 - `WorkLogEntry` — mirrors T3Code
 - `TimelineEntry` — derived union type

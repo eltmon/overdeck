@@ -92,7 +92,7 @@ function makeSearchFetch(issueItems: GitHubSearchIssue[]) {
 
 const config = {
   token: 'ghp_test',
-  repos: [{ owner: 'acme', repo: 'panopticon', prefix: 'PAN' }],
+  repos: [{ owner: 'acme', repo: 'overdeck', prefix: 'PAN' }],
 };
 
 describe('substrate bug poller helpers', () => {
@@ -195,10 +195,10 @@ describe('createSubstrateBugPoller', () => {
       const query = url.searchParams.get('q') ?? '';
       if (url.pathname === '/search/issues' && query.includes('is:issue')) return response({ items: [] });
       if (url.pathname === '/search/issues' && query.includes('is:pr')) return response({ items: [{ number: 9 }] });
-      if (url.pathname === '/repos/acme/panopticon/pulls/9/commits') {
+      if (url.pathname === '/repos/acme/overdeck/pulls/9/commits') {
         return response([{ sha: 'commit-sha', commit: { message: 'resolves #202' } }]);
       }
-      if (url.pathname === '/repos/acme/panopticon/pulls/9') {
+      if (url.pathname === '/repos/acme/overdeck/pulls/9') {
         return response({
           number: 9,
           title: 'Fix substrate regression',
@@ -242,10 +242,10 @@ describe('createSubstrateBugPoller', () => {
         });
       }
       if (url.pathname === '/search/issues' && query.includes('is:pr')) return response({ items: [{ number: 9 }] });
-      if (url.pathname === '/repos/acme/panopticon/pulls/9/commits') {
+      if (url.pathname === '/repos/acme/overdeck/pulls/9/commits') {
         return response([{ sha: 'commit-sha', commit: { message: 'refactor unrelated code' } }]);
       }
-      if (url.pathname === '/repos/acme/panopticon/pulls/9') {
+      if (url.pathname === '/repos/acme/overdeck/pulls/9') {
         return response({
           number: 9,
           title: 'Fix substrate regression',

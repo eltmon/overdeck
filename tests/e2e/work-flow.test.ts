@@ -41,7 +41,7 @@ describe('E2E: Work Flow', () => {
   let testWorkspace: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'panopticon-work-flow-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'overdeck-work-flow-'));
     workspaceRoot = join(tempDir, 'workspaces');
     testWorkspace = join(workspaceRoot, 'TEST-42');
     mkdirSync(workspaceRoot, { recursive: true });

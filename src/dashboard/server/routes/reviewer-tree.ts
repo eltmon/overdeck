@@ -5,7 +5,7 @@
  * nodes (correctness, security, performance, requirements) regardless of how
  * many review rounds have run. Each node carries the
  * aggregated round metadata read from
- * `~/.panopticon/agents/<canonical-session>/round-N.json` artifacts written
+ * `~/.overdeck/agents/<canonical-session>/round-N.json` artifacts written
  * by `archiveReviewerRound` in review-agent.ts.
  *
  * The orchestrator (parent `review` node) is emitted by the caller; this
@@ -58,7 +58,7 @@ async function detectApiError(sessionId: string): Promise<boolean> {
 }
 
 /**
- * Read the agent's own `stoppedAt` from `~/.panopticon/agents/<sessionId>/state.json`.
+ * Read the agent's own `stoppedAt` from `~/.overdeck/agents/<sessionId>/state.json`.
  *
  * Used to give each reviewer node its own end timestamp instead of inheriting the
  * parent review section's `endedAt` — sub-reviewers (correctness/security/...)
@@ -140,7 +140,7 @@ export interface BuildReviewerNodesOptions {
   endedAt?: string;
   /** Parent review section status. */
   status: string;
-  /** Override the ~/.panopticon/agents directory (test hook). */
+  /** Override the ~/.overdeck/agents directory (test hook). */
   agentsDirOverride?: string;
 }
 
@@ -301,7 +301,7 @@ async function findLatestReviewRunDir(
 export async function readSynthesisRounds(
   issueId: string,
   projectKey: string,
-  agentsRoot: string = join(homedir(), '.panopticon', 'agents'),
+  agentsRoot: string = join(homedir(), '.overdeck', 'agents'),
 ): Promise<ReviewerRoundMetadata | undefined> {
   return readReviewerRounds(getReviewerSessionName('synthesis', projectKey, issueId), agentsRoot);
 }
@@ -313,7 +313,7 @@ export async function readSynthesisRounds(
 export async function buildReviewerNodes(
   opts: BuildReviewerNodesOptions,
 ): Promise<ReviewerNode[]> {
-  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+  const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.overdeck', 'agents');
 
   // PAN-915 — current-round output dir disambiguates "zombie session from prior
   // round" vs "alive session for the round currently in progress". When the

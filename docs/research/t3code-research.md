@@ -227,7 +227,7 @@ A `pan ask -r <project> -q "..."` skill that runs a subagent against a project a
 
 **7. Image attachment support** — pass screenshots and diagrams to agents
 **8. Project script runner keybindings** — `script.test.run` etc. in dashboard
-**9. `npx panopticon@latest`** — zero-install mode for getting started
+**9. `npx overdeck@latest`** — zero-install mode for getting started
 
 ---
 

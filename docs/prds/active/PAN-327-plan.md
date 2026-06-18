@@ -220,7 +220,7 @@ Add relevance tags to skill manifest:
 - Log which skills were included/excluded for debugging
 
 **Skill tagging:**
-- Add `applicableTo` field to `.panopticon-manifest.json` entries
+- Add `applicableTo` field to `.overdeck-manifest.json` entries
 - Default: `["universal"]` (backward compatible, all skills copied)
 - Over time, tag skills appropriately and reduce default set
 

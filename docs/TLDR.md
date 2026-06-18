@@ -44,7 +44,7 @@ WORKSPACE (git worktree)
     └──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-Each daemon is a background process managing a TLDR index for its directory. State is stored at `~/.panopticon/tldr/{hash}/daemon.json` where `{hash}` is SHA256 of the workspace path.
+Each daemon is a background process managing a TLDR index for its directory. State is stored at `~/.overdeck/tldr/{hash}/daemon.json` where `{hash}` is SHA256 of the workspace path.
 
 ## Index Lifecycle
 
@@ -370,7 +370,7 @@ The read-enforcer applies quality gates to prevent useless summaries:
 | New workspace has empty index | Main index missing, auto-warm didn't run | Run `.venv/bin/tldr warm .` in the workspace |
 | `tldr: command not found` | Not in venv | Use `.venv/bin/tldr` or activate venv |
 | Stale index (old file count) | Edits didn't trigger re-warm | `pan admin tldr warm` or edit 10+ files to trigger auto-warm |
-| Daemon not starting | PID file stale | Delete `~/.panopticon/tldr/*/daemon.json` and restart |
+| Daemon not starting | PID file stale | Delete `~/.overdeck/tldr/*/daemon.json` and restart |
 | `.tsx` files get "Module not found" | Upstream llm-tldr `_get_module_exports()` only checks `.ts` | Fixed by local patch (`scripts/patches/llm-tldr-tsx-support.py`); upstream PR [#53](https://github.com/parcadei/llm-tldr/pull/53) pending |
 | Context returns "~25 tokens" | Module path includes file extension | Pass without extension: `src/lib/agents` not `src/lib/agents.ts` |
 | Context returns "~25 tokens" | Language defaults to Python | Pass `--lang typescript` explicitly |

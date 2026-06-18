@@ -137,7 +137,7 @@ export async function contextEditCommand(options: ContextOptions = {}): Promise<
 export async function contextSyncCommand(): Promise<void> {
   const result = syncContextLayersSync();
   if (result.globalStubCreated) {
-    console.log(chalk.cyan('Seeded ~/.panopticon/context/global.md with a starter template.'));
+    console.log(chalk.cyan('Seeded ~/.overdeck/context/global.md with a starter template.'));
   }
   if (result.globalWritten) {
     console.log(chalk.green('✓ Rendered global layer → ~/.claude/CLAUDE.md'));

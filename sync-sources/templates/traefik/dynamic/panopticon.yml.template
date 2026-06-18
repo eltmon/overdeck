@@ -1,5 +1,5 @@
 # Dynamic routing configuration for Overdeck Dashboard
-# Generated from panopticon.yml.template -- do not edit manually
+# Generated from overdeck.yml.template -- do not edit manually
 # Variables: {{TRAEFIK_DOMAIN}}, {{DASHBOARD_FRONTEND_PORT}}, {{DASHBOARD_API_PORT}}
 #
 # DASHBOARD_FRONTEND_PORT is resolved at render time (see src/lib/traefik.ts):
@@ -11,11 +11,11 @@
 http:
   routers:
     # Dashboard Frontend
-    panopticon-frontend:
+    overdeck-frontend:
       rule: "Host(`{{TRAEFIK_DOMAIN}}`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`)"
       entryPoints:
         - websecure
-      service: panopticon-frontend
+      service: overdeck-frontend
       tls:
         domains:
           - main: "{{TRAEFIK_DOMAIN}}"
@@ -23,19 +23,19 @@ http:
               - "*.{{TRAEFIK_DOMAIN}}"
 
     # Dashboard API and WebSocket endpoints
-    panopticon-api:
+    overdeck-api:
       rule: "Host(`{{TRAEFIK_DOMAIN}}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`))"
       entryPoints:
         - websecure
-      service: panopticon-api
+      service: overdeck-api
       tls: {}
 
     # Published HTML artifacts
-    panopticon-artifacts:
+    overdeck-artifacts:
       rule: "Host(`artifacts.{{TRAEFIK_DOMAIN}}`) && PathPrefix(`/a/`)"
       entryPoints:
         - websecure
-      service: panopticon-api
+      service: overdeck-api
       tls:
         domains:
           - main: "{{TRAEFIK_DOMAIN}}"
@@ -44,12 +44,12 @@ http:
 
   services:
     # Frontend port differs between production and dev mode — see header comment.
-    panopticon-frontend:
+    overdeck-frontend:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:{{DASHBOARD_FRONTEND_PORT}}"
 
-    panopticon-api:
+    overdeck-api:
       loadBalancer:
         servers:
           - url: "http://host.docker.internal:{{DASHBOARD_API_PORT}}"

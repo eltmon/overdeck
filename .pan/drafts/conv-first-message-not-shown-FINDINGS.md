@@ -49,7 +49,7 @@ the JSONL already has bytes — there is no fallback to correct it, so the view 
 - `fs.promises.watch` on a *missing* file throws ENOENT → `watchConversation` falls back to
   500ms polling and self-heals (tested in Node 22). That is why the missing-file variant is
   NOT the permanent-stuck case; the **file-exists-but-parsed-0** window is.
-- `~/.panopticon/logs/dashboard.log` contains a real occurrence:
+- `~/.overdeck/logs/dashboard.log` contains a real occurrence:
   `[conv-stream] initial parse of 20260614-2698 yielded 0 messages despite byteOffset=2729
   — emitting empty snapshot (client HTTP backfill covers this)`.
 

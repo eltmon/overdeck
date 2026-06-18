@@ -54,7 +54,7 @@ vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
 
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
 
-const cleanEnv = { OVERDECK_DISABLE_DEACON: undefined, HOSTNAME: 'host-panopticon' };
+const cleanEnv = { OVERDECK_DISABLE_DEACON: undefined, HOSTNAME: 'host-overdeck' };
 
 describe('flywheel lifecycle', () => {
   beforeEach(() => {

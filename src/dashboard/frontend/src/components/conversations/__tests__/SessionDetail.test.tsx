@@ -46,7 +46,7 @@ const BASE_SESSION: Session = {
   summaryDetailed: null,
   enrichmentLevel: 0 as const,
   enrichmentFailed: false,
-  panopticonManaged: false,
+  overdeckManaged: false,
   panIssueId: null,
 };
 
@@ -56,7 +56,7 @@ const ARCHIVED_SESSION: Session = {
   source: 'managed-archived',
   conversationName: 'archived session',
   archivedAt: '2025-01-02T00:00:00Z',
-  panopticonManaged: true,
+  overdeckManaged: true,
   panIssueId: 'PAN-1391',
 };
 
@@ -115,7 +115,7 @@ describe('SessionDetail', () => {
 
     rerender(
       <QueryClientProvider client={makeClient()}>
-        <SessionDetail session={{ ...BASE_SESSION, panopticonManaged: true, panIssueId: 'PAN-457' }} onClose={vi.fn()} />
+        <SessionDetail session={{ ...BASE_SESSION, overdeckManaged: true, panIssueId: 'PAN-457' }} onClose={vi.fn()} />
       </QueryClientProvider>,
     );
     expect(screen.getByText('Managed · PAN-457')).toBeInTheDocument();

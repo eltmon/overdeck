@@ -81,7 +81,7 @@ async function isBranchMerged(
       // the code was squash-merged and only planning files remain on the branch.
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
@@ -121,7 +121,7 @@ async function isBranchMerged(
       // Squash-merge detection for remote branch
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+          `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {

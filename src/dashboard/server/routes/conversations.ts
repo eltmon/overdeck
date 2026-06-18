@@ -993,7 +993,7 @@ export async function handleConversationMessage(
     }
     const result = await compactConversationNative(compactSessionFile, conv.name);
     setConversationClaudeSessionId(conv.name, result.forkedSessionId);
-    return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
+    return jsonResponse({ ok: true, compacted: true, mode: 'overdeck-native', model: result.model });
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
@@ -1577,7 +1577,7 @@ export async function spawnConversationSession(
 
   // Channels setup for Claude Code conversations when the experimental flag
   // is on. Writes a per-session bridge token and MCP config so Claude loads
-  // the panopticon-bridge stdio server on startup.
+  // the overdeck-bridge stdio server on startup.
   //
   // TRAP — this relay is NOT how conversations handle "Do you want to proceed?".
   // The bridge handles Claude's `notifications/claude/channel/permission_request`
@@ -1589,7 +1589,7 @@ export async function spawnConversationSession(
   // interactive like a conversation" does not mean "wire this bridge".
   //
   // Plain forks skip channels wiring entirely. Two reasons:
-  //   1. The panopticon-bridge MCP server registers its tool schema into
+  //   1. The overdeck-bridge MCP server registers its tool schema into
   //      Claude's context budget. On a plain fork the whole source JSONL is
   //      loaded via --resume; pushing borderline-sized conversations across
   //      Claude Code's ~200K auto-compact threshold defeats the entire
@@ -1631,7 +1631,7 @@ export async function spawnConversationSession(
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,
-      panopticonEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+      overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
       // Point the agent's hook/heartbeat POSTs at THIS server's loopback API.
       // Without it the Pi extension falls back to http://localhost:3010
       // (index.ts:120) — which in dev is the Vite dev server, whose /api proxy
@@ -1946,7 +1946,7 @@ type ArchivedConversationResponse = {
   summary: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
-  panopticonManaged: true;
+  overdeckManaged: true;
   panIssueId: string | null;
   archivedAt: string;
 };
@@ -1981,7 +1981,7 @@ function mapArchivedConversation(row: ArchivedConversationWithEnrichment): Archi
     summary: row.summary ?? row.title,
     enrichmentLevel: ((row.enrichmentLevel ?? 0) as 0 | 1 | 2 | 3),
     enrichmentFailed: Boolean(row.enrichmentFailed),
-    panopticonManaged: true,
+    overdeckManaged: true,
     panIssueId: row.issueId,
     archivedAt: row.archivedAt,
   };
@@ -3057,7 +3057,7 @@ const getConversationMessagesRoute = HttpRouter.add(
             } catch { /* fall through to the Claude lookup */ }
             // Resolve JSONL via the unified session-id lookup chain
             // (session.id file → sessions.json → runtime state) in
-            // ~/.panopticon/agents/<name>/. Covers work agents, planning
+            // ~/.overdeck/agents/<name>/. Covers work agents, planning
             // agents, and all specialist types (reviewers, test, merge).
             if (!sessionFile) {
               try {

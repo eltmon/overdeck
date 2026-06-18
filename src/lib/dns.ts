@@ -106,8 +106,8 @@ export async function syncDnsToWindows(): Promise<boolean> {
 // ---- hosts_file method ----
 
 const HOSTS_FILE = '/etc/hosts';
-const MARKER_START = '# BEGIN panopticon managed entries';
-const MARKER_END = '# END panopticon managed entries';
+const MARKER_START = '# BEGIN overdeck managed entries';
+const MARKER_END = '# END overdeck managed entries';
 
 export function addHostsFileEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
   try {
@@ -165,7 +165,7 @@ function getDnsmasqConfigDir(): string {
   return '/etc/dnsmasq.d';
 }
 
-const OVERDECK_DNSMASQ_CONF = 'panopticon.conf';
+const OVERDECK_DNSMASQ_CONF = 'overdeck.conf';
 
 export function addDnsmasqEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
   try {

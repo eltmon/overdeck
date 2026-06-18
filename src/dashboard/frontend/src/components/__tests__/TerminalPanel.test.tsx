@@ -199,7 +199,7 @@ describe('TerminalPanel — specialist session (sessionName prop)', () => {
         <TerminalPanel
           agent={makeAgent({ status: 'stopped' })}
           onClose={() => {}}
-          sessionName={'specialist-panopticon-review-agent'}
+          sessionName={'specialist-overdeck-review-agent'}
           title="Review"
         />
       </QueryClientProvider>,

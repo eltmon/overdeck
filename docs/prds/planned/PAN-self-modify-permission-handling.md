@@ -54,7 +54,7 @@ inspector's terminal panel, and only if no other actor races them.
   discussion — explicitly deferred as a months-of-work refactor).
 - Changing Claude Code's safety guard itself (we don't own it).
 - Allowing agents to modify `.claude/agents/`, `.claude/hooks/`,
-  `.claude/settings.json`, or `~/.panopticon/` blanket. Those paths
+  `.claude/settings.json`, or `~/.overdeck/` blanket. Those paths
   remain on the deny-list always (PAN-1024 substrate work already
   hardened those).
 

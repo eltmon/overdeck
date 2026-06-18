@@ -8,7 +8,7 @@ Before running the test:
 
 - [ ] Docker daemon is running: `docker ps`
 - [ ] mkcert is installed: `which mkcert`
-- [ ] Clean test environment: `rm -rf ~/.panopticon`
+- [ ] Clean test environment: `rm -rf ~/.overdeck`
 
 ## Test Procedure
 
@@ -27,19 +27,19 @@ pan install
 # ✓ Config created
 
 # Verify directories were created
-ls ~/.panopticon
+ls ~/.overdeck
 # Expected: agents/ backups/ certs/ commands/ config.toml costs/ skills/ templates/ traefik/
 
 # Verify Traefik config files
-ls ~/.panopticon/traefik/
+ls ~/.overdeck/traefik/
 # Expected: README.md docker-compose.yml dynamic/ traefik.yml certs/
 
 # Verify certificates
-ls ~/.panopticon/traefik/certs/
+ls ~/.overdeck/traefik/certs/
 # Expected: _wildcard.pan.localhost-key.pem  _wildcard.pan.localhost.pem
 
 # Verify config.toml contains traefik section
-cat ~/.panopticon/config.toml | grep -A 3 "\[traefik\]"
+cat ~/.overdeck/config.toml | grep -A 3 "\[traefik\]"
 # Expected:
 # [traefik]
 # enabled = true
@@ -83,8 +83,8 @@ pan up --detach
 #   (fallback: http://localhost:3001, http://localhost:3002)
 
 # Verify Traefik container is running
-docker ps | grep panopticon-traefik
-# Expected: panopticon-traefik container in "Up" state
+docker ps | grep overdeck-traefik
+# Expected: overdeck-traefik container in "Up" state
 
 # Verify Traefik dashboard accessible
 curl -I http://localhost:8080
@@ -151,7 +151,7 @@ pan down
 # Overdeck stopped
 
 # Verify Traefik container stopped
-docker ps | grep panopticon-traefik
+docker ps | grep overdeck-traefik
 # Expected: No output
 
 # Verify ports are free
@@ -169,13 +169,13 @@ curl -I https://pan.localhost
 
 ```bash
 # Clean environment
-rm -rf ~/.panopticon
+rm -rf ~/.overdeck
 
 # Install in minimal mode (no Traefik)
 pan install --minimal
 
 # Verify config has traefik disabled
-cat ~/.panopticon/config.toml | grep -A 3 "\[traefik\]"
+cat ~/.overdeck/config.toml | grep -A 3 "\[traefik\]"
 # Expected:
 # [traefik]
 # enabled = false
@@ -200,7 +200,7 @@ pan down
 
 | Test Case | Expected Result | Status |
 |-----------|----------------|--------|
-| pan install creates directories | ~/.panopticon/ with subdirs | ⏳ |
+| pan install creates directories | ~/.overdeck/ with subdirs | ⏳ |
 | pan install generates certificates | Wildcard certs in traefik/certs/ | ⏳ |
 | pan install creates traefik config | docker-compose.yml, traefik.yml, dynamic/ | ⏳ |
 | pan install sets traefik.enabled=true | Config has [traefik] section | ⏳ |
@@ -271,14 +271,14 @@ lsof -ti:3002 | xargs kill -9
 
 ```bash
 # Remove test installation
-rm -rf ~/.panopticon
+rm -rf ~/.overdeck
 
 # Remove hosts entry
 sudo sed -i.bak '/pan.localhost/d' /etc/hosts
 
 # Remove Docker resources
-docker rm -f panopticon-traefik
-docker network rm panopticon
+docker rm -f overdeck-traefik
+docker network rm overdeck
 ```
 
 ## Automated Test Script

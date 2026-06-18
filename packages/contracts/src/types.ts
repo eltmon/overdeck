@@ -612,7 +612,7 @@ export const DiscoveredSessionSnapshot = Schema.Struct({
   enrichmentModel: Schema.optional(Schema.String),
   enrichedAt: Schema.optional(Schema.String),
   enrichmentFailed: Schema.Boolean,
-  panopticonManaged: Schema.Boolean,
+  overdeckManaged: Schema.Boolean,
   panIssueId: Schema.optional(Schema.String),
   panAgentId: Schema.optional(Schema.String),
   scannedAt: Schema.String,

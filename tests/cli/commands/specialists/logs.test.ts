@@ -60,7 +60,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 describe('specialist logs CLI commands', () => {
-  const testDir = join(tmpdir(), 'panopticon-test-cli-logs');
+  const testDir = join(tmpdir(), 'overdeck-test-cli-logs');
 
   beforeEach(() => {
     if (existsSync(testDir)) {

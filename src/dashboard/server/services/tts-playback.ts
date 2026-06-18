@@ -98,7 +98,7 @@ async function drainQueue(): Promise<void> {
 // Lifecycle event types that the announce-lifecycle toggle controls. These are
 // the planning/work agent start+finish announcements added so the operator
 // hears the substrate breathe without watching the dashboard. Toggle off via
-// `tts.lifecycle = false` in panopticon.yaml when the announcements are noisy.
+// `tts.lifecycle = false` in overdeck.yaml when the announcements are noisy.
 const LIFECYCLE_EVENT_TYPES = new Set([
   'planning.started',
   'planning.finalized',

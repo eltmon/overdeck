@@ -178,7 +178,7 @@ pan convoy stop <convoy-id>    # Kill all agents, mark failed
 
 ## Custom Convoy Templates
 
-Create custom templates in `~/.panopticon/convoy-templates/`:
+Create custom templates in `~/.overdeck/convoy-templates/`:
 
 ```json
 {
@@ -234,7 +234,7 @@ pan convoy start lightweight-review --files "src/**/*.ts"
 1. Start command received
         │
         ▼
-2. Create convoy directory: ~/.panopticon/convoys/<convoy-id>/
+2. Create convoy directory: ~/.overdeck/convoys/<convoy-id>/
         │
         ▼
 3. Spawn parallel agents (Phase 1)
@@ -283,7 +283,7 @@ pan convoy status <convoy-id>
 tmux attach -t convoy-<convoy-id>-security
 
 # View all output files
-ls -lh ~/.panopticon/convoys/<convoy-id>/output/
+ls -lh ~/.overdeck/convoys/<convoy-id>/output/
 ```
 
 ## Performance Benefits

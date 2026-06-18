@@ -4,7 +4,7 @@
  * Writes Overdeck skills to other AI tool formats so skills authored once
  * in .pan/skills/ are available across all configured tools.
  *
- * Configured via `tools.also_sync` in ~/.panopticon/config.yaml and .pan.yaml.
+ * Configured via `tools.also_sync` in ~/.overdeck/config.yaml and .pan.yaml.
  * Per-project .pan.yaml values are merged additively with global config.
  *
  * Supported targets:
@@ -73,11 +73,11 @@ function collectSkillDirs(skillsDir: string): Array<{ name: string; dir: string 
 
 /**
  * Update or insert a named block in a file.
- * Blocks are delimited by: <!-- panopticon:<skill-name> start --> ... <!-- panopticon:<skill-name> end -->
+ * Blocks are delimited by: <!-- overdeck:<skill-name> start --> ... <!-- overdeck:<skill-name> end -->
  */
 function upsertNamedBlock(filePath: string, blockName: string, content: string): void {
-  const startTag = `<!-- panopticon:${blockName} start -->`;
-  const endTag = `<!-- panopticon:${blockName} end -->`;
+  const startTag = `<!-- overdeck:${blockName} start -->`;
+  const endTag = `<!-- overdeck:${blockName} end -->`;
   const block = `${startTag}\n${content}\n${endTag}`;
 
   let existing = existsSync(filePath) ? readFileSync(filePath, 'utf-8') : '';
@@ -174,7 +174,7 @@ export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
   // Merge per-project .pan.yaml (additive)
   if (projectPath) {
     const panYaml = join(projectPath, '.pan.yaml');
-    const legacyYaml = join(projectPath, '.panopticon.yaml');
+    const legacyYaml = join(projectPath, '.overdeck.yaml');
     const configPath = existsSync(panYaml) ? panYaml : existsSync(legacyYaml) ? legacyYaml : null;
     if (configPath) {
       try {
@@ -234,7 +234,7 @@ export function syncSkillsToToolsSync(
 
 /**
  * Run the full multi-tool sync for a project.
- * Sources: .pan/skills/ (project-local) and/or ~/.panopticon/skills/ (global).
+ * Sources: .pan/skills/ (project-local) and/or ~/.overdeck/skills/ (global).
  */
 export function runMultiToolSyncSync(projectPath: string): MultiToolSyncResult[] {
   const tools = resolveAlsoSyncToolsSync(projectPath);
@@ -242,7 +242,7 @@ export function runMultiToolSyncSync(projectPath: string): MultiToolSyncResult[]
 
   const allResults: MultiToolSyncResult[] = [];
 
-  // 1. Global skills (from ~/.panopticon/skills/)
+  // 1. Global skills (from ~/.overdeck/skills/)
   const globalSkillsDir = join(OVERDECK_HOME, 'skills');
   const globalResults = syncSkillsToToolsSync(globalSkillsDir, projectPath, tools);
   allResults.push(...globalResults);

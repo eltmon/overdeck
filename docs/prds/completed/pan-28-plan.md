@@ -20,9 +20,9 @@ Overdeck currently assumes it should update the issue tracker (Linear, GitHub Is
    - Factory pattern for creating tracker instances from config
 
 2. **Configuration Hierarchy**
-   - Global: `~/.panopticon.env` (API keys)
-   - Global: `~/.panopticon/config.toml` (tracker settings)
-   - **Per-project: `.panopticon.yaml`** (model settings - exists but limited scope)
+   - Global: `~/.overdeck.env` (API keys)
+   - Global: `~/.overdeck/config.toml` (tracker settings)
+   - **Per-project: `.overdeck.yaml`** (model settings - exists but limited scope)
    - Per-project config infrastructure exists and can be extended
 
 3. **Existing Skip Patterns**
@@ -45,7 +45,7 @@ Overdeck currently assumes it should update the issue tracker (Linear, GitHub Is
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | **MVP Scope** | Full feature | Everything including install wizard, sync-back, dashboard UI |
-| **Per-project Config** | Extend existing `.panopticon.yaml` | Infrastructure exists, just needs shadow mode fields |
+| **Per-project Config** | Extend existing `.overdeck.yaml` | Infrastructure exists, just needs shadow mode fields |
 | **Read Behavior** | Read normally from tracker | Fetch issue data normally, only skip writes |
 | **Sync History** | Preserve history | Keep shadow-state as audit trail after sync-back |
 | **Status Display** | Show both states | "In Progress (tracker: Backlog)" format |
@@ -69,7 +69,7 @@ Overdeck currently assumes it should update the issue tracker (Linear, GitHub Is
 
 New module for managing shadow state files.
 
-**Storage Location:** `~/.panopticon/shadow-state/`
+**Storage Location:** `~/.overdeck/shadow-state/`
 
 **Schema:**
 ```typescript
@@ -123,7 +123,7 @@ interface YamlConfig {
 }
 ```
 
-**Extend `~/.panopticon.env`:**
+**Extend `~/.overdeck.env`:**
 ```bash
 # Global shadow mode default
 SHADOW_MODE=true
@@ -131,9 +131,9 @@ SHADOW_MODE=true
 
 **Config Loading Priority:**
 1. CLI flag `--shadow` / `--no-shadow`
-2. Per-project `.panopticon.yaml` shadow.enabled
-3. Global `~/.panopticon/config.yaml` shadow.enabled
-4. Global `~/.panopticon.env` SHADOW_MODE
+2. Per-project `.overdeck.yaml` shadow.enabled
+3. Global `~/.overdeck/config.yaml` shadow.enabled
+4. Global `~/.overdeck.env` SHADOW_MODE
 5. Default: `false` (normal mode)
 
 ---
@@ -254,7 +254,7 @@ function resolveShadowMode(options: ShadowModeOptions): boolean
 
 #### 5.3 Sync Queue (for deferred syncs)
 
-**Storage:** `~/.panopticon/sync-queue.json`
+**Storage:** `~/.overdeck/sync-queue.json`
 
 ```typescript
 interface SyncQueueEntry {
@@ -301,7 +301,7 @@ src/dashboard/
     ├── IssueCard.tsx        # MODIFY: Ghost icon, dashed border
     ├── SettingsPage.tsx     # MODIFY: Shadow mode toggles
 
-~/.panopticon/
+~/.overdeck/
 ├── shadow-state/            # NEW: Shadow state storage
 │   ├── MIN-123.json
 │   └── PAN-27.json
@@ -321,7 +321,7 @@ src/dashboard/
 - [ ] "Sync to Tracker" works with retry/skip/queue on error
 - [ ] "Refresh from Tracker" updates cached tracker status
 - [ ] Install wizard asks shadow mode preference
-- [ ] Per-project `.panopticon.yaml` supports shadow config
+- [ ] Per-project `.overdeck.yaml` supports shadow config
 - [ ] Existing `--no-linear` flags still work (backward compatible)
 
 ---

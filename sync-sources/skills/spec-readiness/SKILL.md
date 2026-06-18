@@ -47,7 +47,7 @@ This is the **core scoring engine**. It is designed to be wrapped by a thin cust
 A wrapper skill overrides branding, tracker bindings, and field mappings by providing a `config.yaml`:
 
 ```
-1. Check: Does ~/.panopticon/skills/spec-readiness-*/config.yaml exist?
+1. Check: Does ~/.overdeck/skills/spec-readiness-*/config.yaml exist?
 2. If yes: Load tracker bindings, field mappings, branding, conventions
 3. If no: Use defaults (generic branding, auto-detect tracker)
 ```
@@ -55,7 +55,7 @@ A wrapper skill overrides branding, tracker bindings, and field mappings by prov
 ### Wrapper Config Schema
 
 ```yaml
-# ~/.panopticon/skills/spec-readiness-mycompany/config.yaml
+# ~/.overdeck/skills/spec-readiness-mycompany/config.yaml
 tracker:
   type: linear | github | gitlab | rally | jira
   tools:
@@ -216,7 +216,7 @@ get_relations     → /rest/api/3/issue/<key>?fields=issuelinks
 
 1. Extract the issue identifier from the user's request
 2. Set output directory (default: current directory)
-3. Look for wrapper config at `~/.panopticon/skills/spec-readiness-*/config.yaml`
+3. Look for wrapper config at `~/.overdeck/skills/spec-readiness-*/config.yaml`
 4. If no wrapper, auto-detect tracker (see Auto-Detection above)
 5. Build the tool mapping for the detected tracker
 
@@ -244,7 +244,7 @@ Scores **Dimension 1** (Requirements Clarity) and **Dimension 3** (Scope & Decom
 Prompt must include: identifier, title, project, description, notes (from Step 2), and tracker tool instructions.
 
 Tell the subagent to:
-1. Read `~/.claude/skills/spec-readiness/SCORING-REFERENCE.md` (or `~/.panopticon/skills/spec-readiness/SCORING-REFERENCE.md`) for criteria
+1. Read `~/.claude/skills/spec-readiness/SCORING-REFERENCE.md` (or `~/.overdeck/skills/spec-readiness/SCORING-REFERENCE.md`) for criteria
 2. Fetch edit/activity history for the issue (using the tracker's `get_activity_log` tool — or note if unavailable)
 3. Fetch child issue list (using the tracker's `get_child_issues` tool)
 4. **Scan description for external document links** (BRD, PRD, spec docs — Google Docs, Confluence, SharePoint, Notion, attached files). If a URL is found and appears accessible, use WebFetch to analyze coverage and cross-reference with the description. If no external document found and issue is customer-directed: note for deduction.

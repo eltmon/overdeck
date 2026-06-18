@@ -8,14 +8,14 @@ import {
 
 describe('getReviewerSessionName (PAN-1048+)', () => {
   it('produces agent-* format for correctness reviewer', () => {
-    expect(getReviewerSessionName('correctness', 'panopticon', 'PAN-540')).toBe(
+    expect(getReviewerSessionName('correctness', 'overdeck', 'PAN-540')).toBe(
       'agent-pan-540-review-correctness',
     );
   });
 
   it('produces agent-* format for all five reviewer roles', () => {
     for (const role of REVIEWER_ROLES) {
-      expect(getReviewerSessionName(role, 'panopticon', 'PAN-830')).toBe(
+      expect(getReviewerSessionName(role, 'overdeck', 'PAN-830')).toBe(
         `agent-pan-830-review-${role}`,
       );
     }
@@ -38,7 +38,7 @@ describe('parseReviewerSessionName (PAN-1048+)', () => {
 
   it('round-trips agent-* format for every reviewer role', () => {
     for (const role of REVIEWER_ROLES) {
-      const name = getReviewerSessionName(role as ReviewerRole, 'panopticon', 'PAN-830');
+      const name = getReviewerSessionName(role as ReviewerRole, 'overdeck', 'PAN-830');
       const parsed = parseReviewerSessionName(name);
       expect(parsed?.role).toBe(role);
       expect(parsed?.issueId).toBe('PAN-830');
@@ -46,14 +46,14 @@ describe('parseReviewerSessionName (PAN-1048+)', () => {
   });
 
   it('parses legacy specialist-* format for backward compatibility', () => {
-    expect(parseReviewerSessionName('specialist-panopticon-PAN-540-review-correctness')).toEqual({
+    expect(parseReviewerSessionName('specialist-overdeck-PAN-540-review-correctness')).toEqual({
       role: 'correctness',
       issueId: 'PAN-540',
     });
   });
 
   it('returns null for non-reviewer specialist names (e.g. work-agent)', () => {
-    expect(parseReviewerSessionName('specialist-panopticon-PAN-540-work-agent')).toBeNull();
+    expect(parseReviewerSessionName('specialist-overdeck-PAN-540-work-agent')).toBeNull();
   });
 
   it('returns null for legacy timestamp-based reviewer names', () => {
@@ -64,7 +64,7 @@ describe('parseReviewerSessionName (PAN-1048+)', () => {
 
   it('returns null for unknown reviewer roles', () => {
     expect(
-      parseReviewerSessionName('specialist-panopticon-PAN-540-review-bogus'),
+      parseReviewerSessionName('specialist-overdeck-PAN-540-review-bogus'),
     ).toBeNull();
   });
 

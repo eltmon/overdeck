@@ -10,16 +10,16 @@ Context composes from three layers, outermost to innermost:
 
 | Layer | Source file | Applies |
 |---|---|---|
-| **Global** | `~/.panopticon/context/global.md` | Every harness session on this machine |
+| **Global** | `~/.overdeck/context/global.md` | Every harness session on this machine |
 | **Project** | `<projectRoot>/.pan/context/project.md` | Sessions whose CWD is under a registered project |
 | **Workspace** | `<workspace>/.pan/context/workspace.md` | Inside one issue workspace |
 
-The global layer is per-machine and lives under `~/.panopticon`. The project
+The global layer is per-machine and lives under `~/.overdeck`. The project
 layer is committed to the repo. The workspace layer is **auto-assembled** by
 Overdeck at workspace creation — never hand-authored — and is gitignored.
 
 The global layer may also carry the user's own skills and agents under
-`~/.panopticon/context/global/{skills,agents}/`.
+`~/.overdeck/context/global/{skills,agents}/`.
 
 ### Canonical terminology
 
@@ -29,7 +29,7 @@ are unambiguous:
 | Term | Meaning |
 |---|---|
 | **Context layers** | This whole distribution system |
-| **Global layer** (machine context) | `~/.panopticon/context/global.md` — per-machine quirks only |
+| **Global layer** (machine context) | `~/.overdeck/context/global.md` — per-machine quirks only |
 | **Project layer** | `<root>/.pan/context/project.md` |
 | **Workspace layer** | auto-assembled per issue; never hand-authored |
 | **Bundled rule** | `sync-sources/rules/<name>.md` (`scope: universal` or `dev`) — every-machine engineering rules |
@@ -47,7 +47,7 @@ alone routes the content:
 | "add a **universal rule**" | `sync-sources/rules/<name>.md`, `scope: universal` |
 | "add a **dev rule**" | `sync-sources/rules/<name>.md`, `scope: dev` |
 | "add a **project rule**" | `<root>/.pan/context/project.md` |
-| "add a **machine rule**" | `~/.panopticon/context/global.md` |
+| "add a **machine rule**" | `~/.overdeck/context/global.md` |
 
 The `rule-authoring` bundled rule (`scope: dev`) carries the authoring
 procedure for the first two.
@@ -128,7 +128,7 @@ already maintain. Three guarantees:
 
 2. **First-injection backup.** The first time a sync injects a region into a
    file that already had hand-authored content (no region yet), that file is
-   snapshotted into `~/.panopticon/backups/<timestamp>/context/` *before* the
+   snapshotted into `~/.overdeck/backups/<timestamp>/context/` *before* the
    write. `pan sync` prints a one-time notice naming the file and its backup so
    the very first write that touches your content always has a safety net.
 
@@ -137,7 +137,7 @@ already maintain. Three guarantees:
    `project.md` and its `CLAUDE.md`/`AGENTS.md` are never modified.
 
 The Pi **global** layer is the one exception to "we only write managed
-regions": it renders to `~/.panopticon/context/pi-global.md`, a
+regions": it renders to `~/.overdeck/context/pi-global.md`, a
 Overdeck-owned file (whole-file write), not your `AGENTS.md`. Project-level
 Pi context *does* go into your `AGENTS.md` as a managed region.
 
@@ -209,8 +209,8 @@ silently rot while the maintained rules accumulated elsewhere (#1359).
 
 `pan context migrate` is the one-shot migration:
 
-1. copies `<devroot>/.claude/CLAUDE.md` → `~/.panopticon/context/global.md`;
-2. copies `<devroot>/.claude/{skills,agents}/` → `~/.panopticon/context/global/`;
+1. copies `<devroot>/.claude/CLAUDE.md` → `~/.overdeck/context/global.md`;
+2. copies `<devroot>/.claude/{skills,agents}/` → `~/.overdeck/context/global/`;
 3. offers to register each project found under `~/Projects/`;
 4. prints where the old location is preserved.
 

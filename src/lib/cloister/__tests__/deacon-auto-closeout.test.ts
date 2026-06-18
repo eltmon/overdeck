@@ -132,14 +132,14 @@ vi.mock('../../lifecycle/workflows.js', async () => {
   const { Effect } = await import('effect');
   return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
 });
-vi.mock('../../paths.js', () => ({ OVERDECK_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents', packageRoot: '/tmp/test-package-root' }));
+vi.mock('../../paths.js', () => ({ OVERDECK_HOME: '/tmp/test-overdeck', AGENTS_DIR: '/tmp/test-agents', packageRoot: '/tmp/test-package-root' }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
 vi.mock('../../projects.js', () => ({
   getProject: vi.fn(() => null),
   listProjects: vi.fn(() => []),
   listProjectsSync: vi.fn(() => []),
-  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
-  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/repo' })),
+  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/repo' })),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/repo' })),
 }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
 vi.mock('../../tracker-utils.js', () => ({
@@ -221,7 +221,7 @@ describe('autoCloseOut', () => {
     vi.clearAllMocks();
     mockLoadCloisterConfig.mockReturnValue(Effect.succeed({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} }) as any);
     mockLoadReviewStatuses.mockReturnValue({});
-    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repo' } as any);
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 1190 } as any);
     // PAN-1249: closeOut returns Effect; mock with Effect.succeed.
     mockCloseOut.mockReturnValue(Effect.succeed({ success: true, steps: [] }) as any);

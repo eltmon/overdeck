@@ -194,7 +194,7 @@ The distributed skills (`pan sync` writes ~60 into `~/.claude/skills/`) are the 
 ## Out of scope
 
 - **Renaming the `pan` binary itself** or introducing alternative binary names.
-- **Changing the config file format** (`~/.panopticon/config.yaml` schema stays as-is).
+- **Changing the config file format** (`~/.overdeck/config.yaml` schema stays as-is).
 - **Changing how issue ids are parsed.** Deferred to the separate [`flexible-tracker-id-resolution`](./flexible-tracker-id-resolution.md) PRD, which addresses Rally-style dash-less IDs.
 - **Translating the CLI to a TUI or interactive shell.**
 - **Re-architecting the dashboard.** The dashboard UI *is* in scope (see Phase 4.5) for renaming routes, updating command strings, and adding the first-launch announcement — but component-level redesign, layout changes, or new views are not part of this issue.

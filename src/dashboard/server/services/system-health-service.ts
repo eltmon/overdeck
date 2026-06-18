@@ -25,7 +25,7 @@ const DEFAULT_RESOURCE_CONFIG = {
 };
 const KB = 1024;
 const GIB = 1024 ** 3;
-const GLOBAL_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
+const GLOBAL_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
 
 type SystemHealthSeverity = 'normal' | 'warning' | 'critical';
 
@@ -121,8 +121,8 @@ export interface SystemHealthSnapshot {
     leakedSpecialistCount: number;
     containerCount: number;
     containerMemoryBytes: number;
-    panopticonMemoryBytes: number;
-    panopticonMemoryPercent: number;
+    overdeckMemoryBytes: number;
+    overdeckMemoryPercent: number;
   };
   thresholds: SystemHealthThresholds;
   reasons: string[];
@@ -610,8 +610,8 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const planningAgentCount = agents.filter((agent) => agent.kind === 'planning').length;
   const specialistSessionCount = agents.filter((agent) => agent.kind === 'specialist').length;
   const swapUsedPercent = toPercent(swapUsedBytes, memory.swapTotal);
-  const panopticonMemoryBytes = agents.reduce((sum, agent) => sum + agent.memoryBytes, 0) + containerMemoryBytes;
-  const panopticonMemoryPercent = toPercent(panopticonMemoryBytes, memory.memTotal);
+  const overdeckMemoryBytes = agents.reduce((sum, agent) => sum + agent.memoryBytes, 0) + containerMemoryBytes;
+  const overdeckMemoryPercent = toPercent(overdeckMemoryBytes, memory.memTotal);
 
   const sortedAgents = [...agents].sort((a, b) => b.memoryBytes - a.memoryBytes);
 
@@ -659,8 +659,8 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
       leakedSpecialistCount: leakedSpecialists.length,
       containerCount: containers.length,
       containerMemoryBytes,
-      panopticonMemoryBytes,
-      panopticonMemoryPercent,
+      overdeckMemoryBytes,
+      overdeckMemoryPercent,
     },
     thresholds,
     reasons: evaluation.reasons,

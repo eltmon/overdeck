@@ -29,7 +29,7 @@ The existing `conversations` table (PAN-416) is lifecycle-aware (active/ended, t
 title, archived_at). It tracks Overdeck-spawned sessions only.
 
 `discovered_sessions` is a different shape: an immutable index row per JSONL file on disk.
-Linked back via `panopticon_managed`, `pan_issue_id`, `pan_agent_id` columns populated during
+Linked back via `overdeck_managed`, `pan_issue_id`, `pan_agent_id` columns populated during
 scan by joining against `conversations.session_file` and `cost_events.session_id`.
 
 Rationale: merging into one table would conflate two very different lifecycles and force

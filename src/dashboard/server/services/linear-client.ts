@@ -118,7 +118,7 @@ export interface LinearClientShape {
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
 export class LinearClient extends Context.Service<LinearClient, LinearClientShape>()(
-  'panopticon/dashboard/LinearClient',
+  'overdeck/dashboard/LinearClient',
 ) {}
 
 // ─── Live layer ───────────────────────────────────────────────────────────────

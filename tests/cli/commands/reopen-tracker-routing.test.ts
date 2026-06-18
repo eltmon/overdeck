@@ -54,9 +54,9 @@ describe('pan reopen tracker routing parity with pan start', () => {
   it('routes PAN-XXX issues to GitHub (not Linear) when project has github_repo', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
-        panopticon: {
+        overdeck: {
           name: 'Overdeck',
-          path: '/home/user/panopticon',
+          path: '/home/user/overdeck',
           github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
@@ -99,9 +99,9 @@ describe('pan reopen tracker routing parity with pan start', () => {
   it('defaults unknown prefixes to Linear as safe fallback', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
-        panopticon: {
+        overdeck: {
           name: 'Overdeck',
-          path: '/home/user/panopticon',
+          path: '/home/user/overdeck',
           github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
@@ -118,9 +118,9 @@ describe('pan reopen tracker routing parity with pan start', () => {
   it('auto-derives GitHub repo from github_repo in projects.yaml', () => {
     mockLoadProjectsConfig.mockReturnValue({
       projects: {
-        panopticon: {
+        overdeck: {
           name: 'Overdeck',
-          path: '/home/user/panopticon',
+          path: '/home/user/overdeck',
           github_repo: 'eltmon/overdeck',
           issue_prefix: 'PAN',
         },
@@ -143,7 +143,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
     // Mock resolveProjectFromIssue to return appropriate project for each prefix
     mockResolveProjectFromIssue.mockImplementation((issueId: string) => {
       if (issueId.toUpperCase().startsWith('PAN-')) {
-        return { projectKey: 'panopticon', projectName: 'Overdeck', projectPath: '/home/user/panopticon' };
+        return { projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/home/user/overdeck' };
       }
       if (issueId.toUpperCase().startsWith('MIN-')) {
         return { projectKey: 'myn', projectName: 'Mind Your Now', projectPath: '/home/user/myn' };
@@ -153,7 +153,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
 
     // PAN prefix → both resolvers must agree on GitHub
     expect(resolveTrackerTypeSync('PAN-457')).toBe('github');
-    expect(mockResolveProjectFromIssue('PAN-457', [])?.projectKey).toBe('panopticon');
+    expect(mockResolveProjectFromIssue('PAN-457', [])?.projectKey).toBe('overdeck');
 
     // MIN prefix → both resolvers must agree on Linear
     expect(resolveTrackerTypeSync('MIN-848')).toBe('linear');
@@ -163,7 +163,7 @@ describe('pan reopen tracker routing parity with pan start', () => {
     for (const issue of ['PAN-1', 'PAN-999', 'MIN-123', 'MIN-456']) {
       const trackerType = resolveTrackerTypeSync(issue);
       const project = resolveProjectFromIssueSync(issue, []);
-      if (project?.projectKey === 'panopticon') {
+      if (project?.projectKey === 'overdeck') {
         expect(trackerType).toBe('github');
       } else if (project?.projectKey === 'myn') {
         expect(trackerType).toBe('linear');

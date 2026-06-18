@@ -21,7 +21,7 @@ optional:
   - MEMORY_CONTEXT
   - TLDR_AVAILABLE
 ---
-<!-- panopticon:orchestration-context-start -->
+<!-- overdeck:orchestration-context-start -->
 <!-- This is Overdeck orchestration context injected automatically.
      It contains planning session setup instructions, not agent reasoning.
      Session summarizers should SKIP this block and focus on the agent's
@@ -395,4 +395,4 @@ The continue file is a **structured replacement for STATE.md**. It lives at `.pa
 
 Start by exploring the codebase to understand the context, then begin the discovery conversation.
 
-<!-- panopticon:orchestration-context-end -->
+<!-- overdeck:orchestration-context-end -->

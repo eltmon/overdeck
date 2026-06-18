@@ -361,7 +361,7 @@ Your `.pan/continue.json` MUST be valid JSON with these fields:
 ```
 
 ### What Makes a Good .pan/continue.json Update
-- **resumePoint.description**: "Implementing bead panopticon-x8f (add retry logic to webhook handler) — need to add exponential backoff to src/lib/webhook.ts and write tests" — NOT "Working on implementation"
+- **resumePoint.description**: "Implementing bead overdeck-x8f (add retry logic to webhook handler) — need to add exponential backoff to src/lib/webhook.ts and write tests" — NOT "Working on implementation"
 - **decisions**: Append new decisions as you make them. "Used Effect.retry instead of manual loop because..." — NOT "decided to write code"
 - **hazards**: Add risks you discovered. "Docker network pool exhaustion if tests don't cleanup" — " mitigation: call postMergeLifecycle docker cleanup"
 - **sessionHistory**: Append an entry at the end of every session with what you accomplished

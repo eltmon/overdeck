@@ -239,9 +239,9 @@ describe('config-migration', () => {
       const tmpDir = join(testDir, 'fake-runtime', 'skills');
       mkdirSync(tmpDir, { recursive: true });
 
-      // Create a Overdeck-managed symlink (target contains '.panopticon')
+      // Create a Overdeck-managed symlink (target contains '.overdeck')
       const panSymlinkPath = join(tmpDir, 'pan-skill');
-      const panTarget = join(process.env.OVERDECK_HOME ?? join(process.cwd(), '.test-migration-pan-home'), '.panopticon', 'skills', 'pan-skill');
+      const panTarget = join(process.env.OVERDECK_HOME ?? join(process.cwd(), '.test-migration-pan-home'), '.overdeck', 'skills', 'pan-skill');
       symlinkSync(panTarget, panSymlinkPath);
 
       // Create a non-Overdeck symlink (user-managed)
@@ -273,7 +273,7 @@ describe('config-migration', () => {
   describe('migrateSyncTargets', () => {
     it('should return migrated:false when config.toml does not exist', () => {
       // Override homedir for a dir that doesn't have config.toml
-      // The function reads from ~/.panopticon/config.toml; if it doesn't exist, no migration
+      // The function reads from ~/.overdeck/config.toml; if it doesn't exist, no migration
       // We can't redirect homedir easily so we test observable behavior:
       // if the real user has no config.toml with targets, it should return false
       const result = migrateSyncTargetsSync();
@@ -287,7 +287,7 @@ describe('config-migration', () => {
 
     it('should strip targets field and detect non-claude targets', () => {
       // Write a temporary config.toml with a targets line, then call with mocked path
-      const tmpConfigDir = join(testDir, 'panopticon-home');
+      const tmpConfigDir = join(testDir, 'overdeck-home');
       mkdirSync(tmpConfigDir, { recursive: true });
       const tmpConfigPath = join(tmpConfigDir, 'config.toml');
       writeFileSync(tmpConfigPath, `[sync]\ntargets = ["claude", "codex"]\n\n[other]\nkey = "value"\n`);

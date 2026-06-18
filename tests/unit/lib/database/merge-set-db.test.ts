@@ -29,8 +29,8 @@ import {
 function makeMergeSet(overrides: Partial<MergeSet> = {}): MergeSet {
   return {
     issueId: 'PAN-632',
-    projectKey: 'panopticon',
-    projectPath: '/tmp/panopticon',
+    projectKey: 'overdeck',
+    projectPath: '/tmp/overdeck',
     workspaceType: 'polyrepo',
     status: 'draft',
     createdAt: '2026-04-11T12:00:00.000Z',
@@ -38,7 +38,7 @@ function makeMergeSet(overrides: Partial<MergeSet> = {}): MergeSet {
     repos: [
       {
         repoKey: 'frontend',
-        repoPath: '/tmp/panopticon/frontend',
+        repoPath: '/tmp/overdeck/frontend',
         forge: 'github',
         sourceBranch: 'feature/pan-632',
         targetBranch: 'main',
@@ -52,7 +52,7 @@ function makeMergeSet(overrides: Partial<MergeSet> = {}): MergeSet {
       },
       {
         repoKey: 'api',
-        repoPath: '/tmp/panopticon/api',
+        repoPath: '/tmp/overdeck/api',
         forge: 'gitlab',
         sourceBranch: 'feature/pan-632',
         targetBranch: 'qa',
@@ -76,7 +76,7 @@ describe('merge-set-db', () => {
     const row = testDb.prepare('SELECT * FROM merge_sets WHERE issue_id = ?').get('PAN-632') as any;
     const repos = testDb.prepare('SELECT * FROM merge_set_repos WHERE issue_id = ? ORDER BY merge_order ASC').all('PAN-632') as any[];
 
-    expect(row.project_key).toBe('panopticon');
+    expect(row.project_key).toBe('overdeck');
     expect(repos).toHaveLength(2);
     expect(repos[0].repo_key).toBe('frontend');
     expect(repos[1].forge).toBe('gitlab');
@@ -89,7 +89,7 @@ describe('merge-set-db', () => {
       repos: [
         {
           repoKey: 'frontend',
-          repoPath: '/tmp/panopticon/frontend',
+          repoPath: '/tmp/overdeck/frontend',
           forge: 'github',
           sourceBranch: 'feature/pan-632',
           targetBranch: 'main',

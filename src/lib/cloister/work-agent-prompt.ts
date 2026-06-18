@@ -563,7 +563,7 @@ export function extractStitchDesigns(stateContent: string | null): string | null
 
 /**
  * Extract beads IDs from planning content.
- * Looks for patterns like `panopticon-1dg` in backticks or tables.
+ * Looks for patterns like `overdeck-1dg` in backticks or tables.
  */
 export function extractBeadsIdsFromState(stateContent: string): string[] {
   const ids: string[] = [];

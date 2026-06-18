@@ -51,7 +51,7 @@ EventStore.append(event)
 The read model service. Holds the in-memory state, applies events, serves snapshots.
 
 ```typescript
-import { DashboardSnapshot } from '@panopticon/contracts';
+import { DashboardSnapshot } from '@overdeck/contracts';
 
 class ReadModel {
   private state: DashboardSnapshot;

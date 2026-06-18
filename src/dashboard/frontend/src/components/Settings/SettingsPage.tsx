@@ -367,7 +367,7 @@ const DEFAULT_VOICE_HARDWARE_SETTINGS: VoiceHardwareSettings = {
   volume: 1,
 };
 
-const VOICE_HARDWARE_STORAGE_KEY = 'panopticon.voice.hardwareSettings';
+const VOICE_HARDWARE_STORAGE_KEY = 'overdeck.voice.hardwareSettings';
 
 function loadVoiceHardwareSettings(): VoiceHardwareSettings {
   try {
@@ -1350,7 +1350,7 @@ export function SettingsPage() {
     });
   };
 
-  const handleManualCompactModeChange = (mode: 'claude-code' | 'panopticon-native') => {
+  const handleManualCompactModeChange = (mode: 'claude-code' | 'overdeck-native') => {
     applySettings({
       ...formData,
       conversations: {
@@ -2591,11 +2591,11 @@ export function SettingsPage() {
             </div>
             <select
               value={formData.conversations?.manual_compact_mode || 'claude-code'}
-              onChange={(e) => handleManualCompactModeChange(e.target.value as 'claude-code' | 'panopticon-native')}
+              onChange={(e) => handleManualCompactModeChange(e.target.value as 'claude-code' | 'overdeck-native')}
               className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
             >
               <option value="claude-code">Pass through</option>
-              <option value="panopticon-native">Native compaction</option>
+              <option value="overdeck-native">Native compaction</option>
             </select>
           </div>
 
@@ -2835,7 +2835,7 @@ export function SettingsPage() {
                         <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">
                           {convConfig.embeddingProvider === 'openai' ? 'OPENAI_API_KEY' : 'VOYAGE_API_KEY'}
                         </code>{' '}
-                        or <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">~/.panopticon.env</code>.
+                        or <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">~/.overdeck.env</code>.
                         Session-derived summaries, tags, workspace paths, and tool names are sent to this provider.
                       </p>
                     </div>

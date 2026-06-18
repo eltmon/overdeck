@@ -153,7 +153,7 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
     console.log(`  Model:      ${agent.model}`);
     console.log('');
     console.log(chalk.dim('Commands:'));
-    console.log(`  Attach:   tmux -L panopticon attach -t ${agent.id}`);
+    console.log(`  Attach:   tmux -L overdeck attach -t ${agent.id}`);
     console.log(`  Message:  pan tell ${plan.issueId.toLowerCase()} "your message"`);
     console.log(`  Kill:     pan kill ${plan.issueId.toLowerCase()}`);
   } catch (error: any) {

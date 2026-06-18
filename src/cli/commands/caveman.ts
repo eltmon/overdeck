@@ -17,7 +17,7 @@ const execAsync = promisify(exec);
 
 /** Path where pan admin hooks install places caveman-compress Python scripts */
 function getCavemanCompressDir(): string {
-  return join(homedir(), '.panopticon', 'hooks', 'caveman-compress');
+  return join(homedir(), '.overdeck', 'hooks', 'caveman-compress');
 }
 
 async function cavemanCompressCommand(file: string): Promise<void> {

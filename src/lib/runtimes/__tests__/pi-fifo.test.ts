@@ -38,7 +38,7 @@ describe('createPiFifo', () => {
   beforeEach(() => { h = makeFakeHome() })
   afterEach(() => h.cleanup())
 
-  it('creates a fifo at ~/.panopticon/agents/<id>/rpc.in with mode 0600 (AC1)', async () => {
+  it('creates a fifo at ~/.overdeck/agents/<id>/rpc.in with mode 0600 (AC1)', async () => {
     const path = await Effect.runPromise(createPiFifo('agent-x', h.home))
     expect(path).toBe(piFifoPaths('agent-x', h.home).fifoPath)
     expect(isFifo(path)).toBe(true)

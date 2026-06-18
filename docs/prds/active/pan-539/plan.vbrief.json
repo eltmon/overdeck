@@ -38,7 +38,7 @@
           "issueLabel": "pan-539"
         },
         "narrative": {
-          "Action": "Add a new route to src/dashboard/server/routes/conversations.ts: POST /api/conversations/:name/upload-image. Accepts JSON body { filename: string, data: string (base64), mimeType: string }. Validates mimeType against allowlist (image/png, image/jpeg, image/gif, image/webp). Derives file extension from mimeType. Decodes base64 and saves to OS temp dir as panopticon-paste-{uuid}.{ext} using fs/promises.writeFile. Returns { path: string } with the absolute file path. Returns 400 for missing/invalid fields, 404 if conversation not found."
+          "Action": "Add a new route to src/dashboard/server/routes/conversations.ts: POST /api/conversations/:name/upload-image. Accepts JSON body { filename: string, data: string (base64), mimeType: string }. Validates mimeType against allowlist (image/png, image/jpeg, image/gif, image/webp). Derives file extension from mimeType. Decodes base64 and saves to OS temp dir as overdeck-paste-{uuid}.{ext} using fs/promises.writeFile. Returns { path: string } with the absolute file path. Returns 400 for missing/invalid fields, 404 if conversation not found."
         },
         "subItems": [
           {
@@ -61,7 +61,7 @@
           },
           {
             "id": "backend-upload-endpoint.ac4",
-            "title": "Saved filename matches pattern panopticon-paste-{uuid}.{ext} in os.tmpdir()",
+            "title": "Saved filename matches pattern overdeck-paste-{uuid}.{ext} in os.tmpdir()",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -84,7 +84,7 @@
           "issueLabel": "pan-539"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/main.ts, register a setInterval that runs every 60 seconds. Each tick: async-read os.tmpdir(), filter filenames matching /^panopticon-paste-/, check mtime, and delete files older than 5 minutes using fs/promises.unlink. Must be fully async (no readdirSync/statSync/unlinkSync). Log deletions at debug level."
+          "Action": "In src/dashboard/server/main.ts, register a setInterval that runs every 60 seconds. Each tick: async-read os.tmpdir(), filter filenames matching /^overdeck-paste-/, check mtime, and delete files older than 5 minutes using fs/promises.unlink. Must be fully async (no readdirSync/statSync/unlinkSync). Log deletions at debug level."
         },
         "subItems": [
           {
@@ -95,7 +95,7 @@
           },
           {
             "id": "server-cleanup-interval.ac2",
-            "title": "Deletes panopticon-paste-* files from os.tmpdir() older than 5 minutes",
+            "title": "Deletes overdeck-paste-* files from os.tmpdir() older than 5 minutes",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },
@@ -209,7 +209,7 @@
         "subItems": [
           {
             "id": "frontend-message-injection.ac1",
-            "title": "Submitted message contains @/tmp/panopticon-paste-*.ext lines before user text",
+            "title": "Submitted message contains @/tmp/overdeck-paste-*.ext lines before user text",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           },

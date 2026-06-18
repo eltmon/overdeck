@@ -3,8 +3,8 @@ import { enumerateInFlightIssuesFromSources } from '../../../../src/lib/reconstr
 import type { ProjectConfig } from '../../../../src/lib/projects.js';
 
 const project: ProjectConfig = {
-  name: 'panopticon',
-  path: '/projects/panopticon',
+  name: 'overdeck',
+  path: '/projects/overdeck',
   workspace: { workspaces_dir: 'workspaces' },
 };
 
@@ -94,10 +94,10 @@ describe('enumerateInFlightIssuesFromSources', () => {
       (_cmd: any, _opts: any, cb: any) =>
         cb?.(null, {
           stdout:
-            'worktree /projects/panopticon\n' +
+            'worktree /projects/overdeck\n' +
             'HEAD abc\n' +
             'branch refs/heads/main\n' +
-            'worktree /projects/panopticon/workspaces/feature-pan-1920\n' +
+            'worktree /projects/overdeck/workspaces/feature-pan-1920\n' +
             'HEAD def\n' +
             'branch refs/heads/feature/pan-1920\n',
           stderr: '',
@@ -117,7 +117,7 @@ describe('enumerateInFlightIssuesFromSources', () => {
     execMock.mockImplementation(
       (_cmd: any, _opts: any, cb: any) =>
         cb?.(null, {
-          stdout: 'worktree /projects/panopticon/workspaces/feature-pan-1920\n',
+          stdout: 'worktree /projects/overdeck/workspaces/feature-pan-1920\n',
           stderr: '',
         }) as any,
     );

@@ -14,7 +14,7 @@ return yield* RallyClient.pipe(Effect.provide(RallyClientLive));
 `RallyClient` is a `ServiceMap.Service` tag (a class), NOT an `Effect`. Calling `.pipe(Effect.provide(RallyClientLive))` on a Service tag is invalid — the Fiber runtime receives a raw Service object where it expects a valid Effect, causing:
 
 ```
-Error: Fiber.runLoop: Not a valid effect: { "_id": "Service", "key": "panopticon/dashboard/RallyClient" }
+Error: Fiber.runLoop: Not a valid effect: { "_id": "Service", "key": "overdeck/dashboard/RallyClient" }
 ```
 
 ## Fix

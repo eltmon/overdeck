@@ -42,7 +42,7 @@ describe("context dashboard contracts", () => {
       layers: [
         {
           kind: "global",
-          file: "/home/user/.panopticon/context/global.md",
+          file: "/home/user/.overdeck/context/global.md",
           exists: true,
           content: "global context",
           editable: true,

@@ -118,7 +118,7 @@ export function uatStackFolderName(gen: UatGeneration): string {
 }
 
 function composeProjectName(gen: UatGeneration): string {
-  return `panopticon-${uatStackFolderName(gen)}`;
+  return `overdeck-${uatStackFolderName(gen)}`;
 }
 
 /**

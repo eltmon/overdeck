@@ -35,7 +35,7 @@ describe('paths', () => {
 
   describe('OVERDECK_HOME', () => {
     it('should respect OVERDECK_HOME when set', () => {
-      expect(OVERDECK_HOME).toBe(process.env.OVERDECK_HOME ?? join(home, '.panopticon'));
+      expect(OVERDECK_HOME).toBe(process.env.OVERDECK_HOME ?? join(home, '.overdeck'));
     });
   });
 

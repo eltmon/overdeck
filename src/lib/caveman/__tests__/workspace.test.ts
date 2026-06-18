@@ -105,13 +105,13 @@ describe('injectMemoryHookSettings', () => {
 
     const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
     expect(settings.hooks.Stop[0].hooks[0]).toMatchObject({ type: 'command', timeout: 1 });
-    expect(settings.hooks.Stop[0].hooks[0].command).toContain('panopticon-memory-hook.js" turn');
-    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain('panopticon-memory-hook.js" session-start');
+    expect(settings.hooks.Stop[0].hooks[0].command).toContain('overdeck-memory-hook.js" turn');
+    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain('overdeck-memory-hook.js" session-start');
     expect(settings.hooks.UserPromptSubmit[0].hooks[0]).toMatchObject({ type: 'command', timeout: 2 });
-    expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('panopticon-memory-hook.js" prompt-inject');
+    expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('overdeck-memory-hook.js" prompt-inject');
 
     const scriptPath = settings.hooks.Stop[0].hooks[0].command.match(/node "([^"]+)" turn/)?.[1];
-    expect(scriptPath).toContain(join(process.env.OVERDECK_HOME!, 'hooks', 'memory', 'panopticon-memory-hook.js'));
+    expect(scriptPath).toContain(join(process.env.OVERDECK_HOME!, 'hooks', 'memory', 'overdeck-memory-hook.js'));
     expect(scriptPath).not.toContain(workspaceDir);
     const script = readFileSync(scriptPath, 'utf-8');
     expect(script).toContain('/api/memory/turn');
@@ -132,7 +132,7 @@ describe('injectMemoryHookSettings', () => {
     const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
     expect(settings.hooks.Stop).toHaveLength(2);
     expect(settings.hooks.Stop[0].hooks[0].command).toBe('echo existing');
-    expect(settings.hooks.Stop[1].hooks[0].command).toContain('panopticon-memory-hook.js" turn');
+    expect(settings.hooks.Stop[1].hooks[0].command).toContain('overdeck-memory-hook.js" turn');
     expect(settings.hooks.SessionStart).toHaveLength(1);
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
   });
@@ -150,7 +150,7 @@ describe('injectMemoryHookSettings', () => {
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     const scriptPath = settings.hooks.UserPromptSubmit[0].hooks[0].command.match(/node "([^"]+)" prompt-inject/)?.[1];
     expect(scriptPath).not.toContain(workspaceDir);
-    expect(readFileSync(scriptPath, 'utf-8')).toContain('x-panopticon-internal-token');
+    expect(readFileSync(scriptPath, 'utf-8')).toContain('x-overdeck-internal-token');
   });
 });
 
@@ -170,7 +170,7 @@ describe('injectCavemanSettings', () => {
   });
 
   it('warns and skips injection when activate script is missing', async () => {
-    // hooksDir exists but has no panopticon-caveman-activate.js
+    // hooksDir exists but has no overdeck-caveman-activate.js
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await Effect.runPromise(injectCavemanSettings(workspaceDir, 'enabled'));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('pan admin hooks install'));
@@ -178,20 +178,20 @@ describe('injectCavemanSettings', () => {
   });
 
   it('injects SessionStart and UserPromptSubmit hooks into fresh settings.json', async () => {
-    writeFileSync(join(hooksDir, 'panopticon-caveman-activate.js'), '// activate');
+    writeFileSync(join(hooksDir, 'overdeck-caveman-activate.js'), '// activate');
     writeFileSync(join(hooksDir, 'caveman-mode-tracker.js'), '// tracker');
 
     await Effect.runPromise(injectCavemanSettings(workspaceDir, 'enabled'));
 
     const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
     expect(settings.hooks.SessionStart).toHaveLength(1);
-    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain('panopticon-caveman-activate.js');
+    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain('overdeck-caveman-activate.js');
     expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
     expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('caveman-mode-tracker.js');
   });
 
   it('preserves existing hooks when deep-merging', async () => {
-    writeFileSync(join(hooksDir, 'panopticon-caveman-activate.js'), '// activate');
+    writeFileSync(join(hooksDir, 'overdeck-caveman-activate.js'), '// activate');
     writeFileSync(join(hooksDir, 'caveman-mode-tracker.js'), '// tracker');
 
     mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
@@ -205,11 +205,11 @@ describe('injectCavemanSettings', () => {
     const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
     expect(settings.hooks.SessionStart).toHaveLength(2);
     expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo existing');
-    expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('panopticon-caveman-activate.js');
+    expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('overdeck-caveman-activate.js');
   });
 
   it('does not duplicate hooks on repeated calls (idempotent)', async () => {
-    writeFileSync(join(hooksDir, 'panopticon-caveman-activate.js'), '// activate');
+    writeFileSync(join(hooksDir, 'overdeck-caveman-activate.js'), '// activate');
     writeFileSync(join(hooksDir, 'caveman-mode-tracker.js'), '// tracker');
 
     await Effect.runPromise(injectCavemanSettings(workspaceDir, 'enabled'));

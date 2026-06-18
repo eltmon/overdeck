@@ -242,7 +242,7 @@ describe('shadow-state', () => {
   });
 
   describe('getPendingSyncCount', () => {
-    // NOTE: getPendingSyncCount() scans ALL files in ~/.panopticon/shadow-state/, so
+    // NOTE: getPendingSyncCount() scans ALL files in ~/.overdeck/shadow-state/, so
     // asserting a global count of 0 is environment-dependent. Tests below use
     // needsSync(id) on the specific issue under test instead.
     // Tracked in: https://github.com/eltmon/overdeck/issues/683

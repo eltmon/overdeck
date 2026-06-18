@@ -202,15 +202,15 @@ nearly instant (~2s). It correctly resolves `@overdeck/contracts` to the worktre
 
 ## tmux Socket — CRITICAL
 
-**Overdeck agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon` when inspecting agent sessions:
+**Overdeck agents run under a separate tmux socket named `overdeck`.** Always use `-L overdeck` when inspecting agent sessions:
 
 ```bash
 # List all agent sessions
-tmux -L panopticon list-sessions
+tmux -L overdeck list-sessions
 
 # Attach or capture a specific agent
-tmux -L panopticon capture-pane -t agent-min-846 -p -S -50
-tmux -L panopticon attach -t agent-min-846
+tmux -L overdeck capture-pane -t agent-min-846 -p -S -50
+tmux -L overdeck attach -t agent-min-846
 ```
 
 The default tmux socket (`/tmp/tmux-1000/default`) is NOT used by agents. Plain `tmux list-sessions` will show "no server running" or list unrelated sessions. This is a common source of false "agent not found" errors.
@@ -251,9 +251,9 @@ above for the recommended transport. Channels remains only for already-running
 agents with `state.channelsEnabled = true` and for explicit diagnostic opt-in
 via `experimental.claudeCodeChannelsMcp: true`.
 
-`src/lib/channels/panopticon-bridge.ts` is a per-agent Bun stdio MCP server.
+`src/lib/channels/overdeck-bridge.ts` is a per-agent Bun stdio MCP server.
 When the diagnostic override is enabled, Claude is spawned with
-`--mcp-config <workspace>/.pan/agent-mcp.json --dangerously-load-development-channels server:panopticon-bridge`,
+`--mcp-config <workspace>/.pan/agent-mcp.json --dangerously-load-development-channels server:overdeck-bridge`,
 the bridge listens on `${OVERDECK_HOME}/sockets/agent-<id>.sock`, and
 `deliverAgentMessage` uses it only after the supervisor tier fails. The
 `WARNING: Loading development channels` dialog is dismissed only when that MCP
@@ -316,7 +316,7 @@ Deacon auto-resume is intentionally suppressible through three gates:
   `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
   that dashboard boot only. Restart without `--no-resume` to restore patrols.
 - **Manual pause:** `pan pause <id> [--reason <text>]` persists `paused` fields in
-  `~/.panopticon/agents/<agent-id>/state.json` and stops the agent if it is running.
+  `~/.overdeck/agents/<agent-id>/state.json` and stops the agent if it is running.
   `pan unpause <id>` clears the gate without spawning. `pan start <id>` refuses
   paused agents unless `--force` is passed; `--force` clears the pause gate first.
 - **Troubled gate:** repeated resume/crash failures mark an agent `troubled` and
@@ -332,11 +332,11 @@ These gates are orthogonal to the global Deacon freeze in SQLite
 Agent and pipeline state is split into three planes. Do not read or write the wrong one.
 
 1. **Permanent plane — git infra repo.** Durable per-issue records under `.pan/<recordsPath>/<issue>.json` containing the continue subset (`decisions`, `hazards`, `feedback`), the `pipeline` verdict block, `closeOut` (usage, merges, ranOn), and the `owner` URI lease. Specs and project-side continues live here too. Portable across machines.
-2. **Runtime plane — local SQLite `~/.panopticon/panopticon.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
-3. **Liveness oracle — tmux on socket `-L panopticon`.** Ground truth for whether an agent process is actually running.
+2. **Runtime plane — local SQLite `~/.overdeck/panopticon.db`.** The `agents` table is the authoritative runtime registry; `review_status` holds ephemeral columns; `events` is the lifecycle event log. Rebuildable from git + tmux.
+3. **Liveness oracle — tmux on socket `-L overdeck`.** Ground truth for whether an agent process is actually running.
 
 Key rules:
-- Enumerate agents from the `agents` table, not from `~/.panopticon/agents/*/state.json`.
+- Enumerate agents from the `agents` table, not from `~/.overdeck/agents/*/state.json`.
 - `state.json` is kept as a rollback/rebuild source only.
 - Durable `review_status` verdicts are mirrored into the per-issue permanent record's `pipeline` block.
 - Configure the infra repo per project in `projects.yaml` under `pan_records: { repo, path }`.
@@ -410,7 +410,7 @@ config, closes the tracker issue, and clears review status.
 The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace: true` is **irreversible** and destroys:
 
 1. **tmux sessions** — all agent sessions killed
-2. **Agent state directories** — `~/.panopticon/agents/<id>/` removed
+2. **Agent state directories** — `~/.overdeck/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
    - `.pan/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
    - `.beads/` — all task tracking beads

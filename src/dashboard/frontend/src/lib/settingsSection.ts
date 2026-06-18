@@ -8,8 +8,8 @@
  * Using both a sessionStorage intent AND a window event covers both reliably.
  */
 
-export const SETTINGS_SECTION_INTENT_KEY = 'panopticon.settingsSection';
-export const SETTINGS_SECTION_EVENT = 'panopticon:settings-section';
+export const SETTINGS_SECTION_INTENT_KEY = 'overdeck.settingsSection';
+export const SETTINGS_SECTION_EVENT = 'overdeck:settings-section';
 
 /** Request that the Settings page scroll to `sectionId`, navigating if needed. */
 export function requestSettingsSection(sectionId: string): void {

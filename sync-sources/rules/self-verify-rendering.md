@@ -5,7 +5,7 @@ scope: dev
 
 Do not ask the operator to eyeball dashboard, browser, or terminal rendering.
 Use Playwright screenshots for browser UI and inspect the PNG yourself. For
-terminal ANSI output, capture the pane with `tmux -L panopticon capture-pane -t <session> -e -p`.
+terminal ANSI output, capture the pane with `tmux -L overdeck capture-pane -t <session> -e -p`.
 
-Preview terminal experiments in a throwaway `panopticon`-socket session. Do not
+Preview terminal experiments in a throwaway `overdeck`-socket session. Do not
 attach to and resize a live agent session just to inspect rendering.

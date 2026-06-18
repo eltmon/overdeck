@@ -35,16 +35,16 @@ function metadata(overrides: Partial<ArtifactMetadata> = {}): ArtifactMetadata {
 }
 
 describe('artifact thumbnails', () => {
-  let panopticonHome: string;
+  let overdeckHome: string;
 
   beforeEach(async () => {
-    panopticonHome = await mkdtemp(join(tmpdir(), 'pan-artifact-thumbnails-'));
-    process.env.OVERDECK_HOME = panopticonHome;
+    overdeckHome = await mkdtemp(join(tmpdir(), 'pan-artifact-thumbnails-'));
+    process.env.OVERDECK_HOME = overdeckHome;
   });
 
   afterEach(async () => {
     process.env.OVERDECK_HOME = originalOverdeckHome;
-    await rm(panopticonHome, { recursive: true, force: true });
+    await rm(overdeckHome, { recursive: true, force: true });
   });
 
   it('uses artifact slug and published hash for the thumbnail cache key', () => {

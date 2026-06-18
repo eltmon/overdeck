@@ -24,8 +24,8 @@ const originalHomedir = process.env.HOME;
 
 beforeEach(() => {
   // Create unique test directory for each test
-  TEST_ROOT = join(tmpdir(), `panopticon-agg-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  const costsDir = join(TEST_ROOT, '.panopticon', 'costs');
+  TEST_ROOT = join(tmpdir(), `overdeck-agg-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const costsDir = join(TEST_ROOT, '.overdeck', 'costs');
   mkdirSync(costsDir, { recursive: true });
   process.env.HOME = TEST_ROOT;
 });
@@ -79,7 +79,7 @@ describe('Aggregator Cache Management', () => {
     });
 
     it('should handle cache version mismatch', () => {
-      const cacheFile = join(TEST_ROOT, '.panopticon', 'costs', 'by-issue.json');
+      const cacheFile = join(TEST_ROOT, '.overdeck', 'costs', 'by-issue.json');
       writeFileSync(
         cacheFile,
         JSON.stringify({ version: 1, status: 'live', issues: {} })

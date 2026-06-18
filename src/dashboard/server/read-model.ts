@@ -399,7 +399,7 @@ function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
 export class ReadModelService extends Context.Service<
   ReadModelService,
   ReadModelServiceShape
->()('panopticon/dashboard/ReadModelService') {}
+>()('overdeck/dashboard/ReadModelService') {}
 
 // ─── Live implementation ─────────────────────────────────────────────────────
 

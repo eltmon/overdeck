@@ -132,7 +132,7 @@ export async function pollConversations(): Promise<void> {
 
 /**
  * For each live tmux session that looks like a specialist agent and has no
- * `conversations` row, create one from `~/.panopticon/agents/<id>/state.json`.
+ * `conversations` row, create one from `~/.overdeck/agents/<id>/state.json`.
  * Best-effort JSONL lookup via `~/.claude/projects/<encoded-cwd>/*.jsonl`. If
  * the JSONL can't be located, the row is still written without
  * `claudeSessionId` — UI liveness (sessionAlive via tmux poll) still works;
@@ -144,7 +144,7 @@ async function backfillOrphanedSpecialistConversations(aliveSessions: string[]):
     if (NON_AGENT_PREFIXES.some(p => sessionName.startsWith(p))) continue;
     if (getConversationByName(sessionName)) continue;
 
-    const statePath = join(homedir(), '.panopticon', 'agents', sessionName, 'state.json');
+    const statePath = join(homedir(), '.overdeck', 'agents', sessionName, 'state.json');
     if (!existsSync(statePath)) continue;
 
     let state: AgentStateFile;
@@ -414,7 +414,7 @@ function scheduleNext(): void {
 }
 
 export function startConversationLifecycleService(): void {
-  console.log('[panopticon] ConversationLifecycleService started (10s poll)');
+  console.log('[overdeck] ConversationLifecycleService started (10s poll)');
   scheduleNext();
 }
 
@@ -422,6 +422,6 @@ export function stopConversationLifecycleService(): void {
   if (pollTimer !== null) {
     clearTimeout(pollTimer);
     pollTimer = null;
-    console.log('[panopticon] ConversationLifecycleService stopped');
+    console.log('[overdeck] ConversationLifecycleService stopped');
   }
 }

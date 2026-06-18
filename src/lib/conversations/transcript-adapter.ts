@@ -131,14 +131,14 @@ const claudeCodeAdapter: ConversationTranscriptAdapter = {
 
 /**
  * Pi sessions live at:
- *   `~/.panopticon/agents/<tmuxSession>/sessions/<iso-timestamp>_<id>.jsonl`
+ *   `~/.overdeck/agents/<tmuxSession>/sessions/<iso-timestamp>_<id>.jsonl`
  *
  * Pi may rotate session files (e.g. on resume), so we pick the
  * newest by filename — filenames sort lexicographically by their
  * ISO timestamp prefix so this is deterministic.
  */
 async function resolvePiSessionFileFromTmux(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(homedir(), '.panopticon', 'agents', tmuxSession, 'sessions');
+  const sessionDir = join(homedir(), '.overdeck', 'agents', tmuxSession, 'sessions');
   if (!existsSync(sessionDir)) return null;
   try {
     const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));

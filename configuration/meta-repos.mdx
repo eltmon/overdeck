@@ -16,7 +16,7 @@ team-meta/
 │       ├── CLAUDE.md             # Project conventions for agents
 │       └── skills/               # Team-specific skills
 │           └── workspace-add-repo/
-├── panopticon/                   # Overdeck-specific config
+├── overdeck/                   # Overdeck-specific config
 │   └── repo-groups.yaml          # Repo group definitions
 ├── docs/                         # Architecture and reference docs
 │   ├── repo-map.md               # What each repo does
@@ -41,7 +41,7 @@ This directory is copied into every workspace created for the project. It contai
 | `.claude/commands/` | Team-specific commands |
 | `.claude/agents/` | Custom agent definitions |
 
-### `panopticon/repo-groups.yaml`
+### `overdeck/repo-groups.yaml`
 
 Defines named groups of repositories for progressive workspace creation:
 
@@ -105,7 +105,7 @@ The Setup Agent generates meta repo contents automatically:
 Create the directory structure manually:
 
 ```bash
-mkdir -p team-meta/{.agent-template/.claude,panopticon,docs/onboarding}
+mkdir -p team-meta/{.agent-template/.claude,overdeck,docs/onboarding}
 ```
 
 ## Onboarding Flow

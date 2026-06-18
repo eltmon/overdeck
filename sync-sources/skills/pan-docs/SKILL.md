@@ -4,13 +4,13 @@ description: Find, update, and structure Overdeck documentation using the docs i
 author: Overdeck
 version: 2.0.0
 triggers:
-  - panopticon docs
-  - find in panopticon docs
+  - overdeck docs
+  - find in overdeck docs
   - where is documentation for
-  - panopticon documentation
+  - overdeck documentation
   - pan docs
   - update docs
-  - update panopticon docs
+  - update overdeck docs
 allowed-tools:
   - Read
   - Grep
@@ -40,9 +40,9 @@ This is the primary Overdeck documentation skill. If you need general prose clea
 5. **Keep the index current.** If docs coverage changes, update `docs/INDEX.md` too.
 
 For the full writing philosophy and maintenance guidance, read:
-- `.claude/skills/update-panopticon-docs/resources/STYLE_GUIDE.md`
-- `.claude/skills/update-panopticon-docs/resources/DOC_LOCATIONS.md`
-- `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md`
+- `.claude/skills/update-overdeck-docs/resources/STYLE_GUIDE.md`
+- `.claude/skills/update-overdeck-docs/resources/DOC_LOCATIONS.md`
+- `.claude/skills/update-overdeck-docs/resources/EXAMPLES.md`
 
 ---
 
@@ -113,9 +113,9 @@ When a doc feels too low-level for its audience:
 | Need | Start here |
 |------|------------|
 | Find documentation | `docs/INDEX.md` |
-| Documentation philosophy | `.claude/skills/update-panopticon-docs/resources/STYLE_GUIDE.md` |
-| Where docs belong | `.claude/skills/update-panopticon-docs/resources/DOC_LOCATIONS.md` |
-| Common update patterns | `.claude/skills/update-panopticon-docs/resources/EXAMPLES.md` |
+| Documentation philosophy | `.claude/skills/update-overdeck-docs/resources/STYLE_GUIDE.md` |
+| Where docs belong | `.claude/skills/update-overdeck-docs/resources/DOC_LOCATIONS.md` |
+| Common update patterns | `.claude/skills/update-overdeck-docs/resources/EXAMPLES.md` |
 | General prose cleanup | `clear-writing` |
 
 ---

@@ -3,9 +3,9 @@ name: pan-help
 description: Overview of all Overdeck commands and capabilities
 triggers:
   - pan help
-  - panopticon help
-  - what can panopticon do
-  - show me panopticon commands
+  - overdeck help
+  - what can overdeck do
+  - show me overdeck commands
 allowed-tools:
   - Bash
   - Read
@@ -37,7 +37,7 @@ Overdeck is a multi-agent orchestration framework for AI coding assistants. This
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan init` | Initialize Overdeck configuration (~/.panopticon/) | `pan init` |
+| `pan init` | Initialize Overdeck configuration (~/.overdeck/) | `pan init` |
 | `pan install` | Install prerequisites (Node.js, Docker, etc.) | `pan install` |
 | `pan up` | Start dashboard and services | `pan up` |
 | `pan down` | Stop dashboard and services | `pan down` |
@@ -194,11 +194,11 @@ pan workspace destroy PAN-5
 
 | File | Purpose |
 |------|---------|
-| `~/.panopticon.env` | Main configuration (API keys, tracker settings) |
-| `~/.panopticon/skills/` | Skills distributed with Overdeck |
-| `~/.panopticon/agents/` | Per-agent state and health |
-| `~/.panopticon/workspaces/` | Workspace metadata |
-| `~/.panopticon/backups/` | Configuration backups |
+| `~/.overdeck.env` | Main configuration (API keys, tracker settings) |
+| `~/.overdeck/skills/` | Skills distributed with Overdeck |
+| `~/.overdeck/agents/` | Per-agent state and health |
+| `~/.overdeck/workspaces/` | Workspace metadata |
+| `~/.overdeck/backups/` | Configuration backups |
 
 ## Dashboard
 

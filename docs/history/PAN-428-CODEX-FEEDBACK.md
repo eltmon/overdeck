@@ -60,12 +60,12 @@ Recommendation:
 
 ### 3. The storage plan should not introduce a third SQLite story without justification
 
-The PRD proposes a new `~/.panopticon/dashboard-events.db`.
+The PRD proposes a new `~/.overdeck/dashboard-events.db`.
 
 The repo already has:
 
-- `~/.panopticon/cache.db` via `src/dashboard/server/services/cache-service.ts`
-- `~/.panopticon/panopticon.db` via `src/lib/database/index.ts`
+- `~/.overdeck/cache.db` via `src/dashboard/server/services/cache-service.ts`
+- `~/.overdeck/panopticon.db` via `src/lib/database/index.ts`
 
 So PAN-428 currently implies three SQLite databases unless the design is clarified.
 
@@ -141,7 +141,7 @@ That is fine for local Bun/Vite dev, but Overdeck is published as an npm CLI and
 - `scripts`
 - docs/license files
 
-If the production server runtime imports `@panopticon/contracts` at runtime, the package needs a real build/distribution story. Exporting raw TS source alone is not enough unless the server build fully bundles it away.
+If the production server runtime imports `@overdeck/contracts` at runtime, the package needs a real build/distribution story. Exporting raw TS source alone is not enough unless the server build fully bundles it away.
 
 Recommendation:
 
@@ -300,7 +300,7 @@ If I were tightening the PRD before execution, I would make these changes first:
 2. Relax the "do not rewrite `src/lib/*`" rule and explicitly identify blocking libs that must change.
 3. Clarify the database strategy: `cache.db`, `panopticon.db`, and the proposed event store.
 4. Clarify workspace/package ownership: root/server/frontend/contracts and which lockfiles are in scope.
-5. Add a packaging/distribution section for `@panopticon/contracts` and the new dist layout.
+5. Add a packaging/distribution section for `@overdeck/contracts` and the new dist layout.
 6. Fix the event mapping table, especially `planning:sync`, `plan:subitem-status-changed`, and raw terminal transport.
 7. Expand B20 to cover `XTerminal.tsx` and the interactive PTY path.
 8. Move shared service-wrapper creation earlier in the DAG.

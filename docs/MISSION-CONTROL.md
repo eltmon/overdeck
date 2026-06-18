@@ -133,7 +133,7 @@ The model used for status reviews is configured in **Settings > Workflow Agents 
 
 ### Adding Projects
 
-Projects are configured in `~/.panopticon/config.yaml`. Any project with active workspaces appears in Mission Control's project tree.
+Projects are configured in `~/.overdeck/config.yaml`. Any project with active workspaces appears in Mission Control's project tree.
 
 ## Conversations
 

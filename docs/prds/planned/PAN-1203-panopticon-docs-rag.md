@@ -103,7 +103,7 @@ Embedding model choice for v1: **local gte-small** (~30MB ONNX, 384-dim, ~50ms p
 
 ### Install
 
-`pan install` copies `dist/docs-index.sqlite` → `~/.panopticon/docs/index.sqlite`. Idempotent: skips if hashes match.
+`pan install` copies `dist/docs-index.sqlite` → `~/.overdeck/docs/index.sqlite`. Idempotent: skips if hashes match.
 
 `pan upgrade` (when implemented) refreshes the index.
 
@@ -161,7 +161,7 @@ The hook script:
 prompt=$(cat)
 
 # Trigger check: regex or classifier
-if echo "$prompt" | rg -i "(pan|panopticon|cloister|deacon|workspace|specialist|harness|bd|beads|vbrief|workhorse)" > /dev/null; then
+if echo "$prompt" | rg -i "(pan|overdeck|cloister|deacon|workspace|specialist|harness|bd|beads|vbrief|workhorse)" > /dev/null; then
   # Budget check
   budget=$(pan docs budget-check)  # returns "ok" or "exceeded"
   if [ "$budget" = "ok" ]; then
@@ -169,9 +169,9 @@ if echo "$prompt" | rg -i "(pan|panopticon|cloister|deacon|workspace|specialist|
     if [ -n "$snippets" ]; then
       echo "$prompt"
       echo ""
-      echo "<panopticon-docs>"
+      echo "<overdeck-docs>"
       echo "$snippets"
-      echo "</panopticon-docs>"
+      echo "</overdeck-docs>"
       pan docs budget-bump
       exit 0
     fi
@@ -183,7 +183,7 @@ echo "$prompt"
 
 Detection has two layers:
 
-1. **Regex trigger** — fast, configurable in `~/.panopticon/config.yaml` under `docs.triggers`
+1. **Regex trigger** — fast, configurable in `~/.overdeck/config.yaml` under `docs.triggers`
 2. **Optional classifier fallback** — if regex doesn't match but prompt looks Overdeck-adjacent (e.g., asks about agents, workflows), a cheap Haiku call rates relevance. Off by default; enable via `docs.classifier.enabled = true`.
 
 ### Budget Controls
@@ -197,11 +197,11 @@ Per-conversation cap to avoid token blowout:
 | Max retrieved chunks per injection | 5 | `docs.budget.maxChunksPerInjection` |
 | Override threshold (high-confidence prompts skip rate limit) | classifier ≥ 0.85 | `docs.budget.bypassClassifierThreshold` |
 
-State tracked in `~/.panopticon/docs/budget-state.json` keyed by conversation/session ID.
+State tracked in `~/.overdeck/docs/budget-state.json` keyed by conversation/session ID.
 
 ### Telemetry
 
-Every injection writes a JSONL entry to `~/.panopticon/docs/telemetry.jsonl`:
+Every injection writes a JSONL entry to `~/.overdeck/docs/telemetry.jsonl`:
 
 ```json
 {"ts":"...","conversationId":"...","trigger":"regex","matched":["pan","sync"],"retrievedChunks":[{"path":"docs/HARNESSES.md","heading":"Installing Pi","score":0.83}],"tokens":847,"truncated":false}
@@ -212,14 +212,14 @@ Used for tuning trigger regex + measuring effectiveness.
 ## Acceptance Criteria
 
 - `npm run build:docs-index` produces `dist/docs-index.sqlite` < 50MB
-- `pan install` materializes index to `~/.panopticon/docs/index.sqlite`
+- `pan install` materializes index to `~/.overdeck/docs/index.sqlite`
 - `pan docs query "how do I run pan sync"` returns relevant snippets in < 200ms (cold), < 50ms (warm)
 - `pan docs reindex` regenerates from current local docs/skills in < 60s
 - UserPromptSubmit hook is registered for both Claude Code and Pi during `pan install`
 - A prompt containing "how do I use pan sync" triggers injection of relevant `docs/SYNC.md` or `skills/pan-sync/SKILL.md` snippets
 - `pan docs disable` silences the hook for the current session
 - Budget caps respected; conversation that already hit injection limit does not re-inject within rate window
-- Telemetry written to `~/.panopticon/docs/telemetry.jsonl`
+- Telemetry written to `~/.overdeck/docs/telemetry.jsonl`
 - `pan docs status` shows index path, size, last-built timestamp, enabled/disabled state
 - New tests: chunking correctness, hybrid retrieval ranking, budget state, regex trigger matching, hook integration
 
@@ -233,7 +233,7 @@ Unit:
 
 Integration:
 - Build a fixture index from `tests/fixtures/docs/`, query, assert ranking
-- Run hook script with fixture prompts; assert output contains `<panopticon-docs>` block iff trigger matches
+- Run hook script with fixture prompts; assert output contains `<overdeck-docs>` block iff trigger matches
 - End-to-end: install, query, disable, query (no injection), enable, query (injection resumes)
 
 ## Out of Scope (Phase 2)

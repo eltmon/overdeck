@@ -34,7 +34,7 @@ From Phase 1 implementation (`a1a9753`):
 
 ### 1. Health History Persistence (SQLite)
 
-Create `~/.panopticon/cloister.db`:
+Create `~/.overdeck/cloister.db`:
 
 ```sql
 CREATE TABLE health_events (
@@ -59,7 +59,7 @@ CloisterService.performHealthCheck()
 
 ### 2. Specialist Agent Registry
 
-Create `~/.panopticon/specialists/`:
+Create `~/.overdeck/specialists/`:
 ```
 specialists/
 ├── registry.json         # { specialists: [...], defaults: {...} }
@@ -199,19 +199,19 @@ All tasks created with dependencies in beads:
 
 | ID | Title | Layer |
 |----|-------|-------|
-| panopticon-agl | Create SQLite database module | 1 |
-| panopticon-vw4 | Create specialist registry module | 1 |
-| panopticon-x55 | Implement specialist session management | 1 |
-| panopticon-rpk | Modify Cloister to write health events | 1 |
-| panopticon-xud | Implement health history API endpoint | 2 |
-| panopticon-fyv | Add specialist API endpoints | 2 |
-| panopticon-9yw | Add poke API endpoint | 2 |
-| panopticon-9lh | Update AgentList to show two sections | 3 |
-| panopticon-5f4 | Create SpecialistAgentCard component | 3 |
-| panopticon-cbw | Create IssueAgentCard component | 3 |
-| panopticon-2cw | Create AgentDetailView component | 3 |
-| panopticon-isv | Create HealthHistoryTimeline component | 4 |
-| panopticon-7um | Create HealthHistoryChart component | 4 |
+| overdeck-agl | Create SQLite database module | 1 |
+| overdeck-vw4 | Create specialist registry module | 1 |
+| overdeck-x55 | Implement specialist session management | 1 |
+| overdeck-rpk | Modify Cloister to write health events | 1 |
+| overdeck-xud | Implement health history API endpoint | 2 |
+| overdeck-fyv | Add specialist API endpoints | 2 |
+| overdeck-9yw | Add poke API endpoint | 2 |
+| overdeck-9lh | Update AgentList to show two sections | 3 |
+| overdeck-5f4 | Create SpecialistAgentCard component | 3 |
+| overdeck-cbw | Create IssueAgentCard component | 3 |
+| overdeck-2cw | Create AgentDetailView component | 3 |
+| overdeck-isv | Create HealthHistoryTimeline component | 4 |
+| overdeck-7um | Create HealthHistoryChart component | 4 |
 
 ## Success Criteria
 

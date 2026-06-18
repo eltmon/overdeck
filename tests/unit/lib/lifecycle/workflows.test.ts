@@ -45,7 +45,7 @@ vi.mock('../../../../src/lib/tmux.js', async () => {
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/paths.js')>();
-  const testHome = join(tmpdir(), 'panopticon-wf-test-home');
+  const testHome = join(tmpdir(), 'overdeck-wf-test-home');
   return {
     ...actual,
     OVERDECK_HOME: testHome,
@@ -128,7 +128,7 @@ describe('workflows', () => {
   let testDir: string;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `panopticon-wf-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = join(tmpdir(), `overdeck-wf-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
     mkdirSync(AGENTS_DIR, { recursive: true });
     mkdirSync(OVERDECK_HOME, { recursive: true });

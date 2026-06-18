@@ -229,7 +229,7 @@ export class CodexTranscriptSource implements TranscriptSource {
     if (!threadId) return null;
 
     // Use per-agent CODEX_HOME, not the global ~/.codex; rollouts are written to
-    // ~/.panopticon/agents/<id>/codex-home/sessions/ by the per-agent spawn.
+    // ~/.overdeck/agents/<id>/codex-home/sessions/ by the per-agent spawn.
     const rolloutPath = findRolloutPath(join(getAgentDir(agent.id), 'codex-home'), threadId);
     if (!rolloutPath) return null;
 

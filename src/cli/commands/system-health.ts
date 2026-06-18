@@ -32,7 +32,7 @@ export async function systemHealthCommand(): Promise<void> {
   // smee-client webhook relay
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
-    const smeeUrlPath = join(homedir(), '.panopticon', 'github-app', 'smee-url');
+    const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
     if (!existsSync(smeeUrlPath)) {
       checks.push({
         name: 'smee-client Webhook Relay',

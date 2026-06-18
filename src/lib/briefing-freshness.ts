@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, stat, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { getOverdeckHome } from './paths.js';
 
-export const BRIEFING_UPDATE_TAG = 'panopticon-briefing-update';
+export const BRIEFING_UPDATE_TAG = 'overdeck-briefing-update';
 
 interface BriefingSessionMarker {
   sessionId: string;

@@ -2,7 +2,7 @@
  * Caveman Hook Installation
  *
  * Copies vendored caveman JS hook files and SKILL.md content to
- * ~/.panopticon/hooks/caveman/ and ~/.panopticon/hooks/skills/.
+ * ~/.overdeck/hooks/caveman/ and ~/.overdeck/hooks/skills/.
  *
  * Called from 'pan admin hooks install' to ensure caveman hooks are available
  * before workspace creation injects them into .claude/settings.json.
@@ -13,7 +13,7 @@
  *     caveman-activate.js
  *     caveman-mode-tracker.js
  *     caveman-config.js
- *     panopticon-caveman-activate.js
+ *     overdeck-caveman-activate.js
  *     caveman-statusline.sh
  *     skills/caveman/SKILL.md
  *     skills/caveman-review/SKILL.md
@@ -26,14 +26,14 @@ import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { FsError, FsNotFoundError } from '../errors.js';
 
-/** Resolved path for caveman hook dir under ~/.panopticon */
+/** Resolved path for caveman hook dir under ~/.overdeck */
 export function getCavemanHooksDir(): string {
-  return join(homedir(), '.panopticon', 'hooks', 'caveman');
+  return join(homedir(), '.overdeck', 'hooks', 'caveman');
 }
 
-/** Resolved path for caveman skills dir under ~/.panopticon/hooks */
+/** Resolved path for caveman skills dir under ~/.overdeck/hooks */
 export function getCavemanSkillsDir(): string {
-  return join(homedir(), '.panopticon', 'hooks', 'skills');
+  return join(homedir(), '.overdeck', 'hooks', 'skills');
 }
 
 /**
@@ -52,7 +52,7 @@ function findVendoredDir(): string {
 
 /**
  * Install caveman hook files from the vendored dist/cli/caveman/ directory
- * into ~/.panopticon/hooks/caveman/.
+ * into ~/.overdeck/hooks/caveman/.
  *
  * CLI-only — sync FS is acceptable here; this function is only called from
  * 'pan admin hooks install' and is never imported by any dashboard server route.
@@ -86,7 +86,7 @@ export function setupCavemanHooks(): Effect.Effect<void, FsNotFoundError | FsErr
       'caveman-activate.js',
       'caveman-mode-tracker.js',
       'caveman-config.js',
-      'panopticon-caveman-activate.js',
+      'overdeck-caveman-activate.js',
     ];
 
     for (const file of jsFiles) {
@@ -130,7 +130,7 @@ export function setupCavemanHooks(): Effect.Effect<void, FsNotFoundError | FsErr
 }
 
 /**
- * Install caveman-compress Python scripts to ~/.panopticon/hooks/caveman-compress/.
+ * Install caveman-compress Python scripts to ~/.overdeck/hooks/caveman-compress/.
  * These scripts let users manually compress static reference docs via pan caveman-compress.
  *
  * CLI-only — sync FS is acceptable here; this function is only called from
@@ -149,7 +149,7 @@ export function setupCavemanCompressScripts(): Effect.Effect<boolean, FsError> {
       return false;
     }
 
-    const compressDest = join(homedir(), '.panopticon', 'hooks', 'caveman-compress');
+    const compressDest = join(homedir(), '.overdeck', 'hooks', 'caveman-compress');
     yield* Effect.try({
       try: () => mkdirSync(compressDest, { recursive: true }),
       catch: (cause) => new FsError({ path: compressDest, operation: 'mkdir', cause }),

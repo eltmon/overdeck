@@ -28,7 +28,7 @@
   [`packages/contracts/src/memory.ts:22`](../../../packages/contracts/src/memory.ts)).
   The unit of Memory. Stored append-only as a line in a per-day JSONL file.
 - **The memory store (files)** — NOT a database. A file tree under
-  `~/.panopticon/memory/<projectId>/<issueId>/` holding `observations/*.jsonl`
+  `~/.overdeck/memory/<projectId>/<issueId>/` holding `observations/*.jsonl`
   (the durable records), `observations/*.md` (human mirror), `status.json` (the
   rolled-up status), `archive/*.json`, `summaries/*.md`, `pending/*.json`,
   `rag-runs/*.jsonl`, `health.json`, and `reset-markers.json`. Layout in
@@ -75,7 +75,7 @@ both must be honored or the design is wrong:
 **1. The source of truth is files on disk, not the DB.** For Issues, git
 `.pan/records` is truth and the `issues` table is a rebuildable mirror; the writer
 writes git *first*, then the cache. For Memory the equivalent truth is the
-**observation JSONL** under `~/.panopticon/memory/` (memory-audit "central
+**observation JSONL** under `~/.overdeck/memory/` (memory-audit "central
 SOURCE-OF-TRUTH judgment", lines 365-374: re-extraction is unavailable once the
 transcript is gone, paid, non-deterministic, and ~50% lossy — therefore **not** a
 rebuild path, therefore the JSONL **is** truth). Every other Memory artifact —
@@ -703,7 +703,7 @@ search DB.
   break the per-project partition (`resolveFtsDbPath`) and the worker-thread
   isolation the live code depends on.
 - **Backup / portability is out of scope here.** memory-audit surprises 1-2 note
-  the real "first-class Memory" gaps are (a) is `~/.panopticon/memory/` in the
+  the real "first-class Memory" gaps are (a) is `~/.overdeck/memory/` in the
   backup surface and (b) it is per-machine / non-portable. Those are
   infrastructure concerns, not API-tier doors, and belong to a separate workstream
   — this document designs the resolver/writer/controller only.

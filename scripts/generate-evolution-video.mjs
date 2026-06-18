@@ -348,11 +348,11 @@ for (let i = 0; i < TOTAL_FRAMES; i++) {
 
 console.log('Encoding video with ffmpeg...');
 execSync(
-  `ffmpeg -y -framerate ${FPS} -i ${FRAMES_DIR}/frame-%05d.png -c:v libx264 -pix_fmt yuv420p -crf 23 -preset fast ${join(OUT_DIR, 'panopticon-evolution.mp4')}`,
+  `ffmpeg -y -framerate ${FPS} -i ${FRAMES_DIR}/frame-%05d.png -c:v libx264 -pix_fmt yuv420p -crf 23 -preset fast ${join(OUT_DIR, 'overdeck-evolution.mp4')}`,
   { stdio: 'inherit' }
 );
 
-console.log('Video saved to:', join(OUT_DIR, 'panopticon-evolution.mp4'));
+console.log('Video saved to:', join(OUT_DIR, 'overdeck-evolution.mp4'));
 
 // Clean up frames
 execSync(`rm -rf ${FRAMES_DIR}`);

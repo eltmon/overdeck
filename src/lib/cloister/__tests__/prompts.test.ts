@@ -268,7 +268,7 @@ optional:
 
     it.effect('renders MEMORY_CONTEXT in role prompt templates and hides it when empty', () =>
       Effect.gen(function* () {
-        const memoryContext = '<panopticon-memory-context>durable context</panopticon-memory-context>';
+        const memoryContext = '<overdeck-memory-context>durable context</overdeck-memory-context>';
         const planning = yield* renderPrompt({
           name: 'planning',
           vars: {

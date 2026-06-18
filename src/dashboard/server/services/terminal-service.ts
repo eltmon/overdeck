@@ -189,7 +189,7 @@ export interface TerminalServiceShape {
 }
 
 export class TerminalService extends Context.Service<TerminalService, TerminalServiceShape>()(
-  'panopticon/dashboard/TerminalService',
+  'overdeck/dashboard/TerminalService',
 ) {}
 
 // ─── Service implementation ───────────────────────────────────────────────────

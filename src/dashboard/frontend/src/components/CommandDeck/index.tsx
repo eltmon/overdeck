@@ -176,11 +176,11 @@ export function CommandDeck({
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   // PAN-1591: the Awareness rail can be collapsed to reclaim pane width.
   const [awarenessCollapsed, setAwarenessCollapsed] = useState(
-    () => typeof window !== 'undefined' && localStorage.getItem('panopticon.ui.awarenessCollapsed') === 'true',
+    () => typeof window !== 'undefined' && localStorage.getItem('overdeck.ui.awarenessCollapsed') === 'true',
   );
   const toggleAwareness = useCallback((collapsed: boolean) => {
     setAwarenessCollapsed(collapsed);
-    try { localStorage.setItem('panopticon.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
+    try { localStorage.setItem('overdeck.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
   }, []);
   const [showBeads, setShowBeads] = useState(false);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
@@ -829,7 +829,7 @@ export function CommandDeck({
   }, [queryClient, selectSession]);
 
   const handleOpenStateDir = useCallback((sessionId: string) => {
-    const path = `~/.panopticon/agents/${sessionId}/`;
+    const path = `~/.overdeck/agents/${sessionId}/`;
     navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
   }, []);
 
@@ -900,8 +900,8 @@ export function CommandDeck({
       if (!detail?.conversation) return;
       projectConvMutations.openForkModal(detail.conversation, { mode: detail.mode, focus: detail.focus });
     };
-    window.addEventListener('panopticon:open-fork-modal', handler);
-    return () => window.removeEventListener('panopticon:open-fork-modal', handler);
+    window.addEventListener('overdeck:open-fork-modal', handler);
+    return () => window.removeEventListener('overdeck:open-fork-modal', handler);
   }, [projectConvMutations]);
 
   // Create a conversation (optionally scoped to a project) and open it as an
@@ -1055,8 +1055,8 @@ export function CommandDeck({
       console.log('[CommandDeck] transport reconnected — invalidating query caches');
       queryClient.invalidateQueries();
     };
-    window.addEventListener('panopticon:reconnected', handler);
-    return () => window.removeEventListener('panopticon:reconnected', handler);
+    window.addEventListener('overdeck:reconnected', handler);
+    return () => window.removeEventListener('overdeck:reconnected', handler);
   }, [queryClient]);
 
   const selectedProjectData = useMemo(() => {

@@ -69,7 +69,7 @@ vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({
-    projectKey: 'panopticon',
+    projectKey: 'overdeck',
     projectName: 'Overdeck',
     projectPath: projectRoot,
   })),
@@ -79,7 +79,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
     issue_prefix: 'PAN',
   })),
   hasProjectsSync: vi.fn(() => true),
-  listProjectsSync: vi.fn(() => [{ key: 'panopticon', config: { name: 'Overdeck', path: projectRoot } }]),
+  listProjectsSync: vi.fn(() => [{ key: 'overdeck', config: { name: 'Overdeck', path: projectRoot } }]),
 }));
 
 vi.mock('../../../../src/lib/prd-draft.js', () => ({
@@ -162,7 +162,7 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
     vi.resetModules();
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-start-host-yes-parallel-'));
     originalOverdeckHome = process.env.OVERDECK_HOME;
-    process.env.OVERDECK_HOME = join(projectRoot, '.panopticon-home');
+    process.env.OVERDECK_HOME = join(projectRoot, '.overdeck-home');
     stdinIsTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
     Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
 

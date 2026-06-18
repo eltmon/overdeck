@@ -18,7 +18,7 @@ vi.mock('../terminal/TerminalDrawer', () => ({
   TerminalDrawer: () => <div data-testid="terminal-drawer" />,
 }))
 
-const DECK = 'panopticon'
+const DECK = 'overdeck'
 
 // PAN-1561: the Stage is project-scoped and composes HOME / issue tabs via
 // render props. These stubs keep the test focused on pane mechanics; a HOME

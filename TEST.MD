@@ -38,15 +38,15 @@ Revert or leave your edits as you see fit — this file is meant to churn.
   flash in dark mode (pinned color-scheme from our side). This edit's diff is the
   one to review in the conversation diff panel — it should be dark in dark mode,
   light in light mode, with no flash on open or theme toggle.
-- 2026-06-08: Testing a custom Claude Code theme (custom:panopticon) that mutes
+- 2026-06-08: Testing a custom Claude Code theme (custom:overdeck) that mutes
   the harsh full-width diffAdded/diffRemoved bands. The green/red bands behind
   THESE lines in the Claude terminal should now read as soft, low-saturation
-  tints rather than vivid blocks. Tunable live via ~/.claude/themes/panopticon.json.
+  tints rather than vivid blocks. Tunable live via ~/.claude/themes/overdeck.json.
 - 2026-06-08: Fresh diff to eyeball the muted theme. The lines below mix adds and
   removes so you can compare the soft green vs soft maroon bands side by side.
 - 2026-06-08: Re-saved the theme (muted tones) to force a hot-reload. This line's
   band is the live test of whether the running session re-applied
-  custom:panopticon (#1c3d24 green / #43222a maroon).
+  custom:overdeck (#1c3d24 green / #43222a maroon).
 - 2026-06-09: Mixed-edit smoke test — this block adds, changes, and deletes lines
   in one diff so you can see all three band types stacked together.
 - 2026-06-09: UPDATED this line — the old "fresh add" text was rewritten in place,

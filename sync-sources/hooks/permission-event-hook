@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/permission-event-hook
+# ~/.overdeck/bin/permission-event-hook
 #
 # Fires on Claude Code PermissionRequest, PostToolUse, and Stop hooks.
 # POSTs the raw payload (stdin) to the dashboard's /api/hooks/permission-event

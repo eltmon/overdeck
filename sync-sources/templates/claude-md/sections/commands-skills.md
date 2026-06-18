@@ -10,6 +10,6 @@
 
 ## Skills
 
-Skills are in `~/.panopticon/skills/`. They provide reusable workflows and best practices.
+Skills are in `~/.overdeck/skills/`. They provide reusable workflows and best practices.
 
 To use a skill, invoke it with `/skill-name` or reference it in your prompt.

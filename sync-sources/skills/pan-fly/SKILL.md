@@ -47,7 +47,7 @@ pan remote setup
 pan remote status
 ```
 
-Key config lives in `~/.panopticon/config.toml` under `[remote]` and `[remote.fly]`.
+Key config lives in `~/.overdeck/config.toml` under `[remote]` and `[remote.fly]`.
 
 Important fields:
 - `app`
@@ -166,7 +166,7 @@ pan remote status
 ```
 
 Then inspect:
-- config in `~/.panopticon/config.toml`
+- config in `~/.overdeck/config.toml`
 - whether `flyctl` is installed
 - whether auth is valid
 

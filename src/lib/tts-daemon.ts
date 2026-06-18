@@ -676,7 +676,7 @@ async function hasCudaGpu(): Promise<boolean> {
 }async function installTtsSystemdUnitPromise(): Promise<string> {
   const configDir = join(process.env.HOME ?? '', '.config', 'systemd', 'user');
   await mkdir(configDir, { recursive: true });
-  const unitPath = join(configDir, 'panopticon-qwen-tts.service');
+  const unitPath = join(configDir, 'overdeck-qwen-tts.service');
   const panBinary = process.env.OVERDECK_PAN_BINARY ?? process.argv[1] ?? 'pan';
   const content = `[Unit]\nDescription=Overdeck Qwen TTS daemon\nAfter=default.target\n\n[Service]\nType=simple\nExecStart=${panBinary} tts start --foreground\nRestart=on-failure\nRestartSec=10\n\n[Install]\nWantedBy=default.target\n`;
   await writeFile(unitPath, content, 'utf8');

@@ -3,11 +3,11 @@ import { join, sep } from 'path';
 import { existsSync } from 'fs';
 
 // Overdeck home directory (can be overridden for testing)
-export const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
+export const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
 
 /** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
 export function getOverdeckHome(): string {
-  return process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
+  return process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
 }
 
 // Subdirectories
@@ -57,7 +57,7 @@ export const SYNC_TARGET = {
   agents: join(CLAUDE_DIR, 'agents'),
 } as const;
 
-// Templates directory (in user's ~/.panopticon)
+// Templates directory (in user's ~/.overdeck)
 export const TEMPLATES_DIR = join(OVERDECK_HOME, 'templates');
 export const CLAUDE_MD_TEMPLATES = join(TEMPLATES_DIR, 'claude-md', 'sections');
 
@@ -118,7 +118,7 @@ export const SYNC_SOURCES = {
 } as const;
 
 // Cache directories (where Overdeck keeps its copy of distributed content)
-export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.panopticon/skills/
+export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.overdeck/skills/
 export const CACHE_AGENTS_DIR = join(OVERDECK_HOME, 'agent-definitions');  // separate from agent state
 export const CACHE_RULES_DIR = join(OVERDECK_HOME, 'rules');
 export const CACHE_MANIFEST = join(OVERDECK_HOME, '.manifest.json');
@@ -134,7 +134,7 @@ export const DOCS_DISABLE_STATE_FILE = join(DOCS_DIR, 'disable-state.json');
 export const DOCS_TELEMETRY_FILE = join(DOCS_DIR, 'telemetry.jsonl');
 
 export interface DocsPathOverrides {
-  panopticonHome?: string;
+  overdeckHome?: string;
   docsDir?: string;
   indexPath?: string;
   budgetStatePath?: string;
@@ -151,7 +151,7 @@ export interface DocsPaths {
 }
 
 export function getDocsPaths(overrides: DocsPathOverrides = {}): DocsPaths {
-  const docsDir = overrides.docsDir ?? join(overrides.panopticonHome ?? getOverdeckHome(), 'docs');
+  const docsDir = overrides.docsDir ?? join(overrides.overdeckHome ?? getOverdeckHome(), 'docs');
   return {
     docsDir,
     indexPath: overrides.indexPath ?? join(docsDir, 'index.sqlite'),
@@ -161,23 +161,23 @@ export function getDocsPaths(overrides: DocsPathOverrides = {}): DocsPaths {
   };
 }
 
-export function getDocsDir(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir'> = {}): string {
+export function getDocsDir(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir'> = {}): string {
   return getDocsPaths(overrides).docsDir;
 }
 
-export function getDocsIndexPath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'indexPath'> = {}): string {
+export function getDocsIndexPath(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir' | 'indexPath'> = {}): string {
   return getDocsPaths(overrides).indexPath;
 }
 
-export function getDocsBudgetStatePath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'budgetStatePath'> = {}): string {
+export function getDocsBudgetStatePath(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir' | 'budgetStatePath'> = {}): string {
   return getDocsPaths(overrides).budgetStatePath;
 }
 
-export function getDocsDisableStatePath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'disableStatePath'> = {}): string {
+export function getDocsDisableStatePath(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir' | 'disableStatePath'> = {}): string {
   return getDocsPaths(overrides).disableStatePath;
 }
 
-export function getDocsTelemetryPath(overrides: Pick<DocsPathOverrides, 'panopticonHome' | 'docsDir' | 'telemetryPath'> = {}): string {
+export function getDocsTelemetryPath(overrides: Pick<DocsPathOverrides, 'overdeckHome' | 'docsDir' | 'telemetryPath'> = {}): string {
   return getDocsPaths(overrides).telemetryPath;
 }
 

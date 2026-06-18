@@ -14,9 +14,9 @@ import type { ProjectsConfig } from '../../../../src/lib/projects.js';
 
 const fixtureProjects: ProjectsConfig = {
   projects: {
-    panopticon: {
+    overdeck: {
       name: 'Overdeck',
-      path: '/repo/panopticon',
+      path: '/repo/overdeck',
       issue_prefix: 'PAN',
       github_repo: 'eltmon/overdeck',
     },
@@ -46,7 +46,7 @@ describe('overdeck Config resolver', () => {
 
     expect(project).toMatchObject({
       name: 'Overdeck',
-      path: '/repo/panopticon',
+      path: '/repo/overdeck',
       issue_prefix: 'PAN',
     });
   });

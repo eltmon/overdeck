@@ -4,7 +4,7 @@
  * Manages shadow state for issues - tracking status locally without updating
  * the issue tracker until explicitly synced.
  *
- * Storage Location: ${OVERDECK_HOME:-~/.panopticon}/shadow-state/
+ * Storage Location: ${OVERDECK_HOME:-~/.overdeck}/shadow-state/
  */
 
 import { existsSync, mkdirSync, unlinkSync } from 'fs';

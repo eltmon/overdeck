@@ -24,7 +24,7 @@ export function StandaloneTerminal({ sessionName, token }: StandaloneTerminalPro
   }, [sessionName]);
 
   function handleAlwaysOnTop(): void {
-    const bridge = window.panopticonBridge;
+    const bridge = window.overdeckBridge;
     if (bridge?.isDesktopApp?.()) {
       const nextValue = !isAlwaysOnTop;
       setIsAlwaysOnTop(nextValue);

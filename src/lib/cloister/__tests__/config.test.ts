@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../paths.js', () => ({
-  OVERDECK_HOME: '/tmp/test-panopticon',
+  OVERDECK_HOME: '/tmp/test-overdeck',
 }));
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
     ...actual,
-    existsSync: vi.fn((path: string) => String(path) !== '/tmp/test-panopticon/cloister.toml'),
+    existsSync: vi.fn((path: string) => String(path) !== '/tmp/test-overdeck/cloister.toml'),
     mkdirSync: vi.fn(),
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
@@ -24,7 +24,7 @@ const mockedWriteFileSync = vi.mocked(writeFileSync);
 
 describe('loadCloisterConfig', () => {
   afterEach(() => {
-    mockedExistsSync.mockImplementation((path: Parameters<typeof existsSync>[0]) => String(path) !== '/tmp/test-panopticon/cloister.toml');
+    mockedExistsSync.mockImplementation((path: Parameters<typeof existsSync>[0]) => String(path) !== '/tmp/test-overdeck/cloister.toml');
     mockedReadFileSync.mockReset();
     mockedWriteFileSync.mockReset();
   });

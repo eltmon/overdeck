@@ -81,7 +81,7 @@ groups:
 ### Example Configuration
 
 ```yaml
-# ~/.panopticon/projects.yaml
+# ~/.overdeck/projects.yaml
 enterprise-integration:
   name: "Enterprise Integration"
   path: /home/user/Projects/EnterpriseIntegration
@@ -96,7 +96,7 @@ enterprise-integration:
     type: polyrepo
     progressive: true                    # NEW: only create always_include repos initially
     always_include: [meta]               # NEW: these repos are always in the workspace
-    groups_file: team-meta/panopticon/repo-groups.yaml  # NEW: where groups are defined
+    groups_file: team-meta/overdeck/repo-groups.yaml  # NEW: where groups are defined
     pr_target: qa                        # NEW: default PR target for all repos
     repos:
       - name: meta
@@ -209,7 +209,7 @@ A Claude Code skill that agents invoke during work. Lives in the Overdeck global
 
 **Skill structure:**
 ```
-~/.panopticon/skills/workspace-add-repo/
+~/.overdeck/skills/workspace-add-repo/
 ├── skill.md
 ```
 

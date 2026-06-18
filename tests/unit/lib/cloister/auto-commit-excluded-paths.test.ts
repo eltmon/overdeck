@@ -5,28 +5,28 @@ import {
 } from '../../../../src/lib/cloister/merge-agent.js';
 
 describe('AUTO_COMMIT_EXCLUDED_PATHS', () => {
-  it('excludes the machine-local .panopticon/ config directory (PAN-1899)', () => {
-    expect(AUTO_COMMIT_EXCLUDED_PATHS).toContain('.panopticon/');
+  it('excludes the machine-local .overdeck/ config directory (PAN-1899)', () => {
+    expect(AUTO_COMMIT_EXCLUDED_PATHS).toContain('.overdeck/');
   });
 });
 
 describe('isAutoCommitExcludedPath', () => {
   it('excludes the machine-local projects.yaml copied into every workspace (PAN-1899)', () => {
-    expect(isAutoCommitExcludedPath('.panopticon/projects.yaml')).toBe(true);
+    expect(isAutoCommitExcludedPath('.overdeck/projects.yaml')).toBe(true);
   });
 
-  it('excludes everything else under .panopticon/ (config.yaml, settings.json, nested files)', () => {
-    expect(isAutoCommitExcludedPath('.panopticon/config.yaml')).toBe(true);
-    expect(isAutoCommitExcludedPath('.panopticon/settings.json')).toBe(true);
-    expect(isAutoCommitExcludedPath('.panopticon/claude-md/sections/01.md')).toBe(true);
+  it('excludes everything else under .overdeck/ (config.yaml, settings.json, nested files)', () => {
+    expect(isAutoCommitExcludedPath('.overdeck/config.yaml')).toBe(true);
+    expect(isAutoCommitExcludedPath('.overdeck/settings.json')).toBe(true);
+    expect(isAutoCommitExcludedPath('.overdeck/claude-md/sections/01.md')).toBe(true);
   });
 
-  it('excludes the bare .panopticon directory entry', () => {
-    expect(isAutoCommitExcludedPath('.panopticon')).toBe(true);
+  it('excludes the bare .overdeck directory entry', () => {
+    expect(isAutoCommitExcludedPath('.overdeck')).toBe(true);
   });
 
   it('does not over-match sibling paths that merely share the prefix', () => {
-    expect(isAutoCommitExcludedPath('.panopticonfoo')).toBe(false);
+    expect(isAutoCommitExcludedPath('.overdeckfoo')).toBe(false);
   });
 
   it('still excludes the pre-existing denylisted paths', () => {

@@ -67,7 +67,7 @@ The server reads the JSONL file and transforms it into T3Code's `ChatMessage` fo
 ### Data Model (mirror T3Code)
 
 ```typescript
-// In @panopticon/contracts — same shape as T3Code's types
+// In @overdeck/contracts — same shape as T3Code's types
 interface ChatMessage {
   id: MessageId;
   role: 'user' | 'assistant' | 'system';

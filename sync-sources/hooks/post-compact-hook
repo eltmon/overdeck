@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/post-compact-hook
+# ~/.overdeck/bin/post-compact-hook
 #
 # Fires on Claude Code PostCompact. Emits agent.activity_changed(idle) to clear
 # the compacting indicator and return the agent to normal idle state.

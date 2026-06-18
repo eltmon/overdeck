@@ -55,12 +55,12 @@ cleanup() {
 
     # Remove test installation
     if [ "$CLEAN_PANOPTICON" = "true" ]; then
-        rm -rf ~/.panopticon.test
+        rm -rf ~/.overdeck.test
     fi
 
     # Remove Docker resources
-    docker rm -f panopticon-traefik 2>/dev/null || true
-    docker network rm panopticon 2>/dev/null || true
+    docker rm -f overdeck-traefik 2>/dev/null || true
+    docker network rm overdeck 2>/dev/null || true
 }
 
 # Trap cleanup on exit
@@ -89,7 +89,7 @@ if ! command -v pan &> /dev/null; then
 fi
 
 # Use test environment
-export OVERDECK_HOME=~/.panopticon.test
+export OVERDECK_HOME=~/.overdeck.test
 export CLEAN_PANOPTICON=true
 
 log_info "Using test environment: $OVERDECK_HOME"
@@ -102,7 +102,7 @@ pan install --skip-mkcert > /dev/null 2>&1
 if [ -d "$OVERDECK_HOME/traefik" ] && \
    [ -f "$OVERDECK_HOME/traefik/docker-compose.yml" ] && \
    [ -f "$OVERDECK_HOME/traefik/traefik.yml" ] && \
-   [ -f "$OVERDECK_HOME/traefik/dynamic/panopticon.yml" ] && \
+   [ -f "$OVERDECK_HOME/traefik/dynamic/overdeck.yml" ] && \
    [ -f "$OVERDECK_HOME/config.toml" ]; then
     test_pass
 else
@@ -121,8 +121,8 @@ else
 fi
 
 # Test 3: Docker network created
-test_start "Docker network 'panopticon' exists"
-if docker network ls | grep -q panopticon; then
+test_start "Docker network 'overdeck' exists"
+if docker network ls | grep -q overdeck; then
     test_pass
 else
     test_fail "Docker network not created"
@@ -140,7 +140,7 @@ if grep -q "external: true" "$OVERDECK_HOME/traefik/docker-compose.yml"; then
         exit 1
     fi
 else
-    test_fail "docker-compose.yml missing 'external: true' for panopticon network"
+    test_fail "docker-compose.yml missing 'external: true' for overdeck network"
     exit 1
 fi
 
@@ -149,11 +149,11 @@ test_start "pan up starts Traefik container"
 pan up --detach > /dev/null 2>&1
 sleep 3  # Wait for services to start
 
-if docker ps | grep -q panopticon-traefik; then
+if docker ps | grep -q overdeck-traefik; then
     test_pass
 else
     test_fail "Traefik container not running"
-    docker logs panopticon-traefik 2>&1 | tail -20
+    docker logs overdeck-traefik 2>&1 | tail -20
     exit 1
 fi
 
@@ -219,7 +219,7 @@ TRAEFIK_STOPPED=false
 FRONTEND_STOPPED=false
 API_STOPPED=false
 
-if ! docker ps | grep -q panopticon-traefik; then
+if ! docker ps | grep -q overdeck-traefik; then
     TRAEFIK_STOPPED=true
 fi
 

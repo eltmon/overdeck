@@ -5,8 +5,8 @@
  * that survive event-store resets and are greppable from the shell.
  *
  * Files:
- *   ~/.panopticon/logs/deacon.log        — deacon startup recovery actions
- *   ~/.panopticon/agents/<id>/lifecycle.log — per-agent state transitions
+ *   ~/.overdeck/logs/deacon.log        — deacon startup recovery actions
+ *   ~/.overdeck/agents/<id>/lifecycle.log — per-agent state transitions
  */
 
 import { appendFileSync, mkdirSync } from 'fs';
@@ -39,7 +39,7 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
-/** Append a line to ~/.panopticon/logs/deacon.log */
+/** Append a line to ~/.overdeck/logs/deacon.log */
 export function logDeaconEventSync(message: string): void {
   ensureLogsDir();
   try {
@@ -49,7 +49,7 @@ export function logDeaconEventSync(message: string): void {
   }
 }
 
-/** Append a line to ~/.panopticon/agents/<agentId>/lifecycle.log */
+/** Append a line to ~/.overdeck/agents/<agentId>/lifecycle.log */
 export function logAgentLifecycleSync(agentId: string, message: string): void {
   ensureAgentDir(agentId);
   try {

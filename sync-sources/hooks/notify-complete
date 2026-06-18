@@ -13,7 +13,7 @@ TITLE="${2:-Agent completed work}"
 MR_URL="${3:-}"
 
 # Log to completion file
-COMPLETION_LOG="$HOME/.panopticon/agent-completed.log"
+COMPLETION_LOG="$HOME/.overdeck/agent-completed.log"
 mkdir -p "$(dirname "$COMPLETION_LOG")"
 echo "$(date '+%Y-%m-%d %H:%M:%S') | ${ISSUE_ID} | ${TITLE} | ${MR_URL}" >> "$COMPLETION_LOG"
 

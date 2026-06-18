@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Re-route paths.ts to a fixed per-suite path so getAgentState reads our
-// fixture state.json files instead of the real ~/.panopticon. paths.ts
+// fixture state.json files instead of the real ~/.overdeck. paths.ts
 // freezes the constants at import time, and vi.mock is hoisted above all
 // imports — so we use a literal path here and clean it up in afterAll.
 const TEST_OVERDECK_HOME = '/tmp/pan-test-runtime-dispatch'

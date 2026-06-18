@@ -100,8 +100,8 @@ describe('syncSkillsToTools', () => {
     const agentsMd = join(PROJECT_DIR, 'AGENTS.md');
     expect(existsSync(agentsMd)).toBe(true);
     const content = readFileSync(agentsMd, 'utf-8');
-    expect(content).toContain('<!-- panopticon:my-skill start -->');
-    expect(content).toContain('<!-- panopticon:my-skill end -->');
+    expect(content).toContain('<!-- overdeck:my-skill start -->');
+    expect(content).toContain('<!-- overdeck:my-skill end -->');
     expect(content).toContain('# My Skill');
   });
 
@@ -112,8 +112,8 @@ describe('syncSkillsToTools', () => {
     const conventionsMd = join(PROJECT_DIR, 'CONVENTIONS.md');
     expect(existsSync(conventionsMd)).toBe(true);
     const content = readFileSync(conventionsMd, 'utf-8');
-    expect(content).toContain('<!-- panopticon:my-skill start -->');
-    expect(content).toContain('<!-- panopticon:my-skill end -->');
+    expect(content).toContain('<!-- overdeck:my-skill start -->');
+    expect(content).toContain('<!-- overdeck:my-skill end -->');
   });
 
   it('updates existing named block in AGENTS.md without duplicating', () => {
@@ -125,7 +125,7 @@ describe('syncSkillsToTools', () => {
     const agentsMd = join(PROJECT_DIR, 'AGENTS.md');
     const content = readFileSync(agentsMd, 'utf-8');
     // Should only appear once
-    const count = (content.match(/<!-- panopticon:my-skill start -->/g) || []).length;
+    const count = (content.match(/<!-- overdeck:my-skill start -->/g) || []).length;
     expect(count).toBe(1);
   });
 
@@ -150,7 +150,7 @@ describe('syncSkillsToTools', () => {
 describe('resolveAlsoSyncTools', () => {
   it('returns empty array when no config exists', () => {
     const tools = resolveAlsoSyncToolsSync(PROJECT_DIR);
-    // Since global ~/.panopticon/config.yaml may or may not have tools, we just check it returns an array
+    // Since global ~/.overdeck/config.yaml may or may not have tools, we just check it returns an array
     expect(Array.isArray(tools)).toBe(true);
   });
 

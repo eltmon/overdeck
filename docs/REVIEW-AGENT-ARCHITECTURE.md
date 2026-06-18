@@ -36,12 +36,12 @@ spawnReviewRoleForIssue(issueId)
   ├─ spawnRun(issueId, 'review', { subRole: 'performance' })   ← roles/review-performance.md (inlined)
   ├─ spawnRun(issueId, 'review', { subRole: 'requirements' })  ← roles/review-requirements.md (inlined)
   │
-  ├─ each reviewer writes ~/.panopticon/agents/<reviewer>/review-<subRole>.md
+  ├─ each reviewer writes ~/.overdeck/agents/<reviewer>/review-<subRole>.md
   ├─ each reviewer's LAUNCHER signals synthesis on process exit (PAN-977):
   │    REVIEWER_READY   <subRole> <outputPath>   (report file written)
   │    REVIEWER_FAILED  <subRole> <reason>       (exited, no report)
   │    REVIEWER_TIMEOUT <subRole> <reason>       (timeout 1200s killed it)
-  │    then touches ~/.panopticon/agents/<reviewer>/reviewer-signaled
+  │    then touches ~/.overdeck/agents/<reviewer>/reviewer-signaled
   ├─ Deacon is the rare backup: only signals when the launcher's own bash
   │    process was SIGKILLed before it could (no reviewer-signaled marker)
   ├─ synthesis reads ready output files and synthesizes one verdict
@@ -116,7 +116,7 @@ Synthesis uses tier as a tiebreaker when the same finding is raised at different
 
 ## Output and signal contract
 
-Each convoy reviewer writes exactly one report to its assigned output file under `~/.panopticon/agents/<reviewerAgentId>/review-<subRole>.md`, then stops. The reviewer **does not** signal synthesis itself — it does not run `pan tell` and does not need to `exit` cleanly.
+Each convoy reviewer writes exactly one report to its assigned output file under `~/.overdeck/agents/<reviewerAgentId>/review-<subRole>.md`, then stops. The reviewer **does not** signal synthesis itself — it does not run `pan tell` and does not need to `exit` cleanly.
 
 **The launcher owns the signal (PAN-977).** For a Claude Code review sub-role, `spawnRun` generates a launcher that runs `timeout 1200 claude --print ... < initial-prompt.md` as a *child* process (not `exec`). When `claude` exits, the launcher's own bash process inspects the outcome and signals synthesis exactly once:
 
@@ -124,7 +124,7 @@ Each convoy reviewer writes exactly one report to its assigned output file under
 - report file is non-empty → `REVIEWER_READY <subRole> <outputPath>`
 - otherwise (crash, early exit, empty file) → `REVIEWER_FAILED <subRole> ...`
 
-It then `touch`es `~/.panopticon/agents/<reviewerAgentId>/reviewer-signaled`. This makes the happy path *and* the failure path self-contained in the launcher's bash process: the agent cannot forget to signal, cannot double-signal, and a crash still produces `REVIEWER_FAILED`. The synthesis role never spawns reviewers and never polls files or tmux; it waits for one terminal signal per sub-role, reads the output paths from `REVIEWER_READY`, then writes `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
+It then `touch`es `~/.overdeck/agents/<reviewerAgentId>/reviewer-signaled`. This makes the happy path *and* the failure path self-contained in the launcher's bash process: the agent cannot forget to signal, cannot double-signal, and a crash still produces `REVIEWER_FAILED`. The synthesis role never spawns reviewers and never polls files or tmux; it waits for one terminal signal per sub-role, reads the output paths from `REVIEWER_READY`, then writes `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
 
 **Deacon is the rare backup, not the happy path.** `monitorReviewConvoySignals` skips any reviewer whose `reviewer-signaled` marker is newer than the run's `startedAt` — the launcher already signaled. Deacon only signals `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` itself when that marker is absent, i.e. the launcher's bash process was SIGKILLed before it could run its contract block. Synthesis treats either failure signal as a blocking infrastructure failure.
 

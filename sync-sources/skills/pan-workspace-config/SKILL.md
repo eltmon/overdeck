@@ -17,7 +17,7 @@ Configure workspace settings for polyrepo projects, DNS, Docker, services, and m
 
 ## What This Skill Does
 
-Guides you through configuring workspace settings in `~/.panopticon/projects.yaml`:
+Guides you through configuring workspace settings in `~/.overdeck/projects.yaml`:
 
 1. **Workspace Type** - Monorepo (single git repo) or Polyrepo (multiple repos)
 2. **Git Repositories** - Configure which repos to include for polyrepo projects
@@ -228,7 +228,7 @@ projects:
 
 See the Mind Your Now project for a complete example:
 ```bash
-cat ~/.panopticon/projects.yaml
+cat ~/.overdeck/projects.yaml
 ```
 
 ## Custom Workspace Scripts

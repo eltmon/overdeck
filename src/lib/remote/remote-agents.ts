@@ -21,10 +21,10 @@ import { getManagedTmuxSocketName } from '../tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 
-const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
+const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
 const REMOTE_PAN_DIR = '/workspace/.pan';
 const REMOTE_TMUX_DIR = `${REMOTE_PAN_DIR}/tmux`;
-const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/panopticon.tmux.conf`;
+const REMOTE_TMUX_CONFIG_PATH = `${REMOTE_TMUX_DIR}/overdeck.tmux.conf`;
 const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
 const REMOTE_TMUX_CONFIG_CONTENT = [
   '# Overdeck-managed tmux config',
@@ -90,7 +90,7 @@ export function generatePushDaemonScript(options: PushDaemonOptions): string {
     `      const message = 'wip(remote): heartbeat for ' + ${issueIdLiteral};`,
     '      execFile(',
     "        'git',",
-    `        ['-C', cwd, '-c', 'user.name=Overdeck Remote', '-c', 'user.email=remote@panopticon.local', 'commit', '-m', message],`,
+    `        ['-C', cwd, '-c', 'user.name=Overdeck Remote', '-c', 'user.email=remote@overdeck.local', 'commit', '-m', message],`,
     '        (err) => {',
     '          if (err) {',
     "            log('git commit failed: ' + (err.message || String(err)));",

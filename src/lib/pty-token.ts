@@ -4,7 +4,7 @@ import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
 
-export const PTY_TOKEN_HEADER = 'x-panopticon-pty-token';
+export const PTY_TOKEN_HEADER = 'x-overdeck-pty-token';
 
 function ptyTokenDir(agentId: string): string {
   return join(getOverdeckHome(), 'agents', agentId);

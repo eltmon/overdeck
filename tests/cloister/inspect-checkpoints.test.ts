@@ -50,7 +50,7 @@ describe('inspect-checkpoints', () => {
   const issueId = 'MIN-796';
 
   beforeEach(() => {
-    mkdirSync(join(TEST_HOME, '.panopticon'), { recursive: true });
+    mkdirSync(join(TEST_HOME, '.overdeck'), { recursive: true });
     execSyncMock.mockReset();
   });
 
@@ -68,7 +68,7 @@ describe('inspect-checkpoints', () => {
     });
 
     it('loads existing checkpoints from file', () => {
-      const dir = join(TEST_HOME, '.panopticon', 'specialists', projectKey, 'inspect-agent', 'checkpoints');
+      const dir = join(TEST_HOME, '.overdeck', 'specialists', projectKey, 'inspect-agent', 'checkpoints');
       mkdirSync(dir, { recursive: true });
       const data = {
         issueId: 'MIN-796',

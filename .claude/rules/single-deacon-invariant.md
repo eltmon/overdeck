@@ -1,10 +1,10 @@
 ---
 scope: dev
 ---
-## Single Deacon Invariant — Never Mount `~/.panopticon` Into Workspace Containers
+## Single Deacon Invariant — Never Mount `~/.overdeck` Into Workspace Containers
 
-Only one Deacon may run at a time per `~/.panopticon` state directory. Mounting
-`${HOME}/.panopticon` into a workspace devcontainer that also runs
+Only one Deacon may run at a time per `~/.overdeck` state directory. Mounting
+`${HOME}/.overdeck` into a workspace devcontainer that also runs
 `dist/dashboard/server.js` creates a second Deacon racing the host's.
 
 For the broader workspace container contract, stack-health surfaces, and recovery
@@ -13,7 +13,7 @@ commands, see `docs/WORKSPACE-CONTAINERS.md`.
 ### What goes wrong
 
 The container has its own tmux server. The host has its own tmux server. Both
-deacons share the same `~/.panopticon/agents/*/state.json` files via the rw
+deacons share the same `~/.overdeck/agents/*/state.json` files via the rw
 mount. Each deacon's `recoverOrphanedAgents` patrol checks for tmux sessions
 against ITS tmux server, sees them missing (because the other deacon's sessions
 live elsewhere), and resets `state.json` to `stopped`. The other deacon then
@@ -27,7 +27,7 @@ and stopped without making progress.
 
 - `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` and
   `.devcontainer/docker-compose.devcontainer.yml` MUST NOT include a
-  `${HOME}/.panopticon:...` volume mount on the `server` service.
+  `${HOME}/.overdeck:...` volume mount on the `server` service.
 - Both compose files MUST set `OVERDECK_DISABLE_DEACON=1` on the `server`
   service environment as belt-and-suspenders in case someone reintroduces a
   mount in the future. `src/dashboard/server/main.ts` already checks this env

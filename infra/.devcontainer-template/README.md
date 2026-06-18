@@ -78,8 +78,8 @@ open https://feature-pan-103.pan.localhost
 ## Requirements
 
 - Docker
-- Overdeck Traefik running (`~/.panopticon/traefik/`)
-- `panopticon` Docker network created
+- Overdeck Traefik running (`~/.overdeck/traefik/`)
+- `overdeck` Docker network created
 - Wildcard certs for `*.pan.localhost`
 
 ## Resolved Issues (PAN-109)

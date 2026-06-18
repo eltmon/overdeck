@@ -55,7 +55,7 @@ const DEFAULT_RETENTION_DAYS = 90;
 
 // Use functions for paths to allow test mocking via process.env.HOME
 function getCostsDir(): string {
-  return join(process.env.HOME || homedir(), '.panopticon', 'costs');
+  return join(process.env.HOME || homedir(), '.overdeck', 'costs');
 }
 
 function getCacheFile(): string {

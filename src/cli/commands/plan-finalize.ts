@@ -80,8 +80,8 @@ function findWorkspaceRoot(start: string): string | null {
 }
 
 function readAutoSpawnOnFinalize(issueId: string): boolean {
-  const panopticonHome = process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
-  const flagFile = join(panopticonHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
+  const overdeckHome = process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
+  const flagFile = join(overdeckHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
   try {
     if (!existsSync(flagFile)) return false;
     const flag = JSON.parse(readFileSync(flagFile, 'utf-8')) as { autoSpawnOnFinalize?: unknown };

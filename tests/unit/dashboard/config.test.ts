@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
 import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src/dashboard/server/config.js';
 
-// Prevent loadOverdeckEnv from loading ~/.panopticon.env during tests
+// Prevent loadOverdeckEnv from loading ~/.overdeck.env during tests
 // so env var presence/absence is fully controlled by the test.
 vi.mock('../../../src/lib/env-loader.js', () => ({
   loadOverdeckEnv: () => ({ loaded: [], skipped: [] }),
@@ -102,7 +102,7 @@ describe('ServerConfig', () => {
   });
 
   describe('host', () => {
-    it('defaults to 0.0.0.0 so panopticon-traefik (docker) can reach the host process', async () => {
+    it('defaults to 0.0.0.0 so overdeck-traefik (docker) can reach the host process', async () => {
       const cfg = await getConfig();
       expect(cfg.host).toBe('0.0.0.0');
     });

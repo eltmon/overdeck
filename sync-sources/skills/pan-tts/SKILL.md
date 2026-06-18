@@ -3,7 +3,7 @@ name: pan-tts
 description: Built-in dashboard text-to-speech playback plus optional external sidecar support through Qwen3-TTS (or any local TTS engine). The dashboard speaks activity.tts events directly when tts.enabled=true; the SSE sidecar remains optional for external TTS on another machine. Also exposes an ad-hoc speak helper (scripts/say.sh) so agents can announce one-off messages on demand.
 triggers:
   - pan tts
-  - panopticon tts
+  - overdeck tts
   - text to speech
   - read activity log
   - speak this
@@ -21,7 +21,7 @@ allowed-tools:
 
 ## What It Is
 
-Overdeck has built-in dashboard TTS playback for `activity.tts` events when `tts.enabled=true` in `~/.panopticon/config.yaml`. The dashboard server resolves the configured voice and POSTs directly to the local Qwen3-TTS daemon, so no external subscriber is needed for the normal local-dashboard path.
+Overdeck has built-in dashboard TTS playback for `activity.tts` events when `tts.enabled=true` in `~/.overdeck/config.yaml`. The dashboard server resolves the configured voice and POSTs directly to the local Qwen3-TTS daemon, so no external subscriber is needed for the normal local-dashboard path.
 
 `pan-tts` remains an **optional** external sidecar for users who want SSE-based TTS on a different machine or want to consume Overdeck's public event stream independently.
 
@@ -74,7 +74,7 @@ pan tts restart
 pan tts install-systemd
 ```
 
-`pan tts start` uses `tts.daemonHost` and `tts.daemonPort` from `~/.panopticon/config.yaml`, tracks the PID at `~/.panopticon/pids/qwen-tts.pid`, and waits for `/health` before returning. Set `tts.daemon.autoStart: true` to have `pan up` start the daemon automatically; the default is off because the model cold-start and VRAM footprint are expensive.
+`pan tts start` uses `tts.daemonHost` and `tts.daemonPort` from `~/.overdeck/config.yaml`, tracks the PID at `~/.overdeck/pids/qwen-tts.pid`, and waits for `/health` before returning. Set `tts.daemon.autoStart: true` to have `pan up` start the daemon automatically; the default is off because the model cold-start and VRAM footprint are expensive.
 
 The daemon auto-detects the default PipeWire sink and uses a **persistent `pw-play` stream** to avoid audio truncation caused by sink suspend/resume (see *PipeWire Suspend* below).
 
@@ -118,7 +118,7 @@ queue:
   drop_info_when_full: true
 ```
 
-Secrets (if any) go in `~/.panopticon.env` alongside the rest of the pan environment — do not duplicate them here.
+Secrets (if any) go in `~/.overdeck.env` alongside the rest of the pan environment — do not duplicate them here.
 
 ### Running the subscriber
 
@@ -147,7 +147,7 @@ pan tts voices set-default "Vivian Voice"
 pan tts voices map reviewStatus.passed "Vivian Voice"
 ```
 
-`pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). On a fresh install with no saved system voice, the smoke test uses the daemon's default preset (`Vivian`, override via `QWEN_TTS_VOICE`) so the audio path can be verified before creating a voice library.
+`pan tts test` reads `tts.voice` from `~/.overdeck/config.yaml`, resolves it in `~/.overdeck/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). On a fresh install with no saved system voice, the smoke test uses the daemon's default preset (`Vivian`, override via `QWEN_TTS_VOICE`) so the audio path can be verified before creating a voice library.
 
 The skill also bundles `scripts/say.sh` for one-off utterances that bypass Overdeck voice settings:
 
@@ -156,7 +156,7 @@ The skill also bundles `scripts/say.sh` for one-off utterances that bypass Overd
 ./scripts/say.sh "Pan 672 merged to main."
 ```
 
-The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`) and sends the daemon token from `~/.panopticon/secrets/qwen-tts.token`. It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
+The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`) and sends the daemon token from `~/.overdeck/secrets/qwen-tts.token`. It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
 
 Use ad-hoc speak sparingly — the built-in dashboard playback service or optional SSE sidecar already speaks activity TTS events. Ad-hoc speak is for:
 - Announcements that don't warrant a dashboard activity entry (local test runs, meta-commentary)
@@ -167,7 +167,7 @@ Use ad-hoc speak sparingly — the built-in dashboard playback service or option
 
 1. Install the daemon venv: `pan install` on Linux/CUDA, or skip the heavy CUDA install with `pan install --skip-tts-daemon`.
 2. Start the daemon: `pan tts start`.
-3. Set `tts.enabled: true` and a default voice in `~/.panopticon/config.yaml`.
+3. Set `tts.enabled: true` and a default voice in `~/.overdeck/config.yaml`.
 4. `pan up` — start the dashboard; if `tts.daemon.autoStart: true`, this also starts the daemon.
 5. In another terminal: `pan start PAN-XXX` and listen. You should hear dashboard-emitted `activity.tts` events.
 6. Optional external sidecar path: start `pan-tts` and watch `journalctl --user -u pan-tts -f`.
@@ -175,7 +175,7 @@ Use ad-hoc speak sparingly — the built-in dashboard playback service or option
 If nothing speaks:
 
 - Run `pan tts status` and check the dashboard TTS badge / `GET /api/tts/health` to confirm the daemon is reachable.
-- Check that `tts.voice` points at an existing voice in `~/.panopticon/tts-voices.json`.
+- Check that `tts.voice` points at an existing voice in `~/.overdeck/tts-voices.json`.
 - For the optional sidecar path, check `curl -N http://127.0.0.1:3000/events/stream?types=activity.tts` directly.
 - Check `aplay -l` — make sure the default audio device is reachable from the user session.
 

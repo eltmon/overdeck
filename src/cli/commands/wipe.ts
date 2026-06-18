@@ -43,7 +43,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
     return;
   }
 
-  const projectsYamlPath = join(homedir(), '.panopticon', 'projects.yaml');
+  const projectsYamlPath = join(homedir(), '.overdeck', 'projects.yaml');
   let projectPath: string | undefined;
   if (existsSync(projectsYamlPath)) {
     try {
@@ -68,7 +68,7 @@ export async function wipeCommand(issueId: string, options: WipeOptions): Promis
 
   const issueLower = issueId.toLowerCase();
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const workspaceConfigPath = join(workspacePath, '.panopticon', 'workspace.json');
+  const workspaceConfigPath = join(workspacePath, '.overdeck', 'workspace.json');
 
   let projectName = '';
   let githubMeta: { owner: string; repo: string; number: number } | undefined;

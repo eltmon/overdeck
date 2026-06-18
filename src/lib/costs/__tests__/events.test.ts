@@ -12,8 +12,8 @@ let TEST_ROOT: string;
 const originalHome = process.env.HOME;
 
 beforeEach(() => {
-  TEST_ROOT = join(tmpdir(), `panopticon-events-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(join(TEST_ROOT, '.panopticon', 'costs'), { recursive: true });
+  TEST_ROOT = join(tmpdir(), `overdeck-events-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(join(TEST_ROOT, '.overdeck', 'costs'), { recursive: true });
   process.env.HOME = TEST_ROOT;
 });
 

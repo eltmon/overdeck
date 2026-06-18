@@ -74,14 +74,14 @@ data: {"type":"activity.entry","sequence":18423,"timestamp":"2026-04-12T14:22:08
 
 - `event:` — the Overdeck event type (e.g. `activity.entry`). Consumers that only care about one type can use `eventSource.addEventListener('activity.entry', ...)`.
 - `id:` — the SQLite sequence number. `EventSource` stores the latest and replays it as `Last-Event-ID` on reconnect automatically.
-- `data:` — a single-line JSON object matching the `DomainEvent` schema in `@panopticon/contracts` (see `packages/contracts/src/events.ts`).
+- `data:` — a single-line JSON object matching the `DomainEvent` schema in `@overdeck/contracts` (see `packages/contracts/src/events.ts`).
 
 On initial connect, the server sends a keepalive comment every 15 s (`:\n\n`) so idle proxies do not close the connection.
 
 ## Authentication & Network Exposure
 
 - **Default binding: `127.0.0.1` only.** The endpoint is not reachable from the LAN unless the dashboard is already exposed.
-- **Optional bearer token:** set `OVERDECK_EVENTS_TOKEN=<secret>` in `~/.panopticon.env`. When set, the endpoint requires `Authorization: Bearer <secret>`. When unset, any local process can subscribe.
+- **Optional bearer token:** set `OVERDECK_EVENTS_TOKEN=<secret>` in `~/.overdeck.env`. When set, the endpoint requires `Authorization: Bearer <secret>`. When unset, any local process can subscribe.
 - **No per-event ACLs.** Subscribers receive the full public event catalog. If you need to hide sensitive fields, redact at the emission site, not here.
 
 Rationale: the primary use case is local sidecars on the same machine as pan. Anything cross-host should tunnel over existing infrastructure (Tailscale, Cloudflare tunnel, SSH forward) rather than reinvent auth here.

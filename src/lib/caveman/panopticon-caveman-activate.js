@@ -5,7 +5,7 @@
 // Overdeck-specific overrides that take precedence over the default caveman rules.
 // These overrides are non-negotiable: crash recovery and specialist feedback depend on them.
 //
-// Install location: ~/.panopticon/hooks/caveman/panopticon-caveman-activate.js
+// Install location: ~/.overdeck/hooks/caveman/overdeck-caveman-activate.js
 // Referenced from workspace .claude/settings.json SessionStart hook.
 
 const { execSync } = require('child_process');
@@ -34,7 +34,7 @@ if (baseOutput.trim() === 'OK') {
 
 // Append Overdeck-specific override block.
 // These rules are injected after the caveman rules so they win on any conflict.
-const panopticonOverrides = `
+const overdeckOverrides = `
 
 ## Overdeck Overrides (non-negotiable)
 
@@ -44,4 +44,4 @@ continue.vbrief.json updates: ALWAYS use full prose for narrative fields (decisi
 
 Code, commits, tool arguments: always normal (already in your rules — reinforced here).`;
 
-process.stdout.write(baseOutput + panopticonOverrides);
+process.stdout.write(baseOutput + overdeckOverrides);

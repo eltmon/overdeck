@@ -187,7 +187,7 @@ matches `conversations.id` TEXT; `merge_set_repos.issue_id` TEXT matches
 2. Emitted `docs/overdeck-db-erd.mmd` (Mermaid `erDiagram`) as the accurate,
    reviewable intermediate.
 3. Emitted `docs/overdeck-db-erd.excalidraw` in the same idiom as the existing
-   `docs/panopticon-db-erd.excalidraw` (rounded domain-colored rectangle +
+   `docs/overdeck-db-erd.excalidraw` (rounded domain-colored rectangle +
    title text + monospaced columns text per table), extended to render the
    TYPE / PK / FK / NN / index markers required for this review.
 4. Cross-check pass: every `CREATE TABLE`, column, `REFERENCES`, and

@@ -19,7 +19,7 @@ describe('paths', () => {
 
   describe('OVERDECK_HOME', () => {
     it('should respect OVERDECK_HOME when set', () => {
-      expect(OVERDECK_HOME).toBe(process.env.OVERDECK_HOME ?? join(home, '.panopticon'));
+      expect(OVERDECK_HOME).toBe(process.env.OVERDECK_HOME ?? join(home, '.overdeck'));
     });
   });
 
@@ -42,7 +42,7 @@ describe('paths', () => {
   });
 
   describe('CONFIG_FILE', () => {
-    it('should be config.toml in panopticon home', () => {
+    it('should be config.toml in overdeck home', () => {
       expect(CONFIG_FILE).toBe(join(OVERDECK_HOME, 'config.toml'));
     });
   });

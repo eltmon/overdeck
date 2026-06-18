@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/tldr-read-enforcer
+# ~/.overdeck/bin/tldr-read-enforcer
 # PreToolUse hook on Read — intercepts file reads and returns TLDR summaries
 # for large code files, saving 90-95% of context tokens.
 #
@@ -63,7 +63,7 @@ tldr_config_enabled_value() {
   if [ -n "${OVERDECK_CONFIG:-}" ]; then
     tldr_read_config_enabled "$OVERDECK_CONFIG"
   else
-    tldr_read_config_enabled "$HOME/.panopticon/config.yaml"
+    tldr_read_config_enabled "$HOME/.overdeck/config.yaml"
   fi
 }
 if [ -n "${OVERDECK_TLDR_ENABLED+x}" ]; then

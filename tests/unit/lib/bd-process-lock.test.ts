@@ -17,7 +17,7 @@ import {
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 let testRoot: string;
-let panopticonHome: string;
+let overdeckHome: string;
 let workspacePath: string;
 
 function lockPath(): Promise<string> {
@@ -71,10 +71,10 @@ describe('isTransientBdError', () => {
 describe('bd process lock', () => {
   beforeEach(async () => {
     testRoot = await mkdtemp(join(tmpdir(), 'pan-bd-process-lock-'));
-    panopticonHome = join(testRoot, 'home');
+    overdeckHome = join(testRoot, 'home');
     workspacePath = join(testRoot, 'workspace');
     mkdirSync(join(workspacePath, '.beads'), { recursive: true });
-    process.env.OVERDECK_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = overdeckHome;
   });
 
   afterEach(() => {

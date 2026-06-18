@@ -70,7 +70,7 @@ pan workspace create MIN-123 --docker
 
 Each workspace gets a unique Docker Compose project name to avoid container conflicts:
 - Format: `{project-name}-feature-{issue-id}` (e.g., `mind-your-now-feature-min-123`)
-- The project name comes from `name` in your `~/.panopticon/projects.yaml`
+- The project name comes from `name` in your `~/.overdeck/projects.yaml`
 - Container names follow: `{project}-{service}-1` (e.g., `mind-your-now-feature-min-123-api-1`)
 
 This allows multiple workspaces to run simultaneously without port or name conflicts.
@@ -85,15 +85,15 @@ This allows multiple workspaces to run simultaneously without port or name confl
 The planning dialog includes a "Start Docker containers" checkbox:
 - **Default:** Enabled (containers start automatically)
 - **Preference saved:** Your choice is remembered in browser localStorage
-- **Key:** `panopticon.planning.startDocker`
+- **Key:** `overdeck.planning.startDocker`
 
 To change the default via browser console:
 ```javascript
 // Disable Docker by default
-localStorage.setItem('panopticon.planning.startDocker', 'false');
+localStorage.setItem('overdeck.planning.startDocker', 'false');
 
 // Enable Docker by default (this is the out-of-box default)
-localStorage.setItem('panopticon.planning.startDocker', 'true');
+localStorage.setItem('overdeck.planning.startDocker', 'true');
 ```
 
 **Example workflow:**

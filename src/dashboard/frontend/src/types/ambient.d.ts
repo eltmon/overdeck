@@ -44,7 +44,7 @@ interface OverdeckBridge {
 }
 
 interface Window {
-  panopticonBridge?: OverdeckBridge;
+  overdeckBridge?: OverdeckBridge;
 }
 
 declare module 'framer-motion' {

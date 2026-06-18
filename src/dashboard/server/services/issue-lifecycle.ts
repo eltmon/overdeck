@@ -99,7 +99,7 @@ export interface IssueLifecycleShape {
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
 export class IssueLifecycle extends Context.Service<IssueLifecycle, IssueLifecycleShape>()(
-  'panopticon/dashboard/IssueLifecycle',
+  'overdeck/dashboard/IssueLifecycle',
 ) {}
 
 // ─── Linear state helpers ─────────────────────────────────────────────────────

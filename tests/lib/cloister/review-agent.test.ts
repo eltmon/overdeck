@@ -203,7 +203,7 @@ describe('killAllReviewSessions', () => {
     const { listSessionNames } = await import('../../../src/lib/tmux.js');
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'agent-pan-999',
-      'panopticon-dashboard',
+      'overdeck-dashboard',
     ]));
 
     const result = await Effect.runPromise(killAllReviewSessions());
@@ -622,13 +622,13 @@ describe('convoy orchestration', () => {
     const prompt = await Effect.runPromise(buildConvoyPrompt({
       issueId: 'PAN-1059',
       subRole: 'security',
-      outputPath: '/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md',
+      outputPath: '/home/test/.overdeck/agents/agent-pan-1059-review-security/review-security.md',
       synthesisAgentId: 'agent-pan-1059-review',
       contextManifestPath: '/workspace/.pan/review/run-1/context.json',
     }));
 
     expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
-    expect(prompt).toContain('/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md');
+    expect(prompt).toContain('/home/test/.overdeck/agents/agent-pan-1059-review-security/review-security.md');
     expect(prompt).toContain('/workspace/.pan/review/run-1/context.json');
     // PAN-977: the reviewer no longer signals synthesis itself — the launcher
     // owns REVIEWER_READY/FAILED/TIMEOUT on process exit. The prompt must not

@@ -1006,7 +1006,7 @@
           },
           {
             "id": "p4-admin-config.ac2",
-            "title": "'pan admin config edit' opens ~/.panopticon/config.yaml in $EDITOR",
+            "title": "'pan admin config edit' opens ~/.overdeck/config.yaml in $EDITOR",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1486,7 +1486,7 @@
           "phase": "4.5"
         },
         "narrative": {
-          "Action": "New component at src/dashboard/frontend/src/components/upgrade-announcement/. Renders the migration table from docs/QUICK-REFERENCE.md inline (embedded as a constant; do not fetch at runtime). Shows on first dashboard visit after upgrade. Dismissible. Persist dismissal in localStorage under a versioned key like 'panopticon:upgrade-banner:v0.x-taxonomy-reorg'. Renders at the top of the dashboard, above the kanban board."
+          "Action": "New component at src/dashboard/frontend/src/components/upgrade-announcement/. Renders the migration table from docs/QUICK-REFERENCE.md inline (embedded as a constant; do not fetch at runtime). Shows on first dashboard visit after upgrade. Dismissible. Persist dismissal in localStorage under a versioned key like 'overdeck:upgrade-banner:v0.x-taxonomy-reorg'. Renders at the top of the dashboard, above the kanban board."
         },
         "subItems": [
           {

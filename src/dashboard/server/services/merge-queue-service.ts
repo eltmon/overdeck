@@ -10,7 +10,7 @@ export function setMergeQueueTriggerHandler(handler: MergeTriggerHandler): void 
 
 export async function resumeQueuedMerges(): Promise<void> {
   if (!mergeTriggerHandler) {
-    console.warn('[panopticon] Merge queue resume skipped: trigger handler not registered');
+    console.warn('[overdeck] Merge queue resume skipped: trigger handler not registered');
     return;
   }
 
@@ -21,9 +21,9 @@ export async function resumeQueuedMerges(): Promise<void> {
     .filter((issueId): issueId is string => Boolean(issueId));
 
   for (const issueId of resumableIssues) {
-    console.log(`[panopticon] Resuming queued merge for ${issueId}`);
+    console.log(`[overdeck] Resuming queued merge for ${issueId}`);
     mergeTriggerHandler(issueId).catch((err: any) => {
-      console.error(`[panopticon] Failed to resume queued merge for ${issueId}: ${err.message}`);
+      console.error(`[overdeck] Failed to resume queued merge for ${issueId}: ${err.message}`);
     });
   }
 }

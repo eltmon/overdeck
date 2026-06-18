@@ -4,7 +4,7 @@ import { join } from 'path';
 import { TEMP_DIR } from '../../setup.js';
 
 // Mock paths to use temp directories
-const mockOverdeckSkills = join(TEMP_DIR, '.panopticon', 'skills');
+const mockOverdeckSkills = join(TEMP_DIR, '.overdeck', 'skills');
 const mockClaudeSkills = join(TEMP_DIR, '.claude', 'skills');
 
 vi.mock('../../../src/lib/paths.js', () => ({
@@ -41,7 +41,7 @@ describe('sync command', () => {
   // Cleanup handled by global setup
 
   describe('skill discovery', () => {
-    it('should find skills in panopticon directory', () => {
+    it('should find skills in overdeck directory', () => {
       const skills = readdirSync(mockOverdeckSkills);
       expect(skills).toContain('test-skill');
     });

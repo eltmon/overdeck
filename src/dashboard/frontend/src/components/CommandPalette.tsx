@@ -2,14 +2,14 @@
  * Cmd+K command palette for Overdeck.
  *
  * Opens on Cmd+K (macOS) / Ctrl+K (Linux/Windows).
- * Also opened from the desktop app via panopticonBridge.onMenuAction.
+ * Also opened from the desktop app via overdeckBridge.onMenuAction.
  *
  * Sections (in display order):
  *   - Actions / Orchestration / Navigation  — built-in dashboard actions
  *   - Commands                              — curated `pan <verb>` catalog (click to copy)
  *   - Active Workspaces / Issues / Running Agents
  *   - Conversations                         — semantic JSONL transcript search
- *   - Memory / Observations                 — FTS over ~/.panopticon/memory
+ *   - Memory / Observations                 — FTS over ~/.overdeck/memory
  */
 
 import { useEffect, useMemo, useState, useCallback } from 'react';

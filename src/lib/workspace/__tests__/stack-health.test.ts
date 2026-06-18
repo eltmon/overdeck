@@ -42,7 +42,7 @@ afterEach(() => {
 function container(overrides: Partial<DockerContainerLifecycle>): DockerContainerLifecycle {
   return {
     id: 'abc123',
-    name: 'panopticon-feature-pan-1140-server-1',
+    name: 'overdeck-feature-pan-1140-server-1',
     status: 'Up 10 seconds',
     state: 'running',
     createdAt: '2026-05-16T22:59:00.000Z',
@@ -80,7 +80,7 @@ describe('evaluateWorkspaceStackHealth', () => {
   it('marks an exited non-zero container unhealthy', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({
-        name: 'panopticon-feature-pan-1140-init-1',
+        name: 'overdeck-feature-pan-1140-init-1',
         status: 'Exited (127) 2 minutes ago',
         state: 'exited',
       }),
@@ -93,7 +93,7 @@ describe('evaluateWorkspaceStackHealth', () => {
   it('keeps init containers healthy when they exit zero', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({
-        name: 'panopticon-feature-pan-1140-init-1',
+        name: 'overdeck-feature-pan-1140-init-1',
         status: 'Exited (0) 2 minutes ago',
         state: 'exited',
       }),
@@ -125,14 +125,14 @@ describe('evaluateWorkspaceStackHealth', () => {
   it('marks service containers unhealthy when they exit zero', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({
-        name: 'panopticon-feature-pan-1140-server-1',
+        name: 'overdeck-feature-pan-1140-server-1',
         status: 'Exited (0) 2 minutes ago',
         state: 'exited',
       }),
     ], { now });
 
     expect(health.healthy).toBe(false);
-    expect(health.reasons).toEqual(['panopticon-feature-pan-1140-server-1 service exited (0)']);
+    expect(health.reasons).toEqual(['overdeck-feature-pan-1140-server-1 service exited (0)']);
   });
 
   it('keeps Up containers healthy', () => {
@@ -161,7 +161,7 @@ describe('evaluateWorkspaceStackHealth', () => {
   it('does not match overlapping issue IDs by substring', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({
-        name: 'panopticon-feature-pan-11400-init-1',
+        name: 'overdeck-feature-pan-11400-init-1',
         status: 'Exited (1) 3 minutes ago',
         state: 'exited',
       }),
@@ -172,14 +172,14 @@ describe('evaluateWorkspaceStackHealth', () => {
   });
 
   it('infers issue IDs from workspace stack container names', () => {
-    expect(inferIssueIdFromStackContainerName('panopticon-feature-pan-1140-init-1')).toBe('PAN-1140');
-    expect(inferIssueIdFromStackContainerName('panopticon-feature-pan-11400-init-1')).toBe('PAN-11400');
+    expect(inferIssueIdFromStackContainerName('overdeck-feature-pan-1140-init-1')).toBe('PAN-1140');
+    expect(inferIssueIdFromStackContainerName('overdeck-feature-pan-11400-init-1')).toBe('PAN-11400');
   });
 
   it('uses the cached Docker lifecycle snapshot when containers are omitted', async () => {
     recordDockerContainerLifecycleSnapshot([
       container({
-        name: 'panopticon-feature-pan-1140-init-1',
+        name: 'overdeck-feature-pan-1140-init-1',
         status: 'Exited (1) 3 minutes ago',
         state: 'exited',
       }),
@@ -189,7 +189,7 @@ describe('evaluateWorkspaceStackHealth', () => {
 
     expect(health).toEqual({
       healthy: false,
-      reasons: ['panopticon-feature-pan-1140-init-1 init exited non-zero (1)'],
+      reasons: ['overdeck-feature-pan-1140-init-1 init exited non-zero (1)'],
       lastObserved: '2026-05-16T23:01:00.000Z',
     });
   });

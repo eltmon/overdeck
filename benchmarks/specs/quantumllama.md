@@ -136,7 +136,7 @@ models:
 ```
 
 The API key should be read from `QUANTUMLLAMA_API_KEY` environment variable
-(loaded from `~/.panopticon.env`).
+(loaded from `~/.overdeck.env`).
 
 ### 2. Cost Tracking
 

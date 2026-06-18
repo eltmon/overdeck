@@ -18,7 +18,7 @@ interface Session {
   archivedAt?: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
-  panopticonManaged: boolean;
+  overdeckManaged: boolean;
   panIssueId: string | null;
 }
 
@@ -63,7 +63,7 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
                 <td className="px-3 py-1.5 text-center">
                   {session.source === 'managed-archived' ? (
                     <Anchor className="h-3 w-3 text-amber-400 inline" />
-                  ) : session.panopticonManaged ? (
+                  ) : session.overdeckManaged ? (
                     <Star className="h-3 w-3 text-cyan-400 inline" />
                   ) : session.enrichmentLevel > 0 ? (
                     <CheckCircle className="h-3 w-3 text-green-500 inline" />
@@ -82,7 +82,7 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
                       <span className="shrink-0 rounded-full border border-amber-700 bg-amber-950 px-1.5 py-0.5 text-[10px] font-medium text-amber-200">
                         Archived{session.panIssueId ? ` · ${session.panIssueId}` : ''}
                       </span>
-                    ) : session.panopticonManaged && (
+                    ) : session.overdeckManaged && (
                       <span className="shrink-0 rounded-full border border-cyan-700 bg-cyan-950 px-1.5 py-0.5 text-[10px] font-medium text-cyan-200">
                         Managed{session.panIssueId ? ` · ${session.panIssueId}` : ''}
                       </span>

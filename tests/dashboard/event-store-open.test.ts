@@ -20,12 +20,12 @@ import { tmpdir } from 'os';
 import { openEventDb } from '../../src/dashboard/server/event-store.js';
 
 let testDir: string;
-let panopticonHome: string;
+let overdeckHome: string;
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'event-store-test-'));
-  panopticonHome = join(testDir, '.panopticon');
-  vi.stubEnv('OVERDECK_HOME', panopticonHome);
+  overdeckHome = join(testDir, '.overdeck');
+  vi.stubEnv('OVERDECK_HOME', overdeckHome);
 });
 
 afterEach(() => {
@@ -35,23 +35,23 @@ afterEach(() => {
 
 describe('openEventDb() — async home-dir creation (PAN-446 regression)', () => {
   it('creates OVERDECK_HOME when it does not exist', async () => {
-    expect(existsSync(panopticonHome)).toBe(false);
+    expect(existsSync(overdeckHome)).toBe(false);
 
     // DB open may fail in isolated test env; the dir creation runs first
     try { await openEventDb(); } catch { /* ignore DB open failure */ }
 
-    expect(existsSync(panopticonHome)).toBe(true);
+    expect(existsSync(overdeckHome)).toBe(true);
   });
 
   it('leaves OVERDECK_HOME intact when it already exists', async () => {
-    mkdirSync(panopticonHome, { recursive: true });
-    const sentinel = join(panopticonHome, 'sentinel.txt');
+    mkdirSync(overdeckHome, { recursive: true });
+    const sentinel = join(overdeckHome, 'sentinel.txt');
     require('fs').writeFileSync(sentinel, 'present');
 
     try { await openEventDb(); } catch { /* ignore DB open failure */ }
 
     // Dir must still exist and contents must be untouched
-    expect(existsSync(panopticonHome)).toBe(true);
+    expect(existsSync(overdeckHome)).toBe(true);
     expect(existsSync(sentinel)).toBe(true);
   });
 });

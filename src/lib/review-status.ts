@@ -149,7 +149,7 @@ export function mergeGateEligibility(
   return { eligible: true };
 }
 
-const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
+const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
   // SQLite is the authoritative store for the default (server) path.
@@ -320,12 +320,12 @@ export function setReviewStatusSync(
         );
         const sha = stdout.trim();
         if (sha) {
-          // panopticon/review is honest here — review just transitioned to readyForMerge.
-          // The panopticon/tests status is posted separately at the actual test-completion
+          // overdeck/review is honest here — review just transitioned to readyForMerge.
+          // The overdeck/tests status is posted separately at the actual test-completion
           // site (verification-runner success, test-agent POST in workspaces routes) so it
           // accurately reflects which commit was tested.
-          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/review', 'Review passed');
-          console.log(`[review-status] Reported panopticon/review for ${issueId} (${sha.slice(0, 8)})`);
+          await reportCommitStatus(owner, repo, sha, 'success', 'overdeck/review', 'Review passed');
+          console.log(`[review-status] Reported overdeck/review for ${issueId} (${sha.slice(0, 8)})`);
         }
       } catch (err: any) {
         console.warn(`[review-status] Failed to report commit status: ${err.message}`);

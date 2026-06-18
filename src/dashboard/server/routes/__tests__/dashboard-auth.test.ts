@@ -153,7 +153,7 @@ describe('dashboard session mint auth gate', () => {
 });
 
 describe('peerIsHostLocalDockerBridge — host-local Traefik trust', () => {
-  // Mirrors the real host: the panopticon Docker network's host-side bridge.
+  // Mirrors the real host: the overdeck Docker network's host-side bridge.
   const interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = {
     lo: [ipv4('127.0.0.1', '255.0.0.0')],
     eth0: [ipv4('192.168.1.10', '255.255.255.0')],
@@ -162,7 +162,7 @@ describe('peerIsHostLocalDockerBridge — host-local Traefik trust', () => {
   };
 
   it('trusts a container peer inside a host Docker bridge subnet (the Traefik case)', () => {
-    // panopticon-traefik reaches the host server from 172.18.0.2 — inside br-* /16.
+    // overdeck-traefik reaches the host server from 172.18.0.2 — inside br-* /16.
     expect(peerIsHostLocalDockerBridge('172.18.0.2', interfaces)).toBe(true);
     expect(peerIsHostLocalDockerBridge('172.17.0.9', interfaces)).toBe(true);
   });
@@ -193,7 +193,7 @@ describe('peerIsHostLocalDockerBridge — host-local Traefik trust', () => {
 
 describe('peerIsLocalContainerNetwork — in-container Traefik trust', () => {
   // Mirrors a workspace/UAT stack server container: veth endpoints on the
-  // project-private devnet and the shared panopticon network. No docker0/br-*
+  // project-private devnet and the shared overdeck network. No docker0/br-*
   // names exist inside a container — that's exactly why the host check missed.
   const interfaces: NodeJS.Dict<NetworkInterfaceInfo[]> = {
     lo: [{ ...ipv4('127.0.0.1', '255.0.0.0'), internal: true }],

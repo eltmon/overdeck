@@ -47,7 +47,7 @@ pan flywheel start
 pan flywheel start --brief docs/flywheel-brief.md
 ```
 
-Starts `flywheel-orchestrator` and opens a new run under `~/.panopticon/flywheel/runs/<runId>/`.
+Starts `flywheel-orchestrator` and opens a new run under `~/.overdeck/flywheel/runs/<runId>/`.
 
 Use the default brief unless the user gives a specific markdown brief. The default is `docs/flywheel-brief.md`. The command validates that the brief path stays inside the project root.
 

@@ -46,7 +46,7 @@ interface AgentContext {
 // ============== Path Helpers ==============
 // Use functions for paths to allow test mocking via process.env.HOME
 function getAgentsDir(): string {
-  return join(process.env.HOME || homedir(), '.panopticon', 'agents');
+  return join(process.env.HOME || homedir(), '.overdeck', 'agents');
 }
 
 function getClaudeProjectsDir(): string {
@@ -54,7 +54,7 @@ function getClaudeProjectsDir(): string {
 }
 
 function getProjectsYamlPath(): string {
-  return join(process.env.HOME || homedir(), '.panopticon', 'projects.yaml');
+  return join(process.env.HOME || homedir(), '.overdeck', 'projects.yaml');
 }
 
 // ============== Workspace Resolution ==============

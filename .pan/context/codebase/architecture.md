@@ -26,7 +26,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 - `harness-policy.ts` — ToS gate `canUseHarnessSync()` (Pi + Anthropic + subscription
   is the only blocked combo). Never weaken.
 - `providers.ts` — `PROVIDERS` registry (10 providers), `getProviderForModelSync()`.
-- `config-yaml.ts` — `~/.panopticon/*.yaml` settings: `RoleConfig` (model/harness/effort
+- `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
@@ -34,7 +34,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
 - `launcher-generator.ts` — generates tmux launcher scripts (`--resume`, PTY
   supervisor wrapping, env exports).
-- `tmux.ts` — tmux primitives on the `panopticon` socket. Async (Effect) variants
+- `tmux.ts` — tmux primitives on the `overdeck` socket. Async (Effect) variants
   are canonical; `*Sync` are legacy debt.
 - `session-format-converter.ts` — conversation transcript conversion between
   harness JSONL formats (tier-4 harness switch; experimental).
@@ -45,7 +45,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 Issue → `pan plan` (vBRIEF + beads) → `pan start` (work agent in a git worktree
 `workspaces/feature-<issue>/`) → verification gate → review convoy → test/UAT →
 server-side rebase/merge → close-out. Spawned agents live in tmux sessions
-(`tmux -L panopticon`), with state in `~/.panopticon/agents/<id>/state.json`.
+(`tmux -L overdeck`), with state in `~/.overdeck/agents/<id>/state.json`.
 
 ## Spawn sites (harness decision points)
 
@@ -61,7 +61,7 @@ Conversations pin harness at creation (`routes/conversations.ts` ~:2741) — not
 
 Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `fly-provider.ts`). State lives at
-`~/.panopticon/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
+`~/.overdeck/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
 `vmName`, `status`). The dashboard surfaces them via
 `listActiveRemoteAgentStates()` in `services/resource-discovery.ts` (issue chip
 + aggregate status, PAN-1676) and session-row synthesis in

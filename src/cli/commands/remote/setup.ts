@@ -107,7 +107,7 @@ export async function setupCommand(): Promise<void> {
     saveConfigSync(config);
     console.log(`  ${chalk.green('✓')} Remote configuration added to config.toml`);
     console.log('');
-    console.log(chalk.dim('  Edit ~/.panopticon/config.toml to customize:'));
+    console.log(chalk.dim('  Edit ~/.overdeck/config.toml to customize:'));
     console.log(chalk.dim('    [remote.fly]'));
     console.log(chalk.dim('    app = "pan-workspaces"   # Your Fly app name'));
     console.log(chalk.dim('    org = "personal"          # Your Fly org slug'));

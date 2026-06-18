@@ -43,9 +43,9 @@ describe('injectOverdeckInfraDeny', () => {
     expect(deny).toEqual(expect.arrayContaining([
       'Bash(existing:*)',
       'Bash(tmux send-keys:*)',
-      'Bash(tmux -L panopticon send-keys:*)',
+      'Bash(tmux -L overdeck send-keys:*)',
       'Bash(tmux paste-buffer:*)',
-      'Bash(tmux -L panopticon paste-buffer:*)',
+      'Bash(tmux -L overdeck paste-buffer:*)',
     ]));
     expect(deny.filter(pattern => pattern === 'Bash(tmux send-keys:*)')).toHaveLength(1);
   });

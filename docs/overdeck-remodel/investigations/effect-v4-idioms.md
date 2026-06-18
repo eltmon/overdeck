@@ -58,13 +58,13 @@ Installed `effect` subpath exports (from `effect/package.json`):
 class EventStoreService extends Context.Service<
   EventStoreService,            // Self
   EventStoreServiceShape        // Shape
->()('panopticon/dashboard/EventStoreService') {}   // mandatory string key
+>()('overdeck/dashboard/EventStoreService') {}   // mandatory string key
 ```
 
 - Two-stage call: `Context.Service<Self, Shape>()("Key")`. The **empty `()` is required**
   between the type params and the key string.
 - The **string key is mandatory** and is the runtime identity. Repo convention is a
-  slash-namespaced key, e.g. `'panopticon/dashboard/ReadModelService'`.
+  slash-namespaced key, e.g. `'overdeck/dashboard/ReadModelService'`.
 - The class *is* the tag — `yield* EventStoreService` inside an `Effect.gen` yields the
   shape; `EventStoreService` is also what you pass to `Layer.effect`.
 

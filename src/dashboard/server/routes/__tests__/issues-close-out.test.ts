@@ -148,8 +148,8 @@ describe('POST /api/issues/:id/close-out', () => {
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();
     resolveProjectFromIssueMock.mockReturnValue({
-      projectName: 'panopticon',
-      projectPath: '/tmp/panopticon',
+      projectName: 'overdeck',
+      projectPath: '/tmp/overdeck',
     });
     resolveGitHubIssueMock.mockReturnValue({
       isGitHub: true,
@@ -194,8 +194,8 @@ describe('POST /api/issues/:id/close-out', () => {
     });
     expect(closeOutMock).toHaveBeenCalledWith({
       issueId: 'PAN-1190',
-      projectName: 'panopticon',
-      projectPath: '/tmp/panopticon',
+      projectName: 'overdeck',
+      projectPath: '/tmp/overdeck',
       github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
     });
     expect(issueDataServiceMock.patchIssue).toHaveBeenCalledWith('PAN-1190', {

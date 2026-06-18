@@ -33,7 +33,7 @@ global skill set is untouched.
 `pan sync` is a **global, all-or-nothing** distribution path:
 
 ```
-skills/pan-*/SKILL.md  ──pan sync──►  ~/.panopticon/skills/  ──►  ~/.claude/skills/
+skills/pan-*/SKILL.md  ──pan sync──►  ~/.overdeck/skills/  ──►  ~/.claude/skills/
                                                               └─►  ~/.pi/agent/settings.json
 ```
 
@@ -169,7 +169,7 @@ feature available now.
 **Skill bundle** — a named, declarative list of skill *sources*:
 
 ```yaml
-# ~/.panopticon/skill-bundles/myn-frontend.yaml
+# ~/.overdeck/skill-bundles/myn-frontend.yaml
 name: myn-frontend
 description: MYN React frontend work — house standards + perf + design review
 skills:
@@ -189,7 +189,7 @@ None of these require the skill to be globally synced.
 posture:
 
 ```yaml
-# ~/.panopticon/conversation-templates/myn-frontend.yaml
+# ~/.overdeck/conversation-templates/myn-frontend.yaml
 name: myn-frontend
 description: Start a MYN frontend conversation
 bundle: myn-frontend

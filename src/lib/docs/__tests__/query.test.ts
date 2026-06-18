@@ -104,10 +104,10 @@ describe('docs query library', { timeout: 30_000 }, () => {
     const result = queryDocsIndex({ indexPath: outputPath, query: 'alpha', top: 1, maxTokens: 4 });
     const markdown = formatDocsQueryMarkdown(result);
 
-    expect(markdown).toContain('<panopticon-docs>');
+    expect(markdown).toContain('<overdeck-docs>');
     expect(markdown).toContain('## docs/guide.md → Guide (#guide)');
     expect(markdown).toContain('# Guide Alpha one');
-    expect(markdown).toContain('</panopticon-docs>');
+    expect(markdown).toContain('</overdeck-docs>');
     expect(result.results[0].tokenCount).toBeLessThanOrEqual(4);
   });
 

@@ -159,7 +159,7 @@ export interface AgentHealth {
 export interface Skill {
   name: string;
   path: string;
-  source: 'panopticon' | 'claude';
+  source: 'overdeck' | 'claude';
   hasSkillMd: boolean;
   description?: string;
 }
@@ -256,7 +256,7 @@ export const STATE_TYPE_TO_CANONICAL: Record<string, CanonicalState> = {
 // Overdeck's virtual state tracking
 export interface OverdeckIssueState {
   issueId: string;
-  panopticonState: CanonicalState;  // Our canonical state
+  overdeckState: CanonicalState;  // Our canonical state
   trackerState: string;              // What's in the tracker
   lastSyncedAt: string;
   syncStatus: 'synced' | 'pending' | 'conflict';
@@ -349,8 +349,8 @@ export interface SystemHealthSnapshot {
     leakedSpecialistCount: number;
     containerCount: number;
     containerMemoryBytes: number;
-    panopticonMemoryBytes: number;
-    panopticonMemoryPercent: number;
+    overdeckMemoryBytes: number;
+    overdeckMemoryPercent: number;
   };
   thresholds: {
     memoryAvailableWarningBytes: number;
@@ -389,7 +389,7 @@ export interface StartAgentResponse {
 // State transition result
 export interface StateTransitionResult {
   success: boolean;
-  panopticonState: CanonicalState;
+  overdeckState: CanonicalState;
   trackerState: string;
   fallbacksUsed: string[];
   warnings: string[];

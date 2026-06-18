@@ -7,7 +7,7 @@
  * 3. Opens browser to GitHub with the app manifest (includes webhook events + smee URL)
  * 4. GitHub redirects back with a code
  * 5. Exchanges code for app credentials (ID, private key, webhook secret)
- * 6. Saves credentials and smee URL to ~/.panopticon/github-app/
+ * 6. Saves credentials and smee URL to ~/.overdeck/github-app/
  */
 
 import { createServer } from 'node:http';
@@ -19,7 +19,7 @@ import SmeeClient from 'smee-client';
 
 const PORT = 3456;
 const CALLBACK_URL = `http://localhost:${PORT}/callback`;
-const APP_DIR = join(homedir(), '.panopticon', 'github-app');
+const APP_DIR = join(homedir(), '.overdeck', 'github-app');
 
 if (process.env.OVERDECK_DEV_WEBHOOKS !== '1') {
   console.error('Refusing to configure a third-party webhook relay outside dev mode.');

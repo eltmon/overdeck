@@ -21,7 +21,7 @@ let claudeProjectsDir: string;
 
 beforeEach(async () => {
   testDir = join(tmpdir(), `pan-jsonl-resolver-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  agentsDir = join(testDir, 'panopticon', 'agents');
+  agentsDir = join(testDir, 'overdeck', 'agents');
   claudeProjectsDir = join(testDir, 'claude', 'projects');
   await mkdir(join(agentsDir, AGENT_ID), { recursive: true });
   await mkdir(claudeProjectsDir, { recursive: true });

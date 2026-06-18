@@ -34,7 +34,7 @@ Dashboard Server (Express)
 
 ### CacheService (`src/dashboard/server/services/cache-service.ts`)
 
-Two-layer cache backed by SQLite (at `~/.panopticon/cache.db`):
+Two-layer cache backed by SQLite (at `~/.overdeck/cache.db`):
 
 - **L1 (In-Memory)**: Map with 10s TTL, 50 entries max. Serves hot reads without hitting disk.
 - **L2 (SQLite)**: Persistent storage that survives server restarts. Uses WAL mode for concurrent reads.
@@ -139,8 +139,8 @@ Extracted config readers for reuse:
 
 | Function | Description |
 |----------|-------------|
-| `getLinearApiKey()` | Read from `~/.panopticon.env` or `$LINEAR_API_KEY` |
-| `getGitHubConfig()` | Read token + repos from `~/.panopticon.env` |
+| `getLinearApiKey()` | Read from `~/.overdeck.env` or `$LINEAR_API_KEY` |
+| `getGitHubConfig()` | Read token + repos from `~/.overdeck.env` |
 | `getRallyConfig()` | Read API key + optional server/workspace/project |
 
 ## Mutation Cache Invalidation

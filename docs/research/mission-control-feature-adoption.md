@@ -238,7 +238,7 @@ They occupy different layers. MC watches; Overdeck acts. The features proposed b
 - **Not now** — Overdeck is single-operator by design. Auth adds complexity without value for the current use case.
 - **Future trigger**: When Overdeck dashboard is exposed beyond localhost (e.g., team access, remote agents reporting back)
 - **Minimum viable auth**: API key validation on dashboard endpoints + optional basic auth
-- Store in `~/.panopticon/auth.yaml` (not a database — single operator doesn't need user management)
+- Store in `~/.overdeck/auth.yaml` (not a database — single operator doesn't need user management)
 
 **Effort**: Medium — auth is always more work than it looks
 **Impact**: Low (currently) — would increase if Overdeck goes multi-user

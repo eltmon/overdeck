@@ -29,7 +29,7 @@ Live landmines a change in this repo can step on. Verified 2026-06-13.
 - **`postMergeLifecycle` idempotency** — guarded by
   `src/lib/cloister/in-flight-guard.ts` + its test. Weakening it reopens the
   PAN-328 infinite-loop (24k tracker calls). Keep the test green.
-- **Single Deacon invariant** — never mount `~/.panopticon` into workspace
+- **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
   dies under Bun; circular ESM imports die under tsx/Node source mode).

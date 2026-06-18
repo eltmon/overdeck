@@ -21,7 +21,7 @@
 .moonshine-sidecar-build/
 .moonshine-sidecar-venv/
 .pan/
-.panopticon/
+.overdeck/
 .playwright-mcp/
 .release/
 .tldr/

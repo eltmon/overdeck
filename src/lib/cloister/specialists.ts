@@ -93,7 +93,7 @@ async function resolveWorkspaceGitInfo(workspace: string | undefined, taskBranch
 
 /**
  * Shell fragment that unsets every provider-routing env var a parent tmux server
- * may have leaked into its child sessions. The panopticon tmux server is long-lived
+ * may have leaked into its child sessions. The overdeck tmux server is long-lived
  * and inherits whatever env existed when it was spawned — so fresh Anthropic-model
  * agents can still see a stale ANTHROPIC_BASE_URL pointing at cliproxy, which
  * responds with "unknown provider for model claude-*" (PAN-705). Every launcher
@@ -311,7 +311,7 @@ const DEFAULT_SPECIALISTS: LegacySpecialistDefinition[] = [];
  * PAN-1048 review feedback 003 (REQ-16): initSpecialistsDirectory is a no-op.
  *
  * The cleanup at Cloister startup (service.ts cleanupLegacySpecialistsDirectory)
- * removes ~/.panopticon/specialists/ on every boot. The previous body of this
+ * removes ~/.overdeck/specialists/ on every boot. The previous body of this
  * function would unconditionally re-create the directory and seed
  * registry.json from DEFAULT_SPECIALISTS the next time anything called
  * loadRegistry(), undoing the cleanup and resurrecting the legacy identity

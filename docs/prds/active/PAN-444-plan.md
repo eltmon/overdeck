@@ -26,7 +26,7 @@ Even if we rebuild `dist/` first, the running Node.js process still has old chun
 
 ### Solution: Three-part handoff
 
-1. **Step 0 in `postMergeLifecycle`**: Write pending task to `~/.panopticon/pending-post-merge.json`, spawn detached deploy script, return immediately.
+1. **Step 0 in `postMergeLifecycle`**: Write pending task to `~/.overdeck/pending-post-merge.json`, spawn detached deploy script, return immediately.
 2. **`scripts/post-merge-deploy.sh`**: Build (`npm run build && npm link`) -> kill server -> start new server (auto-detect bun dev vs node prod) -> wait for health check.
 3. **Server startup hook in `main.ts`**: On boot, check for pending file. If found, delete it, then schedule `postMergeLifecycle()` after a short delay. The fresh process has correct chunk references — lifecycle completes successfully.
 
@@ -40,7 +40,7 @@ merge completes
     v
 postMergeLifecycle()
     |
-    +-- write ~/.panopticon/pending-post-merge.json
+    +-- write ~/.overdeck/pending-post-merge.json
     |     { issueId, projectPath, sourceBranch, timestamp }
     |
     +-- spawn detached: scripts/post-merge-deploy.sh

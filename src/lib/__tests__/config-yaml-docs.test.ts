@@ -13,7 +13,7 @@ describe('docs RAG configuration', () => {
       trigger: {
         regexes: [
           'pan',
-          'panopticon',
+          'overdeck',
           'cloister',
           'deacon',
           'workspace',

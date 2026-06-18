@@ -220,7 +220,7 @@ export function renderDevcontainerSync(
   // (PAN-1764). Docker auto-creates missing bind sources as root, which the
   // container's `node` user (uid 1000) cannot write to.
   for (const cacheDir of ['bun', 'npm']) {
-    mkdirSync(join(homedir(), '.cache', 'panopticon-devcontainer', cacheDir), {
+    mkdirSync(join(homedir(), '.cache', 'overdeck-devcontainer', cacheDir), {
       recursive: true,
     });
   }

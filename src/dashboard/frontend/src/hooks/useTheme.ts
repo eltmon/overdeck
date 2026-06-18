@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 type Theme = 'light' | 'dark';
 
-const STORAGE_KEY = 'panopticon.ui.theme';
+const STORAGE_KEY = 'overdeck.ui.theme';
 
 function getStoredTheme(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY);

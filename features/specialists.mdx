@@ -126,7 +126,7 @@ The test-agent runs every configured test suite for the project and analyzes the
 - `skipped` — no test suite applies to this change
 - `dispatch_failed` — Cloister couldn't launch the test run (infra issue, not a code failure)
 
-**Project configuration** in `~/.panopticon/projects.yaml`:
+**Project configuration** in `~/.overdeck/projects.yaml`:
 
 ```yaml
 projects:
@@ -231,7 +231,7 @@ Once the pipeline has driven a branch to ready-to-merge, it lands on the **Await
 
 ## Queue Processing
 
-Each specialist has a per-project task queue at `~/.panopticon/agents/{name}/hook.json`, managed via the **FPP (Fixed Point Principle)** — borrowed from Gastown, inspired by Doctor Who: *any runnable action is a fixed point and must resolve before the system can rest.*
+Each specialist has a per-project task queue at `~/.overdeck/agents/{name}/hook.json`, managed via the **FPP (Fixed Point Principle)** — borrowed from Gastown, inspired by Doctor Who: *any runnable action is a fixed point and must resolve before the system can rest.*
 
 ```
 1. Task arrives (via API or handoff)
@@ -292,7 +292,7 @@ See [Workspace Commands](/cli/workspace-commands#main-project-branch-convention)
 
 ## Configuration
 
-Specialist configuration lives in `~/.panopticon/cloister.toml`:
+Specialist configuration lives in `~/.overdeck/cloister.toml`:
 
 ```toml
 [specialists.review_agent]

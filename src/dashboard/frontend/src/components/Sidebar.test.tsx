@@ -100,7 +100,7 @@ describe('Sidebar navigation', () => {
   });
 
   it('keeps collapsed-mode icons clickable', () => {
-    localStorage.setItem('panopticon.ui.sidebarCollapsed', 'true');
+    localStorage.setItem('overdeck.ui.sidebarCollapsed', 'true');
     const { onTabChange } = renderSidebar({ activeTab: 'kanban' });
 
     const logo = screen.getByTitle('Go to Home');

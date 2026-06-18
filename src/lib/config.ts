@@ -118,7 +118,7 @@ export interface ShadowConfig {
  *
  * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config → 'auto'.
  *
- * The persisted setting lives in `~/.panopticon/config.yaml` under `claude.permissionMode`
+ * The persisted setting lives in `~/.overdeck/config.yaml` under `claude.permissionMode`
  * (loaded by `config-yaml.ts` and surfaced through `loadConfig().config.claude`). The
  * type is exported here so other modules can reference it without pulling the whole
  * yaml-config layer.
@@ -153,7 +153,7 @@ export interface ConversationsConfig {
 }
 
 export interface OverdeckConfig {
-  panopticon: {
+  overdeck: {
     version: string;
   };
   sync: {
@@ -190,7 +190,7 @@ export interface OverdeckConfig {
 }
 
 const DEFAULT_CONFIG: OverdeckConfig = {
-  panopticon: {
+  overdeck: {
     version: '1.0.0',
   },
   sync: {
@@ -439,7 +439,7 @@ export function checkDevrootDeprecation(): string | null {
     '[WARN] sync.devroot is deprecated — the layered context model has replaced it.',
     '       Run `pan context migrate` to move your content across.',
     `       Old location: ${oldLocation}`,
-    '       New location: ~/.panopticon/context/global/',
+    '       New location: ~/.overdeck/context/global/',
     '       Set sync.devroot to null in config to silence this warning after migrating.',
   ].join('\n');
 }

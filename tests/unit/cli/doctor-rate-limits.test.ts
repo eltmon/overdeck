@@ -10,9 +10,9 @@ describe('checkTrackerRateLimits', () => {
 
   beforeEach(async () => {
     testDir = mkdtempSync(join(tmpdir(), 'doctor-rate-limits-test-'));
-    const panopticonHome = join(testDir, '.panopticon');
-    mkdirSync(panopticonHome, { recursive: true });
-    vi.stubEnv('OVERDECK_HOME', panopticonHome);
+    const overdeckHome = join(testDir, '.overdeck');
+    mkdirSync(overdeckHome, { recursive: true });
+    vi.stubEnv('OVERDECK_HOME', overdeckHome);
     vi.resetModules();
 
     const doctor = await import('../../../src/cli/commands/doctor.js');

@@ -2,10 +2,10 @@
 name: pan-up
 description: "pan up — start the Overdeck dashboard (Node 22, port 3011)"
 triggers:
-  - start panopticon
+  - start overdeck
   - start dashboard
   - pan up
-  - launch panopticon
+  - launch overdeck
 allowed-tools:
   - Bash
   - Read
@@ -93,9 +93,9 @@ Then open `https://pan.localhost` (Traefik) or `http://localhost:3011`.
 ### Step 4: Check logs (if issues)
 
 ```bash
-tail -100 ~/.panopticon/logs/dashboard.log
-cat ~/.panopticon/restart-status.json       # last restart outcome
-tail -20 ~/.panopticon/logs/supervisor.log  # watchdog health-check history
+tail -100 ~/.overdeck/logs/dashboard.log
+cat ~/.overdeck/restart-status.json       # last restart outcome
+tail -20 ~/.overdeck/logs/supervisor.log  # watchdog health-check history
 ```
 
 ## Troubleshooting
@@ -111,7 +111,7 @@ pan down                 # stop services cleanly
 
 The supervisor watchdog (port 3012) polls `http://127.0.0.1:3011/api/health`
 every 10s and restarts the dashboard after 3 consecutive failures. If your
-requests return empty, check `~/.panopticon/restart-status.json` — you may be
+requests return empty, check `~/.overdeck/restart-status.json` — you may be
 mid-restart. Wait ~10s and retry.
 
 ### Terminal panel stuck "Connection lost / Reconnecting"
@@ -136,5 +136,5 @@ Run `npm run build` first, or use `/pan-reload`.
 ## More Information
 
 - Dashboard URL: `https://pan.localhost` (Traefik) or `http://localhost:3011`
-- Logs: `~/.panopticon/logs/`
+- Logs: `~/.overdeck/logs/`
 - Run `pan up --help` for current options

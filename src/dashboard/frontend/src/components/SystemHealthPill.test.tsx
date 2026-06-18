@@ -73,8 +73,8 @@ function createSnapshot(severity: SystemHealthSnapshot['severity']): SystemHealt
       leakedSpecialistCount: severity === 'critical' ? 1 : 0,
       containerCount: 1,
       containerMemoryBytes: 2 * GIB,
-      panopticonMemoryBytes: 3 * GIB,
-      panopticonMemoryPercent: 4.7,
+      overdeckMemoryBytes: 3 * GIB,
+      overdeckMemoryPercent: 4.7,
     },
     thresholds: {
       memoryAvailableWarningBytes: 4 * GIB,

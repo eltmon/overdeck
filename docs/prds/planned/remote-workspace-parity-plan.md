@@ -109,7 +109,7 @@ A typical workspace needs:
 
 ## Project-Specific Configuration
 
-Projects can define their remote workspace requirements in `panopticon.projects.yaml`:
+Projects can define their remote workspace requirements in `overdeck.projects.yaml`:
 
 ```yaml
 myn:
@@ -178,7 +178,7 @@ Note: `${WORKSPACE_URL}` is replaced at build time with `https://vm-name.exe.xyz
    - [x] Start services (Docker Compose, Vite preview)
 
 3. **`src/lib/project-config.ts`** (new or extend existing)
-   - [ ] Parse `panopticon.projects.yaml` workspace config (deferred - using auto-detection)
+   - [ ] Parse `overdeck.projects.yaml` workspace config (deferred - using auto-detection)
    - [ ] Generate nginx config from proxy routes (deferred - using standard config)
    - [ ] Detect CORS requirements (deferred - must be configured in project)
 

@@ -113,7 +113,7 @@ const PATH_TO_TAB: Record<string, Tab> = {
   ) as Record<string, Tab>,
 };
 
-export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'panopticon.ui.sessionFeedSidebarOpen';
+export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarOpen';
 
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
@@ -596,7 +596,7 @@ export default function App() {
   //    cached from the last healthy /api/version poll.
   const restartBackendMutation = useMutation({
     mutationFn: async () => {
-      const bridge = window.panopticonBridge;
+      const bridge = window.overdeckBridge;
       if (bridge?.restartDashboard) {
         await bridge.restartDashboard();
         return;
@@ -1217,7 +1217,7 @@ export default function App() {
 
   // Listen for menu actions from desktop app (open-settings, etc.)
   useEffect(() => {
-    const bridge = window.panopticonBridge;
+    const bridge = window.overdeckBridge;
     if (!bridge) return;
     const unsub = bridge.onMenuAction((action: string) => {
       if (action === 'open-settings') {
@@ -1253,7 +1253,7 @@ export default function App() {
       action: {
         label: 'Enable',
         onClick: () => {
-          void window.panopticonBridge?.updateDesktopSetting('autoStart.enabled', true);
+          void window.overdeckBridge?.updateDesktopSetting('autoStart.enabled', true);
         },
       },
     });

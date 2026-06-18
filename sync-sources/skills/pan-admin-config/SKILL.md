@@ -3,8 +3,8 @@ name: pan-admin-config
 description: "pan admin config <cmd> — view and edit Overdeck project configuration"
 triggers:
   - pan admin config
-  - panopticon config
-  - configure panopticon
+  - overdeck config
+  - configure overdeck
   - edit config
 allowed-tools:
   - Bash
@@ -34,7 +34,7 @@ Manages the legacy TOML-backed shadow-mode CLI settings.
 
 This command does **not** currently expose general-purpose `show`, `edit`, `get`, or `set`
 subcommands for the YAML router config. For model routing and provider settings, use the
-Settings page or edit `~/.panopticon/config.yaml` directly.
+Settings page or edit `~/.overdeck/config.yaml` directly.
 
 ## When to Use
 

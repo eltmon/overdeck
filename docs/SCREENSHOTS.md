@@ -39,7 +39,7 @@ node scripts/capture-doc-shot.mjs /costs images/specialists/09-costs --full-page
 node scripts/capture-doc-shot.mjs /agents images/agents-card --selector ".agent-card"
 ```
 
-The script seeds `localStorage['panopticon.ui.theme']` before each navigation,
+The script seeds `localStorage['overdeck.ui.theme']` before each navigation,
 so the page renders in the requested theme from first paint. Run
 `node scripts/capture-doc-shot.mjs` with no arguments for the full option list.
 

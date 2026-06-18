@@ -161,7 +161,7 @@ describe('G5 — exportLegacyConversations', () => {
       INSERT INTO conversations (name, cwd, cleared_to_conv_id, handoff_target_conv_id,
                                  handoff_doc_path, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run('conv-src', '/home/user/proj', 1, 1, '/home/user/.panopticon/handoffs/doc.md', '2026-06-01T01:00:00.000Z');
+    `).run('conv-src', '/home/user/proj', 1, 1, '/home/user/.overdeck/handoffs/doc.md', '2026-06-01T01:00:00.000Z');
 
     legacy.close();
 
@@ -176,7 +176,7 @@ describe('G5 — exportLegacyConversations', () => {
     // The lineage edge should point to the new UUID id of conv-dst
     expect(src!.clearedToConvId).toBe(dst!.id);
     expect(src!.handoffTargetConvId).toBe(dst!.id);
-    expect(src!.handoffDocPath).toBe('/home/user/.panopticon/handoffs/doc.md');
+    expect(src!.handoffDocPath).toBe('/home/user/.overdeck/handoffs/doc.md');
   });
 
   it('AC3: archived_at is preserved and readable', async () => {

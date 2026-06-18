@@ -1,7 +1,7 @@
 /**
  * Overdeck Unified Database
  *
- * Single panopticon.db at ~/.panopticon/panopticon.db.
+ * Single panopticon.db at ~/.overdeck/panopticon.db.
  * Singleton pattern — one connection shared across the process.
  *
  * IMPORTANT: This module is safe to import in both server and CLI contexts.

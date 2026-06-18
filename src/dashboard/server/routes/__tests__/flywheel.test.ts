@@ -236,9 +236,9 @@ describe('flywheel stats payload helper', () => {
   });
 
   it('feeds persisted pipeline events into production stats criteria', async () => {
-    const panopticonHome = join(tmpdir(), `pan-flywheel-stats-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(panopticonHome, { recursive: true });
-    process.env.OVERDECK_HOME = panopticonHome;
+    const overdeckHome = join(tmpdir(), `pan-flywheel-stats-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(overdeckHome, { recursive: true });
+    process.env.OVERDECK_HOME = overdeckHome;
     resetDatabase();
     try {
       const store = await initEventStore();
@@ -279,18 +279,18 @@ describe('flywheel stats payload helper', () => {
       resetDatabase();
       closeOverdeckDatabaseSync();
       delete process.env.OVERDECK_HOME;
-      rmSync(panopticonHome, { recursive: true, force: true });
+      rmSync(overdeckHome, { recursive: true, force: true });
     }
   });
 });
 
 describe('flywheel config routes', () => {
-  let panopticonHome: string;
+  let overdeckHome: string;
 
   beforeEach(() => {
-    panopticonHome = join(tmpdir(), `pan-flywheel-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(panopticonHome, { recursive: true });
-    process.env.OVERDECK_HOME = panopticonHome;
+    overdeckHome = join(tmpdir(), `pan-flywheel-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(overdeckHome, { recursive: true });
+    process.env.OVERDECK_HOME = overdeckHome;
     closeOverdeckDatabaseSync();
   });
 
@@ -298,7 +298,7 @@ describe('flywheel config routes', () => {
     resetDatabase();
     closeOverdeckDatabaseSync();
     delete process.env.OVERDECK_HOME;
-    rmSync(panopticonHome, { recursive: true, force: true });
+    rmSync(overdeckHome, { recursive: true, force: true });
   });
 
   it('returns both flywheel config defaults without requiring origin headers', async () => {
@@ -361,7 +361,7 @@ describe('flywheel config routes', () => {
 });
 
 describe('flywheel auto-merge routes', () => {
-  let panopticonHome: string;
+  let overdeckHome: string;
 
   const eligibleDeps = (overrides: Parameters<typeof postAutoMergeSchedulePayload>[1] = {}) => ({
     isRequireUatBeforeMerge: () => false,
@@ -389,9 +389,9 @@ describe('flywheel auto-merge routes', () => {
   }
 
   beforeEach(() => {
-    panopticonHome = join(tmpdir(), `pan-flywheel-auto-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(panopticonHome, { recursive: true });
-    process.env.OVERDECK_HOME = panopticonHome;
+    overdeckHome = join(tmpdir(), `pan-flywheel-auto-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(overdeckHome, { recursive: true });
+    process.env.OVERDECK_HOME = overdeckHome;
     closeOverdeckDatabaseSync();
   });
 
@@ -399,7 +399,7 @@ describe('flywheel auto-merge routes', () => {
     resetDatabase();
     closeOverdeckDatabaseSync();
     delete process.env.OVERDECK_HOME;
-    rmSync(panopticonHome, { recursive: true, force: true });
+    rmSync(overdeckHome, { recursive: true, force: true });
   });
 
   it('exports the shared auto-merge cooldown constant', () => {
@@ -726,14 +726,14 @@ describe('flywheel auto-merge routes', () => {
 });
 
 describe('flywheel status POST payload helper', () => {
-  let panopticonHome: string;
+  let overdeckHome: string;
 
   beforeEach(async () => {
-    panopticonHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-post-'));
+    overdeckHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-post-'));
   });
 
   afterEach(async () => {
-    await rm(panopticonHome, { recursive: true, force: true });
+    await rm(overdeckHome, { recursive: true, force: true });
   });
 
   it('accepts a valid status, persists latest.json, and notifies subscribers', async () => {
@@ -741,11 +741,11 @@ describe('flywheel status POST payload helper', () => {
     const received: (FlywheelStatus | null)[] = [];
     const unsubscribe = subscribeLatestFlywheelStatus((next) => received.push(next));
 
-    const result = await postFlywheelStatusPayload(status, { panopticonHome });
+    const result = await postFlywheelStatusPayload(status, { overdeckHome });
     unsubscribe();
 
     expect(result).toEqual({ status: 200, body: { ok: true, runId: 'RUN-7' } });
-    await expect(readFile(join(panopticonHome, 'flywheel', 'runs', 'RUN-7', 'latest.json'), 'utf8'))
+    await expect(readFile(join(overdeckHome, 'flywheel', 'runs', 'RUN-7', 'latest.json'), 'utf8'))
       .resolves.toEqual(`${JSON.stringify(status, null, 2)}\n`);
     expect(received).toEqual([status]);
   });
@@ -757,7 +757,7 @@ describe('flywheel status POST payload helper', () => {
     ['invalid orchestrator effort', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), orchestrator: { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z').orchestrator, effort: 'maximum' } }],
     ['invalid activePipeline', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), activePipeline: [{ issueId: 'PAN-1' }] }],
   ])('rejects schema-invalid payloads: %s', async (_name, payload) => {
-    const result = await postFlywheelStatusPayload(payload, { panopticonHome });
+    const result = await postFlywheelStatusPayload(payload, { overdeckHome });
 
     expect(result.status).toBe(400);
     expect(result.body).toMatchObject({ error: 'Invalid FlywheelStatus payload' });
@@ -785,11 +785,11 @@ describe('flywheel action payload helpers', () => {
 });
 
 describe('flywheel run payload helpers', () => {
-  let panopticonHome: string;
+  let overdeckHome: string;
 
   beforeEach(async () => {
-    panopticonHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-routes-'));
-    process.env.OVERDECK_HOME = panopticonHome;
+    overdeckHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-routes-'));
+    process.env.OVERDECK_HOME = overdeckHome;
     resetDatabase();
     closeOverdeckDatabaseSync();
   });
@@ -798,42 +798,42 @@ describe('flywheel run payload helpers', () => {
     resetDatabase();
     closeOverdeckDatabaseSync();
     delete process.env.OVERDECK_HOME;
-    await rm(panopticonHome, { recursive: true, force: true });
+    await rm(overdeckHome, { recursive: true, force: true });
   });
 
   it('returns run summaries sorted by startedAt desc', async () => {
-    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { panopticonHome });
-    await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { panopticonHome });
+    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
+    await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { overdeckHome });
 
-    await expect(getFlywheelRunsPayload({ panopticonHome })).resolves.toEqual([
+    await expect(getFlywheelRunsPayload({ overdeckHome })).resolves.toEqual([
       { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
       { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
     ]);
   });
 
   it('limits run summaries and ignores non-canonical run directories', async () => {
-    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { panopticonHome });
-    await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { panopticonHome });
-    await mkdir(join(panopticonHome, 'flywheel', 'runs', 'not-a-run'), { recursive: true });
+    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { overdeckHome });
+    await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { overdeckHome });
+    await mkdir(join(overdeckHome, 'flywheel', 'runs', 'not-a-run'), { recursive: true });
 
-    await expect(getFlywheelRunsPayload({ panopticonHome, limit: 1 })).resolves.toEqual([
+    await expect(getFlywheelRunsPayload({ overdeckHome, limit: 1 })).resolves.toEqual([
       { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
     ]);
   });
 
   it('returns null for a non-canonical run id', async () => {
-    await expect(getFlywheelRunPayload('../RUN-1', { panopticonHome })).resolves.toBeNull();
+    await expect(getFlywheelRunPayload('../RUN-1', { overdeckHome })).resolves.toBeNull();
   });
 
   it('returns a run detail with report path when the run exists', async () => {
     const status = makeStatus('RUN-1', '2026-05-18T10:00:00.000Z');
-    await writeLatestFlywheelStatus(status, { panopticonHome });
-    const reportPath = join(panopticonHome, 'flywheel', 'runs', 'RUN-1', 'report.md');
+    await writeLatestFlywheelStatus(status, { overdeckHome });
+    const reportPath = join(overdeckHome, 'flywheel', 'runs', 'RUN-1', 'report.md');
     await writeFile(reportPath, '# Report\n');
 
     // PAN-1528: latest.system.agentsActive is now overlaid with the live
-    // work-agent count from <panopticonHome>/agents/. Empty test home => 0.
-    await expect(getFlywheelRunPayload('RUN-1', { panopticonHome })).resolves.toMatchObject({
+    // work-agent count from <overdeckHome>/agents/. Empty test home => 0.
+    await expect(getFlywheelRunPayload('RUN-1', { overdeckHome })).resolves.toMatchObject({
       id: 'RUN-1',
       startedAt: '2026-05-18T10:00:00.000Z',
       status: 'complete',
@@ -845,21 +845,21 @@ describe('flywheel run payload helpers', () => {
   it('bootstraps the current status from the active running run only', async () => {
     const completed = makeStatus('RUN-1', '2026-05-18T10:00:00.000Z');
     const running = makeStatus('RUN-2', '2026-05-18T12:00:00.000Z');
-    await writeLatestFlywheelStatus(completed, { panopticonHome });
-    await writeFile(join(panopticonHome, 'flywheel', 'runs', 'RUN-1', 'report.md'), '# Report\n');
-    await writeLatestFlywheelStatus(running, { panopticonHome });
+    await writeLatestFlywheelStatus(completed, { overdeckHome });
+    await writeFile(join(overdeckHome, 'flywheel', 'runs', 'RUN-1', 'report.md'), '# Report\n');
+    await writeLatestFlywheelStatus(running, { overdeckHome });
 
-    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: null })).resolves.toBeNull();
-    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-1' })).resolves.toBeNull();
+    await expect(readCurrentLatestFlywheelStatus({ overdeckHome, activeRunId: null })).resolves.toBeNull();
+    await expect(readCurrentLatestFlywheelStatus({ overdeckHome, activeRunId: 'RUN-1' })).resolves.toBeNull();
     // PAN-1528: agentsActive overlaid with live count from empty test home.
-    await expect(readCurrentLatestFlywheelStatus({ panopticonHome, activeRunId: 'RUN-2' })).resolves.toEqual({
+    await expect(readCurrentLatestFlywheelStatus({ overdeckHome, activeRunId: 'RUN-2' })).resolves.toEqual({
       ...running,
       system: { ...running.system, agentsActive: 0 },
     });
   });
 
   it('returns null for a missing run', async () => {
-    await expect(getFlywheelRunPayload('RUN-404', { panopticonHome })).resolves.toBeNull();
+    await expect(getFlywheelRunPayload('RUN-404', { overdeckHome })).resolves.toBeNull();
   });
 });
 

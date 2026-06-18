@@ -13,9 +13,9 @@ Claude Code's `Read` tool handles image paths natively: when a message contains 
 **Flow:**
 1. User pastes (Ctrl+V) or drops an image onto the `ComposerFooter`
 2. Browser converts image to base64 and immediately POSTs to `/api/conversations/:name/upload-image`
-3. Server saves to OS temp dir (`/tmp/panopticon-paste-{uuid}.{ext}`)
+3. Server saves to OS temp dir (`/tmp/overdeck-paste-{uuid}.{ext}`)
 4. Thumbnail preview appears in the composer with a × button
-5. On submit: message is prefixed with `@/tmp/panopticon-paste-{uuid}.ext\n` lines before user text
+5. On submit: message is prefixed with `@/tmp/overdeck-paste-{uuid}.ext\n` lines before user text
 6. Claude Code reads the `@path`, base64-encodes the bytes, sends as vision block
 7. Server cleanup: a 5-min TTL interval purges stale temp files
 
@@ -51,7 +51,7 @@ Consistent with the existing `mission-control.ts` upload pattern. No multipart p
 
 ## Architecture Notes
 
-- Cleanup interval uses `glob` or `readdir` on tmpdir filtered by `panopticon-paste-` prefix
+- Cleanup interval uses `glob` or `readdir` on tmpdir filtered by `overdeck-paste-` prefix
 - TTL: delete files older than 5 minutes
 - Cleanup must be `async` (no sync FS in server code)
 - Upload endpoint must use `fs/promises.writeFile` (no `writeFileSync`)

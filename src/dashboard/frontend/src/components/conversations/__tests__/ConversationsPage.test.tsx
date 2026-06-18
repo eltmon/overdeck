@@ -84,7 +84,7 @@ const SESSION_STUB = {
   summary: 'Fixed the auth bug',
   enrichmentLevel: 1 as const,
   enrichmentFailed: false,
-  panopticonManaged: false,
+  overdeckManaged: false,
   panIssueId: null,
 };
 
@@ -99,7 +99,7 @@ const ARCHIVED_RESPONSE = [{
   summary: 'Archived summary',
   lastTs: '2025-01-02T01:00:00Z',
   archivedAt: '2025-01-02T00:00:00Z',
-  panopticonManaged: true,
+  overdeckManaged: true,
   panIssueId: 'PAN-1391',
 }];
 const STATS_RESPONSE = { total: 10, enriched: 5, embedded: 2, managedCount: 3 };

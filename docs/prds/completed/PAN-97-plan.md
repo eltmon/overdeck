@@ -16,9 +16,9 @@ Build the convoy runtime that enables Overdeck to orchestrate multiple AI agents
 |----------|--------|-----------|
 | Runtime approach | General-purpose | All 4 templates work immediately; avoid code-review-specific implementation |
 | Agent spawning | Tmux sessions | Proven pattern from `pan work issue`; visibility, control, attach/detach |
-| State persistence | File-based | Survives restarts; enables convoy recovery; stored in `~/.panopticon/convoys/` |
+| State persistence | File-based | Survives restarts; enables convoy recovery; stored in `~/.overdeck/convoys/` |
 | Review migration | Replace entirely | Clean break; remove `spawnReviewAgent()` complexity |
-| Custom templates | Template inheritance | User templates in `~/.panopticon/convoy-templates/` extend built-ins |
+| Custom templates | Template inheritance | User templates in `~/.overdeck/convoy-templates/` extend built-ins |
 | Model selection | Respect agent frontmatter | Each agent template specifies optimal model (security=sonnet, correctness=haiku) |
 | Agent coordination | Runtime orchestrates | File signaling + tmux exit detection; no agent-to-agent messaging needed |
 | Synthesis | Hybrid | Script merges files, then Claude synthesis agent for AI prioritization |
@@ -105,7 +105,7 @@ Phase 2: Synthesis Agent (after all Phase 1 agents complete)
 pan convoy start code-review --files "src/**/*.ts"
     │
     ├─→ Load template (built-in or custom)
-    ├─→ Create convoy state file: ~/.panopticon/convoys/<convoy-id>.json
+    ├─→ Create convoy state file: ~/.overdeck/convoys/<convoy-id>.json
     ├─→ Determine execution phases from template dependencies
     │
     └─→ Phase 1: Spawn parallel agents
@@ -129,7 +129,7 @@ pan convoy start code-review --files "src/**/*.ts"
 ### State Structure
 
 ```typescript
-// ~/.panopticon/convoys/<convoy-id>.json
+// ~/.overdeck/convoys/<convoy-id>.json
 interface ConvoyState {
   id: string;                    // e.g., "convoy-review-1706123456"
   template: string;              // Template name
@@ -180,7 +180,7 @@ tools:
 ### Custom Template Location
 
 ```
-~/.panopticon/convoy-templates/
+~/.overdeck/convoy-templates/
 ├── my-custom-review.json       # Custom template
 └── lightweight-review.json     # Another custom template
 ```
@@ -207,7 +207,7 @@ function parseAgentTemplate(templatePath: string): { model: string; tools: strin
 
 **Key behaviors:**
 - Loads template from built-in or custom location
-- Creates state file in `~/.panopticon/convoys/`
+- Creates state file in `~/.overdeck/convoys/`
 - Spawns agents in tmux sessions (prefixed `convoy-<id>-<role>`)
 - Monitors tmux sessions for exit
 - Triggers next phase when all agents in current phase complete
@@ -304,8 +304,8 @@ WS   /api/convoys/:id/stream   - Stream agent output
 ### Phase 5: Skill Updates
 
 **Files to modify:**
-- `~/.panopticon/skills/pan-code-review/SKILL.md` - Use convoy commands
-- `~/.panopticon/skills/pan-convoy-synthesis/SKILL.md` - Will work once commands exist
+- `~/.overdeck/skills/pan-code-review/SKILL.md` - Use convoy commands
+- `~/.overdeck/skills/pan-convoy-synthesis/SKILL.md` - Will work once commands exist
 
 **Changes:**
 Remove references to invalid `Task(subagent_type='code-review-*')` patterns.
@@ -375,7 +375,7 @@ a single, prioritized, actionable report. The synthesis agent:
 
 ### Custom Convoy Templates
 
-Create custom templates in `~/.panopticon/convoy-templates/`:
+Create custom templates in `~/.overdeck/convoy-templates/`:
 
 ```json
 {
@@ -448,14 +448,14 @@ src/dashboard/server/index.ts                  # Add convoy API endpoints
 src/dashboard/frontend/src/App.tsx             # Add ConvoyPanel
 src/cli/index.ts                               # Register convoy commands
 README.md                                      # Add convoy documentation
-~/.panopticon/skills/pan-code-review/SKILL.md  # Update for convoy
-~/.panopticon/skills/pan-convoy-synthesis/SKILL.md  # Will work now
+~/.overdeck/skills/pan-code-review/SKILL.md  # Update for convoy
+~/.overdeck/skills/pan-convoy-synthesis/SKILL.md  # Will work now
 ```
 
 ### State/Config Locations
 ```
-~/.panopticon/convoys/                         # Convoy state files
-~/.panopticon/convoy-templates/                # Custom templates
+~/.overdeck/convoys/                         # Convoy state files
+~/.overdeck/convoy-templates/                # Custom templates
 ```
 
 ---

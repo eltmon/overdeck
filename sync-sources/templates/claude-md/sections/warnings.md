@@ -13,11 +13,11 @@ This prevents scope creep, keeps changes traceable, and ensures every fix goes t
 
 ## tmux Socket — CRITICAL
 
-**Overdeck agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon`:
+**Overdeck agents run under a separate tmux socket named `overdeck`.** Always use `-L overdeck`:
 
 ```bash
-tmux -L panopticon list-sessions
-tmux -L panopticon capture-pane -t agent-{{ISSUE_ID_LOWER}} -p -S -50
+tmux -L overdeck list-sessions
+tmux -L overdeck capture-pane -t agent-{{ISSUE_ID_LOWER}} -p -S -50
 ```
 
 Plain `tmux list-sessions` queries the default socket and will show "no server running" — this does NOT mean the agent is dead.
@@ -39,7 +39,7 @@ Plain `tmux list-sessions` queries the default socket and will show "no server r
 **Before making ANY file changes:**
 1. Run `pwd` to verify you're in the workspace
 2. All file paths should be relative to the workspace OR absolute paths within the workspace
-3. NEVER use paths like `/home/.../projects/panopticon/src/...` (main project)
+3. NEVER use paths like `/home/.../projects/overdeck/src/...` (main project)
 4. ALWAYS use paths like `./src/...` or `{{WORKSPACE_PATH}}/src/...` (workspace)
 
 **If you see yourself working in the main project directory instead of the workspace, STOP and correct your working directory.**

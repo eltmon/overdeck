@@ -33,7 +33,7 @@ describe('inspect command', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockResolveProjectFromIssue.mockReturnValue({
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
       projectPath: '/repo',
     });
     mockGetDiffBase.mockReturnValue(Effect.succeed('abcdef1234567890'));

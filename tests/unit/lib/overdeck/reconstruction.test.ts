@@ -117,7 +117,7 @@ function makeTmuxLayer(sessionNames: string[]): Layer.Layer<Tmux> {
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
 const FAKE_PROJECT: ProjectConfig = {
-  id: 'panopticon',
+  id: 'overdeck',
   name: 'overdeck',
   path: '/home/eltmon/Projects/overdeck',
   tracker: 'github',

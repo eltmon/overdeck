@@ -117,7 +117,7 @@ export interface AgentSpawnerShape {
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
 export class AgentSpawner extends Context.Service<AgentSpawner, AgentSpawnerShape>()(
-  'panopticon/dashboard/AgentSpawner',
+  'overdeck/dashboard/AgentSpawner',
 ) {}
 
 // ─── Live layer ───────────────────────────────────────────────────────────────

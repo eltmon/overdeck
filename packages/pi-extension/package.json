@@ -1,9 +1,9 @@
 {
-  "name": "@panopticon/pi-extension",
+  "name": "@overdeck/pi-extension",
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Vendored Pi Coding Agent extension that emits Overdeck lifecycle signals to ~/.panopticon/agents and ~/.panopticon/heartbeats.",
+  "description": "Vendored Pi Coding Agent extension that emits Overdeck lifecycle signals to ~/.overdeck/agents and ~/.overdeck/heartbeats.",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "exports": {

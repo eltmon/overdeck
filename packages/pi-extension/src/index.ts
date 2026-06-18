@@ -1,5 +1,5 @@
 /**
- * @panopticon/pi-extension (PAN-636, PAN-1134)
+ * @overdeck/pi-extension (PAN-636, PAN-1134)
  *
  * Vendored extension loaded by the Pi Coding Agent (`pi --extension <path>`)
  * to emit Overdeck lifecycle signals via filesystem markers and HTTP POSTs.
@@ -72,9 +72,9 @@ export interface OverdeckPaths {
   progressStatePath: string
 }
 
-export function panopticonPathsFor(agentId: string, home: string = homedir()): OverdeckPaths {
-  const agentDir = join(home, '.panopticon', 'agents', agentId)
-  const heartbeatsDir = join(home, '.panopticon', 'heartbeats')
+export function overdeckPathsFor(agentId: string, home: string = homedir()): OverdeckPaths {
+  const agentDir = join(home, '.overdeck', 'agents', agentId)
+  const heartbeatsDir = join(home, '.overdeck', 'heartbeats')
   return {
     agentDir,
     heartbeatsDir,
@@ -97,7 +97,7 @@ const MAX_PENDING_EVENTS = 200
 const MAX_PENDING_EVENT_BYTES = 256_000
 const MAX_PENDING_DRAIN_EVENTS = 25
 const MAX_TURN_OUTPUT_BYTES = 64_000
-const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token'
+const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token'
 const HEARTBEAT_PATH = (agentId: string) => `/api/agents/${agentId}/heartbeat`
 
 function getDashboardUrl(): string {
@@ -107,9 +107,9 @@ function getDashboardUrl(): string {
 async function readInternalToken(env: HookEnv): Promise<string | null> {
   const fromEnv = process.env['OVERDECK_INTERNAL_TOKEN']
   if (fromEnv?.trim()) return fromEnv.trim()
-  const panopticonHome = env.home ? join(env.home, '.panopticon') : (process.env['OVERDECK_HOME'] || join(homedir(), '.panopticon'))
+  const overdeckHome = env.home ? join(env.home, '.overdeck') : (process.env['OVERDECK_HOME'] || join(homedir(), '.overdeck'))
   try {
-    const token = (await readFile(join(panopticonHome, 'internal-token'), 'utf8')).trim()
+    const token = (await readFile(join(overdeckHome, 'internal-token'), 'utf8')).trim()
     return token.length > 0 ? token : null
   } catch {
     return null
@@ -122,7 +122,7 @@ async function postEvent(env: HookEnv, body: Record<string, unknown>): Promise<v
 
 async function postDashboard(env: HookEnv, path: string, body: Record<string, unknown>): Promise<void> {
   const url = `${getDashboardUrl()}${path}`
-  const paths = panopticonPathsFor(env.agentId, env.home)
+  const paths = overdeckPathsFor(env.agentId, env.home)
   await drainPendingEvents(env, paths.pendingEventsPath)
 
   const ok = await postWithTimeout(env, url, body)
@@ -130,7 +130,7 @@ async function postDashboard(env: HookEnv, path: string, body: Record<string, un
 
   if (ok === false) {
     await mkdir(paths.agentDir, { recursive: true })
-    await appendFile(paths.pendingEventsPath, `${JSON.stringify(path === HEARTBEAT_PATH(env.agentId) ? body : { __panopticonPath: path, body })}\n`, 'utf8').catch(() => {})
+    await appendFile(paths.pendingEventsPath, `${JSON.stringify(path === HEARTBEAT_PATH(env.agentId) ? body : { __overdeckPath: path, body })}\n`, 'utf8').catch(() => {})
   }
 }
 
@@ -210,7 +210,7 @@ async function readPendingEventLines(pendingPath: string): Promise<string[]> {
 
 async function writePendingEventLines(pendingPath: string, lines: string[], env: HookEnv): Promise<void> {
   if (lines.length === 0) return
-  const paths = panopticonPathsFor(env.agentId, env.home)
+  const paths = overdeckPathsFor(env.agentId, env.home)
   await mkdir(paths.agentDir, { recursive: true })
   await writeFile(pendingPath, lines.slice(-MAX_PENDING_EVENTS).map((line) => `${line}\n`).join(''), 'utf8').catch(() => {})
 }
@@ -232,8 +232,8 @@ async function drainPendingEvents(env: HookEnv, pendingPath: string): Promise<vo
       continue
     }
 
-    const path = typeof parsed['__panopticonPath'] === 'string'
-      ? parsed['__panopticonPath'] as string
+    const path = typeof parsed['__overdeckPath'] === 'string'
+      ? parsed['__overdeckPath'] as string
       : HEARTBEAT_PATH(env.agentId)
     const body = parsed['body'] && typeof parsed['body'] === 'object'
       ? parsed['body'] as Record<string, unknown>
@@ -270,7 +270,7 @@ function envFor(env: HookEnv): {
   now: () => string
 } {
   return {
-    paths: panopticonPathsFor(env.agentId, env.home),
+    paths: overdeckPathsFor(env.agentId, env.home),
     pid: env.pid ?? process.pid,
     now: env.now ?? (() => new Date().toISOString()),
   }
@@ -606,7 +606,7 @@ export async function handleWorkspaceContext(ctx: unknown, cwd: string = process
 
 export async function handleSessionBriefingContext(
   ctx: unknown,
-  home: string = process.env['OVERDECK_HOME'] || join(homedir(), '.panopticon'),
+  home: string = process.env['OVERDECK_HOME'] || join(homedir(), '.overdeck'),
 ): Promise<void> {
   await appendSystemPromptFile(ctx, join(home, 'session-context.md'))
 }
@@ -615,13 +615,13 @@ export async function handleSessionBriefingContext(
  * Load the rendered global context layer (PAN-1566) and fold it into the
  * Pi session's system prompt.
  *
- * `pan sync` renders the global layer (~/.panopticon/context/global.md +
- * bundled engineering rules) into ~/.panopticon/context/pi-global.md so Pi
+ * `pan sync` renders the global layer (~/.overdeck/context/global.md +
+ * bundled engineering rules) into ~/.overdeck/context/pi-global.md so Pi
  * sessions receive the same engineering rules that Claude Code gets via
  * ~/.claude/CLAUDE.md.
  */
 export async function handleGlobalContext(ctx: unknown): Promise<void> {
-  const home = process.env['OVERDECK_HOME'] || join(homedir(), '.panopticon')
+  const home = process.env['OVERDECK_HOME'] || join(homedir(), '.overdeck')
   await appendSystemPromptFile(ctx, join(home, 'context', 'pi-global.md'))
 }
 
@@ -636,7 +636,7 @@ async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void>
   }
 }
 
-export default function panopticonPiExtension(pi: PiExtensionAPI): void {
+export default function overdeckPiExtension(pi: PiExtensionAPI): void {
   const agentId = process.env['OVERDECK_AGENT_ID']
   if (!agentId) return
 

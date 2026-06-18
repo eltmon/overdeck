@@ -77,7 +77,7 @@ Each one is a symptom of the same root cause: **beads has been growing native su
 - [ ] Document \`bd ping\` and \`bd doctor --fix\` as the canonical health/repair calls
 - [ ] Document \`bd prune\` for DB hygiene
 - [ ] Document \`bd dolt push --remote <name>\` flag
-- [ ] Update \`skills/beads-panopticon-guide/SKILL.md\` with the worktree story (redirect vs auto-import)
+- [ ] Update \`skills/beads-overdeck-guide/SKILL.md\` with the worktree story (redirect vs auto-import)
 
 ### 3. Lean on native support (incremental — do NOT do all at once)
 - [ ] **Replace** our \`bd list --json --limit 0\` connectivity probe in \`src/lib/vbrief/beads.ts\` with \`bd ping --json\`

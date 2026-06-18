@@ -4,7 +4,7 @@
  * Session model (D-7 external store): Codex writes rollout JSONL files to
  * $CODEX_HOME/sessions/YYYY/MM/DD/rollout-<uuid>-<threadId>.jsonl
  * The thread-id is captured at spawn time and persisted at
- * ~/.panopticon/agents/<id>/codex-thread-id so later introspection calls
+ * ~/.overdeck/agents/<id>/codex-thread-id so later introspection calls
  * can locate the correct rollout file.
  *
  * Spawn, sendMessage, killAgent, getHeartbeat, getTokenUsage, and
@@ -40,12 +40,12 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
-function panopticonDir(): string {
-  return join(homedir(), '.panopticon')
+function overdeckDir(): string {
+  return join(homedir(), '.overdeck')
 }
 
 function agentsDir(): string {
-  return join(panopticonDir(), 'agents')
+  return join(overdeckDir(), 'agents')
 }
 
 function agentDirFor(agentId: string): string {
@@ -186,7 +186,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     // single argv array. model/provider is set at launch via the -m flag, so it
     // is omitted here. (Writing `[model]` as a table makes Codex fail config
     // load with "invalid type: map, expected a string in `model`".)
-    const notifyHookPath = join(homedir(), '.panopticon', 'bin', 'codex-notify-hook')
+    const notifyHookPath = join(homedir(), '.overdeck', 'bin', 'codex-notify-hook')
     const lines = [
       '# Overdeck-managed Codex config — do not edit manually',
       '# model/provider set at launch via -m flag',
@@ -233,7 +233,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     // Seed from the pre-rendered Codex global context layer if available;
     // fall back to a placeholder. The static file is written by `pan sync`
     // via syncContextLayersSync → renderGlobalLayer('codex', …).
-    const globalCodexContext = join(homedir(), '.panopticon', 'context', 'codex-global.md')
+    const globalCodexContext = join(homedir(), '.overdeck', 'context', 'codex-global.md')
     if (existsSync(globalCodexContext)) {
       copyFileSync(globalCodexContext, agentsMdPath)
     } else {
@@ -380,7 +380,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const threadId = readThreadId(agentId)
     if (!threadId) return null
     // Use per-agent CODEX_HOME, not the global ~/.codex; each agent's rollouts
-    // are written to ~/.panopticon/agents/<id>/codex-home/sessions/.
+    // are written to ~/.overdeck/agents/<id>/codex-home/sessions/.
     return findRolloutPath(join(agentDirFor(agentId), 'codex-home'), threadId)
   }
 
@@ -396,7 +396,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
 
   getHeartbeat(agentId: string): Heartbeat | null {
     // Tier 1: Fresh notify-written heartbeat (<60s old).
-    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`)
+    const heartbeatPath = join(homedir(), '.overdeck', 'heartbeats', `${agentId}.json`)
     if (existsSync(heartbeatPath)) {
       try {
         const data = JSON.parse(readFileSync(heartbeatPath, 'utf-8')) as {
@@ -504,7 +504,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   async killAgent(agentId: string): Promise<void> {
     // Step 1: interrupt the running task.
     try {
-      await execAsync(`tmux -L panopticon send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
+      await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
     } catch {
       // ignore
     }
@@ -518,7 +518,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     // process group directly.
     try {
       const { stdout } = await execAsync(
-        `tmux -L panopticon list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
+        `tmux -L overdeck list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
       )
       const pid = stdout.trim()
       if (pid) await execAsync(`kill -TERM -- -${pid} 2>/dev/null || kill -TERM ${pid} 2>/dev/null || true`)
@@ -538,8 +538,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   async spawnAgent(config: SpawnConfig & { codexHome?: string; codexSandboxMode?: string }): Promise<Agent> {
     const agentId = config.agentId
 
-    // Per-agent CODEX_HOME: ~/.panopticon/agents/<id>/codex-home
-    const codexHomeDir = config.codexHome ?? join(homedir(), '.panopticon', 'agents', agentId, 'codex-home')
+    // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home
+    const codexHomeDir = config.codexHome ?? join(homedir(), '.overdeck', 'agents', agentId, 'codex-home')
 
     // 1. Create CODEX_HOME structure (config.toml + AGENTS.md + sessions/).
     initCodexHome(codexHomeDir)
@@ -555,7 +555,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
 
     const fullCmd = `CODEX_HOME=${shellQuote(codexHomeDir)} ${tokens.join(' ')}`
 
-    // 3. Launch the tmux session on the panopticon socket.
+    // 3. Launch the tmux session on the overdeck socket.
     await Effect.runPromise(createSession(agentId, config.workspace, fullCmd, {
       env: {
         OVERDECK_AGENT_ID: agentId,

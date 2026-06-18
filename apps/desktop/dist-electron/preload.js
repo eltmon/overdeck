@@ -3,7 +3,7 @@ let electron = require("electron");
 /**
 * Preload script for the Overdeck Electron renderer.
 *
-* Exposes `window.panopticonBridge` via contextBridge.exposeInMainWorld.
+* Exposes `window.overdeckBridge` via contextBridge.exposeInMainWorld.
 * The renderer uses this bridge to communicate with the main process over IPC.
 *
 * Security model:
@@ -24,7 +24,7 @@ const IPC = {
 	UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
 	NOTIFY: "pan:notify"
 };
-electron.contextBridge.exposeInMainWorld("panopticonBridge", {
+electron.contextBridge.exposeInMainWorld("overdeckBridge", {
 	isDesktopApp: () => true,
 	getServerUrl: () => {
 		const result = electron.ipcRenderer.sendSync(IPC.GET_SERVER_URL);

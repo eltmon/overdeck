@@ -84,7 +84,7 @@ vi.mock('../config.js', () => ({
 }));
 
 vi.mock('../../paths.js', () => ({
-  OVERDECK_HOME: '/tmp/test-panopticon',
+  OVERDECK_HOME: '/tmp/test-overdeck',
   AGENTS_DIR: '/tmp/test-agents',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',

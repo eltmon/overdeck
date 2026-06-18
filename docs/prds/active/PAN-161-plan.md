@@ -238,7 +238,7 @@ These tasks can be worked on simultaneously with minimal dependencies.
 
 3. **Activity Aggregation API** (difficulty:medium)
    - Implement `/api/activity/:issueId` endpoint
-   - Read specialist logs from `~/.panopticon/specialists/`
+   - Read specialist logs from `~/.overdeck/specialists/`
    - Aggregate planning agent sessions
    - Return ordered sections with full metadata
 

@@ -599,7 +599,7 @@ describe('GitHubTracker', () => {
       const mockComment = {
         id: 2001,
         body: 'New comment',
-        user: { login: 'panopticon-bot' },
+        user: { login: 'overdeck-bot' },
         created_at: '2024-01-15T12:00:00Z',
         updated_at: '2024-01-15T12:00:00Z',
       };
@@ -618,7 +618,7 @@ describe('GitHubTracker', () => {
         body: 'New comment',
       });
       expect(comment.body).toBe('New comment');
-      expect(comment.author).toBe('panopticon-bot');
+      expect(comment.author).toBe('overdeck-bot');
     });
   });
 

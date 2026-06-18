@@ -126,14 +126,14 @@ Fix 24 failing tests by updating test assertions and mocks to match current impl
 
 | Phase | Bead ID | Description |
 |-------|---------|-------------|
-| 1 | `panopticon-8mb` | Delete redundant tracker unit tests |
-| 2 | `panopticon-yqz` | Fix config tests |
-| 3 | `panopticon-mwh` | Fix paths test |
-| 4 | `panopticon-439` | Fix E2E tests |
-| 5 | `panopticon-qwm` | Fix integration test |
-| 6 | `panopticon-r9o` | Verify and create follow-up |
+| 1 | `overdeck-8mb` | Delete redundant tracker unit tests |
+| 2 | `overdeck-yqz` | Fix config tests |
+| 3 | `overdeck-mwh` | Fix paths test |
+| 4 | `overdeck-439` | Fix E2E tests |
+| 5 | `overdeck-qwm` | Fix integration test |
+| 6 | `overdeck-r9o` | Verify and create follow-up |
 
 ## Work Location
 
-**Main repo:** `/home/eltmon/projects/panopticon/`
+**Main repo:** `/home/eltmon/projects/overdeck/`
 **Reason:** The workspace `feature-pan-8` is missing critical test infrastructure (tests/setup.ts, tests/unit/, tests/e2e/, tests/integration/).

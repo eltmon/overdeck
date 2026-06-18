@@ -977,7 +977,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     // state.json must declare role: 'plan' — parseAgentState() drops state files
     // lacking a valid role, so writing the legacy type/agentPhase shape would
     // make the dashboard discard this planning session on the next startup scan.
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
     yield* Effect.promise(() => mkdir(agentStateDir, { recursive: true }));
     yield* Effect.promise(() => {
       saveAgentStateSync({
@@ -1158,10 +1158,10 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
     yield* killSession(`planning-${id.toLowerCase()}`).pipe(Effect.ignore);
 
     // Clean up agent state files (non-fatal, so absorbed inside the promise)
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);
     const workAgentStateDir = issueIdentifier
-      ? join(homedir(), '.panopticon', 'agents', `agent-${issueIdentifier.toLowerCase()}`)
-      : join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
+      ? join(homedir(), '.overdeck', 'agents', `agent-${issueIdentifier.toLowerCase()}`)
+      : join(homedir(), '.overdeck', 'agents', `agent-${id.toLowerCase()}`);
 
     yield* Effect.promise(() =>
       cleanupAgentStateDirs([agentStateDir, workAgentStateDir]).catch((cleanupErr: unknown) => {
@@ -1294,7 +1294,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       try {
         const remoteState = loadRemoteAgentState(sessionName);
         if (remoteState?.vmName) return { isRemotePlanning: true, remoteVmName: remoteState.vmName };
-        const remoteMetadataPath = join(homedir(), '.panopticon', 'agents', sessionName, 'remote-workspace.json');
+        const remoteMetadataPath = join(homedir(), '.overdeck', 'agents', sessionName, 'remote-workspace.json');
         if (existsSync(remoteMetadataPath)) {
           const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
           if (remoteMetadata.vmName) return { isRemotePlanning: true, remoteVmName: remoteMetadata.vmName };
@@ -1841,7 +1841,7 @@ const postIssueReopenRoute = HttpRouter.add(
 
       // Clear agent completion markers so Deacon doesn't re-dispatch to specialists
       try {
-        const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${id.toLowerCase()}`);
+        const agentDir = join(homedir(), '.overdeck', 'agents', `agent-${id.toLowerCase()}`);
         for (const marker of ['completed', 'completed.processed']) {
           const markerPath = join(agentDir, marker);
           await removeCompletionMarker(markerPath);
@@ -1959,7 +1959,7 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
           console.log(`[restart-from-plan] Killed work agent session ${workAgentSession}`);
         }
       } catch { /* non-fatal */ }
-      const agentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+      const agentStateDir = join(homedir(), '.overdeck', 'agents', `agent-${issueLower}`);
       if (existsSync(agentStateDir)) {
         try {
           await rm(agentStateDir, { recursive: true, force: true });
@@ -2303,7 +2303,7 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
         } catch { /* Branch might not exist */ }
       }
 
-      const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+      const agentDir = join(homedir(), '.overdeck', 'agents', `agent-${issueLower}`);
       if (existsSync(agentDir)) {
         await execAsync(`rm -rf "${agentDir}"`, { encoding: 'utf-8' });
         cleanupLog.push(`Removed agent state: ${agentDir}`);
@@ -2889,7 +2889,7 @@ const getIssueBeadsRoute = HttpRouter.add(
       } catch { /* Ignore */ }
 
       try {
-        const remoteMetadataPath = join(homedir(), '.panopticon', 'agents', planningSessionName, 'remote-workspace.json');
+        const remoteMetadataPath = join(homedir(), '.overdeck', 'agents', planningSessionName, 'remote-workspace.json');
         if (existsSync(remoteMetadataPath)) {
           const remoteMetadata = JSON.parse(await readFile(remoteMetadataPath, 'utf-8'));
           if (remoteMetadata.vmName) return { isRemoteWorkspace: true, remoteVmName: remoteMetadata.vmName };

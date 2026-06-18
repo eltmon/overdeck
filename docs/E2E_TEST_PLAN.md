@@ -4,7 +4,7 @@
 - Clean test environment (or --minimal flag to skip Traefik)
 - Docker running
 - mkcert installed
-- No existing ~/.panopticon/traefik/ directory
+- No existing ~/.overdeck/traefik/ directory
 
 ## Test Scenario 1: Fresh Install with Traefik
 
@@ -14,24 +14,24 @@ pan install
 ```
 
 **Expected Results:**
-- Creates ~/.panopticon/traefik/ directory structure
+- Creates ~/.overdeck/traefik/ directory structure
 - Copies template files from package:
   - docker-compose.yml
   - traefik.yml
-  - dynamic/panopticon.yml
+  - dynamic/overdeck.yml
   - README.md
 - Generates mkcert wildcard certificates:
-  - ~/.panopticon/traefik/certs/_wildcard.pan.localhost.pem
-  - ~/.panopticon/traefik/certs/_wildcard.pan.localhost-key.pem
+  - ~/.overdeck/traefik/certs/_wildcard.pan.localhost.pem
+  - ~/.overdeck/traefik/certs/_wildcard.pan.localhost-key.pem
 - Creates config.toml with traefik.enabled = true
 - Shows next steps message including DNS setup
 
 **Verification:**
 ```bash
-ls -la ~/.panopticon/traefik/
+ls -la ~/.overdeck/traefik/
 # Should show: docker-compose.yml, traefik.yml, dynamic/, certs/, README.md
 
-cat ~/.panopticon/config.toml | grep -A3 "\[traefik\]"
+cat ~/.overdeck/config.toml | grep -A3 "\[traefik\]"
 # Should show: enabled = true, dashboard_port = 8080, domain = "pan.localhost"
 ```
 
@@ -55,7 +55,7 @@ pan up
 **Verification:**
 ```bash
 docker ps | grep traefik
-# Should show: panopticon-traefik container running
+# Should show: overdeck-traefik container running
 
 curl -k https://pan.localhost
 # Should connect to dashboard frontend
@@ -104,14 +104,14 @@ pan install --minimal
 - up/down read config.toml to determine if Traefik is enabled
 
 ### 3. Docker Compose Integration
-- install copies docker-compose.yml to ~/.panopticon/traefik/
+- install copies docker-compose.yml to ~/.overdeck/traefik/
 - up runs: docker-compose up -d (in traefik dir)
 - down runs: docker-compose down (in traefik dir)
 
 ### 4. Certificate Integration
 - install generates wildcard certs via mkcert
 - traefik.yml references certs in TLS config
-- dynamic/panopticon.yml includes TLS certificates section
+- dynamic/overdeck.yml includes TLS certificates section
 
 ## Manual Verification Steps
 
@@ -154,8 +154,8 @@ Since we can't run full E2E in production environment, verify:
 ### Recommended Testing
 - Test in isolated VM or container
 - Test on Linux, macOS, WSL2
-- Test with fresh install (no existing ~/.panopticon/)
-- Test upgrade path (existing ~/.panopticon/ with inline configs)
+- Test with fresh install (no existing ~/.overdeck/)
+- Test upgrade path (existing ~/.overdeck/ with inline configs)
 
 ## Success Criteria
 

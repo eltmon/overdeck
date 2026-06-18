@@ -27,7 +27,7 @@ describe('specialist-logs', () => {
 
   beforeEach(() => {
     // Create unique test directory for each test
-    testDir = join(tmpdir(), `panopticon-test-logs-${Date.now()}-${Math.random().toString(36).substring(7)}`);
+    testDir = join(tmpdir(), `overdeck-test-logs-${Date.now()}-${Math.random().toString(36).substring(7)}`);
     process.env.OVERDECK_HOME = testDir;
     mkdirSync(testDir, { recursive: true });
   });

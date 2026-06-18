@@ -73,7 +73,7 @@ export interface RallyClientShape {
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
 export class RallyClient extends Context.Service<RallyClient, RallyClientShape>()(
-  'panopticon/dashboard/RallyClient',
+  'overdeck/dashboard/RallyClient',
 ) {}
 
 // ─── Live layer ───────────────────────────────────────────────────────────────

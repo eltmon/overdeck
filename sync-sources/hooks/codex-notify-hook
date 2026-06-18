@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// ~/.panopticon/bin/codex-notify-hook  (PAN-1574)
+// ~/.overdeck/bin/codex-notify-hook  (PAN-1574)
 //
 // Fires via Codex CLI notify mechanism on agent-turn-complete.
 // Codex passes the event JSON as stdin or as a JSON argv argument.
 //
-// Writes ~/.panopticon/agents/<id>/heartbeat.json so codex.ts getHeartbeat
+// Writes ~/.overdeck/agents/<id>/heartbeat.json so codex.ts getHeartbeat
 // can detect turn-end activity. Also writes a `completed` marker used by
 // the recovery path to detect agent idle state.
 
@@ -30,9 +30,9 @@ try {
   // Ignore parse errors — best-effort heartbeat.
 }
 
-const panopticonHome = process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
-const heartbeatsDir = join(panopticonHome, 'heartbeats');
-const agentDir = join(panopticonHome, 'agents', agentId);
+const overdeckHome = process.env.OVERDECK_HOME || join(homedir(), '.overdeck');
+const heartbeatsDir = join(overdeckHome, 'heartbeats');
+const agentDir = join(overdeckHome, 'agents', agentId);
 
 try {
   mkdirSync(heartbeatsDir, { recursive: true });

@@ -44,7 +44,7 @@ export function getConversationCompactionSettings() {
 export function shouldInterceptManualCompact(message: string): boolean {
   const trimmed = message.trim();
   if (trimmed !== '/compact') return false;
-  return getConversationCompactionSettings().manualCompactMode === 'panopticon-native';
+  return getConversationCompactionSettings().manualCompactMode === 'overdeck-native';
 }
 
 export async function estimateContextTokens(sessionFile: string | null | undefined): Promise<number> {
@@ -143,7 +143,7 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
       uuid: boundaryUuid,
       level: 'info',
       compactMetadata: {
-        trigger: 'panopticon-native',
+        trigger: 'overdeck-native',
         preTokens: tokensBefore,
         model: settings.model,
         previousBoundaryOffset: boundaryOffset,

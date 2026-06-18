@@ -131,7 +131,7 @@ The merge workflow does not create stashes. Agents never run `git stash`.
 The single supported stash kind is `salvageable:`, which only humans create
 when preserving uncommitted work they want to recover later.
 
-See the "Stash Discipline" section of `/home/eltmon/.panopticon/context/global.md`
+See the "Stash Discipline" section of `/home/eltmon/.overdeck/context/global.md`
 for the full rule.
 
 ## What This Replaces

@@ -61,7 +61,7 @@ Add difficulty badges to task cards:
 
 ### Tracking
 
-Log difficulty to `~/.panopticon/agents/agent-{issue-id}/state.json`:
+Log difficulty to `~/.overdeck/agents/agent-{issue-id}/state.json`:
 ```json
 {
   "issueId": "PAN-75",
@@ -94,14 +94,14 @@ Log difficulty to `~/.panopticon/agents/agent-{issue-id}/state.json`:
 
 | ID | Task | Difficulty |
 |----|------|------------|
-| `panopticon-or63` | Update planning prompt with difficulty rubric | medium |
-| `panopticon-hns3` | Update bd create commands with difficulty labels | simple |
-| `panopticon-ypqn` | Add DifficultyBadge component to dashboard | medium |
-| `panopticon-nmcw` | Add difficulty to agent state tracking | simple |
-| `panopticon-59kd` | Add parseDifficultyLabel utility | trivial |
-| `panopticon-tjsd` | Run tests and verify | trivial |
+| `overdeck-or63` | Update planning prompt with difficulty rubric | medium |
+| `overdeck-hns3` | Update bd create commands with difficulty labels | simple |
+| `overdeck-ypqn` | Add DifficultyBadge component to dashboard | medium |
+| `overdeck-nmcw` | Add difficulty to agent state tracking | simple |
+| `overdeck-59kd` | Add parseDifficultyLabel utility | trivial |
+| `overdeck-tjsd` | Run tests and verify | trivial |
 
-**Dependencies:** `panopticon-tjsd` (test) is blocked by all other tasks.
+**Dependencies:** `overdeck-tjsd` (test) is blocked by all other tasks.
 
 ## Planning Agent Prompt Addition
 

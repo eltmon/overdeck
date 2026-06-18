@@ -16,7 +16,7 @@ Configure test suites for your project in Overdeck.
 
 ## What This Skill Does
 
-Guides you through configuring test suites in `~/.panopticon/projects.yaml`:
+Guides you through configuring test suites in `~/.overdeck/projects.yaml`:
 
 1. **Backend Tests** - Maven, pytest, Cargo, etc.
 2. **Frontend Unit Tests** - Vitest, Jest

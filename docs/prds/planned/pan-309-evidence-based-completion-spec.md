@@ -53,7 +53,7 @@ When LLM returns `STOPPED_FOR_INPUT`:
 
 **Files**: Agent `runtime.json` schema, stop-hook
 
-Add `resolution` field to `~/.panopticon/agents/<id>/runtime.json`:
+Add `resolution` field to `~/.overdeck/agents/<id>/runtime.json`:
 
 ```json
 {

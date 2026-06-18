@@ -144,7 +144,7 @@ export function linkSessionToIssue(sessionId: string, issueId: string): void;
 
 When `pan start` spawns an agent:
 1. Record the Claude Code session ID in agent state
-2. Store mapping in `~/.panopticon/session-map.json`
+2. Store mapping in `~/.overdeck/session-map.json`
 
 ```json
 {
@@ -265,7 +265,7 @@ On agent completion:
 
 #### 5.3 Metrics Storage
 
-Store in `~/.panopticon/runtime-metrics.json`:
+Store in `~/.overdeck/runtime-metrics.json`:
 
 ```json
 {
@@ -443,9 +443,9 @@ While agent is running, show estimated cost based on:
 
 ## References
 
-- Main PRD: `/home/eltmon/projects/panopticon/docs/PRD.md`
-- Cost library: `/home/eltmon/projects/panopticon/src/lib/cost.ts`
-- Runtime interface: `/home/eltmon/projects/panopticon/src/lib/runtime/interface.ts`
-- KanbanBoard: `/home/eltmon/projects/panopticon/src/dashboard/frontend/src/components/KanbanBoard.tsx`
-- IssueDetailPanel: `/home/eltmon/projects/panopticon/src/dashboard/frontend/src/components/IssueDetailPanel.tsx`
+- Main PRD: `/home/eltmon/projects/overdeck/docs/PRD.md`
+- Cost library: `/home/eltmon/projects/overdeck/src/lib/cost.ts`
+- Runtime interface: `/home/eltmon/projects/overdeck/src/lib/runtime/interface.ts`
+- KanbanBoard: `/home/eltmon/projects/overdeck/src/dashboard/frontend/src/components/KanbanBoard.tsx`
+- IssueDetailPanel: `/home/eltmon/projects/overdeck/src/dashboard/frontend/src/components/IssueDetailPanel.tsx`
 - ccusage (reference): https://github.com/ryoppippi/ccusage

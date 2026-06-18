@@ -146,7 +146,7 @@ export async function migrateConfigCommand(options: MigrateConfigOptions = {}): 
   console.log('');
 
   console.log(chalk.bold('Next steps:'));
-  console.log('  1. Review your new config: ' + chalk.cyan('~/.panopticon/config.yaml'));
+  console.log('  1. Review your new config: ' + chalk.cyan('~/.overdeck/config.yaml'));
   console.log('  2. Enable additional providers for more model options');
   console.log('  3. Add work type overrides if you prefer specific models for tasks');
   console.log('  4. Documentation: ' + chalk.cyan('docs/CONFIGURATION.md'));

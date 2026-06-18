@@ -526,9 +526,9 @@ projects:
   #       required: true
 
   # Example: Overdeck itself
-  # panopticon:
+  # overdeck:
   #   name: "Overdeck"
-  #   path: /home/user/projects/panopticon
+  #   path: /home/user/projects/overdeck
   #   linear_team: PAN
 `;
 

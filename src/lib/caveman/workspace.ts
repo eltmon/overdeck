@@ -25,7 +25,7 @@ import { getCavemanHooksDir } from './setup.js';
 export type CavemanVariant = 'enabled' | 'disabled' | 'off';
 
 const CAVEMAN_VARIANT_FILE = '.caveman-variant';
-const MEMORY_HOOK_SCRIPT = 'panopticon-memory-hook.js';
+const MEMORY_HOOK_SCRIPT = 'overdeck-memory-hook.js';
 
 type HookEntry = { matcher?: string; hooks: Array<{ type: string; command: string; timeout?: number }> };
 
@@ -89,7 +89,7 @@ export async function injectMemoryHookSettings(workspacePath: string): Promise<v
   if (variant !== 'enabled') return;
 
   const hooksDir = getCavemanHooksDir();
-  const activateScript = join(hooksDir, 'panopticon-caveman-activate.js');
+  const activateScript = join(hooksDir, 'overdeck-caveman-activate.js');
   const modeTrackerScript = join(hooksDir, 'caveman-mode-tracker.js');
 
   // If hooks aren't installed yet (pan admin hooks install not run), skip injection
@@ -140,7 +140,7 @@ async function readWorkspaceSettings(settingsPath: string): Promise<Record<strin
 }
 
 async function installTrustedMemoryHookScript(): Promise<string> {
-  const hooksDir = join(process.env.OVERDECK_HOME || join(homedir(), '.panopticon'), 'hooks', 'memory');
+  const hooksDir = join(process.env.OVERDECK_HOME || join(homedir(), '.overdeck'), 'hooks', 'memory');
   await mkdir(hooksDir, { recursive: true, mode: 0o700 });
   await chmod(hooksDir, 0o700);
   const scriptPath = join(hooksDir, MEMORY_HOOK_SCRIPT);
@@ -207,7 +207,7 @@ async function post(path, body, timeoutMs) {
   try {
     return await fetch(baseUrl + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-panopticon-internal-token': internalToken() },
+      headers: { 'Content-Type': 'application/json', 'x-overdeck-internal-token': internalToken() },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -217,7 +217,7 @@ async function post(path, body, timeoutMs) {
 }
 function internalToken() {
   if (process.env.OVERDECK_INTERNAL_TOKEN) return process.env.OVERDECK_INTERNAL_TOKEN;
-  const path = join(process.env.OVERDECK_HOME || join(homedir(), '.panopticon'), 'internal-token');
+  const path = join(process.env.OVERDECK_HOME || join(homedir(), '.overdeck'), 'internal-token');
   if (!existsSync(path)) return '';
   return readFileSync(path, 'utf8').trim();
 }

@@ -6,7 +6,7 @@
  * locations:
  *
  *   - Claude Code: ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
- *   - Pi Agent:    ~/.panopticon/agents/<tmux-session>/sessions/<iso>_<id>.jsonl
+ *   - Pi Agent:    ~/.overdeck/agents/<tmux-session>/sessions/<iso>_<id>.jsonl
  *
  * Historically the orchestrator would silently flip the harness and leave the
  * old transcript orphaned (the DB kept pointing at a session id with no file),
@@ -206,7 +206,7 @@ function shortId(): string {
     // Seed a minimal Codex rollout JSONL with the continuation as the task.
     // The thread-id is a random UUID used as the Codex session resume pointer.
     const threadId = randomUUID().replace(/-/g, '').slice(0, 16);
-    const codexAgentDir = join(homedir(), '.panopticon', 'agents', opts.tmuxSession, 'codex-home');
+    const codexAgentDir = join(homedir(), '.overdeck', 'agents', opts.tmuxSession, 'codex-home');
     const sessionDate = new Date();
     const dateDir = [
       sessionDate.getFullYear().toString(),
@@ -222,15 +222,15 @@ function shortId(): string {
     ];
     await writeFile(targetSessionFile, `${lines.join('\n')}\n`, 'utf-8');
     // Persist the thread-id so CodexRuntimeSync.getSessionPath() can locate this rollout.
-    const panopticonAgentDir = join(homedir(), '.panopticon', 'agents', opts.tmuxSession);
-    await mkdir(panopticonAgentDir, { recursive: true, mode: 0o700 });
+    const overdeckAgentDir = join(homedir(), '.overdeck', 'agents', opts.tmuxSession);
+    await mkdir(overdeckAgentDir, { recursive: true, mode: 0o700 });
     writeThreadId(opts.tmuxSession, threadId);
     return { sessionId: threadId, targetSessionFile };
   }
 
   if (opts.toHarness === 'pi') {
     const sessionId = randomUUID();
-    const agentDir = join(homedir(), '.panopticon', 'agents', opts.tmuxSession);
+    const agentDir = join(homedir(), '.overdeck', 'agents', opts.tmuxSession);
     const sessionDir = join(agentDir, 'sessions');
     await mkdir(sessionDir, { recursive: true, mode: 0o700 });
     const fileName = `${timestamp.replace(/[:.]/g, '-')}_${sessionId}.jsonl`;
@@ -270,7 +270,7 @@ function shortId(): string {
       sessionId,
       cwd: opts.cwd,
       level: 'info',
-      compactMetadata: { trigger: 'panopticon-harness-switch', preTokens: 0 },
+      compactMetadata: { trigger: 'overdeck-harness-switch', preTokens: 0 },
     }),
     JSON.stringify({
       parentUuid: boundaryUuid,

@@ -6,7 +6,7 @@
  *
  * Steps:
  *   1. Move PRD from docs/prds/active/ → docs/prds/completed/ (git mv, fallback to copy)
- *   2. Archive workspace .pan/ artifacts to ~/.panopticon/archives/<issue>/
+ *   2. Archive workspace .pan/ artifacts to ~/.overdeck/archives/<issue>/
  *   3. Rotate previous archives to prevent overwrite
  */
 
@@ -172,7 +172,7 @@ async function movePrdImpl(
 }
 
 /**
- * Archive workspace .pan/ artifacts to ~/.panopticon/archives/<issue>/.
+ * Archive workspace .pan/ artifacts to ~/.overdeck/archives/<issue>/.
  * Rotates previous archives to prevent overwrite.
  * Returns a hard failure if archiving fails — callers must NOT proceed with
  * workspace deletion after an archive failure.

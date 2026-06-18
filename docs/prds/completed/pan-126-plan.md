@@ -8,7 +8,7 @@
 
 1. `findWorkspace()` only looks for local `workspaces/feature-{id}` directories
 2. `spawnAgent()` creates local tmux sessions
-3. No integration with remote workspace metadata (`~/.panopticon/workspaces/{id}.yaml`)
+3. No integration with remote workspace metadata (`~/.overdeck/workspaces/{id}.yaml`)
 
 ## Decisions Made
 
@@ -144,11 +144,11 @@ Implementation needed - see beads tasks below.
 
 | ID | Title | Difficulty | Blocked By |
 |----|-------|------------|------------|
-| `panopticon-v605` | Extract workspace metadata functions to shared module | medium | - |
-| `panopticon-zl4k` | Add --remote/--local flags to pan work issue | simple | - |
-| `panopticon-uofo` | Implement determineWorkspaceLocation logic | medium | v605 |
-| `panopticon-avzx` | Implement spawnRemoteAgent function | complex | - |
-| `panopticon-k8a2` | Wire pan work issue to use remote workspaces | medium | uofo, avzx |
-| `panopticon-7j0s` | Add remote agent monitoring to dashboard | medium | avzx |
+| `overdeck-v605` | Extract workspace metadata functions to shared module | medium | - |
+| `overdeck-zl4k` | Add --remote/--local flags to pan work issue | simple | - |
+| `overdeck-uofo` | Implement determineWorkspaceLocation logic | medium | v605 |
+| `overdeck-avzx` | Implement spawnRemoteAgent function | complex | - |
+| `overdeck-k8a2` | Wire pan work issue to use remote workspaces | medium | uofo, avzx |
+| `overdeck-7j0s` | Add remote agent monitoring to dashboard | medium | avzx |
 
 **Parallelization:** Tasks v605, zl4k, and avzx can be done in parallel. After v605 completes, uofo can start. After both uofo and avzx complete, k8a2 can proceed. Dashboard task 7j0s can start after avzx.

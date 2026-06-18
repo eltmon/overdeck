@@ -1,7 +1,7 @@
 /**
  * Tests for initTrackerConfigCache() in src/dashboard/server/services/tracker-config.ts (PAN-446)
  *
- * initTrackerConfigCache() was changed to read ~/.panopticon.env asynchronously
+ * initTrackerConfigCache() was changed to read ~/.overdeck.env asynchronously
  * via readFile from fs/promises (was previously sync readFileSync). These tests
  * verify cache population and fallback behavior.
  *
@@ -43,8 +43,8 @@ async function importTrackerConfig() {
 }
 
 describe('initTrackerConfigCache() — async env-file loading (PAN-446 regression)', () => {
-  it('populates the cache from ~/.panopticon.env and getLinearApiKey() returns it', async () => {
-    writeFileSync(join(testDir, '.panopticon.env'), 'LINEAR_API_KEY=test-key-from-envfile\n');
+  it('populates the cache from ~/.overdeck.env and getLinearApiKey() returns it', async () => {
+    writeFileSync(join(testDir, '.overdeck.env'), 'LINEAR_API_KEY=test-key-from-envfile\n');
 
     const { initTrackerConfigCache, getLinearApiKey } = await importTrackerConfig();
 
@@ -53,7 +53,7 @@ describe('initTrackerConfigCache() — async env-file loading (PAN-446 regressio
     expect(getLinearApiKey()).toBe('test-key-from-envfile');
   });
 
-  it('leaves cache null when ~/.panopticon.env does not exist', async () => {
+  it('leaves cache null when ~/.overdeck.env does not exist', async () => {
     // No env file written; no process.env.LINEAR_API_KEY set
     const savedKey = process.env.LINEAR_API_KEY;
     delete process.env.LINEAR_API_KEY;
@@ -68,7 +68,7 @@ describe('initTrackerConfigCache() — async env-file loading (PAN-446 regressio
   });
 
   it('returns null for a key not present in the env file', async () => {
-    writeFileSync(join(testDir, '.panopticon.env'), 'GITHUB_TOKEN=ghp_test\n');
+    writeFileSync(join(testDir, '.overdeck.env'), 'GITHUB_TOKEN=ghp_test\n');
 
     const savedKey = process.env.LINEAR_API_KEY;
     delete process.env.LINEAR_API_KEY;
@@ -83,7 +83,7 @@ describe('initTrackerConfigCache() — async env-file loading (PAN-446 regressio
   });
 
   it('does not throw when the env file is unreadable — falls back gracefully', async () => {
-    // No .panopticon.env written; initTrackerConfigCache should not throw
+    // No .overdeck.env written; initTrackerConfigCache should not throw
     const { initTrackerConfigCache } = await importTrackerConfig();
     await expect(initTrackerConfigCache()).resolves.toBeUndefined();
   });

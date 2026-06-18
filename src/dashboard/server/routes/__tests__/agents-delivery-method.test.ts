@@ -64,7 +64,7 @@ describe('agent mutation origin validation', () => {
 
     const result = await validateAgentRuntimeEventAuth({
       method: 'POST',
-      headers: { 'x-panopticon-internal-token': 'test-token' },
+      headers: { 'x-overdeck-internal-token': 'test-token' },
     } as any);
 
     expect(result.ok).toBe(true);

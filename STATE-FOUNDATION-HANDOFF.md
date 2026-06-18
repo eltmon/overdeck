@@ -9,11 +9,11 @@ decisions already locked, dependencies, and acceptance. Do not re-derive; execut
 
 ## 0. North Star (the whole point)
 
-The local DB (`~/.panopticon/panopticon.db`) is a **disposable cache**. The four sources of truth are:
+The local DB (`~/.overdeck/panopticon.db`) is a **disposable cache**. The four sources of truth are:
 1. **GitHub** — issue status, PR review/merge state.
 2. **git** — code + plans (`.pan/specs/`, `.pan/drafts/`) + the **per-issue record** (`.pan/records/`). These travel across machines via clone.
 3. **JSONL transcripts** — `~/.claude/projects/.../*.jsonl` (harness session history).
-4. **tmux (`-L panopticon`)** — liveness oracle for whether an agent is actually running.
+4. **tmux (`-L overdeck`)** — liveness oracle for whether an agent is actually running.
 
 "Foundation done" = you can delete the DB and rebuild the board + agents + verdicts from the above.
 Canonical docs: `reference/state-model.mdx`, `docs/AGENT-STATE-PLANES.md`, epic **PAN-1919**.
@@ -50,7 +50,7 @@ Canonical docs: `reference/state-model.mdx`, `docs/AGENT-STATE-PLANES.md`, epic 
   delay/retry test, `pan sync` after hook/context changes.
 - Do **not** pass `--model`/`--harness` when spawning (let Cloister route; kimi→pi, gpt-5.5→codex,
   claude-*→claude-code).
-- **Never** write a destructive "delete X to prove nothing's lost" test (e.g. `rm -rf ~/.panopticon`).
+- **Never** write a destructive "delete X to prove nothing's lost" test (e.g. `rm -rf ~/.overdeck`).
   State derivability is a **property to validate non-destructively on a COPY**, never an imperative.
 
 ---
@@ -167,7 +167,7 @@ They are listed here only so you know they are deliberately excluded, not forgot
 
 ## 5. Validation — prove the DB is disposable (NON-destructive)
 
-On a **COPY** of `panopticon.db` (NEVER the live DB, NEVER `rm -rf ~/.panopticon`): run
+On a **COPY** of `panopticon.db` (NEVER the live DB, NEVER `rm -rf ~/.overdeck`): run
 `pan admin db rebuild-agents`, `pan admin db backfill-records`, and (once 1922 lands)
 `pan admin db restore-verdicts`, then confirm the board, agents, and verdicts reconstruct. This validates
 the north star without risking live state.
@@ -208,7 +208,7 @@ the north star without risking live state.
   the chunk the fresh `server.js` imports matters. Harmless.
 - The flywheel last ticked **2026-06-14** (stalled); `pan flywheel status` shows a stale HEAD.
 - DB backup taken today (pre-PAN-1847):
-  `/home/eltmon/.panopticon/panopticon.db.pre-pan1847.20260616-153029.bak`.
+  `/home/eltmon/.overdeck/panopticon.db.pre-pan1847.20260616-153029.bak`.
 - `pan plan` agents run as `planning-*` tmux sessions and are **not** in the `agents` table, so they do
   **not** appear as live agents in the issue tree; **work** agents (`pan start`) do register and appear.
 - Recurring non-fatal spawn-time noise to ignore until fixed: `[pan-dir/auto-commit] rebase failed for

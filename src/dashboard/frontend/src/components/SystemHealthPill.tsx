@@ -212,8 +212,8 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             </div>
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Overdeck</div>
-              <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.panopticonMemoryBytes)}</div>
-              <div className="text-muted-foreground">{data.summary.panopticonMemoryPercent.toFixed(1)}% of host RAM</div>
+              <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.overdeckMemoryBytes)}</div>
+              <div className="text-muted-foreground">{data.summary.overdeckMemoryPercent.toFixed(1)}% of host RAM</div>
             </div>
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Swap</div>

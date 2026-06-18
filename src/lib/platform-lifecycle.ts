@@ -32,7 +32,7 @@ export const DASHBOARD_LOG_FILE = join(LOGS_DIR, 'dashboard.log');
 
 /**
  * Build the stdio tuple for a detached dashboard spawn. Writes stdout+stderr
- * to `~/.panopticon/logs/dashboard.log` (append) so `pan up --detach` failures
+ * to `~/.overdeck/logs/dashboard.log` (append) so `pan up --detach` failures
  * leave a paper trail instead of vanishing into /dev/null. Falls back to
  * 'ignore' if the log file cannot be opened.
  */
@@ -226,9 +226,9 @@ async function describePid(pid: number): Promise<string> {
 }async function isTraefikContainerRunningPromise(): Promise<boolean> {
   try {
     const { stdout } = await execAsync(
-      'docker ps --filter "name=panopticon-traefik" --format "{{.Names}}" 2>/dev/null',
+      'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
     );
-    return stdout.trim().includes('panopticon-traefik');
+    return stdout.trim().includes('overdeck-traefik');
   } catch {
     return false;
   }

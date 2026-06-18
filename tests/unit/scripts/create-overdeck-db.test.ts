@@ -90,13 +90,13 @@ describe('createOverdeckDatabase', () => {
   it('defaults to overdeck.db without modifying panopticon.db', () => {
     const home = makeTempDir();
     process.env.OVERDECK_HOME = home;
-    const panopticonDbPath = join(home, 'panopticon.db');
-    writeFileSync(panopticonDbPath, 'legacy database bytes');
-    const before = readFileSync(panopticonDbPath, 'utf8');
+    const overdeckDbPath = join(home, 'panopticon.db');
+    writeFileSync(overdeckDbPath, 'legacy database bytes');
+    const before = readFileSync(overdeckDbPath, 'utf8');
 
     const result = createOverdeckDatabase();
 
     expect(result.dbPath).toBe(getOverdeckDatabasePath());
-    expect(readFileSync(panopticonDbPath, 'utf8')).toBe(before);
+    expect(readFileSync(overdeckDbPath, 'utf8')).toBe(before);
   });
 });

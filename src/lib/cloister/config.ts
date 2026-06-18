@@ -1,7 +1,7 @@
 /**
  * Cloister Configuration
  *
- * Loads and manages Cloister configuration from ~/.panopticon/cloister.toml
+ * Loads and manages Cloister configuration from ~/.overdeck/cloister.toml
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -444,11 +444,11 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
 /**
  * Load Cloister configuration
  *
- * Reads from ~/.panopticon/cloister.toml and merges with defaults.
+ * Reads from ~/.overdeck/cloister.toml and merges with defaults.
  * Creates default config file if it doesn't exist.
  */
 export function loadCloisterConfigSync(): CloisterConfig {
-  // Ensure panopticon home exists
+  // Ensure overdeck home exists
   if (!existsSync(OVERDECK_HOME)) {
     mkdirSync(OVERDECK_HOME, { recursive: true });
   }
@@ -479,10 +479,10 @@ export function loadCloisterConfigSync(): CloisterConfig {
 /**
  * Save Cloister configuration
  *
- * Writes configuration to ~/.panopticon/cloister.toml
+ * Writes configuration to ~/.overdeck/cloister.toml
  */
 export function saveCloisterConfigSync(config: CloisterConfig): void {
-  // Ensure panopticon home exists
+  // Ensure overdeck home exists
   if (!existsSync(OVERDECK_HOME)) {
     mkdirSync(OVERDECK_HOME, { recursive: true });
   }

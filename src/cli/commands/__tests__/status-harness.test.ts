@@ -164,14 +164,14 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([
       {
         id: 'init1',
-        name: 'panopticon-feature-pan-1140-init-1',
+        name: 'overdeck-feature-pan-1140-init-1',
         status: 'Exited (1) 2 minutes ago',
         state: 'exited',
       },
     ]))
     ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       healthy: false,
-      reasons: ['panopticon-feature-pan-1140-init-1 init exited non-zero (1)'],
+      reasons: ['overdeck-feature-pan-1140-init-1 init exited non-zero (1)'],
       lastObserved: '2026-05-17T00:00:00.000Z',
     }))
 

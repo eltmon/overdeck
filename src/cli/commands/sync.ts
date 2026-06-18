@@ -134,7 +134,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     // Agent directory cleanup preview
     const agentCleanupPreview = await Effect.runPromise(cleanupAgentDirectories({ dryRun: true }));
     if (agentCleanupPreview.totalOrphaned > 0) {
-      console.log(chalk.cyan(`\nagent cleanup (~/.panopticon/agents/):`));
+      console.log(chalk.cyan(`\nagent cleanup (~/.overdeck/agents/):`));
       console.log(chalk.dim(`  Found ${agentCleanupPreview.totalOrphaned} orphaned directories`));
       for (const name of agentCleanupPreview.wouldRemove) {
         console.log(`  ${chalk.red('✗')} ${name}`);
@@ -302,7 +302,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log(chalk.red(`  ✗ ${error}`));
     }
   } else if (hooksResult.synced.length > 0) {
-    hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.panopticon/bin/`);
+    hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.overdeck/bin/`);
   } else {
     hooksSpinner.info('No hooks to sync');
   }
@@ -400,14 +400,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     // Non-fatal — skip if mcp.json can't be read/written
   }
 
-  // Migrate .panopticon/ → .pan/ and run multi-tool sync in all registered projects
+  // Migrate .overdeck/ → .pan/ and run multi-tool sync in all registered projects
   for (const { config } of projects) {
     if (!existsSync(config.path)) continue;
 
-    // Migrate .panopticon/ subdirs → .pan/
+    // Migrate .overdeck/ subdirs → .pan/
     const migResult = migrateOverdeckToPanSync(config.path);
     if (migResult.migrated.length > 0) {
-      console.log(chalk.cyan(`Migrated .panopticon/ → .pan/ in ${config.name}: ${migResult.migrated.join(', ')}`));
+      console.log(chalk.cyan(`Migrated .overdeck/ → .pan/ in ${config.name}: ${migResult.migrated.join(', ')}`));
     }
     if (migResult.skipped.length > 0) {
       console.log(chalk.yellow(`Migration skipped (both exist) in ${config.name}: ${migResult.skipped.join(', ')}`));

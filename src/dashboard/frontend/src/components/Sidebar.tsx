@@ -53,7 +53,7 @@ function setPipelineFilterUrl(key: 'phase' | 'projects', value: string | null) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-const SIDEBAR_STORAGE_KEY = 'panopticon.ui.sidebarCollapsed';
+const SIDEBAR_STORAGE_KEY = 'overdeck.ui.sidebarCollapsed';
 
 interface FlywheelRunSummary {
   id: string;
@@ -121,7 +121,7 @@ const MORE_GROUPS: NavGroup[] = [
   },
 ];
 
-const MORE_COLLAPSED_KEY = 'panopticon.ui.sidebarMoreCollapsed';
+const MORE_COLLAPSED_KEY = 'overdeck.ui.sidebarMoreCollapsed';
 
 interface SidebarProps {
   activeTab: Tab;

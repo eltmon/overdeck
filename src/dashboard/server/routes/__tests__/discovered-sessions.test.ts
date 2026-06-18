@@ -324,7 +324,7 @@ describe('search (route logic)', () => {
       toolsUsed: ['Read'],
       filesTouched: [],
       tags: [],
-      panopticonManaged: false,
+      overdeckManaged: false,
       panIssueId: null,
       panAgentId: null,
       fileSize: 512,
@@ -364,7 +364,7 @@ describe('search (route logic)', () => {
         toolsUsed: [],
         filesTouched: [],
         tags: [],
-        panopticonManaged: false,
+        overdeckManaged: false,
         panIssueId: null,
         panAgentId: null,
         fileSize: null,
@@ -394,7 +394,7 @@ describe('search (route logic)', () => {
         toolsUsed: [],
         filesTouched: [],
         tags: [],
-        panopticonManaged: false,
+        overdeckManaged: false,
         panIssueId: null,
         panAgentId: null,
         fileSize: null,
@@ -461,7 +461,7 @@ const SEED_SESSION: UpsertDiscoveredSessionOpts = {
   toolsUsed: [],
   filesTouched: [],
   tags: [],
-  panopticonManaged: false,
+  overdeckManaged: false,
   panIssueId: null,
   panAgentId: null,
   fileSize: 512,
@@ -480,9 +480,9 @@ describe('getDiscoveredStats (GET /api/discovered-sessions/stats logic)', () => 
     expect(stats.total).toBeGreaterThanOrEqual(1);
   });
 
-  it('managedCount counts only panopticonManaged sessions', () => {
-    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/b.jsonl', workspaceHash: 'stats-b', panopticonManaged: true });
-    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/c.jsonl', workspaceHash: 'stats-c', panopticonManaged: false });
+  it('managedCount counts only overdeckManaged sessions', () => {
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/b.jsonl', workspaceHash: 'stats-b', overdeckManaged: true });
+    upsertDiscoveredSession({ ...SEED_SESSION, jsonlPath: '/stats/c.jsonl', workspaceHash: 'stats-c', overdeckManaged: false });
     const stats = getDiscoveredStats();
     expect(stats.managedCount).toBeGreaterThanOrEqual(1);
     expect(stats.total).toBeGreaterThanOrEqual(2);

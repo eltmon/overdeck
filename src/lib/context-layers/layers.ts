@@ -3,16 +3,16 @@
  *
  * Three layers of context compose at sync time:
  *
- *   global    — ~/.panopticon/context/global.md  (+ global/{skills,agents}/)
+ *   global    — ~/.overdeck/context/global.md  (+ global/{skills,agents}/)
  *               Applies to every harness invocation, everywhere.
  *   project   — <projectRoot>/.pan/context/project.md
  *               Applies when CWD is under a registered project. Committed.
  *   workspace — <workspace>/.pan/context/workspace.md
  *               Auto-assembled by Overdeck at spawn time. Gitignored.
  *
- * The global layer lives under ~/.panopticon (per-machine). Project and
+ * The global layer lives under ~/.overdeck (per-machine). Project and
  * workspace layers live under the repo's `.pan/` dir — the convention
- * PAN-967 unified everything else under — not the legacy `.panopticon/`.
+ * PAN-967 unified everything else under — not the legacy `.overdeck/`.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -36,22 +36,22 @@ export interface ContextLayer {
 
 // ─── Path resolution ──────────────────────────────────────────────────────
 
-/** `~/.panopticon/context` — the global layer directory. */
+/** `~/.overdeck/context` — the global layer directory. */
 export function globalContextDir(): string {
   return join(getOverdeckHome(), 'context');
 }
 
-/** `~/.panopticon/context/global.md` — the global layer's canonical source. */
+/** `~/.overdeck/context/global.md` — the global layer's canonical source. */
 export function globalContextFile(): string {
   return join(globalContextDir(), 'global.md');
 }
 
-/** `~/.panopticon/context/global/skills` — user skills in the global layer. */
+/** `~/.overdeck/context/global/skills` — user skills in the global layer. */
 export function globalSkillsDir(): string {
   return join(globalContextDir(), 'global', 'skills');
 }
 
-/** `~/.panopticon/context/global/agents` — user agents in the global layer. */
+/** `~/.overdeck/context/global/agents` — user agents in the global layer. */
 export function globalAgentsDir(): string {
   return join(globalContextDir(), 'global', 'agents');
 }
@@ -76,12 +76,12 @@ export function workspaceContextFile(workspacePath: string): string {
   return join(workspaceContextDir(workspacePath), 'workspace.md');
 }
 
-/** `~/.panopticon/context/pi-global.md` — the rendered global layer for Pi. */
+/** `~/.overdeck/context/pi-global.md` — the rendered global layer for Pi. */
 export function piGlobalContextFile(): string {
   return join(getOverdeckHome(), 'context', 'pi-global.md');
 }
 
-/** `~/.panopticon/context/codex-global.md` — the rendered global layer for Codex. */
+/** `~/.overdeck/context/codex-global.md` — the rendered global layer for Codex. */
 export function codexGlobalContextFile(): string {
   return join(getOverdeckHome(), 'context', 'codex-global.md');
 }
@@ -91,7 +91,7 @@ export function codexGlobalContextFile(): string {
 /** Seeded into `global.md` by `pan install` / first `pan sync`. */
 export const GLOBAL_STARTER = `# Per-Machine Context (this machine only)
 
-This file is **per-machine** — it lives at \`~/.panopticon/context/global.md\`
+This file is **per-machine** — it lives at \`~/.overdeck/context/global.md\`
 on the disk in front of you. Nothing syncs it to your other machines.
 
 For content you want on **every** machine — engineering rules, coding

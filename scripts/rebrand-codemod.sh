@@ -75,3 +75,14 @@ _apply 'panopticon\.com'     's/panopticon\.com/overdeck.ai/g'
 # ===========================================================================
 echo "Family 5: repo slug panopticon-cli -> overdeck"
 _apply 'panopticon-cli' 's/panopticon-cli/overdeck/g'
+
+# ===========================================================================
+# Family 6 — lowercase catch-all:  panopticon  ->  overdeck
+# EXCEPT two carve-outs (negative lookahead):
+#   panopticon.db    — legacy DB filename (kept; legacy READ paths fixed in Family 7)
+#   panopticon-agent — the GitHub bot account (external identity, not renamed)
+# Covers: .panopticon home-dir paths, config filenames, the tmux socket, the
+# desktop scheme, skill-source, internal names, and lowercase symbols.
+# ===========================================================================
+echo "Family 6: lowercase panopticon -> overdeck (except .db / -agent)"
+_apply 'panopticon' 's/panopticon(?!\.db|-agent)/overdeck/g'

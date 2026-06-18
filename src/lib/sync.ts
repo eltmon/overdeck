@@ -69,7 +69,7 @@ export function isOverdeckSymlinkSync(targetPath: string): boolean {
 
     const linkTarget = readlinkSync(targetPath);
     // It's ours if it points to our skills/commands dir
-    return linkTarget.includes('.panopticon');
+    return linkTarget.includes('.overdeck');
   } catch {
     return false;
   }
@@ -85,13 +85,13 @@ export interface MigrationResult {
  * One-time migration: remove Overdeck-managed symlinks from ~/.claude/.
  *
  * Detects symlinks in ~/.claude/skills/ and ~/.claude/agents/ that point to
- * .panopticon directories. Removes only those symlinks, preserving any
+ * .overdeck directories. Removes only those symlinks, preserving any
  * user-created content (real files/directories).
  *
  * This is safe to run multiple times — it's a no-op if nothing remains to clean up.
  *
  * Removes stale Overdeck content from ~/.claude/:
- * - Symlinks pointing to .panopticon or overdeck (legacy sync method)
+ * - Symlinks pointing to .overdeck or overdeck (legacy sync method)
  *
  * Plain directories are always preserved as user content — there is no reliable
  * way to prove a plain directory was created by Overdeck vs the user.
@@ -116,7 +116,7 @@ export function migrateStalePersonalContentSync(): MigrationResult {
           const stats = lstatSync(entryPath);
           if (stats.isSymbolicLink()) {
             const linkTarget = readlinkSync(entryPath);
-            if (linkTarget.includes('.panopticon') || linkTarget.includes('overdeck')) {
+            if (linkTarget.includes('.overdeck') || linkTarget.includes('overdeck')) {
               unlinkSync(entryPath);
               result.removedSymlinks.push(`${subdir}/${entry}`);
             } else {
@@ -214,10 +214,10 @@ function copyDirectoryRecursive(source: string, dest: string): number {
 }
 
 /**
- * Refresh the ~/.panopticon/ cache from the repo source.
+ * Refresh the ~/.overdeck/ cache from the repo source.
  *
  * Always copies (overwrites) skills, agents, and rules from the package's
- * source directories to the cache. Generates ~/.panopticon/.manifest.json
+ * source directories to the cache. Generates ~/.overdeck/.manifest.json
  * tracking all cached files.
  *
  * This replaces the old "skip if exists" behavior in `pan install`.
@@ -268,7 +268,7 @@ export function refreshCacheSync(): RefreshCacheResult {
   // merge processes).
   //
   // Both kinds live side by side in the repo's `agents/` directory and both get
-  // mirrored into ~/.panopticon/agent-definitions/ here, then on to
+  // mirrored into ~/.overdeck/agent-definitions/ here, then on to
   // <devroot>/.claude/agents/ via planSync/executeSync. The downstream sync
   // never deletes existing files in the target, so non-Overdeck agent
   // definitions a project may have authored stay intact.
@@ -322,9 +322,9 @@ export function refreshCacheSync(): RefreshCacheResult {
 
   // Generate cache manifest
   const manifest = buildManifestFromDirectory(
-    join(SKILLS_DIR, '..'),  // ~/.panopticon/
+    join(SKILLS_DIR, '..'),  // ~/.overdeck/
     ['skills', 'agent-definitions', 'rules'],
-    'panopticon',
+    'overdeck',
   );
   writeManifestSync(CACHE_MANIFEST, manifest);
 
@@ -349,7 +349,7 @@ export function planSyncSync(): SyncPlan {
   };
 
   const targetBase = CLAUDE_DIR;
-  const manifestPath = join(targetBase, '.panopticon-manifest.json');
+  const manifestPath = join(targetBase, '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
 
   const planInto = (sourceDir: string, prefix: string, bucket: SyncItem[]): void => {
@@ -422,7 +422,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   };
 
   const targetBase = CLAUDE_DIR;
-  const manifestPath = join(targetBase, '.panopticon-manifest.json');
+  const manifestPath = join(targetBase, '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
 
   // Collect all source files from cache (skills + agent definitions).
@@ -441,7 +441,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         mkdirSync(dirname(targetFile), { recursive: true });
         copyFileSync(file.absolutePath, targetFile);
         const hash = hashFileSync(targetFile);
-        setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
+        setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
         result.created.push(file.relativePath);
         break;
       }
@@ -451,7 +451,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         mkdirSync(dirname(targetFile), { recursive: true });
         copyFileSync(file.absolutePath, targetFile);
         const hash = hashFileSync(targetFile);
-        setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
+        setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
         result.updated.push(file.relativePath);
         break;
       }
@@ -470,7 +470,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
           mkdirSync(dirname(targetFile), { recursive: true });
           copyFileSync(file.absolutePath, targetFile);
           const hash = hashFileSync(targetFile);
-          setManifestEntry(manifest, file.relativePath, hash, 'panopticon');
+          setManifestEntry(manifest, file.relativePath, hash, 'overdeck');
           result.updated.push(file.relativePath);
         } else {
           result.conflicts.push(file.relativePath);
@@ -484,7 +484,7 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
         // it so future syncs can manage it. Otherwise it is genuinely
         // user-authored: never touch it.
         if (hashFileSync(targetFile) === hashFileSync(file.absolutePath)) {
-          setManifestEntry(manifest, file.relativePath, hashFileSync(targetFile), 'panopticon');
+          setManifestEntry(manifest, file.relativePath, hashFileSync(targetFile), 'overdeck');
         }
         result.skipped.push(file.relativePath);
         break;
@@ -514,9 +514,9 @@ export interface ContextLayerSyncResult {
   globalStubCreated: boolean;
   /** Names of registered projects whose CLAUDE.md/AGENTS.md was written this run. */
   projectsWritten: string[];
-  /** True when ~/.panopticon/context/pi-global.md was written this run. */
+  /** True when ~/.overdeck/context/pi-global.md was written this run. */
   piGlobalWritten: boolean;
-  /** True when ~/.panopticon/context/codex-global.md was written this run. */
+  /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
   /** Files where a managed region was injected into pre-existing content for
    *  the first time this run (each backed up first). */
@@ -552,7 +552,7 @@ function writeManagedTargetSync(
  * Render the global and project context layers into harness CLAUDE.md files.
  *
  * PAN-1201: the layered-context half of `pan sync`. The global layer
- * (~/.panopticon/context/global.md + the folded bundled rules) renders into
+ * (~/.overdeck/context/global.md + the folded bundled rules) renders into
  * the managed region of ~/.claude/CLAUDE.md; each registered project's
  * `.pan/context/project.md` renders into the managed region of its own
  * CLAUDE.md. Content outside the managed region is preserved untouched, so a
@@ -583,7 +583,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`global: ${err?.message ?? err}`);
   }
 
-  // PAN-1566: Global layer → ~/.panopticon/context/pi-global.md
+  // PAN-1566: Global layer → ~/.overdeck/context/pi-global.md
   try {
     const piManaged = renderGlobalLayer('pi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
@@ -597,7 +597,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`pi-global: ${err?.message ?? err}`);
   }
 
-  // PAN-1574: Global layer → ~/.panopticon/context/codex-global.md
+  // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md
   // This static file is copied into each agent's CODEX_HOME/AGENTS.md at spawn time
   // by initCodexHome(), keeping Codex context isolated from the project-root AGENTS.md.
   try {
@@ -682,7 +682,7 @@ export function planHooksSyncSync(): HookItem[] {
 }
 
 /**
- * Sync hooks (copy scripts to ~/.panopticon/bin/)
+ * Sync hooks (copy scripts to ~/.overdeck/bin/)
  */
 export function syncHooksSync(): { synced: string[]; errors: string[] } {
   const result = { synced: [] as string[], errors: [] as string[] };
@@ -720,7 +720,7 @@ const STATUSLINE_TARGETS: Record<string, { configDir: string; scriptName: string
 
 /**
  * Sync statusline script to all supported runtimes
- * Copies the canonical statusline.sh from panopticon scripts to each runtime's config dir
+ * Copies the canonical statusline.sh from overdeck scripts to each runtime's config dir
  * and ensures the runtime's settings.json references it.
  */
 export function syncStatuslineSync(): { synced: string[]; errors: string[] } {
@@ -938,11 +938,11 @@ export function mirrorProjectSkillsSync(
   mkdirSync(targetDir, { recursive: true });
 
   // Manifest lives outside the repo to avoid creating untracked files in .claude/skills/.
-  // Default: ~/.panopticon/state/mirrors/<escaped-resolvedCwd>/manifest
+  // Default: ~/.overdeck/state/mirrors/<escaped-resolvedCwd>/manifest
   // Testable via opts.manifestDir.
   const manifestDir =
     opts?.manifestDir ??
-    join(homedir(), '.panopticon', 'state', 'mirrors', resolvedCwd.replace(/[/\\:]/g, '_'));
+    join(homedir(), '.overdeck', 'state', 'mirrors', resolvedCwd.replace(/[/\\:]/g, '_'));
   mkdirSync(manifestDir, { recursive: true });
   // Read manifest BEFORE the mirror loop so we can check ownership on existing target dirs.
   // Only mirror-managed dirs (listed in the manifest) may be overwritten; dirs that pre-existed

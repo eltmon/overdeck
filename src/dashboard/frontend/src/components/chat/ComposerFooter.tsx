@@ -377,7 +377,7 @@ export function ComposerFooter({
     const handoffMatch = messageText.match(/^\/(?:pan[\s-])?handoff(?:\s+(.+))?$/i);
     if (handoffMatch) {
       const focus = handoffMatch[1]?.trim() || undefined;
-      window.dispatchEvent(new CustomEvent('panopticon:open-fork-modal', {
+      window.dispatchEvent(new CustomEvent('overdeck:open-fork-modal', {
         detail: { conversation, mode: 'handoff', focus },
       }));
       editor.update(() => {

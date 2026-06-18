@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/tldr-post-edit
+# ~/.overdeck/bin/tldr-post-edit
 # PostToolUse hook on Edit/Write — notifies TLDR to re-warm after code changes.
 #
 # Tracks dirty files in a lightweight file. When the dirty count exceeds a

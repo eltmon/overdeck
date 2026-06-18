@@ -2,8 +2,8 @@
  * YAML Configuration Loader
  *
  * Loads and merges configuration from:
- * 1. Global config: ~/.panopticon/config.yaml
- * 2. Per-project config: .pan.yaml (project root, falls back to .panopticon.yaml with deprecation warning)
+ * 1. Global config: ~/.overdeck/config.yaml
+ * 2. Per-project config: .pan.yaml (project root, falls back to .overdeck.yaml with deprecation warning)
  *
  * Uses smart (capability-based) model selection - no legacy presets.
  */
@@ -196,7 +196,7 @@ function mergeRemoteConfig(result: NormalizedConfig, config: YamlConfig | null):
   }
 }
 
-export type ManualCompactMode = 'claude-code' | 'panopticon-native';
+export type ManualCompactMode = 'claude-code' | 'overdeck-native';
 
 export interface ConversationsConfig {
   /** Model used for Overdeck-native conversation compaction */
@@ -232,7 +232,7 @@ export interface ConversationSearchConfig {
   model?: string;
   /** Name of an env var or config key holding the API key. Default: provider's standard env var. */
   apiKeyRef?: string;
-  /** Path to the sidecar embeddings DB. Default: ~/.panopticon/conversations/embeddings.db. */
+  /** Path to the sidecar embeddings DB. Default: ~/.overdeck/conversations/embeddings.db. */
   dbPath?: string;
 }
 
@@ -681,7 +681,7 @@ export type CavemanMode = 'off' | 'lite' | 'full' | 'ultra' | 'review' | 'disabl
  * Controls whether autonomous agents use the caveman compressed-output hooks to
  * reduce output tokens ~65-75% without losing technical accuracy.
  *
- * Example (~/.panopticon/config.yaml):
+ * Example (~/.overdeck/config.yaml):
  *   agents:
  *     caveman:
  *       enabled: true
@@ -1010,7 +1010,7 @@ export interface ConfigLoadResult {
  */
 const DEFAULT_DOCS_TRIGGER_REGEXES = [
   'pan',
-  'panopticon',
+  'overdeck',
   'cloister',
   'deacon',
   'workspace',
@@ -1097,7 +1097,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     provider: 'openai',
     model: 'text-embedding-3-small',
     apiKeyRef: undefined,
-    dbPath: join(homedir(), '.panopticon', 'conversations', 'embeddings.db'),
+    dbPath: join(homedir(), '.overdeck', 'conversations', 'embeddings.db'),
   },
   memory: {
     extraction: {
@@ -1196,7 +1196,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
 /**
  * Path to global config file
  */
-const GLOBAL_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
+const GLOBAL_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
 
 /**
  * Normalize a provider config (handle both boolean and object forms)
@@ -1293,7 +1293,7 @@ export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig |
 }
 
 /**
- * Load per-project config (.pan.yaml in project root, with fallback to .panopticon.yaml)
+ * Load per-project config (.pan.yaml in project root, with fallback to .overdeck.yaml)
  */
 function loadProjectConfig(): YamlConfig | null {
   const projectRoot = findProjectRoot();
@@ -1306,10 +1306,10 @@ function loadProjectConfig(): YamlConfig | null {
     return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
   }
 
-  const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
+  const legacyConfigPath = join(projectRoot, '.overdeck.yaml');
   if (existsSync(legacyConfigPath)) {
     process.stderr.write(
-      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+      `[overdeck] Deprecation warning: .overdeck.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
     return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
   }
@@ -1318,7 +1318,7 @@ function loadProjectConfig(): YamlConfig | null {
 }
 
 /**
- * Load global config (~/.panopticon/config.yaml)
+ * Load global config (~/.overdeck/config.yaml)
  */
 function loadGlobalConfig(): YamlConfig | null {
   return loadYamlFile(GLOBAL_CONFIG_PATH);
@@ -1358,10 +1358,10 @@ async function loadProjectConfigFromDisk(): Promise<YamlConfig | null> {
   const newConfigPath = join(projectRoot, '.pan.yaml');
   if (await pathExistsFromDisk(newConfigPath)) return stripProjectTtsEndpoint(await loadYamlFileFromDisk(newConfigPath));
 
-  const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
+  const legacyConfigPath = join(projectRoot, '.overdeck.yaml');
   if (await pathExistsFromDisk(legacyConfigPath)) {
     process.stderr.write(
-      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+      `[overdeck] Deprecation warning: .overdeck.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
     return stripProjectTtsEndpoint(await loadYamlFileFromDisk(legacyConfigPath));
   }
@@ -2472,7 +2472,7 @@ function getConfigMtimes(): { global: number; project: number } {
 
   const projectRoot = findProjectRoot();
   if (projectRoot) {
-    for (const name of ['.pan.yaml', '.panopticon.yaml']) {
+    for (const name of ['.pan.yaml', '.overdeck.yaml']) {
       const path = join(projectRoot, name);
       try {
         if (existsSync(path)) {
@@ -2492,7 +2492,7 @@ async function getConfigMtimesFromDisk(): Promise<{ global: number; project: num
 
   const projectRoot = await findProjectRootFromDisk();
   if (projectRoot) {
-    for (const name of ['.pan.yaml', '.panopticon.yaml']) {
+    for (const name of ['.pan.yaml', '.overdeck.yaml']) {
       projectMtime = await getMtimeFromDisk(join(projectRoot, name));
       if (projectMtime > 0) break;
     }
@@ -2600,12 +2600,12 @@ export function loadConfigSync(): ConfigLoadResult {
 }
 
 /**
- * Check if a project-level config exists (.pan.yaml or .panopticon.yaml)
+ * Check if a project-level config exists (.pan.yaml or .overdeck.yaml)
  */
 export function hasProjectConfig(): boolean {
   const projectRoot = findProjectRoot();
   if (!projectRoot) return false;
-  return existsSync(join(projectRoot, '.pan.yaml')) || existsSync(join(projectRoot, '.panopticon.yaml'));
+  return existsSync(join(projectRoot, '.pan.yaml')) || existsSync(join(projectRoot, '.overdeck.yaml'));
 }
 
 /**
@@ -2624,7 +2624,7 @@ export function getGlobalConfigPath(): string {
 
 /**
  * Get path to project config file (null if not in a project).
- * Returns .pan.yaml if it exists, falls back to .panopticon.yaml, otherwise returns .pan.yaml as default.
+ * Returns .pan.yaml if it exists, falls back to .overdeck.yaml, otherwise returns .pan.yaml as default.
  */
 export function getProjectConfigPath(): string | null {
   const projectRoot = findProjectRoot();
@@ -2632,8 +2632,8 @@ export function getProjectConfigPath(): string | null {
   if (existsSync(join(projectRoot, '.pan.yaml'))) {
     return join(projectRoot, '.pan.yaml');
   }
-  if (existsSync(join(projectRoot, '.panopticon.yaml'))) {
-    return join(projectRoot, '.panopticon.yaml');
+  if (existsSync(join(projectRoot, '.overdeck.yaml'))) {
+    return join(projectRoot, '.overdeck.yaml');
   }
   return join(projectRoot, '.pan.yaml');
 }

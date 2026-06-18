@@ -84,7 +84,7 @@ This creates a minimal entry AND pre-trusts the directory in `~/.claude.json`
 
 ### Step 3: Configure projects.yaml
 
-Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
+Edit `~/.overdeck/projects.yaml` to add the FULL configuration.
 
 **Minimum viable config:**
 
@@ -168,7 +168,7 @@ Edit `~/.panopticon/projects.yaml` to add the FULL configuration.
 
 ### Step 4: Add to Dashboard Tracker Config
 
-For **GitHub** projects, add to `GITHUB_REPOS` in `~/.panopticon.env`:
+For **GitHub** projects, add to `GITHUB_REPOS` in `~/.overdeck.env`:
 
 ```bash
 # Format: owner/repo:PREFIX (comma-separated)
@@ -249,7 +249,7 @@ console.log(d.projects?.['<path>']?.hasTrustDialogAccepted
 "
 
 # 4. Dashboard can see issues (GitHub only)
-grep 'GITHUB_REPOS' ~/.panopticon.env | grep -q '<PREFIX>' && \
+grep 'GITHUB_REPOS' ~/.overdeck.env | grep -q '<PREFIX>' && \
   echo "PASS: in GITHUB_REPOS" || echo "FAIL: not in GITHUB_REPOS"
 
 # 5. Beads configured

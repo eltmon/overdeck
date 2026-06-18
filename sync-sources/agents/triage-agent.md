@@ -498,7 +498,7 @@ As more is learned:
 
 Write triage report to:
 - Issue comment (if using GitHub/Linear)
-- Triage file: `.panopticon/triage/ISSUE-ID.md`
+- Triage file: `.overdeck/triage/ISSUE-ID.md`
 - Console output for user
 
 ## When Complete

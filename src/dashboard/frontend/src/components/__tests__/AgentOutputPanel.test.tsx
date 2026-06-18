@@ -90,7 +90,7 @@ describe('deriveAgentIssueId', () => {
   // Non-matching ids
   it('returns null for specialist session names', () => {
     expect(deriveAgentIssueId('specialist-pan-review-agent')).toBeNull();
-    expect(deriveAgentIssueId('specialist-panopticon-PAN-509-review-agent')).toBeNull();
+    expect(deriveAgentIssueId('specialist-overdeck-PAN-509-review-agent')).toBeNull();
   });
 
   it('returns null for unrecognized id formats', () => {

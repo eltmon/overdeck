@@ -14,10 +14,10 @@
  *   2. createPiFifo
  *   3. write launcher.sh via generateLauncherScript({ harness: 'pi', ... })
  *   4. tmux new-session running launcher.sh
- *   5. wait for ~/.panopticon/agents/<id>/ready.json (max 30s)
+ *   5. wait for ~/.overdeck/agents/<id>/ready.json (max 30s)
  *
  * Heartbeat sources (in priority order):
- *   1. fresh (<60s) ~/.panopticon/heartbeats/<id>.json — written by the
+ *   1. fresh (<60s) ~/.overdeck/heartbeats/<id>.json — written by the
  *      extension on tool_execution_end / turn_end
  *   2. mtime of the active session JSONL under <agentDir>/sessions/
  *   3. tmux pane activity timestamp
@@ -57,14 +57,14 @@ function shellQuote(value: string): string {
 const ACTIVE_HEARTBEAT_TTL_MS = 60_000
 const SPAWN_READY_TIMEOUT_MS = 30_000
 
-function panopticonDir(): string {
+function overdeckDir(): string {
   return getOverdeckHome()
 }
 function heartbeatsDir(): string {
-  return join(panopticonDir(), 'heartbeats')
+  return join(overdeckDir(), 'heartbeats')
 }
 function agentsDir(): string {
-  return join(panopticonDir(), 'agents')
+  return join(overdeckDir(), 'agents')
 }
 
 export class PiSpawnTimeout extends Error {
@@ -264,7 +264,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     // Step 3: SIGTERM via tmux. Best-effort — if it fails the kill-session
     // fallback below will still take the pane down.
     try {
-      await execAsync(`tmux -L panopticon send-keys -t ${agentId} C-c 2>/dev/null || true`)
+      await execAsync(`tmux -L overdeck send-keys -t ${agentId} C-c 2>/dev/null || true`)
     } catch {
       // ignore
     }
@@ -274,7 +274,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     // server. Resolve the pane PID and signal only that process group.
     try {
       const { stdout } = await execAsync(
-        `tmux -L panopticon list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
+        `tmux -L overdeck list-panes -t ${shellQuote(agentId)} -F '#{pane_pid}' 2>/dev/null`
       )
       const pid = stdout.trim()
       if (pid) {
@@ -344,7 +344,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
       model: config.model,
       promptFile,
       resumeSessionId,
-      panopticonEnv: { agentId },
+      overdeckEnv: { agentId },
       setTerminalEnv: true,
       trapHup: true,
     })

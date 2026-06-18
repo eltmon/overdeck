@@ -78,8 +78,8 @@ describe('role definitions', () => {
       const bashMatcher = hooks.PreToolUse.find((entry) => entry.matcher === 'Bash');
 
       expect(bashMatcher?.hooks.map((hook) => hook.command)).toEqual([
-        '$HOME/.panopticon/bin/gh-issue-trailer-hook',
-        '$HOME/.panopticon/bin/rtk-bash-filter',
+        '$HOME/.overdeck/bin/gh-issue-trailer-hook',
+        '$HOME/.overdeck/bin/rtk-bash-filter',
       ]);
     },
   );

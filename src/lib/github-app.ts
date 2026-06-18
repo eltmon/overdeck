@@ -5,7 +5,7 @@
  * Agents push via HTTPS with these tokens instead of the user's SSH key, so commits
  * show as `panopticon-agent[bot]` with a verified badge.
  *
- * Credentials stored at: ~/.panopticon/github-app/
+ * Credentials stored at: ~/.overdeck/github-app/
  *   - app-id, private-key.pem, installation-id
  */
 
@@ -20,7 +20,7 @@ import { GitHubApiError, ConfigError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
 
-const APP_DIR = join(homedir(), '.panopticon', 'github-app');
+const APP_DIR = join(homedir(), '.overdeck', 'github-app');
 
 export interface GitHubAppConfig {
   appId: string;
@@ -106,7 +106,7 @@ export function isGitHubAppConfigured(): boolean {
 }
 
 /**
- * Load GitHub App credentials from ~/.panopticon/github-app/
+ * Load GitHub App credentials from ~/.overdeck/github-app/
  */
 export function loadGitHubAppConfig(): GitHubAppConfig | null {
   if (!isGitHubAppConfigured()) return null;
@@ -500,7 +500,7 @@ export async function configureWorkspaceForBot(
  * @param repo - Repo name
  * @param sha - Commit SHA
  * @param status - Check status
- * @param context - Check name (e.g. "panopticon/review", "panopticon/test")
+ * @param context - Check name (e.g. "overdeck/review", "overdeck/test")
  * @param description - Short description
  */
 export async function reportCommitStatus(
@@ -537,7 +537,7 @@ export async function reportCommitStatus(
 }
 
 /**
- * Post the `panopticon/tests` commit status for the HEAD of a workspace.
+ * Post the `overdeck/tests` commit status for the HEAD of a workspace.
  *
  * Used by verification-runner (pre-review gate) and the test specialist
  * (post-review gate) to signal that Overdeck has run the test suite
@@ -545,7 +545,7 @@ export async function reportCommitStatus(
  * reads this status and skips its own vitest run when it's `success`,
  * eliminating duplicate test execution for pipeline-managed PRs.
  *
- * Non-pipeline pushes (no workspace, no `panopticon/tests` status) cause
+ * Non-pipeline pushes (no workspace, no `overdeck/tests` status) cause
  * CI to fall through and run vitest as normal — defense in depth.
  *
  * Failures are non-fatal: status posting is informational and must never
@@ -568,14 +568,14 @@ export async function postOverdeckTestsStatus(
     const sha = stdout.trim();
     if (!sha) return;
     // Context name MUST match branch protection's required_status_checks.contexts
-    // for main, which is the singular "panopticon/test". Don't change to plural
+    // for main, which is the singular "overdeck/test". Don't change to plural
     // without coordinating the branch protection rule update.
-    await reportCommitStatus(owner, repo, sha, status, 'panopticon/test', description);
+    await reportCommitStatus(owner, repo, sha, status, 'overdeck/test', description);
     console.log(
-      `[github-app] Posted panopticon/test=${status} for ${sha.slice(0, 8)} in ${owner}/${repo}`,
+      `[github-app] Posted overdeck/test=${status} for ${sha.slice(0, 8)} in ${owner}/${repo}`,
     );
   } catch (err: any) {
-    console.warn(`[github-app] Failed to post panopticon/test status: ${err.message}`);
+    console.warn(`[github-app] Failed to post overdeck/test status: ${err.message}`);
   }
 }async function refreshWorkspaceTokenPromise(
   workspacePath: string,

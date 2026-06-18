@@ -29,7 +29,7 @@ export function createBackupSync(sourceDirs: string[]): BackupInfo {
     const targetPath = join(backupPath, targetName);
 
     // Use filter to skip symlinks — sync targets (e.g. ~/.claude/skills/)
-    // contain symlinks back into ~/.panopticon/skills/ which causes cpSync
+    // contain symlinks back into ~/.overdeck/skills/ which causes cpSync
     // to fail with "cannot copy to a subdirectory of self".
     cpSync(sourceDir, targetPath, {
       recursive: true,

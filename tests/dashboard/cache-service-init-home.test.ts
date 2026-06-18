@@ -18,13 +18,13 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 
 let testDir: string;
-let panopticonHome: string;
+let overdeckHome: string;
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'cache-service-test-'));
-  panopticonHome = join(testDir, '.panopticon');
+  overdeckHome = join(testDir, '.overdeck');
   vi.resetModules();
-  vi.stubEnv('OVERDECK_HOME', panopticonHome);
+  vi.stubEnv('OVERDECK_HOME', overdeckHome);
 });
 
 afterEach(() => {
@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe('CacheService constructor', () => {
   it('succeeds when OVERDECK_HOME already exists (normal path after main.ts mkdir)', async () => {
-    mkdirSync(panopticonHome, { recursive: true });
+    mkdirSync(overdeckHome, { recursive: true });
 
     const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
     let svc: InstanceType<typeof CacheService> | undefined;
@@ -43,12 +43,12 @@ describe('CacheService constructor', () => {
   });
 
   it('does NOT create OVERDECK_HOME on import (no top-level await side-effects)', async () => {
-    expect(existsSync(panopticonHome)).toBe(false);
+    expect(existsSync(overdeckHome)).toBe(false);
 
     // Importing should NOT create the dir — main.ts owns that responsibility
     await import('../../src/dashboard/server/services/cache-service.js');
 
-    expect(existsSync(panopticonHome)).toBe(false);
+    expect(existsSync(overdeckHome)).toBe(false);
   });
 });
 
@@ -56,7 +56,7 @@ describe('main.ts startup fix regression (PAN-446)', () => {
   it('CacheService construction throws when OVERDECK_HOME does not exist (pre-fix state)', async () => {
     // Before the fix, main.ts did not mkdir OVERDECK_HOME. SQLite cannot create
     // cache.db in a non-existent directory — this is the bug PAN-446 fixed.
-    expect(existsSync(panopticonHome)).toBe(false);
+    expect(existsSync(overdeckHome)).toBe(false);
     const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
     expect(() => new CacheService()).toThrow();
   });
@@ -66,7 +66,7 @@ describe('main.ts startup fix regression (PAN-446)', () => {
     //   await mkdir(getOverdeckHome(), { recursive: true });
     // Without this line the test above throws; with it, CacheService succeeds.
     const { mkdir } = await import('node:fs/promises');
-    await mkdir(panopticonHome, { recursive: true });
+    await mkdir(overdeckHome, { recursive: true });
 
     vi.resetModules();
     const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
@@ -82,7 +82,7 @@ describe('startup/import chain regression', () => {
     // This is the real production chain: routes/issues.ts:65 and routes/misc.ts:114 call
     // require('../services/issue-service-singleton.js'), which statically imports cache-service.
     // CacheService opens SQLite at OVERDECK_HOME/cache.db — fails if the dir doesn't exist.
-    mkdirSync(panopticonHome, { recursive: true });
+    mkdirSync(overdeckHome, { recursive: true });
 
     const { getSharedIssueService } = await import('../../src/dashboard/server/services/issue-service-singleton.js');
     let svc: any;

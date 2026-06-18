@@ -13,7 +13,7 @@ When a specialist is handed a task while already busy, the task is lost. The exi
 | Stale task handling | Process anyway | Let specialist discover issue state - keeps logic simple |
 | Queue size limit | No limit | Rely on priority and manual cleanup |
 | Queue check frequency | On idle detection | Check queue when `isIdleAtPrompt()` returns true |
-| Queue persistence | Hooks system (JSON files) | Already persistent at `~/.panopticon/agents/{specialist}/hook.json` |
+| Queue persistence | Hooks system (JSON files) | Already persistent at `~/.overdeck/agents/{specialist}/hook.json` |
 | Dashboard UI depth | Count + expandable list | Badge with count, expand to see queued issue IDs |
 | Queue management | Full control | View, remove, and reorder from dashboard |
 

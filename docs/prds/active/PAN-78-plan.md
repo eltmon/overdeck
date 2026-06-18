@@ -25,7 +25,7 @@ Integrate [claude-code-router](https://github.com/musistudio/claude-code-router)
 - All work in single PR for cohesive feature
 
 ### 3. API Key Storage
-**Decision**: Store in `~/.panopticon/settings.json` (TOML format)
+**Decision**: Store in `~/.overdeck/settings.json` (TOML format)
 - Plain text TOML file, consistent with existing Linear API key approach
 - Simple implementation, no external dependencies
 - Users responsible for file permissions (document this)
@@ -43,7 +43,7 @@ Integrate [claude-code-router](https://github.com/musistudio/claude-code-router)
 ### Configuration Files
 
 ```
-~/.panopticon/
+~/.overdeck/
 ├── settings.json          # New: Model selection + API keys
 ├── cloister.toml          # Existing: Specialist config (no changes needed)
 └── config.toml            # Existing: General config (no changes needed)
@@ -212,7 +212,7 @@ The `model` parameter will now reference models from any provider, and claude-co
 
 ## Security Considerations
 
-1. **File Permissions**: Document that users should `chmod 600 ~/.panopticon/settings.json`
+1. **File Permissions**: Document that users should `chmod 600 ~/.overdeck/settings.json`
 2. **Environment Variables**: Support `$VAR_NAME` syntax for API keys (alternative to storing plain text)
 3. **API Key Display**: Never show full keys in UI (mask with dots, show last 4 chars only)
 4. **Config Regeneration**: Warn users that manually editing router config will be overwritten

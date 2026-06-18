@@ -1,7 +1,7 @@
 /**
  * CLI Command: pan copy-config
  *
- * Copies configuration from the installed Overdeck (~/.panopticon/)
+ * Copies configuration from the installed Overdeck (~/.overdeck/)
  * into the current workspace and optionally into global user settings.
  */
 
@@ -27,7 +27,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
 
   const sourceDir = getOverdeckHome();
   const workspaceDir = process.cwd();
-  const workspaceConfigDir = join(workspaceDir, '.panopticon');
+  const workspaceConfigDir = join(workspaceDir, '.overdeck');
 
   // Check if we're in a workspace
   const gitDir = join(workspaceDir, '.git');
@@ -43,7 +43,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
   const sourceProjectsYaml = join(sourceDir, 'projects.yaml');
 
   if (!existsSync(sourceConfigYaml)) {
-    console.log(chalk.yellow('⚠ No config.yaml found in ~/.panopticon/'));
+    console.log(chalk.yellow('⚠ No config.yaml found in ~/.overdeck/'));
     console.log(chalk.dim('  Initialize Overdeck first with: pan init'));
     console.log('');
     process.exit(1);
@@ -65,7 +65,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
 
     let copiedFiles: string[] = [];
 
-    // Copy config.yaml to workspace .panopticon/
+    // Copy config.yaml to workspace .overdeck/
     const workspaceConfigFile = join(workspaceConfigDir, 'config.yaml');
     if (existsSync(sourceConfigYaml)) {
       const configContent = readFileSync(sourceConfigYaml, 'utf-8');
@@ -76,7 +76,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
       }
 
       writeFileSync(workspaceConfigFile, configContent);
-      copiedFiles.push('.panopticon/config.yaml');
+      copiedFiles.push('.overdeck/config.yaml');
 
       // Backup source if making global
       if (options.toGlobal && options.backup) {
@@ -95,7 +95,7 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
       }
 
       writeFileSync(workspaceProjectsFile, projectsContent);
-      copiedFiles.push('.panopticon/projects.yaml');
+      copiedFiles.push('.overdeck/projects.yaml');
 
       if (options.toGlobal && options.backup) {
         copyFileSync(sourceProjectsYaml, join(backupDir, 'projects.yaml.backup'));
@@ -118,13 +118,13 @@ export async function copyConfigCommand(options: CopyConfigOptions = {}): Promis
 
     // Promote workspace config to global if requested
     if (options.toGlobal) {
-      // Copy workspace .panopticon/config.yaml to global ~/.panopticon/config.yaml
+      // Copy workspace .overdeck/config.yaml to global ~/.overdeck/config.yaml
       if (existsSync(workspaceConfigFile)) {
         const workspaceConfig = readFileSync(workspaceConfigFile, 'utf-8');
         writeFileSync(sourceConfigYaml, workspaceConfig);
       }
 
-      // Copy workspace .panopticon/projects.yaml to global ~/.panopticon/projects.yaml
+      // Copy workspace .overdeck/projects.yaml to global ~/.overdeck/projects.yaml
       if (existsSync(workspaceProjectsFile)) {
         const workspaceProjects = readFileSync(workspaceProjectsFile, 'utf-8');
         writeFileSync(sourceProjectsYaml, workspaceProjects);

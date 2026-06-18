@@ -1,6 +1,6 @@
 /**
  * Cross-platform browser opener.
- * Used by `npx panopticon serve` to open the dashboard URL after server starts.
+ * Used by `npx overdeck serve` to open the dashboard URL after server starts.
  */
 
 import { Effect } from 'effect';

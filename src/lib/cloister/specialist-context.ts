@@ -5,7 +5,7 @@
  * These digests seed new specialist sessions with learned patterns and expertise.
  *
  * Directory structure:
- *   ~/.panopticon/specialists/{projectKey}/{specialistType}/context/latest-digest.md
+ *   ~/.overdeck/specialists/{projectKey}/{specialistType}/context/latest-digest.md
  */
 
 import { Effect } from 'effect';

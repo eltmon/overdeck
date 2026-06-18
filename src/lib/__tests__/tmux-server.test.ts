@@ -148,7 +148,7 @@ describe('ensureOverdeckTmuxServerSync', () => {
 
     const argv = systemdCalls[0]![1] as string[];
     expect(argv).toContain('--unit');
-    expect(argv).toContain('panopticon-tmux-server');
+    expect(argv).toContain('overdeck-tmux-server');
     expect(argv).not.toContain('--scope');
     expect(argv).toContain('--collect');
   });
@@ -196,8 +196,8 @@ describe('ensureOverdeckTmuxServerSync', () => {
   it('does not warn when the server is in the dedicated unit', () => {
     serverAlive = true;
     systemctlMainPid = '12345';
-    cgroupOutput = '0::/user.slice/user-1000.slice/user@1000.service/panopticon-tmux-server.service\n';
-    cmdlineOutput = 'tmux\0-L\0panopticon\0-f\0/home/user/.panopticon/tmux/panopticon.tmux.conf\0start-server\0';
+    cgroupOutput = '0::/user.slice/user-1000.slice/user@1000.service/overdeck-tmux-server.service\n';
+    cmdlineOutput = 'tmux\0-L\0overdeck\0-f\0/home/user/.overdeck/tmux/overdeck.tmux.conf\0start-server\0';
 
     ensureOverdeckTmuxServerSync({});
 
@@ -208,7 +208,7 @@ describe('ensureOverdeckTmuxServerSync', () => {
   it('warns when the live server has a dirty cmdline founded by new-session', () => {
     serverAlive = true;
     systemctlMainPid = '12345';
-    cmdlineOutput = 'tmux\0-L\0panopticon\0new-session\0-d\0-s\0conv-20260612-3871\0bash\0launcher.sh\0';
+    cmdlineOutput = 'tmux\0-L\0overdeck\0new-session\0-d\0-s\0conv-20260612-3871\0bash\0launcher.sh\0';
 
     ensureOverdeckTmuxServerSync({});
 
@@ -278,7 +278,7 @@ describe('ensureOverdeckTmuxServerAsync', () => {
 
     const argv = systemdCalls[0]![1] as string[];
     expect(argv).toContain('--unit');
-    expect(argv).toContain('panopticon-tmux-server');
+    expect(argv).toContain('overdeck-tmux-server');
     expect(argv).not.toContain('--scope');
   });
 

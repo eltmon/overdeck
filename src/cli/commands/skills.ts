@@ -56,7 +56,7 @@ export async function skillsCommand(options: { json?: boolean }): Promise<void> 
 
   if (skills.length === 0) {
     console.log(chalk.yellow('No skills found.'));
-    console.log(chalk.dim('Skills should be in ~/.panopticon/skills/<name>/SKILL.md'));
+    console.log(chalk.dim('Skills should be in ~/.overdeck/skills/<name>/SKILL.md'));
     return;
   }
 

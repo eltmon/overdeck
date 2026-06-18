@@ -106,9 +106,9 @@ The close-out ceremony is the final human-gated step in the issue lifecycle. It 
 
 1. **Verify PRD preserved** — Ensures the PRD is in `docs/prds/completed/`. If it's still in `active/`, moves it. (Warn, don't fail)
 2. **Verify branch merged** — Confirms no unmerged commits exist on the feature branch. (**Hard fail** if unmerged)
-3. **Archive workspace artifacts** — Copies `.planning/feedback/`, `STATE.md`, and `beads/` to `~/.panopticon/archives/{issue}/`
+3. **Archive workspace artifacts** — Copies `.planning/feedback/`, `STATE.md`, and `beads/` to `~/.overdeck/archives/{issue}/`
 4. **Clean up workspace** — Kills tmux sessions, stops Docker containers, removes git worktree
-5. **Clean up agent state** — Removes `~/.panopticon/agents/agent-{issue}/` and `planning-{issue}/`
+5. **Clean up agent state** — Removes `~/.overdeck/agents/agent-{issue}/` and `planning-{issue}/`
 6. **Close issue on tracker** — Ensures issue is in Done/Closed state (usually already done by the post-merge lifecycle). (**Hard fail**)
 7. **Apply `closed-out` label** — Creates the label if missing (blue `#1d4ed8`), adds to issue
 8. **Clear review status** — Removes the issue's row from SQLite (`review_status` in `panopticon.db`). Per-issue durable verdicts remain in the permanent record under the infra repo's `.pan/` records path.

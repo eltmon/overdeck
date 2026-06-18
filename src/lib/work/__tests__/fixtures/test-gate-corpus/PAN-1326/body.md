@@ -8,8 +8,8 @@ But for **specialist** agents (review/test/ship), \`state.workspace\` either poi
 
 After this session:
 - Killed 6 ship/test specialist agents via \`pan kill\` (PAN-1052, PAN-1228, PAN-1229, PAN-1231, PAN-1235, PAN-1249).
-- \`docker ps\` still showed \`panopticon-feature-pan-1052-{frontend,dev}-1\` and \`panopticon-feature-pan-1190-{frontend,dev}-1\` up.
-- I manually cleaned them with \`docker compose -p panopticon-feature-XXXX down\`.
+- \`docker ps\` still showed \`overdeck-feature-pan-1052-{frontend,dev}-1\` and \`overdeck-feature-pan-1190-{frontend,dev}-1\` up.
+- I manually cleaned them with \`docker compose -p overdeck-feature-XXXX down\`.
 
 ## Root cause
 

@@ -84,7 +84,7 @@ Mirrors T3Code exactly, with `@t3tools/contracts` → `@overdeck/contracts`:
 | `packages/contracts/src/editor.ts` | `packages/contracts/src/editor.ts` | Add Windsurf entry; `OpenError` → reuse `PanRpcError` |
 | `apps/server/src/open.ts` | `src/dashboard/server/services/open.ts` | `"t3/open"` → `"pan/open"`; async FS; cache available editors |
 | `apps/server/src/open.test.ts` | `src/dashboard/server/services/__tests__/open.test.ts` | Same structure, add Windsurf tests |
-| `apps/web/src/editorPreferences.ts` | `src/dashboard/frontend/src/editorPreferences.ts` | `"t3code:last-editor"` → `"panopticon:last-editor"` |
+| `apps/web/src/editorPreferences.ts` | `src/dashboard/frontend/src/editorPreferences.ts` | `"t3code:last-editor"` → `"overdeck:last-editor"` |
 | `apps/web/src/components/chat/OpenInPicker.tsx` | `src/dashboard/frontend/src/components/PanOpenInPicker.tsx` | Import path changes only |
 | (rpc.ts additions) | `packages/contracts/src/rpc.ts` | Add `shellOpenInEditor` to `WS_METHODS`, add RPC definition |
 

@@ -334,7 +334,7 @@ async function handleRemoteWorkspace(
     spinner.fail('Remote workspaces not enabled');
     console.log('');
     console.log(chalk.dim('Run: pan admin remote setup'));
-    console.log(chalk.dim('This writes the required remote settings to ~/.panopticon/config.toml'));
+    console.log(chalk.dim('This writes the required remote settings to ~/.overdeck/config.toml'));
     process.exit(1);
   }
 

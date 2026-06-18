@@ -227,7 +227,7 @@ interface QualityIssue {
 
 1. Split `inspect()` function into `stage1SpecCompliance()` and `stage2Quality()`
 2. Stage 2 only runs if Stage 1 returned `passed: true`
-3. Each stage writes to `~/.panopticon/specialists/<project>/inspect-agent/stages/<issue>.json`
+3. Each stage writes to `~/.overdeck/specialists/<project>/inspect-agent/stages/<issue>.json`
 4. Stage status shown in dashboard UI
 
 **Dashboard UI changes:**

@@ -44,7 +44,7 @@ async function seedSession() {
     estimatedCost: 0.05,
     toolsUsed: ['Read', 'Write'],
     filesTouched: [],
-    panopticonManaged: false,
+    overdeckManaged: false,
     panIssueId: null,
     panAgentId: null,
     fileSize: 2048,

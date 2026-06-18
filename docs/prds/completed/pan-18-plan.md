@@ -143,7 +143,7 @@ export function loadConfig(): OverdeckConfig {
 
 ### Manual Test Cases
 
-1. **Fresh install**: `rm -rf ~/.panopticon && pan install && pan sync` - should work
+1. **Fresh install**: `rm -rf ~/.overdeck && pan install && pan sync` - should work
 2. **Partial config**: Create config with `[sync]` section but no `targets` - should not crash
 3. **init vs install**: Both commands should produce identical configs
 4. **Deep merge**: User overrides single value in nested object - other defaults preserved

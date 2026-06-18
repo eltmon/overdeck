@@ -10,7 +10,7 @@ let testHome: string;
 
 describe('restart status', () => {
   beforeEach(() => {
-    testHome = join(tmpdir(), `panopticon-restart-status-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testHome = join(tmpdir(), `overdeck-restart-status-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     process.env.OVERDECK_HOME = testHome;
   });
 

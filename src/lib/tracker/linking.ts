@@ -101,7 +101,7 @@ export class LinkManager {
   private loaded = false;
 
   constructor(storePath?: string) {
-    this.storePath = storePath ?? join(homedir(), '.panopticon', 'links.json');
+    this.storePath = storePath ?? join(homedir(), '.overdeck', 'links.json');
   }
 
   /**

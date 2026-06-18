@@ -28,7 +28,7 @@ Reimplement the full workspace creation flow for Fly:
 - **Remove**: Database provisioning, Redis provisioning, Traefik routing (exe-specific)
 
 ### 6. Cost Tracking: Existing JSONL System
-Append compute cost events to `~/.panopticon/costs/events.jsonl` using the existing format. Add `session_type: 'compute'` with `machine_id`, uptime, and hourly rate fields.
+Append compute cost events to `~/.overdeck/costs/events.jsonl` using the existing format. Add `session_type: 'compute'` with `machine_id`, uptime, and hourly rate fields.
 
 ### 7. Agent Management: Fly Machine Exec API
 Use Fly Machines API exec endpoint instead of SSH+tmux for agent management. More reliable, no SSH key management needed. Adapt `remote-agents.ts` to use the API transport.
@@ -118,7 +118,7 @@ default_location = "remote"
 auto_hibernate_minutes = 5
 
 [remote.fly]
-org = "panopticon"        # Fly.io org name
+org = "overdeck"        # Fly.io org name
 region = "iad"            # Default region (us-east)
 vm_size = "shared-cpu-2x" # Machine size
 vm_memory = 1024          # MB
@@ -141,7 +141,7 @@ Ubuntu 24.04
 ```
 
 ### Cost Tracking Integration
-On machine create/start/stop/destroy, append events to `~/.panopticon/costs/events.jsonl`:
+On machine create/start/stop/destroy, append events to `~/.overdeck/costs/events.jsonl`:
 ```json
 {
   "timestamp": "2026-03-19T12:00:00Z",

@@ -7,7 +7,7 @@
 
 import { useCallback, useState, useEffect } from 'react';
 
-const STORAGE_KEY = 'panopticon:conversation-ui:v1';
+const STORAGE_KEY = 'overdeck:conversation-ui:v1';
 
 interface PersistedState {
   hideToolCallsById: Record<string, boolean>;

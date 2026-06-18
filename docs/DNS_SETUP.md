@@ -69,7 +69,7 @@ Install and configure dnsmasq for wildcard DNS:
 sudo apt update && sudo apt install -y dnsmasq
 
 # Create Overdeck DNS config
-sudo tee /etc/dnsmasq.d/panopticon.conf > /dev/null <<EOF
+sudo tee /etc/dnsmasq.d/overdeck.conf > /dev/null <<EOF
 # Resolve all *.localhost domains to 127.0.0.1
 address=/localhost/127.0.0.1
 

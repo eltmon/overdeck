@@ -9,7 +9,7 @@
 set -euo pipefail
 
 ENDPOINT="${QWEN_TTS_ENDPOINT:-http://127.0.0.1:8787/speak}"
-TOKEN_PATH="${OVERDECK_HOME:-$HOME/.panopticon}/secrets/qwen-tts.token"
+TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/secrets/qwen-tts.token"
 TEXT="${*:-}"
 
 if [[ -z "$TEXT" ]]; then

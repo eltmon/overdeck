@@ -17,7 +17,7 @@ chmod +x Overdeck-*.AppImage
 
 Or place it in `~/Applications/` so `pan up` detects and launches it automatically.
 
-You can also install to `~/.local/bin/panopticon` for system-wide detection.
+You can also install to `~/.local/bin/overdeck` for system-wide detection.
 
 ### macOS (DMG)
 
@@ -128,13 +128,13 @@ The macOS menu bar includes a **Overdeck** menu with:
 - Open Workspace (lists all registered workspaces)
 - Settings
 
-Menu actions dispatch to the renderer via IPC, which the frontend handles via `panopticonBridge.onMenuAction()`.
+Menu actions dispatch to the renderer via IPC, which the frontend handles via `overdeckBridge.onMenuAction()`.
 
 ---
 
 ## Desktop Settings UI
 
-The **Settings** page includes a **Desktop App** section when running inside the Electron app. This section is automatically hidden in browser mode (when `window.panopticonBridge` is absent).
+The **Settings** page includes a **Desktop App** section when running inside the Electron app. This section is automatically hidden in browser mode (when `window.overdeckBridge` is absent).
 
 Settings are persisted to `$userData/desktop-settings.json` (e.g., `~/.config/Overdeck/desktop-settings.json` on Linux, `~/Library/Application Support/Overdeck/desktop-settings.json` on macOS).
 
@@ -142,10 +142,10 @@ Settings are persisted to `$userData/desktop-settings.json` (e.g., `~/.config/Ov
 
 ## Frontend Protocol (Packaged Builds)
 
-In packaged builds, the frontend is served via a custom `panopticon://` protocol instead of a localhost URL. This avoids cross-origin restrictions and allows the app to work without a running Vite dev server.
+In packaged builds, the frontend is served via a custom `overdeck://` protocol instead of a localhost URL. This avoids cross-origin restrictions and allows the app to work without a running Vite dev server.
 
 - **Dev mode**: Loads from `VITE_DEV_SERVER_URL` (Vite HMR, source maps)
-- **Packaged**: Loads `panopticon://app/index.html` from bundled static assets
+- **Packaged**: Loads `overdeck://app/index.html` from bundled static assets
 
 The protocol handler includes path-traversal protection — paths containing `..` are rejected and fall back to `index.html`. Non-asset routes (no file extension) also fall back to `index.html` for SPA routing.
 
@@ -153,7 +153,7 @@ The protocol handler includes path-traversal protection — paths containing `..
 
 ## IPC Bridge
 
-The Electron preload script exposes `window.panopticonBridge` to the renderer via `contextBridge`. This is the only communication channel between the sandboxed renderer and the main process.
+The Electron preload script exposes `window.overdeckBridge` to the renderer via `contextBridge`. This is the only communication channel between the sandboxed renderer and the main process.
 
 Available methods:
 
@@ -171,12 +171,12 @@ Available methods:
 
 ---
 
-## `npx panopticon serve`
+## `npx overdeck serve`
 
-If you don't want the full desktop app, `npx panopticon serve` starts only the server and opens it in your system browser:
+If you don't want the full desktop app, `npx overdeck serve` starts only the server and opens it in your system browser:
 
 ```bash
-npx panopticon serve
+npx overdeck serve
 ```
 
 This is equivalent to `pan up` without the Electron wrapper — useful on headless servers or when you prefer the browser experience.
@@ -220,7 +220,7 @@ apps/desktop/
 │   ├── menu.ts          # Application menu bar
 │   ├── notifications.ts # Native OS notifications
 │   ├── autostart.ts     # Login item + nag flow
-│   ├── protocol.ts      # panopticon:// file protocol
+│   ├── protocol.ts      # overdeck:// file protocol
 │   └── settings.ts      # Desktop settings persistence
 ├── tests/
 │   ├── settings.test.ts # Settings load/save/update unit tests

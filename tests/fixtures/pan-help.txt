@@ -16,7 +16,7 @@ Options:
   -h, --help                      display help for command
 
 Commands:
-  init                            Initialize Overdeck (~/.panopticon/)
+  init                            Initialize Overdeck (~/.overdeck/)
   sync [options]                  Sync skills/agents to ~/.claude/ and render
                                   the context layers
   context                         Manage the layered context model (global /

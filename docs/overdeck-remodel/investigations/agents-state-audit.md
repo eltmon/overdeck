@@ -43,9 +43,9 @@ from itself and should be deleted as a plane.**
   1. **git record** — `.pan/<recordsPath>/<issue>.json`, permanent, per-issue.
      Holds `harness`/`model` (PAN-1919), the pipeline verdict block, owner lease.
   2. **SQLite `agents` table** — the authoritative runtime registry (this audit).
-  3. **tmux `-L panopticon`** — liveness oracle.
+  3. **tmux `-L overdeck`** — liveness oracle.
   Plus two *file* planes that are NOT the agents table and NOT in scope as columns
-  but matter for derivability: **`state.json`** (`~/.panopticon/agents/<id>/state.json`,
+  but matter for derivability: **`state.json`** (`~/.overdeck/agents/<id>/state.json`,
   "rollback/rebuild source only") and **`runtime.json`** (`AgentRuntimeState`,
   live activity/idle/tool — `src/lib/agents.ts:2303`).
 - **IDENTITY/SPAWN-CONFIG** — defines the agent and is needed to (re)spawn or
@@ -112,7 +112,7 @@ from itself and should be deleted as a plane.**
 
 ## state.json verdict — **DELETE THE PLANE**
 
-**Call: `~/.panopticon/agents/<id>/state.json` should not survive Overdeck.** It
+**Call: `~/.overdeck/agents/<id>/state.json` should not survive Overdeck.** It
 carries nothing that is reconstructable-only from itself, given an empty DB and
 the PAN-1908/PAN-1919 architecture.
 
@@ -201,7 +201,7 @@ agents-table `last_activity` column is a droppable stale copy.
 
 1. **`status` is the only runtime column with real divergence risk, and tmux already
    wins.** `reconcileAgentStatus` (backfill.ts:238) and the two deacon stopped/dead
-   handlers re-derive `status` from `-L panopticon` liveness every patrol. The stored
+   handlers re-derive `status` from `-L overdeck` liveness every patrol. The stored
    `status` is a cache of the tmux oracle. KEEP it (cheap, indexed, gates patrols) but
    recognize it as LIVENESS, not durable truth.
 

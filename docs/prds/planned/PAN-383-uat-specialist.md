@@ -120,7 +120,7 @@ Visual quality audit passed ✓
 No console errors ✓
 No CORS issues ✓
 
-Screenshots saved to: ~/.panopticon/specialists/<project>/uat-agent/runs/<runId>/screenshots/
+Screenshots saved to: ~/.overdeck/specialists/<project>/uat-agent/runs/<runId>/screenshots/
 Ready for merge."
 
 curl -X POST <apiUrl>/api/specialists/done \
@@ -152,7 +152,7 @@ curl -X POST <apiUrl>/api/specialists/done \
 Screenshots are stored alongside run logs:
 
 ```
-~/.panopticon/specialists/<project>/uat-agent/
+~/.overdeck/specialists/<project>/uat-agent/
 ├── runs/
 │   └── <runId>/
 │       ├── screenshots/

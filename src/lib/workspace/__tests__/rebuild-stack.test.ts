@@ -31,10 +31,10 @@ describe('composeProjectNameForWorkspace', () => {
     expect(composeProjectNameForWorkspace(workspacePath, 'MIN-831')).toBe('myn-feature-min-831');
   });
 
-  it('falls back to the legacy panopticon compose prefix when no dev script declares one', () => {
+  it('falls back to the legacy overdeck compose prefix when no dev script declares one', () => {
     const workspacePath = makeWorkspace(null);
 
-    expect(composeProjectNameForWorkspace(workspacePath, 'PAN-1140')).toBe('panopticon-feature-pan-1140');
+    expect(composeProjectNameForWorkspace(workspacePath, 'PAN-1140')).toBe('overdeck-feature-pan-1140');
   });
 
   it('refuses a compose project name that does not target the workspace feature folder', () => {

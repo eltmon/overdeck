@@ -88,7 +88,7 @@ skills/pan-<verb>/SKILL.md            (canonical, committed)
         │
         │ pan sync
         ▼
-~/.panopticon/skills/pan-<verb>/      (installed copy)
+~/.overdeck/skills/pan-<verb>/      (installed copy)
         │
         │ pan sync (devroot symlink)
         ▼

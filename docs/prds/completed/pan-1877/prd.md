@@ -1,4 +1,4 @@
-# PAN-1877 — Test isolation: no test may write the real `~/.panopticon`
+# PAN-1877 — Test isolation: no test may write the real `~/.overdeck`
 
 **Status:** in progress on `main` (operator-authorized direct implementation, 2026-06-14).
 **Scope:** immediate. Executed together with PAN-1883 and PAN-1884.
@@ -12,12 +12,12 @@
 
 ## Background
 
-Many tests build `~/.panopticon` paths from `homedir()` directly instead of the override-aware
+Many tests build `~/.overdeck` paths from `homedir()` directly instead of the override-aware
 `getOverdeckHome()`, so they write the developer's **real** state. A crash, OOM-kill, or parallel
 race leaves the non-crash-safe `afterEach` restore unrun and the real state corrupted. The blast
 radius spans review-status, **agent state**, shadow-state, and more.
 
-**Verified offender inventory** (tests that build `homedir()+'.panopticon'` paths and do destructive
+**Verified offender inventory** (tests that build `homedir()+'.overdeck'` paths and do destructive
 FS ops — `grep` reproducible):
 
 | Test file | real subdir written | ops |
@@ -31,14 +31,14 @@ FS ops — `grep` reproducible):
 | `tests/unit/dashboard/server/routes/show.test.ts` | `shadow-state/` | unlink |
 | `tests/lib/config-migration.test.ts` | `skills/` | mkdir/rm/write |
 
-**Verified production-side root** (modules that hardcode `join(homedir(), '.panopticon', …)` rather
+**Verified production-side root** (modules that hardcode `join(homedir(), '.overdeck', …)` rather
 than `getOverdeckHome()`, so a test calling them writes real home regardless of test-local fixes):
 `src/lib/review-status-json.ts`, `src/lib/shadow-utils.ts`, `src/lib/smee.ts`, `src/lib/env-loader.ts`,
 `src/lib/config-migration.ts`, `src/lib/workspace-manager.ts`, `src/lib/runtimes/codex.ts`,
 `src/lib/runtimes/pi.ts`, `src/lib/session-format-converter.ts`, `src/lib/test-runner.ts`.
 
 The seam already exists: `src/lib/paths.ts` (search `getOverdeckHome`) — `process.env.OVERDECK_HOME
-|| join(homedir(), '.panopticon')`. Note `paths.ts` *also* exports a top-level `const OVERDECK_HOME`
+|| join(homedir(), '.overdeck')`. Note `paths.ts` *also* exports a top-level `const OVERDECK_HOME`
 evaluated **at import time** (search `export const OVERDECK_HOME`); modules that capture that const
 will NOT see a `OVERDECK_HOME` set after import — only `getOverdeckHome()` is dynamic. This
 matters for both the fix and the test-setup ordering.
@@ -49,7 +49,7 @@ matters for both the fix and the test-setup ordering.
 
 - **`OVERDECK_HOME`** — env var relocating all Overdeck state; read by `getOverdeckHome()`.
 - **Runtime write-guard** — a `fs`/`fs/promises` wrapper installed in test setup that throws if a
-  write targets the **real** `${homedir()}/.panopticon`. The hard, mechanism-agnostic enforcement.
+  write targets the **real** `${homedir()}/.overdeck`. The hard, mechanism-agnostic enforcement.
 - **Per-worker home** — each Vitest worker gets its own `OVERDECK_HOME` subtree (keyed by
   `VITEST_POOL_ID`) so tests cannot pollute each other's state within a shared run.
 
@@ -59,7 +59,7 @@ matters for both the fix and the test-setup ordering.
 
 - **FR-1** — `src/lib/review-status-json.ts` (and the other state modules it is reasonable to fix in
   this pass) resolve their path from `getOverdeckHome()`, not `homedir()`.
-- **FR-2** — **No test reads or writes the developer's real `~/.panopticon`.** Enforced by a runtime
+- **FR-2** — **No test reads or writes the developer's real `~/.overdeck`.** Enforced by a runtime
   write-guard, not only by inspection.
 - **FR-3** — Each Vitest worker runs against its own throwaway `OVERDECK_HOME` subtree; the real
   home is never the target.
@@ -77,7 +77,7 @@ matters for both the fix and the test-setup ordering.
 
 ```ts
 import { homedir } from 'os';
-const DEFAULT_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
+const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 ```
 
 Replace with a dynamic resolver and use it as each function's default arg (search every
@@ -104,21 +104,21 @@ cleanup but not required for correctness — do it only if the guard flags it.
 **File:** `tests/setup/no-real-home-writes.ts` (wire via `setupFiles` in `vitest.config.ts`).
 
 Install a guard that wraps the write surface of `fs` and `fs/promises` and throws if the resolved,
-absolute target is under the **real** `${homedir()}/.panopticon` (computed from `os.homedir()`, NOT
+absolute target is under the **real** `${homedir()}/.overdeck` (computed from `os.homedir()`, NOT
 the temp `OVERDECK_HOME`). Cover at minimum:
 
 - sync: `writeFileSync`, `appendFileSync`, `mkdirSync`, `rmSync`, `rmdirSync`, `unlinkSync`,
   `renameSync`, `cpSync`, `createWriteStream`
 - promises: `writeFile`, `appendFile`, `mkdir`, `rm`, `rename`, `cp`
 
-Throw a clear error (`[test-guard] write to REAL ~/.panopticon blocked: <path> — set OVERDECK_HOME
+Throw a clear error (`[test-guard] write to REAL ~/.overdeck blocked: <path> — set OVERDECK_HOME
 to a temp dir`). Provide a minimal allowlist hook for any test that legitimately must touch real home
 (none expected). This catches every offender regardless of which module (test or production helper)
 issues the write — the property a static grep cannot guarantee.
 
 ### WI-3 — Per-worker throwaway `OVERDECK_HOME` (FR-3)
 
-**Files:** `vitest.config.ts`, `tests/setup/panopticon-home.ts`.
+**Files:** `vitest.config.ts`, `tests/setup/overdeck-home.ts`.
 
 - `globalSetup` creates a run root `mkdtemp(pan-test-root-*)` and removes it on teardown.
 - A **setupFile** (runs per worker, before test modules import) sets
@@ -133,11 +133,11 @@ other's state — this is the cross-file-pollution dimension a single shared hom
 
 ### WI-4 — Fix the surfaced offenders (FR-4)
 
-For each test in the inventory, replace `join(homedir(), '.panopticon', …)` with
+For each test in the inventory, replace `join(homedir(), '.overdeck', …)` with
 `join(getOverdeckHome(), …)` (import from `src/lib/paths.js`). With WI-2+WI-3 these land in the
 per-worker temp home; the existing backup/restore dances become unnecessary (may stay, now harmless).
 Re-anchored locations for the primary review-status offender, `tests/lib/cloister/deacon-ci-retry.test.ts`
-(verified current): `REVIEW_STATUS_FILE` at `:101`; `writeStatusFile` builds `join(homedir(), '.panopticon')`
+(verified current): `REVIEW_STATUS_FILE` at `:101`; `writeStatusFile` builds `join(homedir(), '.overdeck')`
 at `:116`–`:118`; backup/restore at `:150`–`:151` and `:166`–`:168`. (v1 of this PRD cited the April
 original `:69`/`:83` — stale; use these.)
 
@@ -146,8 +146,8 @@ surfaces a real `setTimeout`, convert it.
 
 ### WI-5 — Static grep as a second line of defense
 
-Keep a lightweight `tests/meta/no-real-panopticon-home.test.ts` that greps `tests/` for
-`homedir()`-near-`.panopticon`-write patterns and fails listing offenders. It is the **secondary**
+Keep a lightweight `tests/meta/no-real-overdeck-home.test.ts` that greps `tests/` for
+`homedir()`-near-`.overdeck`-write patterns and fails listing offenders. It is the **secondary**
 guard (cheap, catches obvious regressions at author time); WI-2 is the authoritative one.
 
 ---
@@ -156,13 +156,13 @@ guard (cheap, catches obvious regressions at author time); WI-2 is the authorita
 
 - **AC-1 (WI-1)** — `grep -n "homedir" src/lib/review-status-json.ts` returns nothing; it imports
   `getOverdeckHome`. `shadow-utils.ts` shadow-state path uses `getOverdeckHome()`.
-- **AC-2 (WI-2)** — A test that intentionally writes `${homedir()}/.panopticon/pan-test-guard` **fails**
+- **AC-2 (WI-2)** — A test that intentionally writes `${homedir()}/.overdeck/pan-test-guard` **fails**
   under the guard. The guard covers the sync + promise write APIs listed.
 - **AC-3 (WI-3)** — Inside a test, `process.env.OVERDECK_HOME` points to a `pan-test-root-*/worker-*`
   dir; two workers get distinct subtrees.
 - **AC-4 (WI-4)** — After a full `npm test`, `stat`/`find` shows **no** mtime or content change under
-  real `~/.panopticon/review-status.json`, `~/.panopticon/shadow-state`, `~/.panopticon/agents`, or
-  `~/.panopticon/conversations`. `grep -rn "homedir(), '.panopticon'"` over the inventoried tests
+  real `~/.overdeck/review-status.json`, `~/.overdeck/shadow-state`, `~/.overdeck/agents`, or
+  `~/.overdeck/conversations`. `grep -rn "homedir(), '.overdeck'"` over the inventoried tests
   returns nothing.
 - **AC-5 (WI-5)** — the static guard passes clean and fails when a `homedir()`-write is reintroduced.
 - **AC-6 (NFR-1)** — no new real-`setTimeout` delay in touched retry tests.
@@ -179,5 +179,5 @@ guard (cheap, catches obvious regressions at author time); WI-2 is the authorita
   pollution), [#1824](https://github.com/eltmon/overdeck/issues/1824) (real-timer flakiness), [#1783](https://github.com/eltmon/overdeck/issues/1783) (Playwright fixture). WI-3 reduces
   shared-state surface but does not address mock/timer pollution.
 - **Prevents** the silent **agent-state** corruption found in the audit (deacon-orphan-recovery,
-  status-context writing real `~/.panopticon/agents/`).
+  status-context writing real `~/.overdeck/agents/`).
 - **Sibling fixes** executed together: [#1883](https://github.com/eltmon/overdeck/issues/1883), [#1884](https://github.com/eltmon/overdeck/issues/1884).

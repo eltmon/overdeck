@@ -106,8 +106,8 @@ function resolveDiscoveredIn(env: HookEnv): string | null {
   const agentId = env.OVERDECK_AGENT_ID;
   if (!agentId || basename(agentId) !== agentId) return null;
 
-  const panopticonHome = env.OVERDECK_HOME ?? join(env.HOME ?? homedir(), '.panopticon');
-  const statePath = join(panopticonHome, 'agents', agentId, 'state.json');
+  const overdeckHome = env.OVERDECK_HOME ?? join(env.HOME ?? homedir(), '.overdeck');
+  const statePath = join(overdeckHome, 'agents', agentId, 'state.json');
   if (!existsSync(statePath)) return null;
 
   try {

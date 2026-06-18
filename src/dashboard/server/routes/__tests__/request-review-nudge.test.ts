@@ -164,8 +164,8 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     existsSyncMock.mockReturnValue(true);
-    resolveProjectFromIssueMock.mockReturnValue({ projectName: 'panopticon', projectPath: '/tmp/panopticon' });
-    listProjectsMock.mockReturnValue([{ config: { path: '/tmp/panopticon' } }]);
+    resolveProjectFromIssueMock.mockReturnValue({ projectName: 'overdeck', projectPath: '/tmp/overdeck' });
+    listProjectsMock.mockReturnValue([{ config: { path: '/tmp/overdeck' } }]);
     loadWorkspaceMetadataMock.mockReturnValue(null);
     restoreTrackedBeadsExportMock.mockReturnValue(Effect.succeed(undefined));
     transitionIssueToInReviewMock.mockResolvedValue(undefined);
@@ -242,10 +242,10 @@ describe('POST /api/review/:id/request nudge and drift gate', () => {
     await postRequestReview('PAN-1417');
 
     expect(execBehaviorMock.mock.calls.some(([, options]) =>
-      (options as { cwd?: string } | undefined)?.cwd === '/tmp/panopticon/workspaces/feature-pan-1417',
+      (options as { cwd?: string } | undefined)?.cwd === '/tmp/overdeck/workspaces/feature-pan-1417',
     )).toBe(true);
     expect(execBehaviorMock.mock.calls.some(([, options]) =>
-      (options as { cwd?: string } | undefined)?.cwd === '/tmp/panopticon/workspaces/feature-1417',
+      (options as { cwd?: string } | undefined)?.cwd === '/tmp/overdeck/workspaces/feature-1417',
     )).toBe(false);
   });
 

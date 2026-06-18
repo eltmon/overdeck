@@ -44,12 +44,12 @@ Performance optimization for beads task lookup:
 - Heartbeat hook reads from cache file (0ms overhead)
 - Avoids 50-200ms penalty of running `bd show` per tool call
 
-Task cache location: `~/.panopticon/agents/{agentId}/current-task.json`
+Task cache location: `~/.overdeck/agents/{agentId}/current-task.json`
 
 ### 5. Heartbeat Path
 **Decision:** Shared directory
 
-Heartbeats written to: `~/.panopticon/heartbeats/{agentId}.json`
+Heartbeats written to: `~/.overdeck/heartbeats/{agentId}.json`
 
 Benefits:
 - Easier for dashboard to watch all heartbeats in one directory
@@ -92,9 +92,9 @@ The heartbeat hook script will:
 ### In Scope (PAN-30)
 
 **Heartbeat Hook Infrastructure:**
-- Create `~/.panopticon/bin/heartbeat-hook` bash script
+- Create `~/.overdeck/bin/heartbeat-hook` bash script
 - Parse Claude Code's PostToolUse JSON input
-- Write rich heartbeat to `~/.panopticon/heartbeats/{agentId}.json`
+- Write rich heartbeat to `~/.overdeck/heartbeats/{agentId}.json`
 - Include tool name, timestamp, beads task (from cache), git branch, workspace
 
 **Setup Command:**
@@ -125,7 +125,7 @@ The heartbeat hook script will:
 ### Files to Create/Modify
 
 ```
-~/.panopticon/
+~/.overdeck/
 ├── bin/
 │   └── heartbeat-hook         # NEW - bash script called by Claude Code
 ├── heartbeats/
@@ -148,7 +148,7 @@ src/lib/
 
 ```bash
 #!/bin/bash
-# ~/.panopticon/bin/heartbeat-hook
+# ~/.overdeck/bin/heartbeat-hook
 # Called by Claude Code after every tool use with JSON on stdin
 
 set -e
@@ -164,7 +164,7 @@ TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""'
 AGENT_ID="${OVERDECK_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
 
 # Get current beads task from cache (if exists)
-TASK_CACHE="$HOME/.panopticon/agents/$AGENT_ID/current-task.json"
+TASK_CACHE="$HOME/.overdeck/agents/$AGENT_ID/current-task.json"
 CURRENT_TASK=""
 if [ -f "$TASK_CACHE" ]; then
   CURRENT_TASK=$(jq -r '.title // ""' "$TASK_CACHE" 2>/dev/null || true)
@@ -177,7 +177,7 @@ GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 WORKSPACE=$(pwd)
 
 # Ensure heartbeat directory exists
-HEARTBEAT_DIR="$HOME/.panopticon/heartbeats"
+HEARTBEAT_DIR="$HOME/.overdeck/heartbeats"
 mkdir -p "$HEARTBEAT_DIR"
 
 # Write heartbeat
@@ -214,7 +214,7 @@ After:
   "hooks": {
     "PostToolUse": [
       { "matcher": ".*", "command": "my-custom-hook" },
-      { "matcher": ".*", "command": "~/.panopticon/bin/heartbeat-hook" }
+      { "matcher": ".*", "command": "~/.overdeck/bin/heartbeat-hook" }
     ]
   }
 }
@@ -230,7 +230,7 @@ After:
   "last_action": "file_path: src/lib/agents.ts, old_string: ...",
   "current_task": "Implement heartbeat hook script",
   "git_branch": "feature/pan-30",
-  "workspace": "/home/user/projects/panopticon/workspaces/feature-pan-30",
+  "workspace": "/home/user/projects/overdeck/workspaces/feature-pan-30",
   "pid": 12345
 }
 ```
@@ -298,7 +298,7 @@ createSession(agentId, options.workspace, claudeCmd, {
 function hookAlreadyConfigured(settings: any): boolean {
   const postToolUse = settings?.hooks?.PostToolUse || [];
   return postToolUse.some((h: any) =>
-    h.command?.includes('panopticon') ||
+    h.command?.includes('overdeck') ||
     h.command?.includes('heartbeat-hook')
   );
 }
@@ -318,7 +318,7 @@ None - all decisions captured above.
 
 ## References
 
-- PRD: `/home/eltmon/projects/panopticon/docs/PRD-CLOISTER.md` (Phase 3: Active Heartbeats & Hooks)
-- Claude Code Runtime: `/home/eltmon/projects/panopticon/src/lib/runtimes/claude-code.ts`
-- Agent spawning: `/home/eltmon/projects/panopticon/src/lib/agents.ts`
+- PRD: `/home/eltmon/projects/overdeck/docs/PRD-CLOISTER.md` (Phase 3: Active Heartbeats & Hooks)
+- Claude Code Runtime: `/home/eltmon/projects/overdeck/src/lib/runtimes/claude-code.ts`
+- Agent spawning: `/home/eltmon/projects/overdeck/src/lib/agents.ts`
 - GitHub Issue: https://github.com/eltmon/overdeck/issues/30

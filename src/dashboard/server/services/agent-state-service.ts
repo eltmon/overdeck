@@ -84,7 +84,7 @@ export interface AgentStateServiceShape {
 export class AgentStateService extends Context.Service<
   AgentStateService,
   AgentStateServiceShape
->()('panopticon/dashboard/AgentStateService') {}
+>()('overdeck/dashboard/AgentStateService') {}
 
 // ─── Live implementation ──────────────────────────────────────────────────────
 

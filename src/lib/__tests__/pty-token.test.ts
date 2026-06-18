@@ -52,6 +52,6 @@ describe('pty-token', () => {
   });
 
   it('exports a distinct PTY token header', () => {
-    expect(PTY_TOKEN_HEADER).toBe('x-panopticon-pty-token');
+    expect(PTY_TOKEN_HEADER).toBe('x-overdeck-pty-token');
   });
 });

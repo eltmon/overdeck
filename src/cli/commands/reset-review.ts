@@ -44,7 +44,7 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
 
     if (options.session) {
       // Non-destructive: clears only the resume pointers (session.id / sessions.json)
-      // under ~/.panopticon/agents/<id>/ so the next start opens a fresh Claude
+      // under ~/.overdeck/agents/<id>/ so the next start opens a fresh Claude
       // session. The JSONL transcript history is NEVER touched — that is the truly
       // sacred artifact, and resetSessionCommand does not delete it. Also refuses
       // while the agent is running. Re-enabled after bf77f0194 hard-blocked this and

@@ -208,8 +208,8 @@ vi.mock('../no-resume-mode.js', () => ({
 }));
 
 vi.mock('../../../lib/paths.js', () => ({
-  getOverdeckHome: () => '/tmp/test-panopticon',
-  OVERDECK_HOME: '/tmp/test-panopticon',
+  getOverdeckHome: () => '/tmp/test-overdeck',
+  OVERDECK_HOME: '/tmp/test-overdeck',
   AGENTS_DIR: '/tmp/test-agents',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',

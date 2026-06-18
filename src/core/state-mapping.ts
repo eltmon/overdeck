@@ -165,7 +165,7 @@ export const DEFAULT_STATE_MAPPINGS: StateMappingConfig = {
 // Virtual state tracking for issues
 export interface OverdeckIssueState {
   issueId: string;
-  panopticonState: CanonicalState;
+  overdeckState: CanonicalState;
   trackerState: string;
   lastSyncedAt: string;
   syncStatus: 'synced' | 'pending' | 'conflict';
@@ -175,7 +175,7 @@ export interface OverdeckIssueState {
 // State transition result
 export interface StateTransitionResult {
   success: boolean;
-  panopticonState: CanonicalState;
+  overdeckState: CanonicalState;
   trackerState: string;
   fallbacksUsed: string[];
   warnings: string[];

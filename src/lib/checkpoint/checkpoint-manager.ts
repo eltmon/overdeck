@@ -37,7 +37,7 @@ function assertSafeAgentId(agentId: string): void {
   }
 }
 const CHECKPOINT_AUTHOR_NAME = 'Overdeck'
-const CHECKPOINT_AUTHOR_EMAIL = 'panopticon@users.noreply.github.com'
+const CHECKPOINT_AUTHOR_EMAIL = 'overdeck@users.noreply.github.com'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 all-up
 beads
 beads-completion-check
-beads-panopticon-guide
+beads-overdeck-guide
 benchmark
 bug-fix
 check-merged

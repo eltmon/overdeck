@@ -2,10 +2,10 @@
 name: pan-quickstart
 description: Quick start guide combining installation, setup, and first workspace
 triggers:
-  - quick start panopticon
-  - panopticon quickstart
-  - get started with panopticon
-  - panopticon tutorial
+  - quick start overdeck
+  - overdeck quickstart
+  - get started with overdeck
+  - overdeck tutorial
 allowed-tools:
   - Bash
   - Read
@@ -87,13 +87,13 @@ pan doctor
 pan init
 ```
 
-This creates `~/.panopticon.env`.
+This creates `~/.overdeck.env`.
 
 #### Configure Issue Tracker
 
 **Using Linear** (recommended):
 ```bash
-# Edit ~/.panopticon.env and add:
+# Edit ~/.overdeck.env and add:
 LINEAR_API_KEY=lin_api_xxxxxxxxxxxxxxxxxxxxx
 LINEAR_TEAM_ID=your-team-id
 ```
@@ -105,7 +105,7 @@ Get your Linear API key:
 
 **Using GitHub**:
 ```bash
-# Edit ~/.panopticon.env and add:
+# Edit ~/.overdeck.env and add:
 GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxx
 GITHUB_OWNER=your-username-or-org
 GITHUB_REPO=your-repo-name
@@ -118,7 +118,7 @@ Get your GitHub token:
 
 **Using GitLab**:
 ```bash
-# Edit ~/.panopticon.env and add:
+# Edit ~/.overdeck.env and add:
 GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxxx
 GITLAB_PROJECT_ID=12345678
 ```
@@ -254,7 +254,7 @@ pan init
 pan doctor
 
 # 5. Configure tracker (manual step - prompt user)
-echo "Please configure your issue tracker in ~/.panopticon.env"
+echo "Please configure your issue tracker in ~/.overdeck.env"
 echo "Add LINEAR_API_KEY or GITHUB_TOKEN"
 read -p "Press enter when done..."
 
@@ -328,7 +328,7 @@ DASHBOARD_PORT=4001 API_PORT=4002 pan up
 **Solution:**
 ```bash
 # Verify API key is set
-cat ~/.panopticon.env | grep API_KEY
+cat ~/.overdeck.env | grep API_KEY
 
 # Test connection manually
 # For Linear:
@@ -351,7 +351,7 @@ which tmux
 tmux list-sessions
 
 # Check for error logs
-cat ~/.panopticon/logs/agent-*.log
+cat ~/.overdeck/logs/agent-*.log
 ```
 
 ## What You've Accomplished
@@ -393,7 +393,7 @@ If you get stuck at any step:
 pan doctor
 
 # View detailed logs
-cat ~/.panopticon/logs/panopticon.log
+cat ~/.overdeck/logs/overdeck.log
 
 # Check dashboard logs
 cd overdeck/src/dashboard

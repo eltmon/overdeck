@@ -2,7 +2,7 @@
 name: pan-status
 description: "pan status — show running agents overview and system health"
 triggers:
-  - panopticon status
+  - overdeck status
   - check agents
   - show running agents
   - pan status
@@ -88,21 +88,21 @@ Running Agents (3):
 PAN-3: Feature - Add user authentication
   Status: running
   Uptime: 2h 15m
-  Workspace: ~/panopticon/workspaces/feature-pan-3
+  Workspace: ~/overdeck/workspaces/feature-pan-3
   Session: agent-PAN-3
   Activity: Writing tests (2 minutes ago)
 
 PAN-5: Bug - Fix login redirect
   Status: idle
   Uptime: 45m
-  Workspace: ~/panopticon/workspaces/bug-pan-5
+  Workspace: ~/overdeck/workspaces/bug-pan-5
   Session: agent-PAN-5
   Activity: Waiting for user input (10 minutes ago)
 
 PAN-7: Refactor - Simplify API layer
   Status: running
   Uptime: 3h 30m
-  Workspace: ~/panopticon/workspaces/refactor-pan-7
+  Workspace: ~/overdeck/workspaces/refactor-pan-7
   Session: agent-PAN-7
   Activity: Running tests (just now)
 ```
@@ -172,7 +172,7 @@ Overdeck System Health
 ✓ Docker Compose v2.20.2
 ✓ tmux 3.3a
 ✓ Git 2.40.1
-✓ Configuration file exists (~/.panopticon.env)
+✓ Configuration file exists (~/.overdeck.env)
 ✓ Linear API connected
 ✓ Dashboard running (http://localhost:3001)
 ✓ API server running (http://localhost:3002)
@@ -208,7 +208,7 @@ curl http://localhost:3002/api/health
 docker ps | grep traefik
 
 # Check workspace containers
-docker ps | grep panopticon
+docker ps | grep overdeck
 ```
 
 ### Check Resource Usage
@@ -221,7 +221,7 @@ pan status --context
 docker stats
 
 # Check disk usage
-df -h ~/panopticon/workspaces/
+df -h ~/overdeck/workspaces/
 
 # Check memory usage
 free -h
@@ -302,7 +302,7 @@ tmux list-sessions
 tmux list-sessions | grep agent
 
 # If sessions exist but not showing, check:
-cat ~/.panopticon/agents/*.json
+cat ~/.overdeck/agents/*.json
 
 # Restart status tracking
 pan down && pan up
@@ -315,7 +315,7 @@ pan down && pan up
 **Solutions:**
 ```bash
 # Check agent logs
-cat ~/.panopticon/logs/agent-<id>.log
+cat ~/.overdeck/logs/agent-<id>.log
 
 # Try to recover
 pan recover <id>
@@ -341,7 +341,7 @@ docker ps -a | grep <workspace-id>
 pan workspace list --refresh
 
 # Manually check workspace directory
-ls ~/panopticon/workspaces/<workspace-id>/
+ls ~/overdeck/workspaces/<workspace-id>/
 ```
 
 ### `pan doctor` shows errors
@@ -371,7 +371,7 @@ lsof -i :3001  # Check if port is in use
 **Tracker not connected:**
 ```bash
 # Check API key in config
-cat ~/.panopticon.env | grep API_KEY
+cat ~/.overdeck.env | grep API_KEY
 
 # Test connection manually
 curl -X POST https://api.linear.app/graphql \
@@ -405,7 +405,7 @@ echo ""
 
 echo "Resources:"
 echo "Memory: $(free -h | grep Mem | awk '{print $3 "/" $2}')"
-echo "Disk: $(df -h ~/panopticon/workspaces/ | tail -1 | awk '{print $3 "/" $2 " (" $5 " used)"}')"
+echo "Disk: $(df -h ~/overdeck/workspaces/ | tail -1 | awk '{print $3 "/" $2 " (" $5 " used)"}')"
 ```
 
 Run with:
@@ -438,8 +438,8 @@ Regular health check checklist:
 - [ ] Run `pan doctor` - verify system health
 - [ ] Check dashboard at http://localhost:3001
 - [ ] Review `pan review pending` for completed work
-- [ ] Check disk usage: `df -h ~/panopticon/workspaces/`
-- [ ] Review logs for errors: `grep ERROR ~/.panopticon/logs/*.log`
+- [ ] Check disk usage: `df -h ~/overdeck/workspaces/`
+- [ ] Review logs for errors: `grep ERROR ~/.overdeck/logs/*.log`
 - [ ] Check Docker containers: `docker ps`
 - [ ] Monitor resource usage: `docker stats` or `htop`
 

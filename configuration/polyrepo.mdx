@@ -236,7 +236,7 @@ services:
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ~/.panopticon/traefik/certs:/certs:ro
+      - ~/.overdeck/traefik/certs:/certs:ro
     command:
       - --providers.docker=true
       - --entrypoints.web.address=:80
@@ -295,7 +295,7 @@ your-project/
 For a simple monorepo with no Docker:
 
 ```yaml
-# ~/.panopticon/projects.yaml
+# ~/.overdeck/projects.yaml
 projects:
   simple-app:
     name: "Simple App"

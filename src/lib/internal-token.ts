@@ -26,7 +26,7 @@ import { Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 import { FsError } from './errors.js';
 
-export const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token';
+export const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token';
 const TOKEN_FILE_NAME = 'internal-token';
 
 let cachedToken: string | null | undefined;
@@ -116,7 +116,7 @@ export const getInternalToken = (): Effect.Effect<string | null, never> =>
 
 /**
  * Effect-native variant of ensureInternalToken. Fails with FsError if the
- * panopticon home directory or token file cannot be written.
+ * overdeck home directory or token file cannot be written.
  */
 export const ensureInternalToken = (): Effect.Effect<string, FsError> =>
   Effect.try({

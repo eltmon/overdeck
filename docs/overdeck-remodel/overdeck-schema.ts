@@ -107,7 +107,7 @@ export const conversations = sqliteTable("conversations", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   archivedAt: integer("archived_at", { mode: "timestamp" }),
   // lineage edges (self-references) — handoff/clear create NEW conversations:
-  handoffDocPath: text("handoff_doc_path"),                      // → ~/.panopticon/handoffs/ (not git)
+  handoffDocPath: text("handoff_doc_path"),                      // → ~/.overdeck/handoffs/ (not git)
   handoffTargetConvId: text("handoff_target_conv_id").references((): AnySQLiteColumn => conversations.id),
   clearedToConvId: text("cleared_to_conv_id").references((): AnySQLiteColumn => conversations.id),
 }, (t) => [index("conversations_issue_idx").on(t.issueId)]);
@@ -165,7 +165,7 @@ export const transcripts = sqliteTable("transcripts", {
 // migration (Drizzle does not model FTS5 natively). Optional; pure cache.
 
 /* ───────────────────────────── COST ────────────────────────────────
- * Pure cache, rebuilt from a union of sacred transcripts + ~/.panopticon cost
+ * Pure cache, rebuilt from a union of sacred transcripts + ~/.overdeck cost
  * archives. 14 NEED cols (5 zero-populated tldr_ / caveman dropped). `cost` is
  * recomputed from tokens on rebuild (stored USD has a legacy bug). The durable
  * per-issue TOTAL lives in the git record's closeOut, not here.
@@ -380,7 +380,7 @@ export const reviewRunAgents = sqliteTable("review_run_agents", {
 }, (t) => [index("review_run_agents_run_idx").on(t.runId)]);
 
 /* ───────────────────────────── MEMORY ──────────────────────────────
- * Memory's real records are FILES on disk (~/.panopticon/memory/...). Its only
+ * Memory's real records are FILES on disk (~/.overdeck/memory/...). Its only
  * panopticon.db table is this pure-cache dedup cursor + claim-lease. 11 NEED
  * cols (last_observation_at dropped — zero reads). Keys on the raw sessionId
  * string (no FK — deliberate independence).
@@ -484,7 +484,7 @@ export const statusHistory = sqliteTable("status_history", {
  *   discovered_session_* satellites, processed_sessions, and the duplicate
  *   CREATE TABLE agents block.
  * NOT in overdeck.db (live elsewhere): the sacred session files (disk),
- *   memory observation files (~/.panopticon/memory), cache.db, the cost
+ *   memory observation files (~/.overdeck/memory), cache.db, the cost
  *   events.jsonl archive, the git .pan/records. memory-search.db is also a
  *   separate per-project DB (not overdeck.db); its reset_markers /
  *   observation_index tables are MODELED above (MEMORY SEARCH STORE section)

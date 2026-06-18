@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/notification-hook  (PAN-800)
+# ~/.overdeck/bin/notification-hook  (PAN-800)
 #
 # Fires on Claude Code Notification events. If the notification looks like a
 # permission prompt or a request for human input, emits
@@ -31,7 +31,7 @@ fi
 TS=$(date -Iseconds)
 
 # Log the raw notification for forensics. Kept at 500 entries.
-LOG_DIR="$HOME/.panopticon/logs"
+LOG_DIR="$HOME/.overdeck/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null
 LOG_FILE="$LOG_DIR/notifications.jsonl"
 if [ "$HAVE_JQ" = "1" ]; then

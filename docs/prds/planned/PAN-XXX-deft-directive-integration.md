@@ -154,13 +154,13 @@ vbrief/
 
 After existing prereq checks (Node 22, Docker, tmux, Git), `pan install` adds:
 
-1. **Clone Deft** — `git clone https://github.com/deftai/directive.git` into `<project>/deft/` (or shared cache at `~/.panopticon/deft/`)
+1. **Clone Deft** — `git clone https://github.com/deftai/directive.git` into `<project>/deft/` (or shared cache at `~/.overdeck/deft/`)
 2. **Write AGENTS.md** — Deft's agent entry point, wired into project root (idempotent)
 3. **Generate USER.md** — Once globally, at `~/.config/deft/USER.md`. Captures: depth preference (technical/middle/non-technical), strategy, coverage target, custom rules. Overdeck runs the interview; Deft's setup skill doesn't need to.
 4. **Generate PROJECT-DEFINITION.vbrief.json** — Per-project. Inferred from build files (package.json, go.mod, etc.) + `projects.yaml`. Captures: project name, type, languages, tech stack, coverage target, branching policy, project-specific rules.
 5. **Create `vbrief/` folders** — 5 lifecycle subdirectories
 6. **Install git hooks** — `git config core.hooksPath .githooks` (idempotent, from Deft's `task setup`)
-7. **Sync Deft skills** — Copy `deft/skills/*/SKILL.md` into `~/.panopticon/skills/` with `deft-` prefix (avoids namespace collision with Overdeck skills)
+7. **Sync Deft skills** — Copy `deft/skills/*/SKILL.md` into `~/.overdeck/skills/` with `deft-` prefix (avoids namespace collision with Overdeck skills)
 8. **Add Taskfile.yml** — Include Deft's Taskfile in project root for `task check`, `task scope:*`, etc.
 
 **Skip with**: `pan install --no-deft`

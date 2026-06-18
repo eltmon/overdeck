@@ -438,7 +438,7 @@ export async function runTtsDaemonRestart(
 export async function runTtsInstallSystemd(deps: TtsDaemonCommandDeps = {}): Promise<string> {
   const unitPath = await runPromiseOrProgram((deps.installSystemdUnit ?? installTtsSystemdUnitDefault)());
   (deps.stdout ?? console).log(chalk.green(`✓ Installed systemd user unit at ${unitPath}`));
-  (deps.stdout ?? console).log('Enable it with: systemctl --user enable --now panopticon-qwen-tts.service');
+  (deps.stdout ?? console).log('Enable it with: systemctl --user enable --now overdeck-qwen-tts.service');
   return unitPath;
 }
 

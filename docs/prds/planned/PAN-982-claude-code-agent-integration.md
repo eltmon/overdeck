@@ -195,28 +195,28 @@ hooks:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "/home/eltmon/.panopticon/bin/pre-tool-hook"
+          command: "/home/eltmon/.overdeck/bin/pre-tool-hook"
     - matcher: "Read"
       hooks:
         - type: command
-          command: "/home/eltmon/.panopticon/bin/tldr-read-enforcer"
+          command: "/home/eltmon/.overdeck/bin/tldr-read-enforcer"
   PostToolUse:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "/home/eltmon/.panopticon/bin/heartbeat-hook"
+          command: "/home/eltmon/.overdeck/bin/heartbeat-hook"
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "/home/eltmon/.panopticon/bin/inspect-on-bead-close"
+          command: "/home/eltmon/.overdeck/bin/inspect-on-bead-close"
     - matcher: "Edit|Write"
       hooks:
         - type: command
-          command: "/home/eltmon/.panopticon/bin/tldr-post-edit"
+          command: "/home/eltmon/.overdeck/bin/tldr-post-edit"
   Stop:
     - hooks:
         - type: command
-          command: "/home/eltmon/.panopticon/bin/stop-hook"
+          command: "/home/eltmon/.overdeck/bin/stop-hook"
 ---
 
 You are a Overdeck work agent...
@@ -326,7 +326,7 @@ pan plan draft PAN-999
 
 - **tmux session management** — `createSessionAsync()` still creates tmux sessions
 - **Message delivery** — `sendKeysAsync()` load-buffer/paste-buffer pattern unchanged
-- **Agent state tracking** — `~/.panopticon/agents/<id>/` state files unchanged
+- **Agent state tracking** — `~/.overdeck/agents/<id>/` state files unchanged
 - **Ready signal polling** — 30s timeout polling for Claude prompt unchanged
 - **Prompt file delivery** — `$prompt` variable from file read unchanged
 - **Hook FPP system** — `hook.json` pending work queue unchanged
@@ -339,7 +339,7 @@ pan plan draft PAN-999
 |------|--------|------------|
 | Per-agent hooks fire for user sessions too | User's ad-hoc `claude` sessions in workspace would trigger Overdeck hooks defined in agent .md files | `pan-*` prefix means user won't accidentally use `--agent pan-work-agent`. Hooks only fire when that specific agent is active. |
 | `--agent` + `--resume` behavior changes in future Claude Code versions | Migration depends on agent config applying to resumed sessions | Pin minimum Claude Code version in `pan doctor` checks. Test in CI. |
-| Agent definition files pollute `claude agents` listing | Users see 7+ Overdeck agents alongside their own | `pan-` prefix makes them visually distinct. Consider `~/.panopticon/agents/` as alternate location if Claude Code adds user-dir agent discovery. |
+| Agent definition files pollute `claude agents` listing | Users see 7+ Overdeck agents alongside their own | `pan-` prefix makes them visually distinct. Consider `~/.overdeck/agents/` as alternate location if Claude Code adds user-dir agent discovery. |
 | Non-Anthropic models need both `--agent` AND `--model` | Dual-flag complexity | Only applies to ~20% of spawns (Kimi, CLIProxy). Document clearly. |
 | Hook deduplication between global and per-agent | If global hooks aren't cleaned up, PreToolUse/PostToolUse fire twice | Phase 3 must remove migrated hooks from global `settings.json` atomically with agent definition deployment. |
 

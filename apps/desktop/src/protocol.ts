@@ -1,12 +1,12 @@
 /**
- * panopticon:// custom protocol for serving static frontend assets in packaged builds.
+ * overdeck:// custom protocol for serving static frontend assets in packaged builds.
  *
  * In dev mode:
  *   BrowserWindow loads from Vite dev server URL (VITE_DEV_SERVER_URL env var).
  *   HMR and source maps work normally.
  *
  * In packaged builds:
- *   BrowserWindow loads panopticon://app/index.html.
+ *   BrowserWindow loads overdeck://app/index.html.
  *   This protocol handler serves files from the bundled dist/dashboard/public/.
  *   WebSocket connections (ws/rpc, ws/terminal) go to the embedded server port
  *   on localhost — the protocol handler only serves static assets.
@@ -75,7 +75,7 @@ export function resolveStaticPath(staticRoot: string, requestUrl: string): strin
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Register the panopticon:// protocol handler.
+ * Register the overdeck:// protocol handler.
  * Must be called after app.ready (but registration via registerSchemesAsPrivileged
  * must happen before app.ready — done in main.ts).
  */

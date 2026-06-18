@@ -23,7 +23,7 @@ describe('StandaloneTerminal', () => {
       configurable: true,
     });
     window.history.replaceState(null, '', '/');
-    delete window.panopticonBridge;
+    delete window.overdeckBridge;
   });
 
   it('renders the terminal for the requested session', () => {
@@ -46,7 +46,7 @@ describe('StandaloneTerminal', () => {
   it('toggles always-on-top through the desktop bridge', async () => {
     const user = userEvent.setup();
     const setAlwaysOnTop = vi.fn();
-    window.panopticonBridge = {
+    window.overdeckBridge = {
       isDesktopApp: () => true,
       setAlwaysOnTop,
     } as unknown as OverdeckBridge;

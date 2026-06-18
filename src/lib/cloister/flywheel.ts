@@ -82,8 +82,8 @@ Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Overdec
 }
 
 function getLocalFlywheelRunDir(runId: string): string {
-  const panopticonHome = process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
-  return join(panopticonHome, 'flywheel', 'runs', runId);
+  const overdeckHome = process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
+  return join(overdeckHome, 'flywheel', 'runs', runId);
 }
 
 export async function saveResumeSessionId(runId: string, sessionId: string): Promise<void> {

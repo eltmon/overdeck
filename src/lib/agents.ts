@@ -215,7 +215,7 @@ function getCodexLauncherFields(agentId: string, model: string, workspacePath?: 
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
   // PAN-1803: codex work agents must inherit the user's configured codex
   // permission level (Settings → Permissions → Codex) and pre-trust the
   // workspace, EXACTLY like the conversation path
@@ -467,7 +467,7 @@ export async function getAgentRuntimeBaseCommand(
   // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
   // in config), --dangerously-skip-permissions is added on top of --agent. The agent
   // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
-  // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
+  // cross-directory reads (e.g. ~/.overdeck/cliproxy/, ~/pan-tts/) still prompt without
   // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
   // resolved.
   const bypassWithAgent = agentDefinition ? bypassPrefixForAgentFlagSync() : '';
@@ -654,7 +654,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
 
   if (provider.name === 'google') {
     if (!apiKey) {
-      throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
+      throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.overdeck.env before using model "${model}".`);
     }
 
     if (!await Effect.runPromise(bridgeGeminiAuthToCliproxy(apiKey))) {
@@ -1389,14 +1389,14 @@ export async function setAgentDeliveryMethod(
 }
 
 /**
- * Resolve OVERDECK_HOME — same fallback semantics as panopticon-bridge.
+ * Resolve OVERDECK_HOME — same fallback semantics as overdeck-bridge.
  */
-function panopticonHomeForSockets(): string {
-  return process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
+function overdeckHomeForSockets(): string {
+  return process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
 }
 
-function panopticonHomeForChannels(): string {
-  return panopticonHomeForSockets();
+function overdeckHomeForChannels(): string {
+  return overdeckHomeForSockets();
 }
 
 /**
@@ -1413,7 +1413,7 @@ async function appendChannelDeliveryLog(
   },
 ): Promise<void> {
   try {
-    const home = panopticonHomeForSockets();
+    const home = overdeckHomeForSockets();
     const dir = join(home, 'logs');
     await (await import('fs/promises')).mkdir(dir, { recursive: true });
     const line = JSON.stringify({
@@ -1542,7 +1542,7 @@ export async function deliverAgentMessage(
 
   let supervisorFailure: string | undefined;
   if (resolvedMethod === 'auto' || resolvedMethod === 'supervisor') {
-    const supervisorSocketPath = join(panopticonHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
+    const supervisorSocketPath = join(overdeckHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
     const ptyToken = await readPtyToken(normalizedId);
     if (!existsSync(supervisorSocketPath)) {
       supervisorFailure = 'socket-missing';
@@ -1577,7 +1577,7 @@ export async function deliverAgentMessage(
 
   if (resolvedMethod === 'auto' || resolvedMethod === 'channels') {
     let channelFailure: string | undefined;
-    const socketPath = join(panopticonHomeForSockets(), 'sockets', `agent-${normalizedId}.sock`);
+    const socketPath = join(overdeckHomeForSockets(), 'sockets', `agent-${normalizedId}.sock`);
     if (!channelsEnabled) {
       channelFailure = 'channels-disabled';
     } else if (!existsSync(socketPath)) {
@@ -1840,7 +1840,7 @@ export async function deliverAgentPermissionDecision(
     throw new Error(`agent ${normalizedId} is not using Claude channels`);
   }
 
-  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  const socketPath = join(overdeckHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
   if (!existsSync(socketPath)) {
     throw new Error(`bridge socket missing for ${normalizedId}`);
   }
@@ -2043,7 +2043,7 @@ export function decideChannelsForWorkAgent(
 }
 
 /**
- * Write the per-agent MCP config that points claude at the panopticon-bridge
+ * Write the per-agent MCP config that points claude at the overdeck-bridge
  * stdio server. The path is the workspace-local <workspace>/.pan/agent-mcp.json
  * — one config per agent, never shared, never reused.
  */
@@ -2060,15 +2060,15 @@ export async function writeChannelsBridgeMcpConfig(
   // script into the bundle output.
   const here = dirname(import.meta.url.replace('file://', ''));
   const projectRoot = join(here, '..', '..');
-  const repoBridgePath = join(projectRoot, 'src', 'lib', 'channels', 'panopticon-bridge.ts');
+  const repoBridgePath = join(projectRoot, 'src', 'lib', 'channels', 'overdeck-bridge.ts');
   const mcpConfig = {
     mcpServers: {
-      'panopticon-bridge': {
+      'overdeck-bridge': {
         command: 'bun',
         args: ['run', repoBridgePath],
         env: {
           OVERDECK_AGENT_ID: agentId,
-          OVERDECK_HOME: process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon'),
+          OVERDECK_HOME: process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck'),
         },
       },
     },
@@ -2816,7 +2816,7 @@ export async function buildAgentLaunchConfig(opts: {
   isPlanning?: boolean;
   /** Per-agent .mcp.json path for the experimental Channels bridge. */
   channelsBridgeMcpConfig?: string;
-  /** MCP server name to load as a Channel; defaults to 'panopticon-bridge'. */
+  /** MCP server name to load as a Channel; defaults to 'overdeck-bridge'. */
   channelsBridgeServerName?: string;
   useSupervisor?: boolean;
   supervisorScriptPath?: string;
@@ -2839,7 +2839,7 @@ export async function buildAgentLaunchConfig(opts: {
   const model = requireModelOverrideSync(opts.model);
 
   // Substrate guard: inject permission deny rules for Overdeck infrastructure
-  // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
+  // paths (.claude/agents/, .claude/hooks/, ~/.overdeck/, JSONL session dirs)
   // into the workspace's .claude/settings.local.json. Idempotent. Without this
   // a vBRIEF action like "delete the legacy pan-*-agent.md files" can convince
   // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
@@ -2885,7 +2885,7 @@ export async function buildAgentLaunchConfig(opts: {
     // The frontmatter's permissionMode: bypassPermissions only bypasses prompts
     // INSIDE cwd. Tools that touch siblings of cwd (e.g. bd reading
     // .beads/issues.jsonl through git subprocesses, pan reading
-    // ~/.panopticon/...) still hit "Do you want to proceed?" without DSP.
+    // ~/.overdeck/...) still hit "Do you want to proceed?" without DSP.
     // Mid-Bash dialog dismissals (deacon nudge, paste-buffer write, sibling
     // hook output) cancel the in-flight tool call and surface as
     // `Interrupted · What should Claude do instead?` (PAN-1024 reproduced
@@ -2961,7 +2961,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
-          channelsBridgeServerName: opts.channelsBridgeServerName ?? 'panopticon-bridge',
+          channelsBridgeServerName: opts.channelsBridgeServerName ?? 'overdeck-bridge',
         }
       : {}),
   });
@@ -3388,7 +3388,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     promptFileMode: undefined,
-    panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
+    overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
@@ -3821,7 +3821,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
   // fallback covers sessions whose first turn lands after this window.
   if (resolvedHarness === 'codex') {
-    const codexHomeForAgent = join(homedir(), '.panopticon', 'agents', agentId, 'codex-home');
+    const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
     void (async () => {
       try {
         const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
@@ -3861,7 +3861,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 }
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
-  // Match liveness against ALL panopticon-socket sessions, not just `agent-*`.
+  // Match liveness against ALL overdeck-socket sessions, not just `agent-*`.
   // Agent state dirs are named by role prefix (planning-/agent-/conv-/strike-);
   // getAgentSessions only returns `agent-*`, so planning/conv/strike sessions
   // would always read tmuxActive:false and get dropped by the enrichment poller.
@@ -3880,7 +3880,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
 
 /**
  * PAN-1908: list all agents in the SQLite registry with optional filtering.
- * This is the replacement for enumerating ~/.panopticon/agents/ directories.
+ * This is the replacement for enumerating ~/.overdeck/agents/ directories.
  */
 export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
   return listOverdeckAgentStatesSync()
@@ -3897,13 +3897,13 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
     //
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
-    // session on the `panopticon` socket. Run this from a one-off `tsx -e`/CLI
+    // session on the `overdeck` socket. Run this from a one-off `tsx -e`/CLI
     // process that lacks access to that socket and `listSessions()` returns
     // empty, so EVERY agent comes back `tmuxActive: false` — including ones that
     // are genuinely running. Do not conclude "the agent isn't running" / "the
     // enrichment poller skips it" from an out-of-server-process reading. Trust
     // the live dashboard server's view (it owns the socket) or check the tmux
-    // session directly with `tmux -L panopticon list-sessions`.
+    // session directly with `tmux -L overdeck list-sessions`.
     //
     // Use the UNFILTERED session list (not getAgentSessions, which is `agent-*`
     // only): agent state dirs carry role prefixes (planning-/agent-/conv-/strike-),
@@ -3985,7 +3985,7 @@ async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
 }
 
 /**
- * Scan ~/.panopticon/agents/ for state files with bare numeric issueIds
+ * Scan ~/.overdeck/agents/ for state files with bare numeric issueIds
  * (e.g. "484" instead of "PAN-484") and log warnings to stderr.
  *
  * These workspaces were created before the pan- prefix convention and may
@@ -4039,7 +4039,7 @@ export async function warnOnBareNumericIssueIds(): Promise<void> {
       `[agents] WARNING: ${legacy.length} agent state file(s) have bare numeric issueIds ` +
       `(created before the pan- prefix convention). These agents will not be able to ` +
       `transition tracker state. Consider removing or updating them:\n` +
-      legacy.map(l => `  ~/.panopticon/agents/${l}`).join('\n')
+      legacy.map(l => `  ~/.overdeck/agents/${l}`).join('\n')
     );
   }
 }
@@ -5340,7 +5340,7 @@ export async function autoRecoverAgents(): Promise<{ recovered: string[]; failed
  */
 function checkAndSetupHooks(): void {
   const settingsPath = join(homedir(), '.claude', 'settings.json');
-  const hookPath = join(homedir(), '.panopticon', 'bin', 'heartbeat-hook');
+  const hookPath = join(homedir(), '.overdeck', 'bin', 'heartbeat-hook');
 
   // Check if settings.json exists and has heartbeat hook configured
   if (existsSync(settingsPath)) {
@@ -5352,7 +5352,7 @@ function checkAndSetupHooks(): void {
       const hookConfigured = postToolUse.some((hookConfig: any) =>
         hookConfig.hooks?.some((hook: any) =>
           hook.command === hookPath ||
-          hook.command?.includes('panopticon') ||
+          hook.command?.includes('overdeck') ||
           hook.command?.includes('heartbeat-hook')
         )
       );

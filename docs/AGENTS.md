@@ -1,6 +1,6 @@
 # Agent Directory Structure
 
-Overdeck stores per-agent and per-role-run state under `~/.panopticon/agents/`. Each active run gets its own directory named after the run ID.
+Overdeck stores per-agent and per-role-run state under `~/.overdeck/agents/`. Each active run gets its own directory named after the run ID.
 
 ## Valid Directory Naming Patterns
 
@@ -54,7 +54,7 @@ designed, and Pi keeps using its `rpc.in` FIFO.
 The legacy Claude Code Channels MCP bridge is opt-in for new work-agent spawns
 through `experimental.claudeCodeChannelsMcp: true`; when enabled,
 `spawnAgent()` writes `<workspace>/.pan/agent-mcp.json`, a bridge token under
-`~/.panopticon/bridge-tokens/`, and `state.channelsEnabled = true`. Existing
+`~/.overdeck/bridge-tokens/`, and `state.channelsEnabled = true`. Existing
 agents with `channelsEnabled = true` continue to use Channels as the delivery
 fallback even when the MCP override is later disabled.
 
@@ -76,7 +76,7 @@ Older naming conventions that are no longer created include:
 
 Run `pan sync` to clean up orphaned legacy directories. The cleanup step:
 
-1. Scans `~/.panopticon/agents/`
+1. Scans `~/.overdeck/agents/`
 2. Identifies directories that do not match the current naming patterns
 3. Skips directories with a running tmux session (never kills active agents)
 4. Prompts for confirmation before deletion (use `--force` to skip the prompt)

@@ -36,7 +36,7 @@
           "issueLabel": "pan-451"
         },
         "narrative": {
-          "Action": "Add ChatMessage, WorkLogEntry, TimelineEntry, MessagesTimelineRow, and ConversationEvent types to @panopticon/contracts or frontend types.ts. Mirror T3Code's type shapes exactly: ChatMessage with id/role/text/attachments/turnId/createdAt/completedAt/streaming, WorkLogEntry with id/createdAt/label/detail/command/changedFiles/tone/toolTitle, TimelineEntry as discriminated union (message|work|working)."
+          "Action": "Add ChatMessage, WorkLogEntry, TimelineEntry, MessagesTimelineRow, and ConversationEvent types to @overdeck/contracts or frontend types.ts. Mirror T3Code's type shapes exactly: ChatMessage with id/role/text/attachments/turnId/createdAt/completedAt/streaming, WorkLogEntry with id/createdAt/label/detail/command/changedFiles/tone/toolTitle, TimelineEntry as discriminated union (message|work|working)."
         },
         "subItems": [
           {

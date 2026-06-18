@@ -2,7 +2,7 @@
  * Unit tests for resolveStaticPath (protocol.ts).
  *
  * resolveStaticPath is security-critical: it prevents path-traversal attacks
- * when serving static assets via the panopticon:// custom protocol.
+ * when serving static assets via the overdeck:// custom protocol.
  *
  * Mocks 'electron' and './main.js' so we can test the pure path logic
  * without launching the app.
@@ -23,7 +23,7 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("../src/main.js", () => ({
-  DESKTOP_SCHEME: "panopticon",
+  DESKTOP_SCHEME: "overdeck",
   resolveServerStaticDir: () => "/fake/static",
 }));
 
@@ -58,7 +58,7 @@ describe("resolveStaticPath", () => {
     touch("assets/main.js");
     const result = resolveStaticPath(
       staticRoot,
-      `panopticon://app/assets/main.js`,
+      `overdeck://app/assets/main.js`,
     );
     expect(result).toBe(Path.join(staticRoot, "assets/main.js"));
   });
@@ -66,7 +66,7 @@ describe("resolveStaticPath", () => {
   it("rejects path traversal — returns fallback index.html", () => {
     const result = resolveStaticPath(
       staticRoot,
-      `panopticon://app/../../etc/passwd`,
+      `overdeck://app/../../etc/passwd`,
     );
     expect(result).toBe(Path.join(staticRoot, "index.html"));
   });
@@ -74,25 +74,25 @@ describe("resolveStaticPath", () => {
   it("rejects encoded path traversal (%2F..%2F)", () => {
     const result = resolveStaticPath(
       staticRoot,
-      `panopticon://app/%2F..%2F..%2Fetc%2Fpasswd`,
+      `overdeck://app/%2F..%2F..%2Fetc%2Fpasswd`,
     );
     expect(result).toBe(Path.join(staticRoot, "index.html"));
   });
 
   it("returns index.html for empty path (SPA root)", () => {
-    const result = resolveStaticPath(staticRoot, `panopticon://app/`);
+    const result = resolveStaticPath(staticRoot, `overdeck://app/`);
     expect(result).toBe(Path.join(staticRoot, "index.html"));
   });
 
   it("returns root index.html for unknown SPA route (no extension)", () => {
     // /settings has no file extension and no nested index.html
-    const result = resolveStaticPath(staticRoot, `panopticon://app/settings`);
+    const result = resolveStaticPath(staticRoot, `overdeck://app/settings`);
     expect(result).toBe(Path.join(staticRoot, "index.html"));
   });
 
   it("returns nested index.html when present for SPA subroute", () => {
     touch("subapp/index.html");
-    const result = resolveStaticPath(staticRoot, `panopticon://app/subapp`);
+    const result = resolveStaticPath(staticRoot, `overdeck://app/subapp`);
     expect(result).toBe(Path.join(staticRoot, "subapp/index.html"));
   });
 
@@ -100,7 +100,7 @@ describe("resolveStaticPath", () => {
     // File doesn't exist — protocol handler will return 404; resolver just resolves the path
     const result = resolveStaticPath(
       staticRoot,
-      `panopticon://app/missing.css`,
+      `overdeck://app/missing.css`,
     );
     expect(result).toBe(Path.join(staticRoot, "missing.css"));
     // Must be within staticRoot
@@ -114,7 +114,7 @@ describe("resolveStaticPath", () => {
 
   it("resolves path that looks out-of-root after normalization to fallback", () => {
     // Construct a URL whose resolved path would escape staticRoot
-    const escapeAttempt = `panopticon://app/${encodeURIComponent("../secret")}`;
+    const escapeAttempt = `overdeck://app/${encodeURIComponent("../secret")}`;
     const result = resolveStaticPath(staticRoot, escapeAttempt);
     expect(result).toBe(Path.join(staticRoot, "index.html"));
   });

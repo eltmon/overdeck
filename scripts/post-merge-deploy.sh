@@ -15,11 +15,11 @@ PROJECT_PATH="${3:?PROJECT_PATH required}"
 SOURCE_BRANCH="${4:-}"
 REASON="${5:-post-merge}"
 
-LOG_FILE="/tmp/panopticon-deploy.log"
-LOCK_FILE="/tmp/panopticon-deploy.lock"
+LOG_FILE="/tmp/overdeck-deploy.log"
+LOCK_FILE="/tmp/overdeck-deploy.lock"
 HEALTH_URL="http://localhost:3011/api/health"
 HEALTH_TIMEOUT=30
-RESTART_MARKER="$HOME/.panopticon/dashboard-restarting.json"
+RESTART_MARKER="$HOME/.overdeck/dashboard-restarting.json"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*" | tee -a "$LOG_FILE"
@@ -103,7 +103,7 @@ rm -rf "$BUILD_WT" >> "$LOG_FILE" 2>&1 || true
 BUILD_WT=""
 log "Build complete. Built sha=$BUILT_SHA staged at dist.incoming."
 
-# --- Step 2: Link (makes 'panopticon' CLI available globally) ---
+# --- Step 2: Link (makes 'overdeck' CLI available globally) ---
 log "Running npm link..."
 npm link >> "$LOG_FILE" 2>&1 || log "WARN: npm link failed (non-fatal)"
 

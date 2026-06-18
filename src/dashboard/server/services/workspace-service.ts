@@ -80,7 +80,7 @@ export interface WorkspaceServiceShape {
 export class WorkspaceService extends Context.Service<
   WorkspaceService,
   WorkspaceServiceShape
->()('panopticon/dashboard/WorkspaceService') {}
+>()('overdeck/dashboard/WorkspaceService') {}
 
 // ─── Live layer ───────────────────────────────────────────────────────────────
 

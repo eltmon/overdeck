@@ -36,8 +36,8 @@ export function NoResumeBanner() {
     const refetch = () => {
       void queryClient.invalidateQueries({ queryKey: NO_RESUME_QUERY_KEY });
     };
-    window.addEventListener('panopticon:reconnected', refetch);
-    return () => window.removeEventListener('panopticon:reconnected', refetch);
+    window.addEventListener('overdeck:reconnected', refetch);
+    return () => window.removeEventListener('overdeck:reconnected', refetch);
   }, [queryClient]);
 
   if (data?.active !== true) return null;

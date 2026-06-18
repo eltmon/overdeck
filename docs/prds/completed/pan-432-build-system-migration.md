@@ -35,7 +35,7 @@ await build({
     '@effect/platform-bun/BunRuntime',
   ],
   banner: {
-    js: `import { createRequire as __panopticonCreateRequire } from 'module';\nconst require = __panopticonCreateRequire(import.meta.url);`
+    js: `import { createRequire as __overdeckCreateRequire } from 'module';\nconst require = __overdeckCreateRequire(import.meta.url);`
   },
   footer: {
     js: `var __filename = (await import('url')).fileURLToPath(import.meta.url);\nvar __dirname = (await import('path')).dirname(__filename);`
@@ -176,7 +176,7 @@ export default defineConfig({
   sourcemap: true,
   target: 'node18',
   shims: true,
-  noExternal: ['@panopticon/shared'],
+  noExternal: ['@overdeck/shared'],
   tsconfig: './tsconfig.json',
 });
 ```
@@ -197,14 +197,14 @@ export default defineConfig({
   sourcemap: true,
   target: 'node18',
   shims: true,
-  noExternal: (id) => id.startsWith('@panopticon/'),
+  noExternal: (id) => id.startsWith('@overdeck/'),
   outDir: 'dist',
 });
 ```
 
 **Key differences from tsup:**
 - `format` is a string not array (tsdown accepts both, but string is simpler for single format)
-- `noExternal` uses a function pattern (matching T3Code) to catch all `@panopticon/*` workspace packages
+- `noExternal` uses a function pattern (matching T3Code) to catch all `@overdeck/*` workspace packages
 - `tsconfig` option may not be needed — tsdown resolves `tsconfig.json` automatically
 
 ### Step 8: Update root `package.json`
@@ -241,7 +241,7 @@ node dist/cli/index.js status
 
 ## Part 3: Build contracts package with tsdown
 
-Currently `@panopticon/contracts` is consumed as raw TypeScript — `"main": "./src/index.ts"`. This works but diverges from T3Code's pattern where contracts are precompiled. Adding a tsdown build step produces proper `.mjs` + `.cjs` + `.d.ts` outputs, making the package a proper publishable unit.
+Currently `@overdeck/contracts` is consumed as raw TypeScript — `"main": "./src/index.ts"`. This works but diverges from T3Code's pattern where contracts are precompiled. Adding a tsdown build step produces proper `.mjs` + `.cjs` + `.d.ts` outputs, making the package a proper publishable unit.
 
 ### Step 11: Add tsdown to contracts
 
@@ -302,8 +302,8 @@ Should produce:
 
 1. `npm run build:contracts` succeeds
 2. `dist/index.mjs` and `dist/index.cjs` exist in `packages/contracts/`
-3. Server build still resolves `@panopticon/contracts` correctly
-4. Frontend build still resolves `@panopticon/contracts` correctly
+3. Server build still resolves `@overdeck/contracts` correctly
+4. Frontend build still resolves `@overdeck/contracts` correctly
 5. All tests pass — no import resolution changes
 
 ## Files Changed

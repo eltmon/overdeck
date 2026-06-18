@@ -63,7 +63,7 @@ Transform README.md top section with:
 ### Phase 2: Create 18 .mdx Files
 
 ```
-panopticon/
+overdeck/
 ├── introduction.mdx             # Landing page (enhance existing)
 ├── quickstart.mdx               # NEW
 ├── concepts.mdx                 # NEW
@@ -308,27 +308,27 @@ To maintain dependencies and enable incremental testing:
 **Task dependency chain (automatically enforced via `bd dep`):**
 
 ```
-panopticon-769 (file structure) [READY]
-    ├─> panopticon-7wl (Priority 1 content)
-    ├─> panopticon-92t (Priority 2 content)
-    └─> panopticon-36b (Priority 3 content)
-            └─> panopticon-5yx (docs.json)
-                    └─> panopticon-2hx (verification)
+overdeck-769 (file structure) [READY]
+    ├─> overdeck-7wl (Priority 1 content)
+    ├─> overdeck-92t (Priority 2 content)
+    └─> overdeck-36b (Priority 3 content)
+            └─> overdeck-5yx (docs.json)
+                    └─> overdeck-2hx (verification)
 
-panopticon-say (README polish) [READY, parallel track]
-    └─> panopticon-2hx (verification)
+overdeck-say (README polish) [READY, parallel track]
+    └─> overdeck-2hx (verification)
 ```
 
 **Ready to start (no blockers):**
-- **panopticon-769**: Create directory structure and .mdx file templates (difficulty: simple)
-- **panopticon-say**: Polish README introduction with hero section (difficulty: medium)
+- **overdeck-769**: Create directory structure and .mdx file templates (difficulty: simple)
+- **overdeck-say**: Polish README introduction with hero section (difficulty: medium)
 
 **Blocked tasks (will auto-unblock when dependencies complete):**
-- **panopticon-7wl**: Migrate Priority 1 content (blocked by panopticon-769)
-- **panopticon-92t**: Migrate Priority 2 content (blocked by panopticon-769)
-- **panopticon-36b**: Migrate Priority 3 content (blocked by panopticon-769)
-- **panopticon-5yx**: Update docs.json (blocked by all 3 content migrations)
-- **panopticon-2hx**: Verify local dev server (blocked by docs.json + README polish)
+- **overdeck-7wl**: Migrate Priority 1 content (blocked by overdeck-769)
+- **overdeck-92t**: Migrate Priority 2 content (blocked by overdeck-769)
+- **overdeck-36b**: Migrate Priority 3 content (blocked by overdeck-769)
+- **overdeck-5yx**: Update docs.json (blocked by all 3 content migrations)
+- **overdeck-2hx**: Verify local dev server (blocked by docs.json + README polish)
 
 Use `bd ready` to see which tasks are currently unblocked and ready to work on.
 

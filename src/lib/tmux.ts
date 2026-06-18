@@ -22,7 +22,7 @@ function validateSessionName(name: string): void {
   }
 }
 
-const MANAGED_TMUX_SERVER_UNIT = 'panopticon-tmux-server';
+const MANAGED_TMUX_SERVER_UNIT = 'overdeck-tmux-server';
 const SERVER_ALIVE_POLL_MS = 50;
 const SERVER_ALIVE_TIMEOUT_MS = 5000;
 const MANAGED_TMUX_CONFIG_CONTENT = [
@@ -43,7 +43,7 @@ const MANAGED_TMUX_CONFIG_CONTENT = [
 
 // One-shot guard: the managed tmux context (config file + loaded server) only needs
 // to be prepared once per process. Every tmux subprocess invocation already passes
-// `-L panopticon -f <configPath>`, so after the first source-file the config is live
+// `-L overdeck -f <configPath>`, so after the first source-file the config is live
 // on the shared server for every subsequent command. Re-writing the file and
 // re-sourcing it per call was the root of PAN-785's terminal lag.
 let tmuxContextPrepared = false;
@@ -61,11 +61,11 @@ function getTmuxDir(): string {
 }
 
 export function getManagedTmuxConfigPath(): string {
-  return join(getTmuxDir(), 'panopticon.tmux.conf');
+  return join(getTmuxDir(), 'overdeck.tmux.conf');
 }
 
 export function getManagedTmuxSocketName(): string {
-  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'panopticon';
+  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'overdeck';
 }
 
 function ensureLogDir(): void {
@@ -190,7 +190,7 @@ function warnIfServerCmdlineIsDirtySync(): void {
   const pid = findManagedServerPidSync();
   if (pid === undefined) return;
   const cmdline = readServerCmdlineSync(pid);
-  // A clean dedicated founding looks like `tmux -L panopticon -f ... start-server`.
+  // A clean dedicated founding looks like `tmux -L overdeck -f ... start-server`.
   // Any `new-session` in the server argv means a client founded the server.
   if (!cmdline.includes('new-session')) return;
   console.warn(

@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import { spawnSync } from 'child_process';
 import { Effect } from 'effect';
 
-// Mock homedir so installation goes to a temp dir, not ~/.panopticon
+// Mock homedir so installation goes to a temp dir, not ~/.overdeck
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
   return { ...actual, homedir: vi.fn() };
@@ -33,7 +33,7 @@ function createFakeVendoredFiles() {
   mkdirSync(fakeVendoredDir, { recursive: true });
   mkdirSync(join(fakeVendoredDir, 'skills', 'caveman'), { recursive: true });
   mkdirSync(join(fakeVendoredDir, 'skills', 'caveman-review'), { recursive: true });
-  for (const f of ['caveman-activate.js', 'caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
+  for (const f of ['caveman-activate.js', 'caveman-mode-tracker.js', 'caveman-config.js', 'overdeck-caveman-activate.js']) {
     writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
   }
   writeFileSync(join(fakeVendoredDir, 'caveman-statusline.sh'), 'echo caveman');
@@ -64,14 +64,14 @@ afterEach(() => {
 describe('getCavemanHooksDir', () => {
   it('builds path from homedir', () => {
     const dir = getCavemanHooksDir();
-    expect(dir).toBe(join(fakeHome, '.panopticon', 'hooks', 'caveman'));
+    expect(dir).toBe(join(fakeHome, '.overdeck', 'hooks', 'caveman'));
   });
 });
 
 describe('getCavemanSkillsDir', () => {
   it('builds path from homedir', () => {
     const dir = getCavemanSkillsDir();
-    expect(dir).toBe(join(fakeHome, '.panopticon', 'hooks', 'skills'));
+    expect(dir).toBe(join(fakeHome, '.overdeck', 'hooks', 'skills'));
   });
 });
 
@@ -86,7 +86,7 @@ describe('setupCavemanHooks', () => {
   it('fails with FsNotFoundError when a required JS file is missing', async () => {
     mkdirSync(fakeVendoredDir, { recursive: true });
     // Create all except caveman-activate.js
-    for (const f of ['caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
+    for (const f of ['caveman-mode-tracker.js', 'caveman-config.js', 'overdeck-caveman-activate.js']) {
       writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
     }
     const exit = await Effect.runPromiseExit(setupCavemanHooks());
@@ -95,7 +95,7 @@ describe('setupCavemanHooks', () => {
 
   it('fails with FsNotFoundError when SKILL.md files are missing', async () => {
     mkdirSync(fakeVendoredDir, { recursive: true });
-    for (const f of ['caveman-activate.js', 'caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
+    for (const f of ['caveman-activate.js', 'caveman-mode-tracker.js', 'caveman-config.js', 'overdeck-caveman-activate.js']) {
       writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
     }
     // No skills/ directory — SKILL.md files are missing
@@ -110,7 +110,7 @@ describe('setupCavemanHooks', () => {
     expect(exit._tag).toBe('Success');
 
     const hooksDir = getCavemanHooksDir();
-    expect(existsSync(join(hooksDir, 'panopticon-caveman-activate.js'))).toBe(true);
+    expect(existsSync(join(hooksDir, 'overdeck-caveman-activate.js'))).toBe(true);
     expect(existsSync(join(hooksDir, 'caveman-activate.js'))).toBe(true);
     expect(existsSync(join(hooksDir, 'caveman-statusline.sh'))).toBe(true);
 
@@ -145,7 +145,7 @@ describe('setupCavemanCompressScripts', () => {
     const result = await Effect.runPromise(setupCavemanCompressScripts());
     expect(result).toBe(true);
 
-    const destDir = join(fakeHome, '.panopticon', 'hooks', 'caveman-compress');
+    const destDir = join(fakeHome, '.overdeck', 'hooks', 'caveman-compress');
     for (const f of pyFiles) {
       expect(existsSync(join(destDir, f))).toBe(true);
     }
@@ -157,7 +157,7 @@ describe('setupCavemanCompressScripts', () => {
 // Verifies that the three CJS hook scripts have no syntax errors and that
 // caveman-config.js exports the expected symbols. Uses a temp directory with
 // no package.json so Node treats .js files as CommonJS (matching the actual
-// runtime context in ~/.panopticon/hooks/caveman/ where no package.json exists).
+// runtime context in ~/.overdeck/hooks/caveman/ where no package.json exists).
 
 describe('vendored JS files — syntax and load validation', () => {
   // The caveman source directory relative to this test file.

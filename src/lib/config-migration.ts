@@ -16,13 +16,13 @@ import { type ModelId } from './settings.js';
 import { FsError } from './errors.js';
 
 /** Path to legacy settings file */
-const LEGACY_SETTINGS_PATH = join(homedir(), '.panopticon', 'settings.json');
+const LEGACY_SETTINGS_PATH = join(homedir(), '.overdeck', 'settings.json');
 
 /** Path to new config file */
-const NEW_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
+const NEW_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
 
 /** Path to backup of legacy settings */
-const BACKUP_SETTINGS_PATH = join(homedir(), '.panopticon', 'settings.json.backup');
+const BACKUP_SETTINGS_PATH = join(homedir(), '.overdeck', 'settings.json.backup');
 
 /**
  * Check if migration is needed
@@ -235,7 +235,7 @@ export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
 
             const linkTarget = readlinkSync(entryPath);
             // Only remove symlinks pointing to Overdeck directories
-            if (linkTarget.includes('.panopticon')) {
+            if (linkTarget.includes('.overdeck')) {
               unlinkSync(entryPath);
               cleaned.push(`${name}/${subdir}/${entry}`);
             }
@@ -258,7 +258,7 @@ export function cleanupLegacyRuntimeSymlinksSync(): LegacyCleanupResult {
  * This handles users who had `targets = ["claude", "codex"]` in their config.
  */
 export function migrateSyncTargetsSync(): { migrated: boolean; hadNonClaudeTargets: boolean } {
-  const configPath = join(homedir(), '.panopticon', 'config.toml');
+  const configPath = join(homedir(), '.overdeck', 'config.toml');
 
   if (!existsSync(configPath)) {
     return { migrated: false, hadNonClaudeTargets: false };
@@ -320,7 +320,7 @@ export const getMigrationStatus = (): Effect.Effect<
   ReturnType<typeof getMigrationStatusSync>
 > => Effect.sync(() => getMigrationStatusSync());
 
-/** Sweep legacy runtime symlinks under ~/.panopticon (idempotent). */
+/** Sweep legacy runtime symlinks under ~/.overdeck (idempotent). */
 export const cleanupLegacyRuntimeSymlinks =
   (): Effect.Effect<LegacyCleanupResult> =>
     Effect.sync(() => cleanupLegacyRuntimeSymlinksSync());

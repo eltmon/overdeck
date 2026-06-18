@@ -27,7 +27,7 @@ describe.skip('config', () => {
     it('should return default config structure', () => {
       const config = getDefaultConfigSync();
 
-      expect(config).toHaveProperty('panopticon');
+      expect(config).toHaveProperty('overdeck');
       expect(config).toHaveProperty('sync');
       expect(config).toHaveProperty('trackers');
       expect(config).toHaveProperty('dashboard');
@@ -61,7 +61,7 @@ describe.skip('config', () => {
 
     it('should parse TOML config file', () => {
       const configContent = `
-[panopticon]
+[overdeck]
 version = "2.0.0"
 
 [sync]
@@ -78,7 +78,7 @@ api_port = 4001
 
       const config = loadConfigSync();
 
-      expect(config.panopticon.version).toBe('2.0.0');
+      expect(config.overdeck.version).toBe('2.0.0');
       expect(config.sync.backup_before_sync).toBe(false);
       expect(config.trackers.primary).toBe('github');
       expect(config.dashboard.port).toBe(4000);

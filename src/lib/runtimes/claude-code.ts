@@ -171,8 +171,8 @@ export class ClaudeCodeRuntimeSync implements AgentRuntimeSync {
    * Read active heartbeat file if it exists
    */
   private getActiveHeartbeat(agentId: string): Heartbeat | null {
-    // Heartbeats are now in shared directory: ~/.panopticon/heartbeats/
-    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`);
+    // Heartbeats are now in shared directory: ~/.overdeck/heartbeats/
+    const heartbeatPath = join(homedir(), '.overdeck', 'heartbeats', `${agentId}.json`);
     if (!existsSync(heartbeatPath)) {
       return null;
     }

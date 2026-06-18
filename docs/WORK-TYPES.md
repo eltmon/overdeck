@@ -6,7 +6,7 @@ This document is about **routed work types and model-selection slots**, not the 
 
 A work type is a routing slot for one kind of job inside the system. Some work types line up with runtime agents, some line up with helper jobs, and some line up with parallel review lanes or CLI contexts. They all matter for model selection, but they are **not** all members of the main Overdeck runtime agent roster.
 
-Each work type is a routable job slot. You can override any of these IDs in `models.overrides` inside `~/.panopticon/config.yaml` or `.pan.yaml`.
+Each work type is a routable job slot. You can override any of these IDs in `models.overrides` inside `~/.overdeck/config.yaml` or `.pan.yaml`.
 
 ## Overview
 

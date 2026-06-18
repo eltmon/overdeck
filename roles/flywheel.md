@@ -9,27 +9,27 @@ hooks:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/pre-tool-hook"
+          command: "$HOME/.overdeck/bin/pre-tool-hook"
     - matcher: "Bash"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/gh-issue-trailer-hook"
+          command: "$HOME/.overdeck/bin/gh-issue-trailer-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/rtk-bash-filter"
+          command: "$HOME/.overdeck/bin/rtk-bash-filter"
   PostToolUse:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/heartbeat-hook"
+          command: "$HOME/.overdeck/bin/heartbeat-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
+          command: "$HOME/.overdeck/bin/permission-event-hook"
   Stop:
     - matcher: ".*"
       hooks:
         - type: command
-          command: "$HOME/.panopticon/bin/stop-hook"
+          command: "$HOME/.overdeck/bin/stop-hook"
         - type: command
-          command: "$HOME/.panopticon/bin/permission-event-hook"
+          command: "$HOME/.overdeck/bin/permission-event-hook"
 ---
 
 # Overdeck Flywheel Role
@@ -55,7 +55,7 @@ All `GET/POST /api/flywheel/...` calls in this doc target the dashboard server a
 
 If an API call returns empty or connection-refused, do not burn the tick rediscovering the endpoint or grepping source for routes. The supervisor watchdog (port 3012) health-checks the dashboard every 10s and restarts it after 3 consecutive failures, so an unresponsive API usually means a restart is already in flight. Protocol:
 
-1. Check `~/.panopticon/restart-status.json` (last restart outcome) and the tail of `~/.panopticon/logs/supervisor.log`.
+1. Check `~/.overdeck/restart-status.json` (last restart outcome) and the tail of `~/.overdeck/logs/supervisor.log`.
 2. Wait ~15s and retry the same call against `http://127.0.0.1:3011`.
 3. If the API is still down after two retries, record it in the tick snapshot (`systemStatus`) and proceed with the parts of the tick that don't need the API (git/`gh` inventory) rather than stalling.
 
@@ -87,10 +87,10 @@ Each revolution is a tick. The output of every tick is a `FlywheelStatus` snapsh
 3. **Emit suggestions** — produce a ranked `suggestions[]` array. Each suggestion has shape `{ action, issueId?, rationale, priority }`, where `action` is one of `start`, `resume`, `plan`, `review`, `merge`, `unblock`, `park`, `investigate`, `wait`, and `priority` is one of `urgent`, `high`, `medium`, `low`. Suggestions are recommendations for the operator; do not apply them yourself.
    - Auto-merge failures: call `GET /api/flywheel/auto-merge/problems` while assembling suggestions. For every entry with `status` of `failed` or `blocked`, emit `{ action: 'investigate', issueId, rationale: 'auto-merge <status>: <failureReason>', priority: 'high' }`. The failed/blocked entry stays in the table until cancelled; do not auto-clear it from the orchestrator.
    - **Pipeline truth lives in SQLite, surfaced via CLI/API — never read state files or the DB directly.**
-     Authoritative review/test/merge state is the `review_status` table in `~/.panopticon/panopticon.db`,
+     Authoritative review/test/merge state is the `review_status` table in `~/.overdeck/panopticon.db`,
      reached ONLY through `pan review pending --ready`, `GET /api/flywheel/merge-blockers`, and the
      dashboard review snapshots. Durable verdicts are also mirrored to the per-issue permanent record
-     in the infra repo's `.pan/` records path. **`~/.panopticon/review-status.json` is legacy/test-only
+     in the infra repo's `.pan/` records path. **`~/.overdeck/review-status.json` is legacy/test-only
      scratch — NOT the store, usually empty or stale, and must NEVER be read to judge pipeline state.**
      An empty or odd JSON file means nothing; query the surfaces. (RUN-34 misfiled a "review-status
      wiped" bug from spelunking this file while all 11 issues were healthy in SQLite, blocked only by

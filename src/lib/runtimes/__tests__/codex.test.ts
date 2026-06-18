@@ -12,7 +12,7 @@ import { createCodexRuntimeSync } from '../codex.js'
 function withFakeCodexHome(): { codexHome: string; agentsHome: string; cleanup: () => void } {
   const base = mkdtempSync(join(tmpdir(), 'pan-codex-runtime-'))
   const codexHome = join(base, '.codex')
-  const agentsHome = join(base, '.panopticon', 'agents')
+  const agentsHome = join(base, '.overdeck', 'agents')
   mkdirSync(codexHome, { recursive: true })
   mkdirSync(agentsHome, { recursive: true })
   const originalCodexHome = process.env['CODEX_HOME']
@@ -52,7 +52,7 @@ describe('CodexRuntimeSync — session path resolution', () => {
   it('resolves the rollout JSONL by thread-id under the per-agent CODEX_HOME/sessions', () => {
     const threadId = 'abc1234567890def'
     // Build a realistic date-partitioned rollout tree in the per-agent CODEX_HOME.
-    // getSessionPath now uses ~/.panopticon/agents/<id>/codex-home, not the global ~/.codex.
+    // getSessionPath now uses ~/.overdeck/agents/<id>/codex-home, not the global ~/.codex.
     const agentDir = join(ctx.agentsHome, 'agent-test-01')
     const perAgentCodexHome = join(agentDir, 'codex-home')
     const dayDir = join(perAgentCodexHome, 'sessions', '2025', '06', '01')

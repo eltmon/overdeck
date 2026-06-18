@@ -221,7 +221,7 @@ async function startFakeSupervisor(agentId: string, fifoPath: string): Promise<v
         return [line.slice(0, idx).trim().toLowerCase(), line.slice(idx + 1).trim()];
       }));
       const parsed = JSON.parse(body) as { content?: string };
-      const ok = headers['x-panopticon-pty-token'] === expectedToken;
+      const ok = headers['x-overdeck-pty-token'] === expectedToken;
       if (ok && parsed.content) {
         await writeFileAsync(fifoPath, `${parsed.content}\n`, 'utf8');
       }

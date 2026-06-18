@@ -57,7 +57,7 @@ interface SpecialistFeedback {
 ```
 
 **Delivery Mechanism:**
-1. Log to `~/.panopticon/specialists/feedback/feedback.jsonl` (persistent)
+1. Log to `~/.overdeck/specialists/feedback/feedback.jsonl` (persistent)
 2. Send to issue agent's tmux session via `tmux send-keys`
 3. If agent not running, feedback is queued for retrieval
 
@@ -203,7 +203,7 @@ interface HandoffContext {
 
 ### 8. Event Logging
 
-**Decision:** JSONL file at `~/.panopticon/logs/handoffs.jsonl`
+**Decision:** JSONL file at `~/.overdeck/logs/handoffs.jsonl`
 
 **HandoffEvent Structure:**
 ```typescript
@@ -285,14 +285,14 @@ interface HandoffEvent {
        ▼              ▼              ▼               ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                    Agent State Store                          │
-│  ~/.panopticon/agents/{id}/state.json                        │
+│  ~/.overdeck/agents/{id}/state.json                        │
 │  + model, complexity, handoffCount, costSoFar                │
 └──────────────────────────────────────────────────────────────┘
        │
        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                    Handoff Event Log                          │
-│  ~/.panopticon/logs/handoffs.jsonl                           │
+│  ~/.overdeck/logs/handoffs.jsonl                           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -328,7 +328,7 @@ src/dashboard/frontend/AgentCard   # Add handoff UI
 ### Configuration Schema
 
 ```yaml
-# ~/.panopticon/cloister.yaml additions
+# ~/.overdeck/cloister.yaml additions
 
 model_selection:
   default_model: sonnet

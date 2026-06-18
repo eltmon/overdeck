@@ -25,8 +25,8 @@ Main repo (host)
 
 Previous versions symlinked `workspaces/feature-xxx/node_modules → main repo/node_modules`. This broke local workspace package resolution:
 
-- `@panopticon/contracts` is defined in `packages/contracts/` with `workspace:*` specifier
-- Bun resolves `node_modules/@panopticon/contracts` as a symlink to `../../packages/contracts/`
+- `@overdeck/contracts` is defined in `packages/contracts/` with `workspace:*` specifier
+- Bun resolves `node_modules/@overdeck/contracts` as a symlink to `../../packages/contracts/`
 - With symlinked node_modules, this resolved to the **main repo's** `packages/contracts/`, not the worktree's
 - When an agent modified contracts in a worktree, typecheck still saw the main repo's stale build
 
@@ -44,7 +44,7 @@ Each layer is completely independent. Changes in one never affect the others.
 
 ## Project Configuration
 
-In `~/.panopticon/projects.yaml`, projects declare their package manager and workspace packages:
+In `~/.overdeck/projects.yaml`, projects declare their package manager and workspace packages:
 
 ```yaml
 projects:
@@ -80,13 +80,13 @@ Workspace containers use a **single named volume** for the root `node_modules/`:
 
 ```yaml
 volumes:
-  - ../:/workspaces/panopticon:cached          # Project files from host
-  - container-node-modules:/workspaces/panopticon/node_modules  # Container's own deps
+  - ../:/workspaces/overdeck:cached          # Project files from host
+  - container-node-modules:/workspaces/overdeck/node_modules  # Container's own deps
 ```
 
 ### How It Works
 
-1. The project source is mounted from the host via bind mount (`../:/workspaces/panopticon`)
+1. The project source is mounted from the host via bind mount (`../:/workspaces/overdeck`)
 2. The root `node_modules/` is shadowed by a Docker named volume (`container-node-modules`)
 3. An `init` service runs `bun install` inside the container, populating the volume
 4. The init service also builds workspace packages (`packages/contracts`)

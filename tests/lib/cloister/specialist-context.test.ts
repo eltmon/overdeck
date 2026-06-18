@@ -66,7 +66,7 @@ describe('specialist-context', () => {
   const originalOverdeckHome = process.env.OVERDECK_HOME;
 
   beforeEach(() => {
-    testDir = mkdtempSync(join(tmpdir(), 'panopticon-test-context-'));
+    testDir = mkdtempSync(join(tmpdir(), 'overdeck-test-context-'));
     process.env.OVERDECK_HOME = testDir;
     vi.clearAllMocks();
   });

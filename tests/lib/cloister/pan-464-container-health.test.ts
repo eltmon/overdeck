@@ -148,10 +148,10 @@ import { sessionExists } from '../../../src/lib/tmux.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TEST_OVERDECK_HOME = process.env.OVERDECK_HOME ?? join(testHome, '.panopticon');
+const TEST_OVERDECK_HOME = process.env.OVERDECK_HOME ?? join(testHome, '.overdeck');
 const STATE_FILE = join(TEST_OVERDECK_HOME, 'deacon', 'health-state.json');
 
-const CONTAINER = 'panopticon-feature-pan-464-frontend-1';
+const CONTAINER = 'overdeck-feature-pan-464-frontend-1';
 const AGENT_ID = 'agent-pan-464';
 
 function writeState(state: Partial<DeaconState>): void {
@@ -410,7 +410,7 @@ describe('checkWorkspaceContainerHealth', () => {
     writeState({ containerRestarts: {} });
 
     setupExec({
-      'docker ps -a': { stdout: 'panopticon-feature-pan-596-init-1|Exited (0) 30 seconds ago\n' },
+      'docker ps -a': { stdout: 'overdeck-feature-pan-596-init-1|Exited (0) 30 seconds ago\n' },
       'tmux has-session': { stdout: '' },
       'docker restart': { stdout: '' },
       'lsof': { stdout: '' },

@@ -163,7 +163,7 @@ describe('createBeadsFromVBrief', () => {
     const ws = createWorkspace('PAN-500');
     projectRoot = ws.projectRoot;
     WORKSPACE_DIR = ws.workspacePath;
-    process.env.OVERDECK_HOME = join(projectRoot, '.panopticon-home');
+    process.env.OVERDECK_HOME = join(projectRoot, '.overdeck-home');
   });
 
   afterEach(() => {

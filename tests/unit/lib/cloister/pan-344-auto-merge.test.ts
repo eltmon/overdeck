@@ -15,7 +15,7 @@
  * so the dashboard can alert the user to click MERGE.
  *
  * The tests mock fs.existsSync, readFileSync, and writeFileSync so they
- * never touch the real ~/.panopticon files (review-status.json or
+ * never touch the real ~/.overdeck files (review-status.json or
  * deacon/health-state.json). This prevents circuit-breaker state from
  * leaking between test runs.
  */
@@ -41,7 +41,7 @@ let _deaconState: Record<string, unknown> = {};
 // ---------------------------------------------------------------------------
 // Mock fs BEFORE any module that imports it is loaded.
 // Intercept review-status.json and deacon/health-state.json so tests
-// are fully isolated from the real ~/.panopticon filesystem.
+// are fully isolated from the real ~/.overdeck filesystem.
 // ---------------------------------------------------------------------------
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();

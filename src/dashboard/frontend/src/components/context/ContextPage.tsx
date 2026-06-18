@@ -37,7 +37,7 @@ function targetForLayer(layer: ContextEditableLayerRecord): ContextLayerTarget {
 function layerPathLabel(layer: ContextEditableLayerRecord): string {
   switch (layer.kind) {
     case 'global':
-      return '~/.panopticon/context/global.md';
+      return '~/.overdeck/context/global.md';
     case 'project':
       return '.pan/context/project.md';
     case 'workspace':

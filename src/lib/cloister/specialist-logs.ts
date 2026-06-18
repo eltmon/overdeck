@@ -5,7 +5,7 @@
  * Each run produces a structured log file with metadata, context, and full transcript.
  *
  * Directory structure:
- *   ~/.panopticon/specialists/{projectKey}/{specialistType}/runs/{timestamp}-{issueId}.log
+ *   ~/.overdeck/specialists/{projectKey}/{specialistType}/runs/{timestamp}-{issueId}.log
  */
 
 import { existsSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';

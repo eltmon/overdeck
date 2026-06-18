@@ -21,7 +21,7 @@ describe('reviewSpawnReviewerCommand', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     mockResolveProjectFromIssue.mockReturnValue({
       projectPath: '/repo',
-      projectKey: 'panopticon',
+      projectKey: 'overdeck',
     });
     mockSpawnReviewSubRoleForIssue.mockReturnValue(Effect.succeed({
       success: true,

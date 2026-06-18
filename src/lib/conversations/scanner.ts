@@ -213,7 +213,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
     const fileMtime = new Date(stat.mtimeMs).toISOString();
     const correlation = correlationMap.get(jsonlPath) ?? {
-      panopticonManaged: false,
+      overdeckManaged: false,
       panIssueId: null,
       panAgentId: null,
       actualCost: null,
@@ -225,7 +225,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
       existing.fileMtime === fileMtime
     ) {
       const correlationChanged =
-        existing.panopticonManaged !== correlation.panopticonManaged ||
+        existing.overdeckManaged !== correlation.overdeckManaged ||
         existing.panIssueId !== correlation.panIssueId ||
         existing.panAgentId !== correlation.panAgentId;
 
@@ -248,7 +248,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
           estimatedCost: existing.estimatedCost,
           toolsUsed: existing.toolsUsed,
           filesTouched: existing.filesTouched,
-          panopticonManaged: correlation.panopticonManaged,
+          overdeckManaged: correlation.overdeckManaged,
           panIssueId: correlation.panIssueId,
           panAgentId: correlation.panAgentId,
           fileSize: stat.size,
@@ -310,7 +310,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
         estimatedCost,
         toolsUsed: meta.toolsUsed,
         filesTouched: meta.filesTouched,
-        panopticonManaged: correlation.panopticonManaged,
+        overdeckManaged: correlation.overdeckManaged,
         panIssueId: correlation.panIssueId,
         panAgentId: correlation.panAgentId,
         fileSize: stat.size,

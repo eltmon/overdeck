@@ -105,7 +105,7 @@ terminal.onSelectionChange(() => {
 ### 6. Configuration UI
 Add toggle in PlanDialog or XTerminal component:
 - Checkbox: "Auto-copy on selection"
-- Persisted in localStorage: `panopticon.terminal.autoCopyOnSelect`
+- Persisted in localStorage: `overdeck.terminal.autoCopyOnSelect`
 - Default: `true`
 
 ## Files to Modify

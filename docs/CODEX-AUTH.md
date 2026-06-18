@@ -16,7 +16,7 @@ Overdeck uses **OpenAI Codex CLI** (via CLIProxy) for `gpt-5.4` agent work. Code
 
 | Mechanism | API Keys | Codex OAuth |
 |-----------|----------|-------------|
-| Storage | `~/.panopticon.env` | `~/.panopticon/cliproxy/auth/codex-primary.json` |
+| Storage | `~/.overdeck.env` | `~/.overdeck/cliproxy/auth/codex-primary.json` |
 | Lifetime | Permanent until revoked | ~7 days (JWT expiry) |
 | Refresh | Not applicable | Automatic via `codex login` |
 | Burn risk | None | High — concurrent refreshes invalidate the refresh token |
@@ -33,7 +33,7 @@ Because Codex OAuth tokens expire and can be burned, Overdeck implements **autom
 Codex CLI writes its authentication state to:
 
 ```
-~/.panopticon/cliproxy/auth/codex-primary.json
+~/.overdeck/cliproxy/auth/codex-primary.json
 ```
 
 This file contains:
@@ -140,7 +140,7 @@ pan bridge-codex-auth
 Or, if Overdeck doesn't expose `pan bridge-codex-auth` yet, manually copy:
 
 ```bash
-cp ~/.panopticon/cliproxy/auth/codex-primary.json ~/.codex/config.json
+cp ~/.overdeck/cliproxy/auth/codex-primary.json ~/.codex/config.json
 ```
 
 Then restart the dashboard or wait for the next poll cycle.
@@ -163,7 +163,7 @@ Then restart the dashboard or wait for the next poll cycle.
    ```
 2. If missing, manually bridge:
    ```bash
-   cp ~/.panopticon/cliproxy/auth/codex-primary.json ~/.codex/config.json
+   cp ~/.overdeck/cliproxy/auth/codex-primary.json ~/.codex/config.json
    ```
 3. Restart CLIProxy if it's running:
    ```bash

@@ -26,7 +26,7 @@ const RTK_RELEASE_TAG = "v0.41.0";
 | `darwin-arm64` | `rtk-aarch64-apple-darwin.tar.gz` | `8b9751f927da4fb433be23f24f205bf1c22f9dd6949790c0980d2cc91b14658c` |
 | `darwin-x64` | `rtk-x86_64-apple-darwin.tar.gz` | `b2729d9983b38af77824a5c7a3c23de415533be9fb022a5e473904ecc9620db9` |
 
-The release also publishes `.deb`, `.rpm`, and Windows assets, but the Overdeck hook installer should use tarballs for the cross-platform `~/.panopticon/bin/rtk` install path. No supported Overdeck target is blocked by missing prebuilt binaries in `v0.41.0`.
+The release also publishes `.deb`, `.rpm`, and Windows assets, but the Overdeck hook installer should use tarballs for the cross-platform `~/.overdeck/bin/rtk` install path. No supported Overdeck target is blocked by missing prebuilt binaries in `v0.41.0`.
 
 ## Checksum validation
 
@@ -43,7 +43,7 @@ Validate downloads by calculating SHA-256 for the downloaded archive and compari
 Use RTK's built-in Claude Code hook processor rather than a custom stdout pipe:
 
 ```bash
-printf '%s' "$PRE_TOOL_USE_JSON" | ~/.panopticon/bin/rtk hook claude
+printf '%s' "$PRE_TOOL_USE_JSON" | ~/.overdeck/bin/rtk hook claude
 ```
 
 The command reads the Claude Code `PreToolUse` JSON envelope from stdin. For a rewritable Bash tool call, it exits `0` and writes a JSON response on stdout with `hookSpecificOutput.updatedInput.command` set to the rewritten command. Example input:
@@ -76,7 +76,7 @@ Reproducible A/B steps:
 
 1. Pick a representative command that emits enough Bash output to matter; for PAN-1407, use `git diff 47a8df418...HEAD` from the feature branch.
 2. Capture the raw output with RTK disabled: `OVERDECK_RTK_ENABLED=0 git diff 47a8df418...HEAD > raw.txt`.
-3. Capture the RTK output that the hook would execute: `~/.panopticon/bin/rtk git diff 47a8df418...HEAD > rtk.txt`.
+3. Capture the RTK output that the hook would execute: `~/.overdeck/bin/rtk git diff 47a8df418...HEAD > rtk.txt`.
 4. Estimate output tokens as `ceil(bytes / 4)` for both files, then compute `(raw_tokens - rtk_tokens) / raw_tokens * 100`.
 
 Captured measurement on 2026-05-23:

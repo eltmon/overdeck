@@ -335,7 +335,7 @@
           },
           {
             "id": "scanner.ac7",
-            "title": "Sessions matching existing conversations.session_file are marked panopticon_managed=1 with pan_issue_id + pan_agent_id populated",
+            "title": "Sessions matching existing conversations.session_file are marked overdeck_managed=1 with pan_issue_id + pan_agent_id populated",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -521,7 +521,7 @@
           },
           {
             "id": "cli-search-list-show-cost.ac2",
-            "title": "`pan conversations list --managed` lists only panopticon_managed=1 rows",
+            "title": "`pan conversations list --managed` lists only overdeck_managed=1 rows",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -832,7 +832,7 @@
         "subItems": [
           {
             "id": "contracts.ac1",
-            "title": "All new types exported from @panopticon/contracts and typecheck passes project-wide",
+            "title": "All new types exported from @overdeck/contracts and typecheck passes project-wide",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

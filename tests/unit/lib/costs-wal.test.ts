@@ -54,16 +54,16 @@ describe('resolveWalDir', () => {
 
   it('returns the events dir for a matching project key', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', name: 'Overdeck' } },
+      { key: 'PAN', config: { path: '/repos/overdeck', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
-    expect(dir).toBe('/repos/panopticon/.pan/events');
+    expect(dir).toBe('/repos/overdeck/.pan/events');
   });
 
   it('uses events_repo when configured', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', events_repo: '/shared/pan-events', name: 'Overdeck' } },
+      { key: 'PAN', config: { path: '/repos/overdeck', events_repo: '/shared/pan-events', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
@@ -72,11 +72,11 @@ describe('resolveWalDir', () => {
 
   it('uses events_path when configured', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', events_path: 'custom/events', name: 'Overdeck' } },
+      { key: 'PAN', config: { path: '/repos/overdeck', events_path: 'custom/events', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     const dir = resolveWalDir('PAN-335');
-    expect(dir).toBe('/repos/panopticon/custom/events');
+    expect(dir).toBe('/repos/overdeck/custom/events');
   });
 
   it('returns null when no project matches', async () => {
@@ -90,7 +90,7 @@ describe('resolveWalDir', () => {
 
   it('returns null for malformed issueId with no prefix', async () => {
     listProjects.mockReturnValue([
-      { key: 'PAN', config: { path: '/repos/panopticon', name: 'Overdeck' } },
+      { key: 'PAN', config: { path: '/repos/overdeck', name: 'Overdeck' } },
     ]);
     const { resolveWalDir } = await import('../../../src/lib/costs/wal.js');
     expect(resolveWalDir('')).toBeNull();

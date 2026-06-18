@@ -19,7 +19,7 @@ import { getPricingSync, calculateCostSync, type AIProvider } from '../src/lib/c
 const WRITE = process.argv.includes('--write');
 const CUTOFF = '2026-05-21T00:00:00'; // gap start (last good event was 2026-05-21)
 const PROJECTS = join(homedir(), '.claude', 'projects');
-const EVENTS = join(homedir(), '.panopticon', 'costs', 'events.jsonl');
+const EVENTS = join(homedir(), '.overdeck', 'costs', 'events.jsonl');
 
 function providerFor(model: string): AIProvider {
   if (model.includes('gpt')) return 'openai';

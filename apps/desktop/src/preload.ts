@@ -1,7 +1,7 @@
 /**
  * Preload script for the Overdeck Electron renderer.
  *
- * Exposes `window.panopticonBridge` via contextBridge.exposeInMainWorld.
+ * Exposes `window.overdeckBridge` via contextBridge.exposeInMainWorld.
  * The renderer uses this bridge to communicate with the main process over IPC.
  *
  * Security model:
@@ -152,12 +152,12 @@ const bridge: OverdeckBridge = {
     ipcRenderer.invoke(IPC.RESTART_DASHBOARD) as Promise<void>,
 };
 
-contextBridge.exposeInMainWorld("panopticonBridge", bridge);
+contextBridge.exposeInMainWorld("overdeckBridge", bridge);
 
 // ─── Global type augmentation (consumed by renderer TypeScript) ───────────────
 
 declare global {
   interface Window {
-    panopticonBridge?: OverdeckBridge;
+    overdeckBridge?: OverdeckBridge;
   }
 }

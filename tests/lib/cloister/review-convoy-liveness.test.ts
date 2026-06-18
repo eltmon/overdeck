@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     getAgentStateSync: vi.fn((agentId: string) => agentStates.get(agentId) ?? null),
     loadReviewStatuses: vi.fn().mockReturnValue({}),
     setReviewStatusSync: vi.fn(),
-    resolveProjectFromIssueSync: vi.fn().mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' }),
+    resolveProjectFromIssueSync: vi.fn().mockReturnValue({ projectKey: 'overdeck', projectPath: '/repo' }),
     findWorkspacePath: vi.fn().mockReturnValue('/workspace'),
     emitActivityEntrySync: vi.fn(),
     spawnRun: vi.fn(),
@@ -213,7 +213,7 @@ describe('recoverStalledReviewConvoys', () => {
     mocks.getAgentStateSync.mockClear();
     mocks.loadReviewStatuses.mockReset();
     mocks.setReviewStatusSync.mockClear();
-    mocks.resolveProjectFromIssueSync.mockReset().mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' });
+    mocks.resolveProjectFromIssueSync.mockReset().mockReturnValue({ projectKey: 'overdeck', projectPath: '/repo' });
     mocks.findWorkspacePath.mockReset().mockReturnValue('/workspace');
     mocks.emitActivityEntrySync.mockClear();
     mocks.spawnRun.mockClear();
@@ -339,7 +339,7 @@ describe('recoverStalledReviewConvoys', () => {
     expect(stalledReviewConvoyRecoveryState.has('PAN-1614')).toBe(false);
     expect(mocks.spawnReviewRoleForIssue).not.toHaveBeenCalled();
 
-    mocks.resolveProjectFromIssueSync.mockReturnValueOnce({ projectKey: 'panopticon', projectPath: '/repo' });
+    mocks.resolveProjectFromIssueSync.mockReturnValueOnce({ projectKey: 'overdeck', projectPath: '/repo' });
     mocks.findWorkspacePath.mockReturnValueOnce(null);
     expect(await recoverStalledReviewConvoys(async () => 'in_review')).toEqual([
       'Skipped stalled review convoy recovery for PAN-1614: workspace unavailable',

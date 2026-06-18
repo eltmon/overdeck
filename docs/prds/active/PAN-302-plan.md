@@ -35,7 +35,7 @@ After the user submits the planning dialog, close it immediately (default) inste
 - Add `agentPhase?: 'planning' | 'work'` to the `Agent` interface.
 
 **File: `src/dashboard/frontend/src/components/PlanDialog.tsx`**
-- Add `watchPlanning` state (boolean, default false, persisted to localStorage key `panopticon.planning.watchPlanning`).
+- Add `watchPlanning` state (boolean, default false, persisted to localStorage key `overdeck.planning.watchPlanning`).
 - Add checkbox in the `ready` step form: "Stay and watch planning".
 - In `startPlanningMutation.onSuccess`: if `!watchPlanning`, call `onClose()` instead of transitioning to `planning` step.
 - When dialog is reopened (e.g., from INPUT badge click), check for active planning session and reconnect to terminal as today.

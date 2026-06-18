@@ -118,7 +118,7 @@ describe('ComposerFooter image attachments', () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes('/upload-image')) {
-        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }), {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-paste-uploaded.png' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -176,18 +176,18 @@ describe('ComposerFooter image attachments', () => {
         '/api/conversations/test-conv/message',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ message: '@/tmp/panopticon-paste-uploaded.png\nhello world' }),
+          body: JSON.stringify({ message: '@/tmp/overdeck-paste-uploaded.png\nhello world' }),
         }),
       );
     });
-    expect(onSend).toHaveBeenCalledWith('@/tmp/panopticon-paste-uploaded.png\nhello world');
+    expect(onSend).toHaveBeenCalledWith('@/tmp/overdeck-paste-uploaded.png\nhello world');
     expect(screen.queryByText('paste.png')).not.toBeInTheDocument();
   });
 
   it('uploads dropped images through the same endpoint', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ path: '/tmp/panopticon-paste-dropped.png' }), {
+      new Response(JSON.stringify({ path: '/tmp/overdeck-paste-dropped.png' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -221,7 +221,7 @@ describe('ComposerFooter image attachments', () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes('/upload-image')) {
-        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }), {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-paste-uploaded.png' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -266,7 +266,7 @@ describe('ComposerFooter image attachments', () => {
         '/api/conversations/test-conv/delete-image',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }),
+          body: JSON.stringify({ path: '/tmp/overdeck-paste-uploaded.png' }),
         }),
       );
     });
@@ -283,7 +283,7 @@ describe('ComposerFooter image attachments', () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes('/upload-image')) {
-        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-switched.png' }), {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-paste-switched.png' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -364,7 +364,7 @@ describe('ComposerFooter image attachments', () => {
     fetchMock.mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes('/upload-image')) {
-        return new Response(JSON.stringify({ path: '/tmp/panopticon-paste-abandoned.png' }), {
+        return new Response(JSON.stringify({ path: '/tmp/overdeck-paste-abandoned.png' }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -516,7 +516,7 @@ describe('ComposerFooter image attachments', () => {
     expect(onSend).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTitle('Remove slow.png'));
-    resolveUpload?.(new Response(JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }), {
+    resolveUpload?.(new Response(JSON.stringify({ path: '/tmp/overdeck-paste-uploaded.png' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     }));
@@ -526,7 +526,7 @@ describe('ComposerFooter image attachments', () => {
         '/api/conversations/test-conv/delete-image',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ path: '/tmp/panopticon-paste-uploaded.png' }),
+          body: JSON.stringify({ path: '/tmp/overdeck-paste-uploaded.png' }),
         }),
       );
     });
@@ -545,7 +545,7 @@ describe('ComposerFooter image attachments', () => {
       const url = String(input);
       if (url.includes('/upload-image')) {
         uploadCalls += 1;
-        return new Response(JSON.stringify({ path: `/tmp/panopticon-paste-${uploadCalls}.png` }), {
+        return new Response(JSON.stringify({ path: `/tmp/overdeck-paste-${uploadCalls}.png` }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
@@ -586,7 +586,7 @@ describe('ComposerFooter image attachments', () => {
   it('falls back to .items when .files is empty (Wayland screenshot-tool paste)', async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ path: '/tmp/panopticon-paste-wayland.png' }), {
+      new Response(JSON.stringify({ path: '/tmp/overdeck-paste-wayland.png' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),

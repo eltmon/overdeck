@@ -35,7 +35,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Delete all tracked entries under .claude/skills/ except the .gitignore, then copy every directory from skills/ into .claude/skills/ verbatim. This removes the 5 orphan skills (hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-panopticon-docs), fixes structural bugs (nested pan-new-project/pan-new-project/, work-complete/work-complete/), eliminates all stale command references (pan work list, pan cloister start, pan specialists wake), and adds the 56 canonical skills missing from the project tree."
+          "Action": "Delete all tracked entries under .claude/skills/ except the .gitignore, then copy every directory from skills/ into .claude/skills/ verbatim. This removes the 5 orphan skills (hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-overdeck-docs), fixes structural bugs (nested pan-new-project/pan-new-project/, work-complete/work-complete/), eliminates all stale command references (pan work list, pan cloister start, pan specialists wake), and adds the 56 canonical skills missing from the project tree."
         },
         "subItems": [
           {
@@ -64,7 +64,7 @@
           },
           {
             "id": "regen-claude-skills.ac5",
-            "title": "Orphan skills hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-panopticon-docs are deleted from .claude/skills/",
+            "title": "Orphan skills hume-evi, pan-dashboard-restart, rebase-and-submit, test-specialist-workflow, update-overdeck-docs are deleted from .claude/skills/",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
           }

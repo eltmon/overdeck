@@ -19,7 +19,7 @@ interface TerminalPanelProps {
 }
 
 function popoutTerminal(sessionName: string, title: string): void {
-  const bridge = window.panopticonBridge;
+  const bridge = window.overdeckBridge;
   if (bridge?.isDesktopApp?.()) {
     bridge.openTerminalWindow(sessionName, title);
     return;

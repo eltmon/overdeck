@@ -17,7 +17,7 @@ Currently there is a single shared set of specialist agents (review-agent, test-
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Project identification | Project key from `projects.yaml` | Already exists, each project has unique key (e.g., "myn", "panopticon") |
+| Project identification | Project key from `projects.yaml` | Already exists, each project has unique key (e.g., "myn", "overdeck") |
 | Specialist lifecycle | Ephemeral with 60s grace period | Spawn → work → terminate. Grace period allows for batched follow-up work |
 | Grace period UX | Dashboard countdown with pause/stop/exit buttons | User control over termination timing |
 | Context seeding | AI-generated digest of last 5 runs | Same model as specialist (configurable). Higher quality than raw logs |
@@ -34,7 +34,7 @@ Currently there is a single shared set of specialist agents (review-agent, test-
 ### Current Structure (Global Specialists)
 
 ```
-~/.panopticon/specialists/
+~/.overdeck/specialists/
 ├── registry.json              # Metadata for ALL specialists
 ├── review-agent.session       # Single global session ID
 ├── test-agent.session
@@ -47,7 +47,7 @@ Currently there is a single shared set of specialist agents (review-agent, test-
 ### New Structure (Per-Project Specialists)
 
 ```
-~/.panopticon/specialists/
+~/.overdeck/specialists/
 ├── myn/                                   # Project key from projects.yaml
 │   ├── config.json                        # Project-specific specialist config
 │   ├── review-agent/
@@ -63,7 +63,7 @@ Currently there is a single shared set of specialist agents (review-agent, test-
 │   └── merge-agent/
 │       ├── runs/
 │       └── context/
-├── panopticon/
+├── overdeck/
 │   └── (same structure as above)
 └── registry.json                          # Global metadata + per-project entries
 ```
@@ -107,7 +107,7 @@ Each run produces a structured log file:
 
 ```
 # Review Agent Run - PAN-79
-Project: panopticon
+Project: overdeck
 Started: 2026-02-05T14:30:00Z
 Issue: PAN-79
 
@@ -129,7 +129,7 @@ Finished: 2026-02-05T14:33:42Z
 When a specialist starts, it receives an AI-generated digest:
 
 ```markdown
-# Recent Review History for panopticon
+# Recent Review History for overdeck
 
 ## Summary
 Over the last 5 reviews, common patterns include:
@@ -364,7 +364,7 @@ Phase 5: Polish & Migration
 
 ## Acceptance Criteria
 
-- [ ] Specialists are created per-project under `~/.panopticon/specialists/{projectKey}/`
+- [ ] Specialists are created per-project under `~/.overdeck/specialists/{projectKey}/`
 - [ ] Each specialist run produces a persistent log file in `runs/` directory
 - [ ] Specialists fully terminate after completing their task (60s grace period)
 - [ ] Grace period has visible countdown with pause/stop/exit controls
@@ -379,7 +379,7 @@ Phase 5: Polish & Migration
 
 ## Testing Notes
 
-- Test parallel specialists: spawn review for myn AND panopticon simultaneously
+- Test parallel specialists: spawn review for myn AND overdeck simultaneously
 - Test log streaming: verify real-time updates in dashboard
 - Test grace period: pause/resume/exit buttons work correctly
 - Test context seeding: verify digest appears in specialist prompt
@@ -391,25 +391,25 @@ Phase 5: Polish & Migration
 
 | Beads ID | Title | Difficulty | Blocked By |
 |----------|-------|------------|------------|
-| `panopticon-21iw` | Core infrastructure - per-project specialist structure | complex | - |
-| `panopticon-2hpn` | Log file management and streaming | medium | - |
-| `panopticon-d1zb` | Context digest generation | medium | - |
-| `panopticon-ttwg` | Ephemeral lifecycle with grace period | complex | 21iw |
-| `panopticon-n8zi` | Update individual agent files | medium | ttwg |
-| `panopticon-9073` | New per-project API endpoints | medium | 21iw, 2hpn |
-| `panopticon-gxjr` | SSE log streaming implementation | medium | 2hpn, 9073 |
-| `panopticon-76oq` | Dashboard project selector and run history | medium | 9073 |
-| `panopticon-d7rk` | Dashboard log viewer component | medium | gxjr |
-| `panopticon-pz0i` | Dashboard grace period countdown | simple | 9073 |
-| `panopticon-zs4z` | Dashboard specialist detail pages | medium | 76oq, d7rk |
-| `panopticon-7iqa` | CLI log viewing commands | simple | 2hpn |
-| `panopticon-9x4f` | Log retention cleanup job | simple | 2hpn |
-| `panopticon-3pdb` | Project-specific specialist config | simple | 21iw |
+| `overdeck-21iw` | Core infrastructure - per-project specialist structure | complex | - |
+| `overdeck-2hpn` | Log file management and streaming | medium | - |
+| `overdeck-d1zb` | Context digest generation | medium | - |
+| `overdeck-ttwg` | Ephemeral lifecycle with grace period | complex | 21iw |
+| `overdeck-n8zi` | Update individual agent files | medium | ttwg |
+| `overdeck-9073` | New per-project API endpoints | medium | 21iw, 2hpn |
+| `overdeck-gxjr` | SSE log streaming implementation | medium | 2hpn, 9073 |
+| `overdeck-76oq` | Dashboard project selector and run history | medium | 9073 |
+| `overdeck-d7rk` | Dashboard log viewer component | medium | gxjr |
+| `overdeck-pz0i` | Dashboard grace period countdown | simple | 9073 |
+| `overdeck-zs4z` | Dashboard specialist detail pages | medium | 76oq, d7rk |
+| `overdeck-7iqa` | CLI log viewing commands | simple | 2hpn |
+| `overdeck-9x4f` | Log retention cleanup job | simple | 2hpn |
+| `overdeck-3pdb` | Project-specific specialist config | simple | 21iw |
 
 **Ready to start (no blockers):**
-- `panopticon-21iw` - Core infrastructure (complex)
-- `panopticon-2hpn` - Log management (medium)
-- `panopticon-d1zb` - Context digest (medium)
+- `overdeck-21iw` - Core infrastructure (complex)
+- `overdeck-2hpn` - Log management (medium)
+- `overdeck-d1zb` - Context digest (medium)
 
 **Parallelization:**
 - Phase 1: `21iw`, `2hpn`, `d1zb` can run in parallel

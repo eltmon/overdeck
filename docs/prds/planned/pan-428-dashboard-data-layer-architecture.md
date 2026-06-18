@@ -162,7 +162,7 @@ overdeck/
 ```
 overdeck/
 ├── packages/
-│   └── contracts/              # @panopticon/contracts (NEW)
+│   └── contracts/              # @overdeck/contracts (NEW)
 │       ├── package.json
 │       ├── tsconfig.json
 │       └── src/
@@ -214,7 +214,7 @@ overdeck/
 **`packages/contracts/package.json`:**
 ```json
 {
-  "name": "@panopticon/contracts",
+  "name": "@overdeck/contracts",
   "version": "0.1.0",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
@@ -222,7 +222,7 @@ overdeck/
 }
 ```
 
-Server and frontend import: `import { DomainEvent, PanRpcGroup } from "@panopticon/contracts"`
+Server and frontend import: `import { DomainEvent, PanRpcGroup } from "@overdeck/contracts"`
 
 ---
 
@@ -390,7 +390,7 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 
 **Creates:**
 - `bunfig.toml` — Bun configuration
-- `packages/contracts/package.json` — `@panopticon/contracts` workspace package
+- `packages/contracts/package.json` — `@overdeck/contracts` workspace package
 - `packages/contracts/tsconfig.json` — TypeScript config for contracts
 - `packages/contracts/src/index.ts` — Placeholder re-export
 
@@ -410,7 +410,7 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 - [ ] `bun install` succeeds
 - [ ] `bun run build` produces working CLI and dashboard
 - [ ] `bun test` passes all 223 existing tests
-- [ ] `packages/contracts/` exists and is resolvable as `@panopticon/contracts`
+- [ ] `packages/contracts/` exists and is resolvable as `@overdeck/contracts`
 
 ---
 
@@ -427,10 +427,10 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 **Blocks:** B2, B3, B4, B5
 
 **Acceptance criteria:**
-- [ ] `bun run --filter @panopticon/contracts typecheck` passes
+- [ ] `bun run --filter @overdeck/contracts typecheck` passes
 - [ ] Event schemas cover all 13 current socket.io events (mapped to ~25 domain events)
 - [ ] RPC group includes all methods from the RPC Methods section
-- [ ] Server and frontend can both `import { DomainEvent } from "@panopticon/contracts"`
+- [ ] Server and frontend can both `import { DomainEvent } from "@overdeck/contracts"`
 
 **Note on npm distribution:** The contracts package exports raw `.ts` files (`"exports": { ".": "./src/index.ts" }`). This works for local dev (Bun/Vite resolve TS natively) and for production builds (tsdown/Vite bundle the contracts into the output). The contracts package itself is NOT published to npm — it's build-time only, always bundled into the server and frontend artifacts that ship.
 
@@ -447,7 +447,7 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 - Monotonic sequence counter (loaded from DB max on startup)
 - Methods: `append()`, `readFrom(sequence)`, `liveStream`, `getLatestSequence()`
 - DB schema: `events (sequence INTEGER PRIMARY KEY, type TEXT, timestamp TEXT, payload JSON)`
-- DB location: `~/.panopticon/panopticon.db` (existing app DB — add `events` table, NOT a third database). The repo already has `cache.db` and `panopticon.db`; do not create a third SQLite file.
+- DB location: `~/.overdeck/panopticon.db` (existing app DB — add `events` table, NOT a third database). The repo already has `cache.db` and `panopticon.db`; do not create a third SQLite file.
 - **Retention**: Events older than 7 days are compacted on startup. The snapshot RPC provides the full current state, so old events are only needed for short-term replay/recovery. A daily cleanup fiber truncates events where `sequence < latestSequence - 10000`.
 - **Schema migrations**: Version table (`event_store_version`) with ordered migration array, applied on startup. Following the same pattern as `src/lib/database/index.ts`.
 
@@ -467,7 +467,7 @@ export const AgentManagerLive = Layer.succeed(AgentManager, {
 
 **Creates:** `src/dashboard/server/config.ts`
 
-Wraps env vars (`~/.panopticon.env`), projects.yaml, CLI flags as an Effect service. Replaces the inline env loading in current `index.ts`.
+Wraps env vars (`~/.overdeck.env`), projects.yaml, CLI flags as an Effect service. Replaces the inline env loading in current `index.ts`.
 
 **Blocks:** B5
 

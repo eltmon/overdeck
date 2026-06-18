@@ -126,7 +126,7 @@ After: a `flywheel.auto_pickup_backlog` config flag, default `false`. When true,
 
 Today: the role's forbidden list says "never auto-merge a PR without human UAT and merge approval." Two things are baked into one rule.
 
-After: a `flywheel.require_uat_before_merge` config flag, default `true`. When true (today's behavior), merge cannot proceed until a human marks UAT passed. When false, the merge gate only requires the configured CI checks (`panopticon/review` + `panopticon/test`); the human still clicks merge.
+After: a `flywheel.require_uat_before_merge` config flag, default `true`. When true (today's behavior), merge cannot proceed until a human marks UAT passed. When false, the merge gate only requires the configured CI checks (`overdeck/review` + `overdeck/test`); the human still clicks merge.
 
 This separation matters: "human merges" and "human UATs" are independent constraints. We may want to relax UAT but never auto-merge (the model we want for v1.0). The toggle reflects that.
 
@@ -147,7 +147,7 @@ Both flags live in the `app_settings` SQLite table (same place as `flywheel.glob
 
 ### Humans-only-merge — current state and the gap
 
-On `eltmon/overdeck`, branch protection on `main` requires the two status checks (`panopticon/review`, `panopticon/test`) and conversation resolution. It does **not** include `required_pull_request_reviews`. The "only the owner merges" property is currently enforced by access (you're the sole push collaborator), not by policy.
+On `eltmon/overdeck`, branch protection on `main` requires the two status checks (`overdeck/review`, `overdeck/test`) and conversation resolution. It does **not** include `required_pull_request_reviews`. The "only the owner merges" property is currently enforced by access (you're the sole push collaborator), not by policy.
 
 This is fine today and arguably right while we're in dev-loop mode (no second human to approve from). The policy gap matters later: the moment we add a trusted second person, they can merge without any human approval since the rule isn't there. Formalizing `required_pull_request_reviews: 1` now means the "humans only merge" property is owned by the repo's policy rather than its access list. See [Issue tracking](#tracking-issues) for the optional follow-up.
 

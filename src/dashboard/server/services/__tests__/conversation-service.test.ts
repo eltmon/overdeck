@@ -317,10 +317,10 @@ describe('parseConversationMessages', () => {
         uuid: 'u-channel',
         timestamp: '2026-05-13T12:51:04.775Z',
         isMeta: true,
-        origin: { kind: 'channel', server: 'panopticon-bridge' },
+        origin: { kind: 'channel', server: 'overdeck-bridge' },
         message: {
           role: 'user',
-          content: '<channel source="panopticon-bridge" caller="conversation-message">\nCheck the vBRIEF spec\n</channel>',
+          content: '<channel source="overdeck-bridge" caller="conversation-message">\nCheck the vBRIEF spec\n</channel>',
         },
       },
     ];

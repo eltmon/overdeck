@@ -117,7 +117,7 @@ Zustand store (already a dependency at v4.5.0):
 - `theme: 'light' | 'dark'`
 - `toggleTheme()`: Toggles and persists
 - `initTheme()`: Reads localStorage, falls back to OS `prefers-color-scheme`
-- **localStorage key**: `panopticon.ui.theme` (follows existing pattern)
+- **localStorage key**: `overdeck.ui.theme` (follows existing pattern)
 - **Mechanism**: Adds/removes `dark` class on `<html>` element
 
 ### 2. Flash Prevention (`index.html`)
@@ -126,7 +126,7 @@ Inline `<script>` before React mounts:
 ```html
 <script>
   (function() {
-    var theme = localStorage.getItem('panopticon.ui.theme');
+    var theme = localStorage.getItem('overdeck.ui.theme');
     if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     if (theme === 'dark') document.documentElement.classList.add('dark');
   })();
@@ -224,7 +224,7 @@ Add `transition-colors duration-150` to main layout containers for smooth switch
 ### In Scope
 - Toggle button in header (Sun/Moon icon)
 - Dark/Light binary toggle
-- localStorage persistence (`panopticon.ui.theme`)
+- localStorage persistence (`overdeck.ui.theme`)
 - OS `prefers-color-scheme` detection on first visit
 - CSS custom properties with semantic Tailwind tokens
 - Migration of all ~42 component files

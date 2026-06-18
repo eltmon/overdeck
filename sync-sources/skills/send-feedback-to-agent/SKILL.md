@@ -87,7 +87,7 @@ Root cause appears to be missing mock in new test file.
 ## API Function
 
 The `sendFeedbackToAgent()` function in specialists.ts handles:
-1. Logging feedback to `~/.panopticon/specialists/feedback/feedback.jsonl`
+1. Logging feedback to `~/.overdeck/specialists/feedback/feedback.jsonl`
 2. Sending formatted message to the issue agent's tmux session
 3. Returning success/failure status
 

@@ -1088,9 +1088,9 @@ async function createRemoteWorkspace(
     }
 
     // Inject SSH key for git access if available
-    // Check multiple locations: panopticon-specific key first, then standard SSH keys
+    // Check multiple locations: overdeck-specific key first, then standard SSH keys
     const sshKeyPaths = [
-      join(homedir(), '.panopticon', 'ssh', 'exe-dev-key'),
+      join(homedir(), '.overdeck', 'ssh', 'exe-dev-key'),
       join(homedir(), '.ssh', 'id_ed25519'),
       join(homedir(), '.ssh', 'id_rsa'),
     ];

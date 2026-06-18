@@ -14,7 +14,7 @@ describe('git-utils', () => {
 
   beforeEach(async () => {
     // Create a temporary git repository for testing
-    testRepoPath = join(tmpdir(), `panopticon-git-utils-test-${Date.now()}`);
+    testRepoPath = join(tmpdir(), `overdeck-git-utils-test-${Date.now()}`);
     mkdirSync(testRepoPath, { recursive: true });
 
     // Initialize a git repo

@@ -1,5 +1,5 @@
 #!/bin/bash
-# ~/.panopticon/bin/session-start-hook  (PAN-800)
+# ~/.overdeck/bin/session-start-hook  (PAN-800)
 #
 # Fires on Claude Code SessionStart. Emits agent.activity_changed(idle) so the
 # runtime snapshot is current before the first tool fires, and emits
@@ -38,7 +38,7 @@ pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"times
 # waitForReadySignal onto a tmux pane-scrape fallback coupled to permission-mode
 # footer text. clearReadySignal() removes this file before every (re)launch, so
 # its presence means "this session reached the prompt".
-READY_DIR="${OVERDECK_HOME:-$HOME/.panopticon}/agents/$AGENT_ID"
+READY_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
 mkdir -p "$READY_DIR" 2>/dev/null
 if command -v jq >/dev/null 2>&1; then
   jq -n --arg agentId "$AGENT_ID" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
@@ -64,7 +64,7 @@ fi
 
 INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 if [ -z "$INTERNAL_TOKEN" ]; then
-  TOKEN_PATH="${OVERDECK_HOME:-$HOME/.panopticon}/internal-token"
+  TOKEN_PATH="${OVERDECK_HOME:-$HOME/.overdeck}/internal-token"
   if [ -f "$TOKEN_PATH" ]; then
     INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
   fi
@@ -73,7 +73,7 @@ fi
 if command -v jq >/dev/null 2>&1; then
   SESSION_BODY=$(printf '%s' "$INPUT" | jq -c --arg agentId "$AGENT_ID" '. + {agentId: $agentId}' 2>/dev/null)
   if [ -n "$SESSION_BODY" ]; then
-    curl -s -m 0.5 -o /dev/null -X POST -H 'Content-Type: application/json' -H "x-panopticon-internal-token: $INTERNAL_TOKEN" --data "$SESSION_BODY" "$PAN_DASHBOARD_URL/api/memory/session/start" 2>/dev/null || true
+    curl -s -m 0.5 -o /dev/null -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$SESSION_BODY" "$PAN_DASHBOARD_URL/api/memory/session/start" 2>/dev/null || true
   fi
 fi
 

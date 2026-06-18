@@ -21,7 +21,7 @@ Delete the queue concept entirely for all specialist agents **except merge**. Re
 ### Specialist Queue Types
 
 **1. Hook-Based Queues** (review-agent, test-agent, inspect-agent, uat-agent):
-- Storage: `~/.panopticon/agents/<name>/hook.json` (file-based)
+- Storage: `~/.overdeck/agents/<name>/hook.json` (file-based)
 - Implementation: `src/lib/hooks.ts` - `HookItem`, `pushToHook()`, `checkHook()`, `popFromHook()`
 - Key functions in `src/lib/cloister/specialists.ts`:
   - `submitToSpecialistQueue()` (lines ~2581-2631) - adds task to specialist's hook

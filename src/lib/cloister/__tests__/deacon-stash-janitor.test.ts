@@ -107,7 +107,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
 });
 vi.mock('../../paths.js', () => ({
-  OVERDECK_HOME: '/tmp/test-panopticon',
+  OVERDECK_HOME: '/tmp/test-overdeck',
   AGENTS_DIR: '/tmp/test-agents',
   packageRoot: '/tmp/test-package-root',
 }));
@@ -165,18 +165,18 @@ describe('cleanupOrphanedReviewSessions', () => {
 
   it('kills orphaned canonical reviewer sessions', async () => {
     mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
-      'specialist-panopticon-PAN-879-review-correctness',
-      'specialist-panopticon-PAN-879-review-synthesis',
+      'specialist-overdeck-PAN-879-review-correctness',
+      'specialist-overdeck-PAN-879-review-synthesis',
     ]) as any);
 
     const actions = await cleanupOrphanedReviewSessions();
 
     expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
-    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-correctness');
-    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-synthesis');
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-overdeck-PAN-879-review-correctness');
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-overdeck-PAN-879-review-synthesis');
     expect(actions).toEqual([
-      'Killed orphaned specialist-panopticon-PAN-879-review-correctness (synthesis agent-pan-879-review and work agent-pan-879 not running)',
-      'Killed orphaned specialist-panopticon-PAN-879-review-synthesis (synthesis agent-pan-879-review and work agent-pan-879 not running)',
+      'Killed orphaned specialist-overdeck-PAN-879-review-correctness (synthesis agent-pan-879-review and work agent-pan-879 not running)',
+      'Killed orphaned specialist-overdeck-PAN-879-review-synthesis (synthesis agent-pan-879-review and work agent-pan-879 not running)',
     ]);
   });
 
@@ -197,7 +197,7 @@ describe('cleanupOrphanedReviewSessions', () => {
 
   it('keeps canonical reviewer sessions when the work agent still exists', async () => {
     mockListSessionNamesAsync.mockReturnValue(Effect.succeed([
-      'specialist-panopticon-PAN-879-review-correctness',
+      'specialist-overdeck-PAN-879-review-correctness',
     ]) as any);
     mockSessionExists.mockImplementation((name: string) => name === 'agent-pan-879');
 

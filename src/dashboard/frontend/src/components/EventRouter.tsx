@@ -244,7 +244,7 @@ export function EventRouter() {
             bootstrap()
             // Broadcast to all useQuery consumers so they re-fetch stale data
             // (session trees, conversations, costs, etc.)
-            window.dispatchEvent(new CustomEvent('panopticon:reconnected'))
+            window.dispatchEvent(new CustomEvent('overdeck:reconnected'))
           },
           onRetry: (attempt) => {
             if (attempt >= UNREACHABLE_OVERLAY_RETRY_ATTEMPTS) {

@@ -25,7 +25,7 @@ interface CloseOutOptions {
 }
 
 function getGitHubConfig(): { owner: string; repo: string; prefix: string } | null {
-  const envFile = join(homedir(), '.panopticon.env');
+  const envFile = join(homedir(), '.overdeck.env');
   if (!existsSync(envFile)) return null;
 
   const content = readFileSync(envFile, 'utf-8');
@@ -66,7 +66,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
   if (!issueId) {
     console.error(chalk.red(`Could not resolve issue ID "${id}"`));
     console.error(chalk.dim(
-      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.overdeck/agents/agent-<prefix>-<num>/',
     ));
     process.exit(1);
   }

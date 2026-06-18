@@ -4,8 +4,8 @@ import { WorkspaceHeader } from './WorkspaceHeader'
 
 describe('WorkspaceHeader', () => {
   it('shows the workspace name and branch', () => {
-    render(<WorkspaceHeader name="panopticon" branch="feature/pan-1549" iconLabel="P" />)
-    expect(screen.getByRole('heading', { name: 'panopticon' })).toBeTruthy()
+    render(<WorkspaceHeader name="overdeck" branch="feature/pan-1549" iconLabel="P" />)
+    expect(screen.getByRole('heading', { name: 'overdeck' })).toBeTruthy()
     expect(screen.getByText(/feature\/pan-1549/)).toBeTruthy()
     expect(screen.getByText('P')).toBeTruthy()
   })

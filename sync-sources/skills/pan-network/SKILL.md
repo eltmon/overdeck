@@ -44,7 +44,7 @@ Docker containers (internal ports)
 ### 1. Start Traefik
 
 ```bash
-cd /path/to/panopticon/templates/traefik
+cd /path/to/overdeck/templates/traefik
 docker compose up -d
 ```
 
@@ -166,7 +166,7 @@ templates/traefik/
 ├── docker-compose.yml
 ├── traefik.yml           # Static config
 ├── dynamic/
-│   ├── panopticon.yml    # Overdeck dashboard routing
+│   ├── overdeck.yml    # Overdeck dashboard routing
 │   └── workspace.yml.template  # Template for workspaces
 └── certs/
     ├── _wildcard.pan.localhost.pem

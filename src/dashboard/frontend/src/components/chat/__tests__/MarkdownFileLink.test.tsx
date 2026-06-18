@@ -79,7 +79,7 @@ describe('MarkdownFileLink', () => {
   });
 
   it('opens targetPath with the stored preferred editor', async () => {
-    localStorage.setItem('panopticon:last-editor', 'vscode');
+    localStorage.setItem('overdeck:last-editor', 'vscode');
     render(<MarkdownFileLink {...meta} />);
 
     fireEvent.click(screen.getByRole('link'));
@@ -90,7 +90,7 @@ describe('MarkdownFileLink', () => {
         editor: 'vscode',
       });
     });
-    expect(localStorage.getItem('panopticon:last-editor')).toBe('vscode');
+    expect(localStorage.getItem('overdeck:last-editor')).toBe('vscode');
   });
 
   it('falls back to the first available editor and persists it', async () => {
@@ -105,7 +105,7 @@ describe('MarkdownFileLink', () => {
         editor: 'vscode',
       });
     });
-    expect(localStorage.getItem('panopticon:last-editor')).toBe('vscode');
+    expect(localStorage.getItem('overdeck:last-editor')).toBe('vscode');
   });
 
   it('shows context menu actions in the expected order and prevents the native menu', () => {
@@ -163,7 +163,7 @@ describe('MarkdownFileLink', () => {
   });
 
   it('opens the target path from the context menu and emits a success toast', async () => {
-    localStorage.setItem('panopticon:last-editor', 'vscode');
+    localStorage.setItem('overdeck:last-editor', 'vscode');
     render(<MarkdownFileLink {...meta} />);
 
     fireEvent.contextMenu(screen.getByRole('link'));
@@ -244,7 +244,7 @@ describe('MarkdownFileLink', () => {
   });
 
   it('keeps plain left-click opening the file in the editor when Quickview is available', async () => {
-    localStorage.setItem('panopticon:last-editor', 'vscode');
+    localStorage.setItem('overdeck:last-editor', 'vscode');
     render(<MarkdownFileLink {...meta} issueId="PAN-1370" />);
 
     fireEvent.click(screen.getByRole('link'));

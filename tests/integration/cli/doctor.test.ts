@@ -34,13 +34,13 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 
 vi.mock('../../../src/lib/config.js', () => ({
   loadConfig: vi.fn().mockReturnValue({
-    panopticon: { version: '1.0.0' },
+    overdeck: { version: '1.0.0' },
     sync: { backup_before_sync: true },
     trackers: { primary: 'linear' },
     dashboard: { port: 3001, api_port: 3002 },
   }),
   loadConfigSync: vi.fn().mockReturnValue({
-    panopticon: { version: '1.0.0' },
+    overdeck: { version: '1.0.0' },
     sync: { backup_before_sync: true },
     trackers: { primary: 'linear' },
     dashboard: { port: 3001, api_port: 3002 },
@@ -136,7 +136,7 @@ describe('doctor command', () => {
       const { loadConfigSync } = await import('../../../src/lib/config.js');
       const config = loadConfigSync();
 
-      expect(config).toHaveProperty('panopticon');
+      expect(config).toHaveProperty('overdeck');
       expect(config).toHaveProperty('sync');
       expect(config).toHaveProperty('trackers');
       expect(config).toHaveProperty('dashboard');
@@ -203,14 +203,14 @@ describe('doctor command', () => {
       const mockExistsSync = vi.mocked(existsSync);
       mockExistsSync.mockReturnValue(true);
 
-      expect(existsSync('/home/test/.panopticon/skills')).toBe(true);
+      expect(existsSync('/home/test/.overdeck/skills')).toBe(true);
     });
 
     it('should check if commands directory exists', () => {
       const mockExistsSync = vi.mocked(existsSync);
       mockExistsSync.mockReturnValue(true);
 
-      expect(existsSync('/home/test/.panopticon/commands')).toBe(true);
+      expect(existsSync('/home/test/.overdeck/commands')).toBe(true);
     });
   });
 

@@ -60,14 +60,14 @@ Specifically: **70+ issues need pass-3 re-audit** if we extend distrust to all p
 
 - **Model**: GPT-5.5
 - **Transport**: `claude --print --model gpt-5.5 --permission-mode bypassPermissions`
-- **Env**: `ANTHROPIC_BASE_URL=http://127.0.0.1:8317` `ANTHROPIC_AUTH_TOKEN=panopticon-local-cliproxy-key`
+- **Env**: `ANTHROPIC_BASE_URL=http://127.0.0.1:8317` `ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key`
 - **Routing**: CLIProxy bridges to ChatGPT subscription OAuth
 - **Tool access**: GPT-5.5 inherits Claude Code's full tool layer including Playwright MCP
 
 ### Critical prereqs
 
 1. **CLIProxy must be running** (port 8317). Check: `pgrep -af cliproxy`.
-2. **Codex OAuth token must be fresh**. Check `tail ~/.panopticon/cliproxy/cliproxy.log` for recent `refresh_token_reused`. If present, run `codex login` interactively. (This is PAN-913 — the dashboard says "valid" even when token is burned.)
+2. **Codex OAuth token must be fresh**. Check `tail ~/.overdeck/cliproxy/cliproxy.log` for recent `refresh_token_reused`. If present, run `codex login` interactively. (This is PAN-913 — the dashboard says "valid" even when token is burned.)
 3. **Don't trust `pan flywheel status` for run state**. PAN-1386 — orchestrator stops emitting `latest.json` mid-run.
 
 ### Prompt template

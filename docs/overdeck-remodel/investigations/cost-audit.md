@@ -11,11 +11,11 @@ Method: every column traced through its writers (`insertCostEvent[s]`,
 `aggregator.ts`, and the 18 cost HTTP endpoints), with the discriminator being
 **does any consumer read the column at all**, and **is the column reconstructable
 from a durable source**. Empirical distribution was measured against the live
-`~/.panopticon/panopticon.db` (395,910 rows, 1.4 GB) on 2026-06-16.
+`~/.overdeck/panopticon.db` (395,910 rows, 1.4 GB) on 2026-06-16.
 
 **Headline verdict:** the **entire `cost_events` table is pure CACHE** — every
 row is rebuildable from the union of durable sources `{Claude transcripts} ∪
-{~/.panopticon/costs/events.jsonl} ∪ {per-project WALs}`. Nothing in the table
+{~/.overdeck/costs/events.jsonl} ∪ {per-project WALs}`. Nothing in the table
 is irrecoverably DB-only. Of the 20 columns: **14 NEED, 6 DEAD** (5 never
 populated in 395,910 rows + 1 redundant). Of the cost rollups: **all are already
 computed-on-read** — but they are computed on read **four different ways from
@@ -28,13 +28,13 @@ live-window cache.
 
 ## Glossary
 
-- **`cost_events`** — the SQLite table (`~/.panopticon/panopticon.db`). One row
+- **`cost_events`** — the SQLite table (`~/.overdeck/panopticon.db`). One row
   per deduplicated assistant API response: tokens + computed USD + attribution.
 - **Claude transcript** — `~/.claude/projects/<encoded-cwd>/<session>.jsonl`,
   written by Claude Code. Carries per-response `message.usage` token counts and
   `requestId`, but **no cost** (cost is computed by Overdeck from tokens ×
   pricing). The reconciler's source of truth for Claude/CLIProxy agents.
-- **events.jsonl** — `~/.panopticon/costs/events.jsonl`, Overdeck's own
+- **events.jsonl** — `~/.overdeck/costs/events.jsonl`, Overdeck's own
   append-only cost log written by `appendCostEventSync`. Carries the **computed
   cost** at write time. The source of truth for background-AI events that have no
   transcript at all.

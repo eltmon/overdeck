@@ -3,7 +3,7 @@
 # Git post-checkout hook to guard main project directories
 # Prevents accidental checkouts away from main in the primary project directory
 #
-# Install: ln -sf /path/to/panopticon/scripts/git-hooks/post-checkout .git/hooks/post-checkout
+# Install: ln -sf /path/to/overdeck/scripts/git-hooks/post-checkout .git/hooks/post-checkout
 # Or: pan projects add /path/to/project (auto-installs hooks)
 #
 # This hook only activates in the MAIN project directory (not worktrees).

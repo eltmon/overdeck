@@ -34,7 +34,7 @@ export function getShellRcFileSync(shell: Shell): string | null {
   }
 }
 
-const ALIAS_LINE = 'alias pan="panopticon"';
+const ALIAS_LINE = 'alias pan="overdeck"';
 const ALIAS_MARKER = '# Overdeck CLI alias';
 
 export function hasAliasSync(rcFile: string): boolean {
@@ -75,11 +75,11 @@ export const detectShell = (): Effect.Effect<Shell> => Effect.sync(() => detectS
 export const getShellRcFile = (shell: Shell): Effect.Effect<string | null> =>
   Effect.sync(() => getShellRcFileSync(shell));
 
-/** True if the rc file already contains the panopticon alias. Pure-ish (readFile). */
+/** True if the rc file already contains the overdeck alias. Pure-ish (readFile). */
 export const hasAlias = (rcFile: string): Effect.Effect<boolean> =>
   Effect.sync(() => hasAliasSync(rcFile));
 
-/** Append the panopticon alias to an rc file; surfaces FsError on failure. */
+/** Append the overdeck alias to an rc file; surfaces FsError on failure. */
 export const addAlias = (rcFile: string): Effect.Effect<void, FsError> =>
   Effect.try({
     try: () => addAliasSync(rcFile),

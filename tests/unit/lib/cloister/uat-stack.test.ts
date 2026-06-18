@@ -75,7 +75,7 @@ describe('ensureUatStack', () => {
 
     expect(result.success).toBe(true);
     expect(result.frontendUrl).toBe('https://uat-pan-otter-0610.pan.localhost');
-    expect(deps.ups).toEqual(['panopticon-uat-pan-otter-0610']);
+    expect(deps.ups).toEqual(['overdeck-uat-pan-otter-0610']);
     expect(deps.stackWrites).toHaveLength(1);
     expect(deps.stackWrites[0]![0]).toBe('uat/pan-otter-0610');
     expect(deps.stackWrites[0]![1]).toBeTruthy();
@@ -92,10 +92,10 @@ describe('ensureUatStack', () => {
 
     expect(result.success).toBe(true);
     expect(result.evicted).toEqual(['uat/pan-a-0610']);
-    expect(deps.downs).toEqual(['panopticon-uat-pan-a-0610']);
+    expect(deps.downs).toEqual(['overdeck-uat-pan-a-0610']);
     // evicted stack record cleared, new stack recorded
     expect(deps.stackWrites).toContainEqual(['uat/pan-a-0610', null]);
-    expect(deps.ups).toEqual(['panopticon-uat-pan-c-0610']);
+    expect(deps.ups).toEqual(['overdeck-uat-pan-c-0610']);
   });
 
   it('serializes concurrent starts so the cap is enforced against the re-read stack set', async () => {
@@ -117,7 +117,7 @@ describe('ensureUatStack', () => {
     expect(r1.success).toBe(true);
     expect(r2.success).toBe(true);
     expect([...running].sort()).toEqual(['uat/pan-b-0610', 'uat/pan-c-0610']);
-    expect(deps.downs).toEqual(['panopticon-uat-pan-a-0610']);
+    expect(deps.downs).toEqual(['overdeck-uat-pan-a-0610']);
   });
 
   it('re-ensuring a generation that already has a stack does not evict others below cap', async () => {
@@ -159,7 +159,7 @@ describe('teardownUatStack', () => {
   it('composes down and clears the stack record', async () => {
     const deps = makeDeps();
     await teardownUatStack(gen('uat/pan-down-0610', { stackStartedAt: '2026-06-10T01:00:00.000Z' }), deps);
-    expect(deps.downs).toEqual(['panopticon-uat-pan-down-0610']);
+    expect(deps.downs).toEqual(['overdeck-uat-pan-down-0610']);
     expect(deps.stackWrites).toEqual([['uat/pan-down-0610', null]]);
   });
 

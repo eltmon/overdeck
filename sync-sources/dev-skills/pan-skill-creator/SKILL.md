@@ -4,7 +4,7 @@ description: Guide for Overdeck developers on creating and distributing skills
 triggers:
   - create a skill
   - add a skill
-  - new skill for panopticon
+  - new skill for overdeck
   - make skill available to all users
 ---
 
@@ -20,37 +20,37 @@ Overdeck has a two-stage skill distribution system:
 
 | Location | Purpose | Distributed to Users |
 |----------|---------|---------------------|
-| `panopticon/skills/` | Public skills for all users | Yes (via `pan install`) |
-| `panopticon/dev-skills/` | Developer-only skills | No (only when running from repo) |
-| `~/.panopticon/skills/` | User's installed skills | N/A (destination, not source) |
+| `overdeck/skills/` | Public skills for all users | Yes (via `pan install`) |
+| `overdeck/dev-skills/` | Developer-only skills | No (only when running from repo) |
+| `~/.overdeck/skills/` | User's installed skills | N/A (destination, not source) |
 | `~/.claude/skills/` | Active skills for Claude Code | N/A (destination, not source) |
 
 ### 2. Installation Flow
 
 ```
 pan install (first time)
-    └── Copies panopticon/skills/* → ~/.panopticon/skills/
+    └── Copies overdeck/skills/* → ~/.overdeck/skills/
     
 pan sync
-    └── Symlinks ~/.panopticon/skills/* → ~/.claude/skills/
-    └── (In dev mode) Also symlinks panopticon/dev-skills/* → ~/.claude/skills/
+    └── Symlinks ~/.overdeck/skills/* → ~/.claude/skills/
+    └── (In dev mode) Also symlinks overdeck/dev-skills/* → ~/.claude/skills/
 ```
 
 ## Creating a New Skill
 
 ### Step 1: Decide Visibility
 
-**Public skill (all users):** Create in `panopticon/skills/`
-**Dev-only skill:** Create in `panopticon/dev-skills/`
+**Public skill (all users):** Create in `overdeck/skills/`
+**Dev-only skill:** Create in `overdeck/dev-skills/`
 
 ### Step 2: Create Skill Directory
 
 ```bash
 # For public skills
-mkdir -p /path/to/panopticon/skills/my-skill
+mkdir -p /path/to/overdeck/skills/my-skill
 
 # For dev-only skills
-mkdir -p /path/to/panopticon/dev-skills/my-skill
+mkdir -p /path/to/overdeck/dev-skills/my-skill
 ```
 
 ### Step 3: Create SKILL.md
@@ -75,7 +75,7 @@ Content and instructions for the skill...
 
 ```bash
 # Rebuild Overdeck
-cd /path/to/panopticon && npm run build
+cd /path/to/overdeck && npm run build
 
 # Sync skills (dev mode auto-detected)
 pan sync --force
@@ -95,8 +95,8 @@ git push
 ## Key Points
 
 1. **Always add skills to the Overdeck repo** unless the user explicitly says to create a personal/local skill
-2. **`pan install` copies skills** from package to ~/.panopticon/skills/ (doesn't overwrite existing)
-3. **`pan sync` creates symlinks** from ~/.panopticon/skills/ to ~/.claude/skills/
+2. **`pan install` copies skills** from package to ~/.overdeck/skills/ (doesn't overwrite existing)
+3. **`pan sync` creates symlinks** from ~/.overdeck/skills/ to ~/.claude/skills/
 4. **Dev mode** (detected by dev-skills/ existing) also syncs dev-skills/
 
 ## Skill Best Practices
@@ -111,7 +111,7 @@ git push
 
 When updating a skill:
 
-1. Edit the file in `panopticon/skills/my-skill/SKILL.md`
+1. Edit the file in `overdeck/skills/my-skill/SKILL.md`
 2. Run `npm run build`
 3. Run `pan sync --force` to update symlinks
 4. Test the skill works
