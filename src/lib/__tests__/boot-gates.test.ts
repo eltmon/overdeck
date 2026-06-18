@@ -41,4 +41,27 @@ describe('boot gate env resolution', () => {
       resume: { enabled: false, source: 'env' },
     });
   });
+
+  it('defaults agent auto-resume to OFF when nothing opts in (PAN-1963)', () => {
+    // No flag, no env → resume is off by default (deacon unaffected, stays on).
+    expect(resolveBootGates({}, {})).toEqual({
+      deacon: { enabled: true, source: 'default' },
+      resume: { enabled: false, source: 'default' },
+    });
+    const env = applyBootGateEnv({});
+    expect(env.PANOPTICON_NO_RESUME).toBe('1');
+    expect(env[RESUME_GATE_SOURCE_ENV]).toBe('default');
+  });
+
+  it('opts back into auto-resume via --resume', () => {
+    expect(resolveBootGates({ resume: true }, {}).resume).toEqual({ enabled: true, source: 'flag' });
+    const env = applyBootGateEnv({}, { resume: true });
+    expect(env.PANOPTICON_NO_RESUME).toBeUndefined();
+  });
+
+  it('opts back into auto-resume via PANOPTICON_RESUME', () => {
+    expect(resolveBootGates({}, { PANOPTICON_RESUME: '1' }).resume).toEqual({ enabled: true, source: 'env' });
+    const env = applyBootGateEnv({ PANOPTICON_RESUME: '1' });
+    expect(env.PANOPTICON_NO_RESUME).toBeUndefined();
+  });
 });
