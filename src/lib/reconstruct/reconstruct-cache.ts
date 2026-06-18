@@ -15,10 +15,7 @@ import type {
   AgentSnapshot,
   ReviewStatusSnapshot,
 } from '@panctl/contracts';
-import type { SqliteDatabase } from '../database/driver.js';
-import { getDatabase } from '../database/index.js';
-import { backfillAgentsFromStateJsonSync } from '../database/agent-backfill.js';
-import { listAllAgents } from '../database/agents-db.js';
+import { backfillAgentsSync, listAllAgentsSync } from '../overdeck/agents.js';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { listProjectsSync, type ProjectConfig } from '../projects.js';
 import {
@@ -292,15 +289,18 @@ async function fetchPrState(
 
 /**
  * Reconstruct the dashboard cache from durable sources only.
+ *
+ * The `_db` parameter is accepted for backward compatibility but is no longer
+ * used — the cache now reads from the overdeck layer directly.
  */
 export async function reconstructCache(
-  db: SqliteDatabase,
+  _db?: unknown,
   opts?: ReconstructOptions,
 ): Promise<ReconstructResult> {
   const verbose = opts?.verbose ?? false;
 
   // 1. Rebuild the agents table from state.json + tmux (sources-only).
-  const { processed: agentsRebuilt } = backfillAgentsFromStateJsonSync(db, {
+  const { processed: agentsRebuilt } = backfillAgentsSync({
     verbose,
     listLiveSessions: opts?.listLiveSessions,
   });
@@ -314,11 +314,11 @@ export async function reconstructCache(
       '[reconstruct-cache] listRunningAgents failed, falling back to agents table:',
       (err as Error).message,
     );
-    runningAgents = listAllAgents().map((agent) => {
+    runningAgents = listAllAgentsSync().map((agent) => {
       const state = {
         id: agent.id,
         issueId: agent.issueId,
-        workspace: agent.workspace,
+        workspace: agent.workspace ?? '',
         role: agent.role as AgentState['role'],
         model: agent.model ?? '',
         status: agent.status as AgentState['status'],
@@ -423,5 +423,5 @@ export async function reconstructCache(
 }
 
 export function reconstructCacheAuto(opts?: ReconstructOptions): Promise<ReconstructResult> {
-  return reconstructCache(getDatabase(), opts);
+  return reconstructCache(undefined, opts);
 }

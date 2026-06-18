@@ -351,6 +351,46 @@ export const SettingsApi = HttpApiGroup.make('settings')
     }),
   );
 
+// ── Sync helpers (for call sites that cannot use Effect) ─────────────────────
+
+function overdeckDb() {
+  return getOverdeckDatabaseSync();
+}
+
+export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
+
+/** Read a raw app_settings value synchronously. Returns null if not set. */
+export function getSetting(key: string): string | null {
+  const row = overdeckDb()
+    .prepare('SELECT value FROM app_settings WHERE key = ?')
+    .get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+/** Write a raw app_settings value synchronously. */
+export function setSetting(key: string, value: string): void {
+  const now = new Date().toISOString();
+  overdeckDb().prepare(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  ).run(key, value, now);
+}
+
+/** Synchronous check of the global Deacon pause flag. */
+export function isDeaconGloballyPausedSync(): boolean {
+  try {
+    return getSetting(DEACON_GLOBAL_PAUSE_KEY) === 'true';
+  } catch (err) {
+    console.warn('[control-settings] Failed to read deacon pause flag:', err);
+    return false;
+  }
+}
+
+/** Synchronous set of the global Deacon pause flag. */
+export function setDeaconGloballyPausedSync(paused: boolean): void {
+  setSetting(DEACON_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
+}
+
 export const ConfigApi = HttpApiGroup.make('config')
   .add(
     HttpApiEndpoint.get('getProject', '/projects/:key', {

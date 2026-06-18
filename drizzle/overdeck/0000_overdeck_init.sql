@@ -383,4 +383,80 @@ CREATE TABLE `uat_generations` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);
+CREATE INDEX `uat_status_idx` ON `uat_generations` (`status`);--> statement-breakpoint
+CREATE TABLE `discovered_sessions` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`jsonl_path` text NOT NULL UNIQUE,
+	`session_id` text,
+	`workspace_path` text,
+	`workspace_hash` text,
+	`message_count` integer NOT NULL DEFAULT 0,
+	`first_ts` text,
+	`last_ts` text,
+	`models_used` text,
+	`primary_model` text,
+	`token_input` integer NOT NULL DEFAULT 0,
+	`token_output` integer NOT NULL DEFAULT 0,
+	`estimated_cost` real NOT NULL DEFAULT 0,
+	`tools_used` text,
+	`files_touched` text,
+	`tags` text,
+	`summary` text,
+	`summary_detailed` text,
+	`enrichment_level` integer NOT NULL DEFAULT 0,
+	`enrichment_model` text,
+	`enriched_at` text,
+	`enrichment_failed` integer NOT NULL DEFAULT 0,
+	`panopticon_managed` integer NOT NULL DEFAULT 0,
+	`pan_issue_id` text,
+	`pan_agent_id` text,
+	`file_size` integer,
+	`file_mtime` text,
+	`scanned_at` text NOT NULL
+);--> statement-breakpoint
+CREATE INDEX `idx_discovered_workspace` ON `discovered_sessions` (`workspace_path`);--> statement-breakpoint
+CREATE INDEX `idx_discovered_last_ts` ON `discovered_sessions` (`last_ts`);--> statement-breakpoint
+CREATE INDEX `idx_discovered_enrichment` ON `discovered_sessions` (`enrichment_level`,`enriched_at`);--> statement-breakpoint
+CREATE INDEX `idx_discovered_managed` ON `discovered_sessions` (`panopticon_managed`,`pan_issue_id`);--> statement-breakpoint
+CREATE INDEX `idx_discovered_model` ON `discovered_sessions` (`primary_model`);--> statement-breakpoint
+CREATE INDEX `idx_discovered_session_id` ON `discovered_sessions` (`session_id`) WHERE session_id IS NOT NULL;--> statement-breakpoint
+CREATE TABLE `discovered_session_tags` (
+	`session_id` integer NOT NULL REFERENCES `discovered_sessions`(`id`) ON DELETE CASCADE,
+	`tag` text NOT NULL,
+	PRIMARY KEY (`session_id`, `tag`)
+);--> statement-breakpoint
+CREATE INDEX `idx_discovered_session_tags_tag` ON `discovered_session_tags` (`tag`,`session_id`);--> statement-breakpoint
+CREATE TABLE `discovered_session_tools` (
+	`session_id` integer NOT NULL REFERENCES `discovered_sessions`(`id`) ON DELETE CASCADE,
+	`tool` text NOT NULL,
+	PRIMARY KEY (`session_id`, `tool`)
+);--> statement-breakpoint
+CREATE INDEX `idx_discovered_session_tools_tool` ON `discovered_session_tools` (`tool`,`session_id`);--> statement-breakpoint
+CREATE TABLE `discovered_session_files` (
+	`session_id` integer NOT NULL REFERENCES `discovered_sessions`(`id`) ON DELETE CASCADE,
+	`file_path` text NOT NULL,
+	PRIMARY KEY (`session_id`, `file_path`)
+);--> statement-breakpoint
+CREATE INDEX `idx_discovered_session_files_file_path` ON `discovered_session_files` (`file_path`,`session_id`);--> statement-breakpoint
+CREATE TABLE `session_embeddings` (
+	`session_id` integer NOT NULL REFERENCES `discovered_sessions`(`id`) ON DELETE CASCADE,
+	`model` text NOT NULL,
+	`dim` integer NOT NULL,
+	`embedding` blob NOT NULL,
+	`created_at` text NOT NULL,
+	PRIMARY KEY (`session_id`, `model`)
+);--> statement-breakpoint
+CREATE TABLE `git_operations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`operation` text NOT NULL,
+	`branch` text,
+	`issue_id` text,
+	`before_sha` text,
+	`after_sha` text,
+	`remote_sha` text,
+	`status` text NOT NULL,
+	`error` text,
+	`ts` text NOT NULL
+);--> statement-breakpoint
+CREATE INDEX `idx_git_ops_ts` ON `git_operations` (`ts`);--> statement-breakpoint
+CREATE INDEX `idx_git_ops_issue` ON `git_operations` (`issue_id`,`ts`);--> statement-breakpoint

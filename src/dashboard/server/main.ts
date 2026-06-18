@@ -59,7 +59,7 @@ import { makeCutoverEffect } from '../../lib/overdeck/cutover.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
-import { listAllAgents } from '../../lib/database/agents-db.js';
+import { getAgentSessionsSync } from '../../lib/tmux.js';
 
 declare const Bun: unknown;
 
@@ -652,12 +652,19 @@ await (async () => {
       return;
     }
 
-    // Use running/starting agents' issue IDs as reconstruction sources so their
-    // state is reflected in overdeck.db via Reconstruction.rebuild.
-    const runningAgents = listAllAgents().filter(
-      (a) => a.status === 'running' || a.status === 'starting',
+    // Use live tmux agent sessions to determine which issues are actively running.
+    // This is the gate-clean source: sessions named `agent-<prefix>-<n>` exist
+    // only while the agent process is live, so they are a more reliable signal
+    // than the panopticon.db agents table (which is the old DB we are moving
+    // away from) and correctly return an empty set on fresh-overdeck boots.
+    const openIssueIds = new Set(
+      getAgentSessionsSync()
+        .map((s) => {
+          const m = /^agent-([a-z]+)-(\d+)$/.exec(s.name);
+          return m ? `${m[1].toUpperCase()}-${m[2]}` : null;
+        })
+        .filter((id): id is string => id !== null),
     );
-    const openIssueIds = new Set(runningAgents.map((a) => a.issueId));
 
     const cutoverLayer = Layer.mergeAll(ProjectsLive, RecordsLive, TmuxLive);
     const result = await Effect.runPromise(

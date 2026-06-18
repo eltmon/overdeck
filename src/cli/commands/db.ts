@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
-import { backfillAgentsAutoSync } from '../../lib/database/agent-backfill.js';
+import { backfillAgentsSync } from '../../lib/overdeck/agents.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -642,7 +642,7 @@ async function rebuildAgentsCommand(options: {
   const spinner = ora('Rebuilding agents table from state.json sources...').start();
 
   try {
-    const result = backfillAgentsAutoSync({ verbose: options.verbose });
+    const result = backfillAgentsSync({ verbose: options.verbose });
 
     if (options.dryRun) {
       spinner.info(

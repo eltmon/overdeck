@@ -75,7 +75,7 @@ import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
-import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
+import { isDeaconGloballyPausedSync as isDeaconGloballyPaused, setDeaconGloballyPausedSync as setDeaconGloballyPaused } from '../../../lib/overdeck/control-settings.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getAgentStateFilePath } from '../../../lib/agents.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';

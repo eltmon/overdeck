@@ -13,13 +13,13 @@ import { Effect, Data } from 'effect';
 import {
   appendGitOperationSync,
   listGitOperationsSync,
-} from './database/git-operations-db.js';
+} from './overdeck/git-activity.js';
 import type {
   GitOperation,
   GitOperationFilter,
   GitOperationType,
   GitOperationStatus,
-} from './database/git-operations-db.js';
+} from './overdeck/git-activity.js';
 
 export type { GitOperation, GitOperationFilter, GitOperationType, GitOperationStatus };
 export { appendGitOperationSync, listGitOperationsSync };
