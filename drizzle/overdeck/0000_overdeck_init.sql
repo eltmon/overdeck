@@ -257,6 +257,49 @@ CREATE TABLE `review_runs` (
 );
 --> statement-breakpoint
 CREATE INDEX `review_runs_issue_idx` ON `review_runs` (`issue_id`);--> statement-breakpoint
+CREATE TABLE `review_status` (
+	`issue_id` text PRIMARY KEY NOT NULL,
+	`review_status` text DEFAULT 'pending' NOT NULL,
+	`test_status` text DEFAULT 'pending' NOT NULL,
+	`merge_status` text,
+	`inspect_status` text,
+	`inspect_notes` text,
+	`inspect_started_at` text,
+	`inspect_bead_id` text,
+	`verification_status` text,
+	`verification_notes` text,
+	`verification_cycle_count` integer DEFAULT 0,
+	`verification_max_cycles` integer,
+	`review_notes` text,
+	`test_notes` text,
+	`merge_notes` text,
+	`updated_at` text NOT NULL,
+	`ready_for_merge` integer DEFAULT 0 NOT NULL,
+	`auto_requeue_count` integer DEFAULT 0,
+	`merge_retry_count` integer DEFAULT 0,
+	`pr_url` text,
+	`pr_head_sha` text,
+	`pr_number` integer,
+	`stuck` integer DEFAULT 0 NOT NULL,
+	`stuck_reason` text,
+	`stuck_at` text,
+	`stuck_details` text,
+	`reviewed_at_commit` text,
+	`review_spawned_at` text,
+	`conflict_resolution_dispatched_at` text,
+	`test_retry_count` integer DEFAULT 0,
+	`review_retry_count` integer DEFAULT 0,
+	`recovery_started_at` text,
+	`deacon_ignored` integer DEFAULT 0 NOT NULL,
+	`deacon_ignored_at` text,
+	`deacon_ignored_reason` text,
+	`blocker_reasons` text,
+	`last_verified_commit` text,
+	`merge_step` text,
+	`auto_merge` integer
+);
+--> statement-breakpoint
+CREATE INDEX `review_status_updated_idx` ON `review_status` (`updated_at`);--> statement-breakpoint
 CREATE TABLE `status_history` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`issue_id` text NOT NULL,
