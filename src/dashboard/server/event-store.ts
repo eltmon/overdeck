@@ -19,9 +19,8 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
-import { initWorkspaceDiscoveredSessionsSchema } from '../../lib/database/schema.js';
 import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
-import type { SqliteDatabase } from '../../lib/database/driver.js';
+import { openDatabase } from '../../lib/database/driver.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -153,13 +152,33 @@ export async function openEventDb(): Promise<DbAdapter> {
         ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
         WHERE json_type(payload, '$.issueId') = 'text'
     `);
-    initWorkspaceDiscoveredSessionsSchema(db as unknown as SqliteDatabase);
     return db as unknown as DbAdapter;
   } else {
-    // Node.js: use shared database connection — migrations run there
-    const { getDatabase } = await import('../../lib/database/index.js');
-    const db = getDatabase();
-    initWorkspaceDiscoveredSessionsSchema(db);
+    // Node.js: open panopticon.db directly via the shared driver.
+    // discovered_sessions is now in overdeck.db — no need to call initWorkspaceDiscoveredSessionsSchema here.
+    const db = openDatabase(dbPath);
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+    db.pragma('synchronous = NORMAL');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS events (
+        sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+        type      TEXT    NOT NULL,
+        timestamp TEXT    NOT NULL,
+        payload   TEXT    NOT NULL DEFAULT '{}'
+      )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS events_timestamp_idx ON events (timestamp)`);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_issue_type_timestamp_sequence
+        ON events(json_extract(payload, '$.issueId'), type, timestamp, sequence)
+        WHERE json_type(payload, '$.issueId') = 'text'
+    `);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_events_type_timestamp_issue_sequence
+        ON events(type, timestamp, json_extract(payload, '$.issueId'), sequence)
+        WHERE json_type(payload, '$.issueId') = 'text'
+    `);
     return db as unknown as DbAdapter;
   }
 }
