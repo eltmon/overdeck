@@ -66,13 +66,13 @@ describe('memory transcript checkpoints', () => {
       issueId: 'PAN-1052',
       transcriptPath: '/tmp/session-1.jsonl',
       lastOffset: 0,
-      lastObservationAt: null,
+      // lastObservationAt dropped in overdeck schema migration (zero reads)
     });
 
     expect(commit()).toMatchObject({ status: 'committed' });
     expect(getTranscriptCheckpoint('session-1')).toMatchObject({
       lastOffset: 100,
-      lastObservationAt: '2026-05-16T22:45:00.000Z',
+      // lastObservationAt dropped in overdeck schema migration (zero reads)
     });
   });
 

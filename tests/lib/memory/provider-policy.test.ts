@@ -1,9 +1,7 @@
-import { mkdtemp, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
-import { insertCostEvent } from '../../../src/lib/database/cost-events-db.js';
+import { insertCostEventSync } from '../../../src/lib/overdeck/cost-sync.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import {
   extractWithProviderPolicy,
   getTodayMemoryExtractionSpendUsd,
@@ -29,19 +27,22 @@ const identity = {
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
+let odb: OverdeckTestDb;
 
 beforeEach(async () => {
   originalHome = process.env.PANOPTICON_HOME;
-  tempDir = await mkdtemp(join(tmpdir(), 'pan-memory-provider-policy-'));
-  process.env.PANOPTICON_HOME = tempDir;
   resetDatabase();
+  // setupOverdeckTestDb creates a fresh PANOPTICON_HOME with overdeck.db.
+  odb = setupOverdeckTestDb();
+  tempDir = odb.home;
 });
 
 afterEach(async () => {
   closeDatabase();
+  teardownOverdeckTestDb(odb);
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
   else process.env.PANOPTICON_HOME = originalHome;
-  if (tempDir) await rm(tempDir, { recursive: true, force: true });
+  // odb.home (=tempDir) is removed by teardownOverdeckTestDb; no double-rm needed.
   tempDir = null;
 });
 
@@ -78,7 +79,7 @@ describe('memory extraction provider policy', () => {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
 
-    insertCostEvent({
+    insertCostEventSync({
       ts: today.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,
@@ -95,7 +96,7 @@ describe('memory extraction provider policy', () => {
       requestId: 'memory-extraction-today',
       sessionId: identity.sessionId,
     });
-    insertCostEvent({
+    insertCostEventSync({
       ts: yesterday.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,
@@ -112,7 +113,7 @@ describe('memory extraction provider policy', () => {
       requestId: 'memory-extraction-yesterday',
       sessionId: identity.sessionId,
     });
-    insertCostEvent({
+    insertCostEventSync({
       ts: today.toISOString(),
       type: 'cost',
       agentId: identity.sessionId,

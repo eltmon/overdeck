@@ -47,7 +47,7 @@ describe('createOverdeckDatabase', () => {
     const db = openDatabase(dbPath);
     try {
       const tables = tableNames(db);
-      expect(tables).toHaveLength(24);
+      expect(tables).toHaveLength(OVERDECK_TABLE_COUNT);
 
       for (const tableName of tables) {
         const row = db.prepare(`SELECT COUNT(*) AS count FROM "${tableName}"`).get<{ count: number }>();

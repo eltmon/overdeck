@@ -72,7 +72,7 @@ describe('lint-overdeck-boundaries.sh', () => {
 
     const { ok, output } = runLint(root);
     expect(ok).toBe(false);
-    expect(output).toContain('overdeck import-boundary violation');
+    expect(output).toContain('overdeck boundary gate:');
     expect(output).toContain('routes/issues.ts');
   });
 
@@ -88,6 +88,6 @@ describe('lint-overdeck-boundaries.sh', () => {
 
     const { ok, output } = runLint(root);
     expect(ok).toBe(true);
-    expect(output).toContain('overdeck import-boundary lint passed');
+    expect(output).toContain('overdeck boundary gate: zero consumers on the old database');
   });
 });
