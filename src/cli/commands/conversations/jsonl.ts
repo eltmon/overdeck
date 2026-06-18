@@ -4,7 +4,7 @@
 
 import chalk from 'chalk';
 
-import { getConversationById } from '../../../lib/database/conversations-db.js';
+import { getConversationById } from '../../../lib/overdeck/conversations.js';
 import { resolveConversationTranscript } from '../../../lib/conversations/transcript-path.js';
 
 export interface JsonlActionOptions {
