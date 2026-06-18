@@ -15,6 +15,11 @@ import { getOverdeckDatabaseSync } from './infra.js';
 
 let _schemaBootstrapped = false;
 
+/** Reset the schema-bootstrapped flag (e.g. after closing a DB handle in tests). */
+export function resetDiscoveredSessionsSchemaBootstrap(): void {
+  _schemaBootstrapped = false;
+}
+
 function ensureSchema(): void {
   if (_schemaBootstrapped) return;
   const db = getOverdeckDatabaseSync();
