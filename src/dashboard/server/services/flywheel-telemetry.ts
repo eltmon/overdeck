@@ -1,5 +1,5 @@
 import type { FlywheelStats, FlywheelStatsCriterion } from '@panctl/contracts';
-import { listInWindow } from '../../../lib/database/flywheel-substrate-bugs-db.js';
+import { listInWindow } from '../../../lib/overdeck/flywheel-substrate-bugs.js';
 import type { PipelineRunMetrics } from './pipeline-run-metrics.js';
 
 export interface FlywheelStatsOptions {
