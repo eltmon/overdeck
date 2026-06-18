@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
 import { reconstructCache, type ReconstructResult } from '../../../../src/lib/reconstruct/reconstruct-cache.js';
 import type { AgentState } from '../../../../src/lib/agents.js';
-import type { Agent } from '../../../../src/lib/database/agents-db.js';
-
 const agentState = (overrides: Partial<AgentState> = {}): AgentState & { tmuxActive: boolean } => ({
   id: 'agent-pan-1920',
   issueId: 'PAN-1920',
@@ -21,12 +19,10 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   listRunningAgents: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/database/agent-backfill.js', () => ({
-  backfillAgentsFromStateJsonSync: vi.fn(),
-}));
-
-vi.mock('../../../../src/lib/database/agents-db.js', () => ({
-  listAllAgents: vi.fn(),
+// reconstruct-cache now uses overdeck/agents (not database/agent-backfill or database/agents-db)
+vi.mock('../../../../src/lib/overdeck/agents.js', () => ({
+  backfillAgentsSync: vi.fn(),
+  listAllAgentsSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -52,8 +48,7 @@ vi.mock('../../../../src/dashboard/server/routes/issues.js', () => ({
 }));
 
 import { listRunningAgents } from '../../../../src/lib/agents.js';
-import { backfillAgentsFromStateJsonSync } from '../../../../src/lib/database/agent-backfill.js';
-import { listAllAgents } from '../../../../src/lib/database/agents-db.js';
+import { backfillAgentsSync, listAllAgentsSync } from '../../../../src/lib/overdeck/agents.js';
 import { listProjectsSync } from '../../../../src/lib/projects.js';
 import { readIssueRecord, resolveProjectForIssue } from '../../../../src/lib/pan-dir/record.js';
 import { enumerateInFlightIssuesFromSources } from '../../../../src/lib/reconstruct/enumerate-in-flight.js';
@@ -61,8 +56,8 @@ import { getSharedIssueService, startSharedIssueService } from '../../../../src/
 import { fetchIssuePullRequest } from '../../../../src/dashboard/server/routes/issues.js';
 
 const listRunningAgentsMock = vi.mocked(listRunningAgents);
-const backfillMock = vi.mocked(backfillAgentsFromStateJsonSync);
-const listAllAgentsMock = vi.mocked(listAllAgents);
+const backfillMock = vi.mocked(backfillAgentsSync);
+const listAllAgentsMock = vi.mocked(listAllAgentsSync);
 const listProjectsMock = vi.mocked(listProjectsSync);
 const readRecordMock = vi.mocked(readIssueRecord);
 const resolveProjectMock = vi.mocked(resolveProjectForIssue);
@@ -156,7 +151,7 @@ describe('reconstructCache', () => {
       supervisorEnabled: null,
       channelsEnabled: null,
       updatedAt: new Date().toISOString(),
-    } satisfies Agent]);
+    }]);
 
     const result = await reconstructCache(fakeDb());
     expect(result.agentsById['agent-pan-1919']?.status).toBe('stopped');
@@ -208,7 +203,6 @@ describe('reconstructCache', () => {
     const liveSessions = () => new Set(['agent-pan-1920']);
     await reconstructCache(fakeDb(), { verbose: true, listLiveSessions: liveSessions });
     expect(backfillMock).toHaveBeenCalledWith(
-      expect.anything(),
       expect.objectContaining({ verbose: true, listLiveSessions: liveSessions }),
     );
   });
