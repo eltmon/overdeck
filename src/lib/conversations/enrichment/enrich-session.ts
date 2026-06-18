@@ -11,7 +11,7 @@ import * as readline from 'readline';
 import { createReadStream } from 'fs';
 import { Effect } from 'effect';
 
-import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
+import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../overdeck/discovered-sessions.js';
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../cost.js';
 import { recordBackgroundAiCost } from '../../background-ai/cost.js';
 
