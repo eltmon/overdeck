@@ -428,7 +428,7 @@ export function setFlywheelGloballyPaused(paused: boolean): void {
 
 /** Drop-in for isFlywheelAutoPickupBacklog() from app-settings.ts. */
 export function isFlywheelAutoPickupBacklog(): boolean {
-  return getSetting(FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY) !== 'false';
+  return getSetting(FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY) === 'true'; // defaults to false if unset
 }
 
 /** Drop-in for setFlywheelAutoPickupBacklog() from app-settings.ts. */
