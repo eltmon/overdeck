@@ -12,6 +12,7 @@ CREATE TABLE `agents` (
 	`started_at` integer,
 	`last_resume_at` integer,
 	`stopped_by_user` integer,
+	`stopped_by_pause` integer,
 	`kickoff_delivered` integer,
 	`paused` integer,
 	`paused_reason` text,

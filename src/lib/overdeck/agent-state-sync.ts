@@ -16,6 +16,7 @@ type OverdeckAgentRow = {
   started_at: number | null;
   last_resume_at: number | null;
   stopped_by_user: number | null;
+  stopped_by_pause: number | null;
   kickoff_delivered: number | null;
   paused: number | null;
   paused_reason: string | null;
@@ -53,6 +54,7 @@ export const AGENT_COLUMNS_FOR_DB = [
   'started_at',
   'last_resume_at',
   'stopped_by_user',
+  'stopped_by_pause',
   'kickoff_delivered',
   'paused',
   'paused_reason',
@@ -113,6 +115,7 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     harness: row.harness ? (row.harness as RuntimeName) : undefined,
     lastResumeAt: isoFromMillis(row.last_resume_at),
     stoppedByUser: boolFromInteger(row.stopped_by_user),
+    stoppedByPause: boolFromInteger(row.stopped_by_pause),
     kickoffDelivered: boolFromInteger(row.kickoff_delivered),
     paused: boolFromInteger(row.paused),
     pausedReason: row.paused_reason ?? undefined,
@@ -156,6 +159,7 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     millisFromIso(state.startedAt),
     millisFromIso(state.lastResumeAt),
     state.stoppedByUser == null ? null : (state.stoppedByUser ? 1 : 0),
+    state.stoppedByPause == null ? null : (state.stoppedByPause ? 1 : 0),
     state.kickoffDelivered == null ? null : (state.kickoffDelivered ? 1 : 0),
     state.paused == null ? null : (state.paused ? 1 : 0),
     state.pausedReason ?? null,
