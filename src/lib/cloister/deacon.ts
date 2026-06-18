@@ -27,7 +27,7 @@ import {
   ProcessTimeoutError,
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
-import { listAllAgents } from '../database/agents-db.js';
+import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 
@@ -131,8 +131,8 @@ import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { markWorkspaceStuck } from '../database/review-status-db.js';
-import { isDeaconGloballyPaused } from '../database/app-settings.js';
+import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
+import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
@@ -1063,7 +1063,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
               }
             } catch { /* treat as not-yet-recovered — leave it stuck */ }
             if (recoveredPct !== null) {
-              const { clearWorkspaceStuck } = await import('../database/review-status-db.js');
+              const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
               clearWorkspaceStuck(issueId!);
               stuckOverflowNativeRecoveryState.delete(sessionName);
               actions.push(`Context overflow recovery: cleared stuck flag for ${sessionName} (context back to ${Math.round(recoveredPct)}%)`);
