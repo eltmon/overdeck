@@ -219,7 +219,7 @@ export function queueIssueRecordCommit(
 
 /** Build this node's owner URI: pan://host[:port]. */
 export function buildOwnUri(): string {
-  const port = process.env.PANOPTICON_PORT ? `:${process.env.PANOPTICON_PORT}` : '';
+  const port = process.env.OVERDECK_PORT ? `:${process.env.OVERDECK_PORT}` : '';
   return `pan://${hostname()}${port}`;
 }
 

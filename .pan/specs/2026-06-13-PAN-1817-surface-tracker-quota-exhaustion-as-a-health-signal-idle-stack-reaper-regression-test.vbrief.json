@@ -293,7 +293,7 @@
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/cloister/__tests__/idle-stack-reaper.test.ts exercising reconcileIdleWorkspaceStacks (src/lib/cloister/idle-stack-reaper.ts) via injected IdleStackReaperDeps + __resetIdleStackReaperState() between cases. The reaper currently ships the test-only reset hook but has NO test file. Cover: (1) idle < graceMs => not reaped; (2) idle >= graceMs => server+frontend stop issued; (3) running agent / live tmux => never reaped; (4) grace clock resets when UI containers disappear; (5) PANOPTICON_DISABLE_STACK_REAPER short-circuits the patrol. Use injected deps/clock — do not rely on real wall-clock timers."
+          "Action": "Create src/lib/cloister/__tests__/idle-stack-reaper.test.ts exercising reconcileIdleWorkspaceStacks (src/lib/cloister/idle-stack-reaper.ts) via injected IdleStackReaperDeps + __resetIdleStackReaperState() between cases. The reaper currently ships the test-only reset hook but has NO test file. Cover: (1) idle < graceMs => not reaped; (2) idle >= graceMs => server+frontend stop issued; (3) running agent / live tmux => never reaped; (4) grace clock resets when UI containers disappear; (5) OVERDECK_DISABLE_STACK_REAPER short-circuits the patrol. Use injected deps/clock — do not rely on real wall-clock timers."
         },
         "items": [
           {
@@ -322,7 +322,7 @@
           },
           {
             "id": "reaper-regression-test.ac4",
-            "title": "The grace clock resets when a workspace's UI containers disappear, and PANOPTICON_DISABLE_STACK_REAPER causes reconcileIdleWorkspaceStacks to exit without reaping",
+            "title": "The grace clock resets when a workspace's UI containers disappear, and OVERDECK_DISABLE_STACK_REAPER causes reconcileIdleWorkspaceStacks to exit without reaping",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

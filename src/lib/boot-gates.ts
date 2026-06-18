@@ -13,8 +13,8 @@ export type BootGateState = {
 
 const TRUTHY_GATE_VALUES = new Set(['1', 'true', 'yes']);
 
-export const DEACON_GATE_SOURCE_ENV = 'PANOPTICON_DEACON_GATE_SOURCE';
-export const RESUME_GATE_SOURCE_ENV = 'PANOPTICON_RESUME_GATE_SOURCE';
+export const DEACON_GATE_SOURCE_ENV = 'OVERDECK_DEACON_GATE_SOURCE';
+export const RESUME_GATE_SOURCE_ENV = 'OVERDECK_RESUME_GATE_SOURCE';
 
 function isTruthyGateValue(value: string | undefined): boolean {
   return TRUTHY_GATE_VALUES.has(value?.trim().toLowerCase() ?? '');
@@ -31,9 +31,9 @@ export function resolveBootGates(
   env: NodeJS.ProcessEnv = process.env,
 ): BootGateState {
   const explicitNoResume = options.noResume === true || options.resume === false;
-  const deaconEnvDisabled = isTruthyGateValue(env.PANOPTICON_DISABLE_DEACON);
-  const resumeEnvDisabled = isTruthyGateValue(env.PANOPTICON_NO_RESUME);
-  const resumeEnvEnabled = isTruthyGateValue(env.PANOPTICON_RESUME);
+  const deaconEnvDisabled = isTruthyGateValue(env.OVERDECK_DISABLE_DEACON);
+  const resumeEnvDisabled = isTruthyGateValue(env.OVERDECK_NO_RESUME);
+  const resumeEnvEnabled = isTruthyGateValue(env.OVERDECK_RESUME);
   const deaconSource = gateSourceFromEnv(env[DEACON_GATE_SOURCE_ENV]);
   const resumeSource = gateSourceFromEnv(env[RESUME_GATE_SOURCE_ENV]);
 
@@ -50,7 +50,7 @@ export function resolveBootGates(
   // leaves agent tmux sessions alive (nothing to resume); after an abnormal
   // restart we stay safe and leave agents stopped for the operator to resume
   // explicitly (dashboard "Resume all"). Opt back in with `--resume` /
-  // PANOPTICON_RESUME=1.
+  // OVERDECK_RESUME=1.
   const resume = options.resume === true
     ? { enabled: true, source: 'flag' as const }
     : explicitNoResume
@@ -71,20 +71,20 @@ export function applyBootGateEnv(
   const gates = resolveBootGates(options, env);
 
   if (gates.deacon.enabled) {
-    delete env.PANOPTICON_DISABLE_DEACON;
+    delete env.OVERDECK_DISABLE_DEACON;
   } else {
-    env.PANOPTICON_DISABLE_DEACON = '1';
+    env.OVERDECK_DISABLE_DEACON = '1';
   }
   env[DEACON_GATE_SOURCE_ENV] = gates.deacon.source;
 
   if (gates.resume.enabled) {
     // Default is now OFF (PAN-1963), so "on" must be encoded explicitly — deleting
-    // PANOPTICON_NO_RESUME is no longer enough (absence means off).
-    delete env.PANOPTICON_NO_RESUME;
-    env.PANOPTICON_RESUME = '1';
+    // OVERDECK_NO_RESUME is no longer enough (absence means off).
+    delete env.OVERDECK_NO_RESUME;
+    env.OVERDECK_RESUME = '1';
   } else {
-    delete env.PANOPTICON_RESUME;
-    env.PANOPTICON_NO_RESUME = '1';
+    delete env.OVERDECK_RESUME;
+    env.OVERDECK_NO_RESUME = '1';
   }
   env[RESUME_GATE_SOURCE_ENV] = gates.resume.source;
 

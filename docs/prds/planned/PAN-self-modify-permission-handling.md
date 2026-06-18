@@ -87,7 +87,7 @@ writes corresponding `allow` entries into the workspace's
       "Write(.claude/agents/**)",
       "Edit(.claude/hooks/**)",
       "Write(.claude/hooks/**)",
-      ...PANOPTICON_INFRA_DENY_PATTERNS
+      ...OVERDECK_INFRA_DENY_PATTERNS
     ]
   }
 }

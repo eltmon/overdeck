@@ -50,14 +50,14 @@ async function resetDb() {
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `enrich-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
   process.env.HOME = TEST_HOME;
   mockEnrichSessions.mockReset();
 });
 
 afterEach(async () => {
   await resetDb();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   delete process.env.HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
   vi.clearAllMocks();

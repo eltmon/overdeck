@@ -21,16 +21,16 @@ describe('dashboard context routes helpers', () => {
   let oldPanopticonHome: string | undefined;
 
   beforeEach(async () => {
-    oldPanopticonHome = process.env.PANOPTICON_HOME;
+    oldPanopticonHome = process.env.OVERDECK_HOME;
     tempRoot = await mkdtemp(join(tmpdir(), 'pan-context-route-'));
-    process.env.PANOPTICON_HOME = join(tempRoot, 'home');
+    process.env.OVERDECK_HOME = join(tempRoot, 'home');
   });
 
   afterEach(async () => {
     if (oldPanopticonHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = oldPanopticonHome;
+      process.env.OVERDECK_HOME = oldPanopticonHome;
     }
     await rm(tempRoot, { recursive: true, force: true });
   });

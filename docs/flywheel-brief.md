@@ -149,7 +149,7 @@ If `docs/FLYWHEEL-STATE.md` does not exist when you want to record something dur
 
 When there is no more eligible work, or when paused indefinitely, run `pan flywheel report`. That command:
 
-1. Writes the per-run report at `${PANOPTICON_HOME}/flywheel/runs/<runId>/report.md`.
+1. Writes the per-run report at `${OVERDECK_HOME}/flywheel/runs/<runId>/report.md`.
 2. Commits any pending changes to `docs/FLYWHEEL-STATE.md`.
 3. Leaves the repository clean and pushed.
 

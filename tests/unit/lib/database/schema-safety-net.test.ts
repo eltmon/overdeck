@@ -1,7 +1,7 @@
 /**
  * Tests for PAN-1908 cutover safety net:
  *  - v54 → v55 migration snapshots panopticon.db before altering agents data.
- *  - PANOPTICON_NO_RESUME disables event-driven deacon resume/orphan recovery.
+ *  - OVERDECK_NO_RESUME disables event-driven deacon resume/orphan recovery.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -21,15 +21,15 @@ vi.mock('../../../../src/lib/database/index.js', () => ({
 
 beforeEach(() => {
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-safety-net-'));
-  originalHome = process.env.PANOPTICON_HOME;
-  process.env.PANOPTICON_HOME = tmpHome;
+  originalHome = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = tmpHome;
   mkdirSync(join(tmpHome, 'agents'));
 
   testDb = openDatabase(join(tmpHome, 'panopticon.db'));
   testDb.pragma('foreign_keys = ON');
 
-  originalNoResume = process.env.PANOPTICON_NO_RESUME;
-  delete process.env.PANOPTICON_NO_RESUME;
+  originalNoResume = process.env.OVERDECK_NO_RESUME;
+  delete process.env.OVERDECK_NO_RESUME;
 });
 
 afterEach(() => {
@@ -37,15 +37,15 @@ afterEach(() => {
   rmSync(tmpHome, { recursive: true, force: true });
 
   if (originalHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = originalHome;
+    process.env.OVERDECK_HOME = originalHome;
   }
 
   if (originalNoResume === undefined) {
-    delete process.env.PANOPTICON_NO_RESUME;
+    delete process.env.OVERDECK_NO_RESUME;
   } else {
-    process.env.PANOPTICON_NO_RESUME = originalNoResume;
+    process.env.OVERDECK_NO_RESUME = originalNoResume;
   }
 });
 
@@ -79,17 +79,17 @@ describe('v54 → v55 migration safety net', () => {
   });
 });
 
-describe('PANOPTICON_NO_RESUME kill switch', () => {
-  it('skips handleAgentStoppedEvent when PANOPTICON_NO_RESUME=1', async () => {
-    process.env.PANOPTICON_NO_RESUME = '1';
+describe('OVERDECK_NO_RESUME kill switch', () => {
+  it('skips handleAgentStoppedEvent when OVERDECK_NO_RESUME=1', async () => {
+    process.env.OVERDECK_NO_RESUME = '1';
 
     const result = await handleAgentStoppedEvent('agent-pan-1908');
 
     expect(result).toBeNull();
   });
 
-  it('skips handleAgentHeartbeatDeadEvent when PANOPTICON_NO_RESUME=1', async () => {
-    process.env.PANOPTICON_NO_RESUME = '1';
+  it('skips handleAgentHeartbeatDeadEvent when OVERDECK_NO_RESUME=1', async () => {
+    process.env.OVERDECK_NO_RESUME = '1';
 
     const result = await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'event');
 

@@ -209,7 +209,7 @@ vi.mock('../no-resume-mode.js', () => ({
 
 vi.mock('../../../lib/paths.js', () => ({
   getPanopticonHome: () => '/tmp/test-panopticon',
-  PANOPTICON_HOME: '/tmp/test-panopticon',
+  OVERDECK_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
@@ -267,8 +267,8 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   let originalNoResume: string | undefined;
 
   beforeEach(() => {
-    originalNoResume = process.env.PANOPTICON_NO_RESUME;
-    delete process.env.PANOPTICON_NO_RESUME;
+    originalNoResume = process.env.OVERDECK_NO_RESUME;
+    delete process.env.OVERDECK_NO_RESUME;
     vi.clearAllMocks();
     mockReadFileSync.mockReturnValue('{}');
     const agentState = {
@@ -303,8 +303,8 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   });
 
   afterEach(() => {
-    if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME;
-    else process.env.PANOPTICON_NO_RESUME = originalNoResume;
+    if (originalNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
+    else process.env.OVERDECK_NO_RESUME = originalNoResume;
   });
 
   it('does not auto-resume a closed issue even when review feedback is pending', async () => {

@@ -21,9 +21,9 @@ const PORT = 3456;
 const CALLBACK_URL = `http://localhost:${PORT}/callback`;
 const APP_DIR = join(homedir(), '.panopticon', 'github-app');
 
-if (process.env.PANOPTICON_DEV_WEBHOOKS !== '1') {
+if (process.env.OVERDECK_DEV_WEBHOOKS !== '1') {
   console.error('Refusing to configure a third-party webhook relay outside dev mode.');
-  console.error('Set PANOPTICON_DEV_WEBHOOKS=1 to enable smee.io for local development.');
+  console.error('Set OVERDECK_DEV_WEBHOOKS=1 to enable smee.io for local development.');
   process.exit(1);
 }
 

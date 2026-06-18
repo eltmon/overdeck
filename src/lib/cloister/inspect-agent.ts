@@ -221,9 +221,9 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     );
 
     const envForTmux: Record<string, string> = {
-      PANOPTICON_AGENT_ID: tmuxSession,
-      PANOPTICON_ISSUE_ID: context.issueId,
-      PANOPTICON_SESSION_TYPE: subRole,
+      OVERDECK_AGENT_ID: tmuxSession,
+      OVERDECK_ISSUE_ID: context.issueId,
+      OVERDECK_SESSION_TYPE: subRole,
       ...providerEnv,
     };
 

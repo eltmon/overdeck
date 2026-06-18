@@ -221,7 +221,7 @@ export function cleanupGitignoreSync(gitignorePath: string): {
     return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
   }
 
-  const PANOPTICON_HEADER = '# Panopticon-managed symlinks (not committed)';
+  const OVERDECK_HEADER = '# Panopticon-managed symlinks (not committed)';
   let content: string;
   try {
     content = readFileSync(gitignorePath, 'utf-8');
@@ -230,7 +230,7 @@ export function cleanupGitignoreSync(gitignorePath: string): {
   }
 
   // If no Panopticon section, nothing to clean
-  if (!content.includes(PANOPTICON_HEADER)) {
+  if (!content.includes(OVERDECK_HEADER)) {
     return { cleaned: false, duplicatesRemoved: 0, entriesAfter: 0 };
   }
 
@@ -241,7 +241,7 @@ export function cleanupGitignoreSync(gitignorePath: string): {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed === PANOPTICON_HEADER) {
+    if (trimmed === OVERDECK_HEADER) {
       inPanopticonSection = true;
       continue;
     }

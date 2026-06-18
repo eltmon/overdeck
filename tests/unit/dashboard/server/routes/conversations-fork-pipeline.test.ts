@@ -47,7 +47,7 @@ describe('runForkPipeline fallback resilience', () => {
       `pan-1802-fork-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     process.env.HOME = TEST_HOME;
-    process.env.PANOPTICON_HOME = TEST_HOME;
+    process.env.OVERDECK_HOME = TEST_HOME;
     mkdirSync(TEST_HOME, { recursive: true });
 
     const { closeOverdeckDatabaseSync } = await import('../../../../../src/lib/overdeck/infra.js');
@@ -62,7 +62,7 @@ describe('runForkPipeline fallback resilience', () => {
     } else {
       delete process.env.HOME;
     }
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(TEST_HOME, { recursive: true, force: true });
     vi.restoreAllMocks();
   });

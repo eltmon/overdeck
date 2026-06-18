@@ -28,7 +28,7 @@ export function _resetDashboardSessionTokenForTests(): void {
 
 function getDashboardSessionToken(): string {
   if (browserSessionToken) return browserSessionToken;
-  const override = process.env['PANOPTICON_DASHBOARD_SESSION_TOKEN'];
+  const override = process.env['OVERDECK_DASHBOARD_SESSION_TOKEN'];
   if (override) {
     browserSessionToken = override;
     return browserSessionToken;
@@ -49,7 +49,7 @@ function getDashboardSessionToken(): string {
 
 export function dashboardCsrfToken(): string {
   if (browserCsrfToken) return browserCsrfToken;
-  const override = process.env['PANOPTICON_DASHBOARD_CSRF_TOKEN'];
+  const override = process.env['OVERDECK_DASHBOARD_CSRF_TOKEN'];
   if (override) {
     browserCsrfToken = override;
     return browserCsrfToken;

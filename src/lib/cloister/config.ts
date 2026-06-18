@@ -10,9 +10,9 @@ import { parse, stringify } from '@iarna/toml';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { ConfigError, FsError } from '../errors.js';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 
-const CLOISTER_CONFIG_FILE = join(PANOPTICON_HOME, 'cloister.toml');
+const CLOISTER_CONFIG_FILE = join(OVERDECK_HOME, 'cloister.toml');
 
 /**
  * Health threshold configuration (in minutes)
@@ -449,8 +449,8 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
  */
 export function loadCloisterConfigSync(): CloisterConfig {
   // Ensure panopticon home exists
-  if (!existsSync(PANOPTICON_HOME)) {
-    mkdirSync(PANOPTICON_HOME, { recursive: true });
+  if (!existsSync(OVERDECK_HOME)) {
+    mkdirSync(OVERDECK_HOME, { recursive: true });
   }
 
   let config = DEFAULT_CLOISTER_CONFIG;
@@ -483,8 +483,8 @@ export function loadCloisterConfigSync(): CloisterConfig {
  */
 export function saveCloisterConfigSync(config: CloisterConfig): void {
   // Ensure panopticon home exists
-  if (!existsSync(PANOPTICON_HOME)) {
-    mkdirSync(PANOPTICON_HOME, { recursive: true });
+  if (!existsSync(OVERDECK_HOME)) {
+    mkdirSync(OVERDECK_HOME, { recursive: true });
   }
 
   try {
@@ -550,8 +550,8 @@ export function getHealthThresholdsMs(): {
 export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | ConfigError> =>
   Effect.gen(function* () {
     yield* Effect.tryPromise({
-      try: () => mkdir(PANOPTICON_HOME, { recursive: true }),
-      catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation: 'mkdir', cause }),
+      try: () => mkdir(OVERDECK_HOME, { recursive: true }),
+      catch: (cause) => new FsError({ path: OVERDECK_HOME, operation: 'mkdir', cause }),
     });
 
     let config: CloisterConfig = DEFAULT_CLOISTER_CONFIG;
@@ -589,8 +589,8 @@ export const loadCloisterConfig = (): Effect.Effect<CloisterConfig, FsError | Co
 export const saveCloisterConfig = (config: CloisterConfig): Effect.Effect<void, FsError | ConfigError> =>
   Effect.gen(function* () {
     yield* Effect.tryPromise({
-      try: () => mkdir(PANOPTICON_HOME, { recursive: true }),
-      catch: (cause) => new FsError({ path: PANOPTICON_HOME, operation: 'mkdir', cause }),
+      try: () => mkdir(OVERDECK_HOME, { recursive: true }),
+      catch: (cause) => new FsError({ path: OVERDECK_HOME, operation: 'mkdir', cause }),
     });
 
     const content = yield* Effect.try({

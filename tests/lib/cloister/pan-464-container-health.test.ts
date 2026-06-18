@@ -148,14 +148,14 @@ import { sessionExists } from '../../../src/lib/tmux.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TEST_PANOPTICON_HOME = process.env.PANOPTICON_HOME ?? join(testHome, '.panopticon');
-const STATE_FILE = join(TEST_PANOPTICON_HOME, 'deacon', 'health-state.json');
+const TEST_OVERDECK_HOME = process.env.OVERDECK_HOME ?? join(testHome, '.panopticon');
+const STATE_FILE = join(TEST_OVERDECK_HOME, 'deacon', 'health-state.json');
 
 const CONTAINER = 'panopticon-feature-pan-464-frontend-1';
 const AGENT_ID = 'agent-pan-464';
 
 function writeState(state: Partial<DeaconState>): void {
-  mkdirSync(join(TEST_PANOPTICON_HOME, 'deacon'), { recursive: true });
+  mkdirSync(join(TEST_OVERDECK_HOME, 'deacon'), { recursive: true });
   const full: DeaconState = {
     specialists: {} as DeaconState['specialists'],
     patrolCycle: 0,

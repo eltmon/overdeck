@@ -36,8 +36,8 @@ class StubExtractionProvider implements ExtractionProvider {
 
 describe('memory extraction providers', () => {
   afterEach(() => {
-    delete process.env.PANOPTICON_MEMORY_PROVIDER;
-    delete process.env.PANOPTICON_MEMORY_MODEL;
+    delete process.env.OVERDECK_MEMORY_PROVIDER;
+    delete process.env.OVERDECK_MEMORY_MODEL;
   });
 
   it('round-trips a stub provider through the registry', async () => {
@@ -56,8 +56,8 @@ describe('memory extraction providers', () => {
 
   it('lets memory provider env vars override settings', async () => {
     registerExtractionProvider(new StubExtractionProvider());
-    process.env.PANOPTICON_MEMORY_PROVIDER = 'stub';
-    process.env.PANOPTICON_MEMORY_MODEL = 'stub-env-model';
+    process.env.OVERDECK_MEMORY_PROVIDER = 'stub';
+    process.env.OVERDECK_MEMORY_MODEL = 'stub-env-model';
 
     const selection = await resolveExtractionProviderSelection({
       provider: 'anthropic',

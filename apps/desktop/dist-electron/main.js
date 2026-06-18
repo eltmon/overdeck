@@ -216,10 +216,10 @@ function destroyTray() {
 * backoff restart on crash. Graceful shutdown on app quit.
 *
 * Bootstrap config passed via env vars:
-*   PANOPTICON_PORT        — TCP port for HTTP + WS
-*   PANOPTICON_AUTH_TOKEN  — random hex token (future: auth middleware)
-*   PANOPTICON_MODE        — "desktop" (enables desktop-specific behaviours)
-*   PANOPTICON_NO_BROWSER  — "1" (suppresses auto browser open)
+*   OVERDECK_PORT        — TCP port for HTTP + WS
+*   OVERDECK_AUTH_TOKEN  — random hex token (future: auth middleware)
+*   OVERDECK_MODE        — "desktop" (enables desktop-specific behaviours)
+*   OVERDECK_NO_BROWSER  — "1" (suppresses auto browser open)
 */
 const BASE_PORT = 7825;
 const MAX_RESTART_DELAY_MS = 3e4;
@@ -252,10 +252,10 @@ function spawnServer() {
 	const child = node_child_process.spawn(process.execPath, [entry], {
 		env: {
 			...process.env,
-			PANOPTICON_PORT: String(port),
-			PANOPTICON_AUTH_TOKEN: authToken,
-			PANOPTICON_MODE: "desktop",
-			PANOPTICON_NO_BROWSER: "1",
+			OVERDECK_PORT: String(port),
+			OVERDECK_AUTH_TOKEN: authToken,
+			OVERDECK_MODE: "desktop",
+			OVERDECK_NO_BROWSER: "1",
 			TERM: process.env.TERM || "xterm-256color",
 			COLORTERM: process.env.COLORTERM || "truecolor",
 			LANG: process.env.LANG || "en_US.UTF-8",

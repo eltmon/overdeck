@@ -31,8 +31,8 @@ describe('overdeck test fixture', () => {
     startedAt: new Date().toISOString(),
   });
 
-  it('points PANOPTICON_HOME at the temp home and creates overdeck.db there', () => {
-    expect(process.env.PANOPTICON_HOME).toBe(odb.home);
+  it('points OVERDECK_HOME at the temp home and creates overdeck.db there', () => {
+    expect(process.env.OVERDECK_HOME).toBe(odb.home);
     expect(odb.dbPath).toContain(odb.home);
   });
 

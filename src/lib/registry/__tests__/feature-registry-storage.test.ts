@@ -16,12 +16,12 @@ let testHome: string;
 beforeEach(() => {
   testHome = join(tmpdir(), `pan-1579-registry-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(testHome, { recursive: true });
-  process.env.PANOPTICON_HOME = testHome;
+  process.env.OVERDECK_HOME = testHome;
 });
 
 afterEach(async () => {
   await closeFeatureRegistryStorage();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
 

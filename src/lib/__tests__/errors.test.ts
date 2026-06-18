@@ -240,9 +240,9 @@ describe('InvalidAgentIdError', () => {
 
 describe('ConfigError', () => {
   it('constructs and carries the correct _tag', () => {
-    const err = new ConfigError({ message: 'PANOPTICON_HOME not set' });
+    const err = new ConfigError({ message: 'OVERDECK_HOME not set' });
     expect(err._tag).toBe('ConfigError');
-    expect(err.message).toBe('PANOPTICON_HOME not set');
+    expect(err.message).toBe('OVERDECK_HOME not set');
   });
 
   it('can be caught by _tag in an Effect channel', () => {

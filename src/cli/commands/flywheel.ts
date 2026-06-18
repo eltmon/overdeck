@@ -101,7 +101,7 @@ const execAsync = promisify(exec);
 const DEFAULT_STATS_WINDOW = '30d';
 
 function dashboardBaseUrl(): string {
-  return (process.env.PANOPTICON_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
+  return (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
 }
 
 export async function readFlywheelStatusJson(file: string, input: InputStream = process.stdin): Promise<string> {

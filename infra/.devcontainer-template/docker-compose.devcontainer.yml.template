@@ -30,7 +30,7 @@ services:
     environment:
       - NODE_ENV=development
       - HUSKY=0
-      - PANOPTICON_SKIP_NATIVE_POSTINSTALL=1
+      - OVERDECK_SKIP_NATIVE_POSTINSTALL=1
     command: >
       sh -c "
         echo 'Installing dependencies...' &&
@@ -131,7 +131,7 @@ services:
       # using a different tmux server, marking every host agent as "orphaned" and racing
       # auto-resume against the host. (Bug originally observed in PAN-821 loop on
       # 2026-04-25; recurred in PAN-698 on 2026-05-12 because the template never
-      # inherited the host's fix.) PANOPTICON_DISABLE_DEACON below is belt-and-suspenders
+      # inherited the host's fix.) OVERDECK_DISABLE_DEACON below is belt-and-suspenders
       # in case someone re-adds the mount.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - {{PROJECTS_DIR}}:{{PROJECTS_DIR}}:ro
@@ -149,13 +149,13 @@ services:
       - PORT=3011
       # Single-deacon invariant: see .claude/rules/single-deacon-invariant.md.
       # The host's `pan up` owns agent lifecycle; container dashboard runs as a read/UI peer only.
-      - PANOPTICON_DISABLE_DEACON=1
+      - OVERDECK_DISABLE_DEACON=1
       # Trust the stack's own frontend origin. Without this the in-container
       # server 403s ('Invalid origin') the session mint and every mutation
       # from its own UI — Traefik's CORS middleware adds response headers,
       # but getTrustedOrigins() inside the server only knows localhost
       # variants. First hit live on the PAN-1737 UAT stack.
-      - PANOPTICON_TRUSTED_ORIGINS=https://{{FEATURE_FOLDER}}.pan.localhost
+      - OVERDECK_TRUSTED_ORIGINS=https://{{FEATURE_FOLDER}}.pan.localhost
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     networks:

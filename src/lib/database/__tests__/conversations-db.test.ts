@@ -3,7 +3,7 @@ import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-// Must set PANOPTICON_HOME before importing DB modules so they use a temp path
+// Must set OVERDECK_HOME before importing DB modules so they use a temp path
 let TEST_HOME: string;
 
 // Helper to reset the DB singleton between tests
@@ -15,12 +15,12 @@ async function resetDb() {
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `pan-416-conv-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
 });
 
 afterEach(async () => {
   await resetDb();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 

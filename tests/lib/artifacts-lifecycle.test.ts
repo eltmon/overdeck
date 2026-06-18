@@ -26,7 +26,7 @@ describe('artifact lifecycle', () => {
   let tick: number;
 
   beforeEach(() => {
-    originalHome = process.env.PANOPTICON_HOME;
+    originalHome = process.env.OVERDECK_HOME;
     originalIssue = process.env.PAN_ISSUE_ID;
     originalWorkspace = process.env.PAN_WORKSPACE_ID;
     originalRole = process.env.PAN_AGENT_ROLE;
@@ -35,7 +35,7 @@ describe('artifact lifecycle', () => {
     originalSession = process.env.PAN_SESSION_ID;
 
     home = mkdtempSync(join(tmpdir(), 'pan-artifact-lifecycle-'));
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
     process.env.PAN_ISSUE_ID = 'PAN-1205';
     process.env.PAN_WORKSPACE_ID = 'feature-pan-1205-slot-2';
     process.env.PAN_AGENT_ROLE = 'work';
@@ -52,7 +52,7 @@ describe('artifact lifecycle', () => {
 
   afterEach(() => {
     repo.close();
-    restoreEnv('PANOPTICON_HOME', originalHome);
+    restoreEnv('OVERDECK_HOME', originalHome);
     restoreEnv('PAN_ISSUE_ID', originalIssue);
     restoreEnv('PAN_WORKSPACE_ID', originalWorkspace);
     restoreEnv('PAN_AGENT_ROLE', originalRole);

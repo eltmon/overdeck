@@ -22,14 +22,14 @@ describe('forkConversationViaServer', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    process.env['PANOPTICON_DASHBOARD_URL'] = 'http://127.0.0.1:3011';
+    process.env['OVERDECK_DASHBOARD_URL'] = 'http://127.0.0.1:3011';
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     globalThis.fetch = originalFetch;
-    delete process.env['PANOPTICON_DASHBOARD_URL'];
+    delete process.env['OVERDECK_DASHBOARD_URL'];
   });
 
   it('reports timedOut=true when the poll deadline expires while forkStatus is still in-flight', async () => {

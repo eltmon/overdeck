@@ -63,7 +63,7 @@ function answerConfirmation(answer: string) {
 describe('closeOutCommand', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('PANOPTICON_AGENT_ID', '');
+    vi.stubEnv('OVERDECK_AGENT_ID', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     // closeOutCommand calls process.exit(0) on success (PAN-1621). Stub it with
@@ -102,7 +102,7 @@ describe('closeOutCommand', () => {
   });
 
   it('allows the flywheel orchestrator to close out', async () => {
-    vi.stubEnv('PANOPTICON_AGENT_ID', 'flywheel-orchestrator');
+    vi.stubEnv('OVERDECK_AGENT_ID', 'flywheel-orchestrator');
     await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     // Not barred by the caller guard, and the close-out actually runs.
@@ -111,7 +111,7 @@ describe('closeOutCommand', () => {
   });
 
   it('allows an operator conversation (conv-*) to close out', async () => {
-    vi.stubEnv('PANOPTICON_AGENT_ID', 'conv-20260608-1234');
+    vi.stubEnv('OVERDECK_AGENT_ID', 'conv-20260608-1234');
     await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
 
     expect(process.exit).not.toHaveBeenCalledWith(1);
@@ -119,7 +119,7 @@ describe('closeOutCommand', () => {
   });
 
   it('bars other autonomous agents (agent-*/planning-*/strike-*) from closing out', async () => {
-    vi.stubEnv('PANOPTICON_AGENT_ID', 'agent-pan-123');
+    vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-123');
     await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "1"');
 
     expect(process.exit).toHaveBeenCalledWith(1);

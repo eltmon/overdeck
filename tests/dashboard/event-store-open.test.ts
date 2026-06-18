@@ -1,11 +1,11 @@
 /**
  * Tests for openEventDb() in src/dashboard/server/event-store.ts (PAN-446)
  *
- * openEventDb() was changed to async-create PANOPTICON_HOME via mkdir from
+ * openEventDb() was changed to async-create OVERDECK_HOME via mkdir from
  * fs/promises (was previously sync mkdirSync). These tests verify the async
- * home-dir creation path using a redirected PANOPTICON_HOME env var.
+ * home-dir creation path using a redirected OVERDECK_HOME env var.
  *
- * getPanopticonHome() reads process.env.PANOPTICON_HOME on each call, so
+ * getPanopticonHome() reads process.env.OVERDECK_HOME on each call, so
  * vi.stubEnv() is sufficient — no module reset needed.
  *
  * Under Node (Vitest runtime), openEventDb() delegates DB open to getDatabase()
@@ -25,7 +25,7 @@ let panopticonHome: string;
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'event-store-test-'));
   panopticonHome = join(testDir, '.panopticon');
-  vi.stubEnv('PANOPTICON_HOME', panopticonHome);
+  vi.stubEnv('OVERDECK_HOME', panopticonHome);
 });
 
 afterEach(() => {
@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe('openEventDb() — async home-dir creation (PAN-446 regression)', () => {
-  it('creates PANOPTICON_HOME when it does not exist', async () => {
+  it('creates OVERDECK_HOME when it does not exist', async () => {
     expect(existsSync(panopticonHome)).toBe(false);
 
     // DB open may fail in isolated test env; the dir creation runs first
@@ -43,7 +43,7 @@ describe('openEventDb() — async home-dir creation (PAN-446 regression)', () =>
     expect(existsSync(panopticonHome)).toBe(true);
   });
 
-  it('leaves PANOPTICON_HOME intact when it already exists', async () => {
+  it('leaves OVERDECK_HOME intact when it already exists', async () => {
     mkdirSync(panopticonHome, { recursive: true });
     const sentinel = join(panopticonHome, 'sentinel.txt');
     require('fs').writeFileSync(sentinel, 'present');

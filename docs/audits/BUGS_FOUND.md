@@ -42,7 +42,7 @@ Track actual line numbers, not event count. Modify `readEventsFromLine` to retur
 
 ### Problem
 ```javascript
-const agentId = process.env.PANOPTICON_AGENT_ID ||
+const agentId = process.env.OVERDECK_AGENT_ID ||
                 process.env.TMUX_PANE?.replace(/^%/, '') ||
                 'main-cli';
 ```
@@ -53,7 +53,7 @@ Won't match the agentId from heartbeat-hook which uses the session name.
 ### Impact
 - Inconsistent agent IDs in cost tracking
 - Harder to correlate costs with agents
-- Not critical since PANOPTICON_AGENT_ID should always be set
+- Not critical since OVERDECK_AGENT_ID should always be set
 
 ### Solution
 Either remove TMUX_PANE fallback or use proper tmux command to get session name.

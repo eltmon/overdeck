@@ -7,7 +7,7 @@ timestamp: 2026-04-18T23:16:11Z
 
 CODE REVIEW BLOCKED for PAN-446:
 
-1. src/dashboard/server/routes/misc.ts:95 introduces top-level await via panopticonVersion = await readPackageVersion(). This makes misc.ts an async ESM module and can break static import/evaluation of the route layer under Node. 2. Missing regression coverage for the real startup path: the new guarantee that PANOPTICON_HOME exists before CacheService construction depends on main.ts startup ordering, but tests only check CacheService import/constructor and never assert that importing/evaluating main.ts or the server startup path preserves the synchronous require()-based issue-service-singleton path without async-module breakage. Add a regression test covering the actual startup/import chain.
+1. src/dashboard/server/routes/misc.ts:95 introduces top-level await via panopticonVersion = await readPackageVersion(). This makes misc.ts an async ESM module and can break static import/evaluation of the route layer under Node. 2. Missing regression coverage for the real startup path: the new guarantee that OVERDECK_HOME exists before CacheService construction depends on main.ts startup ordering, but tests only check CacheService import/constructor and never assert that importing/evaluating main.ts or the server startup path preserves the synchronous require()-based issue-service-singleton path without async-module breakage. Add a regression test covering the actual startup/import chain.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 

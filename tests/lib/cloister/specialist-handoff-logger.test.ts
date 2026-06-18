@@ -28,14 +28,14 @@ function getTestLogDir(): string {
 
 // Isolated temp directory for hook files — prevents tests from reading real AGENTS_DIR
 let TEST_AGENTS_DIR: string;
-let TEST_PANOPTICON_HOME: string;
-let ORIGINAL_PANOPTICON_HOME: string | undefined;
+let TEST_OVERDECK_HOME: string;
+let ORIGINAL_OVERDECK_HOME: string | undefined;
 
 describe('specialist-handoff-logger', () => {
   beforeEach(() => {
-    ORIGINAL_PANOPTICON_HOME = process.env.PANOPTICON_HOME;
-    TEST_PANOPTICON_HOME = mkdtempSync(join(tmpdir(), 'pan-test-home-'));
-    process.env.PANOPTICON_HOME = TEST_PANOPTICON_HOME;
+    ORIGINAL_OVERDECK_HOME = process.env.OVERDECK_HOME;
+    TEST_OVERDECK_HOME = mkdtempSync(join(tmpdir(), 'pan-test-home-'));
+    process.env.OVERDECK_HOME = TEST_OVERDECK_HOME;
 
     // Clean up test log file
     if (existsSync(getTestLogFile())) {
@@ -53,9 +53,9 @@ describe('specialist-handoff-logger', () => {
     }
     // Remove temp dirs
     rmSync(TEST_AGENTS_DIR, { recursive: true, force: true });
-    rmSync(TEST_PANOPTICON_HOME, { recursive: true, force: true });
-    if (ORIGINAL_PANOPTICON_HOME === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = ORIGINAL_PANOPTICON_HOME;
+    rmSync(TEST_OVERDECK_HOME, { recursive: true, force: true });
+    if (ORIGINAL_OVERDECK_HOME === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = ORIGINAL_OVERDECK_HOME;
   });
 
   describe('createSpecialistHandoff', () => {

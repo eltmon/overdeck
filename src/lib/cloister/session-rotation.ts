@@ -11,7 +11,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentStateSync } from '../agents.js';
 import type { SpecialistAgentName } from './specialists.js';
@@ -212,7 +212,7 @@ export function needsSessionRotation(agentId: string): boolean {
 
     if (specialistName === 'merge-agent' && workingDir) {
       memoryContent = await Effect.runPromise(buildMergeAgentMemory(workingDir));
-      memoryFile = join(PANOPTICON_HOME, `merge-agent-memory-${Date.now()}.md`);
+      memoryFile = join(OVERDECK_HOME, `merge-agent-memory-${Date.now()}.md`);
       writeFileSync(memoryFile, memoryContent);
       console.log(`Built memory file: ${memoryFile}`);
     }

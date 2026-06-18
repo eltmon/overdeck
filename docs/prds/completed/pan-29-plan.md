@@ -262,7 +262,7 @@ async function spawnMergeAgent(config: MergeAgentConfig): Promise<MergeResult> {
   // Spawn in project directory
   const proc = spawn('claude', args, {
     cwd: config.projectPath,
-    env: { ...process.env, PANOPTICON_AGENT_ID: 'merge-agent' }
+    env: { ...process.env, OVERDECK_AGENT_ID: 'merge-agent' }
   });
 
   // Capture output, look for MERGE_RESULT markers

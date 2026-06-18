@@ -10,7 +10,7 @@
 
 set +e
 
-PAN_DASHBOARD_URL="${PANOPTICON_DASHBOARD_URL:-http://localhost:3011}"
+PAN_DASHBOARD_URL="${OVERDECK_DASHBOARD_URL:-http://localhost:3011}"
 PAYLOAD=$(cat 2>/dev/null || echo '{}')
 
 curl -sf \

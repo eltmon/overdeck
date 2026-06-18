@@ -10,7 +10,7 @@ let testHome: string | undefined;
 
 afterEach(() => {
   resetDatabase();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   if (testHome) rmSync(testHome, { recursive: true, force: true });
   testHome = undefined;
 });
@@ -18,7 +18,7 @@ afterEach(() => {
 function makeTestHome(prefix: string): string {
   testHome = join(tmpdir(), `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(testHome, { recursive: true });
-  process.env.PANOPTICON_HOME = testHome;
+  process.env.OVERDECK_HOME = testHome;
   return testHome;
 }
 

@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
 import { Effect } from 'effect';
-import { LOGS_DIR, PANOPTICON_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
+import { LOGS_DIR, OVERDECK_HOME, TRAEFIK_DIR, CONFIG_FILE } from './paths.js';
 import { readDevSupervisorMarker } from './dev-supervisor.js';
 
 const execAsync = promisify(exec);
@@ -88,7 +88,7 @@ export function readPlatformConfigSync(): PlatformConfig {
       dashboardApiPort: config.dashboard?.api_port || defaults.dashboardApiPort,
       traefikEnabled: config.traefik?.enabled === true,
       traefikDomain: config.traefik?.domain || defaults.traefikDomain,
-      traefikDir: join(PANOPTICON_HOME, 'traefik'),
+      traefikDir: join(OVERDECK_HOME, 'traefik'),
     };
   } catch {
     return defaults;
@@ -306,7 +306,7 @@ export interface RestartResult {
   }
   throw new StageError({
     stage: 'cliproxy',
-    reason: `CLIProxy did not come back up within ${timeoutMs}ms — check ${join(PANOPTICON_HOME, 'cliproxy', 'cliproxy.log')}`,
+    reason: `CLIProxy did not come back up within ${timeoutMs}ms — check ${join(OVERDECK_HOME, 'cliproxy', 'cliproxy.log')}`,
   });
 }async function restartTraefikPromise(config: PlatformConfig): Promise<void> {
   if (!config.traefikEnabled) {

@@ -53,7 +53,7 @@ The core attribution problem: given a transcript file `<uuid>.jsonl`, which Pano
 ### Where the Mapping Is Stored
 
 **Runtime state** (`~/.panopticon/agents/<agent-id>/runtime.json`):
-- The heartbeat hook fires on every tool use and receives both `session_id` (from Claude Code) and `PANOPTICON_AGENT_ID` (from env)
+- The heartbeat hook fires on every tool use and receives both `session_id` (from Claude Code) and `OVERDECK_AGENT_ID` (from env)
 - It writes the current active `session_id` to `runtime.json` — this is the "what's active now" mapping
 
 **Session history** (`~/.panopticon/agents/<agent-id>/sessions.json`):
@@ -149,7 +149,7 @@ This is the hot path that records costs as agents work.
 
 ### Session-to-Agent Mapping (Live Path)
 
-The heartbeat hook has both `session_id` (from PostToolUse payload) and `PANOPTICON_AGENT_ID` (from env, set by agent launcher). It should:
+The heartbeat hook has both `session_id` (from PostToolUse payload) and `OVERDECK_AGENT_ID` (from env, set by agent launcher). It should:
 1. Write the current `session_id` to `runtime.json` (active session)
 2. Append the `session_id` to `sessions.json` if not already present (session history)
 3. Pass `session_id` through to `record-cost-event.js` which stores it in `cost_events.session_id`
@@ -157,7 +157,7 @@ The heartbeat hook has both `session_id` (from PostToolUse payload) and `PANOPTI
 ### Issue ID Resolution
 
 The hook resolves issue IDs in this order:
-1. `$PANOPTICON_AGENT_ID` / `$PANOPTICON_ISSUE_ID` env vars (set by agent launcher)
+1. `$OVERDECK_AGENT_ID` / `$OVERDECK_ISSUE_ID` env vars (set by agent launcher)
 2. Git branch name regex: `(pan|min|aud|krux|cli)-(\d+)`
 3. Workspace path regex: same pattern
 4. Fallback: `UNKNOWN`
@@ -239,7 +239,7 @@ For the cost breakdown modal (PAN-77), costs need to be attributed by pipeline s
 
 ### Current State
 
-- Work agents and planning agents set `PANOPTICON_SESSION_TYPE` via env vars at launch
+- Work agents and planning agents set `OVERDECK_SESSION_TYPE` via env vars at launch
 - Specialists do NOT have `state.json` and are ephemeral (PAN-378 refactoring)
 - Specialist sessions work across many issues, so per-issue attribution requires knowing which issue the specialist was working on at each point in the transcript
 - The `session_type` column in `cost_events` tracks this, but only when the live hook captures it
@@ -247,7 +247,7 @@ For the cost breakdown modal (PAN-77), costs need to be attributed by pipeline s
 ### What's Needed
 
 1. **Session-to-agent mapping** (described above) — heartbeat hook writes `session_id` to `runtime.json` and `sessions.json`
-2. **Specialist cost attribution** — specialists need to set `PANOPTICON_ISSUE_ID` and `PANOPTICON_SESSION_TYPE` when they start working on a specific issue
+2. **Specialist cost attribution** — specialists need to set `OVERDECK_ISSUE_ID` and `OVERDECK_SESSION_TYPE` when they start working on a specific issue
 3. **Reconciler v2** — scan `~/.claude/projects/` directly, use `sessions.json` for attribution
 
 ## Related Open Issues

@@ -1136,7 +1136,7 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 30000): Promi
 
 function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
   return (harness === 'claude-code' || harness === 'codex')
-    && process.env.PANOPTICON_DOCKER_WORKSPACE !== '1'
+    && process.env.OVERDECK_DOCKER_WORKSPACE !== '1'
     && process.env.PAN_DOCKER !== '1';
 }
 
@@ -1610,7 +1610,7 @@ export async function spawnConversationSession(
     process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
     process.env.CLAUDE_CODE_USE_VERTEX !== '1' &&
     process.env.CLAUDE_CODE_USE_FOUNDRY !== '1' &&
-    process.env.PANOPTICON_DOCKER_WORKSPACE !== '1' &&
+    process.env.OVERDECK_DOCKER_WORKSPACE !== '1' &&
     process.env.PAN_DOCKER !== '1'
   ) {
     channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
@@ -1639,7 +1639,7 @@ export async function spawnConversationSession(
       // every tool/turn. Resolve the port exactly as the server does so this is
       // correct in dev (3011) and prod (whatever API_PORT/PORT is set to).
       extraEnvExports: [
-        `export PANOPTICON_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
+        `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
       ],
       providerExports: providerExportsStr || undefined,
       trapHup: true,

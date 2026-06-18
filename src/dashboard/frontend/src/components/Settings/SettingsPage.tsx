@@ -2916,7 +2916,7 @@ export function SettingsPage() {
             <div className="min-w-0">
               <span className="text-sm font-medium text-foreground">Extraction provider</span>
               <p className="text-xs text-muted-foreground mt-0.5">
-                PANOPTICON_MEMORY_PROVIDER and PANOPTICON_MEMORY_MODEL override these UI values.
+                OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values.
               </p>
             </div>
             <select

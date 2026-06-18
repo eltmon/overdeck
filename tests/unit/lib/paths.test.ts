@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { homedir } from 'os';
 import { join } from 'path';
 import {
-  PANOPTICON_HOME,
+  OVERDECK_HOME,
   SKILLS_DIR,
   COMMANDS_DIR,
   AGENTS_DIR,
@@ -17,33 +17,33 @@ import {
 describe('paths', () => {
   const home = homedir();
 
-  describe('PANOPTICON_HOME', () => {
-    it('should respect PANOPTICON_HOME when set', () => {
-      expect(PANOPTICON_HOME).toBe(process.env.PANOPTICON_HOME ?? join(home, '.panopticon'));
+  describe('OVERDECK_HOME', () => {
+    it('should respect OVERDECK_HOME when set', () => {
+      expect(OVERDECK_HOME).toBe(process.env.OVERDECK_HOME ?? join(home, '.panopticon'));
     });
   });
 
   describe('subdirectories', () => {
-    it('should all be under PANOPTICON_HOME', () => {
-      expect(SKILLS_DIR.startsWith(PANOPTICON_HOME)).toBe(true);
-      expect(COMMANDS_DIR.startsWith(PANOPTICON_HOME)).toBe(true);
-      expect(AGENTS_DIR.startsWith(PANOPTICON_HOME)).toBe(true);
-      expect(BACKUPS_DIR.startsWith(PANOPTICON_HOME)).toBe(true);
-      expect(COSTS_DIR.startsWith(PANOPTICON_HOME)).toBe(true);
+    it('should all be under OVERDECK_HOME', () => {
+      expect(SKILLS_DIR.startsWith(OVERDECK_HOME)).toBe(true);
+      expect(COMMANDS_DIR.startsWith(OVERDECK_HOME)).toBe(true);
+      expect(AGENTS_DIR.startsWith(OVERDECK_HOME)).toBe(true);
+      expect(BACKUPS_DIR.startsWith(OVERDECK_HOME)).toBe(true);
+      expect(COSTS_DIR.startsWith(OVERDECK_HOME)).toBe(true);
     });
 
     it('should have correct names', () => {
-      expect(SKILLS_DIR).toBe(join(PANOPTICON_HOME, 'skills'));
-      expect(COMMANDS_DIR).toBe(join(PANOPTICON_HOME, 'commands'));
-      expect(AGENTS_DIR).toBe(join(PANOPTICON_HOME, 'agents'));
-      expect(BACKUPS_DIR).toBe(join(PANOPTICON_HOME, 'backups'));
-      expect(COSTS_DIR).toBe(join(PANOPTICON_HOME, 'costs'));
+      expect(SKILLS_DIR).toBe(join(OVERDECK_HOME, 'skills'));
+      expect(COMMANDS_DIR).toBe(join(OVERDECK_HOME, 'commands'));
+      expect(AGENTS_DIR).toBe(join(OVERDECK_HOME, 'agents'));
+      expect(BACKUPS_DIR).toBe(join(OVERDECK_HOME, 'backups'));
+      expect(COSTS_DIR).toBe(join(OVERDECK_HOME, 'costs'));
     });
   });
 
   describe('CONFIG_FILE', () => {
     it('should be config.toml in panopticon home', () => {
-      expect(CONFIG_FILE).toBe(join(PANOPTICON_HOME, 'config.toml'));
+      expect(CONFIG_FILE).toBe(join(OVERDECK_HOME, 'config.toml'));
     });
   });
 
@@ -68,7 +68,7 @@ describe('paths', () => {
 
   describe('INIT_DIRS', () => {
     it('should contain all required directories', () => {
-      expect(INIT_DIRS).toContain(PANOPTICON_HOME);
+      expect(INIT_DIRS).toContain(OVERDECK_HOME);
       expect(INIT_DIRS).toContain(SKILLS_DIR);
       expect(INIT_DIRS).toContain(COMMANDS_DIR);
       expect(INIT_DIRS).toContain(AGENTS_DIR);

@@ -6,10 +6,10 @@ import { homedir } from 'os';
 
 // Load ~/.panopticon.env before any other imports
 // This makes API keys and other env vars available to all commands
-const PANOPTICON_ENV_FILE = join(homedir(), '.panopticon.env');
-if (existsSync(PANOPTICON_ENV_FILE)) {
+const OVERDECK_ENV_FILE = join(homedir(), '.panopticon.env');
+if (existsSync(OVERDECK_ENV_FILE)) {
   try {
-    const envContent = readFileSync(PANOPTICON_ENV_FILE, 'utf-8');
+    const envContent = readFileSync(OVERDECK_ENV_FILE, 'utf-8');
     for (const line of envContent.split('\n')) {
       const trimmed = line.trim();
       // Skip comments and empty lines
@@ -603,7 +603,7 @@ program
   .description('Start dashboard (and Traefik if enabled)')
   .option('--detach', 'Run in background')
   .option('--skip-traefik', 'Skip Traefik startup')
-  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited PANOPTICON_DISABLE_DEACON')
+  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
@@ -1019,14 +1019,14 @@ program
     const dashboardOriginEnv = traefikEnabled
       ? {
           DASHBOARD_URL: `https://${traefikDomain}`,
-          PANOPTICON_TRAEFIK_ENABLED: '1',
-          PANOPTICON_TRAEFIK_DOMAIN: traefikDomain,
-          PANOPTICON_TRUSTED_ORIGINS: [process.env.PANOPTICON_TRUSTED_ORIGINS, `https://${traefikDomain}`].filter(Boolean).join(','),
+          OVERDECK_TRAEFIK_ENABLED: '1',
+          OVERDECK_TRAEFIK_DOMAIN: traefikDomain,
+          OVERDECK_TRUSTED_ORIGINS: [process.env.OVERDECK_TRUSTED_ORIGINS, `https://${traefikDomain}`].filter(Boolean).join(','),
         }
       : {};
     const dashboardBootEnv = applyBootGateEnv({ ...process.env }, options);
     if (options.seedFromLegacy) {
-      dashboardBootEnv.PANOPTICON_SEED_FROM_LEGACY = '1';
+      dashboardBootEnv.OVERDECK_SEED_FROM_LEGACY = '1';
       console.log(chalk.yellow('  [--seed-from-legacy] overdeck.db will be seeded from the legacy database (conversations + in-flight state)'));
     }
 
@@ -1042,7 +1042,7 @@ program
               DASHBOARD_PORT: String(dashboardPort),
               API_PORT: String(dashboardApiPort),
               PORT: String(dashboardApiPort),
-              PANOPTICON_MODE: isProduction ? 'production' : 'development',
+              OVERDECK_MODE: isProduction ? 'production' : 'development',
             },
           });
 
@@ -1099,7 +1099,7 @@ program
               DASHBOARD_PORT: String(dashboardPort),
               API_PORT: String(dashboardApiPort),
               PORT: String(dashboardApiPort),
-              PANOPTICON_MODE: isProduction ? 'production' : 'development',
+              OVERDECK_MODE: isProduction ? 'production' : 'development',
             },
           });
 
@@ -1270,7 +1270,7 @@ program
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
   .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
-  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited PANOPTICON_DISABLE_DEACON')
+  .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
   .option('--no-resume', 'Disable agent auto-resume on restart (now the default; flag kept for explicitness)')
@@ -1381,7 +1381,7 @@ program
     const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
     const port = parseInt(options.port, 10) || 3011;
     const url = `http://localhost:${port}`;
-    const internalToken = process.env.PANOPTICON_INTERNAL_TOKEN || randomBytes(32).toString('hex');
+    const internalToken = process.env.OVERDECK_INTERNAL_TOKEN || randomBytes(32).toString('hex');
     const browserUrl = `${url}#panopticon_token=${encodeURIComponent(internalToken)}`;
 
     if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
@@ -1395,7 +1395,7 @@ program
 
     const server = spawn(process.execPath, [bundledServer], {
       stdio: 'inherit',
-      env: { ...process.env, PORT: String(port), PANOPTICON_INTERNAL_TOKEN: internalToken },
+      env: { ...process.env, PORT: String(port), OVERDECK_INTERNAL_TOKEN: internalToken },
     });
 
     server.on('error', (err) => {

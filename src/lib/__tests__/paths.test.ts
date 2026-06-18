@@ -13,7 +13,7 @@ import {
 } from '../paths.js';
 
 describe('docs RAG paths', () => {
-  it.effect('resolves docs state under PANOPTICON_HOME', () =>
+  it.effect('resolves docs state under OVERDECK_HOME', () =>
     Effect.sync(() => {
       expect(getDocsPaths({ panopticonHome: '/tmp/pan-home' })).toEqual({
         docsDir: join('/tmp/pan-home', 'docs'),

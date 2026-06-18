@@ -119,11 +119,11 @@ Pi also writes local compatibility files under `~/.panopticon/agents/<agent-id>/
 Pi work agents use `turn_end` to approximate Claude Code's `Stop` hook completion flow:
 
 1. Check evidence first: issue beads must all be closed and the workspace vBRIEF/continue state must be satisfied when present.
-2. Scan the turn output/transcript for explicit completion markers such as `PANOPTICON_WORK_COMPLETE`, `Implementation complete`, `all beads closed`, or `ready for review`.
+2. Scan the turn output/transcript for explicit completion markers such as `OVERDECK_WORK_COMPLETE`, `Implementation complete`, `all beads closed`, or `ready for review`.
 3. Ask the dashboard classifier endpoint for a final verdict when the transcript is ambiguous.
 4. Emit `agent.resolution_changed` with `done`, `needs_input`, or `stuck` as appropriate.
 
-Specialist Pi agents use the same `turn_end` surface to detect review, test, merge/ship, inspect, and UAT completion. Auto-completion requires a final structured sentinel line, `PANOPTICON_SPECIALIST_RESULT: <specialist-name> <passed|failed>`, and explicit structured failure artifacts take precedence over pass sentinels.
+Specialist Pi agents use the same `turn_end` surface to detect review, test, merge/ship, inspect, and UAT completion. Auto-completion requires a final structured sentinel line, `OVERDECK_SPECIALIST_RESULT: <specialist-name> <passed|failed>`, and explicit structured failure artifacts take precedence over pass sentinels.
 
 ## Harness-Aware Installation
 

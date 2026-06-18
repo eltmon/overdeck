@@ -87,8 +87,8 @@ beforeEach(async () => {
   mkdirSync(TEST_HOME, { recursive: true });
   sourceSessionFile = join(TEST_HOME, 'source.jsonl');
   writeFileSync(sourceSessionFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'continue' } })}\n`);
-  process.env.PANOPTICON_HOME = TEST_HOME;
-  process.env.PANOPTICON_DOCKER_WORKSPACE = '1';
+  process.env.OVERDECK_HOME = TEST_HOME;
+  process.env.OVERDECK_DOCKER_WORKSPACE = '1';
 
   sessionAlive = new Map();
   harnessAlive = new Map();
@@ -137,8 +137,8 @@ afterEach(async () => {
   __resetForkPipelineRuntimeOverridesForTest();
   await waitForInFlightForkPipelines(0);
   await resetDb();
-  delete process.env.PANOPTICON_HOME;
-  delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+  delete process.env.OVERDECK_HOME;
+  delete process.env.OVERDECK_DOCKER_WORKSPACE;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 

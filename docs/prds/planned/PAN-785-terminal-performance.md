@@ -145,7 +145,7 @@ Two targeted changes in `src/dashboard/server/ws-terminal.ts`:
 
 **Hub-join path (line 174 onward):** Do not call `captureSnapshot`. The existing PTY is the source of truth and is actively streaming. Send a lightweight `size` control frame with the current hub dimensions so the client can resize, then broadcast live data straight away. The existing client-side `reset()` on connect already clears stale buffer; xterm.js will repaint from the first live data chunk forward.
 
-**Fresh attach path (line 308):** Cap the snapshot at 500 lines (configurable via `PANOPTICON_TERMINAL_SNAPSHOT_LINES`, default 500). Keep `-e` because the client relies on escape-coded color/styling; the regression is scrollback size, not escape processing. 500 lines at typical density is tens of KB, not MB.
+**Fresh attach path (line 308):** Cap the snapshot at 500 lines (configurable via `OVERDECK_TERMINAL_SNAPSHOT_LINES`, default 500). Keep `-e` because the client relies on escape-coded color/styling; the regression is scrollback size, not escape processing. 500 lines at typical density is tens of KB, not MB.
 
 ### Fix 4 — Skip `resizeWindowAsync` when dimensions already match
 
@@ -204,7 +204,7 @@ Each commit should pass typecheck + lint + tests before moving to the next.
 
 - `ensureManagedTmuxContextOnce()` exported from `src/lib/tmux.ts` (explicit one-shot init hook).
 - `ensureWindowSize()` helper (no-op when already at target size).
-- `PANOPTICON_TERMINAL_SNAPSHOT_LINES` env var (default 500).
+- `OVERDECK_TERMINAL_SNAPSHOT_LINES` env var (default 500).
 
 ## Acceptance Criteria
 

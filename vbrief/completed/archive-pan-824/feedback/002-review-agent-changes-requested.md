@@ -8,16 +8,16 @@ timestamp: 2026-04-26T15:11:17Z
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-This is a pure refactor to consolidate 12 scattered inline bash launcher templates into a single `generateLauncherScript()` function with typed config. The consolidation is correct in scope and structure, but the refactor introduced three `!`-severity bugs: (1) `PANOPTICON_AGENT_ID` is incorrectly unset in review agent launchers because `unsetPanopticonEnv` overrides the explicit `panopticonEnv.agentId` export; (2) `promptInline` is embedded in double-quoted shell strings without escaping, enabling command injection; (3) `workingDir` (user-controlled via `summary-fork` `cwd`) is interpolated into `cd -- "..."` without shell escaping, also enabling command injection. All three must be fixed before merge.
+This is a pure refactor to consolidate 12 scattered inline bash launcher templates into a single `generateLauncherScript()` function with typed config. The consolidation is correct in scope and structure, but the refactor introduced three `!`-severity bugs: (1) `OVERDECK_AGENT_ID` is incorrectly unset in review agent launchers because `unsetPanopticonEnv` overrides the explicit `panopticonEnv.agentId` export; (2) `promptInline` is embedded in double-quoted shell strings without escaping, enabling command injection; (3) `workingDir` (user-controlled via `summary-fork` `cwd`) is interpolated into `cd -- "..."` without shell escaping, also enabling command injection. All three must be fixed before merge.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Review agent `PANOPTICON_AGENT_ID` is unset when it must remain set — `src/lib/cloister/review-agent.ts:531-532` + `src/lib/launcher-generator.ts` — `!`
+### 1. Review agent `OVERDECK_AGENT_ID` is unset when it must remain set — `src/lib/cloister/review-agent.ts:531-532` + `src/lib/launcher-generator.ts` — `!`
 **Raised by**: requirements, correctness
-**Why it blocks**: The old code explicitly exported `PANOPTICON_AGENT_ID` to pin heartbeat hook attribution to the reviewer session directory. The new generator's `unsetPanopticonEnv` emits `unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE` after the `panopticonEnv` exports, overriding the explicit `agentId` export. Reviewer heartbeats will be attributed to the parent work agent instead of the dedicated reviewer session directory.
+**Why it blocks**: The old code explicitly exported `OVERDECK_AGENT_ID` to pin heartbeat hook attribution to the reviewer session directory. The new generator's `unsetPanopticonEnv` emits `unset OVERDECK_AGENT_ID OVERDECK_ISSUE_ID OVERDECK_SESSION_TYPE` after the `panopticonEnv` exports, overriding the explicit `agentId` export. Reviewer heartbeats will be attributed to the parent work agent instead of the dedicated reviewer session directory.
 
 <fix instruction>
-In `generateLauncherScript()`, change `unsetPanopticonEnv` logic so it only unsets Panopticon env vars that were NOT explicitly provided via `panopticonEnv` in the same config. For the review agent call site, `PANOPTICON_AGENT_ID` should remain set while `PANOPTICON_ISSUE_ID` and `PANOPTICON_SESSION_TYPE` are unset. Concretely: collect the keys from `panopticonEnv` first, then in the unset step skip any key that was explicitly set.
+In `generateLauncherScript()`, change `unsetPanopticonEnv` logic so it only unsets Panopticon env vars that were NOT explicitly provided via `panopticonEnv` in the same config. For the review agent call site, `OVERDECK_AGENT_ID` should remain set while `OVERDECK_ISSUE_ID` and `OVERDECK_SESSION_TYPE` are unset. Concretely: collect the keys from `panopticonEnv` first, then in the unset step skip any key that was explicitly set.
 </fix>
 
 ### 2. `promptInline` shell injection — `src/lib/launcher-generator.ts:307, 346` — `!`
@@ -85,7 +85,7 @@ Extract shared flag/session/prompt construction into a helper function used by b
 - [nit-5] `workingDir` double-quote inside path (same underlying issue as blocker-3)
 
 **`unsetPanopticonEnv` ordering bug** (all stem from the same ordering issue in the generator's emit sequence):
-- [blocker-1] `PANOPTICON_AGENT_ID` unset when it must remain set for review agent
+- [blocker-1] `OVERDECK_AGENT_ID` unset when it must remain set for review agent
 
 **Code duplication in `buildCommand()`** (same logic copied in two branches — future fixes must apply to both):
 - [high-4] Duplicated command-building logic between `planning` and other types

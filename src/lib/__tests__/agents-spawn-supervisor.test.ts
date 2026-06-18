@@ -173,12 +173,12 @@ beforeEach(() => {
   closeOverdeckDatabaseSync();
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
   closeOverdeckDatabaseSync();
-  process.env.PANOPTICON_HOME = tmpHome;
+  process.env.OVERDECK_HOME = tmpHome;
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
   activeFlywheelRunId = null;
   delete process.env.PAN_DOCKER;
-  delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+  delete process.env.OVERDECK_DOCKER_WORKSPACE;
   mockSpawnDependencies();
 });
 
@@ -202,9 +202,9 @@ afterEach(() => {
   vi.doUnmock('../overdeck/control-settings.js');
   vi.doUnmock('../projects.js');
   closeOverdeckDatabaseSync();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   delete process.env.PAN_DOCKER;
-  delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+  delete process.env.OVERDECK_DOCKER_WORKSPACE;
   rmSync(tmpHome, { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });
   rmSync(packageRootDir, { recursive: true, force: true });
@@ -223,12 +223,12 @@ describe('spawnAgent PTY supervisor wiring', () => {
     });
     delete process.env.PAN_DOCKER;
 
-    process.env.PANOPTICON_DOCKER_WORKSPACE = '1';
+    process.env.OVERDECK_DOCKER_WORKSPACE = '1';
     expect(decideSupervisorForWorkAgent('agent-pan-1405', {} as any, baseState())).toEqual({
       eligible: false,
       reason: 'docker-not-supported-yet',
     });
-    delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+    delete process.env.OVERDECK_DOCKER_WORKSPACE;
 
     expect(decideSupervisorForWorkAgent('agent-pan-1405', {} as any, baseState({ harness: 'pi' }))).toEqual({
       eligible: false,
@@ -374,16 +374,16 @@ describe('spawnAgent PTY supervisor wiring', () => {
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
-    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_RUN_ID=RUN-777');
-    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_AGENT_ROLE=work');
+    expect(launcher).toContain('export OVERDECK_FLYWHEEL_RUN_ID=RUN-777');
+    expect(launcher).toContain('export OVERDECK_FLYWHEEL_AGENT_ROLE=work');
     expect(createSessionMock).toHaveBeenCalledWith(
       'agent-pan-1405',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.objectContaining({
         env: expect.objectContaining({
-          PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
-          PANOPTICON_FLYWHEEL_AGENT_ROLE: 'work',
+          OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
+          OVERDECK_FLYWHEEL_AGENT_ROLE: 'work',
         }),
       }),
     );
@@ -444,16 +444,16 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
     const agentDir = join(tmpHome, 'agents', 'flywheel-orchestrator');
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
-    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_RUN_ID=RUN-777');
-    expect(launcher).toContain('export PANOPTICON_FLYWHEEL_AGENT_ROLE=flywheel');
+    expect(launcher).toContain('export OVERDECK_FLYWHEEL_RUN_ID=RUN-777');
+    expect(launcher).toContain('export OVERDECK_FLYWHEEL_AGENT_ROLE=flywheel');
     expect(createSessionMock).toHaveBeenCalledWith(
       'flywheel-orchestrator',
       workspace,
       `bash ${join(agentDir, 'launcher.sh')}`,
       expect.objectContaining({
         env: expect.objectContaining({
-          PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
-          PANOPTICON_FLYWHEEL_AGENT_ROLE: 'flywheel',
+          OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
+          OVERDECK_FLYWHEEL_AGENT_ROLE: 'flywheel',
         }),
       }),
     );
@@ -472,10 +472,10 @@ describe('spawnAgent PTY supervisor wiring', () => {
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1405');
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
     const sessionOptions = createSessionMock.mock.calls[0][3] as { env: Record<string, string> };
-    expect(launcher).not.toContain('PANOPTICON_FLYWHEEL_RUN_ID');
-    expect(launcher).not.toContain('PANOPTICON_FLYWHEEL_AGENT_ROLE');
-    expect(sessionOptions.env.PANOPTICON_FLYWHEEL_RUN_ID).toBeUndefined();
-    expect(sessionOptions.env.PANOPTICON_FLYWHEEL_AGENT_ROLE).toBeUndefined();
+    expect(launcher).not.toContain('OVERDECK_FLYWHEEL_RUN_ID');
+    expect(launcher).not.toContain('OVERDECK_FLYWHEEL_AGENT_ROLE');
+    expect(sessionOptions.env.OVERDECK_FLYWHEEL_RUN_ID).toBeUndefined();
+    expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });
 
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {

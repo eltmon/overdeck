@@ -9,7 +9,7 @@ import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
-  PANOPTICON_HOME,
+  OVERDECK_HOME,
   SKILLS_DIR,
   COMMANDS_DIR,
   AGENTS_DIR,
@@ -666,7 +666,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check Panopticon directories
   const directories = [
-    { path: PANOPTICON_HOME, name: 'Panopticon Home', fix: 'Run: pan init' },
+    { path: OVERDECK_HOME, name: 'Panopticon Home', fix: 'Run: pan init' },
     { path: SKILLS_DIR, name: 'Skills Directory', fix: 'Run: pan init' },
     { path: COMMANDS_DIR, name: 'Commands Directory', fix: 'Run: pan init' },
     { path: AGENTS_DIR, name: 'Agents Directory', fix: 'Run: pan init' },

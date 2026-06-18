@@ -217,7 +217,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   const noResume = isNoResumeCliOptionEnabled(options);
 
   // Force dev mode for Traefik config generation and all downstream code
-  process.env['PANOPTICON_DEV'] = '1';
+  process.env['OVERDECK_DEV'] = '1';
 
   const config = readConfig();
   const node22 = resolveNode22();
@@ -396,9 +396,9 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       env: {
         ...process.env,
         API_PORT: String(config.dashboardApiPort),
-        PANOPTICON_MODE: 'development',
-        ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
-        ...(noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+        OVERDECK_MODE: 'development',
+        ...(options.deacon === false ? { OVERDECK_DISABLE_DEACON: '1' } : {}),
+        ...(noResume ? { OVERDECK_NO_RESUME: '1' } : {}),
       },
     });
     child.stdout?.on('data', (data) => process.stdout.write(chalk.dim(`[server] ${data}`)));

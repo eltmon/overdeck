@@ -4,15 +4,15 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const PANOPTICON_SEGMENT = `.${'panopticon'}`;
-const REAL_HOME_TARGET = join(homedir(), PANOPTICON_SEGMENT, 'pan-test-guard');
+const OVERDECK_SEGMENT = `.${'panopticon'}`;
+const REAL_HOME_TARGET = join(homedir(), OVERDECK_SEGMENT, 'pan-test-guard');
 
-describe('real PANOPTICON_HOME test guard', () => {
-  it('sets PANOPTICON_HOME to a per-worker temp directory', () => {
-    expect(process.env.PANOPTICON_HOME).toBeTruthy();
-    expect(process.env.PANOPTICON_HOME).toContain('pan-test-root-');
-    expect(process.env.PANOPTICON_HOME).toContain('worker-');
-    expect(process.env.PANOPTICON_HOME).not.toBe(join(homedir(), PANOPTICON_SEGMENT));
+describe('real OVERDECK_HOME test guard', () => {
+  it('sets OVERDECK_HOME to a per-worker temp directory', () => {
+    expect(process.env.OVERDECK_HOME).toBeTruthy();
+    expect(process.env.OVERDECK_HOME).toContain('pan-test-root-');
+    expect(process.env.OVERDECK_HOME).toContain('worker-');
+    expect(process.env.OVERDECK_HOME).not.toBe(join(homedir(), OVERDECK_SEGMENT));
   });
 
   it('blocks sync writes to the real ~/.panopticon tree', () => {

@@ -394,7 +394,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "The hook script (.claude/hooks/dcg-pretool.sh) wraps dcg invocation: on dcg exit-code=block, POST a CommandBlocked event to the dashboard's internal event ingest endpoint (using the existing internal-token auth in src/lib/internal-token.ts). On dcg crash/timeout, POST CommandGuardError and exit 0 (fail-open). The agentId is in env (PANOPTICON_AGENT_ID, already exported by the launcher)."
+          "Action": "The hook script (.claude/hooks/dcg-pretool.sh) wraps dcg invocation: on dcg exit-code=block, POST a CommandBlocked event to the dashboard's internal event ingest endpoint (using the existing internal-token auth in src/lib/internal-token.ts). On dcg crash/timeout, POST CommandGuardError and exit 0 (fail-open). The agentId is in env (OVERDECK_AGENT_ID, already exported by the launcher)."
         },
         "subItems": [
           {

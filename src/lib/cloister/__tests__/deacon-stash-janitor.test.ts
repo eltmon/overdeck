@@ -107,7 +107,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   };
 });
 vi.mock('../../paths.js', () => ({
-  PANOPTICON_HOME: '/tmp/test-panopticon',
+  OVERDECK_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
   packageRoot: '/tmp/test-package-root',
 }));

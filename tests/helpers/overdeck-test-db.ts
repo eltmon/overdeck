@@ -2,9 +2,9 @@
  * Shared overdeck test fixture (PAN-1938).
  *
  * The migrated product code serves agent-state / conversations / costs from a
- * real `overdeck.db` resolved from `PANOPTICON_HOME` — the SYNC accessors
+ * real `overdeck.db` resolved from `OVERDECK_HOME` — the SYNC accessors
  * (`getOverdeckDatabaseSync`, `getOverdeckAgentStateSync`, …) resolve the path
- * at CALL time, so they honour a `PANOPTICON_HOME` set in `beforeEach`.
+ * at CALL time, so they honour a `OVERDECK_HOME` set in `beforeEach`.
  *
  * This helper gives a test a fresh, real, schema-applied `overdeck.db` under a
  * throwaway temp home, and — critically — resets the cached sync handle so one
@@ -37,7 +37,7 @@ import { resetDiscoveredSessionsSchemaBootstrap } from '../../src/lib/overdeck/d
 import type { SqliteDatabase } from '../../src/lib/database/driver.js';
 
 export interface OverdeckTestDb {
-  /** Throwaway `PANOPTICON_HOME` for this test. */
+  /** Throwaway `OVERDECK_HOME` for this test. */
   readonly home: string;
   /** Absolute path to the fresh `overdeck.db` under `home`. */
   readonly dbPath: string;
@@ -50,7 +50,7 @@ export interface OverdeckTestDb {
 let savedHome: { present: boolean; value: string | undefined } = { present: false, value: undefined };
 
 /**
- * `beforeEach`: fresh temp `PANOPTICON_HOME`, an empty schema-applied
+ * `beforeEach`: fresh temp `OVERDECK_HOME`, an empty schema-applied
  * `overdeck.db`, and a reset cached sync handle.
  */
 export function setupOverdeckTestDb(): OverdeckTestDb {
@@ -60,10 +60,10 @@ export function setupOverdeckTestDb(): OverdeckTestDb {
   // (the FTS table is NOT in the migration SQL, only in ensureSchema()).
   resetDiscoveredSessionsSchemaBootstrap();
 
-  savedHome = { present: 'PANOPTICON_HOME' in process.env, value: process.env.PANOPTICON_HOME };
+  savedHome = { present: 'OVERDECK_HOME' in process.env, value: process.env.OVERDECK_HOME };
 
   const home = mkdtempSync(join(tmpdir(), 'pan-overdeck-test-'));
-  process.env.PANOPTICON_HOME = home;
+  process.env.OVERDECK_HOME = home;
 
   const dbPath = join(home, 'overdeck.db');
   createOverdeckDatabase({ dbPath });
@@ -81,9 +81,9 @@ export function teardownOverdeckTestDb(db: OverdeckTestDb): void {
   closeOverdeckDatabaseSync();
   rmSync(db.home, { recursive: true, force: true });
   if (savedHome.present) {
-    process.env.PANOPTICON_HOME = savedHome.value;
+    process.env.OVERDECK_HOME = savedHome.value;
   } else {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   }
 }
 

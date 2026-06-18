@@ -10,13 +10,13 @@ describe('ui-theme', () => {
 
   beforeEach(() => {
     tempHome = mkdtempSync(join(tmpdir(), 'pan-ui-theme-'));
-    prevHome = process.env.PANOPTICON_HOME;
-    process.env.PANOPTICON_HOME = tempHome;
+    prevHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = tempHome;
   });
 
   afterEach(() => {
-    if (prevHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = prevHome;
     rmSync(tempHome, { recursive: true, force: true });
   });
 

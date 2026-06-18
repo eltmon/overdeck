@@ -65,7 +65,7 @@ export function getManagedTmuxConfigPath(): string {
 }
 
 export function getManagedTmuxSocketName(): string {
-  return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? 'panopticon';
+  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'panopticon';
 }
 
 function ensureLogDir(): void {
@@ -216,8 +216,8 @@ export function ensurePanopticonTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): voi
   // isolation, PAN-1808) and on hosts where the server cannot come up it
   // burns SERVER_ALIVE_TIMEOUT_MS synchronously inside every createSession.
   // Unit tests of this function itself opt back in via the FORCE override.
-  if (process.env.PANOPTICON_TMUX_MANAGED_SERVER_FORCE !== '1') {
-    if (process.env.PANOPTICON_TMUX_NO_MANAGED_SERVER === '1' || process.env.VITEST) {
+  if (process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE !== '1') {
+    if (process.env.OVERDECK_TMUX_NO_MANAGED_SERVER === '1' || process.env.VITEST) {
       return;
     }
   }

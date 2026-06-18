@@ -17,8 +17,8 @@ describe('migrateDevroot', () => {
 
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'pan-migrate-'));
-    prevHome = process.env.PANOPTICON_HOME;
-    process.env.PANOPTICON_HOME = join(home, '.panopticon');
+    prevHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = join(home, '.panopticon');
     projectsRoot = join(home, 'Projects');
     oldClaudeDir = join(projectsRoot, '.claude');
     mkdirSync(join(oldClaudeDir, 'skills', 'demo-skill'), { recursive: true });
@@ -26,8 +26,8 @@ describe('migrateDevroot', () => {
     writeFileSync(join(oldClaudeDir, 'skills', 'demo-skill', 'SKILL.md'), 'demo skill body');
   });
   afterEach(() => {
-    if (prevHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = prevHome;
     rmSync(home, { recursive: true, force: true });
   });
 

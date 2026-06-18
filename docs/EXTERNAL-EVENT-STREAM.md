@@ -56,7 +56,7 @@ Filters are AND-combined. Unknown query params are ignored.
 | Header              | Direction | Purpose |
 |---------------------|-----------|---------|
 | `Last-Event-ID`     | request   | Standard SSE resume — server replays from `<id>+1`. Overrides `?since=`. |
-| `Authorization`     | request   | Optional `Bearer <token>` when `PANOPTICON_EVENTS_TOKEN` is set. |
+| `Authorization`     | request   | Optional `Bearer <token>` when `OVERDECK_EVENTS_TOKEN` is set. |
 | `Content-Type`      | response  | `text/event-stream` |
 | `Cache-Control`     | response  | `no-cache` |
 | `Connection`        | response  | `keep-alive` |
@@ -81,7 +81,7 @@ On initial connect, the server sends a keepalive comment every 15 s (`:\n\n`) so
 ## Authentication & Network Exposure
 
 - **Default binding: `127.0.0.1` only.** The endpoint is not reachable from the LAN unless the dashboard is already exposed.
-- **Optional bearer token:** set `PANOPTICON_EVENTS_TOKEN=<secret>` in `~/.panopticon.env`. When set, the endpoint requires `Authorization: Bearer <secret>`. When unset, any local process can subscribe.
+- **Optional bearer token:** set `OVERDECK_EVENTS_TOKEN=<secret>` in `~/.panopticon.env`. When set, the endpoint requires `Authorization: Bearer <secret>`. When unset, any local process can subscribe.
 - **No per-event ACLs.** Subscribers receive the full public event catalog. If you need to hide sensitive fields, redact at the emission site, not here.
 
 Rationale: the primary use case is local sidecars on the same machine as pan. Anything cross-host should tunnel over existing infrastructure (Tailscale, Cloudflare tunnel, SSH forward) rather than reinvent auth here.

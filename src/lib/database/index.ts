@@ -31,7 +31,7 @@ export class DatabaseError extends Data.TaggedError('DatabaseError')<{
 let _db: SqliteDatabase | null = null;
 
 /**
- * Get the path to panopticon.db (dynamic, respects PANOPTICON_HOME override for tests)
+ * Get the path to panopticon.db (dynamic, respects OVERDECK_HOME override for tests)
  */
 export function getDatabasePath(): string {
   return join(getPanopticonHome(), 'panopticon.db');
@@ -137,7 +137,7 @@ export function closeDatabase(): void {
 
 /**
  * Force re-initialization of the database connection.
- * Used in tests after PANOPTICON_HOME changes.
+ * Used in tests after OVERDECK_HOME changes.
  */
 export function resetDatabase(): void {
   closeDatabase();

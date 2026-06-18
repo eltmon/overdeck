@@ -165,13 +165,13 @@ function getDnsmasqConfigDir(): string {
   return '/etc/dnsmasq.d';
 }
 
-const PANOPTICON_DNSMASQ_CONF = 'panopticon.conf';
+const OVERDECK_DNSMASQ_CONF = 'panopticon.conf';
 
 export function addDnsmasqEntry(hostname: string, ip: string = '127.0.0.1'): boolean {
   try {
     const configDir = getDnsmasqConfigDir();
     mkdirSync(configDir, { recursive: true });
-    const confPath = join(configDir, PANOPTICON_DNSMASQ_CONF);
+    const confPath = join(configDir, OVERDECK_DNSMASQ_CONF);
 
     let content = '';
     if (existsSync(confPath)) {
@@ -192,7 +192,7 @@ export function addDnsmasqEntry(hostname: string, ip: string = '127.0.0.1'): boo
 export function removeDnsmasqEntry(hostname: string): boolean {
   try {
     const configDir = getDnsmasqConfigDir();
-    const confPath = join(configDir, PANOPTICON_DNSMASQ_CONF);
+    const confPath = join(configDir, OVERDECK_DNSMASQ_CONF);
     if (!existsSync(confPath)) return true;
 
     const content = readFileSync(confPath, 'utf-8');

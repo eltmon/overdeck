@@ -83,12 +83,12 @@ vi.mock('../../src/lib/agent-runtime-mirror.js', () => ({
 vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
   PiNotReady: class PiNotReady extends Error {},
   createPiFifo: vi.fn((agentId: string) => Effect.sync(() => {
-    const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
+    const dir = join(process.env.OVERDECK_HOME ?? tmpdir(), 'agents', agentId);
     mkdirSync(dir, { recursive: true });
     return join(dir, 'rpc.in');
   })),
   piFifoPaths: (agentId: string) => {
-    const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
+    const dir = join(process.env.OVERDECK_HOME ?? tmpdir(), 'agents', agentId);
     return {
       agentDir: dir,
       readyPath: join(dir, 'ready.json'),
@@ -232,12 +232,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   let testPanopticonHome: string;
   let testAgentsDir: string;
   let testWorkspace: string;
-  const originalPanopticonHome = process.env.PANOPTICON_HOME;
-  const originalPromptReadyTimeout = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  const originalPanopticonHome = process.env.OVERDECK_HOME;
+  const originalPromptReadyTimeout = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
   const originalPath = process.env.PATH;
-  const originalTmuxSocketName = process.env.PANOPTICON_TMUX_SOCKET_NAME;
-  const originalTestHarnessCommand = process.env.PANOPTICON_TEST_HARNESS_COMMAND;
-  const originalDockerWorkspace = process.env.PANOPTICON_DOCKER_WORKSPACE;
+  const originalTmuxSocketName = process.env.OVERDECK_TMUX_SOCKET_NAME;
+  const originalTestHarnessCommand = process.env.OVERDECK_TEST_HARNESS_COMMAND;
+  const originalDockerWorkspace = process.env.OVERDECK_DOCKER_WORKSPACE;
   const testTmuxSocketName = `pan-test-${process.pid}`;
   const supervisorScriptPath = join(process.cwd(), 'dist', 'pty-supervisor.js');
   let createdSupervisorStub = false;
@@ -245,8 +245,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   beforeAll(() => {
     // PAN-1808: never touch the shared panopticon socket; use a throwaway
     // per-process socket and a harmless harness command as defense in depth.
-    process.env.PANOPTICON_TMUX_SOCKET_NAME = testTmuxSocketName;
-    process.env.PANOPTICON_TEST_HARNESS_COMMAND = 'true';
+    process.env.OVERDECK_TMUX_SOCKET_NAME = testTmuxSocketName;
+    process.env.OVERDECK_TEST_HARNESS_COMMAND = 'true';
     if (!existsSync(supervisorScriptPath)) {
       mkdirSync(join(process.cwd(), 'dist'), { recursive: true });
       writeFileSync(supervisorScriptPath, '#!/usr/bin/env node\n');
@@ -265,14 +265,14 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // Server may already be gone; ignore.
     }
     if (originalTmuxSocketName) {
-      process.env.PANOPTICON_TMUX_SOCKET_NAME = originalTmuxSocketName;
+      process.env.OVERDECK_TMUX_SOCKET_NAME = originalTmuxSocketName;
     } else {
-      delete process.env.PANOPTICON_TMUX_SOCKET_NAME;
+      delete process.env.OVERDECK_TMUX_SOCKET_NAME;
     }
     if (originalTestHarnessCommand) {
-      process.env.PANOPTICON_TEST_HARNESS_COMMAND = originalTestHarnessCommand;
+      process.env.OVERDECK_TEST_HARNESS_COMMAND = originalTestHarnessCommand;
     } else {
-      delete process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+      delete process.env.OVERDECK_TEST_HARNESS_COMMAND;
     }
   });
 
@@ -286,12 +286,12 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     testWorkspace = join(testPanopticonHome, 'test-workspace');
     mkdirSync(testAgentsDir, { recursive: true });
     mkdirSync(testWorkspace, { recursive: true });
-    process.env.PANOPTICON_HOME = testPanopticonHome;
-    process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = '1';
+    process.env.OVERDECK_HOME = testPanopticonHome;
+    process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS = '1';
     // This suite verifies the role primitive and prompt-delivery paths with a
     // mocked tmux runtime. Keep PTY-supervisor wiring out of scope so the tests
     // remain hermetic when run directly without a prior `npm run build`.
-    process.env.PANOPTICON_DOCKER_WORKSPACE = '1';
+    process.env.OVERDECK_DOCKER_WORKSPACE = '1';
     // The pi harness is normally guarded by `command -v pi`. Several tests
     // exercise the pi resume/delivery path, so provide a harmless stub binary
     // on PATH for the duration of this test. This keeps harness resolution
@@ -338,14 +338,14 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     vi.useRealTimers();
     await closeFeatureRegistryStorage();
     if (originalPanopticonHome) {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     } else {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     }
     if (originalPromptReadyTimeout) {
-      process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS = originalPromptReadyTimeout;
+      process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS = originalPromptReadyTimeout;
     } else {
-      delete process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+      delete process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
     }
     if (originalPath) {
       process.env.PATH = originalPath;
@@ -353,9 +353,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       delete process.env.PATH;
     }
     if (originalDockerWorkspace) {
-      process.env.PANOPTICON_DOCKER_WORKSPACE = originalDockerWorkspace;
+      process.env.OVERDECK_DOCKER_WORKSPACE = originalDockerWorkspace;
     } else {
-      delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+      delete process.env.OVERDECK_DOCKER_WORKSPACE;
     }
     if (existsSync(testPanopticonHome)) {
       rmSync(testPanopticonHome, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
@@ -416,7 +416,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(state.harness).toBeDefined();
     });
 
-    it('persists AgentState (role, harness, model) to disk under PANOPTICON_HOME', async () => {
+    it('persists AgentState (role, harness, model) to disk under OVERDECK_HOME', async () => {
       await spawnAgent({
         issueId: 'PAN-TEST-2',
         workspace: testWorkspace,
@@ -999,7 +999,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).not.toContain('--print');
       expect(launcher).not.toContain('initial-prompt.md');
       expect(launcher).not.toContain('"$prompt"');
-      // PAN-1808: tests run with PANOPTICON_TEST_HARNESS_COMMAND=true so the
+      // PAN-1808: tests run with OVERDECK_TEST_HARNESS_COMMAND=true so the
       // launcher command is a stub, but it must still carry a session-id.
       expect(launcher).toContain("--session-id '");
     });

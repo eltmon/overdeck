@@ -19,13 +19,13 @@ describe('dev-supervisor marker', () => {
 
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'pan-dev-sup-'));
-    prevHome = process.env.PANOPTICON_HOME;
-    process.env.PANOPTICON_HOME = home;
+    prevHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = home;
   });
 
   afterEach(() => {
-    if (prevHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = prevHome;
     rmSync(home, { recursive: true, force: true });
   });
 

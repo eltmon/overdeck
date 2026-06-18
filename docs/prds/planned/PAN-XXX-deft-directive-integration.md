@@ -38,7 +38,7 @@ A: Currently agents get a task and CLAUDE.md. With Deft, they get a layered stac
 A: Planning agents currently do freeform exploration. With Deft, they run structured strategies — interview (one focused question per turn, sizing gate, spec generation) or speckit (5-phase specification for complex scopes). Plans become reproducible.
 
 **Q: Can I still use Panopticon without Deft?**
-A: Yes. `pan install --no-deft` skips it. The old state model remains available via `PANOPTICON_LEGACY_STATES=true`.
+A: Yes. `pan install --no-deft` skips it. The old state model remains available via `OVERDECK_LEGACY_STATES=true`.
 
 **Q: What about my existing projects?**
 A: `pan migrate --deft` creates `vbrief/` lifecycle folders, generates PROJECT-DEFINITION from projects.yaml, maps existing states to the new model, and upgrades vBRIEF plans from v0.5 → v0.6.
@@ -334,7 +334,7 @@ This gives Panopticon a local, structured representation of tracker issues that 
    - `done` → `completed`
    - `canceled` → `cancelled`
 4. Existing `plan.vbrief.json` files auto-bumped from v0.5 → v0.6 on next write
-5. Old 6-state model available via `PANOPTICON_LEGACY_STATES=true`
+5. Old 6-state model available via `OVERDECK_LEGACY_STATES=true`
 
 ---
 

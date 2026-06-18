@@ -98,14 +98,14 @@ export function parsePositiveIntEnv(value: string | undefined, fallback: number)
 
 export function readWatchdogConfig(env: NodeJS.ProcessEnv, dashboardApiPort: number): SupervisorWatchdogConfig {
   return {
-    enabled: env.PANOPTICON_SUPERVISOR_WATCHDOG !== '0',
+    enabled: env.OVERDECK_SUPERVISOR_WATCHDOG !== '0',
     dashboardApiPort,
-    pollMs: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_POLL_MS, 10_000),
-    failThreshold: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_FAIL_THRESHOLD, 3),
-    busyFailThreshold: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_BUSY_FAIL_THRESHOLD, 12),
-    maxRestarts: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_MAX_RESTARTS, 3),
-    windowMs: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_WINDOW_MS, 5 * 60_000),
-    requestTimeoutMs: parsePositiveIntEnv(env.PANOPTICON_SUPERVISOR_TIMEOUT_MS, 10_000),
+    pollMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_POLL_MS, 10_000),
+    failThreshold: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_FAIL_THRESHOLD, 3),
+    busyFailThreshold: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_BUSY_FAIL_THRESHOLD, 12),
+    maxRestarts: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_MAX_RESTARTS, 3),
+    windowMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_WINDOW_MS, 5 * 60_000),
+    requestTimeoutMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_TIMEOUT_MS, 10_000),
   };
 }
 

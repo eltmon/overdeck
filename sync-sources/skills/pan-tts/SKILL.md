@@ -100,7 +100,7 @@ The subscriber is a small Python project that connects to Panopticon's SSE feed 
 
 ```yaml
 endpoint: http://127.0.0.1:3000/events/stream
-token: ${PANOPTICON_EVENTS_TOKEN}   # optional, only if pan has the token set
+token: ${OVERDECK_EVENTS_TOKEN}   # optional, only if pan has the token set
 
 filters:
   types: [activity.tts]

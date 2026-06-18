@@ -20,10 +20,10 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.clearAllMocks();
 
     tempHome = mkdtempSync(join(tmpdir(), 'pan-failure-tracking-'));
-    originalHome = process.env.PANOPTICON_HOME;
-    originalNoResume = process.env.PANOPTICON_NO_RESUME;
-    process.env.PANOPTICON_HOME = tempHome;
-    delete process.env.PANOPTICON_NO_RESUME;
+    originalHome = process.env.OVERDECK_HOME;
+    originalNoResume = process.env.OVERDECK_NO_RESUME;
+    process.env.OVERDECK_HOME = tempHome;
+    delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
     sessionExistsMock = vi.fn(() => Effect.succeed(false));
   });
@@ -43,10 +43,10 @@ describe('agent failure tracking and auto-resume backoff', () => {
     vi.doUnmock('os');
     vi.resetModules();
 
-    if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = originalHome;
-    if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME;
-    else process.env.PANOPTICON_NO_RESUME = originalNoResume;
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    if (originalNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
+    else process.env.OVERDECK_NO_RESUME = originalNoResume;
     rmSync(tempHome, { recursive: true, force: true });
   });
 

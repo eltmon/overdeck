@@ -8,7 +8,7 @@
 #   - Reads with offset/limit (targeted reads for editing)
 #   - Non-code files (configs, docs, json, etc.)
 #   - No .venv available (TLDR not installed)
-#   - TLDR disabled via PANOPTICON_TLDR_ENABLED=0 or agents.tldr.enabled: false
+#   - TLDR disabled via OVERDECK_TLDR_ENABLED=0 or agents.tldr.enabled: false
 #   - TLDR command fails (graceful degradation)
 #   - Summary too sparse to be useful (< 100 tokens for file > 5KB)
 #   - Recently edited files (in .tldr/dirty-files — agent needs to verify changes)
@@ -60,14 +60,14 @@ tldr_read_config_enabled() {
   ' "$config_path" 2>/dev/null
 }
 tldr_config_enabled_value() {
-  if [ -n "${PANOPTICON_CONFIG:-}" ]; then
-    tldr_read_config_enabled "$PANOPTICON_CONFIG"
+  if [ -n "${OVERDECK_CONFIG:-}" ]; then
+    tldr_read_config_enabled "$OVERDECK_CONFIG"
   else
     tldr_read_config_enabled "$HOME/.panopticon/config.yaml"
   fi
 }
-if [ -n "${PANOPTICON_TLDR_ENABLED+x}" ]; then
-  tldr_falsy "$PANOPTICON_TLDR_ENABLED" && exit 0
+if [ -n "${OVERDECK_TLDR_ENABLED+x}" ]; then
+  tldr_falsy "$OVERDECK_TLDR_ENABLED" && exit 0
 else
   tldr_falsy "$(tldr_config_enabled_value)" && exit 0
 fi

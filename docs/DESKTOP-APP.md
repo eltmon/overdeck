@@ -34,7 +34,7 @@ When you launch the desktop app:
 3. Once the server responds to `/api/health`, a `BrowserWindow` opens and loads the dashboard.
 4. A system tray icon appears, polling `/api/health` every 5 seconds.
 
-The embedded server behaves identically to `pan up` — same SQLite database, same WebSocket endpoints, same REST API. The desktop app sets `PANOPTICON_MODE=desktop` and `PANOPTICON_NO_BROWSER=1` to suppress the CLI's own browser-open behavior.
+The embedded server behaves identically to `pan up` — same SQLite database, same WebSocket endpoints, same REST API. The desktop app sets `OVERDECK_MODE=desktop` and `OVERDECK_NO_BROWSER=1` to suppress the CLI's own browser-open behavior.
 
 ---
 

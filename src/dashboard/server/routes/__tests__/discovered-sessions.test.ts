@@ -64,10 +64,10 @@ beforeEach(() => {
   TEST_HOME = join(tmpdir(), `pan-457-route-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   fakeClaudeDir = join(TEST_HOME, '.claude', 'projects');
   mkdirSync(join(fakeClaudeDir, '-home-user-Projects-myapp'), { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
   process.env.HOME = TEST_HOME;
-  process.env.PANOPTICON_INTERNAL_TOKEN = 'test-dashboard-token';
-  process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
+  process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
+  process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetTrustedOriginsForTests();
@@ -75,10 +75,10 @@ beforeEach(() => {
 
 afterEach(async () => {
   await resetDb();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   delete process.env.HOME;
-  delete process.env.PANOPTICON_INTERNAL_TOKEN;
-  delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
+  delete process.env.OVERDECK_INTERNAL_TOKEN;
+  delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetTrustedOriginsForTests();
@@ -210,7 +210,7 @@ describe('parseSearchParams', () => {
 
 describe('dashboard conversation route guards', () => {
   const savedEnv: Record<string, string | undefined> = {};
-  const ORIGIN_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL', 'PANOPTICON_TRUSTED_ORIGINS', 'PANOPTICON_TRAEFIK_ENABLED', 'PANOPTICON_TRAEFIK_DOMAIN', 'NODE_ENV'] as const;
+  const ORIGIN_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL', 'OVERDECK_TRUSTED_ORIGINS', 'OVERDECK_TRAEFIK_ENABLED', 'OVERDECK_TRAEFIK_DOMAIN', 'NODE_ENV'] as const;
 
   beforeEach(() => {
     for (const key of ORIGIN_ENV_KEYS) {

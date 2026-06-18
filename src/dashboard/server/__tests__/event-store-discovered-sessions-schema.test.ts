@@ -15,10 +15,10 @@ let odb: OverdeckTestDb;
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `pan-457-event-store-schema-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  // setupOverdeckTestDb sets its own PANOPTICON_HOME; we override afterwards
+  // setupOverdeckTestDb sets its own OVERDECK_HOME; we override afterwards
   // to match the event-store home so both dbs share the same home.
   odb = setupOverdeckTestDb();
-  // odb already set PANOPTICON_HOME to a temp dir; keep it.
+  // odb already set OVERDECK_HOME to a temp dir; keep it.
 });
 
 afterEach(async () => {

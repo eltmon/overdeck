@@ -19,8 +19,8 @@ import { homedir } from 'os';
 
 const DASHBOARD_URL = 'http://localhost:3010';
 const API_URL = 'http://localhost:3011';
-const PANOPTICON_HOME = join(homedir(), '.panopticon');
-const SETTINGS_FILE = join(PANOPTICON_HOME, 'settings.json');
+const OVERDECK_HOME = join(homedir(), '.panopticon');
+const SETTINGS_FILE = join(OVERDECK_HOME, 'settings.json');
 const ROUTER_CONFIG = join(homedir(), '.claude-code-router', 'config.json');
 
 // Test API key (unique per test run to ensure hasChanges is triggered)

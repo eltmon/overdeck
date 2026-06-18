@@ -317,7 +317,7 @@ async function startRealConversationRoutes(): Promise<void> {
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', () => resolve()));
   const address = httpServer.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
-  process.env.PANOPTICON_TRUSTED_ORIGINS = baseUrl;
+  process.env.OVERDECK_TRUSTED_ORIGINS = baseUrl;
   const { _resetTrustedOriginsForTests } = await import('../../src/dashboard/server/routes/origin-validation.js');
   _resetTrustedOriginsForTests();
 }
@@ -330,12 +330,12 @@ beforeEach(async () => {
   sessions = new Map();
   tmuxSessions = new Set();
   actualTmux = undefined;
-  originalPanopticonHome = process.env.PANOPTICON_HOME;
+  originalPanopticonHome = process.env.OVERDECK_HOME;
   originalHome = process.env.HOME;
-  originalTrustedOrigins = process.env.PANOPTICON_TRUSTED_ORIGINS;
-  process.env.PANOPTICON_HOME = tmpHome;
+  originalTrustedOrigins = process.env.OVERDECK_TRUSTED_ORIGINS;
+  process.env.OVERDECK_HOME = tmpHome;
   process.env.HOME = fakeHome;
-  process.env.PANOPTICON_FRONTEND_DIR = workspace;
+  process.env.OVERDECK_FRONTEND_DIR = workspace;
 
   vi.doMock('../../src/dashboard/server/event-store.js', () => ({
     getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
@@ -407,13 +407,13 @@ afterEach(async () => {
   tmuxSessions.clear();
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
-  if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = originalPanopticonHome;
+  if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalPanopticonHome;
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
-  if (originalTrustedOrigins === undefined) delete process.env.PANOPTICON_TRUSTED_ORIGINS;
-  else process.env.PANOPTICON_TRUSTED_ORIGINS = originalTrustedOrigins;
-  delete process.env.PANOPTICON_FRONTEND_DIR;
+  if (originalTrustedOrigins === undefined) delete process.env.OVERDECK_TRUSTED_ORIGINS;
+  else process.env.OVERDECK_TRUSTED_ORIGINS = originalTrustedOrigins;
+  delete process.env.OVERDECK_FRONTEND_DIR;
   removeTempDir(tmpHome);
   removeTempDir(fakeHome);
   removeTempDir(workspace);

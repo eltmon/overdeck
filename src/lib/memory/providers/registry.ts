@@ -33,8 +33,8 @@ export function listExtractionProviders(): ExtractionProvider[] {
 export async function resolveExtractionProviderSelection(
   settings: MemoryProviderSettings | null = null,
 ): Promise<ExtractionProviderSelection> {
-  const envProvider = normalizeEnv(process.env.PANOPTICON_MEMORY_PROVIDER);
-  const envModel = normalizeEnv(process.env.PANOPTICON_MEMORY_MODEL);
+  const envProvider = normalizeEnv(process.env.OVERDECK_MEMORY_PROVIDER);
+  const envModel = normalizeEnv(process.env.OVERDECK_MEMORY_MODEL);
   if (envProvider || envModel) {
     const provider = envProvider ?? settings?.provider ?? DEFAULT_PROVIDER;
     return {

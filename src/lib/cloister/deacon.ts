@@ -126,7 +126,7 @@ const unlinkPath = (path: string): Effect.Effect<void, FsError> =>
 /** Re-exported for symmetry with the additive pattern in the rest of src/lib. */
 export { GitError, ProcessTimeoutError };
 
-import { PANOPTICON_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
+import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
@@ -255,7 +255,7 @@ export interface HealthCheckResult {
 // State Management
 // ============================================================================
 
-const DEACON_DIR = join(PANOPTICON_HOME, 'deacon');
+const DEACON_DIR = join(OVERDECK_HOME, 'deacon');
 const STATE_FILE = join(DEACON_DIR, 'health-state.json');
 const CONFIG_FILE = join(DEACON_DIR, 'config.json');
 
@@ -392,7 +392,7 @@ function checkHeartbeat(name: SpecialistAgentName): {
   responseTimeMs?: number;
 } {
   const tmuxSession = getTmuxSessionName(name);
-  const heartbeatFile = join(PANOPTICON_HOME, 'heartbeats', `${tmuxSession}.json`);
+  const heartbeatFile = join(OVERDECK_HOME, 'heartbeats', `${tmuxSession}.json`);
 
   try {
     if (!existsSync(heartbeatFile)) {
@@ -1463,7 +1463,7 @@ const ORPHAN_REVIEWER_AGE_MS = 60 * 60 * 1000; // 1 hour
 async function loadTmuxSessionsWithCreationTimes(): Promise<{ sessions: string[]; creationTimes: Map<string, number> } | null> {
   try {
     const { stdout } = await execAsync(
-      `tmux -L panopticon -f ${join(PANOPTICON_HOME, 'tmux', 'panopticon.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
+      `tmux -L panopticon -f ${join(OVERDECK_HOME, 'tmux', 'panopticon.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
       { encoding: 'utf-8' },
     );
     const lines = stdout.split('\n').filter(l => l.trim());
@@ -4475,7 +4475,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
         try {
           // Find pan binary
-          const panBin = join(PANOPTICON_HOME, 'bin', 'pan');
+          const panBin = join(OVERDECK_HOME, 'bin', 'pan');
           const binExists = existsSync(panBin);
           const bin = binExists ? panBin : 'pan';
 
@@ -4975,7 +4975,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
-    const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
+    const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
     if (existsSync(pendingFile)) {
       const content = readFileSync(pendingFile, 'utf-8');
       const pending = JSON.parse(content);
@@ -5642,7 +5642,7 @@ function isRapidPostResumeDeath(state: AgentState): boolean {
 export async function handleAgentHeartbeatDeadEvent(agentId: string, context?: string): Promise<string[]> {
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
-    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — PANOPTICON_NO_RESUME=1`);
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — OVERDECK_NO_RESUME=1`);
     return [];
   }
 
@@ -5767,7 +5767,7 @@ export async function recoverOrphanedAgents(context?: string): Promise<string[]>
 async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
-    logDeaconEventSync(`PANOPTICON_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
+    logDeaconEventSync(`OVERDECK_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
     return [];
   }
 
@@ -6595,7 +6595,7 @@ export async function handleAgentStoppedEvent(
   const { skipGlobalGates = false, context = 'event' } = opts;
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
-    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — PANOPTICON_NO_RESUME=1`);
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — OVERDECK_NO_RESUME=1`);
     return null;
   }
 
@@ -6813,7 +6813,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const loadCeiling = cores * RESUME_LOAD_FACTOR;
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
-    logDeaconEventSync('PANOPTICON_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
+    logDeaconEventSync('OVERDECK_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
     orphanFailureRecordedForAutoResume.clear();
     return resumed;
   }
@@ -6869,7 +6869,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
 export async function reconcileAgentLiveness(): Promise<string[]> {
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
-    logDeaconEventSync('PANOPTICON_NO_RESUME=1 — skipping reconcileAgentLiveness');
+    logDeaconEventSync('OVERDECK_NO_RESUME=1 — skipping reconcileAgentLiveness');
     return [];
   }
 

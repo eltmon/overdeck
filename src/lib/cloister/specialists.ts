@@ -12,7 +12,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID, createHash } from 'crypto';
 import { Effect } from 'effect';
-import { AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
+import { AGENTS_DIR, OVERDECK_HOME } from '../paths.js';
 import { getDevrootPathSync } from '../config.js';
 import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { getProjectSync } from '../projects.js';
@@ -182,7 +182,7 @@ export async function buildSpecialistCavemanExports(
   const variant = workspacePath ? await Effect.runPromise(readCavemanVariant(workspacePath)) : 'off';
   if (variant === 'off') return '';
   if (variant === 'disabled') {
-    return `export PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
+    return `export OVERDECK_CAVEMAN_VARIANT="${variant}"\n`;
   }
 
   // Map specialist type to caveman intensity mode
@@ -197,10 +197,10 @@ export async function buildSpecialistCavemanExports(
   const mode = config.modes[modeKey];
   if (mode === 'off' || mode === 'disabled') return '';
 
-  return `export CAVEMAN_DEFAULT_MODE="${mode}"\nexport PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
+  return `export CAVEMAN_DEFAULT_MODE="${mode}"\nexport OVERDECK_CAVEMAN_VARIANT="${variant}"\n`;
 }
 
-const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
 
 const SPECIALIST_AGENT_NAMES = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'] as const;
@@ -1562,7 +1562,7 @@ export interface SpecialistFeedback {
   suggestions?: string[];  // Suggestions for the issue agent
 }
 
-const FEEDBACK_DIR = join(PANOPTICON_HOME, 'specialists', 'feedback');
+const FEEDBACK_DIR = join(OVERDECK_HOME, 'specialists', 'feedback');
 const FEEDBACK_LOG = join(FEEDBACK_DIR, 'feedback.jsonl');
 
 /**

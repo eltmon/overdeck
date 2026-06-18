@@ -173,7 +173,7 @@
         "subItems": [
           {
             "id": "a3-storage-paths.ac1",
-            "title": "All path functions return absolute paths using existing PANOPTICON_HOME from src/lib/paths.ts",
+            "title": "All path functions return absolute paths using existing OVERDECK_HOME from src/lib/paths.ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -405,7 +405,7 @@
           },
           {
             "id": "b2-provider-registry.ac4",
-            "title": "Env-var override (PANOPTICON_MEMORY_PROVIDER, PANOPTICON_MEMORY_MODEL) takes precedence over Settings",
+            "title": "Env-var override (OVERDECK_MEMORY_PROVIDER, OVERDECK_MEMORY_MODEL) takes precedence over Settings",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1819,7 +1819,7 @@
           },
           {
             "id": "i1-settings-memory.ac3",
-            "title": "Env-var override hint clearly documents PANOPTICON_MEMORY_PROVIDER / PANOPTICON_MEMORY_MODEL precedence over UI",
+            "title": "Env-var override hint clearly documents OVERDECK_MEMORY_PROVIDER / OVERDECK_MEMORY_MODEL precedence over UI",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

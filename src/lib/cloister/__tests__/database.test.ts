@@ -9,13 +9,13 @@ beforeEach(() => {
   vi.resetModules();
   testHome = join(tmpdir(), `pan-1579-cloister-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(testHome, { recursive: true });
-  process.env.PANOPTICON_HOME = testHome;
+  process.env.OVERDECK_HOME = testHome;
 });
 
 afterEach(async () => {
   const database = await import('../database.js');
   database.closeHealthDatabase();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
 

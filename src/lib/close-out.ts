@@ -12,7 +12,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect, Data } from 'effect';
 import {
-  PANOPTICON_HOME,
+  OVERDECK_HOME,
   AGENTS_DIR,
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -513,7 +513,7 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     // review-status module may not be available in CLI context
     // Try cleaning the file directly
     try {
-      const statusFile = join(PANOPTICON_HOME, 'review-status.json');
+      const statusFile = join(OVERDECK_HOME, 'review-status.json');
       if (existsSync(statusFile)) {
         const data = JSON.parse(readFileSync(statusFile, 'utf-8'));
         const upperKey = ctx.issueId.toUpperCase();

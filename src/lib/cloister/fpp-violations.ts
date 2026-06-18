@@ -16,7 +16,7 @@ import { FsError } from '../errors.js';
 import { checkHookSync } from '../hooks.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentHealth } from './health.js';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 
 /**
  * FPP violation types
@@ -61,7 +61,7 @@ export const DEFAULT_FPP_CONFIG: FPPViolationConfig = {
 /**
  * Path to violations data file
  */
-const VIOLATIONS_DATA_FILE = join(PANOPTICON_HOME, 'fpp-violations.json');
+const VIOLATIONS_DATA_FILE = join(OVERDECK_HOME, 'fpp-violations.json');
 
 /**
  * Persisted violations data format

@@ -18,10 +18,10 @@ export interface RestartStatus {
   /** PID of the process that wrote this entry — identifies the writer when
    *  multiple restart flows overlap (see PAN-1714 follow-up). */
   pid?: number;
-  /** Panopticon actor that ran the restart (PANOPTICON_AGENT_ID), e.g.
+  /** Panopticon actor that ran the restart (OVERDECK_AGENT_ID), e.g.
    *  'conv-20260610-8858' or 'agent-pan-1647-review'. Absent = unmanaged shell. */
   initiator?: string;
-  /** Issue the initiating agent was working on (PANOPTICON_ISSUE_ID). */
+  /** Issue the initiating agent was working on (OVERDECK_ISSUE_ID). */
   issueId?: string;
 }
 

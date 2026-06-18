@@ -4,20 +4,20 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { createHandoffPaths, ensureHandoffsDir } from '../handoff-paths.js';
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 
 afterEach(() => {
   if (originalPanopticonHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalPanopticonHome;
   }
 });
 
 describe('handoff paths', () => {
-  it('returns deterministic doc and sentinel paths under PANOPTICON_HOME', () => {
+  it('returns deterministic doc and sentinel paths under OVERDECK_HOME', () => {
     const home = join(tmpdir(), `pan-handoff-paths-${Date.now()}`);
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
 
     const paths = createHandoffPaths('conv-123', '2026-05-23T04:35:00.000Z');
 
@@ -30,7 +30,7 @@ describe('handoff paths', () => {
 
   it('creates the handoffs directory only when requested', async () => {
     const home = join(tmpdir(), `pan-handoff-paths-${Date.now()}-mkdir`);
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
 
     const handoffsDir = await ensureHandoffsDir();
 

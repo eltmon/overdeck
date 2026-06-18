@@ -728,7 +728,7 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
 }
 
 function getManagedTmuxSocketName(): string {
-  return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? 'panopticon';
+  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'panopticon';
 }
 
 function listLiveTmuxSessionNamesSync(): Set<string> {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../paths.js', () => ({
-  PANOPTICON_HOME: '/tmp/test-panopticon',
+  OVERDECK_HOME: '/tmp/test-panopticon',
 }));
 
 vi.mock('fs', async (importOriginal) => {

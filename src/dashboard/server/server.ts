@@ -10,7 +10,7 @@ import { jsonResponse } from "./http-helpers.js";
  *   GET  /api/health  → { status: "ok" }
  *   GET  /ws/rpc      → WebSocket RPC (PanRpcGroup)
  *   GET  /ws/terminal  → Raw WebSocket terminal (bypasses Effect RPC)
- *   GET  *            → static files from PANOPTICON_FRONTEND_DIR
+ *   GET  *            → static files from OVERDECK_FRONTEND_DIR
  */
 
 import { Effect, FileSystem, Layer, Option, Path } from 'effect';
@@ -211,7 +211,7 @@ const staticRouteLayer = HttpRouter.add(
     const fileSystem = yield* FileSystem.FileSystem;
     const pathService = yield* Path.Path;
 
-    // Resolve static directory: PANOPTICON_FRONTEND_DIR env var or default
+    // Resolve static directory: OVERDECK_FRONTEND_DIR env var or default
     // When running from source (Bun): import.meta.dir = src/dashboard/server → ../../.. = project root
     // When running from bundle (Node): import.meta.url = dist/dashboard/server.js → ../.. = project root
     // Fallback: CWD (works if started from project root)
@@ -223,7 +223,7 @@ const staticRouteLayer = HttpRouter.add(
       ? pathService.resolve(selfPath, '..', '..')  // dist/dashboard/ → project root
       : pathService.resolve(selfPath, '..', '..', '..'); // src/dashboard/server/ → project root
     const staticDir =
-      process.env['PANOPTICON_FRONTEND_DIR'] ??
+      process.env['OVERDECK_FRONTEND_DIR'] ??
       pathService.resolve(projectRoot, 'dist', 'dashboard', 'public');
 
     const staticRoot = pathService.resolve(staticDir);
@@ -398,7 +398,7 @@ export const makeServerLayer = Layer.unwrap(
         yield* HttpServer.HttpServer;
         yield* Effect.sync(() => {
           console.log(`[panopticon] Dashboard listening on http://${config.host}:${config.port}`);
-          const mode = process.env['PANOPTICON_MODE'] === 'production' ? 'production mode' : 'development mode';
+          const mode = process.env['OVERDECK_MODE'] === 'production' ? 'production mode' : 'development mode';
           emitActivityEntrySync({
             source: 'dashboard',
             level: 'success',

@@ -485,7 +485,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
   // with path-form `--agent roles/<role>.md`, so these registrations are global again.
   addHookIfMissing('PreToolUse', 'pre-tool-hook');
   // Auto-approve tool calls for Panopticon agents (self-scoped via
-  // PANOPTICON_AGENT_ID inside the hook) — replaces launching agents with
+  // OVERDECK_AGENT_ID inside the hook) — replaces launching agents with
   // --dangerously-skip-permissions so headless agents never hang on Claude
   // Code's "Do you want to proceed?" prompt (PAN-1024). A frontmatter PreToolUse
   // hook's permissionDecision is NOT honored, so this must be registered here in

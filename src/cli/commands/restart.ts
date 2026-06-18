@@ -133,7 +133,7 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
       DASHBOARD_PORT: String(config.dashboardPort),
       API_PORT: String(config.dashboardApiPort),
       PORT: String(config.dashboardApiPort),
-      PANOPTICON_MODE: 'production',
+      OVERDECK_MODE: 'production',
     },
   });
   child.unref();
@@ -148,8 +148,8 @@ async function recordRestartStatus(startedAt: number, success: boolean, error?: 
     durationMs: Date.now() - startedAt,
     attempts: 1,
     pid: process.pid,
-    initiator: process.env.PANOPTICON_AGENT_ID,
-    issueId: process.env.PANOPTICON_ISSUE_ID,
+    initiator: process.env.OVERDECK_AGENT_ID,
+    issueId: process.env.OVERDECK_ISSUE_ID,
   }));
 }
 
@@ -188,7 +188,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     }
   }
 
-  const lockInherited = process.env.PANOPTICON_RESTART_LOCK_HELD === '1';
+  const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';
   const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
   let restartLock: RestartLockHandle | null = null;
   if (needsRestartLock) {
@@ -202,7 +202,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   try {
     switch (scope) {
       case 'dashboard': {
-        if (process.env.PANOPTICON_SKIP_SUPERVISOR_CYCLE !== '1') {
+        if (process.env.OVERDECK_SKIP_SUPERVISOR_CYCLE !== '1') {
           try {
             const { stopSupervisorProcessSync, startSupervisorProcessSync } = await import('../../lib/supervisor.js');
             stopSupervisorProcessSync();

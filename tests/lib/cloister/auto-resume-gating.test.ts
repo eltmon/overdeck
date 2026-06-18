@@ -26,11 +26,11 @@ describe('auto-resume gates', () => {
     tempHome = mkdtempSync(join(tmpdir(), 'pan-auto-resume-gating-'));
     projectRoot = join(tempHome, 'project');
     mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141'), { recursive: true });
-    originalHome = process.env.PANOPTICON_HOME;
-    originalNoResume = process.env.PANOPTICON_NO_RESUME;
+    originalHome = process.env.OVERDECK_HOME;
+    originalNoResume = process.env.OVERDECK_NO_RESUME;
     originalCwd = process.cwd();
-    process.env.PANOPTICON_HOME = tempHome;
-    delete process.env.PANOPTICON_NO_RESUME;
+    process.env.OVERDECK_HOME = tempHome;
+    delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
     resumeSlotsMock = 999;
   });
@@ -65,10 +65,10 @@ describe('auto-resume gates', () => {
     vi.resetModules();
 
     process.chdir(originalCwd);
-    if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = originalHome;
-    if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME;
-    else process.env.PANOPTICON_NO_RESUME = originalNoResume;
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    if (originalNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
+    else process.env.OVERDECK_NO_RESUME = originalNoResume;
     rmSync(tempHome, { recursive: true, force: true });
   });
 
@@ -643,7 +643,7 @@ describe('auto-resume gates', () => {
   });
 
   it('makes no-resume mode skip auto-resume and orphan recovery', async () => {
-    process.env.PANOPTICON_NO_RESUME = '1';
+    process.env.OVERDECK_NO_RESUME = '1';
     const stoppedAgentId = 'agent-pan-1141-no-resume-stopped';
     const runningAgentId = 'agent-pan-1141-no-resume-running';
     resumeAgentMock.mockResolvedValue({ success: true });

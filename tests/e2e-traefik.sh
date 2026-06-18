@@ -89,21 +89,21 @@ if ! command -v pan &> /dev/null; then
 fi
 
 # Use test environment
-export PANOPTICON_HOME=~/.panopticon.test
+export OVERDECK_HOME=~/.panopticon.test
 export CLEAN_PANOPTICON=true
 
-log_info "Using test environment: $PANOPTICON_HOME"
+log_info "Using test environment: $OVERDECK_HOME"
 
 # Test 1: Clean installation
 test_start "pan install creates all required directories and configs"
-rm -rf $PANOPTICON_HOME
+rm -rf $OVERDECK_HOME
 pan install --skip-mkcert > /dev/null 2>&1
 
-if [ -d "$PANOPTICON_HOME/traefik" ] && \
-   [ -f "$PANOPTICON_HOME/traefik/docker-compose.yml" ] && \
-   [ -f "$PANOPTICON_HOME/traefik/traefik.yml" ] && \
-   [ -f "$PANOPTICON_HOME/traefik/dynamic/panopticon.yml" ] && \
-   [ -f "$PANOPTICON_HOME/config.toml" ]; then
+if [ -d "$OVERDECK_HOME/traefik" ] && \
+   [ -f "$OVERDECK_HOME/traefik/docker-compose.yml" ] && \
+   [ -f "$OVERDECK_HOME/traefik/traefik.yml" ] && \
+   [ -f "$OVERDECK_HOME/traefik/dynamic/panopticon.yml" ] && \
+   [ -f "$OVERDECK_HOME/config.toml" ]; then
     test_pass
 else
     test_fail "Missing required files or directories"
@@ -112,8 +112,8 @@ fi
 
 # Test 2: Config contains Traefik section
 test_start "config.toml contains traefik section"
-if grep -q "\[traefik\]" "$PANOPTICON_HOME/config.toml" && \
-   grep -q "enabled = true" "$PANOPTICON_HOME/config.toml"; then
+if grep -q "\[traefik\]" "$OVERDECK_HOME/config.toml" && \
+   grep -q "enabled = true" "$OVERDECK_HOME/config.toml"; then
     test_pass
 else
     test_fail "Traefik section missing or disabled in config"
@@ -131,9 +131,9 @@ fi
 
 # Test 4: docker-compose.yml uses external network (regression test for PAN-45)
 test_start "docker-compose.yml correctly references external network"
-if grep -q "external: true" "$PANOPTICON_HOME/traefik/docker-compose.yml"; then
+if grep -q "external: true" "$OVERDECK_HOME/traefik/docker-compose.yml"; then
     # Verify docker-compose config is valid (no label mismatch)
-    if cd "$PANOPTICON_HOME/traefik" && docker-compose config > /dev/null 2>&1; then
+    if cd "$OVERDECK_HOME/traefik" && docker-compose config > /dev/null 2>&1; then
         test_pass
     else
         test_fail "docker-compose config validation failed - network label mismatch?"
@@ -241,10 +241,10 @@ fi
 
 # Test 11: Minimal mode skips Traefik
 test_start "pan install --minimal disables Traefik"
-rm -rf $PANOPTICON_HOME
+rm -rf $OVERDECK_HOME
 pan install --minimal --skip-mkcert > /dev/null 2>&1
 
-if grep -q "enabled = false" "$PANOPTICON_HOME/config.toml"; then
+if grep -q "enabled = false" "$OVERDECK_HOME/config.toml"; then
     test_pass
 else
     test_fail "Minimal mode did not disable Traefik"

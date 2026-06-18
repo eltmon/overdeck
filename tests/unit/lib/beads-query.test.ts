@@ -10,7 +10,7 @@ const childProcessMocks = vi.hoisted(() => ({
 
 vi.mock('child_process', () => childProcessMocks);
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 let testRoot: string;
 let workspacePath: string;
 
@@ -21,15 +21,15 @@ describe('queryBeadsForIssuePromise', () => {
     testRoot = await mkdtemp(join(tmpdir(), 'pan-beads-query-'));
     workspacePath = join(testRoot, 'workspace');
     mkdirSync(join(workspacePath, '.beads'), { recursive: true });
-    process.env.PANOPTICON_HOME = join(testRoot, 'home');
+    process.env.OVERDECK_HOME = join(testRoot, 'home');
   });
 
   afterEach(() => {
     vi.useRealTimers();
     if (originalPanopticonHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     }
     rmSync(testRoot, { recursive: true, force: true });
   });

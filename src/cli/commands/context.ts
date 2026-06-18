@@ -22,7 +22,7 @@ export async function contextCommand(
   options: ContextOptions = {}
 ): Promise<void> {
   // Get agent ID from environment or argument
-  const agentId = process.env.PANOPTICON_AGENT_ID || arg1 || 'default';
+  const agentId = process.env.OVERDECK_AGENT_ID || arg1 || 'default';
 
   switch (action) {
     case 'summary': {

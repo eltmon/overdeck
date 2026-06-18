@@ -64,7 +64,7 @@ async function createWorkspace(issueId: string) {
 
 describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
   beforeEach(async () => {
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
     _resetInternalTokenCacheForTests();
     projectPath = await mkdtemp(join(tmpdir(), 'pan-inspect-route-'));
     resolveProjectFromIssueMock.mockReturnValue({
@@ -83,7 +83,7 @@ describe('POST /api/issues/:id/beads/:beadId/inspect', () => {
 
   afterEach(async () => {
     vi.clearAllMocks();
-    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
     _resetInternalTokenCacheForTests();
     if (projectPath) await rm(projectPath, { recursive: true, force: true });
   });

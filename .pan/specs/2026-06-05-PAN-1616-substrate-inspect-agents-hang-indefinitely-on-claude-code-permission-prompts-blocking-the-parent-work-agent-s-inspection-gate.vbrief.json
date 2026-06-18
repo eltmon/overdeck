@@ -37,12 +37,12 @@
     ],
     "narratives": {
       "Problem": "An inspect agent (pan inspect) launched for a bead can stall forever on an interactive Claude Code permission dialog, even for read-only git diff/branch/grep commands. Because the inspection never completes, its verdict is never delivered via pan tell, and the parent work agent — instructed by work.md to WAIT for that verdict — blocks indefinitely (8.5h observed on PAN-1491, a v1.0-required issue). The work agent reports healthy while it waits, so the stall is invisible without a tmux spot-check. The inspect prompt claims a 10-minute timeout but nothing enforces it; there is no orchestrator-side watchdog and inspectStatus carries no timestamp to even measure elapsed time.",
-      "Proposal": "Three moves. (1) Lock in the already-landed class-1 fix: the auto-approve-hook already grants permissionDecision:allow for inspect-*/strike-*/flywheel-* (commit b8960b6dc) and the inspect launcher already exports PANOPTICON_AGENT_ID=inspect-* — add a regression test so this scope can never silently regress again. (2) Make a hung inspection fail loud: extend the inspect status schema with a started-at timestamp + bead id + a terminal 'error' state, then add a Deacon watchdog patrol that, when an inspect-* session exceeds a timeout (or dies without a verdict), kills the session, sets inspectStatus='error', and delivers an INSPECTION ERROR verdict to the parent work agent via pan tell. (3) Bound the parent's wait: the watchdog guarantees a terminal verdict arrives within the timeout, and work.md is updated to handle the INSPECTION ERROR verdict (escalate as infrastructure failure, never silently proceed) and to reflect that a verdict is guaranteed. Class-2 (Claude Code's native .claude/** settings-edit gate that wedges work agents) is a distinct root cause, filed separately as PAN-1627."
+      "Proposal": "Three moves. (1) Lock in the already-landed class-1 fix: the auto-approve-hook already grants permissionDecision:allow for inspect-*/strike-*/flywheel-* (commit b8960b6dc) and the inspect launcher already exports OVERDECK_AGENT_ID=inspect-* — add a regression test so this scope can never silently regress again. (2) Make a hung inspection fail loud: extend the inspect status schema with a started-at timestamp + bead id + a terminal 'error' state, then add a Deacon watchdog patrol that, when an inspect-* session exceeds a timeout (or dies without a verdict), kills the session, sets inspectStatus='error', and delivers an INSPECTION ERROR verdict to the parent work agent via pan tell. (3) Bound the parent's wait: the watchdog guarantees a terminal verdict arrives within the timeout, and work.md is updated to handle the INSPECTION ERROR verdict (escalate as infrastructure failure, never silently proceed) and to reflect that a verdict is guaranteed. Class-2 (Claude Code's native .claude/** settings-edit gate that wedges work agents) is a distinct root cause, filed separately as PAN-1627."
     },
     "autoDecisions": [
       {
         "summary": "Do not change the auto-approve hook's prefix scope — class-1 is already fixed (b8960b6dc); add a regression test instead.",
-        "rationale": "The committed sync-sources/hooks/auto-approve-hook already covers inspect-*/strike-*/flywheel-* and is byte-identical to the installed copy; the inspect launcher already exports PANOPTICON_AGENT_ID=inspect-*. The real risk is silent regression (the DSP-removal era had auto-approve scoped to only agent-*/planning-*). A test that asserts allow for each pipeline prefix and silence for conv-*/unset is the surgical, non-duplicative fix."
+        "rationale": "The committed sync-sources/hooks/auto-approve-hook already covers inspect-*/strike-*/flywheel-* and is byte-identical to the installed copy; the inspect launcher already exports OVERDECK_AGENT_ID=inspect-*. The real risk is silent regression (the DSP-removal era had auto-approve scoped to only agent-*/planning-*). A test that asserts allow for each pipeline prefix and silence for conv-*/unset is the surgical, non-duplicative fix."
       },
       {
         "summary": "Put the bound on the orchestrator side (Deacon watchdog), not inside the work agent's prompt.",
@@ -75,12 +75,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a test that executes sync-sources/hooks/auto-approve-hook with a representative tool-call JSON on stdin under different PANOPTICON_AGENT_ID values and asserts the output. For agent-*, planning-*, flywheel-*, strike-*, and inspect-* the hook must emit hookSpecificOutput.permissionDecision === 'allow'. For conv-* and an unset PANOPTICON_AGENT_ID the hook must exit 0 with NO permissionDecision (falls back to normal prompting). Also assert that AskUserQuestion is NOT auto-allowed regardless of prefix (the ask-user-question-hook deny must still win). This locks the class-1 fix (b8960b6dc) against silent regression. Place it alongside existing hook tests (e.g. src/cli/commands/__tests__/setup-hooks.test.ts) or a new dedicated test file; invoke the script via child_process so it tests the real shipped artifact."
+          "Action": "Add a test that executes sync-sources/hooks/auto-approve-hook with a representative tool-call JSON on stdin under different OVERDECK_AGENT_ID values and asserts the output. For agent-*, planning-*, flywheel-*, strike-*, and inspect-* the hook must emit hookSpecificOutput.permissionDecision === 'allow'. For conv-* and an unset OVERDECK_AGENT_ID the hook must exit 0 with NO permissionDecision (falls back to normal prompting). Also assert that AskUserQuestion is NOT auto-allowed regardless of prefix (the ask-user-question-hook deny must still win). This locks the class-1 fix (b8960b6dc) against silent regression. Place it alongside existing hook tests (e.g. src/cli/commands/__tests__/setup-hooks.test.ts) or a new dedicated test file; invoke the script via child_process so it tests the real shipped artifact."
         },
         "subItems": [
           {
             "id": "regress-test-hook-scope.ac1",
-            "title": "Test asserts permissionDecision==='allow' for each of agent-/planning-/flywheel-/strike-/inspect- prefixed PANOPTICON_AGENT_ID",
+            "title": "Test asserts permissionDecision==='allow' for each of agent-/planning-/flywheel-/strike-/inspect- prefixed OVERDECK_AGENT_ID",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -88,7 +88,7 @@
           },
           {
             "id": "regress-test-hook-scope.ac2",
-            "title": "Test asserts conv-* and unset PANOPTICON_AGENT_ID produce exit 0 with no permissionDecision (no auto-allow)",
+            "title": "Test asserts conv-* and unset OVERDECK_AGENT_ID produce exit 0 with no permissionDecision (no auto-allow)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

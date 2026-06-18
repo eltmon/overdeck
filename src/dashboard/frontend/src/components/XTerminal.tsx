@@ -45,11 +45,11 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (.
 }
 
 // Optional /ws/terminal cold-path profiling. Enable with
-// `localStorage.PANOPTICON_TERMINAL_PROFILE = '1'` (then reload) — pairs with
-// the server-side PANOPTICON_TERMINAL_PROFILE env var.
+// `localStorage.OVERDECK_TERMINAL_PROFILE = '1'` (then reload) — pairs with
+// the server-side OVERDECK_TERMINAL_PROFILE env var.
 const TERMINAL_PROFILE_ENABLED = (() => {
   try {
-    return localStorage.getItem('PANOPTICON_TERMINAL_PROFILE') === '1';
+    return localStorage.getItem('OVERDECK_TERMINAL_PROFILE') === '1';
   } catch {
     return false;
   }

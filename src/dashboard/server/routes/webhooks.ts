@@ -135,8 +135,8 @@ export function runWebhookHandler(
         console.warn('[webhook] Invalid HMAC signature — rejecting');
         return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
       }
-    } else if (process.env.PANOPTICON_DEV_WEBHOOKS === '1') {
-      console.warn('[webhook] PANOPTICON_DEV_WEBHOOKS=1 — skipping HMAC verification (dev mode)');
+    } else if (process.env.OVERDECK_DEV_WEBHOOKS === '1') {
+      console.warn('[webhook] OVERDECK_DEV_WEBHOOKS=1 — skipping HMAC verification (dev mode)');
     } else {
       return jsonResponse(
         { error: 'Webhook secret not configured. Run pan auth github to set up.' },

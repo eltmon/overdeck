@@ -188,7 +188,7 @@ status to `pending`, so PAN-794 added a scoped cycle with a hard cap.
 
 Deacon can auto-resume stopped work agents, but three gates suppress that path:
 
-- **Boot no-resume:** `PANOPTICON_NO_RESUME=1` is set for the dashboard process by
+- **Boot no-resume:** `OVERDECK_NO_RESUME=1` is set for the dashboard process by
   `pan dev --no-resume` or `pan up --no-resume`. It is boot-scoped only and
   short-circuits both `autoResumeStoppedWorkAgents()` and `recoverOrphanedAgents()`.
   The dashboard shows a top banner while active; restart without `--no-resume` to

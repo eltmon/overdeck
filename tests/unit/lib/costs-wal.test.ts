@@ -163,7 +163,7 @@ describe('appendToWal', () => {
 describe('syncWalFromDir', () => {
   // sync-wal now writes through the overdeck CostWriter door (not database/cost-events-db).
   // Use the real overdeck fixture to let the full Effect path run and verify via stats.
-  // vi.resetModules() ensures overdeck/infra DbLive captures the new PANOPTICON_HOME.
+  // vi.resetModules() ensures overdeck/infra DbLive captures the new OVERDECK_HOME.
   let tmpDir: string;
   let odb: OverdeckTestDb;
 

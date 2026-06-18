@@ -27,8 +27,8 @@ import { readPlatformConfigSync } from '../lib/platform-lifecycle.js';
 import { readWatchdogConfig, SupervisorWatchdog, type SpawnRestartResult } from './watchdog.js';
 import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
 
-const SUPERVISOR_PORT = Number(process.env.PANOPTICON_SUPERVISOR_PORT || 3012);
-const PAN_BINARY = process.env.PANOPTICON_PAN_BINARY || 'pan';
+const SUPERVISOR_PORT = Number(process.env.OVERDECK_SUPERVISOR_PORT || 3012);
+const PAN_BINARY = process.env.OVERDECK_PAN_BINARY || 'pan';
 const LOG_FILE = path.join(os.homedir(), '.panopticon', 'logs', 'supervisor.log');
 const platformConfig = readPlatformConfigSync();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
@@ -98,8 +98,8 @@ async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promis
       stdio: 'ignore',
       env: {
         ...process.env,
-        PANOPTICON_RESTART_LOCK_HELD: '1',
-        PANOPTICON_SKIP_SUPERVISOR_CYCLE: '1',
+        OVERDECK_RESTART_LOCK_HELD: '1',
+        OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
       },
     });
 
@@ -201,13 +201,13 @@ server.listen(SUPERVISOR_PORT, '127.0.0.1', () => {
       watchdog.start();
       await log(`watchdog polling http://127.0.0.1:${watchdogConfig.dashboardApiPort}/api/health every ${watchdogConfig.pollMs}ms`);
     } else {
-      await log('watchdog disabled by PANOPTICON_SUPERVISOR_WATCHDOG=0');
+      await log('watchdog disabled by OVERDECK_SUPERVISOR_WATCHDOG=0');
     }
     if (ttsWatchdogConfig.enabled) {
       ttsWatchdog.start();
       await log(`tts watchdog polling every ${ttsWatchdogConfig.pollMs}ms`);
     } else {
-      await log('tts watchdog disabled by PANOPTICON_TTS_WATCHDOG=0');
+      await log('tts watchdog disabled by OVERDECK_TTS_WATCHDOG=0');
     }
   })();
 });

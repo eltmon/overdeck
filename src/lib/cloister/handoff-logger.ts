@@ -9,7 +9,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { FsError } from '../errors.js';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import type { HandoffContext } from './handoff-context.js';
 import type { TriggerType } from './triggers.js';
 
@@ -63,13 +63,13 @@ export interface HandoffEvent {
 /**
  * Handoff log file path
  */
-const HANDOFF_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'handoffs.jsonl');
+const HANDOFF_LOG_FILE = join(OVERDECK_HOME, 'logs', 'handoffs.jsonl');
 
 /**
  * Ensure log directory exists
  */
 function ensureLogDir(): void {
-  const logDir = join(PANOPTICON_HOME, 'logs');
+  const logDir = join(OVERDECK_HOME, 'logs');
   if (!existsSync(logDir)) {
     mkdirSync(logDir, { recursive: true });
   }
@@ -340,7 +340,7 @@ export function getPendingVerificationHandoffsSync(): HandoffEvent[] {
 // are appropriate for the dashboard server's request handlers.
 
 const ensureLogDirAsync = (): Effect.Effect<void, FsError> => {
-  const logDir = join(PANOPTICON_HOME, 'logs');
+  const logDir = join(OVERDECK_HOME, 'logs');
   return Effect.tryPromise({
     try: () => mkdir(logDir, { recursive: true }),
     catch: (cause) => new FsError({ path: logDir, operation: 'mkdir', cause }),

@@ -24,14 +24,14 @@ const identity: MemoryIdentity = {
 };
 
 beforeEach(async () => {
-  originalHome = process.env.PANOPTICON_HOME;
+  originalHome = process.env.OVERDECK_HOME;
   tempDir = await mkdtemp(join(tmpdir(), 'pan-compliance-warning-'));
-  process.env.PANOPTICON_HOME = tempDir;
+  process.env.OVERDECK_HOME = tempDir;
 });
 
 afterEach(async () => {
-  if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = originalHome;
+  if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
   tempDir = null;
 });

@@ -28,7 +28,7 @@ and stopped without making progress.
 - `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` and
   `.devcontainer/docker-compose.devcontainer.yml` MUST NOT include a
   `${HOME}/.panopticon:...` volume mount on the `server` service.
-- Both compose files MUST set `PANOPTICON_DISABLE_DEACON=1` on the `server`
+- Both compose files MUST set `OVERDECK_DISABLE_DEACON=1` on the `server`
   service environment as belt-and-suspenders in case someone reintroduces a
   mount in the future. `src/dashboard/server/main.ts` already checks this env
   var and skips Cloister auto-start.
@@ -44,4 +44,4 @@ and stopped without making progress.
   removed but template never updated.
 - PAN-698 (2026-05-12) — recurrence: a workspace devcontainer brought up from
   the still-broken template duelled the host. Template + host compose both
-  fixed to add `PANOPTICON_DISABLE_DEACON=1`.
+  fixed to add `OVERDECK_DISABLE_DEACON=1`.

@@ -45,13 +45,13 @@ pan reload
 
 `pan reload` builds before it touches the running dashboard. If the build fails, the old dashboard keeps running and the command exits non-zero. If the build succeeds, `pan reload` restarts only the dashboard and waits for `/api/health`.
 
-Restart operations are serialized by `${PANOPTICON_HOME}/restart.lock`. The lock records the holder PID, timestamp, and caller. Stale locks recover when the holder PID is dead or the lock is older than five minutes.
+Restart operations are serialized by `${OVERDECK_HOME}/restart.lock`. The lock records the holder PID, timestamp, and caller. Stale locks recover when the holder PID is dead or the lock is older than five minutes.
 
 The supervisor watchdog polls the dashboard API health endpoint every 10 seconds by default. After three consecutive failures, it spawns `pan restart --dashboard`. It allows three watchdog-triggered restarts within a five-minute rolling window. If the cap is reached, it logs `WATCHDOG GIVING UP — manual intervention required` and stops attempting until a healthy poll clears the state.
 
 The supervisor also polls the Qwen TTS daemon every 10 seconds when TTS is enabled or `tts.daemon.autoStart` is true. After two failed health checks it runs the same daemon start path as `pan tts start`, with a three-restart cap in a ten-minute rolling window.
 
-The latest restart outcome is written to `${PANOPTICON_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
+The latest restart outcome is written to `${OVERDECK_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
 
 ## Failure triage
 
@@ -93,7 +93,7 @@ The local stack is two long-lived Node 22 processes, on two ports:
 
 Each is a **singleton on its port.** A second instance that tries to bind an already-owned port fails and exits — so "the process that owns the port" is always the live one.
 
-**Workspace-container peers are not duplicates.** Every running workspace devcontainer runs its own `dist/dashboard/server.js` (cwd `/workspaces/...`, parent `containerd-shim`, `PANOPTICON_DISABLE_DEACON=1`). Seeing N+1 dashboard processes with N containers up is healthy. Only the **host** process whose cwd is the primary repo counts.
+**Workspace-container peers are not duplicates.** Every running workspace devcontainer runs its own `dist/dashboard/server.js` (cwd `/workspaces/...`, parent `containerd-shim`, `OVERDECK_DISABLE_DEACON=1`). Seeing N+1 dashboard processes with N containers up is healthy. Only the **host** process whose cwd is the primary repo counts.
 
 ### Deacon and Flywheel startup order
 
@@ -105,10 +105,10 @@ Flywheel is not auto-started by dashboard boot. It is a singleton agent session 
 
 | Env var | Set by | Effect |
 | --- | --- | --- |
-| `PANOPTICON_NO_RESUME=1` | `pan up --no-resume` / `pan restart --no-resume` | Deacon runs but does **not** auto-resume stopped/orphaned agents (orphan recovery off). Use after a reboot — stale `agent-*` `state.json` with `status:running` would otherwise mass-resume. |
-| `PANOPTICON_DISABLE_DEACON=1` | `pan up --no-deacon` / `pan restart --no-deacon` | Deacon auto-start is **skipped entirely** (no patrols, no recovery). Also set on container peers. |
+| `OVERDECK_NO_RESUME=1` | `pan up --no-resume` / `pan restart --no-resume` | Deacon runs but does **not** auto-resume stopped/orphaned agents (orphan recovery off). Use after a reboot — stale `agent-*` `state.json` with `status:running` would otherwise mass-resume. |
+| `OVERDECK_DISABLE_DEACON=1` | `pan up --no-deacon` / `pan restart --no-deacon` | Deacon auto-start is **skipped entirely** (no patrols, no recovery). Also set on container peers. |
 
-**Boot gate precedence.** `pan up` and `pan restart` support explicit tri-state gates: `--deacon` / `--no-deacon` and `--resume` / `--no-resume`. Precedence is **flag > inherited env > default**. Use `pan restart --dashboard --deacon --resume` to force both gates back on even from a shell that inherited `PANOPTICON_DISABLE_DEACON=1` or `PANOPTICON_NO_RESUME=1`; use the `--no-*` forms to force them off. Dashboard boot logs include the effective state and source, e.g. `deacon=on source=flag resume=off source=env`.
+**Boot gate precedence.** `pan up` and `pan restart` support explicit tri-state gates: `--deacon` / `--no-deacon` and `--resume` / `--no-resume`. Precedence is **flag > inherited env > default**. Use `pan restart --dashboard --deacon --resume` to force both gates back on even from a shell that inherited `OVERDECK_DISABLE_DEACON=1` or `OVERDECK_NO_RESUME=1`; use the `--no-*` forms to force them off. Dashboard boot logs include the effective state and source, e.g. `deacon=on source=flag resume=off source=env`.
 
 The deacon can additionally be paused at runtime via the SQLite flag `deacon.globally_paused` (`pan admin cloister freeze` / `unfreeze`), which **persists across restarts** and is independent of the boot gates — a useful belt-and-suspenders while settling the field.
 

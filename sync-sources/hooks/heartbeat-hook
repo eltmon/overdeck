@@ -88,18 +88,18 @@ if [ -n "$COST_SCRIPT" ] && [ -n "$CLAUDE_SESSION_ID" ]; then
   GIT_BRANCH=$(git branch --show-current 2>/dev/null || echo "")
   WORKSPACE=$(pwd)
 
-  if [ -z "$PANOPTICON_ISSUE_ID" ]; then
+  if [ -z "$OVERDECK_ISSUE_ID" ]; then
     if [[ "$GIT_BRANCH" =~ (pan|min|aud|krux|cli|PAN|MIN|AUD|KRUX|CLI)[-]([0-9]+) ]]; then
-      PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
+      OVERDECK_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
     fi
   fi
-  if [ -z "$PANOPTICON_ISSUE_ID" ]; then
+  if [ -z "$OVERDECK_ISSUE_ID" ]; then
     if [[ "$WORKSPACE" =~ (pan|min|aud|krux|cli|PAN|MIN|AUD|KRUX|CLI)[-]([0-9]+) ]]; then
-      PANOPTICON_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
+      OVERDECK_ISSUE_ID="${BASH_REMATCH[1]^^}-${BASH_REMATCH[2]}"
     fi
   fi
-  export PANOPTICON_ISSUE_ID="${PANOPTICON_ISSUE_ID:-UNKNOWN}"
-  export PANOPTICON_SESSION_TYPE="${PANOPTICON_SESSION_TYPE:-implementation}"
+  export OVERDECK_ISSUE_ID="${OVERDECK_ISSUE_ID:-UNKNOWN}"
+  export OVERDECK_SESSION_TYPE="${OVERDECK_SESSION_TYPE:-implementation}"
 
   STATE_DIR="$HOME/.panopticon/costs/state"
   mkdir -p "$STATE_DIR" 2>/dev/null

@@ -24,20 +24,20 @@ function pendingEntry(overrides: Partial<PendingAutoMerge> = {}): PendingAutoMer
 }
 
 describe('auto-merge executor', () => {
-  const originalDisable = process.env.PANOPTICON_DISABLE_AUTO_MERGE;
+  const originalDisable = process.env.OVERDECK_DISABLE_AUTO_MERGE;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    delete process.env.PANOPTICON_DISABLE_AUTO_MERGE;
+    delete process.env.OVERDECK_DISABLE_AUTO_MERGE;
   });
 
   afterEach(() => {
     stopAutoMergeExecutor();
     vi.useRealTimers();
     if (originalDisable === undefined) {
-      delete process.env.PANOPTICON_DISABLE_AUTO_MERGE;
+      delete process.env.OVERDECK_DISABLE_AUTO_MERGE;
     } else {
-      process.env.PANOPTICON_DISABLE_AUTO_MERGE = originalDisable;
+      process.env.OVERDECK_DISABLE_AUTO_MERGE = originalDisable;
     }
   });
 
@@ -191,8 +191,8 @@ describe('auto-merge executor', () => {
     expect(listEntries).toHaveBeenCalledTimes(1);
   });
 
-  it('does not start when PANOPTICON_DISABLE_AUTO_MERGE=1', async () => {
-    process.env.PANOPTICON_DISABLE_AUTO_MERGE = '1';
+  it('does not start when OVERDECK_DISABLE_AUTO_MERGE=1', async () => {
+    process.env.OVERDECK_DISABLE_AUTO_MERGE = '1';
     const listEntries = vi.fn(() => []);
 
     expect(startAutoMergeExecutor({ listEntries })).toBe(false);

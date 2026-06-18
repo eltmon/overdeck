@@ -102,7 +102,7 @@
           "issueLabel": "pan-805"
         },
         "narrative": {
-          "Action": "Create src/lib/lifecycle/reconciler/ with index.ts (public API), loop.ts (fixed-interval tick driver + single-instance in-process mutex), config.ts (reads PANOPTICON_RECONCILER_INTERVAL_MS env var, default 30000). loop.ts exports startReconciler() and stopReconciler(); each tick is wrapped in try/catch so one failure does not kill the loop. No push/pull/sweep logic in this bead — just the runner and an empty tick fn."
+          "Action": "Create src/lib/lifecycle/reconciler/ with index.ts (public API), loop.ts (fixed-interval tick driver + single-instance in-process mutex), config.ts (reads OVERDECK_RECONCILER_INTERVAL_MS env var, default 30000). loop.ts exports startReconciler() and stopReconciler(); each tick is wrapped in try/catch so one failure does not kill the loop. No push/pull/sweep logic in this bead — just the runner and an empty tick fn."
         },
         "subItems": [
           {
@@ -123,7 +123,7 @@
           },
           {
             "id": "reconciler-scaffold.ac3",
-            "title": "PANOPTICON_RECONCILER_INTERVAL_MS env var overrides the default 30000; invalid values fall back to default with a WARN log",
+            "title": "OVERDECK_RECONCILER_INTERVAL_MS env var overrides the default 30000; invalid values fall back to default with a WARN log",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

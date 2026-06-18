@@ -82,7 +82,7 @@ export async function injectMemoryHookSettings(workspacePath: string): Promise<v
   const claudeDir = join(workspacePath, '.claude');
   await mkdir(claudeDir, { recursive: true });
 
-  // Write the variant file (read by spawnAgent to set PANOPTICON_CAVEMAN_VARIANT)
+  // Write the variant file (read by spawnAgent to set OVERDECK_CAVEMAN_VARIANT)
   await writeFile(join(claudeDir, CAVEMAN_VARIANT_FILE), variant, 'utf-8');
 
   // If caveman is off or disabled for this workspace, no hook injection needed
@@ -140,7 +140,7 @@ async function readWorkspaceSettings(settingsPath: string): Promise<Record<strin
 }
 
 async function installTrustedMemoryHookScript(): Promise<string> {
-  const hooksDir = join(process.env.PANOPTICON_HOME || join(homedir(), '.panopticon'), 'hooks', 'memory');
+  const hooksDir = join(process.env.OVERDECK_HOME || join(homedir(), '.panopticon'), 'hooks', 'memory');
   await mkdir(hooksDir, { recursive: true, mode: 0o700 });
   await chmod(hooksDir, 0o700);
   const scriptPath = join(hooksDir, MEMORY_HOOK_SCRIPT);
@@ -171,7 +171,7 @@ const { existsSync, readFileSync } = require('node:fs');
 const { homedir } = require('node:os');
 const { join } = require('node:path');
 const endpoint = process.argv[2];
-const baseUrl = process.env.PANOPTICON_DASHBOARD_URL || 'http://localhost:3011';
+const baseUrl = process.env.OVERDECK_DASHBOARD_URL || 'http://localhost:3011';
 const chunks = [];
 process.stdin.on('data', chunk => chunks.push(chunk));
 process.stdin.on('end', async () => {
@@ -216,8 +216,8 @@ async function post(path, body, timeoutMs) {
   }
 }
 function internalToken() {
-  if (process.env.PANOPTICON_INTERNAL_TOKEN) return process.env.PANOPTICON_INTERNAL_TOKEN;
-  const path = join(process.env.PANOPTICON_HOME || join(homedir(), '.panopticon'), 'internal-token');
+  if (process.env.OVERDECK_INTERNAL_TOKEN) return process.env.OVERDECK_INTERNAL_TOKEN;
+  const path = join(process.env.OVERDECK_HOME || join(homedir(), '.panopticon'), 'internal-token');
   if (!existsSync(path)) return '';
   return readFileSync(path, 'utf8').trim();
 }

@@ -120,7 +120,7 @@ The role prompt should use this helper instead of hand-writing HTTP requests so 
 pan flywheel report
 ```
 
-Writes the per-run report under the run directory (`${PANOPTICON_HOME}/flywheel/runs/<runId>/report.md`) and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md` (durable cumulative memory). Produces a `docs(flywheel): run N` commit when there are changes.
+Writes the per-run report under the run directory (`${OVERDECK_HOME}/flywheel/runs/<runId>/report.md`) and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md` (durable cumulative memory). Produces a `docs(flywheel): run N` commit when there are changes.
 
 Run this at the end of a Flywheel revolution, not after every status tick.
 

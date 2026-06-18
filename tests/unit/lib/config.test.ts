@@ -6,7 +6,7 @@ import { TEMP_DIR } from '../../setup.js';
 // Mock paths module to use temp directory
 vi.mock('../../../src/lib/paths.js', () => ({
   CONFIG_FILE: join(TEMP_DIR, 'config.toml'),
-  PANOPTICON_HOME: TEMP_DIR,
+  OVERDECK_HOME: TEMP_DIR,
 }));
 
 // Import after mocking

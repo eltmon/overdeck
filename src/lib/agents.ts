@@ -67,8 +67,8 @@ const toAgentFsError = (operation: string, path: string, cause: unknown): FsErro
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 
 type FlywheelSpawnEnv = {
-  PANOPTICON_FLYWHEEL_RUN_ID?: string;
-  PANOPTICON_FLYWHEEL_AGENT_ROLE?: Role;
+  OVERDECK_FLYWHEEL_RUN_ID?: string;
+  OVERDECK_FLYWHEEL_AGENT_ROLE?: Role;
 };
 
 function normalizeFlywheelRunId(runId: string | null | undefined): string | undefined {
@@ -80,14 +80,14 @@ function normalizeFlywheelRunId(runId: string | null | undefined): string | unde
 function resolveFlywheelSpawnEnv(role: Role, runIdOverride?: string | null): FlywheelSpawnEnv {
   const runId = normalizeFlywheelRunId(runIdOverride ?? getFlywheelActiveRunIdSync());
   return runId
-    ? { PANOPTICON_FLYWHEEL_RUN_ID: runId, PANOPTICON_FLYWHEEL_AGENT_ROLE: role }
+    ? { OVERDECK_FLYWHEEL_RUN_ID: runId, OVERDECK_FLYWHEEL_AGENT_ROLE: role }
     : {};
 }
 
 function flywheelEnvExports(env: FlywheelSpawnEnv): string[] {
   return [
-    env.PANOPTICON_FLYWHEEL_RUN_ID ? `export PANOPTICON_FLYWHEEL_RUN_ID=${env.PANOPTICON_FLYWHEEL_RUN_ID}` : undefined,
-    env.PANOPTICON_FLYWHEEL_AGENT_ROLE ? `export PANOPTICON_FLYWHEEL_AGENT_ROLE=${env.PANOPTICON_FLYWHEEL_AGENT_ROLE}` : undefined,
+    env.OVERDECK_FLYWHEEL_RUN_ID ? `export OVERDECK_FLYWHEEL_RUN_ID=${env.OVERDECK_FLYWHEEL_RUN_ID}` : undefined,
+    env.OVERDECK_FLYWHEEL_AGENT_ROLE ? `export OVERDECK_FLYWHEEL_AGENT_ROLE=${env.OVERDECK_FLYWHEEL_AGENT_ROLE}` : undefined,
   ].filter((value): value is string => value !== undefined);
 }
 
@@ -448,8 +448,8 @@ export async function getAgentRuntimeBaseCommand(
 
   // Integration tests can inject a harmless harness command so a leaked or
   // intentionally-real tmux session never runs the production `claude` binary.
-  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
-    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+  if (process.env.OVERDECK_TEST_HARNESS_COMMAND) {
+    return process.env.OVERDECK_TEST_HARNESS_COMMAND;
   }
 
   const provider = getProviderForModelSync(validatedModel);
@@ -544,8 +544,8 @@ export async function getRoleRuntimeBaseCommand(
 
   // Integration tests can inject a harmless harness command so a leaked or
   // intentionally-real tmux session never runs the production `claude` binary.
-  if (process.env.PANOPTICON_TEST_HARNESS_COMMAND) {
-    return process.env.PANOPTICON_TEST_HARNESS_COMMAND;
+  if (process.env.OVERDECK_TEST_HARNESS_COMMAND) {
+    return process.env.OVERDECK_TEST_HARNESS_COMMAND;
   }
 
   const provider = getProviderForModelSync(validatedModel);
@@ -829,7 +829,7 @@ export async function waitForReadySignal(agentId: string, timeoutSeconds = 30): 
 }
 
 function promptReadyTimeoutSeconds(): number {
-  const raw = process.env.PANOPTICON_PROMPT_READY_TIMEOUT_SECONDS;
+  const raw = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
   if (!raw) return 30;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
@@ -1389,10 +1389,10 @@ export async function setAgentDeliveryMethod(
 }
 
 /**
- * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
+ * Resolve OVERDECK_HOME — same fallback semantics as panopticon-bridge.
  */
 function panopticonHomeForSockets(): string {
-  return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+  return process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
 }
 
 function panopticonHomeForChannels(): string {
@@ -1898,7 +1898,7 @@ export function decideSupervisorForWorkAgent(
     return { eligible: false, reason: 'not-a-work-agent' };
   }
 
-  if (process.env.PANOPTICON_DOCKER_WORKSPACE === '1' || process.env.PAN_DOCKER === '1') {
+  if (process.env.OVERDECK_DOCKER_WORKSPACE === '1' || process.env.PAN_DOCKER === '1') {
     log(false, 'docker-not-supported-yet');
     return { eligible: false, reason: 'docker-not-supported-yet' };
   }
@@ -2031,7 +2031,7 @@ export function decideChannelsForWorkAgent(
   // Docker workspace gate. We do not yet share a socket dir between host and
   // container; deferred to a follow-up issue (see hazards H10).
   if (
-    process.env.PANOPTICON_DOCKER_WORKSPACE === '1' ||
+    process.env.OVERDECK_DOCKER_WORKSPACE === '1' ||
     process.env.PAN_DOCKER === '1'
   ) {
     log(false, 'docker-not-supported-yet');
@@ -2067,8 +2067,8 @@ export async function writeChannelsBridgeMcpConfig(
         command: 'bun',
         args: ['run', repoBridgePath],
         env: {
-          PANOPTICON_AGENT_ID: agentId,
-          PANOPTICON_HOME: process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'),
+          OVERDECK_AGENT_ID: agentId,
+          OVERDECK_HOME: process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon'),
         },
       },
     },
@@ -2623,7 +2623,7 @@ export interface SpawnRunOptions {
 /**
  * Build shell export lines to inject into a work agent's launcher.sh.
  *
- * Sets CAVEMAN_DEFAULT_MODE and PANOPTICON_CAVEMAN_VARIANT so the caveman
+ * Sets CAVEMAN_DEFAULT_MODE and OVERDECK_CAVEMAN_VARIANT so the caveman
  * SessionStart hook activates at the right intensity level and cost events
  * carry the A/B test variant.
  *
@@ -2645,14 +2645,14 @@ export async function buildCavemanExports(
   // If this workspace's A/B variant is 'disabled', set variant for tracking but no mode
   if (variant === 'off') return '';
   if (variant === 'disabled') {
-    return `export PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
+    return `export OVERDECK_CAVEMAN_VARIANT="${variant}"\n`;
   }
 
   // Work agents use the 'work' intensity mode
   const mode = config.modes.work;
   if (mode === 'off' || mode === 'disabled') return '';
 
-  return `export CAVEMAN_DEFAULT_MODE="${mode}"\nexport PANOPTICON_CAVEMAN_VARIANT="${variant}"\n`;
+  return `export CAVEMAN_DEFAULT_MODE="${mode}"\nexport OVERDECK_CAVEMAN_VARIANT="${variant}"\n`;
 }
 
 /**
@@ -3418,9 +3418,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     env: {
       ...BLANKED_PROVIDER_ENV,
       TERM: 'xterm-256color',
-      PANOPTICON_AGENT_ID: agentId,
-      PANOPTICON_ISSUE_ID: issueId,
-      PANOPTICON_SESSION_TYPE: role,
+      OVERDECK_AGENT_ID: agentId,
+      OVERDECK_ISSUE_ID: issueId,
+      OVERDECK_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       GIT_SEQUENCE_EDITOR: 'false',
       ...flywheelEnv,
@@ -3759,9 +3759,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     env: {
       ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
       TERM: 'xterm-256color',
-      PANOPTICON_AGENT_ID: agentId,
-      PANOPTICON_ISSUE_ID: options.issueId,
-      PANOPTICON_SESSION_TYPE: role,
+      OVERDECK_AGENT_ID: agentId,
+      OVERDECK_ISSUE_ID: options.issueId,
+      OVERDECK_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
       ...flywheelEnv,
@@ -4406,9 +4406,9 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     await Effect.runPromise(createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
-        PANOPTICON_AGENT_ID: normalizedId,
-        PANOPTICON_ISSUE_ID: agentState.issueId || '',
-        PANOPTICON_SESSION_TYPE: agentState.role,
+        OVERDECK_AGENT_ID: normalizedId,
+        OVERDECK_ISSUE_ID: agentState.issueId || '',
+        OVERDECK_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }
@@ -4806,9 +4806,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         ...BLANKED_PROVIDER_ENV,
-        PANOPTICON_AGENT_ID: normalizedId,
-        PANOPTICON_ISSUE_ID: agentState.issueId || '',
-        PANOPTICON_SESSION_TYPE: agentState.role,
+        OVERDECK_AGENT_ID: normalizedId,
+        OVERDECK_ISSUE_ID: agentState.issueId || '',
+        OVERDECK_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }
@@ -5014,9 +5014,9 @@ export async function restartAgent(
       env: {
         ...BLANKED_PROVIDER_ENV,
         TERM: 'xterm-256color',
-        PANOPTICON_AGENT_ID: normalizedId,
-        PANOPTICON_ISSUE_ID: agentState.issueId || '',
-        PANOPTICON_SESSION_TYPE: agentState.role,
+        OVERDECK_AGENT_ID: normalizedId,
+        OVERDECK_ISSUE_ID: agentState.issueId || '',
+        OVERDECK_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         GIT_SEQUENCE_EDITOR: 'false',
         ...providerEnv,
@@ -5209,9 +5209,9 @@ export async function recoverAgent(
     await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
-        PANOPTICON_AGENT_ID: normalizedId,
-        PANOPTICON_ISSUE_ID: state.issueId || '',
-        PANOPTICON_SESSION_TYPE: recoveryRole,
+        OVERDECK_AGENT_ID: normalizedId,
+        OVERDECK_ISSUE_ID: state.issueId || '',
+        OVERDECK_SESSION_TYPE: recoveryRole,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...piProviderEnv,
       },
@@ -5249,9 +5249,9 @@ export async function recoverAgent(
   createSessionSync(normalizedId, state.workspace, `bash ${launcherScript}`, {
     env: {
       ...BLANKED_PROVIDER_ENV,
-      PANOPTICON_AGENT_ID: normalizedId,
-      PANOPTICON_ISSUE_ID: state.issueId || '',
-      PANOPTICON_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),
+      OVERDECK_AGENT_ID: normalizedId,
+      OVERDECK_ISSUE_ID: state.issueId || '',
+      OVERDECK_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       ...providerEnv
     }

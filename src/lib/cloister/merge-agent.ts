@@ -126,7 +126,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 import {
-  PANOPTICON_HOME,
+  OVERDECK_HOME,
 } from '../paths.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
@@ -140,7 +140,7 @@ import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 
-const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
 const MERGE_HISTORY_FILE = join(MERGE_HISTORY_DIR, 'history.jsonl');
 
@@ -368,7 +368,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
     // dynamic imports already resolve correctly and spawning again would create an infinite loop.
     if (!options?.skipDeploy) {
-      const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
+      const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
       let repoRoot = __dirname.includes('/src/')
         ? __dirname.replace(/\/src\/.*$/, '')
         : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');

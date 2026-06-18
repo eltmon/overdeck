@@ -33,7 +33,7 @@ When running `pan setup hooks`:
 
 When spawning agents via `pan work issue`:
 - Automatically run hook setup if not already configured
-- Set `PANOPTICON_AGENT_ID` environment variable
+- Set `OVERDECK_AGENT_ID` environment variable
 - Silent auto-setup (one-line confirmation message)
 
 ### 4. Task Lookup Method
@@ -105,7 +105,7 @@ The heartbeat hook script will:
 - Install `jq` dependency if missing
 
 **Agent Spawning Integration:**
-- Modify `spawnAgent()` to set `PANOPTICON_AGENT_ID` env var
+- Modify `spawnAgent()` to set `OVERDECK_AGENT_ID` env var
 - Auto-run hook setup on first spawn if not configured
 - Write task cache file when agent starts
 
@@ -139,7 +139,7 @@ src/cli/commands/
     └── hooks.ts               # NEW - `pan setup hooks` implementation
 
 src/lib/
-├── agents.ts                  # MODIFY - set PANOPTICON_AGENT_ID, auto-setup hooks
+├── agents.ts                  # MODIFY - set OVERDECK_AGENT_ID, auto-setup hooks
 └── runtimes/
     └── claude-code.ts         # MODIFY - read from new heartbeat directory
 ```
@@ -161,7 +161,7 @@ TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"')
 TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""')
 
 # Get agent ID from env (set by pan work issue) or tmux session name
-AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
+AGENT_ID="${OVERDECK_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
 
 # Get current beads task from cache (if exists)
 TASK_CACHE="$HOME/.panopticon/agents/$AGENT_ID/current-task.json"
@@ -259,7 +259,7 @@ After:
 | pan30-01 | Create heartbeat-hook bash script | 1 | - |
 | pan30-02 | Implement `pan setup hooks` command | 1 | pan30-01 |
 | pan30-03 | Add jq dependency installation | 1 | pan30-02 |
-| pan30-04 | Modify spawnAgent to set PANOPTICON_AGENT_ID | 2 | - |
+| pan30-04 | Modify spawnAgent to set OVERDECK_AGENT_ID | 2 | - |
 | pan30-05 | Add auto-setup hooks on first spawn | 2 | pan30-02, pan30-04 |
 | pan30-06 | Write task cache file on agent start | 2 | pan30-04 |
 | pan30-07 | Update claude-code.ts heartbeat reading | 2 | pan30-01 |
@@ -287,7 +287,7 @@ const claudeCmd = `claude --dangerously-skip-permissions --model ${state.model}`
 createSession(agentId, options.workspace, claudeCmd, {
   env: {
     ...process.env,
-    PANOPTICON_AGENT_ID: agentId
+    OVERDECK_AGENT_ID: agentId
   }
 });
 ```

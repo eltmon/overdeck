@@ -6,7 +6,7 @@
 # Bypasses (allows normal Bash execution):
 #   - Non-Bash tool_name
 #   - jq unavailable or malformed PreToolUse JSON
-#   - PANOPTICON_RTK_ENABLED is unset/false and agents.rtk.enabled is absent/false
+#   - OVERDECK_RTK_ENABLED is unset/false and agents.rtk.enabled is absent/false
 #   - ~/.panopticon/bin/rtk is missing or not executable
 #   - rtk exits non-zero, emits no output, or emits an invalid PreToolUse response
 #   - rtk chooses not to rewrite a command, including commands whose output it
@@ -84,8 +84,8 @@ rtk_read_config_enabled() {
 rtk_config_enabled_value() {
   local config_path project_root value result
 
-  if [ -n "${PANOPTICON_CONFIG:-}" ]; then
-    value=$(rtk_read_config_enabled "$PANOPTICON_CONFIG")
+  if [ -n "${OVERDECK_CONFIG:-}" ]; then
+    value=$(rtk_read_config_enabled "$OVERDECK_CONFIG")
   else
     value=$(rtk_read_config_enabled "$HOME/.panopticon/config.yaml")
   fi
@@ -110,8 +110,8 @@ rtk_config_enabled_value() {
 
 RTK_BIN="$HOME/.panopticon/bin/rtk"
 
-if [ -n "${PANOPTICON_RTK_ENABLED+x}" ]; then
-  if ! rtk_truthy "$PANOPTICON_RTK_ENABLED"; then
+if [ -n "${OVERDECK_RTK_ENABLED+x}" ]; then
+  if ! rtk_truthy "$OVERDECK_RTK_ENABLED"; then
     exit 0
   fi
 else

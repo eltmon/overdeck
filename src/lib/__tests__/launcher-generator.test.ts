@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { generateLauncherScriptSync, generateLauncherWrapperSync, type LauncherConfig } from '../launcher-generator.js';
 
-// Pin PANOPTICON_HOME to an empty temp dir so the COLORFGBG export (derived
+// Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
 // from ~/.panopticon/ui-theme.json) deterministically uses the dark default
 // regardless of the developer machine's synced dashboard theme.
 let tempHome: string;
@@ -12,13 +12,13 @@ let prevHome: string | undefined;
 
 beforeEach(() => {
   tempHome = mkdtempSync(join(tmpdir(), 'pan-launcher-test-'));
-  prevHome = process.env.PANOPTICON_HOME;
-  process.env.PANOPTICON_HOME = tempHome;
+  prevHome = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = tempHome;
 });
 
 afterEach(() => {
-  if (prevHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = prevHome;
+  if (prevHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = prevHome;
   rmSync(tempHome, { recursive: true, force: true });
 });
 
@@ -113,9 +113,9 @@ describe('generateLauncherScript', () => {
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
       export COLORFGBG='15;0'
-      export PANOPTICON_AGENT_ID='plan-abc'
-      export PANOPTICON_ISSUE_ID='PAN-824'
-      export PANOPTICON_SESSION_TYPE='planning'
+      export OVERDECK_AGENT_ID='plan-abc'
+      export OVERDECK_ISSUE_ID='PAN-824'
+      export OVERDECK_SESSION_TYPE='planning'
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
@@ -155,9 +155,9 @@ describe('generateLauncherScript', () => {
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
-      export PANOPTICON_AGENT_ID='spec-123'
-      export PANOPTICON_ISSUE_ID='PAN-824'
-      export PANOPTICON_SESSION_TYPE='correctness-review'
+      export OVERDECK_AGENT_ID='spec-123'
+      export OVERDECK_ISSUE_ID='PAN-824'
+      export OVERDECK_SESSION_TYPE='correctness-review'
       cd -- '/workspace/project'
       unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
@@ -277,7 +277,7 @@ describe('generateLauncherScript', () => {
       export SKIP_DOCS_INDEX=1
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
-      unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE
+      unset OVERDECK_AGENT_ID OVERDECK_ISSUE_ID OVERDECK_SESSION_TYPE
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
       "
     `);
@@ -308,7 +308,7 @@ describe('generateLauncherScript', () => {
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
       export COLORFGBG='15;0'
-      export PANOPTICON_ISSUE_ID='PAN-824'
+      export OVERDECK_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
       cd -- '/workspace/project'
       trap '' HUP

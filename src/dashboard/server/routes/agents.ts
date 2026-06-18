@@ -192,7 +192,7 @@ function constantTimeTokenEqual(provided: string | undefined, expected: string):
 }
 
 async function readInternalTokenForRequest(): Promise<string | null> {
-  const fromEnv = process.env.PANOPTICON_INTERNAL_TOKEN;
+  const fromEnv = process.env.OVERDECK_INTERNAL_TOKEN;
   if (fromEnv && fromEnv.length > 0) return fromEnv;
   try {
     const token = (await readFile(join(getPanopticonHome(), 'internal-token'), 'utf8')).trim();

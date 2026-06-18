@@ -46,11 +46,11 @@ async function tick(watchdog: TtsWatchdog): Promise<void> {
 describe('readTtsWatchdogConfig', () => {
   it('falls back from invalid timing env vars and clamps unsafe minimums', () => {
     expect(readTtsWatchdogConfig({
-      PANOPTICON_TTS_WATCHDOG_POLL_MS: '0',
-      PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD: 'abc',
-      PANOPTICON_TTS_WATCHDOG_MAX_RESTARTS: 'NaN',
-      PANOPTICON_TTS_WATCHDOG_WINDOW_MS: '-1',
-      PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS: '1',
+      OVERDECK_TTS_WATCHDOG_POLL_MS: '0',
+      OVERDECK_TTS_WATCHDOG_FAIL_THRESHOLD: 'abc',
+      OVERDECK_TTS_WATCHDOG_MAX_RESTARTS: 'NaN',
+      OVERDECK_TTS_WATCHDOG_WINDOW_MS: '-1',
+      OVERDECK_TTS_WATCHDOG_START_TIMEOUT_MS: '1',
     })).toEqual({
       enabled: true,
       pollMs: 5_000,

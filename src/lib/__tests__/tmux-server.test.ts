@@ -59,7 +59,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.PANOPTICON_TMUX_MANAGED_SERVER_FORCE = '1';
+    process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
     serverAlive = false;
     systemdAvailable = true;
     setsidAvailable = true;
@@ -137,7 +137,7 @@ describe('ensurePanopticonTmuxServerSync', () => {
 
   afterEach(() => {
     warnSpy.mockClear();
-    delete process.env.PANOPTICON_TMUX_MANAGED_SERVER_FORCE;
+    delete process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE;
   });
 
   it('founds the shared server in a dedicated systemd unit', () => {
@@ -224,7 +224,7 @@ describe('ensurePanopticonTmuxServerAsync', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.PANOPTICON_TMUX_MANAGED_SERVER_FORCE = '1';
+    process.env.OVERDECK_TMUX_MANAGED_SERVER_FORCE = '1';
     serverAlive = false;
     systemdAvailable = true;
     setsidAvailable = true;

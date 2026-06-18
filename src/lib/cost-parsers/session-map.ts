@@ -7,10 +7,10 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import { FsError } from '../errors.js';
 
-const SESSION_MAP_FILE = join(PANOPTICON_HOME, 'session-map.json');
+const SESSION_MAP_FILE = join(OVERDECK_HOME, 'session-map.json');
 
 /**
  * Session record
@@ -72,7 +72,7 @@ export function loadSessionMapSync(): SessionMapData {
  * Save session map to file
  */
 export function saveSessionMapSync(data: SessionMapData): void {
-  mkdirSync(PANOPTICON_HOME, { recursive: true });
+  mkdirSync(OVERDECK_HOME, { recursive: true });
   data.lastUpdated = new Date().toISOString();
   writeFileSync(SESSION_MAP_FILE, JSON.stringify(data, null, 2));
 }

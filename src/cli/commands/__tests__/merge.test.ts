@@ -22,7 +22,7 @@ describe('merge CLI', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mocks.ensureInternalTokenSync.mockReturnValue('secret-token');
-    vi.stubEnv('PANOPTICON_DASHBOARD_URL', 'http://dashboard.test/');
+    vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://dashboard.test/');
     process.exitCode = undefined;
   });
 

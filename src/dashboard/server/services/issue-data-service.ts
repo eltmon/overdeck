@@ -299,7 +299,7 @@ export class IssueDataService {
    *
    * `skipPolling` (PAN-1817): load the SQLite cache and serve read-only, but
    * start NO recurring tracker fetches. Peer dashboards running inside workspace
-   * containers (PANOPTICON_DISABLE_DEACON=1) MUST use this — otherwise every
+   * containers (OVERDECK_DISABLE_DEACON=1) MUST use this — otherwise every
    * workspace container becomes an independent Linear/GitHub poller hammering
    * the single shared API key, which exhausted Linear's 2500/hr quota when
    * ~17 container pollers ran at once.
@@ -319,7 +319,7 @@ export class IssueDataService {
     this.pushSnapshot();
 
     if (options?.skipPolling) {
-      console.log('[IssueDataService] Tracker polling DISABLED (peer dashboard / PANOPTICON_DISABLE_DEACON=1) — serving cached issues only, zero tracker API calls (PAN-1817)');
+      console.log('[IssueDataService] Tracker polling DISABLED (peer dashboard / OVERDECK_DISABLE_DEACON=1) — serving cached issues only, zero tracker API calls (PAN-1817)');
       return;
     }
 

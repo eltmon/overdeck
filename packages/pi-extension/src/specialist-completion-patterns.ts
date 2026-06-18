@@ -2,7 +2,7 @@ export type SpecialistCompletionStatus = 'passed' | 'failed'
 
 export type SpecialistCompletionName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent'
 
-const RESULT_SENTINEL = /^PANOPTICON_SPECIALIST_RESULT:\s*(review-agent|test-agent|merge-agent|inspect-agent|uat-agent)\s+(passed|failed)\s*$/i
+const RESULT_SENTINEL = /^OVERDECK_SPECIALIST_RESULT:\s*(review-agent|test-agent|merge-agent|inspect-agent|uat-agent)\s+(passed|failed)\s*$/i
 
 const STRUCTURED_FAILURE_PATTERNS: Partial<Record<SpecialistCompletionName, RegExp[]>> = {
   'review-agent': [/^##\s*Verdict:\s*(CHANGES REQUESTED|FAILED)\s*$/im],

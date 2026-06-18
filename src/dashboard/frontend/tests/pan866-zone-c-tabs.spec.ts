@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const DASHBOARD_URL = process.env.PANOPTICON_DASHBOARD_URL ?? 'https://pan.localhost';
+const DASHBOARD_URL = process.env.OVERDECK_DASHBOARD_URL ?? 'https://pan.localhost';
 const ISSUE_ID = 'PAN-866';
 
 async function openIssueInCommandDeck(page: import('@playwright/test').Page, issueId: string) {

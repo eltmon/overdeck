@@ -63,7 +63,7 @@ describe('runWebhookHandler', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    delete process.env.PANOPTICON_DEV_WEBHOOKS;
+    delete process.env.OVERDECK_DEV_WEBHOOKS;
     vi.clearAllMocks();
     _resetWebhookSecretForTests();
     mockExistsSync.mockReturnValue(true);
@@ -144,9 +144,9 @@ describe('runWebhookHandler', () => {
     expect(response.status).toBe(503);
   });
 
-  it('passes through when no secret is configured but PANOPTICON_DEV_WEBHOOKS=1', async () => {
+  it('passes through when no secret is configured but OVERDECK_DEV_WEBHOOKS=1', async () => {
     mockExistsSync.mockReturnValue(false);
-    process.env.PANOPTICON_DEV_WEBHOOKS = '1';
+    process.env.OVERDECK_DEV_WEBHOOKS = '1';
     const body = JSON.stringify({ repository: { full_name: 'test-owner/test-repo' } });
 
     const response = await Effect.runPromise(runWebhookHandler(body, {

@@ -140,7 +140,7 @@ describe('SettingsPage role model routing panels', () => {
 
   it('surfaces memory settings, feature toggles, and environment override precedence', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
-    expect(SETTINGS_PAGE_SOURCE).toContain('PANOPTICON_MEMORY_PROVIDER and PANOPTICON_MEMORY_MODEL override these UI values');
+    expect(SETTINGS_PAGE_SOURCE).toContain('OVERDECK_MEMORY_PROVIDER and OVERDECK_MEMORY_MODEL override these UI values');
     expect(SETTINGS_PAGE_SOURCE).toContain('Extraction provider');
     expect(SETTINGS_PAGE_SOURCE).toContain('Fallback provider');
     expect(SETTINGS_PAGE_SOURCE).toContain('Daily cost cap');

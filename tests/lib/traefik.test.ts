@@ -10,24 +10,24 @@ describe('traefik config generation', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'pan-traefik-test-'));
-    originalPanopticonHome = process.env.PANOPTICON_HOME;
-    originalPanopticonDev = process.env.PANOPTICON_DEV;
-    process.env.PANOPTICON_HOME = tempDir;
-    delete process.env.PANOPTICON_DEV;
+    originalPanopticonHome = process.env.OVERDECK_HOME;
+    originalPanopticonDev = process.env.OVERDECK_DEV;
+    process.env.OVERDECK_HOME = tempDir;
+    delete process.env.OVERDECK_DEV;
     vi.resetModules();
   });
 
   afterEach(() => {
     if (originalPanopticonHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     }
 
     if (originalPanopticonDev === undefined) {
-      delete process.env.PANOPTICON_DEV;
+      delete process.env.OVERDECK_DEV;
     } else {
-      process.env.PANOPTICON_DEV = originalPanopticonDev;
+      process.env.OVERDECK_DEV = originalPanopticonDev;
     }
 
     rmSync(tempDir, { recursive: true, force: true });

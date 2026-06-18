@@ -30,9 +30,9 @@ let originalHome: string | undefined;
 let odb: OverdeckTestDb;
 
 beforeEach(async () => {
-  originalHome = process.env.PANOPTICON_HOME;
+  originalHome = process.env.OVERDECK_HOME;
   resetDatabase();
-  // setupOverdeckTestDb creates a fresh PANOPTICON_HOME with overdeck.db.
+  // setupOverdeckTestDb creates a fresh OVERDECK_HOME with overdeck.db.
   odb = setupOverdeckTestDb();
   tempDir = odb.home;
 });
@@ -40,8 +40,8 @@ beforeEach(async () => {
 afterEach(async () => {
   closeDatabase();
   teardownOverdeckTestDb(odb);
-  if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = originalHome;
+  if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalHome;
   // odb.home (=tempDir) is removed by teardownOverdeckTestDb; no double-rm needed.
   tempDir = null;
 });

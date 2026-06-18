@@ -29,7 +29,7 @@ import { spawn, execSync, exec } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
 import { Effect, Data } from 'effect';
-import { PANOPTICON_HOME, BIN_DIR } from './paths.js';
+import { OVERDECK_HOME, BIN_DIR } from './paths.js';
 import { FsError, ProcessSpawnError } from './errors.js';
 
 const execAsync = promisify(exec);
@@ -49,7 +49,7 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 const CLIPROXY_RELEASE_VERSION = 'v7.1.39';
 
 export function getCliproxyDir(): string {
-  return join(PANOPTICON_HOME, 'cliproxy');
+  return join(OVERDECK_HOME, 'cliproxy');
 }
 
 export function getCliproxyBinary(): string {
@@ -85,14 +85,14 @@ function getCliproxyGeminiCredPath(): string {
 }
 
 function ensureDirs(): void {
-  for (const dir of [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()]) {
+  for (const dir of [OVERDECK_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 }
 
 async function ensureDirsAsync(): Promise<void> {
   await Promise.all(
-    [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()].map((dir) =>
+    [OVERDECK_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()].map((dir) =>
       mkdir(dir, { recursive: true }),
     ),
   );

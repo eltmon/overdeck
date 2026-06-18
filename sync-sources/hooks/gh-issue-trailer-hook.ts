@@ -103,10 +103,10 @@ function containsFlywheelRunId(body: string): boolean {
 }
 
 function resolveDiscoveredIn(env: HookEnv): string | null {
-  const agentId = env.PANOPTICON_AGENT_ID;
+  const agentId = env.OVERDECK_AGENT_ID;
   if (!agentId || basename(agentId) !== agentId) return null;
 
-  const panopticonHome = env.PANOPTICON_HOME ?? join(env.HOME ?? homedir(), '.panopticon');
+  const panopticonHome = env.OVERDECK_HOME ?? join(env.HOME ?? homedir(), '.panopticon');
   const statePath = join(panopticonHome, 'agents', agentId, 'state.json');
   if (!existsSync(statePath)) return null;
 
@@ -119,10 +119,10 @@ function resolveDiscoveredIn(env: HookEnv): string | null {
 }
 
 function buildTrailer(env: HookEnv): string | null {
-  const runId = env.PANOPTICON_FLYWHEEL_RUN_ID?.trim();
+  const runId = env.OVERDECK_FLYWHEEL_RUN_ID?.trim();
   if (!runId || !FLYWHEEL_RUN_ID_PATTERN.test(runId)) return null;
 
-  const filedBy = env.PANOPTICON_FLYWHEEL_AGENT_ROLE === 'flywheel' ? 'agent' : 'operator';
+  const filedBy = env.OVERDECK_FLYWHEEL_AGENT_ROLE === 'flywheel' ? 'agent' : 'operator';
   const discoveredIn = resolveDiscoveredIn(env);
   const lines = [
     '---',

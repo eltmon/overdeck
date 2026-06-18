@@ -33,7 +33,7 @@ const execAsync = promisify(exec);
  *  - Named volumes (node_modules cache) survive, so re-spawning is cheap.
  *
  * The companion structural fix is the polling gate in IssueDataService: peer
- * dashboards (PANOPTICON_DISABLE_DEACON=1) no longer poll the trackers at all, so
+ * dashboards (OVERDECK_DISABLE_DEACON=1) no longer poll the trackers at all, so
  * an un-reaped stack does no quota harm. This reaper is the resource-hygiene half.
  */
 
@@ -109,7 +109,7 @@ export async function reconcileIdleWorkspaceStacks(
   deps: Partial<IdleStackReaperDeps> = {},
 ): Promise<string[]> {
   // Operator kill-switch.
-  if (process.env.PANOPTICON_DISABLE_STACK_REAPER === '1') return [];
+  if (process.env.OVERDECK_DISABLE_STACK_REAPER === '1') return [];
   // When auto-resume is frozen to debug, leave workspaces untouched.
   if (getNoResumeMode().active) return [];
 

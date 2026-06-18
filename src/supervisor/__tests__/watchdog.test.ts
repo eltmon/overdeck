@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SupervisorWatchdog, type SupervisorWatchdogConfig } from '../watchdog.js';
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 let testHome: string;
 
 const config: SupervisorWatchdogConfig = {
@@ -50,14 +50,14 @@ function makeWatchdog(overrides: Partial<{
 describe('SupervisorWatchdog', () => {
   beforeEach(() => {
     testHome = join(tmpdir(), `panopticon-watchdog-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    process.env.PANOPTICON_HOME = testHome;
+    process.env.OVERDECK_HOME = testHome;
   });
 
   afterEach(() => {
     if (originalPanopticonHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     }
     rmSync(testHome, { recursive: true, force: true });
   });

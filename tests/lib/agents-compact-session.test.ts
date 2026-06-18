@@ -57,12 +57,12 @@ beforeEach(() => {
   mockGenerateFallbackSummary.mockReset().mockReturnValue(Effect.succeed('Fallback session summary'));
   HOME_DIR = join(tmpdir(), `pan-compact-session-${process.pid}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(HOME_DIR, { recursive: true });
-  process.env.PANOPTICON_HOME = HOME_DIR;
+  process.env.OVERDECK_HOME = HOME_DIR;
 });
 
 afterEach(() => {
   rmSync(HOME_DIR, { recursive: true, force: true });
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
 });
 
 describe('buildCompactRecoverySeed (PAN-1781)', () => {

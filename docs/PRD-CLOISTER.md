@@ -978,7 +978,7 @@ TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"')
 TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100]')
 
 # Determine agent ID from tmux session or env
-AGENT_ID="${PANOPTICON_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
+AGENT_ID="${OVERDECK_AGENT_ID:-$(tmux display-message -p '#S' 2>/dev/null || echo 'unknown')}"
 
 # Write heartbeat
 HEARTBEAT_DIR="$HOME/.panopticon/agents/$AGENT_ID"
@@ -1046,7 +1046,7 @@ When spawning an agent, Panopticon can:
 
 1. **Set environment variable** for agent ID:
    ```bash
-   PANOPTICON_AGENT_ID=agent-pan-18 claude -p "..."
+   OVERDECK_AGENT_ID=agent-pan-18 claude -p "..."
    ```
 
 2. **Ensure hooks are configured** (one-time setup):

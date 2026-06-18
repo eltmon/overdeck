@@ -124,10 +124,10 @@ async function postBulkCloseOut(headers: Record<string, string> = {}) {
 }
 
 afterEach(() => {
-  delete process.env.PANOPTICON_INTERNAL_TOKEN;
-  delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
-  delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
-  delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+  delete process.env.OVERDECK_INTERNAL_TOKEN;
+  delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
+  delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
+  delete process.env.OVERDECK_TRUSTED_ORIGINS;
   restoreEnv('API_PORT', originalApiPort);
   restoreEnv('PORT', originalPort);
   restoreEnv('DASHBOARD_URL', originalDashboardUrl);
@@ -139,10 +139,10 @@ afterEach(() => {
 describe('POST /api/issues/:id/close-out', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
-    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
-    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
-    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+    process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
+    process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    delete process.env.OVERDECK_TRUSTED_ORIGINS;
     pinDefaultDashboardOrigin();
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
@@ -289,10 +289,10 @@ describe('POST /api/issues/:id/close-out', () => {
 describe('POST /api/issues/bulk-close-out', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
-    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
-    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
-    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+    process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
+    process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    delete process.env.OVERDECK_TRUSTED_ORIGINS;
     pinDefaultDashboardOrigin();
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();

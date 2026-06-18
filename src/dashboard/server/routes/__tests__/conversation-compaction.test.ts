@@ -38,7 +38,7 @@ beforeEach(() => {
   CONFIG_HOME = join(tmpdir(), `pan-compaction-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
   mkdirSync(CONFIG_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
   process.env.HOME = CONFIG_HOME;
   mkdirSync(join(CONFIG_HOME, '.panopticon'), { recursive: true });
   writeFileSync(
@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   if (ORIGINAL_HOME) {
     process.env.HOME = ORIGINAL_HOME;
   } else {

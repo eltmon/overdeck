@@ -52,13 +52,13 @@ function installExecMock(responses: Record<string, string | Error>) {
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `pan-653-git-ops-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
   vi.clearAllMocks();
 });
 
 afterEach(async () => {
   await resetDb();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 

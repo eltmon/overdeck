@@ -52,7 +52,7 @@ interface OverlayResult {
 // (`rm .claude/agents/...`, `rm ~/.panopticon/...`). They cannot cover
 // `cd .claude && rm -rf agents/`. The proper guard is a PreToolUse hook
 // — tracked separately. These rules are the cheap belt-and-suspenders.
-const PANOPTICON_INFRA_DENY_PATTERNS = [
+const OVERDECK_INFRA_DENY_PATTERNS = [
   // Agent definitions / launch templates
   'Bash(rm .claude/agents/:*)',
   'Bash(rm -rf .claude/agents/:*)',
@@ -183,7 +183,7 @@ export function injectPanopticonInfraDeny(workingDir: string): Effect.Effect<voi
     const permissions = (existing.permissions as Record<string, unknown> | undefined) ?? {};
     const denyList = (permissions.deny as string[] | undefined) ?? [];
     const cleaned = denyList.filter(p => !INVALID_LEGACY_PATTERNS.has(p));
-    const merged = new Set<string>([...cleaned, ...PANOPTICON_INFRA_DENY_PATTERNS]);
+    const merged = new Set<string>([...cleaned, ...OVERDECK_INFRA_DENY_PATTERNS]);
     permissions.deny = Array.from(merged).sort();
     existing.permissions = permissions;
 

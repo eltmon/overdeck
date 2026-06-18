@@ -35,12 +35,12 @@ function schedule(issueId: string, scheduledMergeAt = '2026-05-25T10:00:00.000Z'
 beforeEach(() => {
   testHome = join(tmpdir(), `pan-pending-auto-merges-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(testHome, { recursive: true });
-  process.env.PANOPTICON_HOME = testHome;
+  process.env.OVERDECK_HOME = testHome;
 });
 
 afterEach(() => {
   resetDatabase();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
 

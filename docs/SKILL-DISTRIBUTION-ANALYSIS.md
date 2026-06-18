@@ -282,9 +282,9 @@ Readable by all users, writable only by admins. Intended for IT/DevOps to deploy
 ## 5. Path Portability (Completed)
 
 Skills previously contained hardcoded absolute paths like `/home/eltmon/Projects/panopticon-cli/...`. Fixed by introducing environment variables:
-- `$PANOPTICON_INSTALL_PATH` — where panopticon-cli lives
-- `$PANOPTICON_PROJECT_PATH` — the project the agent works on
-- `$PANOPTICON_WORKSPACE_PATH` — the workspace directory
+- `$OVERDECK_INSTALL_PATH` — where panopticon-cli lives
+- `$OVERDECK_PROJECT_PATH` — the project the agent works on
+- `$OVERDECK_WORKSPACE_PATH` — the workspace directory
 
 Injected at agent spawn via `createSession()`. A `pan paths` CLI command provides fallback resolution.
 
@@ -527,12 +527,12 @@ Agent starts on MIN-678 workspace
 ```
 
 Environment variables available to agents:
-- `$PANOPTICON_INSTALL_PATH` — where panopticon-cli lives
-- `$PANOPTICON_PROJECT_PATH` — the project the agent works on
-- `$PANOPTICON_WORKSPACE_PATH` — the workspace directory
-- `$PANOPTICON_AGENT_ID` — agent identifier
-- `$PANOPTICON_ISSUE_ID` — issue being worked on
-- `$PANOPTICON_SESSION_TYPE` — phase (planning, implementation, etc.)
+- `$OVERDECK_INSTALL_PATH` — where panopticon-cli lives
+- `$OVERDECK_PROJECT_PATH` — the project the agent works on
+- `$OVERDECK_WORKSPACE_PATH` — the workspace directory
+- `$OVERDECK_AGENT_ID` — agent identifier
+- `$OVERDECK_ISSUE_ID` — issue being worked on
+- `$OVERDECK_SESSION_TYPE` — phase (planning, implementation, etc.)
 
 ### Directory Structure (End-State)
 

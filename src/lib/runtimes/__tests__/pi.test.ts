@@ -16,16 +16,16 @@ const FIXTURE_LINEAR = join(__dirname, '..', '..', 'cost-parsers', '__tests__', 
 function withFakeHome(): { home: string; cleanup: () => void } {
   const home = mkdtempSync(join(tmpdir(), 'pan-pi-runtime-'))
   const originalHome = process.env['HOME']
-  const originalPanopticonHome = process.env.PANOPTICON_HOME
+  const originalPanopticonHome = process.env.OVERDECK_HOME
   process.env['HOME'] = home
-  process.env.PANOPTICON_HOME = join(home, '.panopticon')
+  process.env.OVERDECK_HOME = join(home, '.panopticon')
   return {
     home,
     cleanup: () => {
       if (originalHome === undefined) delete process.env['HOME']
       else process.env['HOME'] = originalHome
-      if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME
-      else process.env.PANOPTICON_HOME = originalPanopticonHome
+      if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME
+      else process.env.OVERDECK_HOME = originalPanopticonHome
       rmSync(home, { recursive: true, force: true })
     },
   }

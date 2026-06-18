@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readd
 import { join } from 'path';
 import { homedir } from 'os';
 import {
-  PANOPTICON_HOME,
+  OVERDECK_HOME,
   INIT_DIRS,
   CERTS_DIR,
   TRAEFIK_DIR,
@@ -571,7 +571,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   // Step 7: Create or update config file
-  const configFile = join(PANOPTICON_HOME, 'config.toml');
+  const configFile = join(OVERDECK_HOME, 'config.toml');
   const configExists = existsSync(configFile);
 
   if (!configExists) {

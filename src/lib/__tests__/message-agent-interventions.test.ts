@@ -80,14 +80,14 @@ describe('messageAgent operator interventions', () => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-message-agent-'));
     stateDir = join(tmpHome, 'agents');
     mkdirSync(stateDir, { recursive: true });
-    process.env.PANOPTICON_HOME = tmpHome;
+    process.env.OVERDECK_HOME = tmpHome;
     interventionMocks.appendOperatorInterventionEvent.mockReset();
     interventionMocks.appendOperatorInterventionEvent.mockResolvedValue(undefined);
     vi.mocked(sendKeys).mockClear();
   });
 
   afterEach(() => {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(tmpHome, { recursive: true, force: true });
     vi.restoreAllMocks();
   });

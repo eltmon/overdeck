@@ -28,14 +28,14 @@ import { FsError } from './errors.js';
 export type TraefikRenderMode = 'production' | 'dev';
 
 /**
- * Resolve render mode. Explicit param wins; otherwise the PANOPTICON_DEV env
+ * Resolve render mode. Explicit param wins; otherwise the OVERDECK_DEV env
  * var (truthy = 'dev'); otherwise default to 'production'. This keeps `pan up`
  * unchanged for the common case while letting dev workflows opt in by exporting
  * the env var before invoking any code path that regenerates Traefik config.
  */
 export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikRenderMode {
   if (explicit) return explicit;
-  const env = process.env['PANOPTICON_DEV'];
+  const env = process.env['OVERDECK_DEV'];
   if (env && env !== '0' && env.toLowerCase() !== 'false') return 'dev';
   return 'production';
 }

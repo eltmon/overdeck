@@ -18,11 +18,11 @@ The Awaiting Merge page is the operator's human UAT gate. Each merge-ready card 
 
 The Flywheel produces two different artifacts. They are not interchangeable.
 
-**Status** is the live snapshot of the current run. The orchestrator emits it every tick via `pan flywheel emit-status`. It is structured JSON validated against `FlywheelStatus`. Only the latest snapshot matters; the dashboard's **Status** tab renders it live and the CLI's `pan flywheel status` reads it back. Each run's snapshots persist at `${PANOPTICON_HOME}/flywheel/runs/<runId>/latest.json`.
+**Status** is the live snapshot of the current run. The orchestrator emits it every tick via `pan flywheel emit-status`. It is structured JSON validated against `FlywheelStatus`. Only the latest snapshot matters; the dashboard's **Status** tab renders it live and the CLI's `pan flywheel status` reads it back. Each run's snapshots persist at `${OVERDECK_HOME}/flywheel/runs/<runId>/latest.json`.
 
 **State** is the durable cumulative memory across all runs. It lives at `docs/FLYWHEEL-STATE.md`, owned and edited by the orchestrator, plain markdown. Future runs read it before doing anything else. The dashboard's **State** tab renders it as markdown via `GET /api/flywheel/state`. The file does not exist before the first run that needs to record something durable; the orchestrator creates it.
 
-`pan flywheel report` writes the per-run report at `${PANOPTICON_HOME}/flywheel/runs/<runId>/report.md` and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. The CLI does not author State content — that is the orchestrator's job.
+`pan flywheel report` writes the per-run report at `${OVERDECK_HOME}/flywheel/runs/<runId>/report.md` and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. The CLI does not author State content — that is the orchestrator's job.
 
 ## Status contract
 
@@ -87,7 +87,7 @@ Flywheel-Discovered-In: PAN-1487
 
 `Flywheel-Filed-By` is `agent` only when the singleton `flywheel-orchestrator` files the issue itself. Work, plan, review, test, ship, and operator-requested issue creation are recorded as `operator` because a human or non-Flywheel role decided to file the record.
 
-`Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Panopticon state at `${PANOPTICON_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
+`Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Panopticon state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
 
 The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
 
@@ -108,12 +108,12 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Panopticon home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
 
-For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`PANOPTICON_DEV_SOP.md`](./PANOPTICON_DEV_SOP.md#deacon-and-flywheel-startup-order).
+For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`OVERDECK_DEV_SOP.md`](./OVERDECK_DEV_SOP.md#deacon-and-flywheel-startup-order).
 
 Run artifacts live under the Flywheel home:
 
 ```text
-${PANOPTICON_HOME:-~/.panopticon}/flywheel/runs/<RUN-ID>/
+${OVERDECK_HOME:-~/.panopticon}/flywheel/runs/<RUN-ID>/
   latest.json      # latest validated FlywheelStatus
   report.md        # end-of-run report, when complete
   opened-pr.json   # optional merge/report metadata

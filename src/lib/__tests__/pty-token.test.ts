@@ -8,16 +8,16 @@ let tmpHome: string;
 let previousPanopticonHome: string | undefined;
 
 beforeEach(() => {
-  previousPanopticonHome = process.env.PANOPTICON_HOME;
+  previousPanopticonHome = process.env.OVERDECK_HOME;
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-pty-token-'));
-  process.env.PANOPTICON_HOME = tmpHome;
+  process.env.OVERDECK_HOME = tmpHome;
 });
 
 afterEach(() => {
   if (previousPanopticonHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = previousPanopticonHome;
+    process.env.OVERDECK_HOME = previousPanopticonHome;
   }
   rmSync(tmpHome, { recursive: true, force: true });
 });

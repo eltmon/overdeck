@@ -32,7 +32,7 @@ Update Claude Code hooks configuration to report state changes:
 ```bash
 #!/bin/bash
 # Called before any tool execution
-curl -s -X POST "http://localhost:3011/api/agents/${PANOPTICON_AGENT_ID}/heartbeat" \
+curl -s -X POST "http://localhost:3011/api/agents/${OVERDECK_AGENT_ID}/heartbeat" \
   -H "Content-Type: application/json" \
   -d '{"state": "active", "tool": "'"${CLAUDE_TOOL_NAME}"'"}'
 ```
@@ -41,7 +41,7 @@ curl -s -X POST "http://localhost:3011/api/agents/${PANOPTICON_AGENT_ID}/heartbe
 ```bash
 #!/bin/bash
 # Called when Claude finishes responding (waiting for input)
-curl -s -X POST "http://localhost:3011/api/agents/${PANOPTICON_AGENT_ID}/heartbeat" \
+curl -s -X POST "http://localhost:3011/api/agents/${OVERDECK_AGENT_ID}/heartbeat" \
   -H "Content-Type: application/json" \
   -d '{"state": "idle", "timestamp": "'"$(date -Iseconds)"'"}'
 ```
@@ -51,7 +51,7 @@ curl -s -X POST "http://localhost:3011/api/agents/${PANOPTICON_AGENT_ID}/heartbe
 #!/bin/bash
 # Log tool completion to activity file
 echo '{"timestamp":"'"$(date -Iseconds)"'","tool":"'"${CLAUDE_TOOL_NAME}"'","action":"completed"}' \
-  >> ~/.panopticon/agents/${PANOPTICON_AGENT_ID}/activity.jsonl
+  >> ~/.panopticon/agents/${OVERDECK_AGENT_ID}/activity.jsonl
 ```
 
 Also write to disk for persistence:
@@ -141,7 +141,7 @@ async function resumeAgent(agentId: string, message?: string) {
   // 3. Create new tmux session with resume command
   const claudeCmd = `claude --resume "${sessionId}" --dangerously-skip-permissions`;
   await createTmuxSession(agentId, workspace, claudeCmd, {
-    env: { PANOPTICON_AGENT_ID: agentId }
+    env: { OVERDECK_AGENT_ID: agentId }
   });
 
   // 4. If there's a message, send it

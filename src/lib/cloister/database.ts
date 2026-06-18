@@ -9,7 +9,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { Data, Effect } from 'effect';
 import { openDatabase, type SqliteDatabase } from '../database/driver.js';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import type { HealthState } from '../runtimes/types.js';
 
 /**
@@ -23,7 +23,7 @@ export class CloisterDatabaseError extends Data.TaggedError('CloisterDatabaseErr
   readonly cause?: unknown;
 }> {}
 
-const CLOISTER_DB_PATH = join(PANOPTICON_HOME, 'cloister.db');
+const CLOISTER_DB_PATH = join(OVERDECK_HOME, 'cloister.db');
 const RETENTION_DAYS = 7;
 
 /**
@@ -56,8 +56,8 @@ let db: SqliteDatabase | null = null;
  */
 export function initHealthDatabase(): SqliteDatabase {
   // Ensure panopticon home exists
-  if (!existsSync(PANOPTICON_HOME)) {
-    mkdirSync(PANOPTICON_HOME, { recursive: true });
+  if (!existsSync(OVERDECK_HOME)) {
+    mkdirSync(OVERDECK_HOME, { recursive: true });
   }
 
   // Open or create database

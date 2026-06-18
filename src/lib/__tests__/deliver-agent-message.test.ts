@@ -193,13 +193,13 @@ describe('channel bridge delivery', () => {
     socketDir = join(tmpHome, 'sockets');
     mkdirSync(stateDir, { recursive: true });
     mkdirSync(socketDir, { recursive: true });
-    process.env.PANOPTICON_HOME = tmpHome;
+    process.env.OVERDECK_HOME = tmpHome;
     vi.mocked(sendKeys).mockClear();
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(tmpHome, { recursive: true, force: true });
   });
 

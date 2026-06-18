@@ -11,7 +11,7 @@ const CONTRACTS_DIST = join(ROOT, 'packages/contracts/dist/index.mjs');
 
 export default function setup() {
   const panopticonTestRoot = mkdtempSync(join(tmpdir(), 'pan-test-root-'));
-  process.env.PANOPTICON_TEST_HOME_ROOT = panopticonTestRoot;
+  process.env.OVERDECK_TEST_HOME_ROOT = panopticonTestRoot;
 
   if (!existsSync(CONTRACTS_DIST)) {
     console.log('[global-setup] packages/contracts/dist/index.mjs missing — building contracts...');

@@ -178,7 +178,7 @@ export const DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT = 200
 export const DEFAULT_MAX_MEMORY_OBSERVATIONS_PER_ISSUE = 50
 
 export function getMaxMemoryObservationsPerIssue(): number {
-  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_MEMORY_OBSERVATION_LIMIT
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.OVERDECK_MEMORY_OBSERVATION_LIMIT
   const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_MEMORY_OBSERVATIONS_PER_ISSUE
 }
@@ -189,7 +189,7 @@ export function trimMemoryObservations(observations: MemoryObservation[]): Memor
 }
 
 export function getMaxTurnDiffSummariesPerAgent(): number {
-  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_TURN_DIFF_SUMMARY_LIMIT
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.OVERDECK_TURN_DIFF_SUMMARY_LIMIT
   const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN
   return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT
 }

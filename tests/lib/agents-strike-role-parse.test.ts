@@ -16,11 +16,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-// Set PANOPTICON_HOME *before* importing src/lib/agents.js — AGENTS_DIR is
+// Set OVERDECK_HOME *before* importing src/lib/agents.js — AGENTS_DIR is
 // resolved from process.env at module load.
 const tmpHome = mkdtempSync(join(tmpdir(), 'pan-1506-strike-'));
-const previousHome = process.env.PANOPTICON_HOME;
-process.env.PANOPTICON_HOME = tmpHome;
+const previousHome = process.env.OVERDECK_HOME;
+process.env.OVERDECK_HOME = tmpHome;
 
 const { getAgentStateSync } = await import('../../src/lib/agents.js');
 
@@ -50,9 +50,9 @@ describe('PAN-1506: parseAgentState accepts strike role', () => {
   afterAll(() => {
     rmSync(tmpHome, { recursive: true, force: true });
     if (previousHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = previousHome;
+      process.env.OVERDECK_HOME = previousHome;
     }
   });
 

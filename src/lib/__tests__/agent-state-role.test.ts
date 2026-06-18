@@ -11,7 +11,7 @@ describe('AgentState role persistence', () => {
   beforeEach(() => {
     vi.resetModules();
     tempHome = mkdtempSync(join(tmpdir(), 'pan-agent-role-'));
-    process.env.PANOPTICON_HOME = tempHome;
+    process.env.OVERDECK_HOME = tempHome;
   });
 
   afterEach(() => {
@@ -28,7 +28,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../cloister/issue-closed.js');
     vi.doUnmock('../cloister/specialists.js');
     vi.doUnmock('../transcript-landing.js');
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });
 

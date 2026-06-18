@@ -509,7 +509,7 @@ export function ConversationPanel({
       const w = window as unknown as { __panTerminalClickAt?: number };
       w.__panTerminalClickAt = performance.now();
       try {
-        if (localStorage.getItem('PANOPTICON_TERMINAL_PROFILE') === '1') {
+        if (localStorage.getItem('OVERDECK_TERMINAL_PROFILE') === '1') {
           console.log(`[xterm-click] conv=${conversation.name} t=${w.__panTerminalClickAt.toFixed(1)}`);
         }
       } catch { /* ignore */ }

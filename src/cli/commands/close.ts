@@ -81,7 +81,7 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
   //     against closing unfinished work.
   // All other autonomous pipeline agents (`agent-*`, `planning-*`, `strike-*`,
   // `inspect-*`, …) remain barred.
-  const agentId = process.env.PANOPTICON_AGENT_ID;
+  const agentId = process.env.OVERDECK_AGENT_ID;
   const isOperatorConversation = agentId?.startsWith('conv-') ?? false;
   const isFlywheelOrchestrator = agentId?.startsWith('flywheel-') ?? false;
   if (agentId && !isOperatorConversation && !isFlywheelOrchestrator) {

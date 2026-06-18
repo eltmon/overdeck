@@ -37,7 +37,7 @@
     ],
     "narratives": {
       "Problem": "After a reboot or `pan dev`/`pan up` restart, Panopticon's deacon auto-resumes every in-flight work agent indiscriminately. There is no way to (1) boot the dashboard cleanly for inspection without spawning agents, (2) hold a specific issue's agent across restarts while waiting on review or human input, or (3) stop a thrashing agent from being respawned forever. A real incident produced agents with 39–98 hours of accumulated duration silently burning tokens across multiple reboots.",
-      "Proposal": "Add three orthogonal gating mechanisms on top of the existing `autoResumeStoppedWorkAgents()` loop in `src/lib/cloister/deacon.ts:4767` and the orphan-recovery patrol at `:4264`: (1) a per-boot `PANOPTICON_NO_RESUME=1` env var / `--no-resume` flag on `pan dev` and `pan up` that short-circuits BOTH orphan recovery and auto-resume; (2) a persistent per-issue `paused` flag on the agent state JSON, settable via `pan pause <id>` and clearable via `pan unpause <id>`, that survives reboots; (3) per-agent consecutive-failure tracking with exponential backoff (5s/30s/2min) that flips the agent to `troubled` after 3 failures in 10 minutes (configurable per project), clearable via `pan untroubled <id>`. The deacon checks all three gates before resuming any agent. Dashboard surfaces all three states (top-level no-resume banner, paused/troubled badges, single 'why didn't this auto-start?' pill). All three flags persist on the existing JSON state at `~/.panopticon/agents/<id>/state.json` (not SQLite — that's a misread of the issue body; agent state is file-based today and the persistence requirement is met by JSON files surviving reboots)."
+      "Proposal": "Add three orthogonal gating mechanisms on top of the existing `autoResumeStoppedWorkAgents()` loop in `src/lib/cloister/deacon.ts:4767` and the orphan-recovery patrol at `:4264`: (1) a per-boot `OVERDECK_NO_RESUME=1` env var / `--no-resume` flag on `pan dev` and `pan up` that short-circuits BOTH orphan recovery and auto-resume; (2) a persistent per-issue `paused` flag on the agent state JSON, settable via `pan pause <id>` and clearable via `pan unpause <id>`, that survives reboots; (3) per-agent consecutive-failure tracking with exponential backoff (5s/30s/2min) that flips the agent to `troubled` after 3 failures in 10 minutes (configurable per project), clearable via `pan untroubled <id>`. The deacon checks all three gates before resuming any agent. Dashboard surfaces all three states (top-level no-resume banner, paused/troubled badges, single 'why didn't this auto-start?' pill). All three flags persist on the existing JSON state at `~/.panopticon/agents/<id>/state.json` (not SQLite — that's a misread of the issue body; agent state is file-based today and the persistence requirement is met by JSON files surviving reboots)."
     },
     "autoDecisions": [
       {
@@ -57,8 +57,8 @@
         "rationale": "Spawning on unpause would surprise users who paused to inspect. The deacon's next patrol cycle picks up unpaused issues that should resume; the user can also run `pan start <id>` explicitly."
       },
       {
-        "summary": "`PANOPTICON_NO_RESUME=1` is per-boot only, not a persistent SQLite flag",
-        "rationale": "The PRD's 'Boot --no-resume' badge label implies per-boot scope. A persistent flag would silently disable resume forever after one inspection session — a foot-gun. Per-boot scope matches every comparable inspect-mode toggle (e.g. `PANOPTICON_DISABLE_DEACON`)."
+        "summary": "`OVERDECK_NO_RESUME=1` is per-boot only, not a persistent SQLite flag",
+        "rationale": "The PRD's 'Boot --no-resume' badge label implies per-boot scope. A persistent flag would silently disable resume forever after one inspection session — a foot-gun. Per-boot scope matches every comparable inspect-mode toggle (e.g. `OVERDECK_DISABLE_DEACON`)."
       },
       {
         "summary": "Default troubled threshold: 3 consecutive failures within 10 minutes. Default backoff: 5s, 30s, 120s",
@@ -69,7 +69,7 @@
         "rationale": "Consistent with how other per-project knobs (verification timeouts, harness defaults) are scoped today. Adding a separate config file would fragment configuration; per-issue overrides would have nowhere to live before the issue is even planned."
       },
       {
-        "summary": "`PANOPTICON_NO_RESUME=1` gates BOTH `recoverOrphanedAgents()` and `autoResumeStoppedWorkAgents()`",
+        "summary": "`OVERDECK_NO_RESUME=1` gates BOTH `recoverOrphanedAgents()` and `autoResumeStoppedWorkAgents()`",
         "rationale": "Gating only the latter would still let orphan recovery reset every dead tmux session to `stopped` on boot — destroying the inspection state the user wanted to preserve. Hazard H4 in continue.json."
       },
       {
@@ -184,7 +184,7 @@
       },
       {
         "id": "cloister-no-resume-env",
-        "title": "Honor PANOPTICON_NO_RESUME=1 in deacon startup paths",
+        "title": "Honor OVERDECK_NO_RESUME=1 in deacon startup paths",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
@@ -195,12 +195,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add `PANOPTICON_NO_RESUME` env check at the top of BOTH `autoResumeStoppedWorkAgents()` (src/lib/cloister/deacon.ts:4767) and `recoverOrphanedAgents()` (src/lib/cloister/deacon.ts:4264). When set to a truthy value (`1`/`true`/`yes`), log `[deacon] PANOPTICON_NO_RESUME=1 — skipping <function>` and return early. Expose the no-resume state on the dashboard server: a module-level boolean in `src/dashboard/server/main.ts` populated at boot from `process.env.PANOPTICON_NO_RESUME`, plus a read-only `GET /api/no-resume-mode` endpoint returning `{ active: boolean, since: string | null }`."
+          "Action": "Add `OVERDECK_NO_RESUME` env check at the top of BOTH `autoResumeStoppedWorkAgents()` (src/lib/cloister/deacon.ts:4767) and `recoverOrphanedAgents()` (src/lib/cloister/deacon.ts:4264). When set to a truthy value (`1`/`true`/`yes`), log `[deacon] OVERDECK_NO_RESUME=1 — skipping <function>` and return early. Expose the no-resume state on the dashboard server: a module-level boolean in `src/dashboard/server/main.ts` populated at boot from `process.env.OVERDECK_NO_RESUME`, plus a read-only `GET /api/no-resume-mode` endpoint returning `{ active: boolean, since: string | null }`."
         },
         "subItems": [
           {
             "id": "cloister-no-resume-env.ac1",
-            "title": "`PANOPTICON_NO_RESUME=1` causes `autoResumeStoppedWorkAgents()` to return an empty array without scanning agent dirs",
+            "title": "`OVERDECK_NO_RESUME=1` causes `autoResumeStoppedWorkAgents()` to return an empty array without scanning agent dirs",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -208,7 +208,7 @@
           },
           {
             "id": "cloister-no-resume-env.ac2",
-            "title": "`PANOPTICON_NO_RESUME=1` causes `recoverOrphanedAgents()` to return without touching any state.json",
+            "title": "`OVERDECK_NO_RESUME=1` causes `recoverOrphanedAgents()` to return without touching any state.json",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -479,7 +479,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In `src/cli/commands/dev.ts`, add Commander `--no-resume` option (default false). When set, inject `PANOPTICON_NO_RESUME=1` into the child dashboard-server process's environment. Surface in the startup banner that no-resume mode is active."
+          "Action": "In `src/cli/commands/dev.ts`, add Commander `--no-resume` option (default false). When set, inject `OVERDECK_NO_RESUME=1` into the child dashboard-server process's environment. Surface in the startup banner that no-resume mode is active."
         },
         "subItems": [
           {
@@ -492,7 +492,7 @@
           },
           {
             "id": "cli-dev-no-resume.ac2",
-            "title": "Child dashboard process sees `PANOPTICON_NO_RESUME=1` in its environment",
+            "title": "Child dashboard process sees `OVERDECK_NO_RESUME=1` in its environment",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -529,7 +529,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In `src/cli/index.ts` `pan up` definition (around line 810-830), add the `--no-resume` flag with identical semantics to the `pan dev` flag — inject `PANOPTICON_NO_RESUME=1` into the dashboard process env."
+          "Action": "In `src/cli/index.ts` `pan up` definition (around line 810-830), add the `--no-resume` flag with identical semantics to the `pan dev` flag — inject `OVERDECK_NO_RESUME=1` into the dashboard process env."
         },
         "subItems": [
           {
@@ -571,7 +571,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In `src/cli/commands/status.ts`, for each non-running in-flight agent, compute a `gatingReason` string: `Paused (<reason>)`, `Troubled (<N> failures)`, `Boot --no-resume`, `Manual`, or empty if the agent is mid-pipeline. Add a column or per-agent line showing it. Boot mode comes from a small helper that checks `process.env.PANOPTICON_NO_RESUME` OR queries the dashboard's `/api/no-resume-mode` endpoint when available."
+          "Action": "In `src/cli/commands/status.ts`, for each non-running in-flight agent, compute a `gatingReason` string: `Paused (<reason>)`, `Troubled (<N> failures)`, `Boot --no-resume`, `Manual`, or empty if the agent is mid-pipeline. Add a column or per-agent line showing it. Boot mode comes from a small helper that checks `process.env.OVERDECK_NO_RESUME` OR queries the dashboard's `/api/no-resume-mode` endpoint when available."
         },
         "subItems": [
           {
@@ -981,7 +981,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a new test file `tests/lib/cloister/auto-resume-gating.test.ts` (mirror the pattern from `tests/lib/work-agent-lifecycle.test.ts`). Cover: (a) paused agent is skipped by `autoResumeStoppedWorkAgents()` even with pending review feedback; (b) troubled agent is skipped; (c) `PANOPTICON_NO_RESUME=1` causes both `autoResumeStoppedWorkAgents` and `recoverOrphanedAgents` to return empty/no-op; (d) `pan start --force` clears paused and spawns; (e) `pan start` without `--force` refuses on paused."
+          "Action": "Add a new test file `tests/lib/cloister/auto-resume-gating.test.ts` (mirror the pattern from `tests/lib/work-agent-lifecycle.test.ts`). Cover: (a) paused agent is skipped by `autoResumeStoppedWorkAgents()` even with pending review feedback; (b) troubled agent is skipped; (c) `OVERDECK_NO_RESUME=1` causes both `autoResumeStoppedWorkAgents` and `recoverOrphanedAgents` to return empty/no-op; (d) `pan start --force` clears paused and spawns; (e) `pan start` without `--force` refuses on paused."
         },
         "subItems": [
           {
@@ -1049,7 +1049,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Update CLAUDE.md's auto-resume section to mention the three new gates. Update any deacon / cloister docs (search `docs/` for 'auto-resume', 'cloister', 'recoverOrphanedAgents'). Add a short section in the README or docs/ explaining `PANOPTICON_NO_RESUME` and `pan pause`/`pan unpause`/`pan untroubled`. Confirm `docs/SKILLS-CONVENTION.md` does NOT need to add the new verbs to its exclusion list (they have wrapper skills)."
+          "Action": "Update CLAUDE.md's auto-resume section to mention the three new gates. Update any deacon / cloister docs (search `docs/` for 'auto-resume', 'cloister', 'recoverOrphanedAgents'). Add a short section in the README or docs/ explaining `OVERDECK_NO_RESUME` and `pan pause`/`pan unpause`/`pan untroubled`. Confirm `docs/SKILLS-CONVENTION.md` does NOT need to add the new verbs to its exclusion list (they have wrapper skills)."
         },
         "subItems": [
           {

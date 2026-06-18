@@ -10,12 +10,12 @@ import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Effect } from 'effect';
 import { ConfigError, ConfigParseError, FsError } from './errors.js';
-import { PANOPTICON_HOME } from './paths.js';
+import { OVERDECK_HOME } from './paths.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import type { QualityGateConfig, RepoConfig } from './workspace-config.js';
 import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
 
-export const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, 'projects.yaml');
+export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
 /**
  * Issue routing rule - routes issues with certain labels to specific paths
@@ -219,7 +219,7 @@ export function loadProjectsConfigSync(): ProjectsConfig {
  * Save projects configuration
  */
 export function saveProjectsConfigSync(config: ProjectsConfig): void {
-  const dir = PANOPTICON_HOME;
+  const dir = OVERDECK_HOME;
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -532,7 +532,7 @@ projects:
   #   linear_team: PAN
 `;
 
-  const dir = PANOPTICON_HOME;
+  const dir = OVERDECK_HOME;
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -659,7 +659,7 @@ export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseE
 export const saveProjectsConfig = (config: ProjectsConfig): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: async () => {
-      const dir = PANOPTICON_HOME;
+      const dir = OVERDECK_HOME;
       if (!existsSync(dir)) {
         await mkdir(dir, { recursive: true });
       }

@@ -74,10 +74,10 @@ async function postToUnixSocket(
 describe('pushChannelNotification (in-process protocol)', () => {
   beforeEach(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-bridge-unit-'));
-    process.env.PANOPTICON_HOME = tmpHome;
+    process.env.OVERDECK_HOME = tmpHome;
   });
   afterEach(() => {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
@@ -208,7 +208,7 @@ describe('pushChannelNotification (in-process protocol)', () => {
     expect(entry.ts).toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
-  it('exposes a deterministic socket path under PANOPTICON_HOME', () => {
+  it('exposes a deterministic socket path under OVERDECK_HOME', () => {
     expect(getPanopticonHome()).toBe(tmpHome);
     expect(getSocketPath('xyz')).toBe(join(tmpHome, 'sockets', 'agent-xyz.sock'));
   });
@@ -225,7 +225,7 @@ describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
 
   beforeEach(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-bridge-int-'));
-    process.env.PANOPTICON_HOME = tmpHome;
+    process.env.OVERDECK_HOME = tmpHome;
   });
 
   afterEach(async () => {
@@ -235,7 +235,7 @@ describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
       if (!proc.killed) proc.kill('SIGKILL');
     }
     proc = null;
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
@@ -249,8 +249,8 @@ describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
       proc = spawn('bun', ['run', BRIDGE_ENTRY], {
         env: {
           ...process.env,
-          PANOPTICON_HOME: tmpHome,
-          PANOPTICON_AGENT_ID: agentId,
+          OVERDECK_HOME: tmpHome,
+          OVERDECK_AGENT_ID: agentId,
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -298,8 +298,8 @@ describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
       proc = spawn('bun', ['run', BRIDGE_ENTRY], {
         env: {
           ...process.env,
-          PANOPTICON_HOME: tmpHome,
-          PANOPTICON_AGENT_ID: agentId,
+          OVERDECK_HOME: tmpHome,
+          OVERDECK_AGENT_ID: agentId,
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });

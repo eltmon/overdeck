@@ -1,7 +1,7 @@
 # PAN-457 Review Fixes UAT
 
 Date: 2026-05-17
-Server: `API_PORT=4311 PORT=4311 HOST=127.0.0.1 PANOPTICON_DISABLE_DEACON=1 node dist/dashboard/server.js`
+Server: `API_PORT=4311 PORT=4311 HOST=127.0.0.1 OVERDECK_DISABLE_DEACON=1 node dist/dashboard/server.js`
 URL: `http://127.0.0.1:4311/sessions`
 
 ## Automated gates
@@ -28,7 +28,7 @@ Using Playwright against the built Node 22 dashboard:
 
 ## Browser UAT — safe enrichment and embedding dispatch
 
-Using a temporary isolated `PANOPTICON_HOME=/tmp/pan-457-uat-1778983666-1052` and built Node 22 dashboard on `http://127.0.0.1:4312/sessions`:
+Using a temporary isolated `OVERDECK_HOME=/tmp/pan-457-uat-1778983666-1052` and built Node 22 dashboard on `http://127.0.0.1:4312/sessions`:
 
 - Seeded one discovered session whose JSONL path intentionally did not exist, so enrichment request dispatch would exercise the backend path and progress events without sending any prompt to a paid provider.
 - Sessions page loaded with `1 indexed`, `0 enriched`, `0 managed`, and the seeded row for `/tmp/pan-457-uat-workspace`.
@@ -40,7 +40,7 @@ Using a temporary isolated `PANOPTICON_HOME=/tmp/pan-457-uat-1778983666-1052` an
 
 ## Browser UAT — scan click-through
 
-Using a temporary isolated `HOME=/tmp/pan-457-scan-uat-Hok5Ip/home` and `PANOPTICON_HOME=/tmp/pan-457-scan-uat-Hok5Ip/panhome` with a single fixture JSONL, built Node 22 dashboard on `http://127.0.0.1:4316/sessions`:
+Using a temporary isolated `HOME=/tmp/pan-457-scan-uat-Hok5Ip/home` and `OVERDECK_HOME=/tmp/pan-457-scan-uat-Hok5Ip/panhome` with a single fixture JSONL, built Node 22 dashboard on `http://127.0.0.1:4316/sessions`:
 
 - Sessions page initially rendered `0 indexed`, `0 enriched`, `0 managed`, and the empty state `Run a scan to discover Claude Code sessions`.
 - Clicked the actual `Scan` button in the Sessions header.
@@ -68,7 +68,7 @@ Dashboard session minting is now guarded by proof of possession of the internal 
 
 ## Browser UAT — dashboard session auth
 
-Using an isolated rebuilt Node 22 dashboard with `PANOPTICON_HOME=/tmp/pan-457-uat-auth2`, `PANOPTICON_INTERNAL_TOKEN=uat-dashboard-token`, and `PANOPTICON_DISABLE_DEACON=1` on `http://127.0.0.1:4315/sessions`:
+Using an isolated rebuilt Node 22 dashboard with `OVERDECK_HOME=/tmp/pan-457-uat-auth2`, `OVERDECK_INTERNAL_TOKEN=uat-dashboard-token`, and `OVERDECK_DISABLE_DEACON=1` on `http://127.0.0.1:4315/sessions`:
 
 - CORS preflight for `POST /api/dashboard/session` returned `200` with `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Allow-Credentials: true`, and `Access-Control-Allow-Headers: x-panopticon-internal-token, authorization, content-type`.
 - `POST /api/dashboard/session` with trusted origin but no internal token returned `401`.

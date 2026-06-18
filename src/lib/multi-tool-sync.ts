@@ -22,7 +22,7 @@ import { homedir } from 'os';
 import yaml from 'js-yaml';
 import { Effect } from 'effect';
 import { FsError } from './errors.js';
-import { PANOPTICON_HOME } from './paths.js';
+import { OVERDECK_HOME } from './paths.js';
 
 export type AlsoSyncTool = 'cursor' | 'codex' | 'windsurf' | 'cline' | 'copilot' | 'aider';
 
@@ -160,7 +160,7 @@ export function resolveAlsoSyncToolsSync(projectPath?: string): AlsoSyncTool[] {
   const tools = new Set<AlsoSyncTool>();
 
   // Read from global config
-  const globalConfig = join(PANOPTICON_HOME, 'config.yaml');
+  const globalConfig = join(OVERDECK_HOME, 'config.yaml');
   if (existsSync(globalConfig)) {
     try {
       const parsed = yaml.load(readFileSync(globalConfig, 'utf-8')) as any;
@@ -243,7 +243,7 @@ export function runMultiToolSyncSync(projectPath: string): MultiToolSyncResult[]
   const allResults: MultiToolSyncResult[] = [];
 
   // 1. Global skills (from ~/.panopticon/skills/)
-  const globalSkillsDir = join(PANOPTICON_HOME, 'skills');
+  const globalSkillsDir = join(OVERDECK_HOME, 'skills');
   const globalResults = syncSkillsToToolsSync(globalSkillsDir, projectPath, tools);
   allResults.push(...globalResults);
 

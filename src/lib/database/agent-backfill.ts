@@ -2,7 +2,7 @@
  * One-time versioned backfill for the PAN-1908 agents table.
  *
  * This is the ONLY module permitted to enumerate
- * `${PANOPTICON_HOME}/agents/{id}/state.json`. It is invoked:
+ * `${OVERDECK_HOME}/agents/{id}/state.json`. It is invoked:
  *
  *   - automatically once during the v54 -> v55 schema migration, and
  *   - manually via `pan admin db rebuild-agents`.
@@ -84,7 +84,7 @@ function getAgentDir(agentId: string): string {
 }
 
 function getManagedTmuxSocketName(): string {
-  return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? 'panopticon';
+  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'panopticon';
 }
 
 function listLiveTmuxSessionNames(): Set<string> {

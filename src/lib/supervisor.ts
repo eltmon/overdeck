@@ -16,11 +16,11 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
-import { LOGS_DIR, PANOPTICON_HOME, packageRoot } from './paths.js';
+import { LOGS_DIR, OVERDECK_HOME, packageRoot } from './paths.js';
 import { readPlatformConfigSync } from './platform-lifecycle.js';
 import { ProcessSpawnError } from './errors.js';
 
-const SUPERVISOR_PID_PATH = join(PANOPTICON_HOME, 'supervisor.pid');
+const SUPERVISOR_PID_PATH = join(OVERDECK_HOME, 'supervisor.pid');
 const SUPERVISOR_LOG_PATH = join(LOGS_DIR, 'supervisor.log');
 
 /** Compute the supervisor's port from the configured dashboard API port. */
@@ -105,7 +105,7 @@ export function startSupervisorProcessSync(): void {
     stdio: ['ignore', logFd, logFd],
     env: {
       ...process.env,
-      PANOPTICON_SUPERVISOR_PORT: String(port),
+      OVERDECK_SUPERVISOR_PORT: String(port),
     },
   });
 

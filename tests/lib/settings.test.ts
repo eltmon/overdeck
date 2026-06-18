@@ -11,9 +11,9 @@ describe('settings', () => {
     // Create temp directory for isolated tests
     tempDir = mkdtempSync(join(tmpdir(), 'pan-settings-test-'));
 
-    // Override PANOPTICON_HOME for this test
-    originalPanopticonHome = process.env.PANOPTICON_HOME;
-    process.env.PANOPTICON_HOME = tempDir;
+    // Override OVERDECK_HOME for this test
+    originalPanopticonHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = tempDir;
 
     // Clear module cache to reload with new env var
     vi.resetModules();
@@ -22,9 +22,9 @@ describe('settings', () => {
   afterEach(() => {
     // Restore original env var
     if (originalPanopticonHome) {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     } else {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     }
 
     // Clean up temp directory

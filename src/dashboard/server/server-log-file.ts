@@ -1,6 +1,6 @@
 /**
  * Persist the dashboard server's console output to
- * `<PANOPTICON_HOME>/logs/dashboard.log` regardless of how the server was
+ * `<OVERDECK_HOME>/logs/dashboard.log` regardless of how the server was
  * launched (PAN-1552).
  *
  * Detached launchers (`pan up --detach`, `pan restart`) redirect the child's

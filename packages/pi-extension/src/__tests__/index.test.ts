@@ -32,11 +32,11 @@ let fetchResponse: { status: number } = { status: 200 }
 beforeEach(() => {
   fetchCalls = []
   fetchResponse = { status: 200 }
-  // Neutralize any ambient PANOPTICON_DASHBOARD_URL (set on developer machines
+  // Neutralize any ambient OVERDECK_DASHBOARD_URL (set on developer machines
   // running a live `pan dev`) so the default-host tests assert against the
   // production fallback (http://localhost:3011), not the host's value. Tests
   // that exercise the env var stub it explicitly; afterEach unstubs.
-  vi.stubEnv('PANOPTICON_DASHBOARD_URL', undefined)
+  vi.stubEnv('OVERDECK_DASHBOARD_URL', undefined)
   vi.stubGlobal(
     'fetch',
     vi.fn(async (_url: string, init?: RequestInit) => {
@@ -196,8 +196,8 @@ describe('handleSessionStart', () => {
     expect(existsSync(paths.pendingEventsPath)).toBe(false)
   })
 
-  it('respects PANOPTICON_DASHBOARD_URL env var', async () => {
-    vi.stubEnv('PANOPTICON_DASHBOARD_URL', 'http://dashboard.local:9999')
+  it('respects OVERDECK_DASHBOARD_URL env var', async () => {
+    vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://dashboard.local:9999')
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-abc' },
@@ -329,7 +329,7 @@ describe('handleTurnEnd', () => {
   })
 
   it('routes work turn-end completion from launcher session type env', async () => {
-    vi.stubEnv('PANOPTICON_SESSION_TYPE', 'work')
+    vi.stubEnv('OVERDECK_SESSION_TYPE', 'work')
     const workspace = join(h.home, 'workspace')
     mkdirSync(join(workspace, '.beads'), { recursive: true })
     writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
@@ -354,11 +354,11 @@ describe('handleTurnEnd', () => {
   })
 
   it('routes specialist auto-completion from launcher session type env', async () => {
-    vi.stubEnv('PANOPTICON_SESSION_TYPE', 'review')
+    vi.stubEnv('OVERDECK_SESSION_TYPE', 'review')
 
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, issueId: 'PAN-636' },
-      { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+      { output: 'OVERDECK_SPECIALIST_RESULT: review-agent passed' },
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
@@ -377,7 +377,7 @@ describe('handleTurnEnd', () => {
   it('gives structured failure evidence precedence over specialist pass sentinels', async () => {
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
-      { output: '## Verdict: CHANGES REQUESTED\n\nPANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+      { output: '## Verdict: CHANGES REQUESTED\n\nOVERDECK_SPECIALIST_RESULT: review-agent passed' },
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
@@ -391,7 +391,7 @@ describe('handleTurnEnd', () => {
 
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },
-      { output: 'PANOPTICON_SPECIALIST_RESULT: review-agent passed' },
+      { output: 'OVERDECK_SPECIALIST_RESULT: review-agent passed' },
     )
 
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/specialists/review-agent/auto-complete')
@@ -469,20 +469,20 @@ describe('default export — Pi extension wiring', () => {
   beforeEach(() => {
     h = makeFakeHome()
     originalHome = process.env['HOME']
-    originalAgentId = process.env['PANOPTICON_AGENT_ID']
+    originalAgentId = process.env['OVERDECK_AGENT_ID']
     process.env['HOME'] = h.home
   })
 
   afterEach(() => {
     if (originalHome === undefined) delete process.env['HOME']
     else process.env['HOME'] = originalHome
-    if (originalAgentId === undefined) delete process.env['PANOPTICON_AGENT_ID']
-    else process.env['PANOPTICON_AGENT_ID'] = originalAgentId
+    if (originalAgentId === undefined) delete process.env['OVERDECK_AGENT_ID']
+    else process.env['OVERDECK_AGENT_ID'] = originalAgentId
     h.cleanup()
   })
 
-  it('returns silently and registers nothing when PANOPTICON_AGENT_ID is unset', () => {
-    delete process.env['PANOPTICON_AGENT_ID']
+  it('returns silently and registers nothing when OVERDECK_AGENT_ID is unset', () => {
+    delete process.env['OVERDECK_AGENT_ID']
     const handlers: Record<string, unknown> = {}
     const commands: Record<string, PiCommand> = {}
     const pi: PiExtensionAPI = {
@@ -494,8 +494,8 @@ describe('default export — Pi extension wiring', () => {
     expect(Object.keys(commands)).toHaveLength(0)
   })
 
-  it('registers all four hooks when PANOPTICON_AGENT_ID is set', () => {
-    process.env['PANOPTICON_AGENT_ID'] = 'agent-pan-636'
+  it('registers all four hooks when OVERDECK_AGENT_ID is set', () => {
+    process.env['OVERDECK_AGENT_ID'] = 'agent-pan-636'
     const handlers: Record<string, unknown> = {}
     const commands: Record<string, PiCommand> = {}
     const pi: PiExtensionAPI = {

@@ -55,7 +55,7 @@ A **plain fork** copies the raw JSONL history (from the last compact boundary) i
 A **handoff fork** asks the live source agent to write the seed text itself, then starts the new conversation from that authored handoff document.
 
 **What happens:**
-1. Panopticon creates a handoff document path under `${PANOPTICON_HOME}/handoffs/` using the source conversation id and timestamp, for example `${PANOPTICON_HOME}/handoffs/<source-conv-id>-<iso-ts>.md`.
+1. Panopticon creates a handoff document path under `${OVERDECK_HOME}/handoffs/` using the source conversation id and timestamp, for example `${OVERDECK_HOME}/handoffs/<source-conv-id>-<iso-ts>.md`.
 2. Panopticon renders the inlined prompt template from `roles/handoff.md`, substituting the optional `--focus` text and the exact output path.
 3. The prompt is delivered to the source conversation through `deliverAgentMessage()` so Channels and tmux fallback use the same message-delivery primitive as normal agent communication.
 4. The source agent writes the Markdown handoff document and then creates the sibling sentinel file `<source-conv-id>-<iso-ts>.md.done` only after the document is complete.
@@ -77,7 +77,7 @@ A **handoff fork** asks the live source agent to write the seed text itself, the
 - Fallback keeps the command useful: the target conversation still starts, but its title is `Summary Fork: ...` instead of `Handoff: ...`.
 
 **Caveats:**
-- Workspace devcontainer sources cannot write to the host `${PANOPTICON_HOME}/handoffs/` in v1, so Panopticon falls back to summary fork when the source cwd is a workspace path and that workspace stack is up.
+- Workspace devcontainer sources cannot write to the host `${OVERDECK_HOME}/handoffs/` in v1, so Panopticon falls back to summary fork when the source cwd is a workspace path and that workspace stack is up.
 - Handoff seed text is portable Markdown, so Pi targets consume it the same way they consume summary forks. Plain forks remain Claude-Code-only because Pi cannot resume Claude JSONL history.
 
 Implementation lives in `src/lib/conversations/summary-fork.ts`; the authoring prompt template lives in `roles/handoff.md`.

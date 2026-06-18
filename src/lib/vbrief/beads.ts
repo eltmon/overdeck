@@ -90,7 +90,7 @@ const BD_TIMEOUT_MULTIPLIER = 20;
 /**
  * Resolve the operational timeout for all bd calls in this finalize.
  *
- * - If PANOPTICON_BD_TIMEOUT_MS is a positive integer, return it verbatim and
+ * - If OVERDECK_BD_TIMEOUT_MS is a positive integer, return it verbatim and
  *   do NOT probe bd.
  * - Otherwise run `bd ping --json` once with a fixed bootstrap timeout, read
  *   total_ms, and clamp(total_ms * 20, 30s, 180s).
@@ -100,7 +100,7 @@ const BD_TIMEOUT_MULTIPLIER = 20;
  * of one finalize so the probe runs once.
  */
 export async function resolveBdTimeout(workspacePath: string): Promise<number> {
-  const envValue = Number(process.env.PANOPTICON_BD_TIMEOUT_MS);
+  const envValue = Number(process.env.OVERDECK_BD_TIMEOUT_MS);
   if (Number.isInteger(envValue) && envValue > 0) {
     return Math.min(BD_TIMEOUT_CEILING_MS, Math.max(BD_TIMEOUT_FLOOR_MS, envValue));
   }

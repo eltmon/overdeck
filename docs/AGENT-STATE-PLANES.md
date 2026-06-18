@@ -98,4 +98,4 @@ Deacon handlers subscribe to these events instead of reading `~/.panopticon/agen
 - **Pre-migration snapshot:** the v54→v55 migration copies `panopticon.db` to `panopticon.db.v54-backfill-snapshot` before touching agents data.
 - **Rebuild command:** `pan admin db rebuild-agents` rebuilds the `agents` table from `state.json` + live tmux.
 - **Records backfill:** `pan admin db backfill-records` writes permanent records for every in-flight issue.
-- **Kill switch:** `PANOPTICON_NO_RESUME=1` disables event-driven deacon resume and orphan recovery, dropping to safe no-resume mode without data loss.
+- **Kill switch:** `OVERDECK_NO_RESUME=1` disables event-driven deacon resume and orphan recovery, dropping to safe no-resume mode without data loss.

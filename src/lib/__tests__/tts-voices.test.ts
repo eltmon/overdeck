@@ -18,16 +18,16 @@ let tempHome: string;
 let previousPanopticonHome: string | undefined;
 
 beforeEach(async () => {
-  previousPanopticonHome = process.env.PANOPTICON_HOME;
+  previousPanopticonHome = process.env.OVERDECK_HOME;
   tempHome = await mkdtemp(join(tmpdir(), 'pan-tts-voices-'));
-  process.env.PANOPTICON_HOME = tempHome;
+  process.env.OVERDECK_HOME = tempHome;
 });
 
 afterEach(async () => {
   if (previousPanopticonHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = previousPanopticonHome;
+    process.env.OVERDECK_HOME = previousPanopticonHome;
   }
   await rm(tempHome, { recursive: true, force: true });
 });

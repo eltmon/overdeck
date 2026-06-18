@@ -33,10 +33,10 @@ describe('gh issue trailer hook', () => {
     return {
       home,
       env: {
-        PANOPTICON_HOME: home,
-        PANOPTICON_AGENT_ID: agentId,
-        PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
-        PANOPTICON_FLYWHEEL_AGENT_ROLE: 'flywheel',
+        OVERDECK_HOME: home,
+        OVERDECK_AGENT_ID: agentId,
+        OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
+        OVERDECK_FLYWHEEL_AGENT_ROLE: 'flywheel',
       },
     };
   }
@@ -102,10 +102,10 @@ describe('gh issue trailer hook', () => {
 
   it('uses operator filed-by for non-flywheel roles and omits unresolved issue ids', () => {
     const result = outputFor("gh issue create --title Bug --body body", {
-      PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
-      PANOPTICON_FLYWHEEL_AGENT_ROLE: 'work',
-      PANOPTICON_AGENT_ID: 'agent-pan-1487',
-      PANOPTICON_HOME: join(tmpdir(), 'missing-panopticon-home'),
+      OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
+      OVERDECK_FLYWHEEL_AGENT_ROLE: 'work',
+      OVERDECK_AGENT_ID: 'agent-pan-1487',
+      OVERDECK_HOME: join(tmpdir(), 'missing-panopticon-home'),
     });
     const command = updatedCommand(result);
 

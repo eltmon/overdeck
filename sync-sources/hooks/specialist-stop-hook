@@ -10,8 +10,8 @@
 # and never break Claude Code execution
 
 # Get agent ID from env or tmux session name
-if [ -n "$PANOPTICON_AGENT_ID" ]; then
-  AGENT_ID="$PANOPTICON_AGENT_ID"
+if [ -n "$OVERDECK_AGENT_ID" ]; then
+  AGENT_ID="$OVERDECK_AGENT_ID"
 elif [ -n "$TMUX" ]; then
   AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
 else

@@ -138,7 +138,7 @@
         "subItems": [
           {
             "id": "artifact-index-store.ac1",
-            "title": "A fresh artifact index creates the PRD's artifacts table and workspace, issue, and slug indexes idempotently under `~/.panopticon/artifacts/index.sqlite` respecting `PANOPTICON_HOME` in tests.",
+            "title": "A fresh artifact index creates the PRD's artifacts table and workspace, issue, and slug indexes idempotently under `~/.panopticon/artifacts/index.sqlite` respecting `OVERDECK_HOME` in tests.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

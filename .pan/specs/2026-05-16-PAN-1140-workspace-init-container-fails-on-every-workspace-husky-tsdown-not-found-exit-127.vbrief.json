@@ -94,7 +94,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Edit `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` (and the rendered copy at `.devcontainer/docker-compose.devcontainer.yml` in this workspace, so the agent can verify against its own stack) to add `NODE_ENV=development` and `HUSKY=0` to the `init` service `environment:` block, and tighten the install command so the husky `prepare` script is a no-op inside the container. Inspect `scripts/postinstall.mjs` first to decide whether bun's `--ignore-scripts` is safe; if postinstall is needed, prefer HUSKY=0 alone over --ignore-scripts. Keep the existing `PANOPTICON_DISABLE_DEACON=1` and no-${HOME}/.panopticon-mount invariants on the `server` service untouched."
+          "Action": "Edit `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` (and the rendered copy at `.devcontainer/docker-compose.devcontainer.yml` in this workspace, so the agent can verify against its own stack) to add `NODE_ENV=development` and `HUSKY=0` to the `init` service `environment:` block, and tighten the install command so the husky `prepare` script is a no-op inside the container. Inspect `scripts/postinstall.mjs` first to decide whether bun's `--ignore-scripts` is safe; if postinstall is needed, prefer HUSKY=0 alone over --ignore-scripts. Keep the existing `OVERDECK_DISABLE_DEACON=1` and no-${HOME}/.panopticon-mount invariants on the `server` service untouched."
         },
         "subItems": [
           {
@@ -115,7 +115,7 @@
           },
           {
             "id": "fix-init-script.ac3",
-            "title": "Template file (`infra/.devcontainer-template/docker-compose.devcontainer.yml.template`) and the rendered workspace copy both reflect the fix; no $HOME/.panopticon mount appears on the server service; PANOPTICON_DISABLE_DEACON=1 remains set on the server service.",
+            "title": "Template file (`infra/.devcontainer-template/docker-compose.devcontainer.yml.template`) and the rendered workspace copy both reflect the fix; no $HOME/.panopticon mount appears on the server service; OVERDECK_DISABLE_DEACON=1 remains set on the server service.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

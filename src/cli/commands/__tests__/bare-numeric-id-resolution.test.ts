@@ -242,7 +242,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
       ok: true,
       json: async () => ({ success: true, message: 'ok' }),
     })));
-    delete process.env.PANOPTICON_AGENT_ID;
+    delete process.env.OVERDECK_AGENT_ID;
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

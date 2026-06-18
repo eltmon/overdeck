@@ -26,18 +26,18 @@ beforeEach(() => {
   initSchema(testDb);
 
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-backfill-home-'));
-  originalHome = process.env.PANOPTICON_HOME;
-  process.env.PANOPTICON_HOME = tmpHome;
-  delete process.env.PANOPTICON_TMUX_SOCKET_NAME;
+  originalHome = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = tmpHome;
+  delete process.env.OVERDECK_TMUX_SOCKET_NAME;
 });
 
 afterEach(() => {
   testDb.close();
   rmSync(tmpHome, { recursive: true, force: true });
   if (originalHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = originalHome;
+    process.env.OVERDECK_HOME = originalHome;
   }
 });
 

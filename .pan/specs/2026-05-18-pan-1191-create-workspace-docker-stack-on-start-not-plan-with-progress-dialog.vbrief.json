@@ -135,7 +135,7 @@
           },
           {
             "id": "provision-stack-helper.ac7",
-            "title": "`renderDevcontainer()` no-mount + `PANOPTICON_DISABLE_DEACON=1` invariants are preserved (no new mount of `~/.panopticon` is introduced anywhere in this module).",
+            "title": "`renderDevcontainer()` no-mount + `OVERDECK_DISABLE_DEACON=1` invariants are preserved (no new mount of `~/.panopticon` is introduced anywhere in this module).",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

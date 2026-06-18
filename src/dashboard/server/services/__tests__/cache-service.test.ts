@@ -10,13 +10,13 @@ beforeEach(() => {
   vi.resetModules();
   testHome = join(tmpdir(), `pan-1579-cache-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(testHome, { recursive: true });
-  process.env.PANOPTICON_HOME = testHome;
+  process.env.OVERDECK_HOME = testHome;
   service = null;
 });
 
 afterEach(() => {
   service?.close();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(testHome, { recursive: true, force: true });
 });
 

@@ -105,7 +105,7 @@ function authorizeTerminalUpgrade(request: http.IncomingMessage): { ok: true } |
 // before sending `ready` and letting live data through. 500 lines covers a generous
 // scrollback window; override via env for sessions that really need deeper history.
 const SNAPSHOT_SCROLLBACK_LINES = (() => {
-  const parsed = Number(process.env.PANOPTICON_TERMINAL_SNAPSHOT_LINES);
+  const parsed = Number(process.env.OVERDECK_TERMINAL_SNAPSHOT_LINES);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 500;
 })();
 

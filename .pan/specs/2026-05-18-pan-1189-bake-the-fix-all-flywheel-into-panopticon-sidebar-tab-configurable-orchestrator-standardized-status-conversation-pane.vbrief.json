@@ -102,7 +102,7 @@
         "rationale": "Issue calls out hand-writing run reports as the manual step that should disappear; a single command with deterministic output replaces it."
       },
       {
-        "summary": "Refuse to spawn flywheel-orchestrator inside a workspace devcontainer (detect via PANOPTICON_DISABLE_DEACON or container hostname).",
+        "summary": "Refuse to spawn flywheel-orchestrator inside a workspace devcontainer (detect via OVERDECK_DISABLE_DEACON or container hostname).",
         "rationale": "Hazard H6 — single-deacon-invariant rule. Orchestrator needs host git/gh/tmux; spawning inside the workspace container duels the host."
       }
     ],
@@ -254,7 +254,7 @@
           "inspectionDepth": "deep"
         },
         "narrative": {
-          "Action": "Extend Cloister to spawn `flywheel-orchestrator` as a singleton agent (tmux session: `flywheel-orchestrator`, state: `~/.panopticon/agents/flywheel-orchestrator/state.json`). Reuse the existing role-spawn machinery (don't fork it). Add two SQLite admin gate rows: `flywheel.globally_paused` (boolean) and `flywheel.active_run_id` (string|null). Spawn refuses if `flywheel.active_run_id` is set. Spawn refuses inside a devcontainer (detect via `PANOPTICON_DISABLE_DEACON` env or container hostname). Pause flips the gate and stops the tmux session WITHOUT clearing active_run_id. Resume clears the gate and respawns from saved state. Add unit tests asserting (a) double-spawn refused, (b) devcontainer-spawn refused, (c) pause/resume round-trip preserves active_run_id."
+          "Action": "Extend Cloister to spawn `flywheel-orchestrator` as a singleton agent (tmux session: `flywheel-orchestrator`, state: `~/.panopticon/agents/flywheel-orchestrator/state.json`). Reuse the existing role-spawn machinery (don't fork it). Add two SQLite admin gate rows: `flywheel.globally_paused` (boolean) and `flywheel.active_run_id` (string|null). Spawn refuses if `flywheel.active_run_id` is set. Spawn refuses inside a devcontainer (detect via `OVERDECK_DISABLE_DEACON` env or container hostname). Pause flips the gate and stops the tmux session WITHOUT clearing active_run_id. Resume clears the gate and respawns from saved state. Add unit tests asserting (a) double-spawn refused, (b) devcontainer-spawn refused, (c) pause/resume round-trip preserves active_run_id."
         },
         "subItems": [
           {

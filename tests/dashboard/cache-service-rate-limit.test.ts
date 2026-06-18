@@ -13,7 +13,7 @@ describe('CacheService - getSuspensionMs', () => {
     testDir = mkdtempSync(join(tmpdir(), 'cache-suspension-test-'));
     panopticonHome = join(testDir, '.panopticon');
     mkdirSync(panopticonHome, { recursive: true });
-    vi.stubEnv('PANOPTICON_HOME', panopticonHome);
+    vi.stubEnv('OVERDECK_HOME', panopticonHome);
     vi.resetModules();
     const { CacheService } = await import('../../src/dashboard/server/services/cache-service.js');
     cache = new CacheService();

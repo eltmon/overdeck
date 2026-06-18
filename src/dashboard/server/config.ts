@@ -76,13 +76,13 @@ export const ServerConfigLayer = Layer.effect(
     // dashboard is restarting, leaving the user looking at stale workspace code.
     const cwdIsWorkspace = /\/workspaces\/feature-pan-/i.test(process.cwd());
     const portWasExplicit = !!(process.env['API_PORT'] ?? process.env['PORT']);
-    const overrideAllowed = process.env['PANOPTICON_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
+    const overrideAllowed = process.env['OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY'] === '1';
     if (cwdIsWorkspace && !portWasExplicit && !overrideAllowed) {
       const msg = (
         `Refusing to bind primary port ${port} from workspace cwd ${process.cwd()} ` +
         `(PAN-1416). Workspace dashboards must set API_PORT to a non-primary port. ` +
         `To override (e.g. when the canonical dashboard is deliberately stopped), set ` +
-        `PANOPTICON_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
+        `OVERDECK_WORKSPACE_DASHBOARD_ALLOW_PRIMARY=1.`
       );
       console.error(`[panopticon] ${msg}`);
       throw new ServerConfigError('API_PORT', msg);
@@ -98,7 +98,7 @@ export const ServerConfigLayer = Layer.effect(
     const anthropicApiKey = process.env['ANTHROPIC_API_KEY'] || null;
     const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
     const panopticonHome =
-      process.env['PANOPTICON_HOME'] ?? `${process.env['HOME'] ?? homedir()}/.panopticon`;
+      process.env['OVERDECK_HOME'] ?? `${process.env['HOME'] ?? homedir()}/.panopticon`;
 
     return {
       port,

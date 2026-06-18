@@ -238,7 +238,7 @@ describe('flywheel stats payload helper', () => {
   it('feeds persisted pipeline events into production stats criteria', async () => {
     const panopticonHome = join(tmpdir(), `pan-flywheel-stats-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(panopticonHome, { recursive: true });
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     resetDatabase();
     try {
       const store = await initEventStore();
@@ -278,7 +278,7 @@ describe('flywheel stats payload helper', () => {
     } finally {
       resetDatabase();
       closeOverdeckDatabaseSync();
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
       rmSync(panopticonHome, { recursive: true, force: true });
     }
   });
@@ -290,14 +290,14 @@ describe('flywheel config routes', () => {
   beforeEach(() => {
     panopticonHome = join(tmpdir(), `pan-flywheel-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(panopticonHome, { recursive: true });
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     closeOverdeckDatabaseSync();
   });
 
   afterEach(() => {
     resetDatabase();
     closeOverdeckDatabaseSync();
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(panopticonHome, { recursive: true, force: true });
   });
 
@@ -391,14 +391,14 @@ describe('flywheel auto-merge routes', () => {
   beforeEach(() => {
     panopticonHome = join(tmpdir(), `pan-flywheel-auto-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(panopticonHome, { recursive: true });
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     closeOverdeckDatabaseSync();
   });
 
   afterEach(() => {
     resetDatabase();
     closeOverdeckDatabaseSync();
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(panopticonHome, { recursive: true, force: true });
   });
 
@@ -789,7 +789,7 @@ describe('flywheel run payload helpers', () => {
 
   beforeEach(async () => {
     panopticonHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-routes-'));
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     resetDatabase();
     closeOverdeckDatabaseSync();
   });
@@ -797,7 +797,7 @@ describe('flywheel run payload helpers', () => {
   afterEach(async () => {
     resetDatabase();
     closeOverdeckDatabaseSync();
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     await rm(panopticonHome, { recursive: true, force: true });
   });
 
@@ -894,18 +894,18 @@ describe('postFlywheelMergeNextPayload (PAN-1691 merge next N / ship batch)', ()
 
 describe('UAT mutation route auth', () => {
   beforeEach(() => {
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
-    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-session-token';
-    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+    process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-session-token';
+    process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    delete process.env.PANOPTICON_INTERNAL_TOKEN;
-    delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
-    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
+    delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });

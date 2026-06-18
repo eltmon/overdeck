@@ -73,7 +73,7 @@ interface WorkerResponse {
 }
 
 const MAX_PENDING_JOBS = 32;
-const SEMANTIC_SEARCH_TIMEOUT_MS = Number.parseInt(process.env['PANOPTICON_SEMANTIC_SEARCH_TIMEOUT_MS'] ?? '15000', 10);
+const SEMANTIC_SEARCH_TIMEOUT_MS = Number.parseInt(process.env['OVERDECK_SEMANTIC_SEARCH_TIMEOUT_MS'] ?? '15000', 10);
 const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'scanConversations',
   'enrichSessions',

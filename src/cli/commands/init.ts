@@ -3,7 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import ora from 'ora';
-import { INIT_DIRS, CONFIG_FILE, PANOPTICON_HOME, SKILLS_DIR, AGENTS_DIR } from '../../lib/paths.js';
+import { INIT_DIRS, CONFIG_FILE, OVERDECK_HOME, SKILLS_DIR, AGENTS_DIR } from '../../lib/paths.js';
 import { getDefaultConfigSync, saveConfigSync } from '../../lib/config.js';
 import { detectShellSync, getShellRcFileSync, addAliasSync, getAliasInstructionsSync } from '../../lib/shell.js';
 
@@ -82,7 +82,7 @@ export async function initCommand(): Promise<void> {
   if (existsSync(CONFIG_FILE)) {
     spinner.info('Panopticon already initialized');
     console.log(chalk.dim(`  Config: ${CONFIG_FILE}`));
-    console.log(chalk.dim(`  Home: ${PANOPTICON_HOME}`));
+    console.log(chalk.dim(`  Home: ${OVERDECK_HOME}`));
     console.log(chalk.dim('  Run `pan sync` to update skills'));
     return;
   }
@@ -117,7 +117,7 @@ export async function initCommand(): Promise<void> {
       addAliasSync(rcFile);
       spinner.succeed('Panopticon initialized!');
       console.log('');
-      console.log(chalk.green('✓') + ' Created ' + chalk.cyan(PANOPTICON_HOME));
+      console.log(chalk.green('✓') + ' Created ' + chalk.cyan(OVERDECK_HOME));
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(CONFIG_FILE));
       if (skillsCopied > 0) {
         console.log(chalk.green('✓') + ` Installed ${skillsCopied} bundled skills`);
@@ -129,7 +129,7 @@ export async function initCommand(): Promise<void> {
     } else {
       spinner.succeed('Panopticon initialized!');
       console.log('');
-      console.log(chalk.green('✓') + ' Created ' + chalk.cyan(PANOPTICON_HOME));
+      console.log(chalk.green('✓') + ' Created ' + chalk.cyan(OVERDECK_HOME));
       console.log(chalk.green('✓') + ' Created ' + chalk.cyan(CONFIG_FILE));
       if (skillsCopied > 0) {
         console.log(chalk.green('✓') + ` Installed ${skillsCopied} bundled skills`);

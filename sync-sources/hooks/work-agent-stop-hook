@@ -14,7 +14,7 @@
 #   stuck     — 2+ consecutive UNCLEAR LLM verdicts
 #
 # The model used for the completion-check LLM is configurable via
-# PANOPTICON_COMPLETION_CHECK_MODEL or the completion-check-hook override
+# OVERDECK_COMPLETION_CHECK_MODEL or the completion-check-hook override
 # in ~/.panopticon/config.yaml.
 
 set +e
@@ -337,7 +337,7 @@ if [ "$API_ERROR_DETECTED" = "true" ]; then
 fi
 
 # ── Phase 3: LLM fallback ────────────────────────────────────────────────
-COMPLETION_MODEL="${PANOPTICON_COMPLETION_CHECK_MODEL:-}"
+COMPLETION_MODEL="${OVERDECK_COMPLETION_CHECK_MODEL:-}"
 if [ -z "$COMPLETION_MODEL" ]; then
   CONFIG_FILE="$HOME/.panopticon/config.yaml"
   if [ -f "$CONFIG_FILE" ]; then

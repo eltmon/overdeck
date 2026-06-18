@@ -11,7 +11,7 @@
  * The launcher runs `node dist/pty-supervisor.js claude ...` with TERM,
  * COLORTERM, LANG, PATH, NODE_EXTRA_CA_CERTS, and the rest of process.env
  * passed through unchanged. The supervisor proxies stdin/stdout/resize between
- * tmux and Claude, and listens on `${PANOPTICON_HOME}/sockets/pty-<agentId>.sock`
+ * tmux and Claude, and listens on `${OVERDECK_HOME}/sockets/pty-<agentId>.sock`
  * for authenticated HTTP-on-unix POSTs. Socket-injected messages echo to stdout
  * by default so the tmux transcript shows what Cloister sent. Permission relay
  * is intentionally out of scope; existing Channels MCP remains the bidirectional
@@ -56,10 +56,10 @@ export function getPtySupervisorLogPath(agentId: string): string {
 }
 
 function resolveAgentIdOrExit(): string {
-  const agentId = process.env.PANOPTICON_AGENT_ID;
+  const agentId = process.env.OVERDECK_AGENT_ID;
   if (!agentId) {
     process.stderr.write(
-      'pty-supervisor: PANOPTICON_AGENT_ID env var is required. It is normally supplied by the launcher.\n',
+      'pty-supervisor: OVERDECK_AGENT_ID env var is required. It is normally supplied by the launcher.\n',
     );
     process.exit(2);
   }

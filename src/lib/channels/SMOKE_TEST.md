@@ -34,7 +34,7 @@ unit tests in `__tests__/panopticon-bridge.test.ts` and
      - `<workspace>/.pan/agent-mcp.json` pointing at
        `src/lib/channels/panopticon-bridge.ts`.
      - `state.channelsEnabled = true` in
-       `${PANOPTICON_HOME}/agents/<agent-id>/state.json`.
+       `${OVERDECK_HOME}/agents/<agent-id>/state.json`.
    - Watch the agent's stdout/log for the eligibility line:
      ```
      [agent-pan-XXX] channels:eligible
@@ -53,7 +53,7 @@ unit tests in `__tests__/panopticon-bridge.test.ts` and
    - Detach with `Ctrl-B d`.
 
 4. **Tail the bridge log.**
-   - `tail -f ${PANOPTICON_HOME:-~/.panopticon}/logs/bridge-agent-pan-XXX.log`.
+   - `tail -f ${OVERDECK_HOME:-~/.panopticon}/logs/bridge-agent-pan-XXX.log`.
    - `deliverAgentMessage` writes the routing decision to this file. On a
      healthy new agent the default decision is now `path: 'supervisor'`, because
      the PTY supervisor is tried before Channels.
@@ -96,7 +96,7 @@ Fallback to tmux (both sockets unavailable):
   `~/.panopticon/agents/<id>/launcher.sh` — it must include
   `--dangerously-load-development-channels server:panopticon-bridge`.
   If absent, the eligibility decision returned `false`; revisit step 2.
-- **Socket missing:** `ls ${PANOPTICON_HOME}/sockets/agent-<id>.sock`. If
+- **Socket missing:** `ls ${OVERDECK_HOME}/sockets/agent-<id>.sock`. If
   no file: the bridge subprocess never bound. Check
   `~/.panopticon/agents/<id>/state.json`'s `channelsEnabled` and the
   pane output for `panopticon-bridge:` errors.

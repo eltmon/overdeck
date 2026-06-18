@@ -115,11 +115,11 @@ const newContent = buffer.toString('utf-8');
 const lines = newContent.split('\n');
 
 // Get agent/issue context from environment, with git branch fallback
-const agentId: string = process.env.PANOPTICON_AGENT_ID || 'unattributed';
-let issueId: string = process.env.PANOPTICON_ISSUE_ID || '';
-const sessionType: string = process.env.PANOPTICON_SESSION_TYPE || 'implementation';
+const agentId: string = process.env.OVERDECK_AGENT_ID || 'unattributed';
+let issueId: string = process.env.OVERDECK_ISSUE_ID || '';
+const sessionType: string = process.env.OVERDECK_SESSION_TYPE || 'implementation';
 // Caveman A/B test variant — set by agent launcher when agents.caveman.ab_test is active (PAN-611)
-const cavemanVariant = process.env.PANOPTICON_CAVEMAN_VARIANT as 'enabled' | 'disabled' | 'off' | undefined;
+const cavemanVariant = process.env.OVERDECK_CAVEMAN_VARIANT as 'enabled' | 'disabled' | 'off' | undefined;
 
 // Infer issue ID from git branch if not set (covers ad-hoc Claude sessions)
 if (!issueId || issueId === 'UNKNOWN') {

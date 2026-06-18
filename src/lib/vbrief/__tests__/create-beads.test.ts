@@ -28,7 +28,7 @@ import { createBeadsFromVBrief, resolveBdTimeout, retryBd, clearBeadsForIssue } 
 import { writeAutoStartVBrief } from '../auto-synthesize.js';
 import { findPlanSync, readWorkspacePlanSync } from '../io.js';
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 
 function testSleep(ms: number) {
   return (vi as any).isFakeTimers()
@@ -159,20 +159,20 @@ describe('createBeadsFromVBrief', () => {
     vi.resetAllMocks();
     // Fix the operational timeout so resolveBdTimeout skips its probe; this keeps
     // existing mock sequences stable. The probe behavior is tested separately below.
-    process.env.PANOPTICON_BD_TIMEOUT_MS = '30000';
+    process.env.OVERDECK_BD_TIMEOUT_MS = '30000';
     const ws = createWorkspace('PAN-500');
     projectRoot = ws.projectRoot;
     WORKSPACE_DIR = ws.workspacePath;
-    process.env.PANOPTICON_HOME = join(projectRoot, '.panopticon-home');
+    process.env.OVERDECK_HOME = join(projectRoot, '.panopticon-home');
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+    delete process.env.OVERDECK_BD_TIMEOUT_MS;
     if (originalPanopticonHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     }
     rmSync(projectRoot, { recursive: true, force: true });
   });
@@ -1185,9 +1185,9 @@ describe('createBeadsFromVBrief', () => {
   });
 
   describe('resolveBdTimeout', () => {
-    it('returns PANOPTICON_BD_TIMEOUT_MS verbatim and does not probe bd (AC1)', async () => {
-      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
-      process.env.PANOPTICON_BD_TIMEOUT_MS = '120000';
+    it('returns OVERDECK_BD_TIMEOUT_MS verbatim and does not probe bd (AC1)', async () => {
+      delete process.env.OVERDECK_BD_TIMEOUT_MS;
+      process.env.OVERDECK_BD_TIMEOUT_MS = '120000';
 
       const ws = createWorkspace('PAN-520');
       setupRedirect(ws.workspacePath);
@@ -1204,7 +1204,7 @@ describe('createBeadsFromVBrief', () => {
     });
 
     it('clamps bd ping total_ms * 20 between floor and ceiling (AC2)', async () => {
-      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+      delete process.env.OVERDECK_BD_TIMEOUT_MS;
 
       const cases = [
         { totalMs: 5000, expected: 100000 },
@@ -1233,7 +1233,7 @@ describe('createBeadsFromVBrief', () => {
     });
 
     it('returns floor when bd ping throws or returns unparseable JSON (AC3)', async () => {
-      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+      delete process.env.OVERDECK_BD_TIMEOUT_MS;
 
       const errorCases = [
         { label: 'throws', result: () => Promise.reject(new Error('ping failed')) },
@@ -1254,8 +1254,8 @@ describe('createBeadsFromVBrief', () => {
       }
     });
 
-    it('clamps PANOPTICON_BD_TIMEOUT_MS to the hard floor and ceiling', async () => {
-      delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+    it('clamps OVERDECK_BD_TIMEOUT_MS to the hard floor and ceiling', async () => {
+      delete process.env.OVERDECK_BD_TIMEOUT_MS;
 
       const cases = [
         { value: '5000', expected: 30000 },
@@ -1264,7 +1264,7 @@ describe('createBeadsFromVBrief', () => {
 
       for (const { value, expected } of cases) {
         vi.clearAllMocks();
-        process.env.PANOPTICON_BD_TIMEOUT_MS = value;
+        process.env.OVERDECK_BD_TIMEOUT_MS = value;
         const ws = createWorkspace(`PAN-540-${value}`);
         setupRedirect(ws.workspacePath);
 
@@ -1276,15 +1276,15 @@ describe('createBeadsFromVBrief', () => {
         );
         expect(pingCalls).toHaveLength(0);
 
-        delete process.env.PANOPTICON_BD_TIMEOUT_MS;
+        delete process.env.OVERDECK_BD_TIMEOUT_MS;
         rmSync(ws.projectRoot, { recursive: true, force: true });
       }
     });
   });
 
   it('passes the resolved timeout to bd create (AC4)', async () => {
-    delete process.env.PANOPTICON_BD_TIMEOUT_MS;
-    process.env.PANOPTICON_BD_TIMEOUT_MS = '95000';
+    delete process.env.OVERDECK_BD_TIMEOUT_MS;
+    process.env.OVERDECK_BD_TIMEOUT_MS = '95000';
 
     const ws = createWorkspace('PAN-540');
     setupRedirect(ws.workspacePath);

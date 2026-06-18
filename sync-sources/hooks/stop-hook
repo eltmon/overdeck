@@ -14,7 +14,7 @@ set +e
 # answer post-hoc.
 LOG_DIR="$HOME/.panopticon/logs"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
-echo "[$(date -Iseconds)] stop-hook: invoked CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} PANOPTICON_AGENT_ID=${PANOPTICON_AGENT_ID:-unset} cwd=$(pwd)" \
+echo "[$(date -Iseconds)] stop-hook: invoked CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} OVERDECK_AGENT_ID=${OVERDECK_AGENT_ID:-unset} cwd=$(pwd)" \
   >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

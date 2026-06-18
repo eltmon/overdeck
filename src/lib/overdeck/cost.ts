@@ -507,8 +507,8 @@ export const CostWriterLive = Layer.effect(
       });
 
     // Catch-up sweep for pi/codex session files.
-    // Walks PANOPTICON_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
-    // PANOPTICON_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
+    // Walks OVERDECK_HOME/agents/<id>/sessions/**/*.jsonl (pi) or
+    // OVERDECK_HOME/agents/<id>/codex-home/sessions/**/*.jsonl (codex),
     // parses each with the existing parsers, and feeds into record() (which deduplicates).
     const reconcile = (opts?: { source?: 'claude' | 'pi' | 'codex' | 'wal' }) =>
       Effect.gen(function* () {

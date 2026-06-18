@@ -11,7 +11,7 @@ export function isNoResumeCliOptionEnabled(options: { noResume?: boolean; resume
 }
 
 export function getNoResumeMode(): { active: boolean; since: string | null } {
-  const active = isNoResumeValueEnabled(process.env.PANOPTICON_NO_RESUME);
+  const active = isNoResumeValueEnabled(process.env.OVERDECK_NO_RESUME);
   if (!active) {
     noResumeModeSince = null;
     return { active: false, since: null };

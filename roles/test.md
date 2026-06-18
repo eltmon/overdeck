@@ -68,8 +68,8 @@ The test role verifies that a feature branch is ready to leave review. It owns b
    - `TESTS PASSED` when the configured test suite passes and required UAT passes or is not required.
    - `TESTS FAILED` when any test-suite command fails, the app cannot start, Playwright cannot verify required behavior, or an acceptance criterion remains unproven.
 9. For Pi sessions, end your final response with exactly one structured Panopticon sentinel line:
-   - `PANOPTICON_SPECIALIST_RESULT: test-agent passed`
-   - `PANOPTICON_SPECIALIST_RESULT: test-agent failed`
+   - `OVERDECK_SPECIALIST_RESULT: test-agent passed`
+   - `OVERDECK_SPECIALIST_RESULT: test-agent failed`
 
 ## TLDR: prefer code summaries over full reads
 

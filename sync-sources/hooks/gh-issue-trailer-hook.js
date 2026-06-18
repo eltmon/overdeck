@@ -71,9 +71,9 @@ function containsFlywheelRunId(body) {
 	return /^Flywheel-Run-Id:/m.test(body);
 }
 function resolveDiscoveredIn(env) {
-	const agentId = env.PANOPTICON_AGENT_ID;
+	const agentId = env.OVERDECK_AGENT_ID;
 	if (!agentId || basename(agentId) !== agentId) return null;
-	const statePath = join(env.PANOPTICON_HOME ?? join(env.HOME ?? homedir(), ".panopticon"), "agents", agentId, "state.json");
+	const statePath = join(env.OVERDECK_HOME ?? join(env.HOME ?? homedir(), ".panopticon"), "agents", agentId, "state.json");
 	if (!existsSync(statePath)) return null;
 	try {
 		const parsed = JSON.parse(readFileSync(statePath, "utf-8"));
@@ -83,9 +83,9 @@ function resolveDiscoveredIn(env) {
 	}
 }
 function buildTrailer(env) {
-	const runId = env.PANOPTICON_FLYWHEEL_RUN_ID?.trim();
+	const runId = env.OVERDECK_FLYWHEEL_RUN_ID?.trim();
 	if (!runId || !FLYWHEEL_RUN_ID_PATTERN.test(runId)) return null;
-	const filedBy = env.PANOPTICON_FLYWHEEL_AGENT_ROLE === "flywheel" ? "agent" : "operator";
+	const filedBy = env.OVERDECK_FLYWHEEL_AGENT_ROLE === "flywheel" ? "agent" : "operator";
 	const discoveredIn = resolveDiscoveredIn(env);
 	return `\n\n${[
 		"---",

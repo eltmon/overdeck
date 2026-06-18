@@ -224,8 +224,8 @@ describe('flywheel CLI commands', () => {
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'pan-flywheel-'));
     process.exitCode = undefined;
-    process.env.PANOPTICON_HOME = tempDir;
-    process.env.PANOPTICON_DASHBOARD_URL = 'http://dashboard.test';
+    process.env.OVERDECK_HOME = tempDir;
+    process.env.OVERDECK_DASHBOARD_URL = 'http://dashboard.test';
     vi.stubEnv('GIT_AUTHOR_NAME', 'Panopticon Test');
     vi.stubEnv('GIT_AUTHOR_EMAIL', 'test@example.com');
     vi.stubEnv('GIT_COMMITTER_NAME', 'Panopticon Test');
@@ -248,8 +248,8 @@ describe('flywheel CLI commands', () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
-    delete process.env.PANOPTICON_HOME;
-    delete process.env.PANOPTICON_DASHBOARD_URL;
+    delete process.env.OVERDECK_HOME;
+    delete process.env.OVERDECK_DASHBOARD_URL;
     process.exitCode = undefined;
     await rm(tempDir, { recursive: true, force: true });
   });

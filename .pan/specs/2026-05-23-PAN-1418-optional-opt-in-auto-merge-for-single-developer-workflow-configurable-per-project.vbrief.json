@@ -62,8 +62,8 @@
         "rationale": "Reuses the queue serializer, the post-merge lifecycle, Docker cleanup, and idempotency guards. Forking the merge path would duplicate ~300 lines and re-create the PAN-328 idempotency loop risk."
       },
       {
-        "summary": "PANOPTICON_DISABLE_AUTO_MERGE=1 env var as kill switch, default in test envs.",
-        "rationale": "Mirrors the PANOPTICON_DISABLE_DEACON=1 pattern documented in CLAUDE.md. Tests that touch review-status transitions must not accidentally trigger auto-merge scheduling."
+        "summary": "OVERDECK_DISABLE_AUTO_MERGE=1 env var as kill switch, default in test envs.",
+        "rationale": "Mirrors the OVERDECK_DISABLE_DEACON=1 pattern documented in CLAUDE.md. Tests that touch review-status transitions must not accidentally trigger auto-merge scheduling."
       },
       {
         "summary": "Gate re-validation at fire time queries GitHub directly for labels (gh pr view --json labels).",
@@ -281,12 +281,12 @@
           ]
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/services/auto-merge-scheduler.ts exporting an AutoMergeScheduler service with: start() (initialize at dashboard boot, gated by PANOPTICON_DISABLE_AUTO_MERGE), stop() (clear all timers on shutdown), maybeSchedule(issueId, projectKey) (called when readyForMerge transitions false->true; checks config.enabled, no existing pending row, mergeStatus null/pending; on success persists row via schedulePendingAutoMerge, sets in-memory timeout, emits merge.auto.scheduled event, emits TTS), cancel(issueId, reason, cancelledBy) (clears in-memory timeout, calls cancelPendingAutoMerge, emits merge.auto.cancelled, emits TTS), and the internal fire(issueId) handler that runs at executeAt: atomically transitions to executing (returns if already cancelled), re-validates gates, calls triggerMerge or emits merge.auto.aborted. Maintains Map<issueId, NodeJS.Timeout> for live arms. Wall-clock based: timer set via setTimeout(fire, executeAt - now); if now > executeAt (stale at boot) and within maxStaleMinutes, fire immediately, otherwise abort with reason='stale'."
+          "Action": "Create src/dashboard/server/services/auto-merge-scheduler.ts exporting an AutoMergeScheduler service with: start() (initialize at dashboard boot, gated by OVERDECK_DISABLE_AUTO_MERGE), stop() (clear all timers on shutdown), maybeSchedule(issueId, projectKey) (called when readyForMerge transitions false->true; checks config.enabled, no existing pending row, mergeStatus null/pending; on success persists row via schedulePendingAutoMerge, sets in-memory timeout, emits merge.auto.scheduled event, emits TTS), cancel(issueId, reason, cancelledBy) (clears in-memory timeout, calls cancelPendingAutoMerge, emits merge.auto.cancelled, emits TTS), and the internal fire(issueId) handler that runs at executeAt: atomically transitions to executing (returns if already cancelled), re-validates gates, calls triggerMerge or emits merge.auto.aborted. Maintains Map<issueId, NodeJS.Timeout> for live arms. Wall-clock based: timer set via setTimeout(fire, executeAt - now); if now > executeAt (stale at boot) and within maxStaleMinutes, fire immediately, otherwise abort with reason='stale'."
         },
         "subItems": [
           {
             "id": "scheduler-service.ac1",
-            "title": "start() honors PANOPTICON_DISABLE_AUTO_MERGE=1 — when set, start() is a no-op and no scheduling happens",
+            "title": "start() honors OVERDECK_DISABLE_AUTO_MERGE=1 — when set, start() is a no-op and no scheduling happens",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -789,7 +789,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Tests in src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts using vi.useFakeTimers() per CLAUDE.md test rule. Cover: maybeSchedule schedules and persists; double-schedule is a no-op; cancel during cooldown clears timer and updates DB; fire after cooldown calls triggerMerge when gates pass; fire after cooldown aborts when gates fail; boot recovery re-arms pending; boot recovery aborts stale; cancel-during-execute race (executing wins); PANOPTICON_DISABLE_AUTO_MERGE makes start() a no-op."
+          "Action": "Tests in src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts using vi.useFakeTimers() per CLAUDE.md test rule. Cover: maybeSchedule schedules and persists; double-schedule is a no-op; cancel during cooldown clears timer and updates DB; fire after cooldown calls triggerMerge when gates pass; fire after cooldown aborts when gates fail; boot recovery re-arms pending; boot recovery aborts stale; cancel-during-execute race (executing wins); OVERDECK_DISABLE_AUTO_MERGE makes start() a no-op."
         },
         "subItems": [
           {

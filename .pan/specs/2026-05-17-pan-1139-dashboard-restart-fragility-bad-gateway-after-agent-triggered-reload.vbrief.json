@@ -97,7 +97,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a new module `src/lib/restart-lock.ts` exporting `acquireRestartLock(caller: string): { release(): void } | null` and `readRestartLockHolder(): { pid, ts, caller } | null`. Lockfile lives at `${PANOPTICON_HOME}/restart.lock` and contains JSON `{pid, ts, caller}`. Acquire writes the file atomically (open with O_EXCL); if the file exists, parse it — if PID is dead OR ts is older than 5 min, overwrite (stale); otherwise return `null`. Release deletes the file (idempotent; tolerates missing). No SIGCHLD trap needed — beads that use the lock are responsible for calling release(), and the next caller's stale-detection will recover from forgotten releases. This is the cross-cutting primitive the next three beads depend on."
+          "Action": "Add a new module `src/lib/restart-lock.ts` exporting `acquireRestartLock(caller: string): { release(): void } | null` and `readRestartLockHolder(): { pid, ts, caller } | null`. Lockfile lives at `${OVERDECK_HOME}/restart.lock` and contains JSON `{pid, ts, caller}`. Acquire writes the file atomically (open with O_EXCL); if the file exists, parse it — if PID is dead OR ts is older than 5 min, overwrite (stale); otherwise return `null`. Release deletes the file (idempotent; tolerates missing). No SIGCHLD trap needed — beads that use the lock are responsible for calling release(), and the next caller's stale-detection will recover from forgotten releases. This is the cross-cutting primitive the next three beads depend on."
         },
         "subItems": [
           {
@@ -126,7 +126,7 @@
           },
           {
             "id": "lockfile.ac4",
-            "title": "Lockfile path is `${PANOPTICON_HOME}/restart.lock` (uses paths.ts PANOPTICON_HOME, not hard-coded), and parent dir is auto-created.",
+            "title": "Lockfile path is `${OVERDECK_HOME}/restart.lock` (uses paths.ts OVERDECK_HOME, not hard-coded), and parent dir is auto-created.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -297,12 +297,12 @@
           "inspectionDepth": "deep"
         },
         "narrative": {
-          "Action": "Extend `src/supervisor/server.ts` with a background watchdog. On startup, read `PANOPTICON_SUPERVISOR_WATCHDOG` env (default '1'); if disabled, skip. Otherwise: every 10s (`PANOPTICON_SUPERVISOR_POLL_MS`), `fetch('http://127.0.0.1:${dashboardApiPort}/api/health', { signal: AbortSignal.timeout(2000) })`. Track `consecutiveFailures` (reset on any 2xx) and a sliding-window `restartAttempts[]` (timestamps in last 5 min). After 3 consecutive failures (`PANOPTICON_SUPERVISOR_FAIL_THRESHOLD`), check if `restartAttempts.length >= 3` (`PANOPTICON_SUPERVISOR_MAX_RESTARTS`) within 5 min (`PANOPTICON_SUPERVISOR_WINDOW_MS`) — if so, log loudly with 'WATCHDOG GIVING UP — manual intervention required' and stop attempting (don't restart at all until consecutiveFailures resets via a manual recovery). Otherwise: check the restart lockfile from the lockfile bead; if held, skip this cycle. If free: append timestamp to `restartAttempts`, spawn `pan restart --dashboard` exactly as the existing `/restart-dashboard` endpoint does, and log the trigger. Add a new `GET /status` endpoint returning `{healthy, lastCheck, consecutiveFailures, restartAttempts, gaveUp, lastError}` so the dashboard and `pan status` can read watchdog state. The dashboardApiPort is read from `readPlatformConfig()` so the supervisor doesn't need extra env wiring."
+          "Action": "Extend `src/supervisor/server.ts` with a background watchdog. On startup, read `OVERDECK_SUPERVISOR_WATCHDOG` env (default '1'); if disabled, skip. Otherwise: every 10s (`OVERDECK_SUPERVISOR_POLL_MS`), `fetch('http://127.0.0.1:${dashboardApiPort}/api/health', { signal: AbortSignal.timeout(2000) })`. Track `consecutiveFailures` (reset on any 2xx) and a sliding-window `restartAttempts[]` (timestamps in last 5 min). After 3 consecutive failures (`OVERDECK_SUPERVISOR_FAIL_THRESHOLD`), check if `restartAttempts.length >= 3` (`OVERDECK_SUPERVISOR_MAX_RESTARTS`) within 5 min (`OVERDECK_SUPERVISOR_WINDOW_MS`) — if so, log loudly with 'WATCHDOG GIVING UP — manual intervention required' and stop attempting (don't restart at all until consecutiveFailures resets via a manual recovery). Otherwise: check the restart lockfile from the lockfile bead; if held, skip this cycle. If free: append timestamp to `restartAttempts`, spawn `pan restart --dashboard` exactly as the existing `/restart-dashboard` endpoint does, and log the trigger. Add a new `GET /status` endpoint returning `{healthy, lastCheck, consecutiveFailures, restartAttempts, gaveUp, lastError}` so the dashboard and `pan status` can read watchdog state. The dashboardApiPort is read from `readPlatformConfig()` so the supervisor doesn't need extra env wiring."
         },
         "subItems": [
           {
             "id": "supervisor-watchdog.ac1",
-            "title": "Supervisor polls `/api/health` every 10s by default (overridable via PANOPTICON_SUPERVISOR_POLL_MS).",
+            "title": "Supervisor polls `/api/health` every 10s by default (overridable via OVERDECK_SUPERVISOR_POLL_MS).",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -334,7 +334,7 @@
           },
           {
             "id": "supervisor-watchdog.ac5",
-            "title": "`PANOPTICON_SUPERVISOR_WATCHDOG=0` disables the watchdog loop at startup (the supervisor still serves /health, /restart-dashboard, /status).",
+            "title": "`OVERDECK_SUPERVISOR_WATCHDOG=0` disables the watchdog loop at startup (the supervisor still serves /health, /restart-dashboard, /status).",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -371,7 +371,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add `src/lib/restart-status.ts` exporting `writeRestartStatus(entry)` and `readRestartStatus(): RestartStatus | null`. The file at `${PANOPTICON_HOME}/restart-status.json` holds the most recent attempt: `{ts, trigger: 'pan reload' | 'pan restart' | 'watchdog', success, error?, durationMs, attempts}`. `pan reload`, `restartCommand()`, and the supervisor watchdog all call `writeRestartStatus` on each attempt (both success and failure). Update `src/cli/commands/status.ts` to render the most recent entry in its output (e.g., 'Last dashboard restart: ✓ ok (pan reload, 2.4s ago)' or '⚠ FAILED — watchdog gave up at 14:23:01: [dashboard] health check at http://127.0.0.1:3011/api/health did not pass within 15000ms'). On watchdog give-up, the status also surfaces `gaveUp: true` so the user sees the alarm in plain text."
+          "Action": "Add `src/lib/restart-status.ts` exporting `writeRestartStatus(entry)` and `readRestartStatus(): RestartStatus | null`. The file at `${OVERDECK_HOME}/restart-status.json` holds the most recent attempt: `{ts, trigger: 'pan reload' | 'pan restart' | 'watchdog', success, error?, durationMs, attempts}`. `pan reload`, `restartCommand()`, and the supervisor watchdog all call `writeRestartStatus` on each attempt (both success and failure). Update `src/cli/commands/status.ts` to render the most recent entry in its output (e.g., 'Last dashboard restart: ✓ ok (pan reload, 2.4s ago)' or '⚠ FAILED — watchdog gave up at 14:23:01: [dashboard] health check at http://127.0.0.1:3011/api/health did not pass within 15000ms'). On watchdog give-up, the status also surfaces `gaveUp: true` so the user sees the alarm in plain text."
         },
         "subItems": [
           {
@@ -460,7 +460,7 @@
       },
       {
         "id": "dev-sop-doc",
-        "title": "Write `docs/PANOPTICON_DEV_SOP.md` (follow-up from issue)",
+        "title": "Write `docs/OVERDECK_DEV_SOP.md` (follow-up from issue)",
         "status": "pending",
         "priority": "low",
         "created": "2026-05-17T14:30:00.000Z",
@@ -471,12 +471,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Create `docs/PANOPTICON_DEV_SOP.md` covering: (1) post-reboot startup — `pan up` for bundled production mode (Node 22, the only supported path) vs `pan dev` for Vite-HMR development; (2) mode switching — when to use which; (3) what the new restart behavior guarantees — build-before-swap, lockfile serialization, watchdog cadence + cap, status surface at `~/.panopticon/restart-status.json` + `pan status`; (4) failure triage — where to look first (`pan status` → `~/.panopticon/logs/supervisor.log` → `~/.panopticon/logs/dashboard.log`); (5) known limitations — supervisor itself can die (out of scope, follow-up issue). Link to this doc from `CLAUDE.md`'s Dashboard Server section."
+          "Action": "Create `docs/OVERDECK_DEV_SOP.md` covering: (1) post-reboot startup — `pan up` for bundled production mode (Node 22, the only supported path) vs `pan dev` for Vite-HMR development; (2) mode switching — when to use which; (3) what the new restart behavior guarantees — build-before-swap, lockfile serialization, watchdog cadence + cap, status surface at `~/.panopticon/restart-status.json` + `pan status`; (4) failure triage — where to look first (`pan status` → `~/.panopticon/logs/supervisor.log` → `~/.panopticon/logs/dashboard.log`); (5) known limitations — supervisor itself can die (out of scope, follow-up issue). Link to this doc from `CLAUDE.md`'s Dashboard Server section."
         },
         "subItems": [
           {
             "id": "dev-sop-doc.ac1",
-            "title": "`docs/PANOPTICON_DEV_SOP.md` exists and covers the five sections above.",
+            "title": "`docs/OVERDECK_DEV_SOP.md` exists and covers the five sections above.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

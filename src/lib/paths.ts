@@ -3,37 +3,37 @@ import { join, sep } from 'path';
 import { existsSync } from 'fs';
 
 // Panopticon home directory (can be overridden for testing)
-export const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
+export const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
 
-/** Get PANOPTICON_HOME dynamically (reads env var on each call, useful for testing) */
+/** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
 export function getPanopticonHome(): string {
-  return process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
+  return process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
 }
 
 // Subdirectories
-export const CONFIG_DIR = PANOPTICON_HOME;
-export const SKILLS_DIR = join(PANOPTICON_HOME, 'skills');
-export const COMMANDS_DIR = join(PANOPTICON_HOME, 'commands');
-export const AGENTS_DIR = join(PANOPTICON_HOME, 'agents');
-export const BIN_DIR = join(PANOPTICON_HOME, 'bin');
-export const BACKUPS_DIR = join(PANOPTICON_HOME, 'backups');
-export const COSTS_DIR = join(PANOPTICON_HOME, 'costs');
-export const HEARTBEATS_DIR = join(PANOPTICON_HOME, 'heartbeats');
-export const ARCHIVES_DIR = join(PANOPTICON_HOME, 'archives');
-export const LOGS_DIR = join(PANOPTICON_HOME, 'logs');
-export const HANDOFFS_DIR = join(PANOPTICON_HOME, 'handoffs');
+export const CONFIG_DIR = OVERDECK_HOME;
+export const SKILLS_DIR = join(OVERDECK_HOME, 'skills');
+export const COMMANDS_DIR = join(OVERDECK_HOME, 'commands');
+export const AGENTS_DIR = join(OVERDECK_HOME, 'agents');
+export const BIN_DIR = join(OVERDECK_HOME, 'bin');
+export const BACKUPS_DIR = join(OVERDECK_HOME, 'backups');
+export const COSTS_DIR = join(OVERDECK_HOME, 'costs');
+export const HEARTBEATS_DIR = join(OVERDECK_HOME, 'heartbeats');
+export const ARCHIVES_DIR = join(OVERDECK_HOME, 'archives');
+export const LOGS_DIR = join(OVERDECK_HOME, 'logs');
+export const HANDOFFS_DIR = join(OVERDECK_HOME, 'handoffs');
 
 export function getHandoffsDir(): string {
   return join(getPanopticonHome(), 'handoffs');
 }
 
 // Traefik directories
-export const TRAEFIK_DIR = join(PANOPTICON_HOME, 'traefik');
+export const TRAEFIK_DIR = join(OVERDECK_HOME, 'traefik');
 export const TRAEFIK_DYNAMIC_DIR = join(TRAEFIK_DIR, 'dynamic');
 export const TRAEFIK_CERTS_DIR = join(TRAEFIK_DIR, 'certs');
 
 // Legacy certs directory (for backwards compatibility)
-export const CERTS_DIR = join(PANOPTICON_HOME, 'certs');
+export const CERTS_DIR = join(OVERDECK_HOME, 'certs');
 
 // Config files
 export const CONFIG_FILE = join(CONFIG_DIR, 'config.toml');
@@ -58,7 +58,7 @@ export const SYNC_TARGET = {
 } as const;
 
 // Templates directory (in user's ~/.panopticon)
-export const TEMPLATES_DIR = join(PANOPTICON_HOME, 'templates');
+export const TEMPLATES_DIR = join(OVERDECK_HOME, 'templates');
 export const CLAUDE_MD_TEMPLATES = join(TEMPLATES_DIR, 'claude-md', 'sections');
 
 // Source templates directory (bundled with the package)
@@ -119,12 +119,12 @@ export const SYNC_SOURCES = {
 
 // Cache directories (where Panopticon keeps its copy of distributed content)
 export const CACHE_SKILLS_DIR = SKILLS_DIR;   // ~/.panopticon/skills/
-export const CACHE_AGENTS_DIR = join(PANOPTICON_HOME, 'agent-definitions');  // separate from agent state
-export const CACHE_RULES_DIR = join(PANOPTICON_HOME, 'rules');
-export const CACHE_MANIFEST = join(PANOPTICON_HOME, '.manifest.json');
+export const CACHE_AGENTS_DIR = join(OVERDECK_HOME, 'agent-definitions');  // separate from agent state
+export const CACHE_RULES_DIR = join(OVERDECK_HOME, 'rules');
+export const CACHE_MANIFEST = join(OVERDECK_HOME, '.manifest.json');
 
 // Pre-workspace PRD directory and docs RAG state directory
-export const DOCS_DIR = join(PANOPTICON_HOME, 'docs');
+export const DOCS_DIR = join(OVERDECK_HOME, 'docs');
 export const PRDS_DIR = join(DOCS_DIR, 'prds');
 export const PRD_DRAFTS_DIR = join(PRDS_DIR, 'drafts');
 export const PRD_PUBLISHED_DIR = join(PRDS_DIR, 'published');
@@ -240,7 +240,7 @@ export function sessionIdFromFile(sessionFile: string | null | undefined): strin
 
 // All directories to create on init
 export const INIT_DIRS = [
-  PANOPTICON_HOME,
+  OVERDECK_HOME,
   SKILLS_DIR,
   COMMANDS_DIR,
   AGENTS_DIR,

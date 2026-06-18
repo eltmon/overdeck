@@ -9,16 +9,16 @@
  * because tsx has documented delivery bugs and Node lacks first-class
  * shebang support for TypeScript. Run as:
  *
- *     PANOPTICON_AGENT_ID=<id> bun run src/lib/channels/panopticon-bridge.ts
+ *     OVERDECK_AGENT_ID=<id> bun run src/lib/channels/panopticon-bridge.ts
  *
  * Reference: https://code.claude.com/docs/en/channels
  *
  * Lifecycle:
  *   - Spawned by `claude --dangerously-load-development-channels server:panopticon-bridge`
  *     using the per-agent MCP config the launcher writes alongside the
- *     workspace. PANOPTICON_AGENT_ID is supplied through the MCP config's
+ *     workspace. OVERDECK_AGENT_ID is supplied through the MCP config's
  *     env block; this script fail-fasts if the variable is missing.
- *   - Listens on a Unix domain socket at ${PANOPTICON_HOME}/sockets/agent-<id>.sock
+ *   - Listens on a Unix domain socket at ${OVERDECK_HOME}/sockets/agent-<id>.sock
  *     so the dashboard server can post inbound messages and permission decisions
  *     that this bridge forwards as Claude channel notifications.
  *   - Receives Claude-originated permission requests over stdio and relays them
@@ -60,10 +60,10 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
  * main() so it only fires on direct CLI invocation.
  */
 function resolveAgentIdOrExit(): string {
-  const id = process.env.PANOPTICON_AGENT_ID;
+  const id = process.env.OVERDECK_AGENT_ID;
   if (!id) {
     process.stderr.write(
-      'panopticon-bridge: PANOPTICON_AGENT_ID env var is required. ' +
+      'panopticon-bridge: OVERDECK_AGENT_ID env var is required. ' +
         'It is normally supplied by the per-agent MCP config; if you are running this script ' +
         'manually for development, set it explicitly.\n',
     );
@@ -207,9 +207,9 @@ function installPermissionRequestHandler(mcp: Server): void {
   }
 
   handlers.set('notifications/claude/channel/permission_request', async (notification) => {
-    const agentId = process.env.PANOPTICON_AGENT_ID;
+    const agentId = process.env.OVERDECK_AGENT_ID;
     if (!agentId) {
-      throw new Error('PANOPTICON_AGENT_ID missing while handling permission request');
+      throw new Error('OVERDECK_AGENT_ID missing while handling permission request');
     }
     await handlePermissionRequestNotification(notification, agentId);
   });
@@ -218,11 +218,11 @@ function installPermissionRequestHandler(mcp: Server): void {
 installPermissionRequestHandler(server);
 
 /**
- * Resolve PANOPTICON_HOME with the same fallback semantics as the rest of the
+ * Resolve OVERDECK_HOME with the same fallback semantics as the rest of the
  * codebase: env var first, then ~/.panopticon.
  */
 export function getPanopticonHome(): string {
-  return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+  return process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
 }
 
 export function getSocketPath(agentId: string): string {

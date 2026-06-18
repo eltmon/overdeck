@@ -38,16 +38,16 @@ beforeEach(() => {
   testBase = join(tmpdir(), `caveman-ws-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   workspaceDir = join(testBase, 'workspace');
   hooksDir = join(testBase, 'hooks');
-  originalPanopticonHome = process.env.PANOPTICON_HOME;
-  process.env.PANOPTICON_HOME = join(testBase, 'pan-home');
+  originalPanopticonHome = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = join(testBase, 'pan-home');
   mkdirSync(workspaceDir, { recursive: true });
   mkdirSync(hooksDir, { recursive: true });
   mockGetHooksDir.mockReturnValue(hooksDir);
 });
 
 afterEach(() => {
-  if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = originalPanopticonHome;
+  if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalPanopticonHome;
   rmSync(testBase, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
@@ -111,7 +111,7 @@ describe('injectMemoryHookSettings', () => {
     expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('panopticon-memory-hook.js" prompt-inject');
 
     const scriptPath = settings.hooks.Stop[0].hooks[0].command.match(/node "([^"]+)" turn/)?.[1];
-    expect(scriptPath).toContain(join(process.env.PANOPTICON_HOME!, 'hooks', 'memory', 'panopticon-memory-hook.js'));
+    expect(scriptPath).toContain(join(process.env.OVERDECK_HOME!, 'hooks', 'memory', 'panopticon-memory-hook.js'));
     expect(scriptPath).not.toContain(workspaceDir);
     const script = readFileSync(scriptPath, 'utf-8');
     expect(script).toContain('/api/memory/turn');

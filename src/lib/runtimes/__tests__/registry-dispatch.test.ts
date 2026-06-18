@@ -6,12 +6,12 @@ import { join } from 'node:path'
 // fixture state.json files instead of the real ~/.panopticon. paths.ts
 // freezes the constants at import time, and vi.mock is hoisted above all
 // imports — so we use a literal path here and clean it up in afterAll.
-const TEST_PANOPTICON_HOME = '/tmp/pan-test-runtime-dispatch'
+const TEST_OVERDECK_HOME = '/tmp/pan-test-runtime-dispatch'
 const TEST_AGENTS_DIR = '/tmp/pan-test-runtime-dispatch/agents'
 
 vi.mock('../../paths.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../paths.js')>()),
-  PANOPTICON_HOME: '/tmp/pan-test-runtime-dispatch',
+  OVERDECK_HOME: '/tmp/pan-test-runtime-dispatch',
   AGENTS_DIR: '/tmp/pan-test-runtime-dispatch/agents',
   getPanopticonHome: () => '/tmp/pan-test-runtime-dispatch',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
@@ -107,5 +107,5 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
 afterEach(() => {
   // Per-test cleanup so state.json fixtures don't bleed between cases.
   rmSync(TEST_AGENTS_DIR, { recursive: true, force: true })
-  void TEST_PANOPTICON_HOME // referenced for clarity
+  void TEST_OVERDECK_HOME // referenced for clarity
 })

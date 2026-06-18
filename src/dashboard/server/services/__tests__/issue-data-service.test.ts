@@ -52,7 +52,7 @@ describe('computeBeadCounts', () => {
   });
 });
 
-// PAN-1817: peer dashboards (workspace containers, PANOPTICON_DISABLE_DEACON=1) must
+// PAN-1817: peer dashboards (workspace containers, OVERDECK_DISABLE_DEACON=1) must
 // load the cache but start ZERO tracker polling. ~17 container pollers against the one
 // shared Linear API key exhausted Linear's 2500/hr quota. This locks the gate so it
 // can't be silently removed — deleting `skipPolling` turns this suite red.

@@ -149,7 +149,7 @@ function runTick(deps: AutoMergeExecutorDeps): void {
 }
 
 export function startAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): boolean {
-  if (process.env.PANOPTICON_DISABLE_AUTO_MERGE === '1') return false;
+  if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') return false;
   if (timer) return false;
 
   timer = setInterval(() => runTick(deps), AUTO_MERGE_EXECUTOR_INTERVAL_MS);

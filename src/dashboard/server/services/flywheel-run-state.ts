@@ -109,7 +109,7 @@ async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number
 }
 
 export function getFlywheelHome(options: FlywheelRunStateOptions = {}): string {
-  return join(options.panopticonHome ?? process.env['PANOPTICON_HOME'] ?? join(homedir(), '.panopticon'), 'flywheel');
+  return join(options.panopticonHome ?? process.env['OVERDECK_HOME'] ?? join(homedir(), '.panopticon'), 'flywheel');
 }
 
 export function getFlywheelRunsDir(options: FlywheelRunStateOptions = {}): string {

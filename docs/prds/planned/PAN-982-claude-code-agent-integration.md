@@ -77,7 +77,7 @@ Agent system prompt (markdown body)...
 |---|---|
 | Provider env injection (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`) | `model:` frontmatter only supports Anthropic models. Non-Anthropic routing (Kimi, OpenAI CLIProxy, OpenRouter) requires env var injection. |
 | `unset PROVIDER_ENV_UNSETS` | Stale parent env must be scrubbed before re-export. No frontmatter mechanism for this. |
-| `PANOPTICON_AGENT_ID` / `PANOPTICON_ISSUE_ID` / `PANOPTICON_SESSION_TYPE` | Read by hooks (heartbeat, cost recorder, stop-hook). No frontmatter mechanism for custom env vars. |
+| `OVERDECK_AGENT_ID` / `OVERDECK_ISSUE_ID` / `OVERDECK_SESSION_TYPE` | Read by hooks (heartbeat, cost recorder, stop-hook). No frontmatter mechanism for custom env vars. |
 | `TERM` / `COLORTERM` / `LANG` / `LC_ALL` | Terminal env setup. Not agent-specific. |
 | `unset TMUX TMUX_PANE STY` | Prevents nested tmux warnings. Shell hygiene. |
 | mkcert CA trust (`NODE_EXTRA_CA_CERTS`) | TLS setup for `pan.localhost`. |
@@ -105,7 +105,7 @@ Panopticon's global `~/.claude/settings.json` registers hooks for **8 events**:
 - `Notification` ← CANNOT move
 - `PermissionRequest` ← CANNOT move
 
-**Consequence:** The `PANOPTICON_SESSION_TYPE` env-var-gating pattern in global hooks cannot be fully eliminated. Hooks for SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, and PermissionRequest must remain global with env-var dispatch.
+**Consequence:** The `OVERDECK_SESSION_TYPE` env-var-gating pattern in global hooks cannot be fully eliminated. Hooks for SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, and PermissionRequest must remain global with env-var dispatch.
 
 ### Agent Teams: Out of Scope
 
@@ -266,9 +266,9 @@ unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN OPENAI_API_KEY .
 export ANTHROPIC_BASE_URL=...  # if non-Anthropic
 export ANTHROPIC_AUTH_TOKEN=... # if non-Anthropic
 # Panopticon identity
-export PANOPTICON_AGENT_ID='agent-pan-982'
-export PANOPTICON_ISSUE_ID='PAN-982'
-export PANOPTICON_SESSION_TYPE='implementation'
+export OVERDECK_AGENT_ID='agent-pan-982'
+export OVERDECK_ISSUE_ID='PAN-982'
+export OVERDECK_SESSION_TYPE='implementation'
 export GIT_SEQUENCE_EDITOR=false
 # Caveman exports (if enabled)
 export CAVEMAN_MODE=full
@@ -296,7 +296,7 @@ Move PreToolUse, PostToolUse, and Stop hooks from global `settings.json` into pe
   }
 }
 ```
-Hook script internally checks `PANOPTICON_SESSION_TYPE` to skip for non-work agents.
+Hook script internally checks `OVERDECK_SESSION_TYPE` to skip for non-work agents.
 
 **After (per-agent):**
 Only `pan-work-agent.md` gets the `inspect-on-bead-close` hook. Review/test/merge agents don't see it at all.

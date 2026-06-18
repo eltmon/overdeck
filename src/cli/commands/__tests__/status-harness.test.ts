@@ -39,8 +39,8 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   let originalNoResume: string | undefined
 
   beforeEach(() => {
-    originalNoResume = process.env.PANOPTICON_NO_RESUME
-    delete process.env.PANOPTICON_NO_RESUME
+    originalNoResume = process.env.OVERDECK_NO_RESUME
+    delete process.env.OVERDECK_NO_RESUME
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
@@ -56,8 +56,8 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     logSpy.mockRestore()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
-    if (originalNoResume === undefined) delete process.env.PANOPTICON_NO_RESUME
-    else process.env.PANOPTICON_NO_RESUME = originalNoResume
+    if (originalNoResume === undefined) delete process.env.OVERDECK_NO_RESUME
+    else process.env.OVERDECK_NO_RESUME = originalNoResume
   })
 
   it('AC: prints a "Harness:" line for each running agent (pi value when configured)', async () => {

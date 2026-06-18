@@ -54,7 +54,7 @@ vi.mock('../../../dashboard/server/services/flywheel-run-state.js', () => ({
 
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../flywheel.js';
 
-const cleanEnv = { PANOPTICON_DISABLE_DEACON: undefined, HOSTNAME: 'host-panopticon' };
+const cleanEnv = { OVERDECK_DISABLE_DEACON: undefined, HOSTNAME: 'host-panopticon' };
 
 describe('flywheel lifecycle', () => {
   beforeEach(() => {
@@ -152,7 +152,7 @@ describe('flywheel lifecycle', () => {
     await expect(spawnFlywheel({
       runId: 'RUN-1',
       workspace: '/repo',
-      env: { PANOPTICON_DISABLE_DEACON: '1', HOSTNAME: 'workspace-pan-1189' },
+      env: { OVERDECK_DISABLE_DEACON: '1', HOSTNAME: 'workspace-pan-1189' },
     })).rejects.toThrow('Refusing to spawn flywheel-orchestrator inside a workspace devcontainer');
 
     expect(mocks.spawnRun).not.toHaveBeenCalled();

@@ -69,7 +69,7 @@ roles/handoff.md  handoff-external.md  handoff-external-pi.md
 
 ---
 
-## 3. `~/.panopticon` (PANOPTICON_HOME) top-level layout
+## 3. `~/.panopticon` (OVERDECK_HOME) top-level layout
 
 State directory shared by the host orchestrator. **Never mount this into a
 workspace container** (single-Deacon invariant). Top level (observed):

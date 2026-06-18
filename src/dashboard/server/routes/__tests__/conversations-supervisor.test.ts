@@ -94,11 +94,11 @@ function cleanupSession(session: string): void {
 describe('spawnConversationSession PTY supervisor wiring', () => {
   beforeEach(() => {
     panopticonHome = join(tmpdir(), `pan-conv-supervisor-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     channelsEnabled = false;
     dismissDevChannelsDialogMock?.mockClear();
     delete process.env.PAN_DOCKER;
-    delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+    delete process.env.OVERDECK_DOCKER_WORKSPACE;
     createSupervisorSocket = false;
     createSessionCalls = [];
   });
@@ -106,9 +106,9 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
   afterEach(() => {
     for (const call of createSessionCalls) cleanupSession(call.session);
     rmSync(panopticonHome, { recursive: true, force: true });
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     delete process.env.PAN_DOCKER;
-    delete process.env.PANOPTICON_DOCKER_WORKSPACE;
+    delete process.env.OVERDECK_DOCKER_WORKSPACE;
   });
 
   it('wraps Claude Code conversations with the PTY supervisor and waits for its socket', async () => {
@@ -127,7 +127,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     );
 
     const launcher = launcherFor('conv-supervisor-test');
-    expect(launcher).toContain("export PANOPTICON_AGENT_ID='conv-supervisor-test'");
+    expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-supervisor-test'");
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
     expect(existsSync(join(panopticonHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
@@ -151,7 +151,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     );
 
     const launcher = launcherFor('conv-codex-supervisor-test');
-    expect(launcher).toContain("export PANOPTICON_AGENT_ID='conv-codex-supervisor-test'");
+    expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-codex-supervisor-test'");
     expect(launcher).toContain(`export CODEX_HOME='${join(panopticonHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' codex");

@@ -20,7 +20,7 @@ export async function hookCommand(
   options: HookOptions = {}
 ): Promise<void> {
   // Normalize agent ID
-  const agentId = process.env.PANOPTICON_AGENT_ID || 'default';
+  const agentId = process.env.OVERDECK_AGENT_ID || 'default';
 
   switch (action) {
     case 'check': {

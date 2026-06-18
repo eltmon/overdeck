@@ -21,7 +21,7 @@ const CONFIG: NormalizedTtsDaemonConfig = {
   mutedIssues: [],
 };
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 let testHome: string;
 
 function mockProcIdentities(identities: Record<number, { cmdline: string; startTimeTicks: string }>): void {
@@ -53,7 +53,7 @@ describe('tts daemon lifecycle state', () => {
   beforeEach(() => {
     vi.resetModules();
     testHome = mkdtempSync(join(tmpdir(), 'pan-tts-daemon-'));
-    process.env.PANOPTICON_HOME = testHome;
+    process.env.OVERDECK_HOME = testHome;
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new TypeError('ECONNREFUSED');
     }));
@@ -63,8 +63,8 @@ describe('tts daemon lifecycle state', () => {
     vi.doUnmock('node:child_process');
     vi.doUnmock('node:fs/promises');
     vi.unstubAllGlobals();
-    if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = originalPanopticonHome;
+    if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalPanopticonHome;
     rmSync(testHome, { recursive: true, force: true });
   });
 

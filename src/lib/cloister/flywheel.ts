@@ -82,7 +82,7 @@ Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopti
 }
 
 function getLocalFlywheelRunDir(runId: string): string {
-  const panopticonHome = process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+  const panopticonHome = process.env.OVERDECK_HOME ?? join(homedir(), '.panopticon');
   return join(panopticonHome, 'flywheel', 'runs', runId);
 }
 
@@ -107,7 +107,7 @@ export async function loadResumeSessionId(runId: string): Promise<string | null>
 }
 
 export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
-  const disabledDeacon = env.PANOPTICON_DISABLE_DEACON?.toLowerCase();
+  const disabledDeacon = env.OVERDECK_DISABLE_DEACON?.toLowerCase();
   if (disabledDeacon === '1' || disabledDeacon === 'true') return true;
 
   const hostname = env.HOSTNAME?.toLowerCase() ?? '';

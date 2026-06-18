@@ -513,7 +513,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (await pollUntilSessionGone(agentId, 2_000)) return
 
     // Step 3: SIGTERM the pane process group via tmux.
-    // PANOPTICON_AGENT_ID is an env var, not an argv argument, so pkill -f
+    // OVERDECK_AGENT_ID is an env var, not an argv argument, so pkill -f
     // won't match it. Instead, resolve the pane PID from tmux and kill the
     // process group directly.
     try {
@@ -558,7 +558,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     // 3. Launch the tmux session on the panopticon socket.
     await Effect.runPromise(createSession(agentId, config.workspace, fullCmd, {
       env: {
-        PANOPTICON_AGENT_ID: agentId,
+        OVERDECK_AGENT_ID: agentId,
         CODEX_HOME: codexHomeDir,
       },
     }))

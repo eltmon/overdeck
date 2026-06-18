@@ -46,9 +46,9 @@ describe('work-agent-stop-hook structured channel replies', () => {
       join(tempRoot, 'pan-hook-lib.sh'),
       `#!/bin/bash
 set +e
-PAN_DASHBOARD_URL="\${PANOPTICON_DASHBOARD_URL:-http://127.0.0.1:3000}"
+PAN_DASHBOARD_URL="\${OVERDECK_DASHBOARD_URL:-http://127.0.0.1:3000}"
 pan_resolve_agent_id() {
-  AGENT_ID="\${PANOPTICON_AGENT_ID:-}"
+  AGENT_ID="\${OVERDECK_AGENT_ID:-}"
   [ -n "$AGENT_ID" ]
 }
 pan_emit_event() {
@@ -140,8 +140,8 @@ exit 99
         ...process.env,
         HOME: homeDir,
         PATH: `${mockBin}:${process.env.PATH ?? ''}`,
-        PANOPTICON_AGENT_ID: AGENT_ID,
-        PANOPTICON_DASHBOARD_URL: 'http://mocked-dashboard.local',
+        OVERDECK_AGENT_ID: AGENT_ID,
+        OVERDECK_DASHBOARD_URL: 'http://mocked-dashboard.local',
         MOCK_RUNTIME_JSON: runtimeJson,
         MOCK_HEARTBEAT_LOG: heartbeatLog,
         MOCK_TMUX_LOG: tmuxLog,

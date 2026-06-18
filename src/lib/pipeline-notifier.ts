@@ -50,8 +50,8 @@ export function notifyPipelineSync(event: PipelineEvent): void {
   // process such as `pan review run`). Forward to the dashboard so the live
   // event stream stays in sync. Best-effort: fail silently if the dashboard
   // is offline. The DB write (when applicable) is durable.
-  // Tests can opt out with `PANOPTICON_PIPELINE_NOTIFY=off`.
-  if (process.env.PANOPTICON_PIPELINE_NOTIFY === 'off') return;
+  // Tests can opt out with `OVERDECK_PIPELINE_NOTIFY=off`.
+  if (process.env.OVERDECK_PIPELINE_NOTIFY === 'off') return;
   // Skip in test environments — Vitest/Jest set NODE_ENV=test and there's no
   // dashboard at localhost:3011 to receive the POST.
   if (process.env.NODE_ENV === 'test') return;

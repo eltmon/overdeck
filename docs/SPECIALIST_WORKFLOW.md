@@ -188,18 +188,18 @@ All agents spawned by Panopticon receive these environment variables via tmux `-
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
-| `PANOPTICON_AGENT_ID` | `agent-min-693` | Agent identifier for heartbeat, status, messaging |
-| `PANOPTICON_ISSUE_ID` | `MIN-693` | Issue being worked on |
-| `PANOPTICON_SESSION_TYPE` | `implementation` / `planning` / `exploration` | Current phase — used for cost attribution by stage |
+| `OVERDECK_AGENT_ID` | `agent-min-693` | Agent identifier for heartbeat, status, messaging |
+| `OVERDECK_ISSUE_ID` | `MIN-693` | Issue being worked on |
+| `OVERDECK_SESSION_TYPE` | `implementation` / `planning` / `exploration` | Current phase — used for cost attribution by stage |
 | `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` | `false` | Disables suggested prompts for autonomous agents (PAN-251) |
 
 **Specialist Agents (review, test, merge):**
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
-| `PANOPTICON_AGENT_ID` | `specialist-panopticon-cli-review-agent` | Specialist tmux session name |
-| `PANOPTICON_ISSUE_ID` | `PAN-379` | Issue being reviewed/tested/merged |
-| `PANOPTICON_SESSION_TYPE` | `review` / `test` / `merge` | Specialist type — used for cost attribution by stage |
+| `OVERDECK_AGENT_ID` | `specialist-panopticon-cli-review-agent` | Specialist tmux session name |
+| `OVERDECK_ISSUE_ID` | `PAN-379` | Issue being reviewed/tested/merged |
+| `OVERDECK_SESSION_TYPE` | `review` / `test` / `merge` | Specialist type — used for cost attribution by stage |
 
 Specialist env vars are set both in tmux `-e` flags and as `export` statements in the inner run script (belt-and-suspenders for env inheritance).
 

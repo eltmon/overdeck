@@ -29,12 +29,12 @@ function makeCostEvent(overrides: Partial<CostEvent> & { issueId: string; output
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `pan-caveman-exp-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
 });
 
 afterEach(async () => {
   await resetDb();
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 

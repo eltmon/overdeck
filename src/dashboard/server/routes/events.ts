@@ -11,7 +11,7 @@
  *   - Resumable via Last-Event-ID header or ?since= query param.
  *   - Filterable via ?types=, ?sources=, ?issueId= query params.
  *   - Local-only by default (the dashboard binds to 127.0.0.1).
- *   - Optional bearer token auth via PANOPTICON_EVENTS_TOKEN env var.
+ *   - Optional bearer token auth via OVERDECK_EVENTS_TOKEN env var.
  *
  * Stability: only the event types in PUBLIC_CATALOG are part of the public
  * contract. Internal events are not exposed on this route.
@@ -105,7 +105,7 @@ function getHeader(
 }
 
 function authorized(request: HttpServerRequest.HttpServerRequest): boolean {
-  const expected = process.env['PANOPTICON_EVENTS_TOKEN'];
+  const expected = process.env['OVERDECK_EVENTS_TOKEN'];
   if (!expected) return true;
   const header = getHeader(request, 'authorization');
   if (!header) return false;

@@ -62,7 +62,7 @@ function makeAgentsDir(): string {
   // Overdeck (PAN-1938): the doctor test seeds agent state into overdeck.db
   // via saveOverdeckAgentStateSync, and getAgentStateSync reads overdeck first.
   // The agentsDir parameter still must point at a real directory under
-  // PANOPTICON_HOME so readDoctorAgentStates' readdirSync can enumerate it.
+  // OVERDECK_HOME so readDoctorAgentStates' readdirSync can enumerate it.
   const dir = odb ? join(odb.home, 'agents') : mkdtempSync(join(tmpdir(), 'pan-doctor-agents-'));
   mkdirSync(dir, { recursive: true });
   tempDirs.push(dir);

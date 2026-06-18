@@ -28,7 +28,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   return {
     ...actual,
     getPanopticonHome: vi.fn(() => '/fake/pan'),
-    PANOPTICON_HOME:   '/fake/pan',
+    OVERDECK_HOME:   '/fake/pan',
     AGENTS_DIR:        '/fake/pan/agents',
   };
 });

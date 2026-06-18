@@ -3801,32 +3801,32 @@ const runSync = runSync$1;
 Service()("effect/Effect/Transaction");
 //#endregion
 //#region ../../src/lib/paths.ts
-const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), ".panopticon");
-/** Get PANOPTICON_HOME dynamically (reads env var on each call, useful for testing) */
+const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), ".panopticon");
+/** Get OVERDECK_HOME dynamically (reads env var on each call, useful for testing) */
 function getPanopticonHome() {
-	return process.env.PANOPTICON_HOME || join(homedir(), ".panopticon");
+	return process.env.OVERDECK_HOME || join(homedir(), ".panopticon");
 }
-const CONFIG_DIR = PANOPTICON_HOME;
-join(PANOPTICON_HOME, "skills");
-join(PANOPTICON_HOME, "commands");
-join(PANOPTICON_HOME, "agents");
-join(PANOPTICON_HOME, "bin");
-join(PANOPTICON_HOME, "backups");
-const COSTS_DIR = join(PANOPTICON_HOME, "costs");
-join(PANOPTICON_HOME, "heartbeats");
-join(PANOPTICON_HOME, "archives");
-join(PANOPTICON_HOME, "logs");
-join(PANOPTICON_HOME, "handoffs");
-const TRAEFIK_DIR = join(PANOPTICON_HOME, "traefik");
+const CONFIG_DIR = OVERDECK_HOME;
+join(OVERDECK_HOME, "skills");
+join(OVERDECK_HOME, "commands");
+join(OVERDECK_HOME, "agents");
+join(OVERDECK_HOME, "bin");
+join(OVERDECK_HOME, "backups");
+const COSTS_DIR = join(OVERDECK_HOME, "costs");
+join(OVERDECK_HOME, "heartbeats");
+join(OVERDECK_HOME, "archives");
+join(OVERDECK_HOME, "logs");
+join(OVERDECK_HOME, "handoffs");
+const TRAEFIK_DIR = join(OVERDECK_HOME, "traefik");
 join(TRAEFIK_DIR, "dynamic");
 join(TRAEFIK_DIR, "certs");
-join(PANOPTICON_HOME, "certs");
+join(OVERDECK_HOME, "certs");
 join(CONFIG_DIR, "config.toml");
 join(CONFIG_DIR, "settings.json");
 const CLAUDE_DIR = join(homedir(), ".claude");
 join(homedir(), ".codex"), join(homedir(), ".cursor"), join(homedir(), ".gemini"), join(homedir(), ".opencode");
 join(CLAUDE_DIR, "skills"), join(CLAUDE_DIR, "commands"), join(CLAUDE_DIR, "agents");
-join(join(PANOPTICON_HOME, "templates"), "claude-md", "sections");
+join(join(OVERDECK_HOME, "templates"), "claude-md", "sections");
 const currentDir = dirname(fileURLToPath(import.meta.url));
 function resolvePackageRootForDir(dir) {
 	const srcSegment = `${sep}src${sep}`;
@@ -3852,10 +3852,10 @@ function resolvePackageRootForDir(dir) {
 */
 const SYNC_SOURCES_ROOT = join(resolvePackageRootForDir(currentDir), "sync-sources");
 join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
-join(PANOPTICON_HOME, "agent-definitions");
-join(PANOPTICON_HOME, "rules");
-join(PANOPTICON_HOME, ".manifest.json");
-const DOCS_DIR = join(PANOPTICON_HOME, "docs");
+join(OVERDECK_HOME, "agent-definitions");
+join(OVERDECK_HOME, "rules");
+join(OVERDECK_HOME, ".manifest.json");
+const DOCS_DIR = join(OVERDECK_HOME, "docs");
 const PRDS_DIR = join(DOCS_DIR, "prds");
 join(PRDS_DIR, "drafts");
 join(PRDS_DIR, "published");
@@ -4435,7 +4435,7 @@ function agentStateToDbAgent(state) {
 * One-time versioned backfill for the PAN-1908 agents table.
 *
 * This is the ONLY module permitted to enumerate
-* `${PANOPTICON_HOME}/agents/{id}/state.json`. It is invoked:
+* `${OVERDECK_HOME}/agents/{id}/state.json`. It is invoked:
 *
 *   - automatically once during the v54 -> v55 schema migration, and
 *   - manually via `pan admin db rebuild-agents`.
@@ -4500,7 +4500,7 @@ const COLUMN_MAP = {
 	updatedAt: "updated_at"
 };
 function getManagedTmuxSocketName() {
-	return process.env.PANOPTICON_TMUX_SOCKET_NAME ?? "panopticon";
+	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "panopticon";
 }
 function listLiveTmuxSessionNames() {
 	try {
@@ -6034,7 +6034,7 @@ function runMigrations(db, dbPath) {
 var DatabaseError$1 = class extends TaggedError("DatabaseError") {};
 let _db = null;
 /**
-* Get the path to panopticon.db (dynamic, respects PANOPTICON_HOME override for tests)
+* Get the path to panopticon.db (dynamic, respects OVERDECK_HOME override for tests)
 */
 function getDatabasePath() {
 	return join(getPanopticonHome(), "panopticon.db");
@@ -12814,7 +12814,7 @@ function extractPrefixSync(issueId) {
 *
 * Maps Linear team prefixes and labels to project paths for workspace creation.
 */
-const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, "projects.yaml");
+const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, "projects.yaml");
 let _projectsCache = null;
 function loadProjectsConfigSync() {
 	if (!existsSync(PROJECTS_CONFIG_FILE)) return { projects: {} };
@@ -13108,10 +13108,10 @@ const buffer = Buffer.alloc(bytesToRead);
 readSync(fd, buffer, 0, bytesToRead, lastOffset);
 closeSync(fd);
 const lines = buffer.toString("utf-8").split("\n");
-const agentId = process.env.PANOPTICON_AGENT_ID || "unattributed";
-let issueId = process.env.PANOPTICON_ISSUE_ID || "";
-const sessionType = process.env.PANOPTICON_SESSION_TYPE || "implementation";
-const cavemanVariant = process.env.PANOPTICON_CAVEMAN_VARIANT;
+const agentId = process.env.OVERDECK_AGENT_ID || "unattributed";
+let issueId = process.env.OVERDECK_ISSUE_ID || "";
+const sessionType = process.env.OVERDECK_SESSION_TYPE || "implementation";
+const cavemanVariant = process.env.OVERDECK_CAVEMAN_VARIANT;
 if (!issueId || issueId === "UNKNOWN") try {
 	const branchMatch = execFileSync("git", ["branch", "--show-current"], {
 		encoding: "utf-8",

@@ -153,7 +153,7 @@ function readJson<T>(path: string): T {
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), 'auto-promote-chain-'));
   oldDashboardUrl = process.env.DASHBOARD_URL;
-  oldPanopticonHome = process.env.PANOPTICON_HOME;
+  oldPanopticonHome = process.env.OVERDECK_HOME;
   process.env.DASHBOARD_URL = 'http://dashboard.test';
   mocks.createBeadsFromVBrief.mockReset();
   mocks.emitActivityEntrySync.mockReset();
@@ -165,8 +165,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   if (oldDashboardUrl === undefined) delete process.env.DASHBOARD_URL;
   else process.env.DASHBOARD_URL = oldDashboardUrl;
-  if (oldPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = oldPanopticonHome;
+  if (oldPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = oldPanopticonHome;
   if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true });
 });
 
@@ -175,7 +175,7 @@ describe('plan-finalize auto-promote chain regression', () => {
     vi.useFakeTimers();
     const issueId = 'PAN-3401';
     const panopticonHome = join(testDir, 'panopticon-home');
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     const { projectPath, workspacePath } = makeProject(issueId);
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -254,7 +254,7 @@ describe('plan-finalize auto-promote chain regression', () => {
     vi.useFakeTimers();
     const issueId = 'PAN-3406';
     const panopticonHome = join(testDir, 'panopticon-home');
-    process.env.PANOPTICON_HOME = panopticonHome;
+    process.env.OVERDECK_HOME = panopticonHome;
     writePlanningAgentState(panopticonHome, issueId, true);
     const tmuxSessions = new Set<string>();
     const { projectPath, workspacePath } = makeProject(issueId);

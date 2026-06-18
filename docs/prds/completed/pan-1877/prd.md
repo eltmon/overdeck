@@ -37,20 +37,20 @@ than `getPanopticonHome()`, so a test calling them writes real home regardless o
 `src/lib/config-migration.ts`, `src/lib/workspace-manager.ts`, `src/lib/runtimes/codex.ts`,
 `src/lib/runtimes/pi.ts`, `src/lib/session-format-converter.ts`, `src/lib/test-runner.ts`.
 
-The seam already exists: `src/lib/paths.ts` (search `getPanopticonHome`) — `process.env.PANOPTICON_HOME
-|| join(homedir(), '.panopticon')`. Note `paths.ts` *also* exports a top-level `const PANOPTICON_HOME`
-evaluated **at import time** (search `export const PANOPTICON_HOME`); modules that capture that const
-will NOT see a `PANOPTICON_HOME` set after import — only `getPanopticonHome()` is dynamic. This
+The seam already exists: `src/lib/paths.ts` (search `getPanopticonHome`) — `process.env.OVERDECK_HOME
+|| join(homedir(), '.panopticon')`. Note `paths.ts` *also* exports a top-level `const OVERDECK_HOME`
+evaluated **at import time** (search `export const OVERDECK_HOME`); modules that capture that const
+will NOT see a `OVERDECK_HOME` set after import — only `getPanopticonHome()` is dynamic. This
 matters for both the fix and the test-setup ordering.
 
 ---
 
 ## Glossary
 
-- **`PANOPTICON_HOME`** — env var relocating all Panopticon state; read by `getPanopticonHome()`.
+- **`OVERDECK_HOME`** — env var relocating all Panopticon state; read by `getPanopticonHome()`.
 - **Runtime write-guard** — a `fs`/`fs/promises` wrapper installed in test setup that throws if a
   write targets the **real** `${homedir()}/.panopticon`. The hard, mechanism-agnostic enforcement.
-- **Per-worker home** — each Vitest worker gets its own `PANOPTICON_HOME` subtree (keyed by
+- **Per-worker home** — each Vitest worker gets its own `OVERDECK_HOME` subtree (keyed by
   `VITEST_POOL_ID`) so tests cannot pollute each other's state within a shared run.
 
 ---
@@ -61,7 +61,7 @@ matters for both the fix and the test-setup ordering.
   this pass) resolve their path from `getPanopticonHome()`, not `homedir()`.
 - **FR-2** — **No test reads or writes the developer's real `~/.panopticon`.** Enforced by a runtime
   write-guard, not only by inspection.
-- **FR-3** — Each Vitest worker runs against its own throwaway `PANOPTICON_HOME` subtree; the real
+- **FR-3** — Each Vitest worker runs against its own throwaway `OVERDECK_HOME` subtree; the real
   home is never the target.
 - **FR-4** — Every offender in the inventory above writes under the temp home, verified by the guard.
 - **NFR-1** — Retry/backoff tests touched here keep using **fake timers** (`vi.useFakeTimers()` +
@@ -71,7 +71,7 @@ matters for both the fix and the test-setup ordering.
 
 ## Work items
 
-### WI-1 — `review-status-json.ts` honors `PANOPTICON_HOME` (FR-1)
+### WI-1 — `review-status-json.ts` honors `OVERDECK_HOME` (FR-1)
 
 **File:** `src/lib/review-status-json.ts`. Current (search `DEFAULT_STATUS_FILE`):
 
@@ -105,25 +105,25 @@ cleanup but not required for correctness — do it only if the guard flags it.
 
 Install a guard that wraps the write surface of `fs` and `fs/promises` and throws if the resolved,
 absolute target is under the **real** `${homedir()}/.panopticon` (computed from `os.homedir()`, NOT
-the temp `PANOPTICON_HOME`). Cover at minimum:
+the temp `OVERDECK_HOME`). Cover at minimum:
 
 - sync: `writeFileSync`, `appendFileSync`, `mkdirSync`, `rmSync`, `rmdirSync`, `unlinkSync`,
   `renameSync`, `cpSync`, `createWriteStream`
 - promises: `writeFile`, `appendFile`, `mkdir`, `rm`, `rename`, `cp`
 
-Throw a clear error (`[test-guard] write to REAL ~/.panopticon blocked: <path> — set PANOPTICON_HOME
+Throw a clear error (`[test-guard] write to REAL ~/.panopticon blocked: <path> — set OVERDECK_HOME
 to a temp dir`). Provide a minimal allowlist hook for any test that legitimately must touch real home
 (none expected). This catches every offender regardless of which module (test or production helper)
 issues the write — the property a static grep cannot guarantee.
 
-### WI-3 — Per-worker throwaway `PANOPTICON_HOME` (FR-3)
+### WI-3 — Per-worker throwaway `OVERDECK_HOME` (FR-3)
 
 **Files:** `vitest.config.ts`, `tests/setup/panopticon-home.ts`.
 
 - `globalSetup` creates a run root `mkdtemp(pan-test-root-*)` and removes it on teardown.
 - A **setupFile** (runs per worker, before test modules import) sets
-  `process.env.PANOPTICON_HOME = join(root, 'worker-' + (process.env.VITEST_POOL_ID ?? '0'))` and
-  `mkdirSync` it. Because `paths.ts` evaluates its `PANOPTICON_HOME` const at import, the setupFile
+  `process.env.OVERDECK_HOME = join(root, 'worker-' + (process.env.VITEST_POOL_ID ?? '0'))` and
+  `mkdirSync` it. Because `paths.ts` evaluates its `OVERDECK_HOME` const at import, the setupFile
   MUST run before any state module is imported — verify Vitest setupFile ordering and that no
   offender imports a state module at top-of-file before setup. Where a module captured the const too
   early, prefer `getPanopticonHome()` (WI-1) so the value is read dynamically.
@@ -158,7 +158,7 @@ guard (cheap, catches obvious regressions at author time); WI-2 is the authorita
   `getPanopticonHome`. `shadow-utils.ts` shadow-state path uses `getPanopticonHome()`.
 - **AC-2 (WI-2)** — A test that intentionally writes `${homedir()}/.panopticon/pan-test-guard` **fails**
   under the guard. The guard covers the sync + promise write APIs listed.
-- **AC-3 (WI-3)** — Inside a test, `process.env.PANOPTICON_HOME` points to a `pan-test-root-*/worker-*`
+- **AC-3 (WI-3)** — Inside a test, `process.env.OVERDECK_HOME` points to a `pan-test-root-*/worker-*`
   dir; two workers get distinct subtrees.
 - **AC-4 (WI-4)** — After a full `npm test`, `stat`/`find` shows **no** mtime or content change under
   real `~/.panopticon/review-status.json`, `~/.panopticon/shadow-state`, `~/.panopticon/agents`, or

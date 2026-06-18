@@ -101,13 +101,13 @@ const INTERNAL_TOKEN_HEADER = 'x-panopticon-internal-token'
 const HEARTBEAT_PATH = (agentId: string) => `/api/agents/${agentId}/heartbeat`
 
 function getDashboardUrl(): string {
-  return process.env['PANOPTICON_DASHBOARD_URL'] ?? 'http://localhost:3011'
+  return process.env['OVERDECK_DASHBOARD_URL'] ?? 'http://localhost:3011'
 }
 
 async function readInternalToken(env: HookEnv): Promise<string | null> {
-  const fromEnv = process.env['PANOPTICON_INTERNAL_TOKEN']
+  const fromEnv = process.env['OVERDECK_INTERNAL_TOKEN']
   if (fromEnv?.trim()) return fromEnv.trim()
-  const panopticonHome = env.home ? join(env.home, '.panopticon') : (process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon'))
+  const panopticonHome = env.home ? join(env.home, '.panopticon') : (process.env['OVERDECK_HOME'] || join(homedir(), '.panopticon'))
   try {
     const token = (await readFile(join(panopticonHome, 'internal-token'), 'utf8')).trim()
     return token.length > 0 ? token : null
@@ -287,7 +287,7 @@ async function readAgentState(env: HookEnv): Promise<Record<string, unknown>> {
 
 async function issueIdFor(env: HookEnv): Promise<string | null> {
   if (env.issueId) return env.issueId.toUpperCase()
-  if (process.env['PANOPTICON_ISSUE_ID']) return process.env['PANOPTICON_ISSUE_ID']!.toUpperCase()
+  if (process.env['OVERDECK_ISSUE_ID']) return process.env['OVERDECK_ISSUE_ID']!.toUpperCase()
   const state = await readAgentState(env)
   const fromState = state['issueId'] ?? state['currentIssue']
   if (typeof fromState === 'string' && fromState.trim()) return fromState.toUpperCase()
@@ -297,7 +297,7 @@ async function issueIdFor(env: HookEnv): Promise<string | null> {
 
 async function workspaceFor(env: HookEnv): Promise<string | null> {
   if (env.workspace) return env.workspace
-  if (process.env['PANOPTICON_WORKSPACE']) return process.env['PANOPTICON_WORKSPACE']!
+  if (process.env['OVERDECK_WORKSPACE']) return process.env['OVERDECK_WORKSPACE']!
   const state = await readAgentState(env)
   return typeof state['workspace'] === 'string' && state['workspace'].trim() ? state['workspace'] : null
 }
@@ -313,7 +313,7 @@ async function sessionIdFor(env: HookEnv): Promise<string | null> {
 }
 
 function roleFor(env: HookEnv): string {
-  return env.role ?? process.env['PANOPTICON_AGENT_ROLE'] ?? process.env['PANOPTICON_SESSION_TYPE'] ?? ''
+  return env.role ?? process.env['OVERDECK_AGENT_ROLE'] ?? process.env['OVERDECK_SESSION_TYPE'] ?? ''
 }
 
 function usageNumber(value: unknown): number {
@@ -422,7 +422,7 @@ async function evidenceClean(env: HookEnv): Promise<boolean> {
 async function readTurnOutput(env: HookEnv, event: TurnEndEvent): Promise<string> {
   if (event.output?.trim()) return event.output.slice(-MAX_TURN_OUTPUT_BYTES)
   if (event.transcript?.trim()) return event.transcript.slice(-MAX_TURN_OUTPUT_BYTES)
-  const path = event.sessionLogPath ?? env.sessionLogPath ?? process.env['PANOPTICON_PI_SESSION_LOG']
+  const path = event.sessionLogPath ?? env.sessionLogPath ?? process.env['OVERDECK_PI_SESSION_LOG']
   if (!path) return ''
   try {
     const contents = await readFile(path, 'utf8')
@@ -458,7 +458,7 @@ const COMPLETION_PHRASES = [
 ]
 
 function hasStructuredCompletionMarker(output: string): boolean {
-  if (/\bPANOPTICON_WORK_COMPLETE\b/i.test(output)) return true
+  if (/\bOVERDECK_WORK_COMPLETE\b/i.test(output)) return true
 
   for (const phrase of COMPLETION_PHRASES) {
     const pattern = new RegExp(phrase.replace(/ /g, '\\s+'), 'ig')
@@ -511,7 +511,7 @@ export async function handleWorkAgentTurnEnd(env: HookEnv, event: TurnEndEvent):
   }
 
   const turns = await updateProgress(env, 'turn', envFor(env).now())
-  const threshold = env.stuckTurnThreshold ?? Number(process.env['PANOPTICON_PI_STUCK_TURN_THRESHOLD'] ?? 3)
+  const threshold = env.stuckTurnThreshold ?? Number(process.env['OVERDECK_PI_STUCK_TURN_THRESHOLD'] ?? 3)
   if (turns >= threshold) {
     await markStuck(env, `No completion or progress detected after ${turns} Pi turn_end events`)
   }
@@ -606,7 +606,7 @@ export async function handleWorkspaceContext(ctx: unknown, cwd: string = process
 
 export async function handleSessionBriefingContext(
   ctx: unknown,
-  home: string = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon'),
+  home: string = process.env['OVERDECK_HOME'] || join(homedir(), '.panopticon'),
 ): Promise<void> {
   await appendSystemPromptFile(ctx, join(home, 'session-context.md'))
 }
@@ -621,7 +621,7 @@ export async function handleSessionBriefingContext(
  * ~/.claude/CLAUDE.md.
  */
 export async function handleGlobalContext(ctx: unknown): Promise<void> {
-  const home = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon')
+  const home = process.env['OVERDECK_HOME'] || join(homedir(), '.panopticon')
   await appendSystemPromptFile(ctx, join(home, 'context', 'pi-global.md'))
 }
 
@@ -637,7 +637,7 @@ async function appendSystemPromptFile(ctx: unknown, file: string): Promise<void>
 }
 
 export default function panopticonPiExtension(pi: PiExtensionAPI): void {
-  const agentId = process.env['PANOPTICON_AGENT_ID']
+  const agentId = process.env['OVERDECK_AGENT_ID']
   if (!agentId) return
 
   const env: HookEnv = { agentId }

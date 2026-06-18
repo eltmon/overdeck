@@ -368,7 +368,7 @@ Research needed:
 
 - **Decision:** 
   1. **Root cause identified** — Hooks were never unreliable; the SessionStart hook was simply never created or registered
-  2. **Fix required before implementation** — Create `scripts/session-start-hook` (follow pattern of existing hooks: agent ID from `$PANOPTICON_AGENT_ID` or tmux session name, write `ready.json` with `{"ready":true}`)
+  2. **Fix required before implementation** — Create `scripts/session-start-hook` (follow pattern of existing hooks: agent ID from `$OVERDECK_AGENT_ID` or tmux session name, write `ready.json` with `{"ready":true}`)
   3. **Update `src/cli/commands/setup/hooks.ts`** to:
      - Add `'session-start-hook'` to the `hookScripts` array (line 151)
      - Add `SessionStart` to `hooksAlreadyConfigured()` check (line 93)

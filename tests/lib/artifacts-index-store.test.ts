@@ -16,18 +16,18 @@ describe('artifact index store', () => {
   let home: string;
 
   beforeEach(() => {
-    originalHome = process.env.PANOPTICON_HOME;
+    originalHome = process.env.OVERDECK_HOME;
     home = mkdtempSync(join(tmpdir(), 'pan-artifact-index-'));
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
   });
 
   afterEach(() => {
-    if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = originalHome;
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('creates the artifact table and lookup indexes under PANOPTICON_HOME', () => {
+  it('creates the artifact table and lookup indexes under OVERDECK_HOME', () => {
     const repo = new ArtifactIndexRepository();
     repo.close();
 

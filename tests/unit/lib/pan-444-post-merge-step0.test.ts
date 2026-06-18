@@ -81,7 +81,7 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../src/lib/paths.js', () => ({
-  PANOPTICON_HOME: '/tmp/panopticon-test',
+  OVERDECK_HOME: '/tmp/panopticon-test',
   AGENTS_DIR: '/tmp/panopticon-test/agents',
   getPanopticonHome: vi.fn(() => '/tmp/panopticon-test'),
   PROJECT_DOCS_SUBDIR: 'docs',

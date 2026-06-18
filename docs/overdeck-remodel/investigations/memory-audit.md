@@ -334,7 +334,7 @@ Read-side status/identity resolvers are already single (`rollup.ts:readCurrentSt
    "first-class Memory" gaps are: **(a)** is `~/.panopticon/memory/` (170 MB
    today) in the **backup** surface? and **(b)** it is **per-machine and
    non-portable** — keyed by local `projectId`/`sessionId`, living under
-   `$PANOPTICON_HOME`, with nothing syncing it across machines. If Memory is to
+   `$OVERDECK_HOME`, with nothing syncing it across machines. If Memory is to
    be first-class, *that* is the work: a durable/portable home for the
    `~/.panopticon/memory/` tree, not a DB column export.
 

@@ -161,8 +161,8 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
     vi.clearAllMocks();
     vi.resetModules();
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-start-host-yes-parallel-'));
-    originalPanopticonHome = process.env.PANOPTICON_HOME;
-    process.env.PANOPTICON_HOME = join(projectRoot, '.panopticon-home');
+    originalPanopticonHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = join(projectRoot, '.panopticon-home');
     stdinIsTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
     Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
 
@@ -190,8 +190,8 @@ describe('pan start --host --yes parallel spawn regression (PAN-1629)', () => {
     } else {
       delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
     }
-    if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = originalPanopticonHome;
+    if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalPanopticonHome;
     rmSync(projectRoot, { recursive: true, force: true });
     vi.restoreAllMocks();
   });

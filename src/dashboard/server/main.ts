@@ -63,18 +63,18 @@ import { getAgentSessionsSync } from '../../lib/tmux.js';
 
 declare const Bun: unknown;
 
-// Persist this process's console output to <PANOPTICON_HOME>/logs/dashboard.log
+// Persist this process's console output to <OVERDECK_HOME>/logs/dashboard.log
 // in every launch mode (PAN-1552) — must run before any startup logging so the
 // record (including conversation-message 500 causes) survives `serve`/npx and
 // the desktop app, not just detached `pan up`.
 initDashboardLogFile();
 console.log(`[panopticon] Boot gates: ${formatBootGateState(resolveBootGates())}`);
 
-// Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
+// Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
 
 // Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
-// Generates and persists a random token at <PANOPTICON_HOME>/internal-token (mode 0600)
+// Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
 
@@ -94,16 +94,16 @@ await initTrackerConfigCache().catch(err => {
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
 // then fetches fresh data from APIs in the background.
 //
-// PAN-1817: peer dashboards inside workspace containers (PANOPTICON_DISABLE_DEACON=1)
+// PAN-1817: peer dashboards inside workspace containers (OVERDECK_DISABLE_DEACON=1)
 // load the SQLite cache and serve READ-ONLY without polling the trackers. The host
 // `pan up` dashboard is the single tracker poller. Without this gate, every workspace
 // container ran its own Linear/GitHub poller against the shared API key — ~17 of them
 // at once exhausted Linear's 2500/hr quota. This mirrors the single-deacon invariant:
 // a peer dashboard is a read/UI peer, never a second orchestrator.
-const isPeerDashboard = process.env.PANOPTICON_DISABLE_DEACON === '1';
+const isPeerDashboard = process.env.OVERDECK_DISABLE_DEACON === '1';
 if (isPeerDashboard) {
   void startSharedIssueService({ skipPolling: true });
-  console.log('[panopticon] IssueDataService started in CACHE-ONLY mode — peer dashboard (PANOPTICON_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
+  console.log('[panopticon] IssueDataService started in CACHE-ONLY mode — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
 } else {
   void startSharedIssueService().then(() => {
     console.log('[panopticon] IssueDataService background fetch complete');
@@ -572,22 +572,22 @@ await processPendingFeedbackDeliveries();
 // work agents that forgot to call `pan done`, nudges dead-end agents,
 // and detects stuck thinking loops. Without it, stalled agents are invisible.
 //
-// Emergency escape hatch: PANOPTICON_DISABLE_DEACON=1 skips auto-start even
+// Emergency escape hatch: OVERDECK_DISABLE_DEACON=1 skips auto-start even
 // when config.startup.auto_start is true. Use this when deacon's first-cycle
 // scan over many workspaces is starving the event loop and preventing the
 // HTTP server from accepting connections (the "Bad Gateway after pan up"
 // failure mode). The dashboard comes up clean; start cloister manually from
 // the UI once the workspace backlog is cleaned up.
-if (process.env.PANOPTICON_DISABLE_AUTO_MERGE === '1') {
-  console.log('[panopticon] Auto-merge executor SKIPPED (PANOPTICON_DISABLE_AUTO_MERGE=1)');
+if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
+  console.log('[panopticon] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
 } else {
   startAutoMergeExecutor();
   console.log('[panopticon] Auto-merge executor started');
 }
 
-if (process.env.PANOPTICON_DISABLE_DEACON === '1') {
-  console.log('[panopticon] Cloister auto-start SKIPPED (PANOPTICON_DISABLE_DEACON=1)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via PANOPTICON_DISABLE_DEACON — deacon is not running' });
+if (process.env.OVERDECK_DISABLE_DEACON === '1') {
+  console.log('[panopticon] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
+  emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
     console.error('[panopticon] Cloister auto-start failed:', err);
@@ -651,7 +651,7 @@ await (async () => {
 
     // PAN-1960: the legacy seed is opt-in. A normal boot leaves overdeck.db
     // empty; enable the import on demand with `pan up --seed-from-legacy`.
-    if (process.env.PANOPTICON_SEED_FROM_LEGACY !== '1') {
+    if (process.env.OVERDECK_SEED_FROM_LEGACY !== '1') {
       console.log('[panopticon] Overdeck seed skipped — empty DB (pass `pan up --seed-from-legacy` to import legacy conversations + in-flight state)');
       return;
     }

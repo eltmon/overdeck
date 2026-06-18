@@ -237,24 +237,24 @@ afterEach(async () => {
 
   const { resetDatabase } = await import('../../src/lib/database/index.js');
   resetDatabase();
-  if (previousPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-  else process.env.PANOPTICON_HOME = previousPanopticonHome;
+  if (previousPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = previousPanopticonHome;
 
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe('flywheel substrate bug smoke', () => {
   it('flows hook provenance through poller projection, stats route, and Stats tab', async () => {
-    previousPanopticonHome = process.env.PANOPTICON_HOME;
-    process.env.PANOPTICON_HOME = await makePanopticonHome();
+    previousPanopticonHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = await makePanopticonHome();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-25T12:15:00.000Z'));
 
     const hookOutput = runGhIssueTrailerHook(payload("gh issue create --title 'Substrate bug' --body 'body text'"), {
-      PANOPTICON_HOME: process.env.PANOPTICON_HOME,
-      PANOPTICON_AGENT_ID: 'agent-flywheel',
-      PANOPTICON_FLYWHEEL_RUN_ID: 'RUN-777',
-      PANOPTICON_FLYWHEEL_AGENT_ROLE: 'flywheel',
+      OVERDECK_HOME: process.env.OVERDECK_HOME,
+      OVERDECK_AGENT_ID: 'agent-flywheel',
+      OVERDECK_FLYWHEEL_RUN_ID: 'RUN-777',
+      OVERDECK_FLYWHEEL_AGENT_ROLE: 'flywheel',
     });
     const issueBody = extractSingleQuotedBody(updatedCommand(hookOutput));
     expect(issueBody).toContain('Flywheel-Run-Id: RUN-777');

@@ -170,7 +170,7 @@ Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue t
     1. **node-pty** (`@homebridge/node-pty-prebuilt-multiarch`) is a native Node addon. Under Bun's addon compat layer the PTY spawns but exits with code 0 immediately, breaking `/ws/terminal` for all workspaces.
     2. **Circular ESM deps** — the dashboard source has circular imports that Bun tolerates but Node.js strict ESM rejects, so tsx/source-mode also fails under Node.
   - `pan up` handles this automatically — it runs `dist/dashboard/server.js` under Node 22. Run `npm run build` first if the dist is stale.
-  - See [docs/PANOPTICON_DEV_SOP.md](docs/PANOPTICON_DEV_SOP.md) for startup, mode switching, restart guarantees, and failure triage.
+  - See [docs/OVERDECK_DEV_SOP.md](docs/OVERDECK_DEV_SOP.md) for startup, mode switching, restart guarantees, and failure triage.
 - **Issue tracking**: GitHub Issues (PAN-XXX prefix), NOT Linear
 - **Package manager**: Bun (bun.lock, `bun install`, `bun add`)
 - **Workspaces**: Bun workspaces — `packages/contracts`, `src/dashboard/server`, `src/dashboard/frontend`
@@ -220,12 +220,12 @@ The default tmux socket (`/tmp/tmux-1000/default`) is NOT used by agents. Plain 
 Claude Code work agents and Claude Code conversation sessions use the PTY
 supervisor as the preferred orchestrator-to-agent delivery path. The launcher
 wraps Claude as `node <projectRoot>/dist/pty-supervisor.js claude ...`, exports
-`PANOPTICON_AGENT_ID`, and writes a per-agent `pty-token` under
-`${PANOPTICON_HOME}/agents/<id>/pty-token` before the tmux session starts.
+`OVERDECK_AGENT_ID`, and writes a per-agent `pty-token` under
+`${OVERDECK_HOME}/agents/<id>/pty-token` before the tmux session starts.
 
 The supervisor is Node 22-only because it owns a real PTY through
 `@homebridge/node-pty-prebuilt-multiarch`; do not run it under Bun. It binds
-`${PANOPTICON_HOME}/sockets/pty-<id>.sock` at mode `0600`, accepts authenticated
+`${OVERDECK_HOME}/sockets/pty-<id>.sock` at mode `0600`, accepts authenticated
 HTTP-on-unix POSTs, writes each delivered message into Claude's PTY input, and
 echoes the message into the tmux transcript so operators can see what was sent.
 
@@ -254,7 +254,7 @@ via `experimental.claudeCodeChannelsMcp: true`.
 `src/lib/channels/panopticon-bridge.ts` is a per-agent Bun stdio MCP server.
 When the diagnostic override is enabled, Claude is spawned with
 `--mcp-config <workspace>/.pan/agent-mcp.json --dangerously-load-development-channels server:panopticon-bridge`,
-the bridge listens on `${PANOPTICON_HOME}/sockets/agent-<id>.sock`, and
+the bridge listens on `${OVERDECK_HOME}/sockets/agent-<id>.sock`, and
 `deliverAgentMessage` uses it only after the supervisor tier fails. The
 `WARNING: Loading development channels` dialog is dismissed only when that MCP
 config is actually wired; supervisor-only sessions must not receive this Enter
@@ -312,7 +312,7 @@ After 3 consecutive failures, verification is bypassed to prevent permanent bloc
 
 Deacon auto-resume is intentionally suppressible through three gates:
 
-- **Boot no-resume:** `PANOPTICON_NO_RESUME=1`, `pan dev --no-resume`, or
+- **Boot no-resume:** `OVERDECK_NO_RESUME=1`, `pan dev --no-resume`, or
   `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
   that dashboard boot only. Restart without `--no-resume` to restore patrols.
 - **Manual pause:** `pan pause <id> [--reason <text>]` persists `paused` fields in
@@ -342,7 +342,7 @@ Key rules:
 - Configure the infra repo per project in `projects.yaml` under `pan_records: { repo, path }`.
 - `pan admin db rebuild-agents` reconstructs the `agents` table from `state.json` + live tmux.
 - `pan admin db backfill-records` writes permanent records for all in-flight issues.
-- `PANOPTICON_NO_RESUME=1` disables event-driven deacon resume/orphan recovery as a kill switch.
+- `OVERDECK_NO_RESUME=1` disables event-driven deacon resume/orphan recovery as a kill switch.
 
 See [`docs/AGENT-STATE-PLANES.md`](docs/AGENT-STATE-PLANES.md) for the full model.
 
@@ -461,7 +461,7 @@ When TLDR is available, you'll have these MCP tools:
 
 ## Bash Output Compression (RTK)
 
-When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm output, etc.) may be compressed by RTK. Re-run with `PANOPTICON_RTK_ENABLED=0` to regenerate raw command output.
+When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm output, etc.) may be compressed by RTK. Re-run with `OVERDECK_RTK_ENABLED=0` to regenerate raw command output.
 
 ## vBRIEF Plans & Lifecycle
 

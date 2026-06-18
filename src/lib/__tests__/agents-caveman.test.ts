@@ -51,18 +51,18 @@ describe('buildCavemanExports', () => {
     expect(result).toBe('');
   });
 
-  it('returns only PANOPTICON_CAVEMAN_VARIANT when variant is "disabled"', async () => {
+  it('returns only OVERDECK_CAVEMAN_VARIANT when variant is "disabled"', async () => {
     mockReadVariant.mockReturnValue(Effect.succeed('disabled'));
     const result = await buildCavemanExports('/workspace', baseConfig, false);
-    expect(result).toBe('export PANOPTICON_CAVEMAN_VARIANT="disabled"\n');
+    expect(result).toBe('export OVERDECK_CAVEMAN_VARIANT="disabled"\n');
     expect(result).not.toContain('CAVEMAN_DEFAULT_MODE');
   });
 
-  it('returns both CAVEMAN_DEFAULT_MODE and PANOPTICON_CAVEMAN_VARIANT when variant is "enabled"', async () => {
+  it('returns both CAVEMAN_DEFAULT_MODE and OVERDECK_CAVEMAN_VARIANT when variant is "enabled"', async () => {
     mockReadVariant.mockReturnValue(Effect.succeed('enabled'));
     const result = await buildCavemanExports('/workspace', baseConfig, false);
     expect(result).toContain('export CAVEMAN_DEFAULT_MODE="full"');
-    expect(result).toContain('export PANOPTICON_CAVEMAN_VARIANT="enabled"');
+    expect(result).toContain('export OVERDECK_CAVEMAN_VARIANT="enabled"');
   });
 
   it('returns empty string when variant is "enabled" but work mode is "off"', async () => {

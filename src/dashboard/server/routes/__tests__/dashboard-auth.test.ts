@@ -35,15 +35,15 @@ function requestCookie(setCookieHeader: string): string {
 
 describe('dashboard session token persistence', () => {
   beforeEach(() => {
-    delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
+    delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
 
   afterEach(() => {
-    delete process.env.PANOPTICON_INTERNAL_TOKEN;
-    delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
@@ -60,8 +60,8 @@ describe('dashboard session token persistence', () => {
     expect(hasDashboardAuthHeaders({ cookie })).toBe(true);
   });
 
-  it('honors PANOPTICON_DASHBOARD_SESSION_TOKEN override over internal-token derivation', () => {
-    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'explicit-override-token';
+  it('honors OVERDECK_DASHBOARD_SESSION_TOKEN override over internal-token derivation', () => {
+    process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'explicit-override-token';
     _resetDashboardSessionTokenForTests();
 
     const cookie = requestCookie(dashboardSessionCookieHeader());
@@ -72,7 +72,7 @@ describe('dashboard session token persistence', () => {
   it('invalidates a session cookie when the internal token rotates', () => {
     const cookie = requestCookie(dashboardSessionCookieHeader());
 
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'rotated-internal-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'rotated-internal-token';
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
 
@@ -86,15 +86,15 @@ describe('dashboard session token persistence', () => {
 
 describe('dashboard CSRF token persistence', () => {
   beforeEach(() => {
-    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
+    delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
 
   afterEach(() => {
-    delete process.env.PANOPTICON_INTERNAL_TOKEN;
-    delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });
@@ -108,8 +108,8 @@ describe('dashboard CSRF token persistence', () => {
     expect(dashboardCsrfToken()).toBe(before);
   });
 
-  it('honors PANOPTICON_DASHBOARD_CSRF_TOKEN override over internal-token derivation', () => {
-    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'explicit-csrf-override';
+  it('honors OVERDECK_DASHBOARD_CSRF_TOKEN override over internal-token derivation', () => {
+    process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'explicit-csrf-override';
     _resetDashboardSessionTokenForTests();
     expect(dashboardCsrfToken()).toBe('explicit-csrf-override');
   });
@@ -118,7 +118,7 @@ describe('dashboard CSRF token persistence', () => {
     const before = dashboardCsrfToken();
     expect(before).not.toBe(requestCookie(dashboardSessionCookieHeader()).split('=')[1]);
 
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'rotated-internal-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'rotated-internal-token';
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
 
@@ -128,11 +128,11 @@ describe('dashboard CSRF token persistence', () => {
 
 describe('dashboard session mint auth gate', () => {
   beforeEach(() => {
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'stable-internal-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
     _resetInternalTokenCacheForTests();
   });
   afterEach(() => {
-    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
     _resetInternalTokenCacheForTests();
   });
 

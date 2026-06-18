@@ -13,8 +13,8 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { openDatabase, type SqliteDatabase } from '../../../lib/database/driver.js';
 
-const PANOPTICON_HOME = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
-const CACHE_DB_PATH = join(PANOPTICON_HOME, 'cache.db');
+const OVERDECK_HOME = process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
+const CACHE_DB_PATH = join(OVERDECK_HOME, 'cache.db');
 
 // Default TTLs per tracker (seconds)
 export const DEFAULT_TTLS: Record<string, number> = {

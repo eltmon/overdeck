@@ -354,7 +354,7 @@ export class PiRuntimeSync implements AgentRuntimeSync {
     chmodSync(launcherPath, 0o755)
 
     await Effect.runPromise(createSession(agentId, config.workspace, `bash ${launcherPath}`, {
-      env: { PANOPTICON_AGENT_ID: agentId },
+      env: { OVERDECK_AGENT_ID: agentId },
     }))
 
     await waitForReady(agentId, SPAWN_READY_TIMEOUT_MS)

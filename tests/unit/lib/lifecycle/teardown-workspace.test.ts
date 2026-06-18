@@ -35,7 +35,7 @@ vi.mock('../../../../src/lib/tmux.js', async () => {
 
 vi.mock('../../../../src/lib/paths.js', () => ({
   AGENTS_DIR: join(tmpdir(), 'panopticon-test-agents'),
-  PANOPTICON_HOME: join(tmpdir(), 'panopticon-test-home'),
+  OVERDECK_HOME: join(tmpdir(), 'panopticon-test-home'),
   PROJECT_PRDS_SUBDIR: 'prds',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',

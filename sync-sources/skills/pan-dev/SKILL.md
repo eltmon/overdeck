@@ -60,7 +60,7 @@ sleep 1
 ### Step 1b: Export the dev-mode env var
 
 ```bash
-export PANOPTICON_DEV=1
+export OVERDECK_DEV=1
 ```
 
 This is read by `generatePanopticonTraefikConfig()` (src/lib/traefik.ts) so the
@@ -99,21 +99,21 @@ cd ~/.panopticon/traefik && docker compose up -d 2>&1
 Regenerate the Traefik dynamic config in dev mode so the frontend route points
 to Vite (3010) instead of the bundled server (3011):
 ```bash
-PANOPTICON_DEV=1 node -e "
+OVERDECK_DEV=1 node -e "
 import('~/Projects/panopticon-cli/dist/cli/index.js').catch(()=>{});
 import('~/Projects/panopticon-cli/src/lib/traefik.ts').catch(()=>{});
 " 2>/dev/null
 
 # Or, more reliably via tsx:
 cd ~/Projects/panopticon-cli && \
-  PANOPTICON_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generatePanopticonTraefikConfig())" 2>&1
+  OVERDECK_DEV=1 npx tsx -e "import('./src/lib/traefik.ts').then(m => m.generatePanopticonTraefikConfig())" 2>&1
 ```
 
 Verify the rendered file has the frontend on port 3010:
 ```bash
 grep 'host.docker.internal' ~/.panopticon/traefik/dynamic/panopticon.yml
 # Expected: 3010 (frontend) and 3011 (api). If both show 3011, the regen above
-# did not run with PANOPTICON_DEV=1; check the env var.
+# did not run with OVERDECK_DEV=1; check the env var.
 ```
 
 ### Step 5: Rebuild server if needed

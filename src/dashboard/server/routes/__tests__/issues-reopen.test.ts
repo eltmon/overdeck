@@ -143,10 +143,10 @@ async function postReopen(issueId: string) {
 }
 
 afterEach(() => {
-  delete process.env.PANOPTICON_INTERNAL_TOKEN;
-  delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
-  delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
-  delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+  delete process.env.OVERDECK_INTERNAL_TOKEN;
+  delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
+  delete process.env.OVERDECK_DASHBOARD_CSRF_TOKEN;
+  delete process.env.OVERDECK_TRUSTED_ORIGINS;
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   _resetTrustedOriginsForTests();
@@ -155,8 +155,8 @@ afterEach(() => {
 describe('POST /api/issues/:id/reopen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
-    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+    delete process.env.OVERDECK_TRUSTED_ORIGINS;
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();

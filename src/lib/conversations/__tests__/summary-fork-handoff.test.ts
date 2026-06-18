@@ -43,7 +43,7 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
 import { runModelSummary as mockedRunModelSummary } from '../smart-compaction.js';
 import { Effect as EffectMod } from 'effect';
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 const originalHome = process.env.HOME;
 const fixedNow = new Date('2026-05-23T04:35:00.000Z');
 
@@ -124,7 +124,7 @@ async function createSourceConversation(home: string, overrides: Partial<Convers
   createOverdeckDatabase({ dbPath });
   _testDbPaths.push(dbPath);
 
-  process.env.PANOPTICON_HOME = home;
+  process.env.OVERDECK_HOME = home;
   process.env.HOME = home;
 
   const cwd = overrides.cwd ?? '/home/test/project';
@@ -154,9 +154,9 @@ afterEach(() => {
   resetDiscoveredSessionsSchemaBootstrap();
   _testDbPaths.length = 0;
   if (originalPanopticonHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalPanopticonHome;
   }
   if (originalHome === undefined) {
     delete process.env.HOME;
@@ -223,7 +223,7 @@ describe('validateHandoffDoc', () => {
 describe('handoff fork handshake', () => {
   it('delivers the rendered handoff prompt and returns the validated document', async () => {
     const home = join(tmpdir(), `pan-handoff-request-${Date.now()}`);
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
     const paths = createHandoffPaths('conv-source', fixedNow.toISOString());
     const docText = validDoc();
 
@@ -256,7 +256,7 @@ describe('handoff fork handshake', () => {
     mkdirSync(home, { recursive: true });
     createOverdeckDatabase({ dbPath: join(home, 'overdeck.db') });
     _testDbPaths.push(join(home, 'overdeck.db'));
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
     process.env.HOME = home;
 
     const cwd = '/home/test/project';
@@ -404,7 +404,7 @@ describe('handoff fork handshake', () => {
   it('times out distinctly when the document and sentinel do not both appear', async () => {
     vi.useFakeTimers();
     const home = join(tmpdir(), `pan-handoff-timeout-${Date.now()}`);
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
 
     const result = requestHandoffFromAgent(sourceConversation(), undefined, {
       now: fixedNow,

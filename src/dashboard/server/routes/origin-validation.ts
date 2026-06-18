@@ -23,13 +23,13 @@ export function getTrustedOrigins(): string[] {
   addTrustedOrigin(origins, 'http://localhost:3010');
   addTrustedOrigin(origins, 'http://127.0.0.1:3010');
 
-  const trustedOrigins = process.env['PANOPTICON_TRUSTED_ORIGINS'];
+  const trustedOrigins = process.env['OVERDECK_TRUSTED_ORIGINS'];
   for (const origin of trustedOrigins?.split(',') ?? []) {
     addTrustedOrigin(origins, origin);
   }
 
-  const traefikDomain = process.env['PANOPTICON_TRAEFIK_DOMAIN'] ?? process.env['TRAEFIK_DOMAIN'];
-  if (process.env['PANOPTICON_TRAEFIK_ENABLED'] === '1' && traefikDomain) {
+  const traefikDomain = process.env['OVERDECK_TRAEFIK_DOMAIN'] ?? process.env['TRAEFIK_DOMAIN'];
+  if (process.env['OVERDECK_TRAEFIK_ENABLED'] === '1' && traefikDomain) {
     addTrustedOrigin(origins, `https://${traefikDomain}`);
   }
 

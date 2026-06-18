@@ -9,16 +9,16 @@ let TEST_HOME: string;
 beforeEach(() => {
   TEST_HOME = join(tmpdir(), `pan-1552-log-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.OVERDECK_HOME = TEST_HOME;
 });
 
 afterEach(() => {
-  delete process.env.PANOPTICON_HOME;
+  delete process.env.OVERDECK_HOME;
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
 describe('dashboardLogPath', () => {
-  it('resolves under PANOPTICON_HOME/logs', () => {
+  it('resolves under OVERDECK_HOME/logs', () => {
     expect(dashboardLogPath()).toBe(join(TEST_HOME, 'logs', 'dashboard.log'));
   });
 });

@@ -60,7 +60,7 @@ import {
   type PatrolResult,
   type DeaconLogEntry,
 } from './deacon.js';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
 import { rm } from 'fs/promises';
 import { join } from 'path';
@@ -77,8 +77,8 @@ import { isIssueClosed } from './issue-closed.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 
 // State file for cross-process communication
-const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
-const LEGACY_SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+const CLOISTER_STATE_FILE = join(OVERDECK_HOME, 'cloister.state');
+const LEGACY_SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 
 async function cleanupLegacySpecialistsDirectory(): Promise<void> {
   await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });

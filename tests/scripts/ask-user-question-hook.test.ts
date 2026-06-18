@@ -10,7 +10,7 @@ function writeStubHookLib(dir: string, eventLog: string): void {
   const lib = `#!/bin/bash
 set +e
 pan_resolve_agent_id() {
-  AGENT_ID="\${PANOPTICON_AGENT_ID:-}"
+  AGENT_ID="\${OVERDECK_AGENT_ID:-}"
   [ -n "$AGENT_ID" ]
 }
 pan_emit_event() {
@@ -78,7 +78,7 @@ describe('ask-user-question-hook (PAN-1520)', () => {
       },
     })
 
-    const { stdout, code } = await runHook(tempDir, stdin, { PANOPTICON_AGENT_ID: 'agent-pan-1520' })
+    const { stdout, code } = await runHook(tempDir, stdin, { OVERDECK_AGENT_ID: 'agent-pan-1520' })
 
     expect(code).toBe(0)
     const parsed = JSON.parse(stdout) as {
@@ -105,7 +105,7 @@ describe('ask-user-question-hook (PAN-1520)', () => {
       },
     })
 
-    await runHook(tempDir, stdin, { PANOPTICON_AGENT_ID: 'agent-pan-1520' })
+    await runHook(tempDir, stdin, { OVERDECK_AGENT_ID: 'agent-pan-1520' })
 
     const events = readFileSync(eventLog, 'utf-8')
     expect(events).toContain('agent-pan-1520')
@@ -114,19 +114,19 @@ describe('ask-user-question-hook (PAN-1520)', () => {
 
   it('passes through silently for non-AskUserQuestion tool calls', async () => {
     const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } })
-    const { stdout, code } = await runHook(tempDir, stdin, { PANOPTICON_AGENT_ID: 'agent-pan-1520' })
+    const { stdout, code } = await runHook(tempDir, stdin, { OVERDECK_AGENT_ID: 'agent-pan-1520' })
     expect(code).toBe(0)
     expect(stdout.trim()).toBe('')
   })
 
   it('exits cleanly on missing stdin', async () => {
-    const { stdout, code } = await runHook(tempDir, '', { PANOPTICON_AGENT_ID: 'agent-pan-1520' })
+    const { stdout, code } = await runHook(tempDir, '', { OVERDECK_AGENT_ID: 'agent-pan-1520' })
     expect(code).toBe(0)
     expect(stdout.trim()).toBe('')
   })
 
   it('exits cleanly on malformed JSON stdin', async () => {
-    const { code } = await runHook(tempDir, 'not-json-{', { PANOPTICON_AGENT_ID: 'agent-pan-1520' })
+    const { code } = await runHook(tempDir, 'not-json-{', { OVERDECK_AGENT_ID: 'agent-pan-1520' })
     // Hook must never break Claude Code — exit 0 even on bad input.
     expect(code).toBe(0)
   })

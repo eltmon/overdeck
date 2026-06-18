@@ -52,7 +52,7 @@ describe('auto-approve-hook', () => {
   ])('auto-allows read-only tool calls for %s', async (agentId) => {
     const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git diff --stat' } })
 
-    const { stdout, code } = await runHook(stdin, { HOME: home, PANOPTICON_AGENT_ID: agentId })
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: agentId })
 
     expect(code).toBe(0)
     const parsed = JSON.parse(stdout) as {
@@ -73,7 +73,7 @@ describe('auto-approve-hook', () => {
   ] as const)('stays silent for %s', async (_label, agentId) => {
     const stdin = JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git diff --stat' } })
 
-    const { stdout, code } = await runHook(stdin, { HOME: home, PANOPTICON_AGENT_ID: agentId })
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: agentId })
 
     expect(code).toBe(0)
     expect(stdout.trim()).toBe('')
@@ -87,7 +87,7 @@ describe('auto-approve-hook', () => {
       },
     })
 
-    const { stdout, code } = await runHook(stdin, { HOME: home, PANOPTICON_AGENT_ID: 'inspect-pan-1616-workspace-kb8b7' })
+    const { stdout, code } = await runHook(stdin, { HOME: home, OVERDECK_AGENT_ID: 'inspect-pan-1616-workspace-kb8b7' })
 
     expect(code).toBe(0)
     expect(stdout.trim()).toBe('')

@@ -7,7 +7,7 @@
  * (frequently wrong, per PAN-1520).
  *
  * Resolution order:
- *   1. `PANOPTICON_AGENT_ID` — the launcher exports this for every non-Docker
+ *   1. `OVERDECK_AGENT_ID` — the launcher exports this for every non-Docker
  *      claude-code conversation, set to the tmux session name (`conv-<name>`).
  *      We resolve the live conversation on that session.
  *   2. tmux fallback — read the current session name via `display-message` (the
@@ -30,7 +30,7 @@ const execFileAsync = promisify(execFile);
  * Prefers the launcher-exported env var; falls back to asking tmux directly.
  */
 export async function currentTmuxSession(): Promise<string | null> {
-  const fromEnv = process.env['PANOPTICON_AGENT_ID'];
+  const fromEnv = process.env['OVERDECK_AGENT_ID'];
   if (fromEnv && fromEnv.length > 0) return fromEnv;
 
   // Only meaningful when actually inside a tmux pane.

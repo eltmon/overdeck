@@ -30,12 +30,12 @@ function parseTtsWatchdogIntEnv(value: string | undefined, fallback: number, min
 
 export function readTtsWatchdogConfig(env: NodeJS.ProcessEnv = process.env): TtsWatchdogConfig {
   return {
-    enabled: env.PANOPTICON_TTS_WATCHDOG !== '0',
-    pollMs: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_POLL_MS, 5_000, 1_000),
-    failThreshold: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD, 1, 1),
-    maxRestarts: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_MAX_RESTARTS, 3, 1),
-    windowMs: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_WINDOW_MS, 10 * 60_000, 1_000),
-    startTimeoutMs: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS, 25_000, 1_000),
+    enabled: env.OVERDECK_TTS_WATCHDOG !== '0',
+    pollMs: parseTtsWatchdogIntEnv(env.OVERDECK_TTS_WATCHDOG_POLL_MS, 5_000, 1_000),
+    failThreshold: parseTtsWatchdogIntEnv(env.OVERDECK_TTS_WATCHDOG_FAIL_THRESHOLD, 1, 1),
+    maxRestarts: parseTtsWatchdogIntEnv(env.OVERDECK_TTS_WATCHDOG_MAX_RESTARTS, 3, 1),
+    windowMs: parseTtsWatchdogIntEnv(env.OVERDECK_TTS_WATCHDOG_WINDOW_MS, 10 * 60_000, 1_000),
+    startTimeoutMs: parseTtsWatchdogIntEnv(env.OVERDECK_TTS_WATCHDOG_START_TIMEOUT_MS, 25_000, 1_000),
   };
 }
 

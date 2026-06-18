@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
 import { createOverdeckDatabase, getOverdeckDatabasePath, OVERDECK_TABLE_COUNT } from '../../../scripts/create-overdeck-db.js';
 
-const previousHome = process.env.PANOPTICON_HOME;
+const previousHome = process.env.OVERDECK_HOME;
 let tempDirs: string[] = [];
 
 function makeTempDir(): string {
@@ -29,7 +29,7 @@ function tableNames(db: SqliteDatabase): string[] {
 }
 
 afterEach(() => {
-  process.env.PANOPTICON_HOME = previousHome;
+  process.env.OVERDECK_HOME = previousHome;
   for (const dir of tempDirs) {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -89,7 +89,7 @@ describe('createOverdeckDatabase', () => {
 
   it('defaults to overdeck.db without modifying panopticon.db', () => {
     const home = makeTempDir();
-    process.env.PANOPTICON_HOME = home;
+    process.env.OVERDECK_HOME = home;
     const panopticonDbPath = join(home, 'panopticon.db');
     writeFileSync(panopticonDbPath, 'legacy database bytes');
     const before = readFileSync(panopticonDbPath, 'utf8');

@@ -22,13 +22,13 @@ import {
 } from '../../../src/lib/cloister/specialist-logs.js';
 
 describe('specialist-logs', () => {
-  const originalPanopticonHome = process.env.PANOPTICON_HOME;
+  const originalPanopticonHome = process.env.OVERDECK_HOME;
   let testDir: string;
 
   beforeEach(() => {
     // Create unique test directory for each test
     testDir = join(tmpdir(), `panopticon-test-logs-${Date.now()}-${Math.random().toString(36).substring(7)}`);
-    process.env.PANOPTICON_HOME = testDir;
+    process.env.OVERDECK_HOME = testDir;
     mkdirSync(testDir, { recursive: true });
   });
 
@@ -36,7 +36,7 @@ describe('specialist-logs', () => {
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    process.env.PANOPTICON_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalPanopticonHome;
   });
 
   describe('generateRunId', () => {

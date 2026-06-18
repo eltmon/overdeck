@@ -65,7 +65,7 @@ export function isForkResultInProgress(conv: ForkResultConv): boolean {
  * origin) — a self-signed TLS hop would just make a loopback call fail.
  */
 function dashboardBaseUrl(): string {
-  return (process.env['PANOPTICON_DASHBOARD_URL'] || 'http://127.0.0.1:3011').replace(/\/$/, '');
+  return (process.env['OVERDECK_DASHBOARD_URL'] || 'http://127.0.0.1:3011').replace(/\/$/, '');
 }
 
 export async function forkConversationViaServer(

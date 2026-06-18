@@ -440,7 +440,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "In `src/lib/cloister/config.ts`, change `DEFAULT_CLOISTER_CONFIG.close_out` from `{ remove_workspace: false, delete_feature_branch: false }` to `{ remove_workspace: true, delete_feature_branch: true }`. Update `src/lib/cloister/__tests__/config.test.ts` snapshot. Add a brief note in `docs/PANOPTICON_DEV_SOP.md` (or `docs/HYGIENE.md` if that exists post-bead-hygiene-docs) explaining the change and how to opt out per-project via `projects.yaml`.",
+          "Action": "In `src/lib/cloister/config.ts`, change `DEFAULT_CLOISTER_CONFIG.close_out` from `{ remove_workspace: false, delete_feature_branch: false }` to `{ remove_workspace: true, delete_feature_branch: true }`. Update `src/lib/cloister/__tests__/config.test.ts` snapshot. Add a brief note in `docs/OVERDECK_DEV_SOP.md` (or `docs/HYGIENE.md` if that exists post-bead-hygiene-docs) explaining the change and how to opt out per-project via `projects.yaml`.",
           "Tests": "`src/lib/cloister/__tests__/config.test.ts` covers the new defaults."
         },
         "subItems": [

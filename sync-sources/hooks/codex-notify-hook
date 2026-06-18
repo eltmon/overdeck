@@ -14,7 +14,7 @@ const { join } = require('node:path');
 const { homedir } = require('node:os');
 const { writeFileSync, mkdirSync, existsSync } = require('node:fs');
 
-const agentId = process.env.PANOPTICON_AGENT_ID;
+const agentId = process.env.OVERDECK_AGENT_ID;
 if (!agentId) process.exit(0); // Not a Panopticon-managed agent
 
 // Read event JSON from stdin (Codex delivers via stdin by default).
@@ -30,7 +30,7 @@ try {
   // Ignore parse errors — best-effort heartbeat.
 }
 
-const panopticonHome = process.env.PANOPTICON_HOME || join(homedir(), '.panopticon');
+const panopticonHome = process.env.OVERDECK_HOME || join(homedir(), '.panopticon');
 const heartbeatsDir = join(panopticonHome, 'heartbeats');
 const agentDir = join(panopticonHome, 'agents', agentId);
 

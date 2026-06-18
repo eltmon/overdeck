@@ -8,7 +8,7 @@ import {
   writeStuckRemediationState,
 } from '../stuck-remediation-state.js';
 
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 let testHome: string;
 
 function stateFile(agentId: string): string {
@@ -18,7 +18,7 @@ function stateFile(agentId: string): string {
 describe('stuck-remediation state helpers', () => {
   beforeEach(() => {
     testHome = join(process.cwd(), `.tmp-stuck-remediation-${process.pid}-${Date.now()}`);
-    process.env.PANOPTICON_HOME = testHome;
+    process.env.OVERDECK_HOME = testHome;
   });
 
   afterEach(() => {
@@ -26,9 +26,9 @@ describe('stuck-remediation state helpers', () => {
       rmSync(testHome, { recursive: true, force: true });
     }
     if (originalPanopticonHome === undefined) {
-      delete process.env.PANOPTICON_HOME;
+      delete process.env.OVERDECK_HOME;
     } else {
-      process.env.PANOPTICON_HOME = originalPanopticonHome;
+      process.env.OVERDECK_HOME = originalPanopticonHome;
     }
     vi.restoreAllMocks();
   });

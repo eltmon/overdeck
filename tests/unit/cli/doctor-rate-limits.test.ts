@@ -12,7 +12,7 @@ describe('checkTrackerRateLimits', () => {
     testDir = mkdtempSync(join(tmpdir(), 'doctor-rate-limits-test-'));
     const panopticonHome = join(testDir, '.panopticon');
     mkdirSync(panopticonHome, { recursive: true });
-    vi.stubEnv('PANOPTICON_HOME', panopticonHome);
+    vi.stubEnv('OVERDECK_HOME', panopticonHome);
     vi.resetModules();
 
     const doctor = await import('../../../src/cli/commands/doctor.js');

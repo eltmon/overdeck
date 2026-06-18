@@ -9,7 +9,7 @@ describe('agent mutation origin validation', () => {
     delete process.env.NODE_ENV;
     process.env.PORT = '3011';
     delete process.env.DASHBOARD_URL;
-    delete process.env.PANOPTICON_INTERNAL_TOKEN;
+    delete process.env.OVERDECK_INTERNAL_TOKEN;
     _resetTrustedOriginsForTests();
   });
 
@@ -49,7 +49,7 @@ describe('agent mutation origin validation', () => {
   });
 
   it('rejects agent runtime event POSTs without the internal token', async () => {
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
 
     const result = await validateAgentRuntimeEventAuth({
       method: 'POST',
@@ -60,7 +60,7 @@ describe('agent mutation origin validation', () => {
   });
 
   it('allows agent runtime event POSTs with the internal token', async () => {
-    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
 
     const result = await validateAgentRuntimeEventAuth({
       method: 'POST',

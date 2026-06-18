@@ -16,9 +16,9 @@ import {
 } from '../../../src/lib/cloister/deacon.js';
 import { existsSync, unlinkSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { PANOPTICON_HOME } from '../../../src/lib/paths.js';
+import { OVERDECK_HOME } from '../../../src/lib/paths.js';
 
-const DEACON_DIR = join(PANOPTICON_HOME, 'deacon');
+const DEACON_DIR = join(OVERDECK_HOME, 'deacon');
 const STATE_FILE = join(DEACON_DIR, 'health-state.json');
 const CONFIG_FILE = join(DEACON_DIR, 'config.json');
 

@@ -267,16 +267,16 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   // Panopticon env vars
   if (config.panopticonEnv) {
     if (config.panopticonEnv.agentId != null) {
-      lines.push(`export PANOPTICON_AGENT_ID=${shellQuote(config.panopticonEnv.agentId)}`);
-      explicitlySetPanopticonKeys.add('PANOPTICON_AGENT_ID');
+      lines.push(`export OVERDECK_AGENT_ID=${shellQuote(config.panopticonEnv.agentId)}`);
+      explicitlySetPanopticonKeys.add('OVERDECK_AGENT_ID');
     }
     if (config.panopticonEnv.issueId != null) {
-      lines.push(`export PANOPTICON_ISSUE_ID=${shellQuote(config.panopticonEnv.issueId)}`);
-      explicitlySetPanopticonKeys.add('PANOPTICON_ISSUE_ID');
+      lines.push(`export OVERDECK_ISSUE_ID=${shellQuote(config.panopticonEnv.issueId)}`);
+      explicitlySetPanopticonKeys.add('OVERDECK_ISSUE_ID');
     }
     if (config.panopticonEnv.sessionType != null) {
-      lines.push(`export PANOPTICON_SESSION_TYPE=${shellQuote(config.panopticonEnv.sessionType)}`);
-      explicitlySetPanopticonKeys.add('PANOPTICON_SESSION_TYPE');
+      lines.push(`export OVERDECK_SESSION_TYPE=${shellQuote(config.panopticonEnv.sessionType)}`);
+      explicitlySetPanopticonKeys.add('OVERDECK_SESSION_TYPE');
     }
   }
 
@@ -322,7 +322,7 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
 
   // Unset Panopticon env (review agent — prevents parent attribution)
   if (config.unsetPanopticonEnv) {
-    const keysToUnset = ['PANOPTICON_AGENT_ID', 'PANOPTICON_ISSUE_ID', 'PANOPTICON_SESSION_TYPE']
+    const keysToUnset = ['OVERDECK_AGENT_ID', 'OVERDECK_ISSUE_ID', 'OVERDECK_SESSION_TYPE']
       .filter(k => !explicitlySetPanopticonKeys.has(k));
     if (keysToUnset.length > 0) {
       lines.push(`unset ${keysToUnset.join(' ')}`);

@@ -15,7 +15,7 @@ import { GitError } from '../errors.js';
 
 const execAsync = promisify(exec);
 
-const PANOPTICON_HOME = join(homedir(), '.panopticon');
+const OVERDECK_HOME = join(homedir(), '.panopticon');
 
 export interface InspectCheckpoint {
   beadId: string;
@@ -32,7 +32,7 @@ export interface InspectCheckpointFile {
  * Get the directory for a project's inspect checkpoints.
  */
 function getCheckpointDir(projectKey: string): string {
-  return join(PANOPTICON_HOME, 'specialists', projectKey, 'inspect-agent', 'checkpoints');
+  return join(OVERDECK_HOME, 'specialists', projectKey, 'inspect-agent', 'checkpoints');
 }
 
 /**

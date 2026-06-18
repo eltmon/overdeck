@@ -132,7 +132,7 @@ vi.mock('../../lifecycle/workflows.js', async () => {
   const { Effect } = await import('effect');
   return { closeOut: vi.fn(() => Effect.succeed({ success: true, steps: [] })) };
 });
-vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents', packageRoot: '/tmp/test-package-root' }));
+vi.mock('../../paths.js', () => ({ OVERDECK_HOME: '/tmp/test-panopticon', AGENTS_DIR: '/tmp/test-agents', packageRoot: '/tmp/test-package-root' }));
 vi.mock('../../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn(), logDeaconEvent: vi.fn() }));
 vi.mock('../../projects.js', () => ({
   getProject: vi.fn(() => null),

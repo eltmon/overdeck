@@ -11,19 +11,19 @@
 # Shell: intended to be sourced, not executed. Exports no subprocesses; all
 # helpers are plain bash functions.
 
-PAN_DASHBOARD_URL="${PANOPTICON_DASHBOARD_URL:-http://localhost:3011}"
-PAN_CURL_TIMEOUT="${PANOPTICON_HOOK_TIMEOUT:-0.5}"
+PAN_DASHBOARD_URL="${OVERDECK_DASHBOARD_URL:-http://localhost:3011}"
+PAN_CURL_TIMEOUT="${OVERDECK_HOOK_TIMEOUT:-0.5}"
 
 # Internal token for authenticated HTTP ingestion (PAN-1596). The
 # /api/agents/:id/heartbeat route is token-gated — without this header every
 # hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity
 # (thinking/working/idle/waiting) never reaches the AgentStateService mirror.
-# No launcher exports PANOPTICON_INTERNAL_TOKEN, so source it from the on-disk
+# No launcher exports OVERDECK_INTERNAL_TOKEN, so source it from the on-disk
 # token as the primary path. Empty token => same 403/drop as before (no
 # regression).
-PAN_INTERNAL_TOKEN="${PANOPTICON_INTERNAL_TOKEN:-}"
+PAN_INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 if [ -z "$PAN_INTERNAL_TOKEN" ]; then
-  _pan_token_path="${PANOPTICON_HOME:-$HOME/.panopticon}/internal-token"
+  _pan_token_path="${OVERDECK_HOME:-$HOME/.panopticon}/internal-token"
   [ -f "$_pan_token_path" ] && PAN_INTERNAL_TOKEN=$(cat "$_pan_token_path" 2>/dev/null || true)
 fi
 
@@ -32,8 +32,8 @@ fi
 # can exit cleanly. We refuse to emit events that can't be authoritatively
 # attributed — the whole point of HTTP ingestion is explicit identity.
 pan_resolve_agent_id() {
-  if [ -n "$PANOPTICON_AGENT_ID" ]; then
-    AGENT_ID="$PANOPTICON_AGENT_ID"
+  if [ -n "$OVERDECK_AGENT_ID" ]; then
+    AGENT_ID="$OVERDECK_AGENT_ID"
   elif [ -n "$TMUX" ]; then
     AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
   else

@@ -21,8 +21,8 @@ function startSupervisor(agentId: string, command: string, args: string[] = []):
   proc = spawn(process.execPath, [SUPERVISOR_ENTRY, command, ...args], {
     env: {
       ...process.env,
-      PANOPTICON_HOME: tmpHome,
-      PANOPTICON_AGENT_ID: agentId,
+      OVERDECK_HOME: tmpHome,
+      OVERDECK_AGENT_ID: agentId,
       TERM: 'xterm-256color',
     },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -165,7 +165,7 @@ afterEach(async () => {
 
 beforeEach(() => {
   tmpHome = mkdtempSync(join(tmpdir(), 'pan-pty-supervisor-'));
-  process.env.PANOPTICON_HOME = tmpHome;
+  process.env.OVERDECK_HOME = tmpHome;
   stdout = '';
   stderr = '';
   proc = null;

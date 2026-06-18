@@ -24,9 +24,9 @@ describe('agent permission helpers', () => {
     delete process.env.DASHBOARD_URL;
     delete process.env.API_PORT;
     delete process.env.PORT;
-    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
-    delete process.env.PANOPTICON_TRAEFIK_ENABLED;
-    delete process.env.PANOPTICON_TRAEFIK_DOMAIN;
+    delete process.env.OVERDECK_TRUSTED_ORIGINS;
+    delete process.env.OVERDECK_TRAEFIK_ENABLED;
+    delete process.env.OVERDECK_TRAEFIK_DOMAIN;
     _resetTrustedOriginsForTests();
   });
 
@@ -43,8 +43,8 @@ describe('agent permission helpers', () => {
 
   it('trusts the configured Traefik dashboard origin', () => {
     process.env.PORT = '3011';
-    process.env.PANOPTICON_TRAEFIK_ENABLED = '1';
-    process.env.PANOPTICON_TRAEFIK_DOMAIN = 'pan.localhost';
+    process.env.OVERDECK_TRAEFIK_ENABLED = '1';
+    process.env.OVERDECK_TRAEFIK_DOMAIN = 'pan.localhost';
     _resetTrustedOriginsForTests();
 
     const result = validateOrigin({
@@ -58,7 +58,7 @@ describe('agent permission helpers', () => {
   });
 
   it('trusts explicit comma-separated dashboard origins', () => {
-    process.env.PANOPTICON_TRUSTED_ORIGINS = 'https://pan.localhost, https://admin.pan.localhost/path';
+    process.env.OVERDECK_TRUSTED_ORIGINS = 'https://pan.localhost, https://admin.pan.localhost/path';
     _resetTrustedOriginsForTests();
 
     expect(validateOrigin({ method: 'POST', headers: { origin: 'https://pan.localhost' } } as any)).toEqual({ ok: true });

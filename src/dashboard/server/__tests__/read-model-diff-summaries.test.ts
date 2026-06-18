@@ -21,8 +21,8 @@ async function withIsolatedReadModel<T>(
   options?: { setupMocks?: () => void; initialOverdeckAgents?: ReadonlyArray<unknown> },
 ): Promise<T> {
   const tmpHome = mkdtempSync(join(tmpdir(), 'pan-1024-read-model-'))
-  const originalHome = process.env['PANOPTICON_HOME']
-  process.env['PANOPTICON_HOME'] = tmpHome
+  const originalHome = process.env['OVERDECK_HOME']
+  process.env['OVERDECK_HOME'] = tmpHome
 
   try {
     vi.resetModules()
@@ -44,7 +44,7 @@ async function withIsolatedReadModel<T>(
     })
     return await Effect.runPromise(Effect.provide(program, ReadModelServiceLive.pipe(L.provide(mockLayer))))
   } finally {
-    process.env['PANOPTICON_HOME'] = originalHome
+    process.env['OVERDECK_HOME'] = originalHome
     rmSync(tmpHome, { recursive: true, force: true })
   }
 }

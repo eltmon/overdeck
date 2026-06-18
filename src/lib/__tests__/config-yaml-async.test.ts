@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const originalCwd = process.cwd();
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 let projectRoot: string;
 let testHome: string;
 
@@ -15,14 +15,14 @@ describe('async yaml config loading', () => {
     projectRoot = mkdtempSync(join(tmpdir(), 'pan-config-project-'));
     testHome = mkdtempSync(join(tmpdir(), 'pan-config-home-'));
     mkdirSync(join(projectRoot, '.git'));
-    process.env.PANOPTICON_HOME = testHome;
+    process.env.OVERDECK_HOME = testHome;
     process.chdir(projectRoot);
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
-    if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
-    else process.env.PANOPTICON_HOME = originalPanopticonHome;
+    if (originalPanopticonHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalPanopticonHome;
     rmSync(projectRoot, { recursive: true, force: true });
     rmSync(testHome, { recursive: true, force: true });
   });

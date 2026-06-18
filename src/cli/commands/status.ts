@@ -50,7 +50,7 @@ function renderRestartStatus(status: RestartStatus | null): void {
 }
 
 async function isBootNoResumeModeActive(): Promise<boolean> {
-  if (isNoResumeValueEnabled(process.env.PANOPTICON_NO_RESUME)) return true;
+  if (isNoResumeValueEnabled(process.env.OVERDECK_NO_RESUME)) return true;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 250);

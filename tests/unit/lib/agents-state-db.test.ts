@@ -15,7 +15,7 @@ import {
   type OverdeckTestDb,
 } from '../../helpers/overdeck-test-db.js';
 
-// ============== Overdeck DB fixture + temp PANOPTICON_HOME ==============
+// ============== Overdeck DB fixture + temp OVERDECK_HOME ==============
 
 let odb: OverdeckTestDb;
 let tempHome: string;

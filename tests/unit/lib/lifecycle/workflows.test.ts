@@ -48,7 +48,7 @@ vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   const testHome = join(tmpdir(), 'panopticon-wf-test-home');
   return {
     ...actual,
-    PANOPTICON_HOME: testHome,
+    OVERDECK_HOME: testHome,
     AGENTS_DIR: join(testHome, 'agents'),
     ARCHIVES_DIR: join(testHome, 'archives'),
   };
@@ -88,7 +88,7 @@ const closeOut = (...args: Parameters<typeof closeOutProgram>) => Effect.runProm
 const deepWipe = (...args: Parameters<typeof deepWipeProgram>) => Effect.runPromise(deepWipeProgram(...args));
 const close = (...args: Parameters<typeof closeProgram>) => Effect.runPromise(closeProgram(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoProgram>) => Effect.runPromise(resetToTodoProgram(...args));
-import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
+import { AGENTS_DIR, OVERDECK_HOME } from '../../../../src/lib/paths.js';
 import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../../../src/lib/pan-dir/specs.js';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
@@ -131,7 +131,7 @@ describe('workflows', () => {
     testDir = join(tmpdir(), `panopticon-wf-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
     mkdirSync(AGENTS_DIR, { recursive: true });
-    mkdirSync(PANOPTICON_HOME, { recursive: true });
+    mkdirSync(OVERDECK_HOME, { recursive: true });
 
     vi.clearAllMocks();
     process.env.HOME = testDir;
@@ -140,7 +140,7 @@ describe('workflows', () => {
   });
 
   afterEach(() => {
-    for (const dir of [testDir, AGENTS_DIR, PANOPTICON_HOME]) {
+    for (const dir of [testDir, AGENTS_DIR, OVERDECK_HOME]) {
       if (existsSync(dir)) {
         rmSync(dir, { recursive: true, force: true });
       }
@@ -251,7 +251,7 @@ describe('workflows', () => {
 
     it('should honor close_out branch deletion config', async () => {
       writeFileSync(
-        join(PANOPTICON_HOME, 'cloister.toml'),
+        join(OVERDECK_HOME, 'cloister.toml'),
         '[close_out]\nremove_workspace = false\ndelete_feature_branch = true\nauto = false\nauto_delay_minutes = 60\n',
       );
 
@@ -263,7 +263,7 @@ describe('workflows', () => {
 
     it('should delete the workspace, complete vBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
       writeFileSync(
-        join(PANOPTICON_HOME, 'cloister.toml'),
+        join(OVERDECK_HOME, 'cloister.toml'),
         '[close_out]\nremove_workspace = true\ndelete_feature_branch = false\nauto = false\nauto_delay_minutes = 60\n',
       );
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');

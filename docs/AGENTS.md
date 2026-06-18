@@ -42,7 +42,7 @@ New Claude Code work agents and Claude Code conversation sessions launch through
 the PTY supervisor by default. Their launchers wrap Claude as
 `node <projectRoot>/dist/pty-supervisor.js claude ...`; the supervisor runs under
 Node 22, owns Claude's PTY master fd, and binds
-`${PANOPTICON_HOME}/sockets/pty-<id>.sock` at mode `0600`. Because the
+`${OVERDECK_HOME}/sockets/pty-<id>.sock` at mode `0600`. Because the
 supervisor owns the PTY, a supervisor crash also terminates Claude; resume the
 session through the normal dashboard/Deacon flow.
 

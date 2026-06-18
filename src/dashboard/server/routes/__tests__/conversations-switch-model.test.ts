@@ -122,8 +122,8 @@ describe('POST /api/conversations/:name/switch-model', () => {
     mkdirSync(testHome, { recursive: true });
     originalHome = process.env.HOME;
     process.env.HOME = testHome;
-    process.env.PANOPTICON_HOME = join(testHome, '.panopticon');
-    mkdirSync(process.env.PANOPTICON_HOME, { recursive: true });
+    process.env.OVERDECK_HOME = join(testHome, '.panopticon');
+    mkdirSync(process.env.OVERDECK_HOME, { recursive: true });
 
     capturePaneMock.mockImplementation(() => Effect.succeed('Claude Fable 5 (claude-fable-5)\nctx 21%  cost $0.0000'));
     deliverAgentMessageMock.mockResolvedValue({ ok: true, path: 'supervisor' });
@@ -131,7 +131,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     getProviderAuthModeMock.mockResolvedValue('anthropic');
     killSessionMock.mockImplementation(() => Effect.succeed(undefined));
     createSessionMock.mockImplementation((session: string) => Effect.sync(() => {
-      const socketDir = join(process.env.PANOPTICON_HOME!, 'sockets');
+      const socketDir = join(process.env.OVERDECK_HOME!, 'sockets');
       mkdirSync(socketDir, { recursive: true, mode: 0o700 });
       const socketPath = join(socketDir, `pty-${session}.sock`);
       writeFileSync(socketPath, '');
@@ -143,7 +143,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     await resetDb();
     if (originalHome === undefined) delete process.env.HOME;
     else process.env.HOME = originalHome;
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
     rmSync(testHome, { recursive: true, force: true });
   });
 

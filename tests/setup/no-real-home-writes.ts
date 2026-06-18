@@ -27,7 +27,7 @@ function assertNotRealPanopticonHome(targets: unknown[]): void {
   for (const target of targets) {
     const blocked = blockedRealHomeTarget(target);
     if (blocked) {
-      throw new Error(`[test-guard] write to REAL ~/.panopticon blocked: ${blocked} — set PANOPTICON_HOME to a temp dir`);
+      throw new Error(`[test-guard] write to REAL ~/.panopticon blocked: ${blocked} — set OVERDECK_HOME to a temp dir`);
     }
   }
 }

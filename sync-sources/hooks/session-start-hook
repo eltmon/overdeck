@@ -38,7 +38,7 @@ pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"times
 # waitForReadySignal onto a tmux pane-scrape fallback coupled to permission-mode
 # footer text. clearReadySignal() removes this file before every (re)launch, so
 # its presence means "this session reached the prompt".
-READY_DIR="${PANOPTICON_HOME:-$HOME/.panopticon}/agents/$AGENT_ID"
+READY_DIR="${OVERDECK_HOME:-$HOME/.panopticon}/agents/$AGENT_ID"
 mkdir -p "$READY_DIR" 2>/dev/null
 if command -v jq >/dev/null 2>&1; then
   jq -n --arg agentId "$AGENT_ID" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
@@ -62,9 +62,9 @@ if [ -n "$MODEL" ]; then
   pan_emit_event "$AGENT_ID" "$BODY"
 fi
 
-INTERNAL_TOKEN="${PANOPTICON_INTERNAL_TOKEN:-}"
+INTERNAL_TOKEN="${OVERDECK_INTERNAL_TOKEN:-}"
 if [ -z "$INTERNAL_TOKEN" ]; then
-  TOKEN_PATH="${PANOPTICON_HOME:-$HOME/.panopticon}/internal-token"
+  TOKEN_PATH="${OVERDECK_HOME:-$HOME/.panopticon}/internal-token"
   if [ -f "$TOKEN_PATH" ]; then
     INTERNAL_TOKEN=$(cat "$TOKEN_PATH" 2>/dev/null || true)
   fi

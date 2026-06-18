@@ -7,8 +7,8 @@
  * events into the live event stream.
  *
  * Resolution order:
- *   1. `PANOPTICON_INTERNAL_TOKEN` env var (preferred for tests / explicit setup)
- *   2. `<PANOPTICON_HOME>/internal-token` (auto-generated on first server start)
+ *   1. `OVERDECK_INTERNAL_TOKEN` env var (preferred for tests / explicit setup)
+ *   2. `<OVERDECK_HOME>/internal-token` (auto-generated on first server start)
  *
  * The dashboard server calls `ensureInternalToken()` once at startup, which
  * generates a random token and persists it with mode 0600 if neither source is
@@ -43,7 +43,7 @@ function tokenFilePath(): string {
 export function getInternalTokenSync(): string | null {
   if (cachedToken !== undefined) return cachedToken;
 
-  const fromEnv = process.env.PANOPTICON_INTERNAL_TOKEN;
+  const fromEnv = process.env.OVERDECK_INTERNAL_TOKEN;
   if (fromEnv && fromEnv.length > 0) {
     cachedToken = fromEnv;
     return cachedToken;

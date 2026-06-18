@@ -173,13 +173,13 @@ pan admin specialists done review <issueId> --status blocked --notes "<one-line 
 For Pi sessions, also end your final response with exactly one structured sentinel line:
 
 ```text
-PANOPTICON_SPECIALIST_RESULT: review-agent passed
+OVERDECK_SPECIALIST_RESULT: review-agent passed
 ```
 
 or
 
 ```text
-PANOPTICON_SPECIALIST_RESULT: review-agent failed
+OVERDECK_SPECIALIST_RESULT: review-agent failed
 ```
 
 ## Signal the flywheel before you stall

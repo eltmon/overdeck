@@ -7,11 +7,11 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import { FsError } from '../errors.js';
 import { RuntimeType } from './interface.js';
 
-const METRICS_FILE = join(PANOPTICON_HOME, 'runtime-metrics.json');
+const METRICS_FILE = join(OVERDECK_HOME, 'runtime-metrics.json');
 
 // Task outcome
 export type TaskOutcome = 'success' | 'failure' | 'partial' | 'timeout' | 'canceled';
@@ -123,7 +123,7 @@ export function loadMetricsSync(): MetricsData {
  * Save metrics to file
  */
 export function saveMetricsSync(data: MetricsData): void {
-  mkdirSync(PANOPTICON_HOME, { recursive: true });
+  mkdirSync(OVERDECK_HOME, { recursive: true });
   data.lastUpdated = new Date().toISOString();
   writeFileSync(METRICS_FILE, JSON.stringify(data, null, 2));
 }

@@ -10,7 +10,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { FsError } from '../errors.js';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import { loadCloisterConfigSync, type CostLimitsConfig } from './config.js';
 import {
   getAgentRollup,
@@ -60,7 +60,7 @@ interface CostData {
 /**
  * Path to cost data file
  */
-const COST_DATA_FILE = join(PANOPTICON_HOME, 'cost-data.json');
+const COST_DATA_FILE = join(OVERDECK_HOME, 'cost-data.json');
 
 /**
  * Load cost data from file

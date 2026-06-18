@@ -13,7 +13,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { PANOPTICON_HOME } from '../paths.js';
+import { OVERDECK_HOME } from '../paths.js';
 import type {
   LifecycleContext,
   WorkflowResult,
@@ -622,7 +622,7 @@ async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
   } catch {
     // Fallback: direct file manipulation
     try {
-      const statusFile = join(PANOPTICON_HOME, 'review-status.json');
+      const statusFile = join(OVERDECK_HOME, 'review-status.json');
       if (existsSync(statusFile)) {
         const data = JSON.parse(await readFile(statusFile, 'utf-8'));
         const upperKey = issueId.toUpperCase();

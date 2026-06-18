@@ -16,11 +16,11 @@ const childProcessMocks = vi.hoisted(() => ({
 vi.mock('child_process', () => childProcessMocks);
 
 let tmpDir: string;
-const originalPanopticonHome = process.env.PANOPTICON_HOME;
+const originalPanopticonHome = process.env.OVERDECK_HOME;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), 'pan-issue-test-'));
-  process.env.PANOPTICON_HOME = join(tmpDir, '.panopticon-home');
+  process.env.OVERDECK_HOME = join(tmpDir, '.panopticon-home');
   childProcessMocks.execFileSync.mockImplementation(() => {
     throw new Error('bd unavailable');
   });
@@ -29,9 +29,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   if (originalPanopticonHome === undefined) {
-    delete process.env.PANOPTICON_HOME;
+    delete process.env.OVERDECK_HOME;
   } else {
-    process.env.PANOPTICON_HOME = originalPanopticonHome;
+    process.env.OVERDECK_HOME = originalPanopticonHome;
   }
   rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();

@@ -186,7 +186,7 @@ Harness selection follows the same role/sub-role shape. Because the convoy promp
 
 ## Cost attribution
 
-Review cost events use `PANOPTICON_SESSION_TYPE` as the stage key. The synthesis
+Review cost events use `OVERDECK_SESSION_TYPE` as the stage key. The synthesis
 role records as `review`; convoy reviewers record as `review.security`,
 `review.correctness`, `review.performance`, and `review.requirements`.
 

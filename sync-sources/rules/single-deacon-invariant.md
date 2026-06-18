@@ -12,7 +12,7 @@ Symptoms: `[deacon] Auto-resumed agent-XXX` messages firing constantly across ma
 **Rules:**
 
 - `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` and `.devcontainer/docker-compose.devcontainer.yml` MUST NOT include a `${HOME}/.panopticon:…` volume mount on the `server` service.
-- Both compose files MUST set `PANOPTICON_DISABLE_DEACON=1` on the `server` service environment as belt-and-suspenders. `src/dashboard/server/main.ts` already checks this env var and skips Cloister auto-start.
+- Both compose files MUST set `OVERDECK_DISABLE_DEACON=1` on the `server` service environment as belt-and-suspenders. `src/dashboard/server/main.ts` already checks this env var and skips Cloister auto-start.
 - The `server` service inside a workspace container is a development-time read/UI peer only — not a second orchestrator. It will start cleanly with no agent state. To inspect the host's running orchestrator, open `https://pan.localhost` (host) rather than the workspace's `https://api-feature-pan-XXX.pan.localhost`.
 
 **History:** PAN-821 (2026-04-25), PAN-698 (2026-05-12). For the broader workspace container contract, see `docs/WORKSPACE-CONTAINERS.md`.

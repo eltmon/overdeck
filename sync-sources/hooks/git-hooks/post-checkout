@@ -10,8 +10,8 @@
 # Worktrees can freely checkout any branch - that's their purpose.
 #
 # Auto-revert behavior:
-# - Agents (PANOPTICON_AGENT=1): Always auto-revert (agents should never checkout in main)
-# - Manual (PANOPTICON_AUTO_REVERT_CHECKOUT=1): Opt-in auto-revert for humans
+# - Agents (OVERDECK_AGENT=1): Always auto-revert (agents should never checkout in main)
+# - Manual (OVERDECK_AUTO_REVERT_CHECKOUT=1): Opt-in auto-revert for humans
 # - Default: Warn only, don't revert
 
 # Get the previous and new HEAD refs
@@ -67,16 +67,16 @@ echo ""
 
 # Auto-revert for agents and planning sessions
 # They should NEVER be checking out in main project
-IS_PANOPTICON_SESSION=0
+IS_OVERDECK_SESSION=0
 
 # Check explicit environment variables
-if [ "$PANOPTICON_AGENT" = "1" ] || [ -n "$PANOPTICON_AGENT_ID" ]; then
-    IS_PANOPTICON_SESSION=1
+if [ "$OVERDECK_AGENT" = "1" ] || [ -n "$OVERDECK_AGENT_ID" ]; then
+    IS_OVERDECK_SESSION=1
 fi
 
 # Check for planning session
-if [ "$PANOPTICON_PLANNING" = "1" ] || [ -n "$PANOPTICON_PLANNING_ISSUE" ]; then
-    IS_PANOPTICON_SESSION=1
+if [ "$OVERDECK_PLANNING" = "1" ] || [ -n "$OVERDECK_PLANNING_ISSUE" ]; then
+    IS_OVERDECK_SESSION=1
 fi
 
 # Check tmux session name pattern (agent-* or planning-* or specialist-*)
@@ -84,12 +84,12 @@ if [ -n "$TMUX" ]; then
     TMUX_SESSION=$(tmux display-message -p '#{session_name}' 2>/dev/null || true)
     case "$TMUX_SESSION" in
         agent-*|planning-*|specialist-*)
-            IS_PANOPTICON_SESSION=1
+            IS_OVERDECK_SESSION=1
             ;;
     esac
 fi
 
-if [ "$IS_PANOPTICON_SESSION" = "1" ]; then
+if [ "$IS_OVERDECK_SESSION" = "1" ]; then
     echo "🤖 Panopticon session detected - auto-reverting to main branch..."
     git checkout main --quiet
     echo "✓ Reverted to main branch. Agents/planning must use workspaces for feature branches."
@@ -97,8 +97,8 @@ if [ "$IS_PANOPTICON_SESSION" = "1" ]; then
 fi
 
 # Check for manual auto-revert environment variable
-if [ "$PANOPTICON_AUTO_REVERT_CHECKOUT" = "1" ]; then
-    echo "Auto-reverting to main branch (PANOPTICON_AUTO_REVERT_CHECKOUT=1)..."
+if [ "$OVERDECK_AUTO_REVERT_CHECKOUT" = "1" ]; then
+    echo "Auto-reverting to main branch (OVERDECK_AUTO_REVERT_CHECKOUT=1)..."
     git checkout main --quiet
     echo "Reverted to main branch."
     exit 0

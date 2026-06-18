@@ -5,17 +5,17 @@ import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { LOGS_DIR, PANOPTICON_HOME, SYNC_SOURCES, packageRoot } from './paths.js';
+import { LOGS_DIR, OVERDECK_HOME, SYNC_SOURCES, packageRoot } from './paths.js';
 import { loadConfigSync, type NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { ProcessSpawnError, FsError } from './errors.js';
 
 const execFileAsync = promisify(execFile);
 
-export const QWEN_TTS_PID_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.pid');
-export const QWEN_TTS_STATE_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.json');
-export const QWEN_TTS_START_LOCK_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.start.lock');
-export const QWEN_TTS_MANUAL_STOP_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.manual-stop');
-export const QWEN_TTS_AUTH_TOKEN_PATH = join(PANOPTICON_HOME, 'secrets', 'qwen-tts.token');
+export const QWEN_TTS_PID_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.pid');
+export const QWEN_TTS_STATE_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.json');
+export const QWEN_TTS_START_LOCK_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.start.lock');
+export const QWEN_TTS_MANUAL_STOP_PATH = join(OVERDECK_HOME, 'pids', 'qwen-tts.manual-stop');
+export const QWEN_TTS_AUTH_TOKEN_PATH = join(OVERDECK_HOME, 'secrets', 'qwen-tts.token');
 export const QWEN_TTS_AUTH_HEADER = 'X-Panopticon-TTS-Token';
 export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
 const GPU_MEMORY_CACHE_TTL_MS = 30_000;
@@ -202,7 +202,7 @@ function defaultAllowedOrigins(): string {
   if (dashboardUrl) origins.add(dashboardUrl);
   origins.add(`http://localhost:${port}`);
   origins.add(`http://127.0.0.1:${port}`);
-  for (const origin of process.env.PANOPTICON_TRUSTED_ORIGINS?.split(',') ?? []) {
+  for (const origin of process.env.OVERDECK_TRUSTED_ORIGINS?.split(',') ?? []) {
     const trimmed = origin.trim();
     if (trimmed) origins.add(trimmed);
   }
@@ -281,7 +281,7 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 }
 
 function readStartupGraceMs(): number {
-  return parsePositiveInt(process.env.PANOPTICON_TTS_DAEMON_STARTUP_GRACE_MS, DEFAULT_TTS_DAEMON_STARTUP_GRACE_MS);
+  return parsePositiveInt(process.env.OVERDECK_TTS_DAEMON_STARTUP_GRACE_MS, DEFAULT_TTS_DAEMON_STARTUP_GRACE_MS);
 }
 
 function startupDeadlineIso(): string {
@@ -677,7 +677,7 @@ async function hasCudaGpu(): Promise<boolean> {
   const configDir = join(process.env.HOME ?? '', '.config', 'systemd', 'user');
   await mkdir(configDir, { recursive: true });
   const unitPath = join(configDir, 'panopticon-qwen-tts.service');
-  const panBinary = process.env.PANOPTICON_PAN_BINARY ?? process.argv[1] ?? 'pan';
+  const panBinary = process.env.OVERDECK_PAN_BINARY ?? process.argv[1] ?? 'pan';
   const content = `[Unit]\nDescription=Panopticon Qwen TTS daemon\nAfter=default.target\n\n[Service]\nType=simple\nExecStart=${panBinary} tts start --foreground\nRestart=on-failure\nRestartSec=10\n\n[Install]\nWantedBy=default.target\n`;
   await writeFile(unitPath, content, 'utf8');
   return unitPath;
@@ -722,14 +722,14 @@ export const resolveTtsDaemonScript = (): Effect.Effect<string, FsError> =>
 export const getTtsDaemonVenvDir = (): Effect.Effect<string, FsError> =>
   Effect.tryPromise({
     try: () => getTtsDaemonVenvDirPromise(),
-    catch: (cause) => ttsFsError('getTtsDaemonVenvDir', PANOPTICON_HOME, cause),
+    catch: (cause) => ttsFsError('getTtsDaemonVenvDir', OVERDECK_HOME, cause),
   });
 
 /** Resolved python interpreter inside the TTS daemon venv. */
 export const getTtsDaemonPython = (): Effect.Effect<string, FsError> =>
   Effect.tryPromise({
     try: () => getTtsDaemonPythonPromise(),
-    catch: (cause) => ttsFsError('getTtsDaemonPython', PANOPTICON_HOME, cause),
+    catch: (cause) => ttsFsError('getTtsDaemonPython', OVERDECK_HOME, cause),
   });
 
 /** True if a daemon state file exists on disk. */
@@ -811,12 +811,12 @@ export const installTtsDaemonDependencies = (): Effect.Effect<TtsDaemonInstallRe
 export const installTtsSystemdUnit = (): Effect.Effect<string, FsError> =>
   Effect.tryPromise({
     try: () => installTtsSystemdUnitPromise(),
-    catch: (cause) => ttsFsError('installTtsSystemdUnit', PANOPTICON_HOME, cause),
+    catch: (cause) => ttsFsError('installTtsSystemdUnit', OVERDECK_HOME, cause),
   });
 
 /** Reports whether the daemon venv is materialised. */
 export const ttsDaemonInstallState = (): Effect.Effect<{ venvDir: string; installed: boolean }, FsError> =>
   Effect.tryPromise({
     try: () => ttsDaemonInstallStatePromise(),
-    catch: (cause) => ttsFsError('ttsDaemonInstallState', PANOPTICON_HOME, cause),
+    catch: (cause) => ttsFsError('ttsDaemonInstallState', OVERDECK_HOME, cause),
   });
