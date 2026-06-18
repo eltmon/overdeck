@@ -46,7 +46,7 @@
     }
   },
   "bin": {
-    "panctl": "./dist/cli/index.js",
+    "overdeck": "./dist/cli/index.js",
     "pan": "./dist/cli/index.js"
   },
   "main": "./dist/index.js",

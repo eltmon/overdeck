@@ -183,7 +183,7 @@ const ensureDashboardBundle = async (
 };
 
 program
-  .name('pan')
+  .name('overdeck')
   .description('Multi-agent orchestration for AI coding assistants')
   .version(JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')).version)
   .option(
