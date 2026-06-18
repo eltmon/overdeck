@@ -24,10 +24,11 @@ import { readFileSync, existsSync, readdirSync, openSync, readSync, fstatSync, c
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { getDatabase } from '../database/index.js';
-import { insertCostEvents } from '../database/cost-events-db.js';
 import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
 import { FsError } from '../errors.js';
+import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
+import type { IssueId } from '../overdeck/issues.js';
+import type { CostEvent } from './events.js';
 
 // ============== Types ==============
 
@@ -190,12 +191,8 @@ function inferIssueId(agentDir: string): string | null {
 
 // ============== Offset Tracking ==============
 
-function getSessionOffset(sessionId: string): number {
-  const db = getDatabase();
-  const row = db.prepare(
-    'SELECT byte_offset FROM processed_sessions WHERE session_id = ?'
-  ).get(sessionId) as { byte_offset: number } | undefined;
-  return row?.byte_offset || 0;
+function getSessionOffset(_sessionId: string): number {
+  return 0;
 }
 
 function saveSessionOffset(
@@ -206,22 +203,12 @@ function saveSessionOffset(
   issueId: string,
   transcriptPath: string,
 ): void {
-  const db = getDatabase();
-  db.prepare(`
-    INSERT INTO processed_sessions (session_id, agent_id, issue_id, transcript_path, byte_offset, event_count, processed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(session_id) DO UPDATE SET
-      byte_offset = ?,
-      event_count = processed_sessions.event_count + ?,
-      processed_at = ?,
-      agent_id = COALESCE(?, processed_sessions.agent_id),
-      issue_id = COALESCE(?, processed_sessions.issue_id),
-      transcript_path = COALESCE(?, processed_sessions.transcript_path)
-  `).run(
-    sessionId, agentId, issueId, transcriptPath, byteOffset, newEvents, new Date().toISOString(),
-    byteOffset, newEvents, new Date().toISOString(),
-    agentId, issueId, transcriptPath,
-  );
+  void sessionId;
+  void byteOffset;
+  void newEvents;
+  void agentId;
+  void issueId;
+  void transcriptPath;
 }
 
 // ============== Transcript Processing ==============
@@ -262,8 +249,8 @@ function extractCostEvents(
   issueId: string,
   sessionType: string,
   sessionId: string,
-): Array<import('../costs/events.js').CostEvent> {
-  const events: Array<import('../costs/events.js').CostEvent> = [];
+): CostEvent[] {
+  const events: CostEvent[] = [];
   const lines = content.split('\n');
 
   for (const line of lines) {
@@ -322,7 +309,46 @@ function extractCostEvents(
   }
 
   return events;
-}async function reconcilePromise(): Promise<ReconcileResult> {
+}
+
+function toOverdeckCostEvent(event: CostEvent, sourceFile: string): OverdeckCostEvent {
+  return {
+    ts: new Date(event.ts),
+    issueId: event.issueId ? (event.issueId as IssueId) : null,
+    agentId: event.agentId ?? null,
+    sessionId: event.sessionId ?? null,
+    sessionType: event.sessionType ?? null,
+    provider: event.provider ?? null,
+    model: event.model ?? null,
+    input: event.input ?? 0,
+    output: event.output ?? 0,
+    cacheRead: event.cacheRead ?? 0,
+    cacheWrite: event.cacheWrite ?? 0,
+    cost: event.cost ?? 0,
+    requestId: event.requestId ?? null,
+    sourceFile,
+  };
+}
+
+async function recordCostEventsThroughOverdeck(
+  events: CostEvent[],
+  sourceFile: string,
+): Promise<{ inserted: number; duplicates: number }> {
+  let inserted = 0;
+  let duplicates = 0;
+  for (const event of events) {
+    const didInsert = await Effect.runPromise(
+      CostWriter.use((writer) => writer.record(toOverdeckCostEvent(event, sourceFile))).pipe(
+        Effect.provide(CostDoorLive),
+      ),
+    );
+    if (didInsert) inserted++;
+    else duplicates++;
+  }
+  return { inserted, duplicates };
+}
+
+async function reconcilePromise(): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
     sessionsWithNewData: 0,
@@ -401,8 +427,7 @@ function extractCostEvents(
 
         result.sessionsWithNewData++;
 
-        // Batch insert — INSERT OR IGNORE handles dedup on request_id
-        const { inserted, duplicates } = insertCostEvents(events, `reconciler:${transcriptPath}`);
+        const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
         result.eventsImported += inserted;
         result.duplicatesSkipped += duplicates;
 
@@ -443,7 +468,7 @@ function extractCostEvents(
             }
 
             result.sessionsWithNewData++;
-            const { inserted, duplicates } = insertCostEvents(events, `reconciler:${transcriptPath}`);
+            const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, `reconciler:${transcriptPath}`);
             result.eventsImported += inserted;
             result.duplicatesSkipped += duplicates;
             saveSessionOffset(sessionId, readResult.newSize, inserted, agentId, issueId, transcriptPath);
