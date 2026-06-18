@@ -1,20 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
 import { Effect } from 'effect';
 
 import { normalizeEmbedding } from '../embeddings/providers.js';
 import { buildEmbeddingText, embedSessions } from '../embeddings/index.js';
-import { upsertDiscoveredSession, findDiscoveredSessions, getEmbedding, updateEnrichment } from '../../database/discovered-sessions-db.js';
+import { upsertDiscoveredSession, findDiscoveredSessions, getEmbedding, updateEnrichment } from '../../overdeck/discovered-sessions.js';
 import type { EmbeddingResult } from '../embeddings/providers.js';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../../tests/helpers/overdeck-test-db.js';
 
-let TEST_HOME: string;
-
-async function resetDb() {
-  const { resetDatabase } = await import('../../database/index.js');
-  resetDatabase();
-}
+let odb: OverdeckTestDb;
 
 function seedEnrichedSession(id: number) {
   upsertDiscoveredSession({
@@ -53,17 +50,11 @@ function seedEnrichedSession(id: number) {
 }
 
 beforeEach(() => {
-  TEST_HOME = join(tmpdir(), `pan-457-embed-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
-  process.env.HOME = TEST_HOME;
+  odb = setupOverdeckTestDb();
 });
 
-afterEach(async () => {
-  await resetDb();
-  delete process.env.PANOPTICON_HOME;
-  delete process.env.HOME;
-  rmSync(TEST_HOME, { recursive: true, force: true });
+afterEach(() => {
+  teardownOverdeckTestDb(odb);
 });
 
 // ─── normalizeEmbedding ───────────────────────────────────────────────────────
