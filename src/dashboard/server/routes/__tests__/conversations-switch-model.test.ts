@@ -108,8 +108,8 @@ async function postSwitchModel(conversationName: string, body: Record<string, un
 }
 
 async function resetDb() {
-  const { resetDatabase } = await import('../../../../lib/database/index.js');
-  resetDatabase();
+  const { closeOverdeckDatabaseSync } = await import('../../../../lib/overdeck/infra.js');
+  closeOverdeckDatabaseSync();
 }
 
 describe('POST /api/conversations/:name/switch-model', () => {
@@ -151,7 +151,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = '206k-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -206,7 +206,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'fallback-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'fallback-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -251,7 +251,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'default-model-anthropic-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'default-model-anthropic-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -299,7 +299,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'default-model-routed-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'default-model-routed-session';
     const sessionFile = sessionFilePath(cwd, sessionId);
@@ -347,7 +347,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
       const cwd = join(testHome, 'echo-workspace');
       mkdirSync(cwd, { recursive: true });
 
-      const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+      const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
       const { sessionFilePath } = await import('../../../../lib/paths.js');
       const sessionId = 'echo-session';
       const sessionFile = sessionFilePath(cwd, sessionId);
@@ -401,7 +401,7 @@ describe('POST /api/conversations/:name/switch-model', () => {
     const cwd = join(testHome, 'over-window-workspace');
     mkdirSync(cwd, { recursive: true });
 
-    const { createConversation } = await import('../../../../lib/database/conversations-db.js');
+    const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { sessionFilePath } = await import('../../../../lib/paths.js');
     const sessionId = 'over-window-session';
     const sessionFile = sessionFilePath(cwd, sessionId);

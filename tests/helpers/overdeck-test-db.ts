@@ -33,6 +33,7 @@ import {
   type Db,
 } from '../../src/lib/overdeck/infra.js';
 import { getOverdeckDatabasePath } from '../../src/lib/overdeck/paths.js';
+import { resetDiscoveredSessionsSchemaBootstrap } from '../../src/lib/overdeck/discovered-sessions.js';
 import type { SqliteDatabase } from '../../src/lib/database/driver.js';
 
 export interface OverdeckTestDb {
@@ -55,6 +56,9 @@ let savedHome: { present: boolean; value: string | undefined } = { present: fals
 export function setupOverdeckTestDb(): OverdeckTestDb {
   // Drop any cached sync handle from a prior test before we swap the home.
   closeOverdeckDatabaseSync();
+  // Reset the schema-bootstrap flag so ensureSchema() runs DDL on the new DB
+  // (the FTS table is NOT in the migration SQL, only in ensureSchema()).
+  resetDiscoveredSessionsSchemaBootstrap();
 
   savedHome = { present: 'PANOPTICON_HOME' in process.env, value: process.env.PANOPTICON_HOME };
 

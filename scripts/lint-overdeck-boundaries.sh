@@ -47,6 +47,13 @@ EXCLUDES=(
   ':!scripts/create-overdeck-db.ts'
   ':!scripts/drizzle-node-sqlite-smoke.ts'
   ':!scripts/lint-overdeck-boundaries.sh'
+  # DELIBERATE, DOCUMENTED CARVE-OUT (PAN-1957) — not a hidden hole:
+  # The dashboard event-store owns the domain-event log (events table) that feeds
+  # the read-model bootstrap. It is the single riskiest file to migrate, so it is
+  # cut over to overdeck.db as its own low-risk follow-up (PAN-1957), watching the
+  # dashboard live. Until then it deliberately stays on panopticon.db. Remove this
+  # exemption when PAN-1957 lands.
+  ':!src/dashboard/server/event-store.ts'
   ':!scripts/recover-costs-deep.mjs'
   ':!scripts/recover-costs-proportional.mjs'
   ':!scripts/recover-costs.mjs'

@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { rmSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import type { Conversation } from '../../database/conversations-db.js';
-import { createConversation, getConversationByName } from '../../database/conversations-db.js';
-import { resetDatabase } from '../../database/index.js';
+import type { LegacyConversation as Conversation } from '../../overdeck/conversations.js';
+import { createConversation, getConversationByName } from '../../overdeck/conversations.js';
+import { createOverdeckDatabase } from '../../../../scripts/create-overdeck-db.js';
+import { closeOverdeckDatabaseSync } from '../../overdeck/infra.js';
+import { resetDiscoveredSessionsSchemaBootstrap } from '../../overdeck/discovered-sessions.js';
 import { sessionFilePath } from '../../paths.js';
 import { createHandoffPaths } from '../handoff-paths.js';
 import {
@@ -52,7 +54,8 @@ function sourceConversation(): Conversation {
     tmuxSession: 'conv-source-session',
     status: 'active',
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    endedAt: null,
+    lastAttachedAt: null,
     cwd: '/tmp/project',
     issueId: null,
     claudeSessionId: 'session-123',
@@ -61,16 +64,20 @@ function sourceConversation(): Conversation {
     title: null,
     titleSource: null,
     titleSeed: null,
-    archived: false,
     archivedAt: null,
-    archivedReason: null,
-    lastActivityAt: null,
-    runtimeStatus: null,
+    totalCost: 0,
+    totalTokens: 0,
     harness: 'claude-code',
     deliveryMethod: null,
+    spawnError: null,
     handoffDocPath: null,
     handoffTargetConvId: null,
     forkFallbackReason: null,
+    forkStatus: null,
+    forkError: null,
+    clearedToConvId: null,
+    forkRequest: null,
+    forkRetryCount: 0,
   };
 }
 
@@ -105,10 +112,20 @@ function docWithSuggestedSkillsHeading(heading: string): string {
   ].join('\n\n');
 }
 
+// Track the overdeck DB paths we created so afterEach can clean up the handles.
+const _testDbPaths: string[] = [];
+
 async function createSourceConversation(home: string, overrides: Partial<Conversation> = {}): Promise<Conversation> {
+  // Set up a fresh overdeck.db at this test's home directory.
+  closeOverdeckDatabaseSync();
+  resetDiscoveredSessionsSchemaBootstrap();
+  mkdirSync(home, { recursive: true });
+  const dbPath = join(home, 'overdeck.db');
+  createOverdeckDatabase({ dbPath });
+  _testDbPaths.push(dbPath);
+
   process.env.PANOPTICON_HOME = home;
   process.env.HOME = home;
-  resetDatabase();
 
   const cwd = overrides.cwd ?? '/home/test/project';
   const sessionId = overrides.claudeSessionId ?? 'source-session-123';
@@ -133,7 +150,9 @@ afterEach(() => {
   vi.useRealTimers();
   vi.mocked(deliverAgentMessage).mockReset();
   vi.mocked(deliverAgentMessage).mockResolvedValue(undefined);
-  resetDatabase();
+  closeOverdeckDatabaseSync();
+  resetDiscoveredSessionsSchemaBootstrap();
+  _testDbPaths.length = 0;
   if (originalPanopticonHome === undefined) {
     delete process.env.PANOPTICON_HOME;
   } else {
@@ -231,9 +250,14 @@ describe('handoff fork handshake', () => {
 
   it('uses the handoff document as the fork seed and records source/target metadata', async () => {
     const home = join(tmpdir(), `pan-handoff-fork-${Date.now()}`);
+    // Set up a fresh overdeck.db at this test's home directory.
+    closeOverdeckDatabaseSync();
+    resetDiscoveredSessionsSchemaBootstrap();
+    mkdirSync(home, { recursive: true });
+    createOverdeckDatabase({ dbPath: join(home, 'overdeck.db') });
+    _testDbPaths.push(join(home, 'overdeck.db'));
     process.env.PANOPTICON_HOME = home;
     process.env.HOME = home;
-    resetDatabase();
 
     const cwd = '/home/test/project';
     const sessionId = 'source-session-123';
