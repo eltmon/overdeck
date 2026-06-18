@@ -16,7 +16,7 @@ import {
   getReviewStatusFromDb,
 } from './database/review-status-db.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { updateIssueRecordForIssue } from './pan-dir/records.js';
+import { updateIssueRecordForReviewStatusSync } from './overdeck/review-status-record-sync.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -342,7 +342,7 @@ export function setReviewStatusSync(
   // PAN-1908: project durable review_status verdicts into the infra repo's
   // per-issue permanent record. Fire-and-forget so the SQLite write path stays
   // synchronous and fast; queueAutoCommit debounces bursts into one commit.
-  void updateIssueRecordForIssue(issueId, updated);
+  updateIssueRecordForReviewStatusSync(issueId, updated);
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 

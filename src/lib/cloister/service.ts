@@ -22,7 +22,6 @@ import {
   writeHealthEvent,
   getLatestHealthEvent,
 } from '../database/health-events-db.js';
-import { getDatabase, closeDatabase } from '../database/index.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
@@ -690,14 +689,6 @@ export class CloisterService {
 
     console.log('🔔 Starting Cloister agent watchdog...');
 
-    // Initialize unified panopticon database (includes health_events table)
-    try {
-      getDatabase();
-      console.log('  ✓ Panopticon database initialized');
-    } catch (error) {
-      console.error('  ✗ Failed to initialize panopticon database:', error);
-    }
-
     try {
       await cleanupLegacySpecialistsDirectory();
       console.log('  ✓ Removed legacy ~/.panopticon/specialists directory');
@@ -959,13 +950,6 @@ export class CloisterService {
       console.log('  ✓ Deacon stopped');
     } catch (error) {
       console.error('Failed to stop deacon:', error);
-    }
-
-    // Close database connection
-    try {
-      closeDatabase();
-    } catch (error) {
-      console.error('Failed to close panopticon database:', error);
     }
 
     this.emit({ type: 'stopped' });
