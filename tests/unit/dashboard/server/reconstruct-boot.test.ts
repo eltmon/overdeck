@@ -31,6 +31,7 @@ const appendAsyncSpy = vi.fn(async () => 1);
 
 vi.mock('../../../../src/lib/reconstruct/reconstruct-cache.js', () => ({
   reconstructCache: vi.fn(),
+  reconstructCacheAuto: vi.fn(),
 }));
 
 vi.mock('../../../../src/dashboard/server/event-store.js', () => ({
@@ -43,18 +44,20 @@ vi.mock('../../../../src/lib/agent-runtime-mirror.js', () => ({
   markAgentStateServiceInProcess: vi.fn(() => Effect.void),
 }));
 
-import { reconstructCache } from '../../../../src/lib/reconstruct/reconstruct-cache.js';
+import { reconstructCache, reconstructCacheAuto } from '../../../../src/lib/reconstruct/reconstruct-cache.js';
 import { initEventStore } from '../../../../src/dashboard/server/event-store.js';
 import { AgentStateServiceLive } from '../../../../src/dashboard/server/services/agent-state-service.js';
 import { ReadModelServiceLive } from '../../../../src/dashboard/server/read-model.js';
 import { AgentsResolver } from '../../../../src/lib/overdeck/agents.js';
 
 const reconstructCacheMock = vi.mocked(reconstructCache);
+const reconstructCacheAutoMock = vi.mocked(reconstructCacheAuto);
 const initEventStoreMock = vi.mocked(initEventStore);
 
 beforeEach(() => {
   vi.resetAllMocks();
   reconstructCacheMock.mockResolvedValue(fakeReconstructResult as any);
+  reconstructCacheAutoMock.mockResolvedValue(fakeReconstructResult as any);
   initEventStoreMock.mockResolvedValue({
     readFrom: readFromSpy,
     subscribe: subscribeSpy,
@@ -66,7 +69,7 @@ beforeEach(() => {
 describe('AgentStateService bootstrap (PAN-1920)', () => {
   it('seeds from reconstructCache and does not replay the event log', async () => {
     await Effect.runPromise(Effect.provide(Effect.void, AgentStateServiceLive));
-    await vi.waitFor(() => expect(reconstructCacheMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(reconstructCacheAutoMock).toHaveBeenCalled());
 
     expect(readFromSpy).not.toHaveBeenCalled();
     expect(subscribeSpy).toHaveBeenCalled();
@@ -90,6 +93,6 @@ describe('ReadModelService bootstrap (PAN-1938 source-swap)', () => {
   it('seeds reviewStatuses from reconstructCache and agents from AgentsResolver', async () => {
     const layer = ReadModelServiceLive.pipe(Layer.provide(MockAgentsResolverLive));
     await Effect.runPromise(Effect.provide(Effect.void, layer));
-    await vi.waitFor(() => expect(reconstructCacheMock).toHaveBeenCalled());
+    await vi.waitFor(() => expect(reconstructCacheAutoMock).toHaveBeenCalled());
   });
 });
