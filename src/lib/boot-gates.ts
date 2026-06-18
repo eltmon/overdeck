@@ -33,6 +33,7 @@ export function resolveBootGates(
   const explicitNoResume = options.noResume === true || options.resume === false;
   const deaconEnvDisabled = isTruthyGateValue(env.PANOPTICON_DISABLE_DEACON);
   const resumeEnvDisabled = isTruthyGateValue(env.PANOPTICON_NO_RESUME);
+  const resumeEnvEnabled = isTruthyGateValue(env.PANOPTICON_RESUME);
   const deaconSource = gateSourceFromEnv(env[DEACON_GATE_SOURCE_ENV]);
   const resumeSource = gateSourceFromEnv(env[RESUME_GATE_SOURCE_ENV]);
 
@@ -45,14 +46,20 @@ export function resolveBootGates(
           source: deaconSource ?? (deaconEnvDisabled ? 'env' as const : 'default' as const),
         };
 
+  // PAN-1963: agent auto-resume is OFF by default. A normal dashboard restart
+  // leaves agent tmux sessions alive (nothing to resume); after an abnormal
+  // restart we stay safe and leave agents stopped for the operator to resume
+  // explicitly (dashboard "Resume all"). Opt back in with `--resume` /
+  // PANOPTICON_RESUME=1.
   const resume = options.resume === true
     ? { enabled: true, source: 'flag' as const }
     : explicitNoResume
       ? { enabled: false, source: 'flag' as const }
-      : {
-          enabled: !resumeEnvDisabled,
-          source: resumeSource ?? (resumeEnvDisabled ? 'env' as const : 'default' as const),
-        };
+      : resumeEnvDisabled
+        ? { enabled: false, source: resumeSource ?? 'env' as const }
+        : resumeEnvEnabled
+          ? { enabled: true, source: resumeSource ?? 'env' as const }
+          : { enabled: false, source: resumeSource ?? 'default' as const };
 
   return { deacon, resume };
 }
@@ -71,8 +78,12 @@ export function applyBootGateEnv(
   env[DEACON_GATE_SOURCE_ENV] = gates.deacon.source;
 
   if (gates.resume.enabled) {
+    // Default is now OFF (PAN-1963), so "on" must be encoded explicitly — deleting
+    // PANOPTICON_NO_RESUME is no longer enough (absence means off).
     delete env.PANOPTICON_NO_RESUME;
+    env.PANOPTICON_RESUME = '1';
   } else {
+    delete env.PANOPTICON_RESUME;
     env.PANOPTICON_NO_RESUME = '1';
   }
   env[RESUME_GATE_SOURCE_ENV] = gates.resume.source;
