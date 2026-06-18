@@ -366,3 +366,432 @@ export function getDiscoveredStats(): {
   ).all() as Array<{ model: string; embedded: number }>;
   return { total, enriched, embedded, managedCount, embeddingModels };
 }
+
+// ─── Additional read operations ────────────────────────────────────────────────
+
+export function getDiscoveredSessionByJsonlPath(jsonlPath: string): DiscoveredSession | null {
+  const db = overdeckDb();
+  const row = db.prepare(`SELECT * FROM discovered_sessions WHERE jsonl_path = ?`).get(jsonlPath) as Record<string, unknown> | undefined;
+  return row ? rowToSession(row) : null;
+}
+
+export function findDiscoveredSessionIds(filter: ConversationFilter = {}): number[] {
+  const db = overdeckDb();
+  const { where, params } = buildFilterSql(filter);
+  const safeLimit = Number.isFinite(filter.limit) && filter.limit! >= 0 ? filter.limit! : undefined;
+  const safeOffset = Number.isFinite(filter.offset) && filter.offset! >= 0 ? filter.offset! : undefined;
+  const limit = safeLimit !== undefined ? `LIMIT ${safeLimit}` : '';
+  const offset = safeOffset !== undefined ? `OFFSET ${safeOffset}` : '';
+  const rows = db.prepare(
+    `SELECT id FROM discovered_sessions ${where} ORDER BY last_ts DESC NULLS LAST ${limit} ${offset}`,
+  ).all(...params) as Array<{ id: number }>;
+  return rows.map((row) => row.id);
+}
+
+export function findEnrichedSessionIdsMissingEmbedding(model: string): number[] {
+  const db = overdeckDb();
+  const rows = db.prepare(
+    `SELECT ds.id
+     FROM discovered_sessions ds
+     WHERE ds.enrichment_level > 0
+       AND NOT EXISTS (
+         SELECT 1 FROM session_embeddings se
+         WHERE se.session_id = ds.id AND se.model = ?
+       )
+     ORDER BY ds.last_ts DESC NULLS LAST`,
+  ).all(model) as Array<{ id: number }>;
+  return rows.map((row) => row.id);
+}
+
+// ─── Write operations ─────────────────────────────────────────────────────────
+
+export interface UpsertDiscoveredSessionOpts {
+  jsonlPath: string;
+  sessionId?: string | null;
+  workspacePath?: string | null;
+  workspaceHash?: string | null;
+  messageCount?: number;
+  firstTs?: string | null;
+  lastTs?: string | null;
+  modelsUsed?: string[];
+  primaryModel?: string | null;
+  tokenInput?: number;
+  tokenOutput?: number;
+  estimatedCost?: number;
+  toolsUsed?: string[];
+  filesTouched?: string[];
+  tags?: string[];
+  panopticonManaged?: boolean;
+  panIssueId?: string | null;
+  panAgentId?: string | null;
+  fileSize?: number | null;
+  fileMtime?: string | null;
+}
+
+type FtsRow = {
+  enrichment_level: number;
+  summary: string | null;
+  summary_detailed: string | null;
+  tags: string | null;
+  files_touched: string | null;
+};
+
+function getFtsRow(id: number): FtsRow | undefined {
+  return overdeckDb()
+    .prepare(
+      `SELECT enrichment_level, summary, summary_detailed, tags, files_touched
+       FROM discovered_sessions WHERE id = ?`,
+    )
+    .get(id) as FtsRow | undefined;
+}
+
+function replaceFtsRow(id: number, oldRow: FtsRow | undefined): void {
+  const db = overdeckDb();
+  if (oldRow && oldRow.enrichment_level > 0) {
+    db.prepare(
+      `INSERT INTO sessions_fts(sessions_fts, rowid, summary, summary_detailed, tags, files_touched)
+       VALUES('delete', ?, ?, ?, ?, ?)`,
+    ).run(id, oldRow.summary, oldRow.summary_detailed, oldRow.tags, oldRow.files_touched);
+  }
+  const newRow = getFtsRow(id);
+  if (!newRow || newRow.enrichment_level === 0) return;
+  db.prepare(
+    `INSERT INTO sessions_fts(rowid, summary, summary_detailed, tags, files_touched)
+     VALUES(?, ?, ?, ?, ?)`,
+  ).run(id, newRow.summary, newRow.summary_detailed, newRow.tags, newRow.files_touched);
+}
+
+function replaceSessionArrayIndex(
+  target: ArrayIndexTarget,
+  sessionId: number,
+  values: string[],
+): void {
+  const db = overdeckDb();
+  const replace = db.transaction((items: string[]) => {
+    db.prepare(`DELETE FROM ${target.table} WHERE session_id = ?`).run(sessionId);
+    const insert = db.prepare(
+      `INSERT OR IGNORE INTO ${target.table} (session_id, ${target.column}) VALUES (?, ?)`,
+    );
+    for (const value of uniqueStrings(items)) insert.run(sessionId, value);
+  });
+  replace(values);
+}
+
+function replaceDiscoveredSessionArrayIndexes(session: DiscoveredSession): void {
+  replaceSessionArrayIndex({ table: 'discovered_session_tags', column: 'tag' }, session.id, session.tags);
+  replaceSessionArrayIndex({ table: 'discovered_session_tools', column: 'tool' }, session.id, session.toolsUsed);
+  replaceSessionArrayIndex({ table: 'discovered_session_files', column: 'file_path' }, session.id, session.filesTouched);
+}
+
+/**
+ * Insert or update a discovered session by jsonl_path.
+ * Idempotent: re-inserting the same path updates metadata without duplicates.
+ */
+export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): DiscoveredSession {
+  const db = overdeckDb();
+  const now = new Date().toISOString();
+  const oldRow = db.prepare(
+    `SELECT id, enrichment_level, summary, summary_detailed, tags, files_touched
+     FROM discovered_sessions WHERE jsonl_path = ?`,
+  ).get(opts.jsonlPath) as (FtsRow & { id: number }) | undefined;
+
+  db.prepare(
+    `INSERT INTO discovered_sessions (
+       jsonl_path, session_id, workspace_path, workspace_hash,
+       message_count, first_ts, last_ts, models_used, primary_model,
+       token_input, token_output, estimated_cost,
+       tools_used, files_touched, tags,
+       panopticon_managed, pan_issue_id, pan_agent_id,
+       file_size, file_mtime, scanned_at
+     ) VALUES (
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+     )
+     ON CONFLICT(jsonl_path) DO UPDATE SET
+       session_id         = excluded.session_id,
+       workspace_path     = excluded.workspace_path,
+       workspace_hash     = excluded.workspace_hash,
+       message_count      = excluded.message_count,
+       first_ts           = excluded.first_ts,
+       last_ts            = excluded.last_ts,
+       models_used        = excluded.models_used,
+       primary_model      = excluded.primary_model,
+       token_input        = excluded.token_input,
+       token_output       = excluded.token_output,
+       estimated_cost     = excluded.estimated_cost,
+       tools_used         = excluded.tools_used,
+       files_touched      = excluded.files_touched,
+       tags               = CASE WHEN ? = 1 THEN excluded.tags ELSE discovered_sessions.tags END,
+       panopticon_managed = excluded.panopticon_managed,
+       pan_issue_id       = excluded.pan_issue_id,
+       pan_agent_id       = excluded.pan_agent_id,
+       file_size          = excluded.file_size,
+       file_mtime         = excluded.file_mtime,
+       scanned_at         = excluded.scanned_at`,
+  ).run(
+    opts.jsonlPath,
+    opts.sessionId ?? null,
+    opts.workspacePath ?? null,
+    opts.workspaceHash ?? null,
+    opts.messageCount ?? 0,
+    opts.firstTs ?? null,
+    opts.lastTs ?? null,
+    JSON.stringify(opts.modelsUsed ?? []),
+    opts.primaryModel ?? null,
+    opts.tokenInput ?? 0,
+    opts.tokenOutput ?? 0,
+    opts.estimatedCost ?? 0,
+    JSON.stringify(opts.toolsUsed ?? []),
+    JSON.stringify(opts.filesTouched ?? []),
+    JSON.stringify(opts.tags ?? []),
+    opts.panopticonManaged ? 1 : 0,
+    opts.panIssueId ?? null,
+    opts.panAgentId ?? null,
+    opts.fileSize ?? null,
+    opts.fileMtime ?? null,
+    now,
+    opts.tags !== undefined ? 1 : 0,
+  );
+
+  const row = db.prepare(`SELECT * FROM discovered_sessions WHERE jsonl_path = ?`).get(opts.jsonlPath) as Record<string, unknown>;
+  const session = rowToSession(row);
+  replaceDiscoveredSessionArrayIndexes(session);
+  if (oldRow && oldRow.enrichment_level > 0) {
+    replaceFtsRow(session.id, oldRow);
+  }
+  return session;
+}
+
+/**
+ * Update enrichment fields for a discovered session.
+ * Also updates the FTS5 index for the session.
+ */
+export function updateEnrichment(
+  id: number,
+  opts: {
+    enrichmentLevel: 1 | 2 | 3;
+    enrichmentModel: string;
+    summary?: string | null;
+    summaryDetailed?: string | null;
+    tags?: string[];
+    enrichmentFailed?: boolean;
+  },
+): void {
+  const db = overdeckDb();
+  const oldRow = getFtsRow(id);
+  db.prepare(
+    `UPDATE discovered_sessions SET
+       enrichment_level  = ?,
+       enrichment_model  = ?,
+       enriched_at       = ?,
+       summary           = CASE WHEN ? IS NOT NULL THEN ? ELSE summary END,
+       summary_detailed  = CASE WHEN ? IS NOT NULL THEN ? ELSE summary_detailed END,
+       tags              = CASE WHEN ? IS NOT NULL THEN ? ELSE tags END,
+       enrichment_failed = ?
+     WHERE id = ?`,
+  ).run(
+    opts.enrichmentLevel,
+    opts.enrichmentModel,
+    new Date().toISOString(),
+    opts.summary ?? null,
+    opts.summary ?? null,
+    opts.summaryDetailed ?? null,
+    opts.summaryDetailed ?? null,
+    opts.tags ? JSON.stringify(opts.tags) : null,
+    opts.tags ? JSON.stringify(opts.tags) : null,
+    opts.enrichmentFailed ? 1 : 0,
+    id,
+  );
+  if (opts.tags) {
+    replaceSessionArrayIndex({ table: 'discovered_session_tags', column: 'tag' }, id, opts.tags);
+  }
+  replaceFtsRow(id, oldRow);
+}
+
+/**
+ * Mark a session's enrichment as failed without changing level.
+ */
+export function markEnrichmentFailed(id: number): void {
+  overdeckDb().prepare(`UPDATE discovered_sessions SET enrichment_failed = 1 WHERE id = ?`).run(id);
+}
+
+// ─── FTS5 operations ──────────────────────────────────────────────────────────
+
+export function searchFtsSessions(
+  query: string,
+  filter: ConversationFilter = {},
+  limit = 50,
+  offset = 0,
+): DiscoveredSession[] {
+  const db = overdeckDb();
+  const { where, params } = buildFilterSql(filter, 'ds');
+  const whereClause = where ? `${where} AND sessions_fts MATCH ?` : 'WHERE sessions_fts MATCH ?';
+  try {
+    const rows = db.prepare(
+      `SELECT ds.* FROM sessions_fts
+       JOIN discovered_sessions ds ON ds.id = sessions_fts.rowid
+       ${whereClause}
+       ORDER BY sessions_fts.rank
+       LIMIT ? OFFSET ?`,
+    ).all(...params, query, limit, offset) as Record<string, unknown>[];
+    return rows.map(rowToSession);
+  } catch {
+    return [];
+  }
+}
+
+export function countFtsSessions(query: string, filter: ConversationFilter = {}): number {
+  const db = overdeckDb();
+  const { where, params } = buildFilterSql(filter, 'ds');
+  const whereClause = where ? `${where} AND sessions_fts MATCH ?` : 'WHERE sessions_fts MATCH ?';
+  try {
+    const row = db.prepare(
+      `SELECT COUNT(*) AS cnt FROM sessions_fts
+       JOIN discovered_sessions ds ON ds.id = sessions_fts.rowid
+       ${whereClause}`,
+    ).get(...params, query) as { cnt: number } | undefined;
+    return row?.cnt ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// ─── Embedding operations ─────────────────────────────────────────────────────
+
+function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+function getDiscoveredSessionsByIds(ids: number[]): Map<number, DiscoveredSession> {
+  if (ids.length === 0) return new Map();
+  const db = overdeckDb();
+  const rows = db.prepare(
+    `SELECT * FROM discovered_sessions WHERE id IN (${ids.map(() => '?').join(',')})`,
+  ).all(...ids) as Record<string, unknown>[];
+  return new Map(rows.map((row) => {
+    const session = rowToSession(row);
+    return [session.id, session];
+  }));
+}
+
+const MAX_SEMANTIC_RESULT_WINDOW = 1_000;
+
+function insertScoredCandidate(
+  heap: Array<{ sessionId: number; score: number }>,
+  candidate: { sessionId: number; score: number },
+  maxSize: number,
+): void {
+  if (maxSize === 0) return;
+  if (heap.length < maxSize) { heap.push(candidate); return; }
+  let minIndex = 0;
+  for (let i = 1; i < heap.length; i++) {
+    if (heap[i]!.score < heap[minIndex]!.score) minIndex = i;
+  }
+  if (candidate.score > heap[minIndex]!.score) heap[minIndex] = candidate;
+}
+
+export function topKCosine(
+  queryEmbedding: Float32Array,
+  model: string,
+  filter: ConversationFilter = {},
+  limit = 50,
+  offset = 0,
+): { results: CosineSearchResult[]; total: number } {
+  const db = overdeckDb();
+  const { where, params } = buildFilterSql({ ...filter, limit: undefined, offset: undefined }, 'ds');
+  const modelClause = where ? `${where} AND se.model = ?` : 'WHERE se.model = ?';
+  const safeLimit = Number.isFinite(limit) && limit >= 0 ? limit : 50;
+  const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
+  const windowSize = safeOffset + safeLimit;
+  if (windowSize > MAX_SEMANTIC_RESULT_WINDOW) {
+    throw new Error(`Semantic search result window exceeds ${MAX_SEMANTIC_RESULT_WINDOW}`);
+  }
+
+  const countRow = db.prepare(
+    `SELECT COUNT(*) AS cnt
+     FROM session_embeddings se
+     JOIN discovered_sessions ds ON ds.id = se.session_id
+     ${modelClause}`,
+  ).get(...params, model) as { cnt: number } | undefined;
+
+  const rows = db.prepare(
+    `SELECT se.session_id, se.dim AS embedding_dim, se.embedding AS embedding_blob
+     FROM session_embeddings se
+     JOIN discovered_sessions ds ON ds.id = se.session_id
+     ${modelClause}`,
+  );
+
+  const top: Array<{ sessionId: number; score: number }> = [];
+  for (const row of rows.iterate(...params, model) as Iterable<{ session_id: number; embedding_dim: number; embedding_blob: Buffer }>) {
+    insertScoredCandidate(top, {
+      sessionId: row.session_id,
+      score: cosineSimilarity(
+        queryEmbedding,
+        new Float32Array(row.embedding_blob.buffer, row.embedding_blob.byteOffset, row.embedding_dim),
+      ),
+    }, windowSize);
+  }
+
+  const page = top.sort((a, b) => b.score - a.score).slice(safeOffset, safeOffset + safeLimit);
+  const sessionsById = getDiscoveredSessionsByIds(page.map((item) => item.sessionId));
+  const results = page.flatMap((item) => {
+    const session = sessionsById.get(item.sessionId);
+    return session ? [{ session, score: item.score }] : [];
+  });
+
+  return { results, total: countRow?.cnt ?? top.length };
+}
+
+/**
+ * Insert or replace an embedding for a session.
+ */
+export function insertEmbedding(sessionId: number, model: string, embedding: Float32Array): void {
+  const db = overdeckDb();
+  const blob = Buffer.from(embedding.buffer, embedding.byteOffset, embedding.byteLength);
+  db.prepare(
+    `INSERT INTO session_embeddings (session_id, model, dim, embedding, created_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(session_id, model) DO UPDATE SET
+       dim        = excluded.dim,
+       embedding  = excluded.embedding,
+       created_at = excluded.created_at`,
+  ).run(sessionId, model, embedding.length, blob, new Date().toISOString());
+}
+
+/**
+ * Load all embeddings for a given model, optionally filtered by session IDs.
+ */
+export function loadEmbeddings(
+  model: string,
+  sessionIds?: number[],
+): Array<{ sessionId: number; embedding: Float32Array }> {
+  if (sessionIds && sessionIds.length === 0) return [];
+  const db = overdeckDb();
+  const idClause = sessionIds ? ` AND session_id IN (${sessionIds.map(() => '?').join(',')})` : '';
+  const rows = db.prepare(
+    `SELECT session_id, dim, embedding FROM session_embeddings WHERE model = ?${idClause}`,
+  ).all(...(sessionIds ? [model, ...sessionIds] : [model])) as Array<{ session_id: number; dim: number; embedding: Buffer }>;
+  return rows.map((r) => ({
+    sessionId: r.session_id,
+    embedding: new Float32Array(r.embedding.buffer, r.embedding.byteOffset, r.dim),
+  }));
+}
+
+/**
+ * Get the embedding for a specific session + model combination.
+ */
+export function getEmbedding(sessionId: number, model: string): Float32Array | null {
+  const db = overdeckDb();
+  const row = db.prepare(
+    `SELECT dim, embedding FROM session_embeddings WHERE session_id = ? AND model = ?`,
+  ).get(sessionId, model) as { dim: number; embedding: Buffer } | undefined;
+  if (!row) return null;
+  return new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.dim);
+}
