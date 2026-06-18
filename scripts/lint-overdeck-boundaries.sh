@@ -81,8 +81,16 @@ rawdb=$(
       -- "${INCLUDES[@]}" "${EXCLUDES[@]}"; } || true
 )
 
+# 4) Opening a sqlite DB directly via the low-level driver — only the store layer
+#    and the overdeck doors may call openDatabase(); a consumer doing so is
+#    reaching panopticon.db behind the gate's back (the event-store evasion).
+opendb=$(
+  { git grep -nE --untracked -e "\\bopenDatabase[[:space:]]*\\(" \
+      -- "${INCLUDES[@]}" "${EXCLUDES[@]}"; } || true
+)
+
 violations=$(
-  { printf '%s\n' "$getdb" "$dbimport" "$rawdb"; } \
+  { printf '%s\n' "$getdb" "$dbimport" "$rawdb" "$opendb"; } \
     | grep -vE '^[[:space:]]*$' | comment_filter | sort -u
 )
 
