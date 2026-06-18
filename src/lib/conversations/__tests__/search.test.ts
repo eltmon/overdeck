@@ -1,30 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
 
 import { parseRelativeTime, cosineSimilarity, searchSessions } from '../search.js';
-import { upsertDiscoveredSession, updateEnrichment, insertEmbedding, topKCosine } from '../../database/discovered-sessions-db.js';
+import { upsertDiscoveredSession, updateEnrichment, insertEmbedding, topKCosine } from '../../overdeck/discovered-sessions.js';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../../tests/helpers/overdeck-test-db.js';
 
-let TEST_HOME: string;
+let odb: OverdeckTestDb;
 
-async function resetDb() {
-  const { resetDatabase } = await import('../../database/index.js');
-  resetDatabase();
+function resetDb() {
+  teardownOverdeckTestDb(odb);
+  odb = setupOverdeckTestDb();
 }
 
 beforeEach(() => {
-  TEST_HOME = join(tmpdir(), `pan-457-search-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(TEST_HOME, { recursive: true });
-  process.env.PANOPTICON_HOME = TEST_HOME;
-  process.env.HOME = TEST_HOME;
+  odb = setupOverdeckTestDb();
 });
 
-afterEach(async () => {
-  await resetDb();
-  delete process.env.PANOPTICON_HOME;
-  delete process.env.HOME;
-  rmSync(TEST_HOME, { recursive: true, force: true });
+afterEach(() => {
+  teardownOverdeckTestDb(odb);
 });
 
 // ─── parseRelativeTime ────────────────────────────────────────────────────────

@@ -51,6 +51,15 @@ import { startAutoMergeExecutor, stopAutoMergeExecutor } from './services/auto-m
 import { startConversationSearchWatcher, stopConversationSearchWatcher } from './services/conversation-search-watcher.js';
 import { closeConversationSearchService } from './services/conversation-search-service.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { Layer } from 'effect';
+import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
+import { makeCutoverEffect } from '../../lib/overdeck/cutover.js';
+import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
+import { ProjectsLive } from '../../lib/overdeck/config.js';
+import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
+import { getAgentSessionsSync } from '../../lib/tmux.js';
 
 declare const Bun: unknown;
 
@@ -544,7 +553,7 @@ void reconcileStaleGitHubBlockers()
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
 try {
-  const { resetProcessingToQueued } = await import('../../lib/database/merge-queue-db.js');
+  const { resetProcessingToQueued } = await import('../../lib/overdeck/merge-sync.js');
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
     console.log(`[panopticon] Reset ${resetCount} stuck merge queue entries to queued`);
@@ -623,6 +632,64 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
     console.log(`[panopticon] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
   }
 }
+
+// ── Overdeck boot: create overdeck.db if needed; optional legacy seed ─────────
+//
+// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). The
+// legacy seed (copy conversations + reconstruct in-flight agents/issues from
+// panopticon.db) is OPT-IN via `pan up --seed-from-legacy` (PAN-1960).
+// panopticon.db is NEVER written — it stays as the rollback backup.
+await (async () => {
+  try {
+    const overdeckDbPath = getOverdeckDatabasePath();
+    const legacyDbPath = join(getPanopticonHome(), 'panopticon.db');
+
+    if (!existsSync(overdeckDbPath)) {
+      createOverdeckDatabase({ dbPath: overdeckDbPath });
+      console.log(`[panopticon] Created overdeck.db at ${overdeckDbPath}`);
+    }
+
+    // PAN-1960: the legacy seed is opt-in. A normal boot leaves overdeck.db
+    // empty; enable the import on demand with `pan up --seed-from-legacy`.
+    if (process.env.PANOPTICON_SEED_FROM_LEGACY !== '1') {
+      console.log('[panopticon] Overdeck seed skipped — empty DB (pass `pan up --seed-from-legacy` to import legacy conversations + in-flight state)');
+      return;
+    }
+
+    if (!existsSync(legacyDbPath)) {
+      console.log('[panopticon] No panopticon.db found; skipping overdeck seed');
+      return;
+    }
+
+    // Use live tmux agent sessions to determine which issues are actively running.
+    // This is the gate-clean source: sessions named `agent-<prefix>-<n>` exist
+    // only while the agent process is live, so they are a more reliable signal
+    // than the panopticon.db agents table (which is the old DB we are moving
+    // away from) and correctly return an empty set on fresh-overdeck boots.
+    const openIssueIds = new Set(
+      getAgentSessionsSync()
+        .map((s) => {
+          const m = /^agent-([a-z]+)-(\d+)$/.exec(s.name);
+          return m ? `${m[1].toUpperCase()}-${m[2]}` : null;
+        })
+        .filter((id): id is string => id !== null),
+    );
+
+    const cutoverLayer = Layer.mergeAll(ProjectsLive, RecordsLive, TmuxLive);
+    const result = await Effect.runPromise(
+      makeCutoverEffect({ legacyDbPath, sources: { openIssueIds } }).pipe(
+        Effect.provide(cutoverLayer),
+      ),
+    );
+    console.log(
+      `[panopticon] Overdeck seed: ${result.conversationsExported} convs, ` +
+        `${result.agentsUpserted} agents, ${result.issuesUpserted} issues`,
+    );
+  } catch (err) {
+    // Non-fatal: dashboard continues with whatever data is in overdeck.db.
+    console.warn('[panopticon] Overdeck boot seed failed (non-fatal):', err);
+  }
+})();
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
 

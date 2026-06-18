@@ -11,8 +11,8 @@
 import { existsSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { listAllAgents } from '../database/agents-db.js';
-import { getAllReviewStatusesFromDb } from '../database/review-status-db.js';
+import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
+import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
 import {
   getProjectSync,
   loadProjectsConfigSync,
@@ -71,7 +71,7 @@ async function collectContinueIssueIds(project: ProjectConfig): Promise<Set<stri
 function collectAgentIssueIds(): Set<string> {
   const ids = new Set<string>();
   try {
-    for (const agent of listAllAgents()) {
+    for (const agent of listOverdeckAgentStatesSync()) {
       if (agent.issueId) ids.add(agent.issueId.toUpperCase());
     }
   } catch {

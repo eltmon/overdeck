@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pendingCommand } from '../../../src/cli/commands/pending.js';
-import { getAllReviewStatusesFromDb } from '../../../src/lib/database/review-status-db.js';
+import { getAllReviewStatusesFromDb } from '../../../src/lib/overdeck/review-status-sync.js';
 import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
-vi.mock('../../../src/lib/database/review-status-db.js', () => ({
+vi.mock('../../../src/lib/overdeck/review-status-sync.js', () => ({
   getAllReviewStatusesFromDb: vi.fn(),
 }));
 

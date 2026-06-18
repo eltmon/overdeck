@@ -21,15 +21,14 @@ import {
 import {
   writeHealthEvent,
   getLatestHealthEvent,
-} from '../database/health-events-db.js';
-import { getDatabase, closeDatabase } from '../database/index.js';
+} from '../overdeck/health-events.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { setDeaconGloballyPaused, setFlywheelGloballyPaused } from '../database/app-settings.js';
+import { setDeaconGloballyPaused, setFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEventSync, createHandoffEvent } from './handoff-logger.js';
@@ -690,14 +689,6 @@ export class CloisterService {
 
     console.log('🔔 Starting Cloister agent watchdog...');
 
-    // Initialize unified panopticon database (includes health_events table)
-    try {
-      getDatabase();
-      console.log('  ✓ Panopticon database initialized');
-    } catch (error) {
-      console.error('  ✗ Failed to initialize panopticon database:', error);
-    }
-
     try {
       await cleanupLegacySpecialistsDirectory();
       console.log('  ✓ Removed legacy ~/.panopticon/specialists directory');
@@ -959,13 +950,6 @@ export class CloisterService {
       console.log('  ✓ Deacon stopped');
     } catch (error) {
       console.error('Failed to stop deacon:', error);
-    }
-
-    // Close database connection
-    try {
-      closeDatabase();
-    } catch (error) {
-      console.error('Failed to close panopticon database:', error);
     }
 
     this.emit({ type: 'stopped' });

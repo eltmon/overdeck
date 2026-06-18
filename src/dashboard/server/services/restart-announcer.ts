@@ -20,8 +20,8 @@ import {
   type EmitActivityOptions,
 } from '../../../lib/activity-logger.js';
 import { readRestartStatus, type RestartStatus } from '../../../lib/restart-status.js';
-import { getSetting, setSetting } from '../../../lib/database/app-settings.js';
-import { getConversationByTmuxSession } from '../../../lib/database/conversations-db.js';
+import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
+import { getConversationByTmuxSession } from '../../../lib/overdeck/conversations.js';
 
 export const RESTART_ANNOUNCER_LAST_TS_KEY = 'restart_announcer.last_announced_ts';
 const POLL_MS = 15_000;

@@ -20,7 +20,7 @@
 
 import { promisify } from 'util';
 import { execFile } from 'child_process';
-import { getConversationByTmuxSession, type Conversation } from '../database/conversations-db.js';
+import { getConversationByTmuxSession, type LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import { getTmuxCommand } from '../tmux.js';
 
 const execFileAsync = promisify(execFile);

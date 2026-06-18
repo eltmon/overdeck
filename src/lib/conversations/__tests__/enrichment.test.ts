@@ -1,16 +1,20 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
 
 import { selectModelForTier, maxMessagesForTier, DEFAULT_QUICK_MODEL, DEFAULT_DEEP_MODEL } from '../enrichment/model-fallback.js';
 import { enrichSession } from '../enrichment/enrich-session.js';
 import { estimateEnrichmentCost, enrichSessions, CostThresholdError } from '../enrichment/index.js';
-import { upsertDiscoveredSession, findDiscoveredSessions } from '../../database/discovered-sessions-db.js';
+import { upsertDiscoveredSession, findDiscoveredSessions } from '../../overdeck/discovered-sessions.js';
 import type { EnrichmentResponse } from '../enrichment/enrich-session.js';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../../tests/helpers/overdeck-test-db.js';
 
-let TEST_HOME: string;
+let odb: OverdeckTestDb;
 let fakeJsonlPath: string;
 
 const MOCK_JSONL = [
@@ -27,11 +31,6 @@ const MOCK_JSONL = [
     content: [{ type: 'text', text: 'Let me look at the auth module.' }],
   }),
 ].join('\n') + '\n';
-
-async function resetDb() {
-  const { resetDatabase } = await import('../../database/index.js');
-  resetDatabase();
-}
 
 function seedSession() {
   return upsertDiscoveredSession({
@@ -58,19 +57,13 @@ function seedSession() {
 }
 
 beforeEach(() => {
-  TEST_HOME = join(tmpdir(), `pan-457-enrich-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(TEST_HOME, { recursive: true });
-  fakeJsonlPath = join(TEST_HOME, 'sess.jsonl');
+  odb = setupOverdeckTestDb();
+  fakeJsonlPath = join(odb.home, 'sess.jsonl');
   writeFileSync(fakeJsonlPath, MOCK_JSONL, 'utf8');
-  process.env.PANOPTICON_HOME = TEST_HOME;
-  process.env.HOME = TEST_HOME;
 });
 
-afterEach(async () => {
-  await resetDb();
-  delete process.env.PANOPTICON_HOME;
-  delete process.env.HOME;
-  rmSync(TEST_HOME, { recursive: true, force: true });
+afterEach(() => {
+  teardownOverdeckTestDb(odb);
 });
 
 // ─── model-fallback ───────────────────────────────────────────────────────────
@@ -192,7 +185,7 @@ describe('enrichSession', () => {
   });
 
   it('sends L1 as 3 sampled messages and L2 as 11 sampled messages with tool summaries', async () => {
-    const samplePath = join(TEST_HOME, 'sampled.jsonl');
+    const samplePath = join(odb.home, 'sampled.jsonl');
     const lines = Array.from({ length: 20 }, (_, i) => JSON.stringify({
       message: {
         role: i % 2 === 0 ? 'user' : 'assistant',
@@ -228,7 +221,7 @@ describe('enrichSession', () => {
   });
 
   it('bounds sampled prompt size for large L1 transcripts', async () => {
-    const largePath = join(TEST_HOME, 'large-l1.jsonl');
+    const largePath = join(odb.home, 'large-l1.jsonl');
     const lines = Array.from({ length: 10_000 }, (_, i) => JSON.stringify({
       message: { role: i % 2 === 0 ? 'user' : 'assistant', content: `message ${i} ${'x'.repeat(200)}` },
     }));
@@ -251,7 +244,7 @@ describe('enrichSession', () => {
   });
 
   it('caps L3 prompt size for very large transcripts', async () => {
-    const largePath = join(TEST_HOME, 'large-l3.jsonl');
+    const largePath = join(odb.home, 'large-l3.jsonl');
     const lines = Array.from({ length: 8_000 }, (_, i) => JSON.stringify({
       message: { role: 'user', content: `deep message ${i} ${'y'.repeat(500)}` },
     }));
@@ -274,7 +267,7 @@ describe('enrichSession', () => {
   });
 
   it('full-transcript enrichment sends every JSONL line without L3 caps', async () => {
-    const largePath = join(TEST_HOME, 'full-l3.jsonl');
+    const largePath = join(odb.home, 'full-l3.jsonl');
     const lines = Array.from({ length: 5_050 }, (_, i) => JSON.stringify({
       message: {
         role: 'user',
@@ -307,7 +300,7 @@ describe('enrichSession', () => {
   });
 
   it('omits raw tool inputs and redacts secrets before sending enrichment prompts', async () => {
-    const secretPath = join(TEST_HOME, 'secret-tool-use.jsonl');
+    const secretPath = join(odb.home, 'secret-tool-use.jsonl');
     const lines = [
       JSON.stringify({
         message: {
@@ -407,7 +400,7 @@ describe('enrichSession', () => {
         },
       }),
     ].join('\n') + '\n';
-    const realPath = join(TEST_HOME, 'real-sess.jsonl');
+    const realPath = join(odb.home, 'real-sess.jsonl');
     writeFileSync(realPath, realJsonl, 'utf8');
 
     const session = upsertDiscoveredSession({

@@ -3,7 +3,7 @@ import {
   getConversationByName,
   listArchivedConversations,
   unarchiveConversation,
-} from '../../lib/database/conversations-db.js';
+} from '../../lib/overdeck/conversations.js';
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();

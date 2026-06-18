@@ -20,7 +20,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
-import { isDeaconGloballyPaused } from '../database/app-settings.js';
+import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { loadConfig } from '../config.js';
 
 const execFileAsync = promisify(execFile);

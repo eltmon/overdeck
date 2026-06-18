@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { readlinkSync } from 'fs';
 import { listSessionsSync } from '../../lib/tmux.js';
-import { listActiveConversations } from '../../lib/database/conversations-db.js';
+import { listActiveConversations } from '../../lib/overdeck/conversations.js';
 
 interface ResourcesOptions {
   json?: boolean;

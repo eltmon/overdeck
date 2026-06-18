@@ -7,9 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
 
 import { scan } from '../scanner.js';
 import { parseSessionJsonl } from '../jsonl-async.js';
@@ -17,20 +16,21 @@ import { searchSessions } from '../search.js';
 import { enrichSessions } from '../enrichment/index.js';
 import { enrichSession } from '../enrichment/enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
-import { getDatabase } from '../../database/index.js';
 import {
   findDiscoveredSessions,
   getDiscoveredSessionById,
   getDiscoveredStats,
-  searchFts,
-} from '../../database/discovered-sessions-db.js';
+  searchFtsSessions,
+} from '../../overdeck/discovered-sessions.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../../tests/helpers/overdeck-test-db.js';
 import type { EnrichmentResponse } from '../enrichment/enrich-session.js';
 import type { EmbeddingResult } from '../embeddings/providers.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-let TEST_HOME: string;
+let odb: OverdeckTestDb;
 let claudeProjectsDir: string;
+let savedHome: string | undefined;
 
 const MYAPP_SESSION = [
   JSON.stringify({
@@ -98,14 +98,9 @@ const AUTHLIB_SESSION = [
   }),
 ].join('\n') + '\n';
 
-async function resetDb() {
-  const { resetDatabase } = await import('../../database/index.js');
-  resetDatabase();
-}
-
 beforeEach(() => {
-  TEST_HOME = join(tmpdir(), `pan-457-integration-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  claudeProjectsDir = join(TEST_HOME, '.claude', 'projects');
+  odb = setupOverdeckTestDb();
+  claudeProjectsDir = join(odb.home, '.claude', 'projects');
   mkdirSync(join(claudeProjectsDir, '-home-user-Projects-myapp'), { recursive: true });
   mkdirSync(join(claudeProjectsDir, '-home-user-Projects-otherapp'), { recursive: true });
   mkdirSync(join(claudeProjectsDir, '-home-user-Projects-authlib'), { recursive: true });
@@ -126,15 +121,17 @@ beforeEach(() => {
     'utf8',
   );
 
-  process.env.PANOPTICON_HOME = TEST_HOME;
-  process.env.HOME = TEST_HOME;
+  savedHome = process.env.HOME;
+  process.env.HOME = odb.home;
 });
 
-afterEach(async () => {
-  await resetDb();
-  delete process.env.PANOPTICON_HOME;
-  delete process.env.HOME;
-  rmSync(TEST_HOME, { recursive: true, force: true });
+afterEach(() => {
+  teardownOverdeckTestDb(odb);
+  if (savedHome !== undefined) {
+    process.env.HOME = savedHome;
+  } else {
+    delete process.env.HOME;
+  }
 });
 
 // ─── Stage 1: Scan ────────────────────────────────────────────────────────────
@@ -176,10 +173,17 @@ describe('Stage 1: scan', () => {
 
   it('links managed session_file rows to issue IDs', async () => {
     const myappPath = join(claudeProjectsDir, '-home-user-Projects-myapp', 'myapp-sess.jsonl');
-    getDatabase().prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run('agent-pan-457', 'agent-pan-457', 'active', '/home/user/Projects/myapp', 'PAN-457', new Date().toISOString(), myappPath);
+    const db = odb.raw();
+    // Insert a conversation record and a conversation_files record so the
+    // correlator (which JOINs conversations → conversation_files) can find this session.
+    db.prepare(
+      `INSERT INTO conversations (id, name, cwd, issue_id, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run('conv-test-pan-457', 'agent-pan-457', '/home/user/Projects/myapp', 'PAN-457', Math.floor(Date.now() / 1000));
+    db.prepare(
+      `INSERT INTO conversation_files (conversation_id, harness, locator, created_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run('conv-test-pan-457', 'claude-code', 'myapp-sess', Math.floor(Date.now() / 1000));
 
     await scan({ mode: 'system', watchDirs: [] });
     const myapp = findDiscoveredSessions({}).find((s) => s.jsonlPath === myappPath)!;
@@ -354,7 +358,7 @@ describe('Stage 4: search after enrichment', () => {
     }));
 
     // FTS5 MATCH search
-    const ftsResults = searchFts('jwt', 10);
+    const ftsResults = searchFtsSessions('jwt', {}, 10);
     expect(ftsResults.length).toBeGreaterThan(0);
     expect(ftsResults[0].id).toBe(myapp.id);
   });

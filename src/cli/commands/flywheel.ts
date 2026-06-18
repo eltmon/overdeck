@@ -29,7 +29,7 @@ import {
   isFlywheelRequireUatBeforeMerge,
   setFlywheelAutoPickupBacklog,
   setFlywheelRequireUatBeforeMerge,
-} from '../../lib/database/app-settings.js';
+} from '../../lib/overdeck/control-settings.js';
 import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';

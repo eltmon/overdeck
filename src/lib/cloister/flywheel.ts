@@ -12,7 +12,7 @@ import {
   isFlywheelRequireUatBeforeMerge,
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
-} from '../database/app-settings.js';
+} from '../overdeck/control-settings.js';
 import { resolveLiveFlywheelRunId } from '../../dashboard/server/services/flywheel-run-state.js';
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';

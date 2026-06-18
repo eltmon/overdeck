@@ -7,10 +7,10 @@ import {
   findDiscoveredSessions,
   getDiscoveredSessionById,
   getDiscoveredStats,
-} from '../../../lib/database/discovered-sessions-db.js';
-import { getConversationByName } from '../../../lib/database/conversations-db.js';
-import { getSetting, setSetting } from '../../../lib/database/app-settings.js';
-import type { ConversationFilter } from '../../../lib/database/discovered-sessions-db.js';
+} from '../../../lib/overdeck/discovered-sessions.js';
+import { getConversationByName } from '../../../lib/overdeck/conversations.js';
+import { getSetting, setSetting } from '../../../lib/overdeck/control-settings.js';
+import type { ConversationFilter } from '../../../lib/overdeck/discovered-sessions.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
 import { scan } from '../../../lib/conversations/scanner.js';

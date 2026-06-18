@@ -24,7 +24,7 @@ import {
   listUatGenerationsWithStacksSync,
   setUatGenerationStackStartedAtSync,
   type UatGeneration,
-} from '../database/uat-generations-db.js';
+} from '../overdeck/merge-sync.js';
 
 const execFileAsync = promisify(execFile);
 

@@ -9,26 +9,27 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { Effect } from 'effect';
 
-const mockGetCostBreakdownByStageAndModel = vi.hoisted(() => vi.fn());
-const mockGetCostForIssueFromDb = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
-const mockListAllAgents = vi.hoisted(() => vi.fn());
+const mockListOverdeckAgentStatesSync = vi.hoisted(() => vi.fn());
 const mockGetAllReviewStatusesFromDb = vi.hoisted(() => vi.fn());
 const mockResolveProjectFromIssueSync = vi.hoisted(() => vi.fn());
 const mockGetProjectSync = vi.hoisted(() => vi.fn());
 const mockLoadProjectsConfigSync = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../../src/lib/database/agents-db.js', () => ({
-  listAllAgents: mockListAllAgents,
+// records-backfill now reads agents from overdeck/agent-state-sync (not database/agents-db)
+vi.mock('../../../../src/lib/overdeck/agent-state-sync.js', () => ({
+  listOverdeckAgentStatesSync: mockListOverdeckAgentStatesSync,
+  getOverdeckAgentStateSync: vi.fn(),
+  saveOverdeckAgentStateSync: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/database/review-status-db.js', () => ({
+// records-backfill reads review statuses from overdeck/review-status-sync (not database/review-status-db)
+vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
   getAllReviewStatusesFromDb: mockGetAllReviewStatusesFromDb,
-}));
-
-vi.mock('../../../../src/lib/database/cost-events-db.js', () => ({
-  getCostBreakdownByStageAndModel: mockGetCostBreakdownByStageAndModel,
-  getCostForIssueFromDb: mockGetCostForIssueFromDb,
+  getReviewStatusFromDbSync: vi.fn().mockReturnValue(null),
+  setReviewStatusSync: vi.fn(),
+  markWorkspaceStuck: vi.fn(),
+  clearWorkspaceStuck: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({
@@ -70,10 +71,8 @@ describe('backfillIssueRecords', () => {
     execSync('git branch -M main', { cwd: infraRepo });
     execSync('git remote add origin .', { cwd: infraRepo });
 
-    mockGetCostBreakdownByStageAndModel.mockReturnValue({ byStage: {}, totals: {} });
-    mockGetCostForIssueFromDb.mockReturnValue(null);
     mockGetMergeSetSync.mockReturnValue(null);
-    mockListAllAgents.mockReturnValue([]);
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
     mockGetAllReviewStatusesFromDb.mockReturnValue({});
     mockLoadProjectsConfigSync.mockReturnValue({
       projects: {
@@ -141,7 +140,7 @@ describe('backfillIssueRecords', () => {
   });
 
   it('discovers issues from the agents table even without review_status or continue files', async () => {
-    mockListAllAgents.mockReturnValue([
+    mockListOverdeckAgentStatesSync.mockReturnValue([
       {
         id: 'agent-pan-1909',
         issueId: 'PAN-1909',
@@ -177,7 +176,7 @@ describe('backfillIssueRecords', () => {
   });
 
   it('writes a record for a single issue when --issue-id is passed', async () => {
-    mockListAllAgents.mockReturnValue([
+    mockListOverdeckAgentStatesSync.mockReturnValue([
       { id: 'agent-pan-1908', issueId: 'PAN-1908', role: 'work', status: 'running', workspace: '/w' },
       { id: 'agent-pan-1909', issueId: 'PAN-1909', role: 'work', status: 'running', workspace: '/w' },
     ]);

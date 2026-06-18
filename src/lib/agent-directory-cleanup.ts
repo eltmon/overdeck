@@ -15,13 +15,14 @@
  */
 
 import { existsSync, readdirSync, rmSync } from 'fs';
-import { access, readdir, readFile, rm } from 'node:fs/promises';
+import { access, readdir, rm } from 'node:fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { listSessionNames } from './tmux.js';
 import { parseIssueIdSync } from './issue-id.js';
 import { FsError } from './errors.js';
+import { getAgentStateSync } from './agents.js';
 
 export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -227,10 +228,6 @@ type IssueReadSourceState = {
   closedAt?: unknown;
 };
 
-type AgentStateIssue = {
-  issueId?: unknown;
-};
-
 export interface ClosedIssueAgentDir {
   name: string;
   path: string;
@@ -311,9 +308,9 @@ async function pathExists(path: string): Promise<boolean> {
 
 async function readAgentStateIssueId(dirPath: string): Promise<string | null> {
   try {
-    const raw = await readFile(join(dirPath, 'state.json'), 'utf8');
-    const parsed = JSON.parse(raw) as AgentStateIssue;
-    return normalizeIssueId(parsed.issueId);
+    const agentId = dirPath.split('/').pop() ?? '';
+    const issueId = getAgentStateSync(agentId)?.issueId;
+    return issueId ? normalizeIssueId(issueId) : null;
   } catch {
     return null;
   }
@@ -374,7 +371,7 @@ async function findClosedIssueAgentDirsPromise(options: {
       closedAt: new Date(closedAtMs).toISOString(),
       ageMs,
       hasRunningSession: sessionSet.has(entry.name),
-      hasStateFile: await pathExists(join(dirPath, 'state.json')),
+      hasStateFile: getAgentStateSync(entry.name) !== null,
       containsJsonl: await directoryContainsJsonl(dirPath),
     });
   }

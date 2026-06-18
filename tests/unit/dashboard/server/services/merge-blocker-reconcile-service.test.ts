@@ -11,7 +11,7 @@ function candidatesEffect(candidates: ReturnType<typeof candidate>[]) {
   return Effect.succeed(candidates);
 }
 
-vi.mock('../../../../../src/lib/database/review-status-db.js', () => ({
+vi.mock('../../../../../src/lib/overdeck/review-status-sync.js', () => ({
   getMergeBlockerReconcileCandidates: mockGetMergeBlockerReconcileCandidates,
 }));
 

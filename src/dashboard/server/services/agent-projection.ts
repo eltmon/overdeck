@@ -6,24 +6,21 @@
  * SQLite transaction. This replaces save-then-append, which a crash could
  * leave out of sync.
  *
- * The transaction runs on the shared panopticon.db connection. After commit,
- * the persisted event is emitted to the event store's subscribers so the
- * in-memory read model stays current.
+ * The transaction runs on the shared overdeck.db connection (PAN-1938). After
+ * commit, the persisted event is emitted to the event store's subscribers so
+ * the in-memory read model stays current.
  */
 
 import { Effect } from 'effect';
-import { getDatabase } from '../../../lib/database/index.js';
 import type { SqliteDatabase } from '../../../lib/database/driver.js';
-import { upsertAgentWithDb, type Agent as DbAgent } from '../../../lib/database/agents-db.js';
+import { getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
+import { stateToOverdeckParamsForDb, AGENT_COLUMNS_FOR_DB } from '../../../lib/overdeck/agent-state-sync.js';
 import { getEventStore, type EventStore, type StoredEvent } from '../event-store.js';
 import { writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
-import { agentStateToDbAgent } from '../../../lib/database/agent-mappers.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 export interface AgentProjectionResult {
-  /** The agents-table row as persisted. */
-  agent: DbAgent;
   /** Assigned event sequence number. */
   sequence: number;
 }
@@ -50,31 +47,12 @@ function buildStoredEvent(
   };
 }
 
-function appendEventInTransaction(
-  db: SqliteDatabase,
-  event: Omit<DomainEvent, 'sequence'>,
-): number {
-  const record = event as Record<string, unknown>;
-  const timestamp = (record['timestamp'] as string) ?? new Date().toISOString();
-  const payload = JSON.stringify(record['payload'] ?? {});
-
-  db.prepare(`INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`).run([
-    event.type,
-    timestamp,
-    payload,
-  ]);
-  const row = db.prepare(`SELECT last_insert_rowid() AS sequence`).get() as
-    | { sequence: number }
-    | undefined;
-  return row?.sequence ?? 0;
-}
-
 /**
  * Atomically persist an agent state change and its lifecycle event.
  *
  * 1. Prepares the state (stoppedAt stamping).
  * 2. Writes state.json (rollback source) outside the SQLite tx.
- * 3. Begins a SQLite transaction, upserts the agents row, inserts the event.
+ * 3. Begins an overdeck.db transaction, upserts the agents row, inserts the event.
  * 4. Commits and emits the stored event to subscribers.
  *
  * @throws If the SQLite transaction is rolled back, neither the row nor the
@@ -84,7 +62,7 @@ export function saveAgentStateAndEmitEvent(
   state: AgentState,
   event: Omit<DomainEvent, 'sequence'>,
 ): AgentProjectionResult {
-  const db = getDatabase();
+  const db = getOverdeckDatabaseSync();
   const eventStore = getEventStore();
   return saveAgentStateAndEmitEventWithDeps(db, eventStore, state, event);
 }
@@ -109,19 +87,39 @@ export function saveAgentStateAndEmitEventWithDeps(
   state: AgentState,
   event: Omit<DomainEvent, 'sequence'>,
 ): AgentProjectionResult {
-  const oldStatus = state.status;
   prepareAgentStateForSave(state);
 
   // Rollback source lives on the filesystem; keep it outside the SQLite tx
   // so a tx failure does not corrupt it.
   writeAgentStateJsonSync(state);
 
-  const agent = agentStateToDbAgent(state);
+  const record = event as Record<string, unknown>;
+  const timestamp = (record['timestamp'] as string) ?? new Date().toISOString();
+  const timestampSecs = Math.floor(new Date(timestamp).getTime() / 1000);
+  const payload = JSON.stringify(record['payload'] ?? {});
+  const updatedAt = Date.now();
 
   db.exec('BEGIN IMMEDIATE');
   try {
-    upsertAgentWithDb(db, agent);
-    const sequence = appendEventInTransaction(db, event);
+    // Ensure the issues row exists (overdeck FK requirement).
+    db.prepare(
+      `INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, 'working', ?)`,
+    ).run(state.issueId, updatedAt);
+
+    // Upsert the agents row.
+    db.prepare(
+      `INSERT OR REPLACE INTO agents (${AGENT_COLUMNS_FOR_DB.join(', ')}) VALUES (${AGENT_COLUMNS_FOR_DB.map(() => '?').join(', ')})`,
+    ).run(...stateToOverdeckParamsForDb(state, updatedAt));
+
+    // Append the event. overdeck events.timestamp is integer unix seconds.
+    db.prepare(
+      `INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`,
+    ).run(event.type, timestampSecs, payload);
+
+    const row = db.prepare(`SELECT last_insert_rowid() AS sequence`).get() as
+      | { sequence: number }
+      | undefined;
+    const sequence = row?.sequence ?? 0;
     db.exec('COMMIT');
 
     const stored = buildStoredEvent(event, sequence);
@@ -132,7 +130,7 @@ export function saveAgentStateAndEmitEventWithDeps(
       `projected ${event.type} (seq=${sequence}) for ${state.id}`,
     );
 
-    return { agent, sequence };
+    return { sequence };
   } catch (err) {
     try {
       db.exec('ROLLBACK');

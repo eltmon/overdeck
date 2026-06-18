@@ -8,8 +8,14 @@ import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
+import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 
 // ============== Shared test data ==============
+
+// vi.mock is hoisted — use vi.hoisted so the factory can reference these fns
+const { mockListProjects: hoistedMockListProjects } = vi.hoisted(() => ({
+  mockListProjects: vi.fn(),
+}));
 
 function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
   return {
@@ -32,11 +38,9 @@ function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
 
 // ============== wal.ts: resolveWalDir ==============
 
-const mockListProjects = vi.fn();
-
 vi.mock('../../../src/lib/projects.js', () => ({
-  listProjects: mockListProjects,
-  listProjectsSync: mockListProjects,
+  listProjects: hoistedMockListProjects,
+  listProjectsSync: hoistedMockListProjects,
 }));
 
 describe('resolveWalDir', () => {
@@ -156,25 +160,22 @@ describe('appendToWal', () => {
 
 // ============== sync-wal.ts: syncWalFromDir ==============
 
-vi.mock('../../../src/lib/database/cost-events-db.js', () => ({
-  insertCostEvents: vi.fn(),
-}));
-
 describe('syncWalFromDir', () => {
+  // sync-wal now writes through the overdeck CostWriter door (not database/cost-events-db).
+  // Use the real overdeck fixture to let the full Effect path run and verify via stats.
+  // vi.resetModules() ensures overdeck/infra DbLive captures the new PANOPTICON_HOME.
   let tmpDir: string;
-  let insertCostEvents: ReturnType<typeof vi.fn>;
+  let odb: OverdeckTestDb;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     tmpDir = join(tmpdir(), `pan-sync-test-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
-
-    const mod = await import('../../../src/lib/database/cost-events-db.js');
-    insertCostEvents = mod.insertCostEvents as ReturnType<typeof vi.fn>;
-    insertCostEvents.mockReset();
-    insertCostEvents.mockReturnValue({ inserted: 0, duplicates: 0 });
+    vi.resetModules();
+    odb = setupOverdeckTestDb();
   });
 
   afterEach(() => {
+    teardownOverdeckTestDb(odb);
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -190,36 +191,38 @@ describe('syncWalFromDir', () => {
   it('imports valid events from JSONL files', async () => {
     const event = makeCostEvent();
     writeFileSync(join(tmpDir, 'PAN-335.jsonl'), JSON.stringify(event) + '\n');
-    insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
     const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
 
-    expect(insertCostEvents).toHaveBeenCalledOnce();
     expect(stats.imported).toBe(1);
     expect(stats.duplicates).toBe(0);
     expect(stats.files).toBe(1);
     expect(stats.errors).toHaveLength(0);
   });
 
-  it('passes the source file path to insertCostEvents', async () => {
+  it('records the source file path in overdeck cost_events', async () => {
     const event = makeCostEvent();
     const walFile = join(tmpDir, 'PAN-335.jsonl');
     writeFileSync(walFile, JSON.stringify(event) + '\n');
-    insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
     await Effect.runPromise(syncWalFromDir(tmpDir));
 
-    expect(insertCostEvents).toHaveBeenCalledWith(expect.any(Array), walFile);
+    // Verify source_file was persisted in overdeck
+    const rows = odb.raw().prepare('SELECT source_file FROM cost_events WHERE request_id = ?').all(event.requestId) as Array<{ source_file: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].source_file).toBe(walFile);
   });
 
-  it('counts duplicates correctly', async () => {
+  it('counts duplicates correctly (same requestId re-imported)', async () => {
     const event = makeCostEvent();
     writeFileSync(join(tmpDir, 'PAN-335.jsonl'), JSON.stringify(event) + '\n');
-    insertCostEvents.mockReturnValue({ inserted: 0, duplicates: 1 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
+    // First import — inserted
+    await Effect.runPromise(syncWalFromDir(tmpDir));
+    // Second import of same file — duplicate
     const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
 
     expect(stats.imported).toBe(0);
@@ -232,23 +235,19 @@ describe('syncWalFromDir', () => {
       join(tmpDir, 'PAN-335.jsonl'),
       'not-valid-json\n' + JSON.stringify(event) + '\n',
     );
-    insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
 
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
     const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
 
-    // The valid event should still be imported; malformed line silently skipped
     expect(stats.imported).toBe(1);
     expect(stats.errors).toHaveLength(0);
   });
 
   it('skips lines missing required fields', async () => {
     writeFileSync(join(tmpDir, 'PAN-335.jsonl'), '{"ts":"2026-01-01"}\n');
-    // No valid events → insertCostEvents not called
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
     const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
 
-    expect(insertCostEvents).not.toHaveBeenCalled();
     expect(stats.imported).toBe(0);
   });
 
@@ -257,7 +256,6 @@ describe('syncWalFromDir', () => {
     const { syncWalFromDir } = await import('../../../src/lib/costs/sync-wal.js');
     const stats = await Effect.runPromise(syncWalFromDir(tmpDir));
 
-    expect(insertCostEvents).not.toHaveBeenCalled();
     expect(stats.files).toBe(0);
   });
 });
@@ -267,23 +265,21 @@ describe('syncWalFromDir', () => {
 describe('syncWalFromAllProjects', () => {
   let tmpDir: string;
   let listProjects: ReturnType<typeof vi.fn>;
-  let insertCostEvents: ReturnType<typeof vi.fn>;
+  let odb: OverdeckTestDb;
 
   beforeEach(async () => {
     tmpDir = join(tmpdir(), `pan-sync-all-test-${Date.now()}`);
     mkdirSync(tmpDir, { recursive: true });
+    vi.resetModules();
+    odb = setupOverdeckTestDb();
 
     const projectsMod = await import('../../../src/lib/projects.js');
     listProjects = projectsMod.listProjectsSync as ReturnType<typeof vi.fn>;
     listProjects.mockReset();
-
-    const dbMod = await import('../../../src/lib/database/cost-events-db.js');
-    insertCostEvents = dbMod.insertCostEvents as ReturnType<typeof vi.fn>;
-    insertCostEvents.mockReset();
-    insertCostEvents.mockReturnValue({ inserted: 0, duplicates: 0 });
   });
 
   afterEach(() => {
+    teardownOverdeckTestDb(odb);
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -306,7 +302,6 @@ describe('syncWalFromAllProjects', () => {
     const result = await Effect.runPromise(syncWalFromAllProjects());
 
     expect(result.filesScanned).toBe(0);
-    expect(insertCostEvents).not.toHaveBeenCalled();
   });
 
   it('aggregates imported events across multiple projects', async () => {
@@ -318,15 +313,13 @@ describe('syncWalFromAllProjects', () => {
     mkdirSync(eventsDir1, { recursive: true });
     mkdirSync(eventsDir2, { recursive: true });
 
-    writeFileSync(join(eventsDir1, 'PAN-1.jsonl'), JSON.stringify(makeCostEvent({ issueId: 'PAN-1' })) + '\n');
-    writeFileSync(join(eventsDir2, 'MIN-1.jsonl'), JSON.stringify(makeCostEvent({ issueId: 'MIN-1' })) + '\n');
+    writeFileSync(join(eventsDir1, 'PAN-1.jsonl'), JSON.stringify(makeCostEvent({ issueId: 'PAN-1', requestId: 'req-pan-1' })) + '\n');
+    writeFileSync(join(eventsDir2, 'MIN-1.jsonl'), JSON.stringify(makeCostEvent({ issueId: 'MIN-1', requestId: 'req-min-1' })) + '\n');
 
     listProjects.mockReturnValue([
       { key: 'PAN', config: { path: repo1 } },
       { key: 'MIN', config: { path: repo2 } },
     ]);
-    insertCostEvents.mockReturnValue({ inserted: 1, duplicates: 0 });
-
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
     const result = await Effect.runPromise(syncWalFromAllProjects());
 
@@ -345,7 +338,12 @@ describe('syncWalFromAllProjects', () => {
     listProjects.mockReturnValue([
       { key: 'PAN', config: { path: repo1 } },
     ]);
-    insertCostEvents.mockImplementation(() => { throw new Error('DB write failed'); });
+    // Simulate a DB write failure by using a real overdeck DB with no schema (broken DB).
+    // The easiest simulation: close the DB and remove it so writes fail.
+    teardownOverdeckTestDb(odb);
+    odb = setupOverdeckTestDb();
+    // Corrupt the DB by removing the cost_events table so inserts throw
+    odb.raw().prepare('DROP TABLE cost_events').run();
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
     const result = await Effect.runPromise(syncWalFromAllProjects());

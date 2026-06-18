@@ -3,31 +3,30 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { join } from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { closeDatabase, getDatabase } from '../../src/lib/database/index.js';
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
 import { createEventStore, type DbAdapter } from '../../src/dashboard/server/event-store.js';
 
-// Override PANOPTICON_HOME to isolate each test in its own temp DB
-let tmpDir: string;
+let db: SqliteDatabase;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), 'pan-event-store-test-'));
-  process.env['PANOPTICON_HOME'] = tmpDir;
-  // Reset the DB singleton so each test gets a fresh connection
-  closeDatabase();
+  db = openDatabase(':memory:');
+  db.exec(`
+    CREATE TABLE events (
+      sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
+      type      TEXT    NOT NULL,
+      timestamp INTEGER NOT NULL,
+      payload   TEXT    NOT NULL DEFAULT '{}'
+    )
+  `);
 });
 
 afterEach(() => {
-  closeDatabase();
-  rmSync(tmpDir, { recursive: true, force: true });
-  delete process.env['PANOPTICON_HOME'];
+  db.close();
 });
 
 describe('EventStore', () => {
   it('append returns monotonically increasing sequence numbers', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
+    const store = createEventStore(db as unknown as DbAdapter);
 
     const s1 = store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: { agentId: 'a1', issueId: 'PAN-1' } } as any);
     const s2 = store.append({ type: 'agent.stopped', timestamp: new Date().toISOString(), payload: { agentId: 'a1', issueId: 'PAN-1' } } as any);
@@ -39,7 +38,7 @@ describe('EventStore', () => {
   });
 
   it('readFrom(0) returns all appended events', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
+    const store = createEventStore(db as unknown as DbAdapter);
 
     store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: { agentId: 'a1' } } as any);
     store.append({ type: 'agent.stopped', timestamp: new Date().toISOString(), payload: { agentId: 'a1' } } as any);
@@ -51,7 +50,7 @@ describe('EventStore', () => {
   });
 
   it('readFrom(N) returns only events with sequence > N', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
+    const store = createEventStore(db as unknown as DbAdapter);
 
     const s1 = store.append({ type: 'agent.created', timestamp: new Date().toISOString(), payload: {} } as any);
     store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: {} } as any);
@@ -63,7 +62,7 @@ describe('EventStore', () => {
   });
 
   it('events are returned in sequence order', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
+    const store = createEventStore(db as unknown as DbAdapter);
 
     store.append({ type: 'event.a', timestamp: new Date().toISOString(), payload: {} } as any);
     store.append({ type: 'event.b', timestamp: new Date().toISOString(), payload: {} } as any);
@@ -75,7 +74,7 @@ describe('EventStore', () => {
   });
 
   it('subscribe delivers live events in real time', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
+    const store = createEventStore(db as unknown as DbAdapter);
     const received: string[] = [];
 
     const unsub = store.subscribe(e => received.push(e.type));
@@ -96,7 +95,7 @@ describe('EventStore', () => {
   });
 
   it('payload is round-tripped through JSON correctly', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
+    const store = createEventStore(db as unknown as DbAdapter);
     const payload = { issueId: 'PAN-42', agentId: 'agent-xyz', nested: { count: 7 } };
 
     store.append({ type: 'agent.created', timestamp: new Date().toISOString(), payload } as any);
@@ -106,11 +105,10 @@ describe('EventStore', () => {
   });
 
   it('compact removes events older than 7 days', () => {
-    const store = createEventStore(getDatabase() as unknown as DbAdapter);
-    const db = getDatabase();
+    const store = createEventStore(db as unknown as DbAdapter);
 
     // Insert a stale event directly into DB with old timestamp
-    const oldTimestamp = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const oldTimestamp = Date.now() - 8 * 24 * 60 * 60 * 1000;
     db.prepare('INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)').run(
       'agent.created', oldTimestamp, '{}'
     );

@@ -60,7 +60,7 @@ function writeJsonl(name: string, lines: unknown[]): Promise<string> {
 }
 
 describe('conversation native compaction', () => {
-  it('summarizes the whole transcript before appending an end-of-file compact boundary', async () => {
+  it('writes the compact boundary to a forked file without mutating the source', async () => {
     const file = await writeJsonl('session.jsonl', [
       { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Fix the broken deploy' }] } },
       {
@@ -82,9 +82,10 @@ describe('conversation native compaction', () => {
         },
       },
     ]);
+    const originalContent = await readFile(file, 'utf-8');
 
     const { compactConversationNative } = await import('../conversation-compaction.js');
-    await compactConversationNative(file);
+    const result = await compactConversationNative(file);
 
     expect(mockGenerateSmartSummary).toHaveBeenCalledWith(expect.objectContaining({
       jsonlPath: file,
@@ -93,9 +94,19 @@ describe('conversation native compaction', () => {
       mode: 'fork',
     }));
 
-    const compacted = await readFile(file, 'utf-8');
-    expect(compacted).toContain('"subtype":"compact_boundary"');
-    expect(compacted).toContain('summary from claude-haiku-4-5');
+    // Source file must be byte-for-byte unchanged (sacred-file invariant)
+    const sourceAfter = await readFile(file, 'utf-8');
+    expect(sourceAfter).toBe(originalContent);
+
+    // Fork result must carry the new session identifiers
+    expect(result.forkedSessionId).toBeTruthy();
+    expect(result.forkedSessionFile).toBeTruthy();
+    expect(result.forkedSessionFile).not.toBe(file);
+
+    // Fork file must contain the compact boundary and summary
+    const forkedContent = await readFile(result.forkedSessionFile, 'utf-8');
+    expect(forkedContent).toContain('"subtype":"compact_boundary"');
+    expect(forkedContent).toContain('summary from claude-haiku-4-5');
   });
 
   it('ignores trailing zero-token assistant usage when estimating context', async () => {
