@@ -20,7 +20,7 @@
  * sources live in the dashboard server service.
  */
 import type { ReadyFeature, GenerationStorePort } from './uat-generation-engine.js';
-import type { UatGeneration } from '../database/uat-generations-db.js';
+import type { UatGeneration } from '../overdeck/merge-sync.js';
 
 /**
  * An 'assembling' row with NO PROGRESS for this long is marked failed (train

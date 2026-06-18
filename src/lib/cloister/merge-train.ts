@@ -9,7 +9,7 @@
  * this module (and unit-testing the gating) stays light and never pulls in the
  * agent-spawn machinery.
  */
-import { isMergeTrainEnabled } from '../database/app-settings.js';
+import { isMergeTrainEnabled } from '../overdeck/merge-sync.js';
 import { reconcileStaleSiblings, type ReconcileDeps, type SiblingOutcome } from './merge-train-reconciler.js';
 
 export interface RunMergeTrainOptions {

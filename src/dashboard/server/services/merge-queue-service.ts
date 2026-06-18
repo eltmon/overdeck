@@ -1,4 +1,4 @@
-import { getAllActiveQueues } from '../../../lib/database/merge-queue-db.js';
+import { getAllActiveQueues } from '../../../lib/overdeck/merge-sync.js';
 
 export type MergeTriggerHandler = (issueId: string) => Promise<unknown>;
 

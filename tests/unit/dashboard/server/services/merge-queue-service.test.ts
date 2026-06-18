@@ -4,7 +4,7 @@ const { getAllActiveQueuesMock } = vi.hoisted(() => ({
   getAllActiveQueuesMock: vi.fn(),
 }));
 
-vi.mock('../../../../../src/lib/database/merge-queue-db.js', () => ({
+vi.mock('../../../../../src/lib/overdeck/merge-sync.js', () => ({
   getAllActiveQueues: getAllActiveQueuesMock,
 }));
 
