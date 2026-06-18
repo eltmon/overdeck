@@ -403,3 +403,17 @@ CREATE TABLE `session_embeddings` (
 	`created_at` text NOT NULL,
 	PRIMARY KEY (`session_id`, `model`)
 );--> statement-breakpoint
+CREATE TABLE `git_operations` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`operation` text NOT NULL,
+	`branch` text,
+	`issue_id` text,
+	`before_sha` text,
+	`after_sha` text,
+	`remote_sha` text,
+	`status` text NOT NULL,
+	`error` text,
+	`ts` text NOT NULL
+);--> statement-breakpoint
+CREATE INDEX `idx_git_ops_ts` ON `git_operations` (`ts`);--> statement-breakpoint
+CREATE INDEX `idx_git_ops_issue` ON `git_operations` (`issue_id`,`ts`);--> statement-breakpoint
