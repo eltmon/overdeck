@@ -53,4 +53,40 @@ describe('overdeck test fixture', () => {
     expect(getOverdeckAgentStateSync('agent-x')).toBeNull();
     expect(listOverdeckAgentStatesSync()).toHaveLength(0);
   });
+
+  it('round-trips the restored lifecycle columns (parity: stoppedAt, costSoFar, reviewRunId, …)', () => {
+    saveOverdeckAgentStateSync({
+      id: 'agent-restored',
+      issueId: 'PAN-9999',
+      workspace: '/tmp/ws',
+      role: 'review',
+      model: 'claude-opus-4-8',
+      status: 'stopped',
+      startedAt: '2026-06-17T00:00:00.000Z',
+      stoppedAt: '2026-06-17T01:00:00.000Z',
+      pausedAt: '2026-06-17T00:30:00.000Z',
+      troubledAt: '2026-06-17T00:45:00.000Z',
+      lastActivity: '2026-06-17T00:50:00.000Z',
+      lastFailureReason: 'boom',
+      phase: 'review-response',
+      roleRunHead: 'abc123',
+      flywheelRunId: 'fw-1',
+      costSoFar: 1.2345,
+      reviewSubRole: 'security',
+      reviewRunId: 'run-7',
+    } as AgentState);
+
+    const got = getOverdeckAgentStateSync('agent-restored');
+    expect(got?.stoppedAt).toBe('2026-06-17T01:00:00.000Z');
+    expect(got?.pausedAt).toBe('2026-06-17T00:30:00.000Z');
+    expect(got?.troubledAt).toBe('2026-06-17T00:45:00.000Z');
+    expect(got?.lastActivity).toBe('2026-06-17T00:50:00.000Z');
+    expect(got?.lastFailureReason).toBe('boom');
+    expect(got?.phase).toBe('review-response');
+    expect(got?.roleRunHead).toBe('abc123');
+    expect(got?.flywheelRunId).toBe('fw-1');
+    expect(got?.costSoFar).toBeCloseTo(1.2345);
+    expect(got?.reviewSubRole).toBe('security');
+    expect(got?.reviewRunId).toBe('run-7');
+  });
 });

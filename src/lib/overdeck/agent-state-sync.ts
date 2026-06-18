@@ -24,6 +24,17 @@ type OverdeckAgentRow = {
   consecutive_failures: number | null;
   first_failure_in_run_at: number | null;
   last_failure_next_retry_at: number | null;
+  stopped_at: number | null;
+  paused_at: number | null;
+  troubled_at: number | null;
+  last_activity: number | null;
+  last_failure_reason: string | null;
+  phase: string | null;
+  role_run_head: string | null;
+  flywheel_run_id: string | null;
+  cost_so_far: number | null;
+  review_sub_role: string | null;
+  review_run_id: string | null;
   updated_at: number;
 };
 
@@ -49,6 +60,17 @@ const AGENT_COLUMNS = [
   'consecutive_failures',
   'first_failure_in_run_at',
   'last_failure_next_retry_at',
+  'stopped_at',
+  'paused_at',
+  'troubled_at',
+  'last_activity',
+  'last_failure_reason',
+  'phase',
+  'role_run_head',
+  'flywheel_run_id',
+  'cost_so_far',
+  'review_sub_role',
+  'review_run_id',
   'updated_at',
 ] as const;
 
@@ -102,6 +124,17 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     supervisorEnabled: deliveryMethod === 'supervisor' ? true : undefined,
     deliveryMethod: deliveryMethod ?? undefined,
     hostOverride: hostOverrideFromRow(row.host_override),
+    stoppedAt: isoFromMillis(row.stopped_at),
+    pausedAt: isoFromMillis(row.paused_at),
+    troubledAt: isoFromMillis(row.troubled_at),
+    lastActivity: isoFromMillis(row.last_activity),
+    lastFailureReason: row.last_failure_reason ?? undefined,
+    phase: row.phase == null ? undefined : (row.phase as AgentState['phase']),
+    roleRunHead: row.role_run_head ?? undefined,
+    flywheelRunId: row.flywheel_run_id ?? undefined,
+    costSoFar: row.cost_so_far ?? undefined,
+    reviewSubRole: row.review_sub_role ?? undefined,
+    reviewRunId: row.review_run_id ?? undefined,
   };
 }
 
@@ -129,6 +162,17 @@ function stateToOverdeckParams(state: AgentState, updatedAt: number): unknown[] 
     state.consecutiveFailures ?? null,
     millisFromIso(state.firstFailureInRunAt),
     millisFromIso(state.lastFailureNextRetryAt),
+    millisFromIso(state.stoppedAt),
+    millisFromIso(state.pausedAt),
+    millisFromIso(state.troubledAt),
+    millisFromIso(state.lastActivity),
+    state.lastFailureReason ?? null,
+    state.phase ?? null,
+    state.roleRunHead ?? null,
+    state.flywheelRunId ?? null,
+    state.costSoFar ?? null,
+    state.reviewSubRole ?? null,
+    state.reviewRunId ?? null,
     updatedAt,
   ];
 }

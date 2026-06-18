@@ -20,6 +20,17 @@ CREATE TABLE `agents` (
 	`consecutive_failures` integer DEFAULT 0,
 	`first_failure_in_run_at` integer,
 	`last_failure_next_retry_at` integer,
+	`stopped_at` integer,
+	`paused_at` integer,
+	`troubled_at` integer,
+	`last_activity` integer,
+	`last_failure_reason` text,
+	`phase` text,
+	`role_run_head` text,
+	`flywheel_run_id` text,
+	`cost_so_far` real,
+	`review_sub_role` text,
+	`review_run_id` text,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
 );
