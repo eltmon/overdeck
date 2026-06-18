@@ -22,14 +22,14 @@ import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
-import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
+import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getPanopticonHome } from '../../../lib/paths.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -148,15 +148,19 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
   return aId.localeCompare(bId);
 }
 
-/** Read the pause gate from an agent's state (PAN-1779): specialist
+/** Read the pause gate from an agent's state.json (PAN-1779): specialist
  *  sessions are built from review history, not state, so the gate must be
  *  looked up separately for them. Returns {} when not paused. */
-function readSessionPauseFields(
+async function readSessionPauseFields(
   sessionId: string,
-): { paused?: true; pausedReason?: string; pausedAt?: string } {
-  const s = getAgentStateSync(sessionId);
-  if (!s || s.paused !== true) return {};
-  return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
+): Promise<{ paused?: true; pausedReason?: string; pausedAt?: string }> {
+  const stateText = await readOptional(join(getPanopticonHome(), 'agents', sessionId, 'state.json'));
+  if (!stateText) return {};
+  try {
+    const s = JSON.parse(stateText) as { paused?: boolean; pausedReason?: string; pausedAt?: string };
+    if (s.paused === true) return { paused: true, pausedReason: s.pausedReason, pausedAt: s.pausedAt };
+  } catch { /* malformed state — treat as unpaused */ }
+  return {};
 }
 
 async function collectSessionTreeNodes(
@@ -194,10 +198,11 @@ async function collectSessionTreeNodes(
   for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
-    const state = getAgentStateSync(checkId);
-    if (!state) continue;
+    const stateText = await readOptional(join(agentDir, 'state.json'));
+    if (!stateText) continue;
 
     try {
+      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux'; paused?: boolean; pausedReason?: string; pausedAt?: string };
       const isPlanning = checkId.startsWith('planning-');
       const isStrike = checkId.startsWith('strike-');
       const sectionType = isPlanning ? 'planning' : isStrike ? 'strike' : 'work';
@@ -217,7 +222,7 @@ async function collectSessionTreeNodes(
         sessionId: checkId,
         tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' ? checkId : undefined,
         model: state.model || 'unknown',
-        startedAt: state.startedAt || new Date().toISOString(),
+        startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         endedAt: undefined,
         duration: state.startedAt
           ? (() => {
@@ -296,7 +301,7 @@ async function collectSessionTreeNodes(
         roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
         hasJsonl: !!orchestratorJsonlPath,
         tmuxSession: orchestratorSessionName,
-        ...readSessionPauseFields(orchestratorSessionName),
+        ...(await readSessionPauseFields(orchestratorSessionName)),
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,
@@ -331,7 +336,7 @@ async function collectSessionTreeNodes(
         presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!testJsonlPath,
         tmuxSession: testIsLive ? testSessionName : undefined,
-        ...readSessionPauseFields(testSessionName),
+        ...(await readSessionPauseFields(testSessionName)),
       });
     }
 
@@ -354,7 +359,7 @@ async function collectSessionTreeNodes(
         presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
-        ...readSessionPauseFields(shipSessionName),
+        ...(await readSessionPauseFields(shipSessionName)),
       });
     }
   }
@@ -376,7 +381,7 @@ async function resolveFeatureTitle(
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
-      const entry = await Effect.runPromise(findSpecByIssueThroughOverdeck(projectPath, issueId));
+      const entry = await Effect.runPromise(findSpecByIssue(projectPath, issueId));
       if (entry) {
         const specContent = await readOptional(entry.path);
         if (specContent) {

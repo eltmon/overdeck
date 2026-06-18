@@ -16,8 +16,6 @@ let TEST_HOME: string;
 async function resetDb() {
   const { resetDatabase } = await import('../index.js');
   resetDatabase();
-  const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
-  closeOverdeckDatabaseSync();
 }
 
 beforeEach(() => {
@@ -71,13 +69,14 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
     }
   });
 
-  it('dashboard startup database opener (event-store) opens overdeck.db with events and discovered_sessions', async () => {
+  it('dashboard startup database opener wires the workspace discovered-session schema', async () => {
     const { openEventDb } = await import('../../../dashboard/server/event-store.js');
     const db = await openEventDb();
     const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')`).all() as Array<{ name: string }>;
     const names = tables.map((t) => t.name);
-    expect(names).toContain('events');
     expect(names).toContain('discovered_sessions');
+    expect(names).toContain('sessions_fts');
+    expect(names).toContain('session_embeddings');
   });
 
   it('inspect status metadata persists across a read', async () => {
@@ -112,11 +111,9 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
     expect(row?.inspectBeadId).toBe('workspace-sposy');
   });
 
-  // PAN-1938: markWorkspaceStuck/clearWorkspaceStuck write to overdeck.db via
-  // overdeck/review-status-sync.js — read back from the same door.
   it('markWorkspaceStuck persists across a read', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
-    const { getReviewStatusFromDbSync } = await import('../../overdeck/review-status-sync.js');
+    const { getReviewStatusFromDbSync } = await import('../review-status-db.js');
 
     markWorkspaceStuck('PAN-653', 'main_diverged', { localSha: 'abc123', remoteSha: 'def456' });
 
@@ -130,7 +127,7 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
 
   it('clearWorkspaceStuck removes the stuck flag', async () => {
     const { markWorkspaceStuck, clearWorkspaceStuck } = await import('../../review-status.js');
-    const { getReviewStatusFromDbSync } = await import('../../overdeck/review-status-sync.js');
+    const { getReviewStatusFromDbSync } = await import('../review-status-db.js');
 
     markWorkspaceStuck('PAN-100', 'main_diverged');
     expect(getReviewStatusFromDbSync('PAN-100')?.stuck).toBe(true);

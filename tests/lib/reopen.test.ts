@@ -10,16 +10,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../helpers/overdeck-test-db.js';
+import { openDatabase, type SqliteDatabase } from '../../src/lib/database/driver.js';
+import { initSchema } from '../../src/lib/database/schema.js';
 
-// ── Overdeck DB fixture ───────────────────────────────────────────────────────
+// ── In-memory DB injection ────────────────────────────────────────────────────
 
-let odb: OverdeckTestDb;
+let testDb: SqliteDatabase;
 let projectStub: { projectPath: string } | null = null;
 const mockClearIssueClosedCache = vi.fn();
 
 vi.mock('../../src/lib/cloister/issue-closed.js', () => ({
   clearIssueClosedCache: (...args: unknown[]) => mockClearIssueClosedCache(...args),
+}));
+
+vi.mock('../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
 }));
 
 vi.mock('../../src/lib/pipeline-notifier.js', () => ({
@@ -52,10 +57,9 @@ vi.mock('../../src/lib/projects.js', async () => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function seedStatus(data: Record<string, unknown>) {
-  const db = odb.raw();
   for (const [issueId, s] of Object.entries(data)) {
     const row = s as Record<string, unknown>;
-    db.prepare(`
+    testDb.prepare(`
       INSERT OR REPLACE INTO review_status
         (issue_id, review_status, test_status, merge_status, ready_for_merge,
          pr_url, auto_requeue_count, stuck, stuck_reason, stuck_at,
@@ -79,7 +83,7 @@ function seedStatus(data: Record<string, unknown>) {
 }
 
 function readStatus(issueId: string): Record<string, unknown> | null {
-  return odb.raw().prepare('SELECT * FROM review_status WHERE issue_id = ?').get(issueId) as Record<string, unknown> | null;
+  return testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get(issueId) as Record<string, unknown> | null;
 }
 
 /** Create a minimal workspace directory (no longer used directly by reopen, but
@@ -94,13 +98,15 @@ function createWorkspace(): string {
 // ── Setup / teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  odb = setupOverdeckTestDb();
+  testDb = openDatabase(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
   projectStub = null;
   mockClearIssueClosedCache.mockClear();
 });
 
 afterEach(() => {
-  teardownOverdeckTestDb(odb);
+  testDb.close();
 });
 
 // ── Import under test (after mocks) ─────────────────────────────────────────

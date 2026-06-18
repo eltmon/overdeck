@@ -15,7 +15,7 @@ const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
 const mockSetClearedToConvId = vi.fn();
 
-vi.mock('../../../../lib/overdeck/conversations.js', () => ({
+vi.mock('../../../../lib/database/conversations-db.js', () => ({
   listActiveConversations: mockListActiveConversations,
   markConversationEnded: mockMarkConversationEnded,
   createConversation: mockCreateConversation,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,7 +18,7 @@ async function withIsolatedReadModel<T>(
     getTurnDiffSummaries: (agentId: string) => unknown
     applyEvent: (event: unknown) => void
   }) => Promise<T>,
-  options?: { setupMocks?: () => void; initialOverdeckAgents?: ReadonlyArray<unknown> },
+  options?: { setupMocks?: () => void },
 ): Promise<T> {
   const tmpHome = mkdtempSync(join(tmpdir(), 'pan-1024-read-model-'))
   const originalHome = process.env['PANOPTICON_HOME']
@@ -28,21 +28,11 @@ async function withIsolatedReadModel<T>(
     vi.resetModules()
     options?.setupMocks?.()
     const { ReadModelService, ReadModelServiceLive } = await import('../read-model.js')
-    const { AgentsResolver: AR } = await import('../../../lib/overdeck/agents.js')
-    const { Layer: L } = await import('effect')
-    const agents = options?.initialOverdeckAgents ?? []
-    const mockLayer = L.succeed(AR, AR.of({
-      list: (_f: never) => Effect.succeed(agents as never),
-      get: (_id: never) => Effect.fail(new Error('not found') as never),
-      isAlive: (_id: never) => Effect.succeed(false),
-      getRuntime: (_id: never) => Effect.succeed(null),
-      getHealthHistory: (_id: never) => Effect.succeed([]),
-    }))
     const program = Effect.gen(function* () {
       const svc = yield* ReadModelService
       return yield* Effect.promise(() => run(svc as never))
     })
-    return await Effect.runPromise(Effect.provide(program, ReadModelServiceLive.pipe(L.provide(mockLayer))))
+    return await Effect.runPromise(Effect.provide(program, ReadModelServiceLive))
   } finally {
     process.env['PANOPTICON_HOME'] = originalHome
     rmSync(tmpHome, { recursive: true, force: true })
@@ -267,17 +257,6 @@ describe('ReadModel checkpoint reconciliation', () => {
     })
     const deleteLegacyCheckpointRefs = vi.fn(() => Effect.succeed(0))
 
-    // PAN-1938: agents now come from AgentsResolver (overdeck.db), not reconstructCache.
-    const agentReconcile = {
-      id: 'agent-reconcile', issueId: 'PAN-1024', role: 'work', status: 'running',
-      workspace: '/tmp/pan-1024', sessionId: null, harness: 'claude-code', model: 'sonnet',
-      hostOverride: null, deliveryMethod: null,
-      startedAt: new Date('2026-05-08T05:00:00.000Z'), lastResumeAt: null,
-      stoppedByUser: null, kickoffDelivered: null, paused: null, pausedReason: null,
-      troubled: null, channelsEnabled: null, consecutiveFailures: 0,
-      firstFailureInRunAt: null, lastFailureNextRetryAt: null, updatedAt: new Date(),
-    }
-
     const summaries = await withIsolatedReadModel(
       async (readModel) => {
         await vi.waitFor(async () => {
@@ -288,7 +267,6 @@ describe('ReadModel checkpoint reconciliation', () => {
         return Effect.runPromise(readModel.getTurnDiffSummaries('agent-reconcile') as Effect.Effect<any>)
       },
       {
-        initialOverdeckAgents: [agentReconcile],
         setupMocks: () => {
           vi.doMock('../../../lib/checkpoint/checkpoint-manager.js', () => ({
             listCheckpoints,

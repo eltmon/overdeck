@@ -3,11 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  setupOverdeckTestDb,
-  teardownOverdeckTestDb,
-  type OverdeckTestDb,
-} from '../../../../../tests/helpers/overdeck-test-db.js';
+import { mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 vi.mock('chalk', () => {
   const identity = (s: unknown) => String(s);
@@ -17,19 +15,30 @@ vi.mock('chalk', () => {
   return { default: chalk };
 });
 
-let odb: OverdeckTestDb;
+let TEST_HOME: string;
+
+async function resetDb() {
+  const { resetDatabase } = await import('../../../../lib/database/index.js');
+  resetDatabase();
+}
 
 beforeEach(() => {
-  odb = setupOverdeckTestDb();
+  TEST_HOME = join(tmpdir(), `cost-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(TEST_HOME, { recursive: true });
+  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.HOME = TEST_HOME;
 });
 
-afterEach(() => {
-  teardownOverdeckTestDb(odb);
+afterEach(async () => {
+  await resetDb();
+  delete process.env.PANOPTICON_HOME;
+  delete process.env.HOME;
+  rmSync(TEST_HOME, { recursive: true, force: true });
   vi.clearAllMocks();
 });
 
 async function seedSessions() {
-  const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
+  const { upsertDiscoveredSession } = await import('../../../../lib/database/discovered-sessions-db.js');
   const workspaces = ['/home/user/Projects/alpha', '/home/user/Projects/beta', '/home/user/Projects/alpha'];
   const models = ['claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-sonnet-4-6'];
   const costs = [0.10, 0.05, 0.20];
@@ -144,7 +153,7 @@ describe('costAction', () => {
   it('dashboard workspace aggregate matches CLI workspace JSON semantics', async () => {
     await seedSessions();
     const { costAction } = await import('../cost.js');
-    const { aggregateDiscoveredSessionCostBy } = await import('../../../../lib/overdeck/discovered-sessions.js');
+    const { aggregateDiscoveredSessionCostBy } = await import('../../../../lib/database/discovered-sessions-db.js');
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg) => logs.push(String(msg ?? '')));
 

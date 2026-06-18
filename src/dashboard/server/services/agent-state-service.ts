@@ -31,6 +31,7 @@ import type {
   DomainEvent,
 } from '@panctl/contracts';
 import { initEventStore } from '../event-store.js';
+import { getDatabase } from '../../../lib/database/index.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
 
@@ -106,10 +107,10 @@ export const AgentStateServiceLive = Layer.effect(
     // so the dashboard port binds fast. The merge keeps any live events that
     // arrived during the fork (they have a higher sequence than reconstruction).
     const seedFromSources = Effect.gen(function* () {
-      const { reconstructCacheAuto } = yield* Effect.promise(() =>
+      const { reconstructCache } = yield* Effect.promise(() =>
         import('../../../lib/reconstruct/reconstruct-cache.js'),
       );
-      const result = yield* Effect.promise(() => reconstructCacheAuto());
+      const result = yield* Effect.promise(() => reconstructCache(getDatabase()));
       const seeded = result.agentRuntimeById;
       if (Object.keys(seeded).length > 0) {
         yield* SubscriptionRef.update(ref, (current) =>

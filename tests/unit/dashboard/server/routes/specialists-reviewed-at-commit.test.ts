@@ -20,19 +20,16 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { openDatabase, type SqliteDatabase } from '../../../../../src/lib/database/driver.js';
+import { initSchema } from '../../../../../src/lib/database/schema.js';
 
-// PAN-1938: the production code now reads/writes overdeck.db via
-// src/lib/overdeck/review-status-sync.ts. The old in-memory panopticon.db
-// injection no longer applies — port the test to the shared overdeck-test-db
-// helper so setReviewStatusSync / getReviewStatusFromDbSync round-trip through
-// the real overdeck schema.
-import {
-  setupOverdeckTestDb,
-  teardownOverdeckTestDb,
-  type OverdeckTestDb,
-} from '../../../../helpers/overdeck-test-db.js';
+// ─── In-memory DB injection ───────────────────────────────────────────────────
 
-let odb: OverdeckTestDb;
+let testDb: SqliteDatabase;
+
+vi.mock('../../../../../src/lib/database/index.js', () => ({
+  getDatabase: () => testDb,
+}));
 
 // ─── Mock exec for deacon's `git rev-parse HEAD` calls ───────────────────────
 
@@ -146,42 +143,26 @@ vi.mock('node:fs', async (importActual) => {
 });
 
 import { existsSync } from 'node:fs';
-import { getRealExistsSync } from './_real-exists-sync.js';
 
-let realExistsSync: (path: string) => boolean = () => false;
-
-beforeEach(async () => {
-  realExistsSync = await getRealExistsSync();
-  // PAN-1938: re-apply the smart existsSync mock AFTER vi.clearAllMocks so
-  // setupOverdeckTestDb's createOverdeckDatabase sees the fresh temp home as
-  // empty (it relies on the real fs for overdeck.db paths).
-  (existsSync as ReturnType<typeof vi.fn>).mockImplementation((path: string) => {
-    if (typeof path === 'string' && (path.includes('pan-overdeck-test-') || path.endsWith('/overdeck.db'))) {
-      return realExistsSync(path);
-    }
-    return true;
-  });
-  odb = setupOverdeckTestDb();
+beforeEach(() => {
+  testDb = openDatabase(':memory:');
+  testDb.pragma('foreign_keys = ON');
+  initSchema(testDb);
   vi.clearAllMocks();
-  (existsSync as ReturnType<typeof vi.fn>).mockImplementation((path: string) => {
-    if (typeof path === 'string' && (path.includes('pan-overdeck-test-') || path.endsWith('/overdeck.db'))) {
-      return realExistsSync(path);
-    }
-    return true;
-  });
+  (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
   mockExecHeadSha = 'defaultsha';
   mockTreeShaByCommit.clear();
   mockResolveProject.mockReturnValue({ projectPath: '/fake/project' });
 });
 
 afterEach(() => {
-  teardownOverdeckTestDb(odb);
+  testDb.close();
 });
 
 // ─── Imports after mocks ──────────────────────────────────────────────────────
 
 import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
-import { getReviewStatusFromDbSync } from '../../../../../src/lib/overdeck/review-status-sync.js';
+import { getReviewStatusFromDbSync } from '../../../../../src/lib/database/review-status-db.js';
 import { checkPostReviewCommits } from '../../../../../src/lib/cloister/deacon.js';
 
 // ─── 1. DB persistence ───────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import type { FlywheelStatus } from '@panctl/contracts';
 import { Effect } from 'effect';
 import { loadConfigNoMigration, resolveModel, type FlywheelScope, type RoleEffort } from '../../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, isFlywheelDevcontainerRuntime, loadResumeSessionId, saveResumeSessionId, spawnFlywheelAgent } from '../../../lib/cloister/flywheel.js';
-import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/overdeck/control-settings.js';
+import { FLYWHEEL_ACTIVE_RUN_ID_KEY, FLYWHEEL_GLOBAL_PAUSE_KEY } from '../../../lib/database/app-settings.js';
 import { sessionExists } from '../../../lib/tmux.js';
 import {
   abortFlywheelRun,

@@ -4,7 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryIdentity, MemoryObservation, MemoryStatus, PendingTurn } from '@panctl/contracts';
 import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
-import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
+import { queryCostEvents } from '../../../src/lib/database/cost-events-db.js';
 import { createResetMarker, searchMemory as searchMemoryCli } from '../../../src/lib/memory/cli.js';
 import { closeMemoryFtsDatabases } from '../../../src/lib/memory/fts-db.js';
 import { extractFromTranscriptDelta } from '../../../src/lib/memory/pipeline.js';
@@ -24,24 +24,20 @@ const identity: MemoryIdentity = {
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
-let odb: OverdeckTestDb;
 
 beforeEach(async () => {
   originalHome = process.env.PANOPTICON_HOME;
+  tempDir = await mkdtemp(join(tmpdir(), 'pan-memory-e2e-'));
+  process.env.PANOPTICON_HOME = tempDir;
   resetDatabase();
-  // setupOverdeckTestDb creates a fresh PANOPTICON_HOME with overdeck.db and sets the env var.
-  // Use odb.home as tempDir so memory files and overdeck DB share the same root.
-  odb = setupOverdeckTestDb();
-  tempDir = odb.home;
 });
 
 afterEach(async () => {
   closeMemoryFtsDatabases();
   closeDatabase();
-  teardownOverdeckTestDb(odb);
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
   else process.env.PANOPTICON_HOME = originalHome;
-  // odb.home (=tempDir) is removed by teardownOverdeckTestDb; no double-rm needed.
+  if (tempDir) await rm(tempDir, { recursive: true, force: true });
   tempDir = null;
 });
 
@@ -137,11 +133,10 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
     expect(subagent).toEqual({ status: 'noop', observation: null, reason: 'subagent' });
     expect(await readPersistedObservations()).toHaveLength(6);
 
-    // costs now go to overdeck — query the raw DB
-    const costEvents = odb.raw().prepare('SELECT * FROM cost_events WHERE issue_id = ?').all(identity.issueId) as Array<Record<string, unknown>>;
+    const costEvents = queryCostEvents({ issueId: identity.issueId });
     expect(costEvents).toHaveLength(6);
-    expect(costEvents.every((event) => event.session_type === 'memory-extraction')).toBe(true);
-    expect(costEvents.every((event) => event.session_id === identity.sessionId)).toBe(true);
+    expect(costEvents.every((event) => event.sessionType === 'memory-extraction')).toBe(true);
+    expect(costEvents.every((event) => event.sessionId === identity.sessionId)).toBe(true);
 
     const concurrentFromOffset = await fileSize(transcriptPath);
     await appendTranscriptTurn(transcriptPath, 7);

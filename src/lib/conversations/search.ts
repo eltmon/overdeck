@@ -25,8 +25,8 @@ import {
   loadEmbeddings,
   getEmbedding,
   topKCosine,
-} from '../overdeck/discovered-sessions.js';
-import type { DiscoveredSession, ConversationFilter } from '../overdeck/discovered-sessions.js';
+} from '../database/discovered-sessions-db.js';
+import type { DiscoveredSession, ConversationFilter } from '../database/discovered-sessions-db.js';
 import { embed } from './embeddings/providers.js';
 import type { EmbeddingProviderName } from './embeddings/providers.js';
 import { getConversationsConfigSync } from '../config-yaml.js';

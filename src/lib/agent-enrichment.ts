@@ -20,7 +20,7 @@ import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { FsError } from './errors.js'
-import { getAgentRuntimeState, getAgentDir, getAgentStateSync } from './agents.js'
+import { getAgentRuntimeState, getAgentDir } from './agents.js'
 import {
   detectAwaitingInputForAgent,
   normalizeAwaitingInputPrompt,
@@ -152,8 +152,13 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   }
   return join(homedir(), 'Projects')
 }async function getAgentWorkspacePromise(agentId: string): Promise<string | null> {
-  const workspace = getAgentStateSync(agentId)?.workspace;
-  if (workspace) return workspace;
+  const stateFile = join(getAgentDir(agentId), 'state.json')
+  if (existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'))
+      if (state.workspace) return state.workspace
+    } catch {}
+  }
   try {
     const { stdout: paneCwd } = await execAsync(
       `tmux display-message -t ${agentId} -p '#{pane_current_path}' 2>/dev/null`,
@@ -412,8 +417,15 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
-  // Read persisted role for enrichment projection.
-  const stateRole = getAgentStateSync(agentId)?.role
+  // Read state.json role for enrichment projection.
+  const stateFile = join(getAgentDir(agentId), 'state.json')
+  let stateRole: string | undefined
+  if (existsSync(stateFile)) {
+    try {
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'))
+      stateRole = state.role
+    } catch {}
+  }
 
   const role: AgentEnrichment['role'] =
     (stateRole === 'plan' || stateRole === 'work' || stateRole === 'review' ||

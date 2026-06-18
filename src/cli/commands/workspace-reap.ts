@@ -1,11 +1,10 @@
 import { execFile } from 'child_process';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
 import { join } from 'path';
 import chalk from 'chalk';
 import { getPanopticonHome } from '../../lib/paths.js';
-import { getAgentStateSync } from '../../lib/agents.js';
 
 const execFileAsync = promisify(execFile);
 const WORKSPACE_PROJECT_PREFIX = 'panopticon-feature-';
@@ -167,9 +166,14 @@ function collectActiveAgentIssueIds(): Set<string> {
   if (!existsSync(agentsDir)) return activeIssues;
 
   for (const dir of readdirSync(agentsDir)) {
+    const stateFile = join(agentsDir, dir, 'state.json');
+    if (!existsSync(stateFile)) continue;
     try {
-      const state = getAgentStateSync(dir);
-      if (!state?.issueId || !state.status || !ACTIVE_AGENT_STATUSES.has(state.status)) continue;
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8')) as {
+        issueId?: string;
+        status?: string;
+      };
+      if (!state.issueId || !state.status || !ACTIVE_AGENT_STATUSES.has(state.status)) continue;
       activeIssues.add(normalizeIssueId(state.issueId));
     } catch {}
   }

@@ -30,7 +30,7 @@ import type {
   EnrichCompleteEvent,
   EmbedProgressEvent,
 } from '@panctl/contracts';
-import type { ConversationFilter, DiscoveredSession } from '../../../lib/overdeck/discovered-sessions.js';
+import type { ConversationFilter, DiscoveredSession } from '../../../lib/database/discovered-sessions-db.js';
 import type { SearchResult } from '../../../lib/conversations/search.js';
 import { CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';

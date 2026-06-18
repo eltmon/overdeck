@@ -9,8 +9,7 @@ import { join } from 'node:path'
 const TEST_PANOPTICON_HOME = '/tmp/pan-test-runtime-dispatch'
 const TEST_AGENTS_DIR = '/tmp/pan-test-runtime-dispatch/agents'
 
-vi.mock('../../paths.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../paths.js')>()),
+vi.mock('../../paths.js', () => ({
   PANOPTICON_HOME: '/tmp/pan-test-runtime-dispatch',
   AGENTS_DIR: '/tmp/pan-test-runtime-dispatch/agents',
   getPanopticonHome: () => '/tmp/pan-test-runtime-dispatch',

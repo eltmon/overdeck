@@ -61,7 +61,6 @@ import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
   getAgentState,
-  getAgentStateSync,
   getAgentRuntimeStateSync,
   getAgentRuntimeState,
   deliverAgentPermissionDecision,
@@ -3266,10 +3265,15 @@ const postAgentsRoute = HttpRouter.add(
           const earlyAgentId = agentSessionName;
           const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-          // PAN-1048 R2: legacy `runtime` field removed; PAN-1055: persist user-picked harness.
-          saveAgentStateSync({
+          yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
             id: earlyAgentId,
             issueId,
+            // PAN-1048 R2: legacy `runtime` field removed from state.json writes;
+            // AgentState shape carries `harness` instead and parseAgentState drops
+            // unknown fields. PAN-1055: persist the user-picked harness when set,
+            // so a Pi-locked spawn does not race-degrade to claude-code on restart.
+            // When the user did not pick, omit the field — saveAgentState() will
+            // backfill it from roles.work.harness on the next write.
             ...(effectiveHarness ? { harness: effectiveHarness } : {}),
             model: 'pending-container-start',
             status: 'starting',
@@ -3277,7 +3281,8 @@ const postAgentsRoute = HttpRouter.add(
             workspace: workspacePath,
             role,
             hostOverride: allowHost || undefined,
-          });
+            message: 'Waiting for containers to start...',
+          }, null, 2)));
           updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
@@ -3335,17 +3340,20 @@ const postAgentsRoute = HttpRouter.add(
                   });
 
                   if (!healthy) {
-                    // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
-                    saveAgentStateSync({
+                    await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                       id: earlyAgentId,
                       issueId,
+                      // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist
+                      // the user-picked harness only when set (see comment above).
                       ...(effectiveHarness ? { harness: effectiveHarness } : {}),
                       model: 'pending-container-start',
                       status: 'error',
                       startedAt: new Date().toISOString(),
                       workspace: workspacePath,
                       role,
-                    });
+                      message: `Container startup timed out before work agent spawn. Run pan workspace rebuild ${issueId} to reset the stack.`,
+                      error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
+                    }, null, 2));
                     return;
                   }
 
@@ -3394,16 +3402,18 @@ const postAgentsRoute = HttpRouter.add(
                     issueId,
                     error: errorMessage,
                   }).catch(() => undefined);
-                  // PAN-1048 R2: legacy `runtime` removed from state writes.
-                  try { saveAgentStateSync({
+                  await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                     id: earlyAgentId,
                     issueId,
+                    // PAN-1048 R2: legacy `runtime` removed from state.json writes.
                     model: 'pending-container-start',
                     status: 'error',
                     startedAt: new Date().toISOString(),
                     workspace: workspacePath,
                     role,
-                  }); } catch { /* non-fatal */ }
+                    message: 'Container startup failed before work agent spawn',
+                    error: errorMessage,
+                  }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
               })();
@@ -3501,10 +3511,11 @@ const postAgentsRoute = HttpRouter.add(
     const earlyAgentId = agentSessionName; // e.g. "agent-pan-488"
     const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
     yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-    // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist user-picked harness.
-    saveAgentStateSync({
+    yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
+      // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist the user-picked
+      // harness only when set (see container-startup branch above for rationale).
       ...(effectiveHarness ? { harness: effectiveHarness } : {}),
       model: 'pending-work-spawn',
       status: 'starting',
@@ -3512,7 +3523,8 @@ const postAgentsRoute = HttpRouter.add(
       workspace: workspacePath,
       role,
       hostOverride: allowHost || undefined,
-    });
+      message: 'Work agent spawn requested',
+    }, null, 2)));
     updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,
@@ -3822,11 +3834,16 @@ const postAgentSwitchModelRoute = HttpRouter.add(
     // Kill zombie tmux session if exists
     yield* killSession(id).pipe(Effect.catch(() => Effect.void));
 
-    // Update model in agent state
-    try {
-      const state = getAgentStateSync(id);
-      if (state) saveAgentStateSync({ ...state, model: newModel });
-    } catch { /* non-fatal */ }
+    // Update model in state.json
+    const stateFile = join(agentDir, 'state.json');
+    if (existsSync(stateFile)) {
+      try {
+        const stateContent = yield* Effect.promise(() => readFile(stateFile, 'utf-8'));
+        const state = JSON.parse(stateContent);
+        state.model = newModel;
+        yield* Effect.promise(() => writeFile(stateFile, JSON.stringify(state, null, 2)));
+      } catch { /* non-fatal */ }
+    }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.model_switched', { previousModel, newModel }));
     invalidateAgentsCache();

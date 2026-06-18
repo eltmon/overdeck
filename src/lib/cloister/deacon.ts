@@ -27,7 +27,7 @@ import {
   ProcessTimeoutError,
 } from '../errors.js';
 import { isStartingWithinGrace } from './agent-grace.js';
-import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
+import { listAllAgents } from '../database/agents-db.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 
@@ -131,8 +131,8 @@ import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, releaseAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
-import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
+import { markWorkspaceStuck } from '../database/review-status-db.js';
+import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
 import { queueBeadsAutoCommit } from '../pan-dir/auto-commit.js';
@@ -1063,7 +1063,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
               }
             } catch { /* treat as not-yet-recovered — leave it stuck */ }
             if (recoveredPct !== null) {
-              const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+              const { clearWorkspaceStuck } = await import('../database/review-status-db.js');
               clearWorkspaceStuck(issueId!);
               stuckOverflowNativeRecoveryState.delete(sessionName);
               actions.push(`Context overflow recovery: cleared stuck flag for ${sessionName} (context back to ${Math.round(recoveredPct)}%)`);
@@ -1321,8 +1321,15 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
           if (agent != null) continue;
         }
 
-        // Check directory age via directory mtime.
-        const mtime = statSync(agentDir).mtimeMs;
+        // Check directory age via state.json mtime (or dir mtime as fallback)
+        const stateFile = join(agentDir, 'state.json');
+        let mtime: number;
+
+        if (existsSync(stateFile)) {
+          mtime = statSync(stateFile).mtimeMs;
+        } else {
+          mtime = statSync(agentDir).mtimeMs;
+        }
 
         const ageMs = now - mtime;
         if (ageMs < effectiveRetentionMs) {
@@ -5570,8 +5577,15 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
 
   for (const agentId of agentDirs) {
     // Only check agents that claim to be running
-    const state = getAgentStateSync(agentId);
-    if (!state || state.status !== 'running') continue;
+    const stateFile = join(AGENTS_DIR, agentId, 'state.json');
+    if (!existsSync(stateFile)) continue;
+    let state: Record<string, unknown>;
+    try {
+      state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+    } catch {
+      continue;
+    }
+    if (state.status !== 'running') continue;
 
     // Check if the tmux session is alive
     if (!sessionExistsSync(agentId)) continue;
@@ -5587,7 +5601,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     if (!output.includes('Invalid signature in thinking block')) continue;
 
     // Corruption detected — recover the agent
-    const issueId = state.issueId ?? agentId;
+    const issueId = (state.issueId as string | undefined) ?? agentId;
     console.error(`[deacon] SIGNATURE CORRUPTION detected in ${agentId} (${issueId}) — recovering`);
     logDeaconEventSync(`checkThinkingSignatureCorruption: corruption detected in ${agentId} (${issueId})`);
     logAgentLifecycleSync(agentId, 'signature corruption detected — recovering: killed session, cleared session.id');
@@ -5604,8 +5618,10 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     }
 
     // Mark agent as stopped
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
     try {
-      saveAgentStateSync({ ...state, status: 'stopped', stoppedAt: new Date().toISOString() });
+      writeFileSync(stateFile, JSON.stringify(state, null, 2));
     } catch { /* non-fatal */ }
 
     // Notify server layer so the read model and frontend update
@@ -5829,14 +5845,19 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
 
     // Mark planning agent state as stopped so the UI doesn't show a "running" pill.
     try {
-      const agentState = getAgentStateSync(planningSession);
-      if (agentState && (agentState.status === 'running' || agentState.status === 'starting')) {
-        const oldStatus = agentState.status;
-        saveAgentStateSync({ ...agentState, status: 'stopped', stoppedAt: new Date().toISOString() });
-        if (agentStoppedNotifier) {
-          try { agentStoppedNotifier(planningSession); } catch { /* non-fatal */ }
+      const stateFile = join(AGENTS_DIR, planningSession, 'state.json');
+      if (existsSync(stateFile)) {
+        const agentState = JSON.parse(readFileSync(stateFile, 'utf-8'));
+        if (agentState.status === 'running' || agentState.status === 'starting') {
+          const oldStatus = agentState.status;
+          agentState.status = 'stopped';
+          agentState.stoppedAt = new Date().toISOString();
+          writeFileSync(stateFile, JSON.stringify(agentState, null, 2));
+          if (agentStoppedNotifier) {
+            try { agentStoppedNotifier(planningSession); } catch { /* non-fatal */ }
+          }
+          logAgentLifecycleSync(planningSession, `status changed: ${oldStatus} → stopped (orphaned planning session killed)`);
         }
-        logAgentLifecycleSync(planningSession, `status changed: ${oldStatus} → stopped (orphaned planning session killed)`);
       }
     } catch (err: unknown) {
       const reason = err instanceof Error ? err.message : String(err);

@@ -25,7 +25,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { Effect } from 'effect';
 
-import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
+import type { Conversation } from '../database/conversations-db.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { sessionFilePath } from '../paths.js';
 import {

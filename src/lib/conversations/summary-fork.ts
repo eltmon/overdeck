@@ -26,13 +26,13 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
-import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
+import type { Conversation } from '../database/conversations-db.js';
 import {
   createConversation,
   getConversationByName,
   recordConversationHandoff,
   updateConversationForkFallbackReason,
-} from '../overdeck/conversations.js';
+} from '../database/conversations-db.js';
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';

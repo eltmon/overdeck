@@ -28,19 +28,16 @@ import {
   reconcile,
 } from '../../../lib/costs/index.js';
 import {
-  getCostsByIssueSync,
-  getCostForIssueAggregateSync,
-  getDailyTrendsSync,
-  getModelRollupSync,
-  getCavemanExperimentDataSync,
-  getBackgroundCostBySourceSync,
-} from '../../../lib/overdeck/cost-sync.js';
+  getCostsByIssueFromDb,
+  getCostForIssueFromDb,
+  getDailyTrends,
+  getModelRollup,
+  getAgentRollup,
+  getCavemanExperimentData,
+  getBackgroundCostBySource,
+} from '../../../lib/database/cost-events-db.js';
 import { syncWalFromAllProjects } from '../../../lib/costs/sync-wal.js';
 import { httpHandler } from './http-handler.js';
-// PAN-1938: overdeck read door — CostResolver replaces direct DB calls for read endpoints.
-// CostWriter is deferred until CostArchiveLive is wired (write endpoints stay on legacy path).
-import { CostResolver } from '../../../lib/overdeck/cost.js';
-import type { IssueId } from '../../../lib/overdeck/cost.js';
 
 // ─── Route: GET /api/costs/summary ───────────────────────────────────────────
 
@@ -100,7 +97,7 @@ const getCostsByIssueRoute = HttpRouter.add(
   '/api/costs/by-issue',
   httpHandler(Effect.try({
     try: () => {
-      const dbIssues = getCostsByIssueSync();
+      const dbIssues = getCostsByIssueFromDb();
 
       const issues = Object.entries(dbIssues).map(([issueId, data]) => {
         const d = data as {
@@ -236,7 +233,7 @@ const getCostsTrendsRoute = HttpRouter.add(
     const issueId = searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
-      try: () => jsonResponse({ trends: getDailyTrendsSync({ days, issueId }), days, issueId: issueId ?? null }),
+      try: () => jsonResponse({ trends: getDailyTrends({ days, issueId }), days, issueId: issueId ?? null }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
   })),
@@ -256,7 +253,7 @@ const getCostsByModelRoute = HttpRouter.add(
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
 
     return yield* Effect.try({
-      try: () => jsonResponse({ models: getModelRollupSync(issueId), issueId: issueId ?? null }),
+      try: () => jsonResponse({ models: getModelRollup(issueId), issueId: issueId ?? null }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
   })),
@@ -273,7 +270,7 @@ const getCostsIssueRoute = HttpRouter.add(
 
     return yield* Effect.try({
       try: () => {
-        const data = getCostForIssueAggregateSync(id);
+        const data = getCostForIssueFromDb(id);
         if (!data) {
           return jsonResponse({ issueId: id.toUpperCase(), totalCost: 0, models: {}, stages: {} });
         }
@@ -285,8 +282,6 @@ const getCostsIssueRoute = HttpRouter.add(
 );
 
 // ─── Route: GET /api/costs/by-agent ──────────────────────────────────────────
-// PAN-1938: served through CostResolver (overdeck read door).
-// Response shape: Rollup[] = { key: agentId, cost, tokens: { input, output, cacheRead, cacheWrite } }
 
 const getCostsByAgentRoute = HttpRouter.add(
   'GET',
@@ -298,9 +293,11 @@ const getCostsByAgentRoute = HttpRouter.add(
       return jsonResponse({ error: 'Bad Request' }, { status: 400 });
     }
     const issueId = urlOpt.value.searchParams.get('issueId') ?? undefined;
-    const resolver = yield* CostResolver;
-    const agents = yield* resolver.byAgent(issueId as IssueId | undefined);
-    return jsonResponse({ agents, issueId: issueId ?? null });
+
+    return yield* Effect.try({
+      try: () => jsonResponse({ agents: getAgentRollup(issueId), issueId: issueId ?? null }),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
   })),
 );
 
@@ -319,7 +316,6 @@ const postCostsSyncWalRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/costs/reconcile ────────────────────────────────────────
-// TODO PAN-1938: migrate to CostWriter once CostArchiveLive is wired.
 
 const postCostsReconcileRoute = HttpRouter.add(
   'POST',
@@ -342,7 +338,7 @@ const getCostsExperimentsRoute = HttpRouter.add(
   'GET',
   '/api/costs/experiments',
   httpHandler(Effect.try({
-    try: () => jsonResponse({ experiments: getCavemanExperimentDataSync() }),
+    try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -359,7 +355,7 @@ const getCostsBackgroundRoute = HttpRouter.add(
       const url = new URL(request.url, 'http://localhost');
       const hoursParam = Number(url.searchParams.get('hours'));
       const hours = Number.isFinite(hoursParam) && hoursParam > 0 ? hoursParam : 24;
-      return jsonResponse({ hours, bySource: getBackgroundCostBySourceSync(hours) });
+      return jsonResponse({ hours, bySource: getBackgroundCostBySource(hours) });
     }),
   ),
 );

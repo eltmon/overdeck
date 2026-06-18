@@ -12,7 +12,6 @@ vi.mock('../agents.js', async (importOriginal) => {
   return {
     ...original,
     getAgentRuntimeState: vi.fn(),
-    getAgentStateSync: vi.fn(),
   }
 })
 
@@ -32,14 +31,12 @@ function makeAgentDir(role: string) {
 
 describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
   const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
-  const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
   const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
 
   it('produces pendingInputKinds for a review-role agent even when hasActiveSpecialist is true', async () => {
     const agentDir = makeAgentDir('review')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'review' } as ReturnType<typeof agents.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'rate_limit', prompt: 'Switch model?' }))
 
@@ -57,7 +54,6 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     const agentDir = makeAgentDir('work')
     const agentId = `agent-test-${Date.now()}`
     vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
-    getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agents.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
     detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'rate_limit', prompt: 'Switch model?' }))
 

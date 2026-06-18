@@ -7,7 +7,7 @@
  */
 
 import { Effect } from 'effect';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getDatabase } from '../database/index.js';
 import { sessionFilePath } from '../paths.js';
 
 export interface CorrelationResult {
@@ -27,7 +27,7 @@ export interface CorrelationResult {
 export function buildCorrelationMapSync(
   jsonlPaths: string[],
 ): Map<string, CorrelationResult> {
-  const db = getOverdeckDatabaseSync();
+  const db = getDatabase();
   const map = new Map<string, CorrelationResult>();
 
   if (jsonlPaths.length === 0) return map;
@@ -35,19 +35,20 @@ export function buildCorrelationMapSync(
   const pathSet = new Set(jsonlPaths);
   const rows = db
     .prepare(
-      `SELECT c.name, c.cwd, cf.locator AS claude_session_id, c.issue_id
-       FROM conversations c
-       JOIN conversation_files cf ON cf.conversation_id = c.id`,
+      `SELECT name, cwd, session_file, claude_session_id, issue_id FROM conversations
+       WHERE session_file IS NOT NULL OR claude_session_id IS NOT NULL`,
     )
     .all() as Array<{
     name: string;
     cwd: string;
+    session_file: string | null;
     claude_session_id: string | null;
     issue_id: string | null;
   }>;
 
   for (const row of rows) {
     const candidatePaths = new Set<string>();
+    if (row.session_file) candidatePaths.add(row.session_file);
     if (row.claude_session_id) candidatePaths.add(sessionFilePath(row.cwd, row.claude_session_id));
 
     for (const path of candidatePaths) {

@@ -262,7 +262,7 @@ describe('flywheel substrate bug smoke', () => {
     expect(issueBody).toContain('Flywheel-Discovered-In: PAN-1487');
 
     const { createSubstrateBugPoller } = await import('../../src/dashboard/server/services/substrate-bug-poller.js');
-    const { getByIssueId } = await import('../../src/lib/overdeck/flywheel-substrate-bugs.js');
+    const { getByIssueId } = await import('../../src/lib/database/flywheel-substrate-bugs-db.js');
     const eventStore = { appendAsync: vi.fn(async () => 1) };
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
       const raw = typeof input === 'string' || input instanceof URL ? input.toString() : input.url;

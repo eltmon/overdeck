@@ -3361,7 +3361,7 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
         const resolved = resolveProjectFromIssueSync(issueId);
         if (resolved) {
           const { getQueueForProject } = yield* Effect.promise(() =>
-            import('../../../lib/overdeck/merge.js')
+            import('../../../lib/database/merge-queue-db.js')
           );
           const mergeQueue = getQueueForProject(resolved.projectKey);
           const mergePos = findPositionInQueueSync(issueId, mergeQueue.map(e => ({
@@ -4876,7 +4876,7 @@ import {
   markMergeProcessing,
   dequeueMerge,
   getAllActiveQueues,
-} from '../../../lib/overdeck/merge.js';
+} from '../../../lib/database/merge-queue-db.js';
 
 /** Dequeue the next merge after current completes (success or failure). */
 function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {

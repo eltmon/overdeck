@@ -2,21 +2,7 @@
  * Tests for cost-monitor.ts
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-
-// Mock the overdeck cost-sync door so checkCostLimits reads from controllable
-// fakes rather than requiring a real SQLite database.
-vi.mock('../../src/lib/overdeck/cost-sync.js', () => ({
-  getAgentRollup:          vi.fn(() => []),
-  getDailyTrendsSync:      vi.fn(() => []),
-  getCostForIssueSync:     vi.fn(() => null),
-}));
-
-import {
-  getAgentRollup,
-  getDailyTrendsSync as getDailyTrends,
-  getCostForIssueSync as getCostForIssueFromDb,
-} from '../../src/lib/overdeck/cost-sync.js';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   recordCostSync,
   checkCostLimits,
@@ -29,16 +15,8 @@ import {
 
 describe('cost-monitor', () => {
   beforeEach(() => {
-    // Reset in-memory tracking before each test
+    // Reset tracking before each test
     resetCostTrackingSync();
-    // Reset DB mocks to default (no spend)
-    vi.mocked(getAgentRollup).mockReturnValue([]);
-    vi.mocked(getDailyTrends).mockReturnValue([]);
-    vi.mocked(getCostForIssueFromDb).mockReturnValue(null);
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
   });
 
   describe('recordCost', () => {
@@ -76,12 +54,7 @@ describe('cost-monitor', () => {
 
   describe('checkCostLimits', () => {
     it('should not alert when under threshold', () => {
-      vi.mocked(getAgentRollup).mockReturnValue([
-        { agentId: 'agent-1', totalCost: 1.0, calls: 1, totalTokens: 100, firstEvent: '', lastEvent: '' },
-      ]);
-      vi.mocked(getDailyTrends).mockReturnValue([
-        { date: '2026-06-17', totalCost: 1.0, eventCount: 1, totalTokens: 100 },
-      ]);
+      recordCostSync('agent-1', 1.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -92,9 +65,7 @@ describe('cost-monitor', () => {
     });
 
     it('should warn at 80% threshold for agent', () => {
-      vi.mocked(getAgentRollup).mockReturnValue([
-        { agentId: 'agent-1', totalCost: 8.0, calls: 1, totalTokens: 100, firstEvent: '', lastEvent: '' },
-      ]);
+      recordCostSync('agent-1', 8.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -110,9 +81,7 @@ describe('cost-monitor', () => {
     });
 
     it('should alert at 100% limit for agent', () => {
-      vi.mocked(getAgentRollup).mockReturnValue([
-        { agentId: 'agent-1', totalCost: 10.0, calls: 1, totalTokens: 100, firstEvent: '', lastEvent: '' },
-      ]);
+      recordCostSync('agent-1', 10.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 10.0,
         per_issue_usd: 25.0,
@@ -127,25 +96,7 @@ describe('cost-monitor', () => {
     });
 
     it('should warn for multiple limit types when exceeded', () => {
-      vi.mocked(getAgentRollup).mockReturnValue([
-        { agentId: 'agent-1', totalCost: 10.0, calls: 1, totalTokens: 100, firstEvent: '', lastEvent: '' },
-      ]);
-      vi.mocked(getCostForIssueFromDb).mockReturnValue({
-        issueId: 'issue-1',
-        totalCost: 10.0,
-        inputTokens: 100,
-        outputTokens: 50,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        lastUpdated: '',
-        budgetWarning: false,
-        models: {},
-        stages: {},
-      });
-      vi.mocked(getDailyTrends).mockReturnValue([
-        { date: '2026-06-17', totalCost: 10.0, eventCount: 1, totalTokens: 100 },
-      ]);
-
+      recordCostSync('agent-1', 10.0, 'issue-1');
       const alerts = checkCostLimits('agent-1', 'issue-1', {
         per_agent_usd: 10.0,
         per_issue_usd: 10.0,
@@ -160,12 +111,7 @@ describe('cost-monitor', () => {
     });
 
     it('should not check disabled limits (set to 0)', () => {
-      vi.mocked(getAgentRollup).mockReturnValue([
-        { agentId: 'agent-1', totalCost: 100.0, calls: 1, totalTokens: 0, firstEvent: '', lastEvent: '' },
-      ]);
-      vi.mocked(getDailyTrends).mockReturnValue([
-        { date: '2026-06-17', totalCost: 100.0, eventCount: 1, totalTokens: 0 },
-      ]);
+      recordCostSync('agent-1', 100.0);
       const alerts = checkCostLimits('agent-1', undefined, {
         per_agent_usd: 0,
         per_issue_usd: 0,

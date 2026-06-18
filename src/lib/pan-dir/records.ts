@@ -13,9 +13,9 @@ import { promises as fsp } from 'node:fs';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 import {
-  getCostBreakdownByStageAndModelSync,
-  getCostForIssueSync,
-} from '../overdeck/cost-sync.js';
+  getCostBreakdownByStageAndModel,
+  getCostForIssueFromDb,
+} from '../database/cost-events-db.js';
 import { getMergeSetSync } from '../merge-set.js';
 import {
   getProjectSync,
@@ -114,8 +114,8 @@ function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssue
 // ─── Usage projection ─────────────────────────────────────────────────────────
 
 function projectUsage(issueId: string): PanIssueUsageRecord {
-  const { byStage, totals } = getCostBreakdownByStageAndModelSync(issueId);
-  const aggregate = getCostForIssueSync(issueId);
+  const { byStage, totals } = getCostBreakdownByStageAndModel(issueId);
+  const aggregate = getCostForIssueFromDb(issueId);
 
   return {
     byStage,

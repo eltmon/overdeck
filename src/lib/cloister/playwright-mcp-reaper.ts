@@ -23,7 +23,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
-import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
+import { isDeaconGloballyPaused } from '../database/app-settings.js';
 
 const execFileAsync = promisify(execFile);
 

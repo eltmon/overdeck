@@ -1,6 +1,5 @@
 import { Effect } from 'effect';
-import { writeFile, readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { appendFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
@@ -22,8 +21,6 @@ export interface NativeCompactionResult {
   tokensBefore: number;
   boundaryUuid: string;
   model: string;
-  forkedSessionId: string;
-  forkedSessionFile: string;
 }
 
 export interface MaybeCompactBeforeRespawnOptions {
@@ -164,36 +161,29 @@ async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
     }),
   ];
 
-  const forkedSessionId = randomUUID();
-  const forkedSessionFile = join(dirname(sessionFile), `${forkedSessionId}.jsonl`);
-  await writeFile(forkedSessionFile, `${entries.join('\n')}\n`, 'utf-8');
+  await appendFile(sessionFile, `${entries.join('\n')}\n`, 'utf-8');
 
   return {
     summary: continuation,
     tokensBefore,
     boundaryUuid,
     model: settings.model,
-    forkedSessionId,
-    forkedSessionFile,
   };
 }
 
-export async function maybeCompactBeforeRespawn(
-  opts: MaybeCompactBeforeRespawnOptions,
-): Promise<{ forkedSessionId: string; forkedSessionFile: string } | null> {
-  if (!opts.sessionFile || !existsSync(opts.sessionFile)) return null;
+export async function maybeCompactBeforeRespawn(opts: MaybeCompactBeforeRespawnOptions): Promise<void> {
+  if (!opts.sessionFile || !existsSync(opts.sessionFile)) return;
   if (!opts.shouldCompact) {
     console.log('[conversation-compaction] Skipping compact (shouldCompact=false)');
-    return null;
+    return;
   }
   // Background AI gate: low-cost mode (or the summaryFork toggle) skips
   // automatic LLM compaction before respawn.
-  if (!isBackgroundFeatureEnabled('summaryFork')) return null;
+  if (!isBackgroundFeatureEnabled('summaryFork')) return;
 
   const tokens = await estimateContextTokens(opts.sessionFile);
   console.log(`[conversation-compaction] Compacting before respawn (shouldCompact=true, tokens=${tokens})`);
-  const result = await compactConversationNative(opts.sessionFile);
-  return { forkedSessionId: result.forkedSessionId, forkedSessionFile: result.forkedSessionFile };
+  await compactConversationNative(opts.sessionFile);
 }
 
 export async function buildCompactionRuntimeInfo(model: string): Promise<{ command: string; exports: string }> {

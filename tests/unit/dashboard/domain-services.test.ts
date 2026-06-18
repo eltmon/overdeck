@@ -10,7 +10,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
-import { openDatabase, type SqliteDatabase } from '../../../src/lib/database/driver.js';
+import { join } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { closeDatabase, getDatabase } from '../../../src/lib/database/index.js';
 import { createEventStore, type DbAdapter } from '../../../src/dashboard/server/event-store.js';
 import {
   EventStoreService,
@@ -19,29 +22,26 @@ import {
 
 // ─── Test DB setup ────────────────────────────────────────────────────────────
 
-let db: SqliteDatabase;
+let tmpDir: string;
 
 beforeEach(() => {
-  db = openDatabase(':memory:');
-  db.exec(`
-    CREATE TABLE events (
-      sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
-      type      TEXT    NOT NULL,
-      timestamp INTEGER NOT NULL,
-      payload   TEXT    NOT NULL DEFAULT '{}'
-    )
-  `);
+  tmpDir = mkdtempSync(join(tmpdir(), 'pan-domain-svc-test-'));
+  process.env['PANOPTICON_HOME'] = tmpDir;
+  closeDatabase();
 });
 
 afterEach(() => {
-  db.close();
+  closeDatabase();
+  rmSync(tmpDir, { recursive: true, force: true });
+  delete process.env['PANOPTICON_HOME'];
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Build an EventStoreServiceShape directly from the underlying store for unit testing. */
 function makeTestService(): EventStoreServiceShape {
-  const store = createEventStore(db as unknown as DbAdapter);
+  const db = getDatabase() as unknown as DbAdapter;
+  const store = createEventStore(db);
 
   const streamEvents = Stream.callback<import('../../../src/dashboard/server/event-store.js').StoredEvent>((queue) =>
     Effect.acquireRelease(
@@ -169,7 +169,8 @@ describe('EventStoreService', () => {
     it('delivers events via subscribe callback', async () => {
       // Test the underlying store's subscribe mechansim directly (same code path
       // that streamEvents wraps) to avoid Effect fiber complexity in unit tests.
-      const store = createEventStore(db as unknown as DbAdapter);
+      const db = getDatabase() as unknown as DbAdapter;
+      const store = createEventStore(db);
 
       const received: string[] = [];
       const unsubscribe = store.subscribe((event) => received.push(event.type));

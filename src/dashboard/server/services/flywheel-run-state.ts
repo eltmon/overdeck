@@ -9,8 +9,8 @@ import {
   isFlywheelGloballyPaused,
   setFlywheelActiveRunId,
   setFlywheelGloballyPaused,
-} from '../../../lib/overdeck/control-settings.js';
-import { countAgentsByStatusRole } from '../../../lib/overdeck/agents.js';
+} from '../../../lib/database/app-settings.js';
+import { countAgentsByStatusRole } from '../../../lib/database/agents-db.js';
 
 export type FlywheelRunStatus = 'running' | 'paused' | 'complete' | 'aborted';
 

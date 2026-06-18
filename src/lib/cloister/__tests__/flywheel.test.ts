@@ -33,7 +33,7 @@ vi.mock('../../agents.js', async () => {
   };
 });
 
-vi.mock('../../overdeck/control-settings.js', () => ({
+vi.mock('../../database/app-settings.js', () => ({
   getFlywheelActiveRunId: () => mocks.activeRunId,
   isFlywheelAutoPickupBacklog: () => mocks.autoPickupBacklog,
   isFlywheelRequireUatBeforeMerge: () => mocks.requireUatBeforeMerge,

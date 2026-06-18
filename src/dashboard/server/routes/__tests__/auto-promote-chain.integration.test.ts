@@ -139,11 +139,6 @@ function writePlanningAgentState(panopticonHome: string, issueId: string, autoSp
     role: 'plan',
     autoSpawnOnFinalize,
   }, null, 2));
-  // planFinalizeCommand now reads autoSpawnOnFinalize from a flag file, not state.json
-  // (refactor: replace state.json writes with saveAgentStateSync + flag file)
-  if (autoSpawnOnFinalize) {
-    writeFileSync(join(stateDir, 'auto-spawn-on-finalize.json'), JSON.stringify({ autoSpawnOnFinalize: true }, null, 2));
-  }
 }
 
 function readJson<T>(path: string): T {
