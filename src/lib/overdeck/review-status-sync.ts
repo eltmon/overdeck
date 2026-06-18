@@ -13,6 +13,18 @@ import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 import { getOverdeckDatabaseSync } from './infra.js';
 
+// ── Timestamp helpers — overdeck stores timestamps as integer epoch-MILLISECONDS;
+//    the ReviewStatus domain type exposes them as ISO strings, so convert at the
+//    storage boundary (PAN-1961). ─────────────────────────────────────────────
+function isoToMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+function msToIso(value: number | null | undefined): string | undefined {
+  return value == null ? undefined : new Date(value).toISOString();
+}
+
 // ── Internal row type ────────────────────────────────────────────────────────
 
 interface DbRow {
@@ -22,7 +34,7 @@ interface DbRow {
   merge_status: string | null;
   inspect_status: string | null;
   inspect_notes: string | null;
-  inspect_started_at: string | null;
+  inspect_started_at: number | null;
   inspect_bead_id: string | null;
   verification_status: string | null;
   verification_notes: string | null;
@@ -31,7 +43,7 @@ interface DbRow {
   review_notes: string | null;
   test_notes: string | null;
   merge_notes: string | null;
-  updated_at: string;
+  updated_at: number;
   ready_for_merge: number;
   auto_requeue_count: number | null;
   merge_retry_count: number | null;
@@ -40,16 +52,16 @@ interface DbRow {
   pr_number: number | null;
   stuck: number;
   stuck_reason: string | null;
-  stuck_at: string | null;
+  stuck_at: number | null;
   stuck_details: string | null;
   reviewed_at_commit: string | null;
-  review_spawned_at: string | null;
-  conflict_resolution_dispatched_at: string | null;
+  review_spawned_at: number | null;
+  conflict_resolution_dispatched_at: number | null;
   test_retry_count: number | null;
   review_retry_count: number | null;
-  recovery_started_at: string | null;
+  recovery_started_at: number | null;
   deacon_ignored: number;
-  deacon_ignored_at: string | null;
+  deacon_ignored_at: number | null;
   deacon_ignored_reason: string | null;
   blocker_reasons: string | null;
   last_verified_commit: string | null;
@@ -65,7 +77,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     mergeStatus: (row.merge_status as ReviewStatus['mergeStatus']) ?? undefined,
     inspectStatus: (row.inspect_status as ReviewStatus['inspectStatus']) ?? undefined,
     inspectNotes: row.inspect_notes ?? undefined,
-    inspectStartedAt: row.inspect_started_at ?? undefined,
+    inspectStartedAt: msToIso(row.inspect_started_at),
     inspectBeadId: row.inspect_bead_id ?? undefined,
     verificationStatus:
       (row.verification_status as ReviewStatus['verificationStatus']) ?? undefined,
@@ -75,7 +87,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     reviewNotes: row.review_notes ?? undefined,
     testNotes: row.test_notes ?? undefined,
     mergeNotes: row.merge_notes ?? undefined,
-    updatedAt: row.updated_at,
+    updatedAt: msToIso(row.updated_at) ?? new Date(0).toISOString(),
     readyForMerge: row.ready_for_merge === 1,
     autoRequeueCount: row.auto_requeue_count ?? undefined,
     mergeRetryCount: row.merge_retry_count ?? undefined,
@@ -84,16 +96,16 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     prNumber: row.pr_number ?? undefined,
     stuck: row.stuck === 1 ? true : undefined,
     stuckReason: row.stuck_reason ?? undefined,
-    stuckAt: row.stuck_at ?? undefined,
+    stuckAt: msToIso(row.stuck_at),
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
-    reviewSpawnedAt: row.review_spawned_at ?? undefined,
-    conflictResolutionDispatchedAt: row.conflict_resolution_dispatched_at ?? undefined,
+    reviewSpawnedAt: msToIso(row.review_spawned_at),
+    conflictResolutionDispatchedAt: msToIso(row.conflict_resolution_dispatched_at),
     testRetryCount: row.test_retry_count ?? undefined,
     reviewRetryCount: row.review_retry_count ?? undefined,
-    recoveryStartedAt: row.recovery_started_at ?? undefined,
+    recoveryStartedAt: msToIso(row.recovery_started_at),
     deaconIgnored: row.deacon_ignored === 1 ? true : undefined,
-    deaconIgnoredAt: row.deacon_ignored_at ?? undefined,
+    deaconIgnoredAt: msToIso(row.deacon_ignored_at),
     deaconIgnoredReason: row.deacon_ignored_reason ?? undefined,
     blockerReasons: row.blocker_reasons
       ? (JSON.parse(row.blocker_reasons) as BlockerReason[])
@@ -204,7 +216,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.mergeStatus ?? null,
       s.inspectStatus ?? null,
       s.inspectNotes ?? null,
-      s.inspectStartedAt ?? null,
+      isoToMs(s.inspectStartedAt),
       s.inspectBeadId ?? null,
       s.verificationStatus ?? null,
       s.verificationNotes ?? null,
@@ -213,7 +225,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.reviewNotes ?? null,
       s.testNotes ?? null,
       s.mergeNotes ?? null,
-      s.updatedAt,
+      isoToMs(s.updatedAt) ?? Date.now(),
       s.readyForMerge ? 1 : 0,
       s.autoRequeueCount ?? null,
       s.mergeRetryCount ?? null,
@@ -222,16 +234,16 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.prNumber ?? null,
       s.stuck ? 1 : 0,
       s.stuckReason ?? null,
-      s.stuckAt ?? null,
+      isoToMs(s.stuckAt),
       s.stuckDetails ?? null,
       s.reviewedAtCommit ?? null,
-      s.reviewSpawnedAt ?? null,
-      s.conflictResolutionDispatchedAt ?? null,
+      isoToMs(s.reviewSpawnedAt),
+      isoToMs(s.conflictResolutionDispatchedAt),
       s.testRetryCount ?? null,
       s.reviewRetryCount ?? null,
-      s.recoveryStartedAt ?? null,
+      isoToMs(s.recoveryStartedAt),
       s.deaconIgnored ? 1 : 0,
-      s.deaconIgnoredAt ?? null,
+      isoToMs(s.deaconIgnoredAt),
       s.deaconIgnoredReason ?? null,
       s.blockerReasons ? JSON.stringify(s.blockerReasons) : null,
       s.lastVerifiedCommit ?? null,
@@ -361,7 +373,7 @@ export function markWorkspaceStuck(
   details?: Record<string, unknown>,
 ): void {
   const db = getOverdeckDatabaseSync();
-  const now = new Date().toISOString();
+  const now = Date.now();
   const detailsJson = details ? JSON.stringify(details) : null;
   db.prepare(`
     INSERT OR IGNORE INTO review_status
@@ -378,7 +390,7 @@ export function markWorkspaceStuck(
 
 export function clearWorkspaceStuck(issueId: string): void {
   const db = getOverdeckDatabaseSync();
-  const now = new Date().toISOString();
+  const now = Date.now();
   db.prepare(`
     UPDATE review_status
     SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
@@ -392,7 +404,7 @@ export function setDeaconIgnored(
   reason?: string,
 ): void {
   const db = getOverdeckDatabaseSync();
-  const now = new Date().toISOString();
+  const now = Date.now();
   db.prepare(`
     INSERT OR IGNORE INTO review_status
       (issue_id, review_status, test_status, updated_at, ready_for_merge, deacon_ignored)
@@ -407,7 +419,7 @@ export function setDeaconIgnored(
 
 export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
   const db = getOverdeckDatabaseSync();
-  const now = new Date().toISOString();
+  const now = Date.now();
   db.prepare(`
     INSERT OR IGNORE INTO review_status
       (issue_id, review_status, test_status, updated_at, ready_for_merge)
