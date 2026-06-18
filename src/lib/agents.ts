@@ -36,8 +36,7 @@ import {
 } from './pan-dir/record.js';
 import { generateLauncherScriptSync } from './launcher-generator.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
-import { getAgent as getAgentFromDb, upsertAgent, listAllAgents, type Agent as DbAgent } from './database/agents-db.js';
-import { agentStateToDbAgent } from './database/agent-mappers.js';
+import { getOverdeckAgentStateSync, listOverdeckAgentStatesSync, saveOverdeckAgentStateSync } from './overdeck/agent-state-sync.js';
 import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
@@ -624,7 +623,7 @@ export function resolveAgentTargetSync(input: string): string | null {
 
   try {
     const wantedIssueId = issueId.toUpperCase();
-    const matches = listAllAgents()
+    const matches = listOverdeckAgentStatesSync()
       .filter((agent) => agent.issueId.toUpperCase() === wantedIssueId)
       .map((agent) => agent.id);
     if (matches.length === 1) return matches[0].toLowerCase();
@@ -1032,63 +1031,11 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
-function dbAgentToAgentState(agent: DbAgent): AgentState {
-  return cleanAgentState({
-    id: agent.id,
-    issueId: agent.issueId,
-    workspace: agent.workspace,
-    role: agent.role as Role,
-    model: agent.model ?? '',
-    status: agent.status as AgentState['status'],
-    startedAt: agent.startedAt ?? new Date().toISOString(),
-    harness: agent.harness ? (agent.harness as RuntimeName) : undefined,
-    lastActivity: agent.lastActivity ?? undefined,
-    lastResumeAt: agent.lastResumeAt ?? undefined,
-    stoppedAt: agent.stoppedAt ?? undefined,
-    stoppedByUser: agent.stoppedByUser ?? undefined,
-    stoppedByPause: agent.stoppedByPause ?? undefined,
-    kickoffDelivered: agent.kickoffDelivered ?? undefined,
-    paused: agent.paused ?? undefined,
-    pausedReason: agent.pausedReason ?? undefined,
-    pausedAt: agent.pausedAt ?? undefined,
-    troubled: agent.troubled ?? undefined,
-    troubledAt: agent.troubledAt ?? undefined,
-    consecutiveFailures: agent.consecutiveFailures ?? undefined,
-    firstFailureInRunAt: agent.firstFailureInRunAt ?? undefined,
-    lastFailureAt: agent.lastFailureAt ?? undefined,
-    lastFailureReason: agent.lastFailureReason ?? undefined,
-    lastFailureNextRetryAt: agent.lastFailureNextRetryAt ?? undefined,
-    branch: agent.branch ?? undefined,
-    costSoFar: agent.costSoFar ?? undefined,
-    sessionId: agent.sessionId ?? undefined,
-    phase: agent.phase ? (agent.phase as AgentState['phase']) : undefined,
-    workType: agent.workType ?? undefined,
-    roleRunHead: agent.roleRunHead ?? undefined,
-    channelsEnabled: agent.channelsEnabled ?? undefined,
-    supervisorEnabled: agent.supervisorEnabled ?? undefined,
-    deliveryMethod: agent.deliveryMethod ? (agent.deliveryMethod as AgentState['deliveryMethod']) : undefined,
-    flywheelRunId: agent.flywheelRunId ?? undefined,
-    reviewSubRole: agent.reviewSubRole ?? undefined,
-    reviewRunId: agent.reviewRunId ?? undefined,
-    reviewOutputPath: agent.reviewOutputPath ?? undefined,
-    reviewSynthesisAgentId: agent.reviewSynthesisAgentId ?? undefined,
-    reviewDeadlineAt: agent.reviewDeadlineAt ?? undefined,
-    reviewMonitorSignaled: agent.reviewMonitorSignaled
-      ? (agent.reviewMonitorSignaled as AgentState['reviewMonitorSignaled'])
-      : undefined,
-    reviewRetryAttempt: agent.reviewRetryAttempt ?? undefined,
-    hostOverride: agent.hostOverride ?? undefined,
-    inspectSubRole: agent.inspectSubRole ?? undefined,
-  });
-}
-
 export function getAgentStateSync(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
 
-  // PAN-1908: authoritative runtime registry is the agents table. Fall back to
-  // state.json only while pre-migration directories have not been backfilled.
-  const dbAgent = getAgentFromDb(normalizedId);
-  if (dbAgent) return dbAgentToAgentState(dbAgent);
+  const overdeckState = getOverdeckAgentStateSync(normalizedId);
+  if (overdeckState) return cleanAgentState(overdeckState);
 
   const stateFile = join(getAgentDir(normalizedId), 'state.json');
   if (!existsSync(stateFile)) return null;
@@ -1143,9 +1090,7 @@ export function saveAgentStateSync(state: AgentState): void {
 
   prepareAgentStateForSave(state);
 
-  // PAN-1908: write the authoritative row to SQLite and keep state.json as the
-  // rollback/rebuild source through the cutover (D2/CP-2).
-  upsertAgent(agentStateToDbAgent(state));
+  saveOverdeckAgentStateSync(state);
   writeAgentStateJsonSync(state);
 
   // PAN-1919: mirror harness/model into the per-issue git-tracked record so
@@ -1187,7 +1132,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
     }
 
     yield* Effect.try({
-      try: () => upsertAgent(agentStateToDbAgent(state)),
+      try: () => saveOverdeckAgentStateSync(state),
       catch: (cause) => toAgentFsError('write', `agents-db:${state.id}`, cause),
     });
 
@@ -3947,9 +3892,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
   const tmuxSessions = listSessionsSync();
   const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-  // PAN-1908: authoritative registry is the agents table; no directory scan.
-  return listAllAgents().map((agent) => {
-    const state = dbAgentToAgentState(agent);
+  return listOverdeckAgentStatesSync().map((state) => {
     const normalizedId = normalizeAgentId(state.id);
     return {
       ...state,
@@ -3964,9 +3907,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
  * This is the replacement for enumerating ~/.panopticon/agents/ directories.
  */
 export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
-  const agents = listAllAgents();
-  return agents
-    .map(dbAgentToAgentState)
+  return listOverdeckAgentStatesSync()
     .filter((state) => {
       if (options?.status && state.status !== options.status) return false;
       if (options?.role && state.role !== options.role) return false;
@@ -3995,8 +3936,7 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     const tmuxSessions = yield* listSessions();
     const tmuxNames = new Set(tmuxSessions.map(s => s.name));
 
-    return listAllAgents().map((agent) => {
-      const state = dbAgentToAgentState(agent);
+    return listOverdeckAgentStatesSync().map((state) => {
       const normalizedId = normalizeAgentId(state.id);
       return {
         ...state,

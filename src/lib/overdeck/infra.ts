@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
@@ -21,7 +22,7 @@ import {
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getPanopticonHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
-import { getOverdeckDatabasePath } from './paths.js';
+import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
 
 export const overdeckEvents = sqliteTable('events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
@@ -42,6 +43,50 @@ export interface DbServiceShape {
 }
 
 export class Db extends Context.Service<Db, DbServiceShape>()('overdeck/Db') {}
+
+let overdeckDbSync: { path: string; db: SqliteDatabase } | null = null;
+
+function runOverdeckMigrationSync(db: SqliteDatabase): void {
+  const row = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agents'`)
+    .get();
+  if (row) return;
+
+  const migration = readFileSync(OVERDECK_MIGRATION_PATH, 'utf8');
+  for (const statement of migration.split('--> statement-breakpoint')) {
+    const trimmed = statement.trim();
+    if (trimmed) db.exec(trimmed);
+  }
+}
+
+export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
+  if (overdeckDbSync?.path === dbPath) {
+    return overdeckDbSync.db;
+  }
+
+  if (overdeckDbSync) {
+    overdeckDbSync.db.close();
+    overdeckDbSync = null;
+  }
+
+  const dir = dirname(dbPath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  const db = openDatabase(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('synchronous = NORMAL');
+  runOverdeckMigrationSync(db);
+  overdeckDbSync = { path: dbPath, db };
+  return db;
+}
+
+export function closeOverdeckDatabaseSync(): void {
+  overdeckDbSync?.db.close();
+  overdeckDbSync = null;
+}
 
 function rowValues(row: SqliteRow | undefined): SqliteScalar[] {
   return row ? Object.values(row) : [];
