@@ -2,11 +2,11 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Context, Effect, Layer, Schema } from 'effect';
-import { and, desc, eq, gte, like, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, like, or, sql } from 'drizzle-orm';
 import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { CostArchive, Db, EventBus } from './infra.js';
+import { CostArchive, CostArchiveLive, Db, DbLive, EventBus, EventBusLive } from './infra.js';
 import { IssueId } from './issues.js';
 import {
   getAllBudgetsSync,
@@ -431,7 +431,7 @@ export class CostWriter extends Context.Service<
   CostWriter,
   {
     // The ONLY ingest primitive — owns archive fan-out and dedup
-    readonly record: (event: CostEvent) => Effect.Effect<void, CostIngestError>;
+    readonly record: (event: CostEvent) => Effect.Effect<boolean, CostIngestError>;
     // Catch-up sweep (PAN-1935: pi/codex sweep lands here)
     readonly reconcile: (opts?: {
       source?: 'claude' | 'pi' | 'codex' | 'wal';
@@ -451,16 +451,20 @@ export const CostWriterLive = Layer.effect(
     const archive = yield* CostArchive;
     const bus = yield* EventBus;
 
-    // Dedup by sourceFile: pi/codex sessions carry a file path but no requestId,
+    // Dedup by requestId or sourceFile: pi/codex sessions carry a file path but no requestId,
     // so the UNIQUE(request_id) constraint doesn't catch re-imports of the same file.
     const checkDuplicate = (e: CostEvent) =>
       Effect.gen(function* () {
-        if (e.sourceFile == null) return false;
+        if (e.requestId == null && e.sourceFile == null) return false;
+        const conditions = [
+          e.requestId != null ? eq(costEventsTable.requestId, e.requestId) : undefined,
+          e.sourceFile != null ? eq(costEventsTable.sourceFile, e.sourceFile) : undefined,
+        ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined);
         const existing = yield* Effect.promise(() =>
           q
             .select({ id: costEventsTable.id })
             .from(costEventsTable)
-            .where(eq(costEventsTable.sourceFile, e.sourceFile!))
+            .where(conditions.length === 1 ? conditions[0] : or(...conditions))
             .limit(1),
         );
         return (existing as unknown[]).length > 0;
@@ -468,7 +472,7 @@ export const CostWriterLive = Layer.effect(
 
     const record = (event: CostEvent) =>
       Effect.gen(function* () {
-        if (yield* checkDuplicate(event)) return;
+        if (yield* checkDuplicate(event)) return false;
 
         // 1. DURABLE ARCHIVE FIRST — events.jsonl + WAL. Archive decides no-op
         //    vs append by event source (transcript-backed events are no-ops).
@@ -499,6 +503,7 @@ export const CostWriterLive = Layer.effect(
 
         // 3. Announce — cost.subscribe + /api/costs/stream feed from this.
         yield* bus.emit({ type: 'cost.recorded', payload: { issueId: event.issueId, cost: event.cost } });
+        return true;
       });
 
     // Catch-up sweep for pi/codex session files.
@@ -555,8 +560,7 @@ export const CostWriterLive = Layer.effect(
 
             const wasDuplicate = yield* checkDuplicate(event);
             if (!wasDuplicate) {
-              yield* record(event);
-              imported++;
+              if (yield* record(event)) imported++;
             }
           }
         }
@@ -587,6 +591,10 @@ export const CostWriterLive = Layer.effect(
 
     return CostWriter.of({ record, reconcile, rebuild, createBudget, deleteBudget });
   }),
+);
+
+export const CostDoorLive = CostWriterLive.pipe(
+  Layer.provide(Layer.mergeAll(DbLive, EventBusLive.pipe(Layer.provide(DbLive)), CostArchiveLive)),
 );
 
 // ── CostApi — the controller (HttpApiGroup, no handler wiring) ────────────────

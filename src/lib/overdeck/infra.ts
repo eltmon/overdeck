@@ -321,6 +321,13 @@ export interface CostArchiveServiceShape {
 
 export class CostArchive extends Context.Service<CostArchive, CostArchiveServiceShape>()('overdeck/CostArchive') {}
 
+export const CostArchiveLive = Layer.succeed(
+  CostArchive,
+  CostArchive.of({
+    append: (_event) => Effect.void,
+  }),
+);
+
 export type FtsStatement = Readonly<{
   method?: 'all' | 'exec' | 'get' | 'run';
   sql: string;
