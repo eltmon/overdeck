@@ -2,19 +2,19 @@
   "vBRIEFInfo": {
     "version": "0.6",
     "created": "2026-06-17T07:08:54.000Z",
-    "updated": "2026-06-17T11:08:05.689Z",
+    "updated": "2026-06-17T11:08:06.064Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1938: Overdeck — the Panopticon data-architecture remodel + rebrand (big-bang)"
   },
   "plan": {
     "id": "pan-1938",
     "title": "Overdeck: the Panopticon data-architecture remodel + rebrand (big-bang)",
-    "status": "approved",
+    "status": "running",
     "uid": "0dc557c8-0493-4a6a-b460-e98d39a7ab5c",
     "author": "agent:claude-opus-4-8",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-06-17T07:08:54.000Z",
-    "updated": "2026-06-17T11:08:05.689Z",
+    "updated": "2026-06-17T11:08:06.064Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1938",
