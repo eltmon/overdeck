@@ -32,6 +32,11 @@ CREATE TABLE `agents` (
 	`cost_so_far` real,
 	`review_sub_role` text,
 	`review_run_id` text,
+	`review_synthesis_agent_id` text,
+	`review_output_path` text,
+	`review_deadline_at` integer,
+	`review_monitor_signaled` text,
+	`review_retry_attempt` integer,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action
 );
