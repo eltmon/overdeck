@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { openDatabase, type SqliteDatabase } from '../src/lib/database/driver.js';
 import {
@@ -89,7 +88,7 @@ export function createOverdeckDatabase(options: CreateOverdeckDatabaseOptions = 
   return { dbPath, tableCount: OVERDECK_TABLE_COUNT };
 }
 
-function parseArgs(argv: string[]): CreateOverdeckDatabaseOptions {
+export function parseArgs(argv: string[]): CreateOverdeckDatabaseOptions {
   const options: CreateOverdeckDatabaseOptions = {};
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -114,9 +113,4 @@ function parseArgs(argv: string[]): CreateOverdeckDatabaseOptions {
   }
 
   return options;
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const result = createOverdeckDatabase(parseArgs(process.argv.slice(2)));
-  console.log(`Created ${result.dbPath} with ${result.tableCount} empty tables.`);
 }
