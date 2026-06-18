@@ -15,7 +15,7 @@ const agentsDbMocks = vi.hoisted(() => ({
   runningWorkCount: 0,
 }));
 
-vi.mock('../../../../lib/database/app-settings.js', () => ({
+vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
   getFlywheelActiveRunId: () => appSettingsMocks.activeRunId,
   isFlywheelGloballyPaused: () => appSettingsMocks.paused,
   setFlywheelActiveRunId: (runId: string | null) => {
@@ -26,7 +26,7 @@ vi.mock('../../../../lib/database/app-settings.js', () => ({
   },
 }));
 
-vi.mock('../../../../lib/database/agents-db.js', () => ({
+vi.mock('../../../../lib/overdeck/agents.js', () => ({
   countAgentsByStatusRole: (status: string, role: string) =>
     status === 'running' && role === 'work' ? agentsDbMocks.runningWorkCount : 0,
 }));
