@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync, ren
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { insertCostEvent } from '../database/cost-events-db.js';
+import { insertCostEventSync } from '../overdeck/cost-sync.js';
 import { appendToWalSync } from './wal.js';
 import { FsError } from '../errors.js';
 
@@ -113,7 +113,7 @@ export function appendCostEventSync(event: CostEvent): void {
 
   // Dual-write to SQLite (best-effort — JSONL remains canonical)
   try {
-    insertCostEvent(event);
+    insertCostEventSync(event);
   } catch (err) {
     console.error('[cost-events] SQLite write failed (continuing with JSONL):', err);
   }
