@@ -8,7 +8,7 @@ import {
   upsert,
   type FlywheelSubstrateBug,
   type FlywheelSubstrateBugFiledBy,
-} from '../../../lib/database/flywheel-substrate-bugs-db.js';
+} from '../../../lib/overdeck/flywheel-substrate-bugs.js';
 
 type Severity = 'P0' | 'P1' | 'P2';
 
