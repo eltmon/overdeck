@@ -840,6 +840,34 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
 }
 
 /**
+ * Count agents by status, grouped by role.
+ * Drop-in for countAgentsByStatus() from database/agents-db.ts.
+ */
+export function countAgentsByStatus(status: string): Record<string, number> {
+  const db = getOverdeckDatabaseSync();
+  const rows = db.prepare(
+    `SELECT role, COUNT(*) AS n FROM agents WHERE status = ? GROUP BY role`,
+  ).all(status) as Array<{ role: string; n: number }>;
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    result[row.role] = row.n;
+  }
+  return result;
+}
+
+/**
+ * Count agents matching both status and role.
+ * Drop-in for countAgentsByStatusRole() from database/agents-db.ts.
+ */
+export function countAgentsByStatusRole(status: string, role: string): number {
+  const db = getOverdeckDatabaseSync();
+  const row = db.prepare(
+    `SELECT COUNT(*) AS n FROM agents WHERE status = ? AND role = ?`,
+  ).get(status, role) as { n: number } | undefined;
+  return row?.n ?? 0;
+}
+
+/**
  * List all agents from the overdeck agents table as AgentState-compatible objects.
  * Used as a fallback in reconstruct-cache when listRunningAgents() fails.
  */

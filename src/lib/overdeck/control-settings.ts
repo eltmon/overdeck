@@ -358,6 +358,10 @@ function overdeckDb() {
 }
 
 export const DEACON_GLOBAL_PAUSE_KEY = 'deacon.globally_paused';
+export const FLYWHEEL_GLOBAL_PAUSE_KEY = 'flywheel.globally_paused';
+export const FLYWHEEL_ACTIVE_RUN_ID_KEY = 'flywheel.active_run_id';
+export const FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY = 'flywheel.auto_pickup_backlog';
+export const FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY = 'flywheel.require_uat_before_merge';
 
 /** Read a raw app_settings value synchronously. Returns null if not set. */
 export function getSetting(key: string): string | null {
@@ -386,9 +390,60 @@ export function isDeaconGloballyPausedSync(): boolean {
   }
 }
 
+/** Drop-in for isDeaconGloballyPaused() from app-settings.ts. */
+export function isDeaconGloballyPaused(): boolean {
+  return isDeaconGloballyPausedSync();
+}
+
 /** Synchronous set of the global Deacon pause flag. */
 export function setDeaconGloballyPausedSync(paused: boolean): void {
   setSetting(DEACON_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
+}
+
+/** Drop-in for setDeaconGloballyPaused() from app-settings.ts. */
+export function setDeaconGloballyPaused(paused: boolean): void {
+  setDeaconGloballyPausedSync(paused);
+}
+
+/** Drop-in for getFlywheelActiveRunId() from app-settings.ts. */
+export function getFlywheelActiveRunId(): string | null {
+  return getFlywheelActiveRunIdSync();
+}
+
+/** Set the active flywheel run ID. */
+export function setFlywheelActiveRunId(runId: string | null): void {
+  setSetting(FLYWHEEL_ACTIVE_RUN_ID_KEY, runId ?? '');
+}
+
+/** Drop-in for isFlywheelGloballyPaused() from app-settings.ts. */
+export function isFlywheelGloballyPaused(): boolean {
+  return getSetting(FLYWHEEL_GLOBAL_PAUSE_KEY) === 'true';
+}
+
+/** Drop-in for setFlywheelGloballyPaused() from app-settings.ts. */
+export function setFlywheelGloballyPaused(paused: boolean): void {
+  setSetting(FLYWHEEL_GLOBAL_PAUSE_KEY, paused ? 'true' : 'false');
+}
+
+/** Drop-in for isFlywheelAutoPickupBacklog() from app-settings.ts. */
+export function isFlywheelAutoPickupBacklog(): boolean {
+  return getSetting(FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY) !== 'false';
+}
+
+/** Drop-in for setFlywheelAutoPickupBacklog() from app-settings.ts. */
+export function setFlywheelAutoPickupBacklog(enabled: boolean): void {
+  setSetting(FLYWHEEL_AUTO_PICKUP_BACKLOG_KEY, enabled ? 'true' : 'false');
+}
+
+/** Drop-in for isFlywheelRequireUatBeforeMerge() from app-settings.ts. */
+export function isFlywheelRequireUatBeforeMerge(): boolean {
+  const val = getSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY);
+  return val !== 'false'; // defaults to true if unset
+}
+
+/** Drop-in for setFlywheelRequireUatBeforeMerge() from app-settings.ts. */
+export function setFlywheelRequireUatBeforeMerge(enabled: boolean): void {
+  setSetting(FLYWHEEL_REQUIRE_UAT_BEFORE_MERGE_KEY, enabled ? 'true' : 'false');
 }
 
 export const ConfigApi = HttpApiGroup.make('config')

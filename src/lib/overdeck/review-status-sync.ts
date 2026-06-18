@@ -8,6 +8,7 @@
  * (added in the 0000_overdeck_init.sql migration). status_history is shared
  * between the old and new domains — both tables exist in overdeck.db.
  */
+import { Effect } from 'effect';
 import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -420,3 +421,56 @@ export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
     issueId.toUpperCase(),
   );
 }
+
+// ── Merge-blocker reconcile candidates ───────────────────────────────────────
+
+export interface MergeBlockerReconcileCandidate {
+  issueId: string;
+  prUrl: string | undefined;
+  blockerReasons: BlockerReason[] | undefined;
+  readyForMerge: boolean;
+}
+
+/**
+ * Sync query for merge-blocker reconcile service.
+ * Drop-in for getMergeBlockerReconcileCandidatesSync() from review-status-db.ts.
+ */
+export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileCandidate[] {
+  const db = getOverdeckDatabaseSync();
+  const rows = db.prepare(`
+    SELECT issue_id, pr_url, blocker_reasons, ready_for_merge
+    FROM review_status
+    WHERE ready_for_merge = 1
+      OR blocker_reasons LIKE '%merge_conflict%'
+      OR blocker_reasons LIKE '%not_mergeable%'
+  `).all() as Array<{
+    issue_id: string;
+    pr_url: string | null;
+    blocker_reasons: string | null;
+    ready_for_merge: number;
+  }>;
+
+  return rows.map((row) => ({
+    issueId: row.issue_id.toUpperCase(),
+    prUrl: row.pr_url ?? undefined,
+    blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
+    readyForMerge: row.ready_for_merge === 1,
+  }));
+}
+
+/**
+ * Effect wrapper for getMergeBlockerReconcileCandidatesSync.
+ * Drop-in for getMergeBlockerReconcileCandidates() from review-status-db.ts.
+ */
+export const getMergeBlockerReconcileCandidates = (): Effect.Effect<MergeBlockerReconcileCandidate[]> =>
+  Effect.promise(() =>
+    new Promise<MergeBlockerReconcileCandidate[]>((resolve, reject) => {
+      setImmediate(() => {
+        try {
+          resolve(getMergeBlockerReconcileCandidatesSync());
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }),
+  );
