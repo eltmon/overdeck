@@ -55,7 +55,7 @@
     {
       "id": "H3",
       "summary": "Resume storms: refreshing many sessions in parallel recreates PAN-821-style thrash (deacon churn, duplicate resumes).",
-      "mitigation": "--all-stale is strictly sequential with --max cap (default 3); the deacon patrol does at most ONE refresh per tick, oldest first, and respects the global freeze and OVERDECK_NO_RESUME."
+      "mitigation": "--all-stale is strictly sequential with --max cap (default 3); the deacon patrol does at most ONE refresh per tick, oldest first, and respects the global freeze and PANOPTICON_NO_RESUME."
     },
     {
       "id": "H4",

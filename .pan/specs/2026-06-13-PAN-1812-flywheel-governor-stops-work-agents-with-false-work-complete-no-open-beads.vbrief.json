@@ -31,7 +31,7 @@
     ],
     "narratives": {
       "Problem": "On 2026-06-12 the deacon stuck ladder marked agent-pan-1787 troubled at 18:34Z (idleMin=90) while the agent was actively closing beads (18:31:52 and 18:38:31), because (a) runtime.lastActivity was ~90min stale with no independent activity evidence consulted, and (b) hasReadyBeads uses `bd ready`, which excludes in_progress and dependency-blocked beads, so a mid-bead agent reads as having no work. Flywheel RUN-28 then `pan pause`d the agent claiming 'Work complete, no open beads' — the brief forbids pan kill but is silent on pan pause, prescribes no completion-verification procedure, and has no agent provenance concept, so the governor reaped an operator-relevant flagship agent. Separately, checkTaskCompletionPromise in triggers.ts runs `bd list` without cwd, querying the server's working directory instead of the agent workspace. Full reconstruction with verified file/line references is in .pan/drafts/PAN-1812.md.",
-      "Proposal": "Four-front fix: (1) make every automated work-completeness check workspace-scoped, count in_progress as remaining work, and treat bd errors as unknown (triggers.ts cwd fix + new tri-state getWorkspaceBeadWork helper consumed by the stuck ladder); (2) stuck-remediation stage 3 pauses with an explanatory reason instead of marking troubled, and fresh .beads/issues.jsonl mtime resets the ladder; (3) record startedBy provenance ('operator'|'flywheel') at spawn, detected from OVERDECK_AGENT_ID at CLI choke points and threaded explicitly through the plan→finalize→auto-spawn HTTP chain; (4) `pan pause` refuses flywheel-invoked pauses of non-flywheel-started work agents unless app-setting flywheel.governor_reap_operator_agents is true (default false), and docs/flywheel-brief.md gains explicit governor rules prescribing the verified workspace-scoped completion check.",
+      "Proposal": "Four-front fix: (1) make every automated work-completeness check workspace-scoped, count in_progress as remaining work, and treat bd errors as unknown (triggers.ts cwd fix + new tri-state getWorkspaceBeadWork helper consumed by the stuck ladder); (2) stuck-remediation stage 3 pauses with an explanatory reason instead of marking troubled, and fresh .beads/issues.jsonl mtime resets the ladder; (3) record startedBy provenance ('operator'|'flywheel') at spawn, detected from PANOPTICON_AGENT_ID at CLI choke points and threaded explicitly through the plan→finalize→auto-spawn HTTP chain; (4) `pan pause` refuses flywheel-invoked pauses of non-flywheel-started work agents unless app-setting flywheel.governor_reap_operator_agents is true (default false), and docs/flywheel-brief.md gains explicit governor rules prescribing the verified workspace-scoped completion check.",
       "NonGoals": "- Fixing the stale runtime.lastActivity activity-mirror pipeline itself (hooks/heartbeats) — the mtime cross-check mitigates it; root-cause fix is a separate issue if staleness recurs\n- Changing nudgeIdleWorkAgentsWithOpenBeads's `bd ready` usage in deacon.ts (ready-semantics are correct for naming the next actionable bead; it already uses cwd and skips on error)\n- Cleaning stale beads inherited from main out of workspace beads DBs\n- Gating pan kill or other lifecycle verbs (the brief already forbids them for the flywheel)\n- Changing evaluateFlywheelOrchestrator stage-3 semantics (paused-and-troubled for the orchestrator itself stays)\n- New provenance categories beyond operator|flywheel\n- Changing maxAgents/minAgents values, merge policy, or UAT policy"
     },
     "autoDecisions": [
@@ -48,8 +48,8 @@
         "rationale": "Directly encodes the issue's desired behavior 1; verified live that `bd list --json -l <label>` with cwd=workspace returns open+in_progress by default; tri-state makes 'bd error => unknown, never complete' structural."
       },
       {
-        "summary": "Provenance detected via OVERDECK_AGENT_ID env at CLI choke points, with explicit --initiator override threaded through the auto-spawn HTTP chain; default 'operator'",
-        "rationale": "The launcher exports OVERDECK_AGENT_ID into every agent shell (launcher-generator.ts:270) so flywheel-spawned `pan` children are detectable without new plumbing; env does not survive the complete-planning HTTP hop, hence the explicit field; defaulting unknowns to 'operator' is conservative (exempt from reaping)."
+        "summary": "Provenance detected via PANOPTICON_AGENT_ID env at CLI choke points, with explicit --initiator override threaded through the auto-spawn HTTP chain; default 'operator'",
+        "rationale": "The launcher exports PANOPTICON_AGENT_ID into every agent shell (launcher-generator.ts:270) so flywheel-spawned `pan` children are detectable without new plumbing; env does not survive the complete-planning HTTP hop, hence the explicit field; defaulting unknowns to 'operator' is conservative (exempt from reaping)."
       },
       {
         "summary": "Reap gate enforced in pan pause CLI plus stated in the brief; config gate is SQLite app-setting flywheel.governor_reap_operator_agents default false",
@@ -271,7 +271,7 @@
           ]
         },
         "narrative": {
-          "Action": "Add startedBy?: 'operator' | 'flywheel' to AgentState in src/lib/agents.ts (~line 934) AND to the cleanAgentState field whitelist (~line 945) — omitting the whitelist entry silently drops the field on save. Add startedBy to SpawnOptions and persist in spawnAgent (default 'operator'). In src/cli/commands/start.ts add internal option --initiator <operator|flywheel> registered in src/cli/index.ts; resolution order: explicit flag, then env (process.env.OVERDECK_AGENT_ID === FLYWHEEL_ORCHESTRATOR_AGENT_ID from src/lib/cloister/flywheel.ts:18 => 'flywheel'), else 'operator'; pass into the spawnAgent call at start.ts:1120. If importing the constant creates an import cycle, move it to a leaf module rather than inlining the literal. Update skills/pan-start/SKILL.md in the same commit if it enumerates flags (scripts/lint-skills.sh cross-checks --help). Full spec: WI-5 in .pan/drafts/PAN-1812.md."
+          "Action": "Add startedBy?: 'operator' | 'flywheel' to AgentState in src/lib/agents.ts (~line 934) AND to the cleanAgentState field whitelist (~line 945) — omitting the whitelist entry silently drops the field on save. Add startedBy to SpawnOptions and persist in spawnAgent (default 'operator'). In src/cli/commands/start.ts add internal option --initiator <operator|flywheel> registered in src/cli/index.ts; resolution order: explicit flag, then env (process.env.PANOPTICON_AGENT_ID === FLYWHEEL_ORCHESTRATOR_AGENT_ID from src/lib/cloister/flywheel.ts:18 => 'flywheel'), else 'operator'; pass into the spawnAgent call at start.ts:1120. If importing the constant creates an import cycle, move it to a leaf module rather than inlining the literal. Update skills/pan-start/SKILL.md in the same commit if it enumerates flags (scripts/lint-skills.sh cross-checks --help). Full spec: WI-5 in .pan/drafts/PAN-1812.md."
         },
         "items": [
           {
@@ -284,7 +284,7 @@
           },
           {
             "id": "agent-started-by.ac2",
-            "title": "pan start running with OVERDECK_AGENT_ID=flywheel-orchestrator records startedBy='flywheel'; with no OVERDECK_AGENT_ID it defaults to 'operator'",
+            "title": "pan start running with PANOPTICON_AGENT_ID=flywheel-orchestrator records startedBy='flywheel'; with no PANOPTICON_AGENT_ID it defaults to 'operator'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -329,7 +329,7 @@
         "items": [
           {
             "id": "autostart-provenance.ac1",
-            "title": "pan plan invoked with OVERDECK_AGENT_ID=flywheel-orchestrator produces a planning agent state.json containing startedBy='flywheel'",
+            "title": "pan plan invoked with PANOPTICON_AGENT_ID=flywheel-orchestrator produces a planning agent state.json containing startedBy='flywheel'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -377,7 +377,7 @@
           ]
         },
         "narrative": {
-          "Action": "Add FLYWHEEL_GOVERNOR_REAP_OPERATOR_AGENTS_KEY = 'flywheel.governor_reap_operator_agents' to src/lib/database/app-settings.ts with isFlywheelGovernorReapOperatorAgents()/setFlywheelGovernorReapOperatorAgents() following the isFlywheelAutoPickupBacklog pattern (lines 104-118; default false). In src/cli/commands/pause.ts pauseCommand (lines 10-45), after resolving target state and before any mutation: if process.env.OVERDECK_AGENT_ID === FLYWHEEL_ORCHESTRATOR_AGENT_ID AND state.role === 'work' AND state.startedBy !== 'flywheel' AND the toggle is false, print a policy error naming the config key and exit(1). Legacy agents without startedBy are protected (treated as operator-started). Update skills/pan-pause/SKILL.md if it documents behavior the lint cross-checks. Full spec: WI-7 in .pan/drafts/PAN-1812.md."
+          "Action": "Add FLYWHEEL_GOVERNOR_REAP_OPERATOR_AGENTS_KEY = 'flywheel.governor_reap_operator_agents' to src/lib/database/app-settings.ts with isFlywheelGovernorReapOperatorAgents()/setFlywheelGovernorReapOperatorAgents() following the isFlywheelAutoPickupBacklog pattern (lines 104-118; default false). In src/cli/commands/pause.ts pauseCommand (lines 10-45), after resolving target state and before any mutation: if process.env.PANOPTICON_AGENT_ID === FLYWHEEL_ORCHESTRATOR_AGENT_ID AND state.role === 'work' AND state.startedBy !== 'flywheel' AND the toggle is false, print a policy error naming the config key and exit(1). Legacy agents without startedBy are protected (treated as operator-started). Update skills/pan-pause/SKILL.md if it documents behavior the lint cross-checks. Full spec: WI-7 in .pan/drafts/PAN-1812.md."
         },
         "items": [
           {
@@ -390,7 +390,7 @@
           },
           {
             "id": "pause-reap-gate.ac2",
-            "title": "pauseCommand under OVERDECK_AGENT_ID=flywheel-orchestrator targeting a work agent whose startedBy is not 'flywheel' exits non-zero with a message naming the config key, and the target state remains unpaused",
+            "title": "pauseCommand under PANOPTICON_AGENT_ID=flywheel-orchestrator targeting a work agent whose startedBy is not 'flywheel' exits non-zero with a message naming the config key, and the target state remains unpaused",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -406,7 +406,7 @@
           },
           {
             "id": "pause-reap-gate.ac4",
-            "title": "Given no OVERDECK_AGENT_ID in the environment, pauseCommand marks any resolvable agent paused exactly as before",
+            "title": "Given no PANOPTICON_AGENT_ID in the environment, pauseCommand marks any resolvable agent paused exactly as before",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

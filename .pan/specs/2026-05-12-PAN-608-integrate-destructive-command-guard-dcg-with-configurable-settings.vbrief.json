@@ -141,7 +141,7 @@
       },
       {
         "id": "event-schema",
-        "title": "Add CommandBlocked / CommandGuardError / CommandGuardSkipped events to @overdeck/contracts",
+        "title": "Add CommandBlocked / CommandGuardError / CommandGuardSkipped events to @panctl/contracts",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-12T03:15:00.000Z",
@@ -394,7 +394,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "The hook script (.claude/hooks/dcg-pretool.sh) wraps dcg invocation: on dcg exit-code=block, POST a CommandBlocked event to the dashboard's internal event ingest endpoint (using the existing internal-token auth in src/lib/internal-token.ts). On dcg crash/timeout, POST CommandGuardError and exit 0 (fail-open). The agentId is in env (OVERDECK_AGENT_ID, already exported by the launcher)."
+          "Action": "The hook script (.claude/hooks/dcg-pretool.sh) wraps dcg invocation: on dcg exit-code=block, POST a CommandBlocked event to the dashboard's internal event ingest endpoint (using the existing internal-token auth in src/lib/internal-token.ts). On dcg crash/timeout, POST CommandGuardError and exit 0 (fail-open). The agentId is in env (PANOPTICON_AGENT_ID, already exported by the launcher)."
         },
         "subItems": [
           {
@@ -444,7 +444,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Extend src/dashboard/frontend/src/components/ActivityPanel.tsx (and the reducer in @overdeck/contracts) so CommandBlocked events render with a yellow/orange warning row showing command, matched pack/rule, and a 'why' tooltip. CommandGuardError renders with a red/error row (the guard itself broke). CommandGuardSkipped is muted/info-only."
+          "Action": "Extend src/dashboard/frontend/src/components/ActivityPanel.tsx (and the reducer in @panctl/contracts) so CommandBlocked events render with a yellow/orange warning row showing command, matched pack/rule, and a 'why' tooltip. CommandGuardError renders with a red/error row (the guard itself broke). CommandGuardSkipped is muted/info-only."
         },
         "subItems": [
           {

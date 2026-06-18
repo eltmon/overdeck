@@ -3,12 +3,12 @@
     "version": "0.5",
     "created": "2026-06-04T06:18:20.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1547: fix: @overdeck/cli npm install warns on Node <22 (engine mismatch + deprecated deps)",
+    "description": "Plan for PAN-1547: fix: @panctl/cli npm install warns on Node <22 (engine mismatch + deprecated deps)",
     "updated": "2026-06-04T06:19:47.903Z"
   },
   "plan": {
     "id": "pan-1547",
-    "title": "fix: @overdeck/cli npm install warns on Node <22 (engine mismatch + deprecated deps)",
+    "title": "fix: @panctl/cli npm install warns on Node <22 (engine mismatch + deprecated deps)",
     "status": "proposed",
     "uid": "4a90c550-fcaf-4748-b07a-8f08dd154d4b",
     "author": "agent:claude-opus-4-8",
@@ -29,7 +29,7 @@
       "packaging"
     ],
     "narratives": {
-      "Problem": "Installing `@overdeck/cli` emits noisy npm warnings. A real production install of the published 0.21.0 on Node 22.22.0 emits exactly four: (1) ini@7.0.0 EBADENGINE — from effect@4.0.0-beta.73 — which fires even on supported Node 22.0–22.22.1 because ini@7's engines are `^22.22.2 || ^24.15.0 || >=26.0.0`; (2) glob@10.5.0 'security vulnerabilities' deprecation — from @google-cloud/speech → google-gax → rimraf@5; (3) node-domexception@1.0.0 deprecation — from @google-cloud/speech → google-gax → node-fetch@3 → fetch-blob; (4) prebuild-install@7.1.3 'no longer maintained' — from node-pty + better-sqlite3 + @xenova/transformers→sharp. The @overdeck/cli >=22.0.0 engine warning itself only appears on Node <22 and is correct/intentional.",
+      "Problem": "Installing `@panctl/cli` emits noisy npm warnings. A real production install of the published 0.21.0 on Node 22.22.0 emits exactly four: (1) ini@7.0.0 EBADENGINE — from effect@4.0.0-beta.73 — which fires even on supported Node 22.0–22.22.1 because ini@7's engines are `^22.22.2 || ^24.15.0 || >=26.0.0`; (2) glob@10.5.0 'security vulnerabilities' deprecation — from @google-cloud/speech → google-gax → rimraf@5; (3) node-domexception@1.0.0 deprecation — from @google-cloud/speech → google-gax → node-fetch@3 → fetch-blob; (4) prebuild-install@7.1.3 'no longer maintained' — from node-pty + better-sqlite3 + @xenova/transformers→sharp. The @panctl/cli >=22.0.0 engine warning itself only appears on Node <22 and is correct/intentional.",
       "Proposal": "Fix at the root cause we actually control. EMPIRICALLY PROVEN: a package's own `overrides` are ignored for `npm install -g` (only the root project's overrides win), so overrides cannot help end users. Both heavyweight culprits are lazy-loaded dynamic imports with no static type references, so we make `@google-cloud/speech` and `@xenova/transformers` NOT-auto-installed optional dependencies (peerDependencies + peerDependenciesMeta.optional). Making @google-cloud/speech optional eliminates BOTH glob@10.5 (CVE notice) and node-domexception in one move; making @xenova/transformers optional removes sharp and lightens the install. Each dynamic-import site gets an actionable 'install X to use Y' error. We ACCEPT and DOCUMENT the two genuinely-upstream residuals: prebuild-install (node-pty + better-sqlite3 hard-require it; no replacement) and ini@7 EBADENGINE on Node <22.22.2 (effect's transitive). REJECTED: npm-shrinkwrap.json (disproportionate, fragile on a bun monorepo) and bumping the engines floor to >=22.22.2 (past the maintainer's own Node 22.22.0). README is updated to state the Node 22 requirement clearly (recommend latest 22.x), the new opt-in installs, and the expected residual notices. A verification bead re-runs the real install probe to prove glob + node-domexception are gone."
     },
     "autoDecisions": [
@@ -68,12 +68,12 @@
           ]
         },
         "narrative": {
-          "Action": "Remove `@google-cloud/speech` from `dependencies` in the root package.json and declare it as an optional peer dependency (`peerDependencies` + `peerDependenciesMeta['@google-cloud/speech'].optional = true`), keeping it resolvable for development (devDependencies and/or bun install). Update the single dynamic-import site at src/voice/google-cloud-transcription.ts (~line 88) so that a missing module produces a clear, actionable error naming the exact install command (e.g. `npm install -g @google-cloud/speech`) instead of a raw 'Cannot find module'. This establishes the optional-peer-dep pattern that the transformers bead reuses and the verification bead checks. Verify with a real `npm install @overdeck/cli --omit=dev` probe (in a temp dir) that glob@10.5.0 AND node-domexception are no longer in the resolved tree, and that `npm run typecheck && npm run build && npm test` still pass in the dev workspace."
+          "Action": "Remove `@google-cloud/speech` from `dependencies` in the root package.json and declare it as an optional peer dependency (`peerDependencies` + `peerDependenciesMeta['@google-cloud/speech'].optional = true`), keeping it resolvable for development (devDependencies and/or bun install). Update the single dynamic-import site at src/voice/google-cloud-transcription.ts (~line 88) so that a missing module produces a clear, actionable error naming the exact install command (e.g. `npm install -g @google-cloud/speech`) instead of a raw 'Cannot find module'. This establishes the optional-peer-dep pattern that the transformers bead reuses and the verification bead checks. Verify with a real `npm install @panctl/cli --omit=dev` probe (in a temp dir) that glob@10.5.0 AND node-domexception are no longer in the resolved tree, and that `npm run typecheck && npm run build && npm test` still pass in the dev workspace."
         },
         "subItems": [
           {
             "id": "speech-optional.ac1",
-            "title": "@google-cloud/speech is removed from `dependencies` and declared as an optional peer dep; it is NOT present in a fresh `npm install @overdeck/cli --omit=dev` resolved tree.",
+            "title": "@google-cloud/speech is removed from `dependencies` and declared as an optional peer dep; it is NOT present in a fresh `npm install @panctl/cli --omit=dev` resolved tree.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -123,7 +123,7 @@
         "subItems": [
           {
             "id": "transformers-optional.ac1",
-            "title": "@xenova/transformers is removed from `dependencies` and declared as an optional peer dep; it is NOT present in a fresh `npm install @overdeck/cli --omit=dev` resolved tree.",
+            "title": "@xenova/transformers is removed from `dependencies` and declared as an optional peer dep; it is NOT present in a fresh `npm install @panctl/cli --omit=dev` resolved tree.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -210,7 +210,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "After speech-optional and transformers-optional land, run the real install probe used during planning — a clean `npm install @overdeck/cli --omit=dev` from a temp project (or `npm pack` of the local build installed into a temp dir to validate pre-publish) — and capture the before/after warning sets. Assert glob@10.5.0 and node-domexception@1.0.0 are GONE, and that only the documented residuals (ini@7 on Node <22.22.2; prebuild-install) remain. Record the captured output in the PR description / issue as the evidence the fix meets the issue's 'eliminate transitive noise' bar."
+          "Action": "After speech-optional and transformers-optional land, run the real install probe used during planning — a clean `npm install @panctl/cli --omit=dev` from a temp project (or `npm pack` of the local build installed into a temp dir to validate pre-publish) — and capture the before/after warning sets. Assert glob@10.5.0 and node-domexception@1.0.0 are GONE, and that only the documented residuals (ini@7 on Node <22.22.2; prebuild-install) remain. Record the captured output in the PR description / issue as the evidence the fix meets the issue's 'eliminate transitive noise' bar."
         },
         "subItems": [
           {

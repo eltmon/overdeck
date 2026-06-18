@@ -45,7 +45,7 @@
         "rationale": "Confirmed in CLAUDE.md and the dashboard-node22-only rule. Same reason the dashboard server is Node-only."
       },
       {
-        "summary": "Socket layout mirrors the existing channels bridge: ${OVERDECK_HOME}/sockets/pty-<agentId>.sock at mode 0600, HTTP-on-unix wire format, pty-token header auth via a new src/lib/pty-token.ts helper.",
+        "summary": "Socket layout mirrors the existing channels bridge: ${PANOPTICON_HOME}/sockets/pty-<agentId>.sock at mode 0600, HTTP-on-unix wire format, pty-token header auth via a new src/lib/pty-token.ts helper.",
         "rationale": "Symmetry with panopticon-bridge keeps the postUnixSocketJson primitive, log paths, and operator mental model the same."
       },
       {
@@ -61,7 +61,7 @@
         "rationale": "Operator transcript completeness wins over secrecy. Reserving the field keeps the wire format forward-compatible."
       },
       {
-        "summary": "Eligibility for the supervisor: harness === 'claude-code' (excludes Pi), provider-agnostic (no Anthropic gate), excludes Docker workspaces via the existing PAN_DOCKER / OVERDECK_DOCKER_WORKSPACE env vars.",
+        "summary": "Eligibility for the supervisor: harness === 'claude-code' (excludes Pi), provider-agnostic (no Anthropic gate), excludes Docker workspaces via the existing PAN_DOCKER / PANOPTICON_DOCKER_WORKSPACE env vars.",
         "rationale": "Docker host/container shared-socket plumbing is unsolved and out of scope. All other Claude Code agents (Anthropic + every cliproxy-routed model) become eligible."
       },
       {
@@ -139,12 +139,12 @@
           ]
         },
         "narrative": {
-          "Action": "Create src/lib/channels/pty-supervisor.ts as a Node 22 script that spawns claude in a PTY (via @homebridge/node-pty-prebuilt-multiarch), proxies stdin↔PTY input and PTY output↔stdout, forwards SIGWINCH/resize events, and listens on ~/.panopticon/sockets/pty-<agentId>.sock for HTTP-on-unix POSTs that inject text into Claude's PTY input. Echo each socket-delivered message back to stdout (so the user sees it in the tmux pane). On EXIT/SIGTERM/SIGINT, unlink the socket and exit. Require OVERDECK_AGENT_ID env var; reject requests without a matching pty-token header. Add a new tsdown entry to emit dist/pty-supervisor.js (node-pty marked external). Add @homebridge/node-pty-prebuilt-multiarch to root package.json. Header comment documents the architecture, the H1 PTY-owns-claude lifecycle, env-var requirements (TERM/COLORTERM/LANG passthrough), and the per-message echo behavior."
+          "Action": "Create src/lib/channels/pty-supervisor.ts as a Node 22 script that spawns claude in a PTY (via @homebridge/node-pty-prebuilt-multiarch), proxies stdin↔PTY input and PTY output↔stdout, forwards SIGWINCH/resize events, and listens on ~/.panopticon/sockets/pty-<agentId>.sock for HTTP-on-unix POSTs that inject text into Claude's PTY input. Echo each socket-delivered message back to stdout (so the user sees it in the tmux pane). On EXIT/SIGTERM/SIGINT, unlink the socket and exit. Require PANOPTICON_AGENT_ID env var; reject requests without a matching pty-token header. Add a new tsdown entry to emit dist/pty-supervisor.js (node-pty marked external). Add @homebridge/node-pty-prebuilt-multiarch to root package.json. Header comment documents the architecture, the H1 PTY-owns-claude lifecycle, env-var requirements (TERM/COLORTERM/LANG passthrough), and the per-message echo behavior."
         },
         "subItems": [
           {
             "id": "supervisor-script.ac1",
-            "title": "Spawning the supervisor with OVERDECK_AGENT_ID set and `claude --version` as the child completes, prints 'claude --version' output to stdout, and exits when the child exits.",
+            "title": "Spawning the supervisor with PANOPTICON_AGENT_ID set and `claude --version` as the child completes, prints 'claude --version' output to stdout, and exits when the child exits.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -482,12 +482,12 @@
           ]
         },
         "narrative": {
-          "Action": "Add decideSupervisorForWorkAgent(agentId, options, state) → { eligible, reason } to src/lib/agents.ts. Eligibility: harness === 'claude-code' AND NOT inside Docker (PAN_DOCKER / OVERDECK_DOCKER_WORKSPACE env). Provider-agnostic — no Anthropic gate. Add supervisorEnabled?: boolean to AgentState. In spawnAgent, when eligible: writePtyTokenSync(agentId), set state.supervisorEnabled=true, pass useSupervisor=true and supervisorScriptPath=resolved-dist-path to buildAgentLaunchConfig→generateLauncherScriptSync. If dist/pty-supervisor.js is missing, raise a clear error: 'pty-supervisor build artifact missing — run `npm run build`.' Channels eligibility is now independent (and defaults off — see channels-mcp-default-off bead)."
+          "Action": "Add decideSupervisorForWorkAgent(agentId, options, state) → { eligible, reason } to src/lib/agents.ts. Eligibility: harness === 'claude-code' AND NOT inside Docker (PAN_DOCKER / PANOPTICON_DOCKER_WORKSPACE env). Provider-agnostic — no Anthropic gate. Add supervisorEnabled?: boolean to AgentState. In spawnAgent, when eligible: writePtyTokenSync(agentId), set state.supervisorEnabled=true, pass useSupervisor=true and supervisorScriptPath=resolved-dist-path to buildAgentLaunchConfig→generateLauncherScriptSync. If dist/pty-supervisor.js is missing, raise a clear error: 'pty-supervisor build artifact missing — run `npm run build`.' Channels eligibility is now independent (and defaults off — see channels-mcp-default-off bead)."
         },
         "subItems": [
           {
             "id": "spawn-eligibility-and-state.ac1",
-            "title": "decideSupervisorForWorkAgent returns { eligible: false, reason: 'docker-not-supported-yet' } when PAN_DOCKER=1 or OVERDECK_DOCKER_WORKSPACE=1.",
+            "title": "decideSupervisorForWorkAgent returns { eligible: false, reason: 'docker-not-supported-yet' } when PAN_DOCKER=1 or PANOPTICON_DOCKER_WORKSPACE=1.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

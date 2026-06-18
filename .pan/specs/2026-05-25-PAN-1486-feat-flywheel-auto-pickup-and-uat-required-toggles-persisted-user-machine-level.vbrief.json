@@ -808,7 +808,7 @@
         "subItems": [
           {
             "id": "b11.ac1",
-            "title": "Executor starts when the dashboard server boots and is registered alongside the existing Deacon patrol so dev-mode and prod both pick it up; it can be disabled via env (OVERDECK_DISABLE_AUTO_MERGE=1) for tests.",
+            "title": "Executor starts when the dashboard server boots and is registered alongside the existing Deacon patrol so dev-mode and prod both pick it up; it can be disabled via env (PANOPTICON_DISABLE_AUTO_MERGE=1) for tests.",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

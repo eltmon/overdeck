@@ -46,7 +46,7 @@
     ],
     "narratives": {
       "Problem": "Today Panopticon can fork a conversation in two ways: summary fork (a separate model distills the JSONL) and plain fork (raw history copy). Both are passive: a summarizer reads the transcript after the fact. Neither knows the dead ends the working agent learned, which skills the successor should pick up, or which slice of the work matters for the next task. Long-running work hits the context wall and either restarts with thin context or stops outright.",
-      "Proposal": "Add `pan handoff <conv> [--focus \"...\"]` as a third fork mode that asks the live source agent to author its own handoff document. The orchestrator delivers a handoff-authoring prompt to the source agent via the existing deliverAgentMessage primitive, waits for the agent to write a doc + .done sentinel to ${OVERDECK_HOME}/handoffs/, validates the doc, then spawns a new conversation using the doc as the seed message — slotting into the same pipeline summary text occupies today. If the source is ended, stalls, or produces an invalid doc, the pipeline auto-falls back to summary fork so the command always produces a working new conversation."
+      "Proposal": "Add `pan handoff <conv> [--focus \"...\"]` as a third fork mode that asks the live source agent to author its own handoff document. The orchestrator delivers a handoff-authoring prompt to the source agent via the existing deliverAgentMessage primitive, waits for the agent to write a doc + .done sentinel to ${PANOPTICON_HOME}/handoffs/, validates the doc, then spawns a new conversation using the doc as the seed message — slotting into the same pipeline summary text occupies today. If the source is ended, stalls, or produces an invalid doc, the pipeline auto-falls back to summary fork so the command always produces a working new conversation."
     },
     "autoDecisions": [
       {
@@ -54,7 +54,7 @@
         "rationale": "Two-boolean discriminators (plain && handoff?) are bug-prone. A single discriminator keeps the spec sharp and prevents nonsensical option combinations."
       },
       {
-        "summary": "Handoff doc path is ${OVERDECK_HOME}/handoffs/<source-conv-id>-<iso-ts>.md with sibling .done sentinel.",
+        "summary": "Handoff doc path is ${PANOPTICON_HOME}/handoffs/<source-conv-id>-<iso-ts>.md with sibling .done sentinel.",
         "rationale": "Issue body explicitly names this path. Timestamp-suffix is collision-free without locking. Separate .done sentinel cleanly distinguishes in-progress writes from completed handoffs."
       },
       {
@@ -75,7 +75,7 @@
       },
       {
         "summary": "v1 refuses handoff for conversations running inside a workspace devcontainer and auto-falls back to summary fork.",
-        "rationale": "The single-deacon invariant prohibits mounting ${OVERDECK_HOME} into workspace containers, so a containerized agent cannot write to the host's handoffs/ directory. Cross-container handoff is a separate, larger problem; punt it to a follow-up."
+        "rationale": "The single-deacon invariant prohibits mounting ${PANOPTICON_HOME} into workspace containers, so a containerized agent cannot write to the host's handoffs/ directory. Cross-container handoff is a separate, larger problem; punt it to a follow-up."
       },
       {
         "summary": "Handoff is mode-symmetric with summary fork for harness rules: Pi source allowed (agent authors plain-text doc; portable), Pi target allowed (doc is injected via the Pi FIFO same as a summary).",
@@ -157,7 +157,7 @@
       },
       {
         "id": "handoff-paths",
-        "title": "Add path helpers for ${OVERDECK_HOME}/handoffs/<conv-id>-<ts>.md and .done sentinel",
+        "title": "Add path helpers for ${PANOPTICON_HOME}/handoffs/<conv-id>-<ts>.md and .done sentinel",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-23T04:35:00.000Z",
@@ -168,12 +168,12 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add HANDOFFS_DIR (or equivalent) to src/lib/paths.ts derived from OVERDECK_HOME. Add a helper function (likely in a new src/lib/conversations/handoff-paths.ts) returning { docPath, sentinelPath } given (sourceConvId, isoTimestamp). Ensure the directory exists on first write (mkdir recursive). Sentinel filename pattern: <doc-basename>.done (i.e., <conv-id>-<iso-ts>.md.done). No directory creation at module load — only on demand."
+          "Action": "Add HANDOFFS_DIR (or equivalent) to src/lib/paths.ts derived from PANOPTICON_HOME. Add a helper function (likely in a new src/lib/conversations/handoff-paths.ts) returning { docPath, sentinelPath } given (sourceConvId, isoTimestamp). Ensure the directory exists on first write (mkdir recursive). Sentinel filename pattern: <doc-basename>.done (i.e., <conv-id>-<iso-ts>.md.done). No directory creation at module load — only on demand."
         },
         "subItems": [
           {
             "id": "handoff-paths.ac1",
-            "title": "src/lib/paths.ts exports HANDOFFS_DIR computed from OVERDECK_HOME (works with OVERDECK_HOME env override)",
+            "title": "src/lib/paths.ts exports HANDOFFS_DIR computed from PANOPTICON_HOME (works with PANOPTICON_HOME env override)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -688,7 +688,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add Vitest tests that drive runForkPipeline (or createSummaryFork) through the handoff fallback paths with mocked deliverAgentMessage and a tmp directory standing in for OVERDECK_HOME/handoffs. Required cases: (a) source-ended → falls back to summary; (b) handshake timeout (never write doc/sentinel) → falls back to summary; (c) doc written but sentinel never appears → falls back to summary; (d) sentinel and doc both written but doc fails validation → falls back to summary; (e) happy path: doc + sentinel both written and valid → seeds the new conversation with the doc text. Use vi.useFakeTimers + vi.advanceTimersByTimeAsync for the timeout case (per the project's mandatory fake-timers rule for retry/delay code). Mock deliverAgentMessage as a no-op so the test does not actually attempt tmux/channels delivery."
+          "Action": "Add Vitest tests that drive runForkPipeline (or createSummaryFork) through the handoff fallback paths with mocked deliverAgentMessage and a tmp directory standing in for PANOPTICON_HOME/handoffs. Required cases: (a) source-ended → falls back to summary; (b) handshake timeout (never write doc/sentinel) → falls back to summary; (c) doc written but sentinel never appears → falls back to summary; (d) sentinel and doc both written but doc fails validation → falls back to summary; (e) happy path: doc + sentinel both written and valid → seeds the new conversation with the doc text. Use vi.useFakeTimers + vi.advanceTimersByTimeAsync for the timeout case (per the project's mandatory fake-timers rule for retry/delay code). Mock deliverAgentMessage as a no-op so the test does not actually attempt tmux/channels delivery."
         },
         "subItems": [
           {
@@ -759,7 +759,7 @@
           },
           {
             "id": "handoff-docs-update.ac2",
-            "title": "Documentation names the doc path (${OVERDECK_HOME}/handoffs/...), the sentinel pattern, the default 5-minute timeout, and the fallback-to-summary behavior",
+            "title": "Documentation names the doc path (${PANOPTICON_HOME}/handoffs/...), the sentinel pattern, the default 5-minute timeout, and the fallback-to-summary behavior",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

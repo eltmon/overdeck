@@ -49,7 +49,7 @@
     "items": [
       {
         "id": "a1-memory-contracts",
-        "title": "Define memory contracts in @overdeck/contracts (Observation, Status, PendingTurn, ResetMarker, RagDecision)",
+        "title": "Define memory contracts in @panctl/contracts (Observation, Status, PendingTurn, ResetMarker, RagDecision)",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-12T19:50:00.000Z",
@@ -115,7 +115,7 @@
       },
       {
         "id": "a2-domain-events",
-        "title": "Add memory domain events to @overdeck/contracts events union",
+        "title": "Add memory domain events to @panctl/contracts events union",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-12T19:50:00.000Z",
@@ -173,7 +173,7 @@
         "subItems": [
           {
             "id": "a3-storage-paths.ac1",
-            "title": "All path functions return absolute paths using existing OVERDECK_HOME from src/lib/paths.ts",
+            "title": "All path functions return absolute paths using existing PANOPTICON_HOME from src/lib/paths.ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -405,7 +405,7 @@
           },
           {
             "id": "b2-provider-registry.ac4",
-            "title": "Env-var override (OVERDECK_MEMORY_PROVIDER, OVERDECK_MEMORY_MODEL) takes precedence over Settings",
+            "title": "Env-var override (PANOPTICON_MEMORY_PROVIDER, PANOPTICON_MEMORY_MODEL) takes precedence over Settings",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1572,7 +1572,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add slices to useDashboardStore: observationsByIssueId (rolling buffer of recent obs per issue), statusByIssueId, resetMarkersByScope. Reducers shared from @overdeck/contracts. Rolling buffer cap (default 50 per issue) to keep memory bounded."
+          "Action": "Add slices to useDashboardStore: observationsByIssueId (rolling buffer of recent obs per issue), statusByIssueId, resetMarkersByScope. Reducers shared from @panctl/contracts. Rolling buffer cap (default 50 per issue) to keep memory bounded."
         },
         "subItems": [
           {
@@ -1593,7 +1593,7 @@
           },
           {
             "id": "h2-zustand-slice.ac3",
-            "title": "Reducers exported from @overdeck/contracts and used by both server read-model and frontend store",
+            "title": "Reducers exported from @panctl/contracts and used by both server read-model and frontend store",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1819,7 +1819,7 @@
           },
           {
             "id": "i1-settings-memory.ac3",
-            "title": "Env-var override hint clearly documents OVERDECK_MEMORY_PROVIDER / OVERDECK_MEMORY_MODEL precedence over UI",
+            "title": "Env-var override hint clearly documents PANOPTICON_MEMORY_PROVIDER / PANOPTICON_MEMORY_MODEL precedence over UI",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

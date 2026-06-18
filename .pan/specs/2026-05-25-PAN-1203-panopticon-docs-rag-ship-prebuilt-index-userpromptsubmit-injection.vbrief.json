@@ -118,7 +118,7 @@
           },
           {
             "id": "docs-config.ac2",
-            "title": "Docs path helpers resolve under OVERDECK_HOME and support test overrides",
+            "title": "Docs path helpers resolve under PANOPTICON_HOME and support test overrides",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -436,7 +436,7 @@
           },
           {
             "id": "docs-install-materialization.ac3",
-            "title": "Install tests cover first install, upgrade refresh, missing packaged index, and OVERDECK_HOME overrides",
+            "title": "Install tests cover first install, upgrade refresh, missing packaged index, and PANOPTICON_HOME overrides",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

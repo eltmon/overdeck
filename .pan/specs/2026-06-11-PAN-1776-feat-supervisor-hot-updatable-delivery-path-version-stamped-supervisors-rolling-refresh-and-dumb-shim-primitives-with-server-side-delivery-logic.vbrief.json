@@ -519,7 +519,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add SUPERVISOR_AUTO_REFRESH_KEY = 'supervisor.auto_refresh' with isSupervisorAutoRefreshEnabled() (default false) / setSupervisorAutoRefreshEnabled() to src/lib/database/app-settings.ts, following the isMergeTrainEnabled pattern exactly (Effect getter, DatabaseError → false). Register a patrol in the deacon tick (alongside recoverOrphanedAgents / autoResumeStoppedWorkAgents, src/lib/cloister/deacon.ts ~4905): when enabled, refresh at most ONE stale supervisor per tick, oldest startedAt first, scope strictly agent-* (NEVER conversations — unsubmitted composer state cannot be detected), reusing the supervisor-refresh.ts core so idle/pause/troubled/Docker gates and skip-reason logging are identical to the CLI. Respect the global deacon freeze (deacon.globally_paused) and OVERDECK_NO_RESUME."
+          "Action": "Add SUPERVISOR_AUTO_REFRESH_KEY = 'supervisor.auto_refresh' with isSupervisorAutoRefreshEnabled() (default false) / setSupervisorAutoRefreshEnabled() to src/lib/database/app-settings.ts, following the isMergeTrainEnabled pattern exactly (Effect getter, DatabaseError → false). Register a patrol in the deacon tick (alongside recoverOrphanedAgents / autoResumeStoppedWorkAgents, src/lib/cloister/deacon.ts ~4905): when enabled, refresh at most ONE stale supervisor per tick, oldest startedAt first, scope strictly agent-* (NEVER conversations — unsubmitted composer state cannot be detected), reusing the supervisor-refresh.ts core so idle/pause/troubled/Docker gates and skip-reason logging are identical to the CLI. Respect the global deacon freeze (deacon.globally_paused) and PANOPTICON_NO_RESUME."
         },
         "subItems": [
           {
@@ -540,7 +540,7 @@
           },
           {
             "id": "a4-deacon-patrol.ac3",
-            "title": "Patrol is suppressed by the global deacon freeze and by OVERDECK_NO_RESUME",
+            "title": "Patrol is suppressed by the global deacon freeze and by PANOPTICON_NO_RESUME",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

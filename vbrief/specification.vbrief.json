@@ -127,7 +127,7 @@
             "title": "Real-time data architecture",
             "status": "completed",
             "narrative": {
-              "Description": "EventRouter bootstraps via getSnapshot RPC, then subscribes to domain event stream. Zustand store with shared reducers from @overdeck/contracts. Snapshot cache (SQLite projection) for instant startup. WS reconnection with automatic re-bootstrap."
+              "Description": "EventRouter bootstraps via getSnapshot RPC, then subscribes to domain event stream. Zustand store with shared reducers from @panctl/contracts. Snapshot cache (SQLite projection) for instant startup. WS reconnection with automatic re-bootstrap."
             }
           }
         ]
@@ -352,7 +352,7 @@
       },
       {
         "id": "contracts",
-        "title": "Shared contracts package (@overdeck/contracts)",
+        "title": "Shared contracts package (@panctl/contracts)",
         "status": "completed",
         "narrative": {
           "Description": "TypeScript package shared between frontend and server. Defines: domain event types, dashboard snapshot schema (Effect Schema), event reducers (shared between server read model and client Zustand store), RPC protocol types, agent/specialist/review status types."

@@ -8,12 +8,12 @@
   "decisions": [
     {
       "id": "D1",
-      "summary": "Verified the EXACT warning set: a real production install (`npm install @overdeck/cli --omit=dev`) of published 0.21.0 on Node 22.22.0 emits 4 warnings — ini@7.0.0 EBADENGINE, glob@10.5.0 (security) deprecated, node-domexception@1.0.0 deprecated, prebuild-install@7.1.3 deprecated. The @overdeck/cli engine warning itself only appears on Node <22 (correct/intentional).",
+      "summary": "Verified the EXACT warning set: a real production install (`npm install @panctl/cli --omit=dev`) of published 0.21.0 on Node 22.22.0 emits 4 warnings — ini@7.0.0 EBADENGINE, glob@10.5.0 (security) deprecated, node-domexception@1.0.0 deprecated, prebuild-install@7.1.3 deprecated. The @panctl/cli engine warning itself only appears on Node <22 (correct/intentional).",
       "recordedAt": "2026-06-04T06:18:20.000Z"
     },
     {
       "id": "D2",
-      "summary": "Proven empirically that a package's own `overrides` field is IGNORED by npm when the package is installed as a dependency / globally (only the ROOT project's overrides win). Therefore @overdeck/cli's `overrides` cannot fix any transitive warning for end users running `npm install -g @overdeck/cli`. The only mechanisms that reach end users are (a) changing our direct `dependencies`, or (b) publishing an `npm-shrinkwrap.json`.",
+      "summary": "Proven empirically that a package's own `overrides` field is IGNORED by npm when the package is installed as a dependency / globally (only the ROOT project's overrides win). Therefore @panctl/cli's `overrides` cannot fix any transitive warning for end users running `npm install -g @panctl/cli`. The only mechanisms that reach end users are (a) changing our direct `dependencies`, or (b) publishing an `npm-shrinkwrap.json`.",
       "recordedAt": "2026-06-04T06:18:20.000Z"
     },
     {
@@ -56,7 +56,7 @@
     {
       "id": "H3",
       "summary": "The mechanism choice matters: `optionalDependencies` are STILL installed by default (they only tolerate install failure) and would NOT remove the warnings. The change must actually remove the packages from the default-installed set.",
-      "mitigation": "Use peerDependencies + peerDependenciesMeta.optional (npm does NOT auto-install optional peer deps). Confirm with a real `npm install @overdeck/cli --omit=dev` probe that the package is absent from the resolved tree."
+      "mitigation": "Use peerDependencies + peerDependenciesMeta.optional (npm does NOT auto-install optional peer deps). Confirm with a real `npm install @panctl/cli --omit=dev` probe that the package is absent from the resolved tree."
     },
     {
       "id": "H4",

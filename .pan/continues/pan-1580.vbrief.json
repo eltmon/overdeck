@@ -21,7 +21,7 @@
     },
     {
       "id": "D3",
-      "summary": "The heartbeat is added as a new SystemHeartbeatEvent variant in the @overdeck/contracts DomainEvent union so it decodes on the wire. The client reducer needs NO change: applyEvent's default case already does `void (event as never); return state`, so an unrecognized type is ignored without throwing or mutating state. The heartbeat is liveness-only.",
+      "summary": "The heartbeat is added as a new SystemHeartbeatEvent variant in the @panctl/contracts DomainEvent union so it decodes on the wire. The client reducer needs NO change: applyEvent's default case already does `void (event as never); return state`, so an unrecognized type is ignored without throwing or mutating state. The heartbeat is liveness-only.",
       "recordedAt": "2026-06-07T03:07:29Z"
     },
     {

@@ -1,7 +1,7 @@
 # PAN-748 Review Fixes UAT
 
 Date: 2026-05-23
-Server: `OVERDECK_DISABLE_DEACON=1 API_PORT=4317 PORT=4317 HOST=127.0.0.1 /home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node dist/dashboard/server.js`
+Server: `PANOPTICON_DISABLE_DEACON=1 API_PORT=4317 PORT=4317 HOST=127.0.0.1 /home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node dist/dashboard/server.js`
 URL: `http://localhost:4317/`
 
 ## Automated gates

@@ -31,7 +31,7 @@
     ],
     "narratives": {
       "Problem": "On a server restart (pan reload/restart/redeploy) the dashboard goes blank instead of staying mounted and waiting to reconnect. The blank-pre-mount-document symptom (fix-direction #2) was already fixed on main by 31ef04dda (theme-aware boot shell + bundle-independent boot watchdog in index.html). The deeper regression remains: commit 3345c7c11 made RootErrorBoundary.componentDidCatch auto-window.location.reload() on GENERIC render crashes, which tears down the live mounted app on a restart-race crash; and there is no liveness signal on the Effect-managed /ws/rpc stream, so a silent half-open socket (laptop sleep / NAT drop) produces a permanent freeze with no error and no reconnect.",
-      "Proposal": "Make the dashboard reconnect IN-APP without destroying the mounted document. (1) Add an app-level heartbeat to the /ws/rpc domain-events stream (a new SystemHeartbeatEvent in @overdeck/contracts; server Stream.merges a ~15s tick into subscribeDomainEvents). (2) Add a client staleness watchdog that forces a fresh reconnect when ~2 beats are missed, catching half-open sockets. (3) Cap the reconnect backoff with exponential + jitter instead of a fixed 250ms hammer. (4) Wire the transport reconnect lifecycle to the visible overlay (export showOverlay + add hideOverlay; show 'Reconnecting…', hide on reconnect, show an actionable 'Server unreachable — Retry' after N failures). (5) Reverse the root-cause regression by narrowing componentDidCatch so generic render crashes no longer full-reload — only true module/asset-load errors do. (6, low priority) Surface the snapshot-fallback cliff instead of giving up silently."
+      "Proposal": "Make the dashboard reconnect IN-APP without destroying the mounted document. (1) Add an app-level heartbeat to the /ws/rpc domain-events stream (a new SystemHeartbeatEvent in @panctl/contracts; server Stream.merges a ~15s tick into subscribeDomainEvents). (2) Add a client staleness watchdog that forces a fresh reconnect when ~2 beats are missed, catching half-open sockets. (3) Cap the reconnect backoff with exponential + jitter instead of a fixed 250ms hammer. (4) Wire the transport reconnect lifecycle to the visible overlay (export showOverlay + add hideOverlay; show 'Reconnecting…', hide on reconnect, show an actionable 'Server unreachable — Retry' after N failures). (5) Reverse the root-cause regression by narrowing componentDidCatch so generic render crashes no longer full-reload — only true module/asset-load errors do. (6, low priority) Surface the snapshot-fallback cliff instead of giving up silently."
     },
     "autoDecisions": [
       {
@@ -58,7 +58,7 @@
     "items": [
       {
         "id": "heartbeat-contract",
-        "title": "Add SystemHeartbeatEvent to the @overdeck/contracts DomainEvent union",
+        "title": "Add SystemHeartbeatEvent to the @panctl/contracts DomainEvent union",
         "status": "pending",
         "priority": "high",
         "created": "2026-06-07T03:07:29Z",

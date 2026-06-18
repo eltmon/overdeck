@@ -11,7 +11,7 @@
   "decisions": [
     {
       "id": "D1",
-      "summary": "Class-1 (inspect-* sessions not covered by the auto-approve hook) is ALREADY FIXED in source by commit b8960b6dc (2026-06-04 01:59), which added strike-*/inspect-*/flywheel-* to the prefix case in sync-sources/hooks/auto-approve-hook. The installed copy at ~/.panopticon/bin/auto-approve-hook is byte-identical. The inspect launcher (inspect-agent.ts:209) already exports OVERDECK_AGENT_ID=inspect-<issue>-<bead>, which the hook keys on. So no scope change is needed — instead we ADD A REGRESSION TEST that asserts the hook grants permissionDecision:allow for agent-*/planning-*/flywheel-*/strike-*/inspect-* and stays silent (exit 0, no allow) for conv-* and unset. This locks the fix so the DSP-removal-era regression (auto-approve scoped to only agent-*/planning-*) can never recur silently.",
+      "summary": "Class-1 (inspect-* sessions not covered by the auto-approve hook) is ALREADY FIXED in source by commit b8960b6dc (2026-06-04 01:59), which added strike-*/inspect-*/flywheel-* to the prefix case in sync-sources/hooks/auto-approve-hook. The installed copy at ~/.panopticon/bin/auto-approve-hook is byte-identical. The inspect launcher (inspect-agent.ts:209) already exports PANOPTICON_AGENT_ID=inspect-<issue>-<bead>, which the hook keys on. So no scope change is needed — instead we ADD A REGRESSION TEST that asserts the hook grants permissionDecision:allow for agent-*/planning-*/flywheel-*/strike-*/inspect-* and stays silent (exit 0, no allow) for conv-* and unset. This locks the fix so the DSP-removal-era regression (auto-approve scoped to only agent-*/planning-*) can never recur silently.",
       "recordedAt": "2026-06-05T18:56:01.899Z"
     },
     {

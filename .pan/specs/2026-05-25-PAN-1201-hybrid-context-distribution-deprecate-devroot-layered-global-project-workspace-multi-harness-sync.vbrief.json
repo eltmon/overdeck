@@ -190,7 +190,7 @@
           },
           {
             "id": "context-dashboard-contracts.ac3",
-            "title": "`npm run typecheck` can import the new context contracts from `@overdeck/contracts` in both dashboard server and frontend code.",
+            "title": "`npm run typecheck` can import the new context contracts from `@panctl/contracts` in both dashboard server and frontend code.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -217,7 +217,7 @@
           ]
         },
         "narrative": {
-          "Action": "Create `src/dashboard/server/routes/context.ts` and register `contextRouteLayer` in `src/dashboard/server/server.ts`. Implement async, allowlisted endpoints for the dashboard page: `GET /api/context/layers` returns registered projects from the async `listProjects()` Effect API, workspace candidates under each project's configured workspaces directory, current global/project/workspace layer file paths, existence flags, and content read with `fs/promises`; `POST /api/context/preview` accepts draft layer content and returns rendered `claude-code`, `pi`, and `fullPrompt` previews using pure `renderForHarness` plus explicit Panopticon-injected prompt sections; `PUT /api/context/layers` writes only the selected canonical layer file after resolving it from the allowlist. Do not import `src/lib/sync.ts` or call `renderGlobalLayer`/`renderProjectLayer` in this route because those paths use sync FS. Add route/helper tests under `tests/dashboard/context-routes.test.ts` (or nearby route test location) with temporary OVERDECK_HOME/project/workspace fixtures."
+          "Action": "Create `src/dashboard/server/routes/context.ts` and register `contextRouteLayer` in `src/dashboard/server/server.ts`. Implement async, allowlisted endpoints for the dashboard page: `GET /api/context/layers` returns registered projects from the async `listProjects()` Effect API, workspace candidates under each project's configured workspaces directory, current global/project/workspace layer file paths, existence flags, and content read with `fs/promises`; `POST /api/context/preview` accepts draft layer content and returns rendered `claude-code`, `pi`, and `fullPrompt` previews using pure `renderForHarness` plus explicit Panopticon-injected prompt sections; `PUT /api/context/layers` writes only the selected canonical layer file after resolving it from the allowlist. Do not import `src/lib/sync.ts` or call `renderGlobalLayer`/`renderProjectLayer` in this route because those paths use sync FS. Add route/helper tests under `tests/dashboard/context-routes.test.ts` (or nearby route test location) with temporary PANOPTICON_HOME/project/workspace fixtures."
         },
         "subItems": [
           {
@@ -309,7 +309,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Create `src/dashboard/frontend/src/lib/contextApi.ts` (or colocate in the new context page directory) with typed fetch helpers for `GET /api/context/layers`, `POST /api/context/preview`, `PUT /api/context/layers`, and `POST /api/context/sync`. Use the contracts from `@overdeck/contracts`. Add React Query hooks or plain helpers used by the page; keep path/query construction in one place. Tests should mock `fetch` and assert request methods/bodies for load, preview, save, and sync."
+          "Action": "Create `src/dashboard/frontend/src/lib/contextApi.ts` (or colocate in the new context page directory) with typed fetch helpers for `GET /api/context/layers`, `POST /api/context/preview`, `PUT /api/context/layers`, and `POST /api/context/sync`. Use the contracts from `@panctl/contracts`. Add React Query hooks or plain helpers used by the page; keep path/query construction in one place. Tests should mock `fetch` and assert request methods/bodies for load, preview, save, and sync."
         },
         "subItems": [
           {
@@ -569,7 +569,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Run the required quality gates and manual dashboard verification after implementation. Commands: run `bun install` if Monaco dependencies changed; run `npm run typecheck`, `npm run lint`, `npm test`, and targeted tests for context layers/dashboard if useful during debugging. Build the dashboard with `npm run build` before running it. For UI verification, start the dashboard using the Node 22 built dist path via the existing project workflow (`pan up` or the documented Node 22 command, never Bun), open `/context` in an isolated Playwright browser/profile, edit sample harness blocks, confirm Claude/Pi/full previews update, save a temp fixture layer if the route supports fixture mode or otherwise use a safe temporary OVERDECK_HOME/project fixture, and confirm Save & Sync feedback appears."
+          "Action": "Run the required quality gates and manual dashboard verification after implementation. Commands: run `bun install` if Monaco dependencies changed; run `npm run typecheck`, `npm run lint`, `npm test`, and targeted tests for context layers/dashboard if useful during debugging. Build the dashboard with `npm run build` before running it. For UI verification, start the dashboard using the Node 22 built dist path via the existing project workflow (`pan up` or the documented Node 22 command, never Bun), open `/context` in an isolated Playwright browser/profile, edit sample harness blocks, confirm Claude/Pi/full previews update, save a temp fixture layer if the route supports fixture mode or otherwise use a safe temporary PANOPTICON_HOME/project fixture, and confirm Save & Sync feedback appears."
         },
         "subItems": [
           {

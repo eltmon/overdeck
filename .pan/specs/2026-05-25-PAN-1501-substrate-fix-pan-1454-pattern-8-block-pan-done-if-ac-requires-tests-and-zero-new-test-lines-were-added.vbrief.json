@@ -560,7 +560,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a short section to docs/OVERDECK_DEV_SOP.md (or wherever pan done is documented today — locate via `grep -rn 'pan done' docs/`) listing the four preflight gates (open beads / uncommitted changes / vBRIEF AC status / test-requirement) with one sentence each. Include the `--test-waived` escape hatch and its semantic distinction from `--force`. Cross-reference PAN-1501 and PAN-1454 pattern 8."
+          "Action": "Add a short section to docs/PANOPTICON_DEV_SOP.md (or wherever pan done is documented today — locate via `grep -rn 'pan done' docs/`) listing the four preflight gates (open beads / uncommitted changes / vBRIEF AC status / test-requirement) with one sentence each. Include the `--test-waived` escape hatch and its semantic distinction from `--force`. Cross-reference PAN-1501 and PAN-1454 pattern 8."
         },
         "subItems": [
           {

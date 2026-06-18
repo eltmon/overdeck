@@ -15,10 +15,13 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-# tracked text files (-I drops binary), minus lockfiles, build output, and THIS script
+# tracked text files (-I drops binary), minus lockfiles, build output, this script,
+# and machine-generated DATA/HISTORY records (issue tracker, vBRIEF plan data, per-issue
+# specs/continues/records/review). Those are point-in-time history, not rebrand targets.
 _matches() {
   git grep -lI "$1" -- . \
-    ':!*.lock' ':!*-lock.json' ':!dist' ':!**/dist/**' ':!scripts/rebrand-codemod.sh'
+    ':!*.lock' ':!*-lock.json' ':!dist' ':!**/dist/**' ':!scripts/rebrand-codemod.sh' \
+    ':!.beads' ':!vbrief' ':!.pan/specs' ':!.pan/continues' ':!.pan/records' ':!.pan/review'
 }
 
 # _apply <grep-pattern> <perl-expr>

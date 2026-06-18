@@ -177,7 +177,7 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "Add a Vitest test file (e.g. src/lib/registry/__tests__/feature-registry-storage-cwd.test.ts and src/lib/memory/__tests__/fts-db-cwd.test.ts, or a single shared spec under src/lib/__tests__/) that: (1) records the original process.cwd(); (2) calls process.chdir(os.tmpdir()) to simulate the broken-cwd condition; (3) imports and exercises the worker (initializeFeatureRegistryStorage() + listFeatureRegistryEntries() for registry; equivalent entrypoint for fts-db); (4) asserts the operation completes without throwing MODULE_NOT_FOUND; (5) restores the original cwd in afterEach/afterAll. Use a unique OVERDECK_HOME per test (os.tmpdir()/panopticon-test-<uuid>) to avoid clobbering the user's real registry. Use a small timeout — workers should respond in well under a second. Do NOT use real-wall-clock setTimeout retries; if any waiting is needed, use vi.useFakeTimers() per project test rules."
+          "Action": "Add a Vitest test file (e.g. src/lib/registry/__tests__/feature-registry-storage-cwd.test.ts and src/lib/memory/__tests__/fts-db-cwd.test.ts, or a single shared spec under src/lib/__tests__/) that: (1) records the original process.cwd(); (2) calls process.chdir(os.tmpdir()) to simulate the broken-cwd condition; (3) imports and exercises the worker (initializeFeatureRegistryStorage() + listFeatureRegistryEntries() for registry; equivalent entrypoint for fts-db); (4) asserts the operation completes without throwing MODULE_NOT_FOUND; (5) restores the original cwd in afterEach/afterAll. Use a unique PANOPTICON_HOME per test (os.tmpdir()/panopticon-test-<uuid>) to avoid clobbering the user's real registry. Use a small timeout — workers should respond in well under a second. Do NOT use real-wall-clock setTimeout retries; if any waiting is needed, use vi.useFakeTimers() per project test rules."
         },
         "subItems": [
           {
@@ -198,7 +198,7 @@
           },
           {
             "id": "add-cwd-regression-test.ac3",
-            "title": "Test cleans up its temporary OVERDECK_HOME directory and restores process.cwd in afterEach — no leaked state between test runs",
+            "title": "Test cleans up its temporary PANOPTICON_HOME directory and restores process.cwd in afterEach — no leaked state between test runs",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

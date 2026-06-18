@@ -59,7 +59,7 @@
       },
       {
         "summary": "Tests mock `getAgentStateAsync` via `vi.mock` rather than spinning up real `~/.panopticon/agents/` fixtures.",
-        "rationale": "Faster, hermetic, no OVERDECK_HOME mutation, matches the dominant testing style in the repo (cf. tests under `src/lib/__tests__/`)."
+        "rationale": "Faster, hermetic, no PANOPTICON_HOME mutation, matches the dominant testing style in the repo (cf. tests under `src/lib/__tests__/`)."
       }
     ],
     "items": [

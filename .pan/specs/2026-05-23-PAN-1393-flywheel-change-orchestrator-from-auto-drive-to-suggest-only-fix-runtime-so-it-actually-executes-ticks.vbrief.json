@@ -139,7 +139,7 @@
           },
           {
             "id": "contract-suggestions.ac5",
-            "title": "packages/contracts/src/flywheel.test.ts covers: valid suggestions array, empty array, missing field (default), invalid action, invalid priority — all green under `bun --filter @overdeck/contracts test`",
+            "title": "packages/contracts/src/flywheel.test.ts covers: valid suggestions array, empty array, missing field (default), invalid action, invalid priority — all green under `bun --filter @panctl/contracts test`",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -147,7 +147,7 @@
           },
           {
             "id": "contract-suggestions.ac6",
-            "title": "`bun --filter @overdeck/contracts run build` succeeds and exports FlywheelSuggestion from packages/contracts/src/index.ts",
+            "title": "`bun --filter @panctl/contracts run build` succeeds and exports FlywheelSuggestion from packages/contracts/src/index.ts",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -387,7 +387,7 @@
           },
           {
             "id": "dashboard-suggestions-section.ac6",
-            "title": "Component unit tests cover render, sort, empty state, click-through with issueId, no click-through without issueId — all green under `npm run test --workspace @overdeck/frontend`",
+            "title": "Component unit tests cover render, sort, empty state, click-through with issueId, no click-through without issueId — all green under `npm run test --workspace @panctl/frontend`",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

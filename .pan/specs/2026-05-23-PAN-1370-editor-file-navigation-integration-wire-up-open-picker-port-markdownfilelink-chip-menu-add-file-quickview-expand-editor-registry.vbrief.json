@@ -94,7 +94,7 @@
     "items": [
       {
         "id": "edit-registry-expand",
-        "title": "Expand EDITORS registry in @overdeck/contracts to include Kiro + full JetBrains family",
+        "title": "Expand EDITORS registry in @panctl/contracts to include Kiro + full JetBrains family",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-23T04:45:20.000Z",

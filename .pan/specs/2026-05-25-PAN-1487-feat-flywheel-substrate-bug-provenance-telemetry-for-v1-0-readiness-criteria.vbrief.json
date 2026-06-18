@@ -41,7 +41,7 @@
     ],
     "narratives": {
       "Problem": "Without substrate-bug provenance and per-run telemetry, none of the seven v1.0 readiness criteria in FLYWHEEL-VISION.md can be measured. Today: (a) substrate bugs filed by an agent during a Flywheel pass are indistinguishable from operator-asked-agent filings (same author, same shape), so we can't compute 'agent-discovered substrate bug rate'; (b) per-issue stage timing, intervention count, pass count, and outcome are scattered across the events table with no aggregator, so we can't compute pass-rate, MTTR, intervention-rate, time-consistency, or flake-rate. Everything else in the v1.0 vision is aspirational until this lands.",
-      "Proposal": "Three layers: (1) Provenance — Cloister threads OVERDECK_FLYWHEEL_RUN_ID into every agent spawned while a Flywheel run is active; a Claude Code PreToolUse Bash hook intercepts `gh issue create` and appends a trailer block (Flywheel-Run-Id, Flywheel-Filed-By, Flywheel-Discovered-In) to the issue body. (2) Telemetry events + storage — new SubstrateBugFiledEvent and OperatorInterventionEvent domain events, plus a flywheel_substrate_bugs SQLite projection populated by a 60s GitHub poller. (3) Aggregation + surfaces — flywheel-telemetry service derives the 7 criteria from events + substrate bugs over a 30-day rolling window; GET /api/flywheel/stats route, `pan flywheel stats` CLI, and a new Stats tab on FlywheelPage render each criterion as value-vs-target with green/yellow/red status."
+      "Proposal": "Three layers: (1) Provenance — Cloister threads PANOPTICON_FLYWHEEL_RUN_ID into every agent spawned while a Flywheel run is active; a Claude Code PreToolUse Bash hook intercepts `gh issue create` and appends a trailer block (Flywheel-Run-Id, Flywheel-Filed-By, Flywheel-Discovered-In) to the issue body. (2) Telemetry events + storage — new SubstrateBugFiledEvent and OperatorInterventionEvent domain events, plus a flywheel_substrate_bugs SQLite projection populated by a 60s GitHub poller. (3) Aggregation + surfaces — flywheel-telemetry service derives the 7 criteria from events + substrate bugs over a 30-day rolling window; GET /api/flywheel/stats route, `pan flywheel stats` CLI, and a new Stats tab on FlywheelPage render each criterion as value-vs-target with green/yellow/red status."
     },
     "autoDecisions": [
       {
@@ -84,7 +84,7 @@
     "items": [
       {
         "id": "provenance-env-vars",
-        "title": "Thread OVERDECK_FLYWHEEL_RUN_ID + AGENT_ROLE into every agent spawn",
+        "title": "Thread PANOPTICON_FLYWHEEL_RUN_ID + AGENT_ROLE into every agent spawn",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-25T08:45:00.000Z",
@@ -100,12 +100,12 @@
           ]
         },
         "narrative": {
-          "Action": "In spawnRun() (src/lib/agents.ts) read getFlywheelActiveRunId() from app_settings at spawn time. If a run id is present and validates as RUN-<digits>, set OVERDECK_FLYWHEEL_RUN_ID and OVERDECK_FLYWHEEL_AGENT_ROLE=<role> in the spawned process env. spawnFlywheelAgent (src/lib/cloister/flywheel.ts) sets both unconditionally for the orchestrator since it owns the run."
+          "Action": "In spawnRun() (src/lib/agents.ts) read getFlywheelActiveRunId() from app_settings at spawn time. If a run id is present and validates as RUN-<digits>, set PANOPTICON_FLYWHEEL_RUN_ID and PANOPTICON_FLYWHEEL_AGENT_ROLE=<role> in the spawned process env. spawnFlywheelAgent (src/lib/cloister/flywheel.ts) sets both unconditionally for the orchestrator since it owns the run."
         },
         "subItems": [
           {
             "id": "provenance-env-vars.ac1",
-            "title": "spawnRun sets OVERDECK_FLYWHEEL_RUN_ID when getFlywheelActiveRunId() returns a value at spawn time",
+            "title": "spawnRun sets PANOPTICON_FLYWHEEL_RUN_ID when getFlywheelActiveRunId() returns a value at spawn time",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -113,7 +113,7 @@
           },
           {
             "id": "provenance-env-vars.ac2",
-            "title": "spawnRun sets OVERDECK_FLYWHEEL_AGENT_ROLE to the role string passed to it (work|plan|review|test|ship|flywheel)",
+            "title": "spawnRun sets PANOPTICON_FLYWHEEL_AGENT_ROLE to the role string passed to it (work|plan|review|test|ship|flywheel)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -163,7 +163,7 @@
           ]
         },
         "narrative": {
-          "Action": "Create scripts/hooks/gh-issue-trailer-hook.ts (compiled to bin/) that reads Claude Code PreToolUse JSON payload from stdin. If tool_name=='Bash' and the command is `gh issue create` (recognize flags --title/--body/--body-file), parse out the body, append '\\n\\n---\\nFlywheel-Run-Id: <OVERDECK_FLYWHEEL_RUN_ID>\\nFlywheel-Filed-By: <agent|operator>\\nFlywheel-Discovered-In: <OVERDECK_AGENT_ID's issueId>\\n' to it, and emit modifiedToolInput JSON. Filed-By=agent ONLY when OVERDECK_FLYWHEEL_AGENT_ROLE=='flywheel'; everything else → operator. Install via pan admin hooks install (existing infra)."
+          "Action": "Create scripts/hooks/gh-issue-trailer-hook.ts (compiled to bin/) that reads Claude Code PreToolUse JSON payload from stdin. If tool_name=='Bash' and the command is `gh issue create` (recognize flags --title/--body/--body-file), parse out the body, append '\\n\\n---\\nFlywheel-Run-Id: <PANOPTICON_FLYWHEEL_RUN_ID>\\nFlywheel-Filed-By: <agent|operator>\\nFlywheel-Discovered-In: <PANOPTICON_AGENT_ID's issueId>\\n' to it, and emit modifiedToolInput JSON. Filed-By=agent ONLY when PANOPTICON_FLYWHEEL_AGENT_ROLE=='flywheel'; everything else → operator. Install via pan admin hooks install (existing infra)."
         },
         "subItems": [
           {
@@ -192,7 +192,7 @@
           },
           {
             "id": "provenance-hook-script.ac4",
-            "title": "OVERDECK_FLYWHEEL_AGENT_ROLE=='flywheel' produces Filed-By: agent; any other role (or unset) produces Filed-By: operator",
+            "title": "PANOPTICON_FLYWHEEL_AGENT_ROLE=='flywheel' produces Filed-By: agent; any other role (or unset) produces Filed-By: operator",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -200,7 +200,7 @@
           },
           {
             "id": "provenance-hook-script.ac5",
-            "title": "Discovered-In resolves from OVERDECK_AGENT_ID's state.json issueId field; if unresolvable, line is omitted (not left blank)",
+            "title": "Discovered-In resolves from PANOPTICON_AGENT_ID's state.json issueId field; if unresolvable, line is omitted (not left blank)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -277,7 +277,7 @@
       },
       {
         "id": "events-substrate-bug-filed",
-        "title": "Add SubstrateBugFiledEvent to @overdeck/contracts DomainEvent union",
+        "title": "Add SubstrateBugFiledEvent to @panctl/contracts DomainEvent union",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T08:45:00.000Z",
@@ -320,7 +320,7 @@
       },
       {
         "id": "events-operator-intervention",
-        "title": "Add OperatorInterventionEvent to @overdeck/contracts DomainEvent union",
+        "title": "Add OperatorInterventionEvent to @panctl/contracts DomainEvent union",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-25T08:45:00.000Z",
@@ -1142,7 +1142,7 @@
       },
       {
         "id": "stats-contracts",
-        "title": "Add FlywheelStats schema to @overdeck/contracts",
+        "title": "Add FlywheelStats schema to @panctl/contracts",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-25T08:45:00.000Z",
@@ -1547,7 +1547,7 @@
           "foundationFor": []
         },
         "narrative": {
-          "Action": "Add an integration test (Vitest + a Playwright check) that: (1) simulates a Flywheel-orchestrator agent invoking `gh issue create` with OVERDECK_FLYWHEEL_RUN_ID set — verifies trailer block is appended; (2) drives the substrate-bug poller against a fixture GitHub response containing the trailer — verifies the row appears in flywheel_substrate_bugs and SubstrateBugFiledEvent is emitted; (3) calls /api/flywheel/stats — verifies criterion 1 (bug-rate) value reflects the inserted bug; (4) Playwright opens FlywheelPage Stats tab in an isolated browser instance and asserts the criterion card renders the new value."
+          "Action": "Add an integration test (Vitest + a Playwright check) that: (1) simulates a Flywheel-orchestrator agent invoking `gh issue create` with PANOPTICON_FLYWHEEL_RUN_ID set — verifies trailer block is appended; (2) drives the substrate-bug poller against a fixture GitHub response containing the trailer — verifies the row appears in flywheel_substrate_bugs and SubstrateBugFiledEvent is emitted; (3) calls /api/flywheel/stats — verifies criterion 1 (bug-rate) value reflects the inserted bug; (4) Playwright opens FlywheelPage Stats tab in an isolated browser instance and asserts the criterion card renders the new value."
         },
         "subItems": [
           {
@@ -1576,7 +1576,7 @@
           },
           {
             "id": "e2e-acceptance.ac4",
-            "title": "Provenance flows correctly: trailer says Filed-By=agent only because OVERDECK_FLYWHEEL_AGENT_ROLE=flywheel was set",
+            "title": "Provenance flows correctly: trailer says Filed-By=agent only because PANOPTICON_FLYWHEEL_AGENT_ROLE=flywheel was set",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
