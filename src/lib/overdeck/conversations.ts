@@ -1171,6 +1171,16 @@ export function markConversationEnded(name: string): void {
     .run(Date.now(), name);
 }
 
+// PAN-1972: resurrect a conversation the liveness poller previously latched to
+// 'ended'. tmux is the liveness oracle — when a session + harness are observed
+// alive, the row must read 'active'. The `status != 'active'` guard makes this a
+// true no-op (no needless write) when the row is already correct.
+export function markConversationRunning(name: string): void {
+  overdeckDb()
+    .prepare(`UPDATE conversations SET status = 'active', ended_at = NULL WHERE name = ? AND status != 'active'`)
+    .run(name);
+}
+
 export function markConversationActive(name: string): void {
   overdeckDb().prepare(`UPDATE conversations SET archived_at = NULL WHERE name = ?`).run(name);
 }

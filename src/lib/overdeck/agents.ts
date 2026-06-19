@@ -145,6 +145,19 @@ export class InvalidModel extends Schema.TaggedErrorClass<InvalidModel>()(
 const decodeAgent = Schema.decodeUnknownSync(Agent);
 const decodeHealthEvent = Schema.decodeUnknownSync(HealthEvent);
 
+// `consecutive_failures` is a nullable DB column — `.default(0)` only fires on an
+// omitted-insert, not an explicit null, so rows written through other paths (e.g.
+// planning-* state sync) legitimately carry null. A null failure count means "no
+// failures recorded" = 0; normalize it here so the strict `Schema.Number` entity
+// type stays valid and every consumer keeps a number (e.g. `consecutiveFailures + 1`
+// in recordFailure). A null row otherwise crashed the dashboard boot decode (PAN-1972).
+const decodeAgentRow = (row: unknown): Agent =>
+  decodeAgent(
+    row && typeof row === 'object' && (row as { consecutiveFailures?: unknown }).consecutiveFailures == null
+      ? { ...(row as object), consecutiveFailures: 0 }
+      : row,
+  );
+
 const validateModel = (model: string): Effect.Effect<string, InvalidModel> =>
   model.trim().length > 0
     ? Effect.succeed(model.trim())
@@ -174,7 +187,7 @@ export const AgentsResolverLive = Layer.effect(
         if (!row) {
           return yield* Effect.fail(new AgentNotFound({ id }));
         }
-        return decodeAgent(row);
+        return decodeAgentRow(row);
       });
 
     const list = (f: AgentFilter) =>
@@ -191,7 +204,7 @@ export const AgentsResolverLive = Layer.effect(
             : db.q.select().from(overdeckAgents),
         );
 
-        return rows.map((r) => decodeAgent(r));
+        return rows.map((r) => decodeAgentRow(r));
       });
 
     const isAlive = (id: AgentId) => tmux.sessionExists(id);
@@ -841,13 +854,23 @@ export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): Backfil
         markedStopped++;
       }
 
-      const row = agentStateToOverdeckRow(state);
-      ensureIssue.run(row[issueIdIdx], Date.now());
-      upsert.run(...row);
-      processed++;
-
-      if (options?.verbose) {
-        console.log(`[backfill] ${state.id} -> ${state.status}`);
+      // Per-row resilience (PAN-1972): the disposable agents cache is rebuilt
+      // from N agent state.json files. A single unreconstructable row — e.g. an
+      // incomplete state.json that violates a NOT NULL column such as `harness`
+      // (observed on an `inspect-*` agent whose state lacked a harness) — must NOT
+      // abort the whole transaction and crash the dashboard boot. Skip + log the
+      // bad row; it self-heals on the next reconstruct once its state is complete.
+      try {
+        const row = agentStateToOverdeckRow(state);
+        ensureIssue.run(row[issueIdIdx], Date.now());
+        upsert.run(...row);
+        processed++;
+        if (options?.verbose) {
+          console.log(`[backfill] ${state.id} -> ${state.status}`);
+        }
+      } catch (err) {
+        skipped++;
+        console.warn(`[backfill] Skipped agent ${state.id}: ${(err as Error).message}`);
       }
     }
   });

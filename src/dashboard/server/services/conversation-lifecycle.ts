@@ -26,6 +26,7 @@ import {
   getConversationByName,
   listActiveConversations,
   markConversationEnded,
+  markConversationRunning,
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
@@ -85,7 +86,20 @@ export async function pollConversations(): Promise<void> {
       // dashboard stops showing a dead conversation as active and resume
       // respawns it. PAN-1638.
       const harnessGone = !sessionGone && !(await isHarnessProcessAlive(conv.tmuxSession));
-      if (!sessionGone && !harnessGone) continue;
+      if (!sessionGone && !harnessGone) {
+        // PAN-1972: the poller used to be one-directional — it only ever marked
+        // conversations 'ended'. A transient blip (a dashboard restart that
+        // recreated the tmux session, or a momentary harness-process gap during a
+        // resume) would latch a still-live conversation to 'ended' forever, so the
+        // UI showed a gray dot + "Resume Session" on a conversation in active use.
+        // tmux is the liveness oracle: a conversation whose session AND harness are
+        // both alive must read 'active'. Resurrect it. Idempotent when already active.
+        if (conv.status === 'ended') {
+          console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} alive but row marked ended — resurrecting to active`);
+          markConversationRunning(conv.name);
+        }
+        continue;
+      }
       // Re-validate at mark time, not poll-start time. A resume can land
       // between the snapshot above and here (kill → spawn → ready), making the
       // verdict stale: marking then flips a just-revived conversation to
