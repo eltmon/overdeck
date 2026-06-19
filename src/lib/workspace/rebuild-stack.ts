@@ -92,6 +92,25 @@ const dockerCompose = (args: string[], cwd: string): Effect.Effect<void, Error> 
     catch: (err) => (err instanceof Error ? err : new Error(String(err))),
   });
 
+/**
+ * PAN-1618: the workspace compose declares an external bridge network (`overdeck`)
+ * so workspace containers share a network with the host stack. It is created by
+ * `pan install`, but a host installed under the old `panopticon` name — or any
+ * host whose install pre-dated the Panopticon→Overdeck network rename — won't have
+ * it, and `docker compose up` then fails with "network overdeck declared as
+ * external, but could not be found", silently blocking work-agent (auto-)start.
+ * Ensure it idempotently right before bringing the stack up. `docker network
+ * create` errors when the network already exists (the common case) — swallow that.
+ */
+const EXTERNAL_WORKSPACE_NETWORK = 'overdeck';
+
+const ensureExternalNetwork = (): Effect.Effect<void> =>
+  Effect.promise(() =>
+    execFileAsync('docker', ['network', 'create', EXTERNAL_WORKSPACE_NETWORK], { timeout: 30_000 })
+      .then(() => undefined)
+      .catch(() => undefined),
+  );
+
 export interface RebuildWorkspaceStackOptions {
   /** Progress callback for each rebuild phase. Optional. */
   onProgress?: (message: string) => void;
@@ -175,6 +194,8 @@ export const rebuildWorkspaceStack = (
       } satisfies RebuildWorkspaceStackResult;
     }
 
+    progress('Ensuring shared docker network...');
+    yield* ensureExternalNetwork();
     progress('Starting workspace stack...');
     yield* dockerCompose(
       ['-f', composeFile, '-p', composeProjectName, 'up', '-d', '--build'],
