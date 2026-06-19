@@ -4,17 +4,17 @@
     "created": "2026-06-19T18:06:55.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1971: New-user: omnibox Claude/Codex launches open in terminal view (onboarding dialog visible)",
-    "updated": "2026-06-19T18:12:09.638Z"
+    "updated": "2026-06-19T18:34:35.442Z"
   },
   "plan": {
     "id": "pan-1971",
     "title": "New-user: omnibox Claude/Codex launches open in terminal view (onboarding dialog visible)",
-    "status": "proposed",
+    "status": "running",
     "uid": "2ace2773-c328-4fcd-adb6-75ec4f410b62",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-19T18:06:55.000Z",
-    "updated": "2026-06-19T18:12:09.638Z",
+    "updated": "2026-06-19T18:34:35.442Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1971",
@@ -171,5 +171,5 @@
       "canonicalFilename": "2026-06-19-PAN-1971-new-user-omnibox-claude-codex-launches-open-in-terminal-view-onboarding-dialog-visible.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
