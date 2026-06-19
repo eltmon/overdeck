@@ -44,6 +44,7 @@ const ROLE_ACCENTS = {
   flywheel: 'var(--primary)',
   // Strike: bright orange — distinct from work blue, review amber, ship purple.
   strike: '#ff6a00',
+  sequencer: 'var(--primary)',
 } satisfies Record<AgentCardRole, string>;
 
 function AgentCard({
