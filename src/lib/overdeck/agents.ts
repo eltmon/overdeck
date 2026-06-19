@@ -762,7 +762,7 @@ function listLiveTmuxSessionNamesSync(): Set<string> {
   }
 }
 
-const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike']);
+const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer']);
 
 function parseAgentStateJsonSync(content: string, fallbackId: string): AgentState | null {
   let parsed: Partial<AgentState>;
