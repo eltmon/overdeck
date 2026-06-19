@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactFlow, {
   type Node,
   type Edge,
@@ -35,7 +35,7 @@ interface SequenceEdge {
   type: string;
 }
 
-interface SequenceResponse {
+export interface SequenceResponse {
   nodes: SequenceNode[];
   edges: SequenceEdge[];
 }
@@ -60,6 +60,14 @@ const IMPORTANCE_BORDER: Record<string, string> = {
   high:     '#f97316',
   medium:   '#6b7280',
   low:      '#374151',
+};
+
+// ── Condition styling ──
+
+const CONDITION_STYLE: Record<string, { color: string; label: string }> = {
+  'ok':                { color: '#22c55e', label: '' },
+  'needs-refinement':  { color: '#f59e0b', label: '⚠ REFINE' },
+  'stale':             { color: '#6b7280', label: '⊘ STALE' },
 };
 
 // ── dagre layout ──
@@ -93,6 +101,8 @@ function IssueNode({ data }: { data: IssueNodeData }) {
   const dims = sizeDims(node.size);
   const borderLeft = IMPORTANCE_BORDER[node.importance] ?? IMPORTANCE_BORDER['medium'];
   const isInPipeline = node.inPipeline;
+  const isStale = node.condition === 'stale';
+  const cond = CONDITION_STYLE[node.condition];
 
   return (
     <div
@@ -114,6 +124,8 @@ function IssueNode({ data }: { data: IssueNodeData }) {
         justifyContent: 'space-between',
         overflow: 'hidden',
         boxSizing: 'border-box',
+        opacity: isStale ? 0.55 : 1,
+        textDecoration: isStale ? 'line-through' : undefined,
       }}
     >
       {/* Top row: rank badge + issueId */}
@@ -152,12 +164,17 @@ function IssueNode({ data }: { data: IssueNodeData }) {
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
         {node.gate === 'ready' && (
           <span style={{ fontSize: 8, background: '#14532d', color: '#86efac', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
-            ✓ READY
+            📌 PROMOTED
           </span>
         )}
         {node.gate === 'blocked' && (
           <span style={{ fontSize: 8, background: '#450a0a', color: '#fca5a5', borderRadius: 3, padding: '1px 4px', fontWeight: 600 }}>
-            BLOCKED
+            ⛔ HELD
+          </span>
+        )}
+        {cond?.label && (
+          <span style={{ fontSize: 8, borderRadius: 3, padding: '1px 4px', fontWeight: 600, color: cond.color, background: '#1f2937', border: `1px solid ${cond.color}44` }}>
+            {cond.label}
           </span>
         )}
         <span style={{ fontSize: 8, background: '#1f2937', color: '#6b7280', borderRadius: 3, padding: '1px 4px' }}>
@@ -206,7 +223,75 @@ function sequenceToFlow(
 
 // ── Side panel ──
 
-function RationaleSidePanel({ node, onClose }: { node: SequenceNode; onClose: () => void }) {
+function SegControl({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: Array<{ value: string; label: string; activeColor?: string }>;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', border: '1px solid #374151' }}>
+      {options.map((opt) => {
+        const isActive = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            style={{
+              flex: 1,
+              padding: '3px 6px',
+              fontSize: 9,
+              fontWeight: isActive ? 700 : 400,
+              border: 'none',
+              cursor: 'pointer',
+              background: isActive ? (opt.activeColor ?? '#3b82f6') : '#1f2937',
+              color: isActive ? '#fff' : '#6b7280',
+              transition: 'all 0.15s',
+            }}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function RationaleSidePanel({
+  node,
+  onClose,
+  onGateChange,
+  onPlanningChange,
+}: {
+  node: SequenceNode;
+  onClose: () => void;
+  onGateChange: (issueId: string, gate: string) => Promise<void>;
+  onPlanningChange: (issueId: string, planning: string) => Promise<void>;
+}) {
+  const [gate, setGate] = useState(node.gate);
+  const [planning, setPlanning] = useState(node.planning);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setGate(node.gate);
+    setPlanning(node.planning);
+  }, [node.issueId, node.gate, node.planning]);
+
+  async function handleGateChange(v: string) {
+    setGate(v);
+    setBusy(true);
+    try { await onGateChange(node.issueId, v); } finally { setBusy(false); }
+  }
+
+  async function handlePlanningChange(v: string) {
+    setPlanning(v);
+    setBusy(true);
+    try { await onPlanningChange(node.issueId, v); } finally { setBusy(false); }
+  }
+
   return (
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0, width: 300,
@@ -225,35 +310,65 @@ function RationaleSidePanel({ node, onClose }: { node: SequenceNode; onClose: ()
           ×
         </button>
       </div>
+
+      {/* Why */}
       <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5 }}>
         <div style={{ fontWeight: 600, color: '#d1d5db', marginBottom: 4 }}>Why ranked #{node.rank}</div>
         {node.why}
       </div>
+
+      {/* Rationale */}
       {node.rationale && (
         <div style={{ fontSize: 10, color: '#9ca3af', lineHeight: 1.5, borderTop: '1px solid #374151', paddingTop: 8 }}>
           <div style={{ fontWeight: 600, color: '#d1d5db', marginBottom: 4 }}>Rationale</div>
           {node.rationale}
         </div>
       )}
+
+      {/* Gate control */}
+      <div style={{ borderTop: '1px solid #374151', paddingTop: 8 }}>
+        <div style={{ fontSize: 9, color: '#6b7280', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Pickup Gate {busy && '…'}
+        </div>
+        <SegControl
+          value={gate}
+          options={[
+            { value: 'auto', label: 'Auto' },
+            { value: 'ready', label: '📌 Promote', activeColor: '#15803d' },
+            { value: 'blocked', label: '⛔ Hold', activeColor: '#b91c1c' },
+          ]}
+          onChange={handleGateChange}
+        />
+      </div>
+
+      {/* Planning policy control */}
+      <div>
+        <div style={{ fontSize: 9, color: '#6b7280', fontWeight: 600, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Planning Policy
+        </div>
+        <SegControl
+          value={planning}
+          options={[
+            { value: 'skip', label: 'Skip' },
+            { value: 'auto', label: 'Auto' },
+            { value: 'interactive', label: 'Interactive' },
+          ]}
+          onChange={handlePlanningChange}
+        />
+      </div>
+
+      {/* Meta */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', borderTop: '1px solid #374151', paddingTop: 8 }}>
-        <span style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
-          size: {node.size}
-        </span>
-        <span style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
-          importance: {node.importance}
-        </span>
-        <span style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
-          score: {node.score}
-        </span>
-        <span style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
-          condition: {node.condition}
-        </span>
-        <span style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
-          gate: {node.gate}
-        </span>
-        <span style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
-          planning: {node.planning}
-        </span>
+        {[
+          ['size', node.size],
+          ['importance', node.importance],
+          ['score', String(node.score)],
+          ['condition', node.condition],
+        ].map(([k, v]) => (
+          <span key={k} style={{ fontSize: 9, background: '#374151', color: '#9ca3af', borderRadius: 3, padding: '2px 5px' }}>
+            {k}: {v}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -267,6 +382,7 @@ interface BacklogDAGProps {
 }
 
 export function BacklogDAG({ data, className }: BacklogDAGProps) {
+  const queryClient = useQueryClient();
   const [selectedNode, setSelectedNode] = useState<SequenceNode | null>(null);
 
   const handleSelect = useCallback((n: SequenceNode) => {
@@ -285,7 +401,30 @@ export function BacklogDAG({ data, className }: BacklogDAGProps) {
     const { nodes: updated, edges: updatedEdges } = sequenceToFlow(data.nodes, data.edges, handleSelect);
     setNodes(updated);
     setEdges(updatedEdges);
-  }, [data.nodes, data.edges, handleSelect, setNodes, setEdges]);
+    // Keep selected node in sync with updated data
+    if (selectedNode) {
+      const updated = data.nodes.find((n) => n.issueId === selectedNode.issueId);
+      if (updated) setSelectedNode(updated);
+    }
+  }, [data.nodes, data.edges, handleSelect, setNodes, setEdges, selectedNode]);
+
+  async function handleGateChange(issueId: string, gate: string) {
+    await fetch('/api/backlog/sequence/gate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueId, gate }),
+    });
+    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
+  }
+
+  async function handlePlanningChange(issueId: string, planning: string) {
+    await fetch('/api/backlog/sequence/planning', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueId, planning }),
+    });
+    queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
+  }
 
   return (
     <div
@@ -315,7 +454,12 @@ export function BacklogDAG({ data, className }: BacklogDAGProps) {
         <Controls style={{ background: '#1f2937', border: '1px solid #374151' }} />
       </ReactFlow>
       {selectedNode && (
-        <RationaleSidePanel node={selectedNode} onClose={() => setSelectedNode(null)} />
+        <RationaleSidePanel
+          node={selectedNode}
+          onClose={() => setSelectedNode(null)}
+          onGateChange={handleGateChange}
+          onPlanningChange={handlePlanningChange}
+        />
       )}
     </div>
   );
