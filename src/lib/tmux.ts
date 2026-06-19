@@ -202,6 +202,47 @@ function warnIfServerCmdlineIsDirtySync(): void {
 }
 
 /**
+ * PAN-1798: a tmux server founded implicitly by a client `new-session` (e.g. a
+ * Playwright UAT, or any ad-hoc spawn that beats the managed founding to the
+ * socket) captures that founding process's environment as the server's GLOBAL
+ * environment. Every subsequent `new-session` inherits it — so a stray test's
+ * `HOME=/tmp/pan-playwright-...` leaks into real conversation/agent sessions and
+ * breaks Claude/Codex auth: they read a fresh `~/.claude.json` under the wrong
+ * HOME and drop into the onboarding/login screen.
+ *
+ * Detecting this and only warning (the old behaviour) left the poison in place.
+ * Since `ensureOverdeckTmuxServer*` runs before every `new-session`, overwrite the
+ * critical vars in the server's global environment with the clean child env so new
+ * sessions are always spawned with the correct HOME/OVERDECK_HOME — even on a
+ * dirtily-founded server — and strip known test pollution. Non-destructive: existing
+ * sessions keep their captured env; only future sessions change.
+ */
+function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
+  const sock = getManagedTmuxSocketName();
+  // Pin the vars that, if wrong, break agent auth / overdeck-home resolution.
+  for (const key of ['HOME', 'OVERDECK_HOME'] as const) {
+    const value = cleanEnv[key];
+    if (!value) continue;
+    try {
+      execFileSync('tmux', ['-L', sock, 'set-environment', '-g', key, value], { stdio: 'ignore' });
+    } catch {
+      // tmux momentarily unavailable; the next createSession preflight retries.
+    }
+  }
+  // Strip test-only pollution that must never reach a real session.
+  for (const key of ['OVERDECK_FRONTEND_DIR', 'OVERDECK_TEST_HOME_ROOT', 'OVERDECK_TEST_POLL_MS']) {
+    try {
+      execFileSync('tmux', ['-L', sock, 'set-environment', '-g', '-u', key], { stdio: 'ignore' });
+    } catch {
+      // best-effort.
+    }
+  }
+}
+
+/** PAN-1798: surface the dirty-founding teardown hazard once per process, not per spawn. */
+let warnedManagedServerDirty = false;
+
+/**
  * PAN-1798: ensure the shared tmux server is running in a dedicated, long-lived
  * systemd user service — never inside an agent/conversation spawn scope. The
  * service is created on demand; once running it outlives every client on the
@@ -223,8 +264,15 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
   }
 
   if (isManagedServerAliveSync()) {
-    warnIfServerInTmuxSpawnScopeSync();
-    warnIfServerCmdlineIsDirtySync();
+    // PAN-1798: repair a poisoned global environment so new sessions spawn clean,
+    // even on a server founded by a stray client `new-session`.
+    sanitizeManagedServerGlobalEnvSync(cleanEnv);
+    // Surface the dirty-founding teardown hazard once per process (not per spawn).
+    if (!warnedManagedServerDirty) {
+      warnIfServerInTmuxSpawnScopeSync();
+      warnIfServerCmdlineIsDirtySync();
+      warnedManagedServerDirty = true;
+    }
     return;
   }
 
