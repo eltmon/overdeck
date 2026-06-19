@@ -1138,7 +1138,7 @@ const getAgentHealthHistoryRoute = HttpRouter.add(
     const urlOpt = HttpServerRequest.toURL(request);
     const hours = Option.isSome(urlOpt) ? (urlOpt.value.searchParams.get('hours') ?? '24') : '24';
 
-    const { getHealthHistory } = yield* Effect.promise(() => import('../../../lib/database/health-events-db.js'));
+    const { getHealthHistory } = yield* Effect.promise(() => import('../../../lib/overdeck/health-events.js'));
     const endTime = new Date();
     const startTime = new Date(endTime.getTime() - parseInt(hours) * 60 * 60 * 1000);
     const events = getHealthHistory(id, startTime.toISOString(), endTime.toISOString());

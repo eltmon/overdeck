@@ -1637,7 +1637,6 @@ export class CloisterService {
           agentId: health.agentId,
           timestamp: new Date().toISOString(),
           state: currentState,
-          previousState: previousState,
           source,
           metadata: health.heartbeat
             ? JSON.stringify({

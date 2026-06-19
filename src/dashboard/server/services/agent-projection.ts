@@ -95,7 +95,7 @@ export function saveAgentStateAndEmitEventWithDeps(
 
   const record = event as Record<string, unknown>;
   const timestamp = (record['timestamp'] as string) ?? new Date().toISOString();
-  const timestampSecs = Math.floor(new Date(timestamp).getTime() / 1000);
+  const timestampMs = new Date(timestamp).getTime();
   const payload = JSON.stringify(record['payload'] ?? {});
   const updatedAt = Date.now();
 
@@ -111,10 +111,11 @@ export function saveAgentStateAndEmitEventWithDeps(
       `INSERT OR REPLACE INTO agents (${AGENT_COLUMNS_FOR_DB.join(', ')}) VALUES (${AGENT_COLUMNS_FOR_DB.map(() => '?').join(', ')})`,
     ).run(...stateToOverdeckParamsForDb(state, updatedAt));
 
-    // Append the event. overdeck events.timestamp is integer unix seconds.
+    // Append the event. overdeck events.timestamp is integer unix milliseconds
+    // (schema: integer(timestamp_ms); event-store decodes via new Date(row.timestamp)).
     db.prepare(
       `INSERT INTO events (type, timestamp, payload) VALUES (?, ?, ?)`,
-    ).run(event.type, timestampSecs, payload);
+    ).run(event.type, timestampMs, payload);
 
     const row = db.prepare(`SELECT last_insert_rowid() AS sequence`).get() as
       | { sequence: number }

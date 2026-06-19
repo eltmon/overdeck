@@ -603,9 +603,9 @@ function makeInsertResetMarkerStatement(marker: ResetMarker): FtsStatement {
     params: [
       marker.scope,
       marker.scopeId,
-      new Date(marker.fromTimestamp).getTime(),
+      marker.fromTimestamp,
       marker.reason,
-      new Date(marker.createdAt).getTime(),
+      marker.createdAt,
     ],
   }
 }

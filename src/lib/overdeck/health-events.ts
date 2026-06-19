@@ -22,7 +22,6 @@ export interface HealthEvent {
   agentId: string;
   timestamp: string; // ISO-8601
   state: HealthState;
-  previousState?: string;
   source?: string;
   metadata?: string;
 }
@@ -102,4 +101,40 @@ export function getLatestHealthEvent(agentId: string): HealthEventWithMetadata |
     metadata: row.metadata ?? undefined,
   };
   return parseMetadata(event);
+}
+
+/**
+ * Drop-in for getHealthHistory() from the legacy database/health-events-db.ts —
+ * reads overdeck.db (the single source of truth). Accepts ISO start/end (the
+ * route passes ISO), converts to the INTEGER-ms column, and returns events with
+ * ISO timestamps ascending. PAN-1979 Bug 1: the route used to import the legacy
+ * panopticon.db module here, so the chart was always empty.
+ */
+export function getHealthHistory(
+  agentId: string,
+  startTime: string,
+  endTime: string,
+): HealthEventWithMetadata[] {
+  const db = getOverdeckDatabaseSync();
+  const rows = db.prepare(`
+    SELECT id, agent_id, timestamp, state, source, metadata
+    FROM health_events
+    WHERE agent_id = ? AND timestamp >= ? AND timestamp <= ?
+    ORDER BY timestamp ASC
+  `).all(agentId, toMs(startTime), toMs(endTime)) as Array<{
+    id: number;
+    agent_id: string;
+    timestamp: number | null;
+    state: string;
+    source: string | null;
+    metadata: string | null;
+  }>;
+  return rows.map((row) => parseMetadata({
+    id: row.id,
+    agentId: row.agent_id,
+    timestamp: fromMs(row.timestamp) ?? new Date().toISOString(),
+    state: row.state as HealthState,
+    source: row.source ?? undefined,
+    metadata: row.metadata ?? undefined,
+  }));
 }
