@@ -338,7 +338,15 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
   }, [agentByIssueId, filter, issues, reviewStatusByIssueId]);
 
   const metricTiles = useMemo(() => {
-    const activeIssues = issues.filter((issue) => !isClosedIssue(issue)).length;
+    const activeIssues = issues.filter((issue) => {
+      if (isClosedIssue(issue)) return false;
+      // Active issues = the pipeline set (the rendered lanes), NOT all open
+      // issues — raw backlog ('todo') is excluded so the header matches the
+      // Definition-of-Ready lanes below (PAN-1966).
+      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
+      const reviewStatus = reviewStatusForIssue(reviewStatusByIssueId, issue);
+      return getPipelineIssuePhase(issue, reviewStatus, agent) !== 'todo';
+    }).length;
     const workRunning = agents.filter((agent) => agent.role === 'work' && isRunningAgent(agent)).length;
     const reviewIssueIds = new Set<string>();
 
@@ -370,7 +378,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
       { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready to merge', icon: <MetricIcon label="↑" />, signal: 'success' as const },
       { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },
     ];
-  }, [agents, eventsByIssue, issues, reviewStatusByIssueId]);
+  }, [agents, agentByIssueId, eventsByIssue, issues, reviewStatusByIssueId]);
 
   const visiblePhases = filter.phase === 'all' ? PHASES : [filter.phase];
 
