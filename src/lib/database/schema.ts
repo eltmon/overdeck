@@ -21,7 +21,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 56;
+export const SCHEMA_VERSION = 57;
 
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
@@ -705,6 +705,29 @@ export function initSchema(db: SqliteDatabase): void {
   `);
 
   initDiscoveredSessionsSchema(db);
+
+  db.exec(`
+    -- ===== Backlog Sequence Cache (PAN-1866) =====
+    CREATE TABLE IF NOT EXISTS backlog_sequence (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_key  TEXT    NOT NULL,
+      issue_id     TEXT    NOT NULL,
+      rank         INTEGER NOT NULL,
+      size         TEXT    NOT NULL,
+      importance   TEXT    NOT NULL,
+      score        REAL    NOT NULL,
+      condition    TEXT    NOT NULL,
+      depends_on   TEXT    NOT NULL DEFAULT '[]',
+      why          TEXT    NOT NULL,
+      gate         TEXT    NOT NULL DEFAULT 'auto',
+      planning     TEXT    NOT NULL DEFAULT 'auto',
+      generated_at TEXT    NOT NULL,
+      UNIQUE(project_key, issue_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_backlog_sequence_project_rank
+      ON backlog_sequence(project_key, rank);
+  `);
 
   // Record schema version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -1597,6 +1620,30 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v55 → v56: projection_cache table is dead after PAN-1920 / PAN-1847
   if (currentVersion < 56) {
     db.exec(`DROP TABLE IF EXISTS projection_cache`);
+  }
+
+  // v56 → v57: backlog_sequence disposable cache table (PAN-1866)
+  if (currentVersion < 57) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS backlog_sequence (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_key  TEXT    NOT NULL,
+        issue_id     TEXT    NOT NULL,
+        rank         INTEGER NOT NULL,
+        size         TEXT    NOT NULL,
+        importance   TEXT    NOT NULL,
+        score        REAL    NOT NULL,
+        condition    TEXT    NOT NULL,
+        depends_on   TEXT    NOT NULL DEFAULT '[]',
+        why          TEXT    NOT NULL,
+        gate         TEXT    NOT NULL DEFAULT 'auto',
+        planning     TEXT    NOT NULL DEFAULT 'auto',
+        generated_at TEXT    NOT NULL,
+        UNIQUE(project_key, issue_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_backlog_sequence_project_rank
+        ON backlog_sequence(project_key, rank);
+    `);
   }
 
   // After all migrations, set the version
