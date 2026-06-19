@@ -97,16 +97,16 @@
   ],
   "feedback": [],
   "created": "2026-06-19T17:59:04.545Z",
-  "updated": "2026-06-19T19:24:01.073Z",
+  "updated": "2026-06-19T19:24:55.585Z",
   "pipeline": {
     "issueId": "PAN-1970",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-19T19:16:28.864Z",
+    "updatedAt": "2026-06-19T19:24:55.570Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (1052ms):\n\n).pipe(\nsrc/lib/pan-dir/continue.ts:129:      Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/continue.ts:131:    yield* fs.rename(tmp, continuePath).pipe(\nsrc/lib/pan-dir/continues.ts:53:    yield* fs.writeFileString(path, content).pipe(\nsrc/lib/pan-dir/continues.ts:54:      Effect.mapError((cause) => new FsError({ path, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/continues.ts:98:        .rename(path, join(deletedDir, `${issueId.toLowerCase()}-${Date.now()}.vbrief.json`))\nsrc/lib/pan-dir/feedback.ts:47:    yield* fs.writeFileString(path, content).pipe(\nsrc/lib/pan-dir/feedback.ts:48:      Effect.mapError((cause) => new FsError({ path, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/sessions.ts:25:      yield* fs.writeFileString(sessionsPath, current + line).pipe(\nsrc/lib/pan-dir/sessions.ts:26:        Effect.mapError((cause) => new FsError({ path: sessionsPath, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/sessions.ts:29:      yield* fs.writeFileString(sessionsPath, line).pipe(\nsrc/lib/pan-dir/sessions.ts:30:        Effect.mapError((cause) => new FsError({ path: sessionsPath, operation: 'writeFileString', cause })),\n\n> @overdeck/cli@0.21.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✗ overdeck boundary gate: 3 site(s) across 2 file(s) still on the OLD panopticon.db\n\nsrc/cli/index.ts:1030:      console.log(chalk.yellow('  [--seed-from-legacy] overdeck.db will be seeded from the legacy database (conversations + in-flight state)'));\nsrc/cli/index.ts:610:  .option('--seed-from-legacy', 'Seed a fresh overdeck.db from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty overdeck.db.')\nsrc/dashboard/server/read-model.ts:557:        `[ReadModel] Bootstrapped from overdeck.db: ` +\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n",
     "inspectNotes": "Inspection error for bead workspace-lvoqt: tmux session inspect-pan-1970-workspace-lvoqt exited before producing a verdict. No verdict was produced.",
@@ -125,10 +125,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 232,
-            "output": 74408,
-            "cacheRead": 29325279,
-            "cacheWrite": 368136
+            "input": 250,
+            "output": 81243,
+            "cacheRead": 30356622,
+            "cacheWrite": 435400
           }
         }
       },
@@ -140,15 +140,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 232,
-          "output": 74408,
-          "cacheRead": 29325279,
-          "cacheWrite": 368136
+          "input": 250,
+          "output": 81243,
+          "cacheRead": 30356622,
+          "cacheWrite": 435400
         }
       },
       "costAtCloseOut": {
-        "usd": 11.441215,
-        "pricingAsOf": "2026-06-19T19:16:28.875Z"
+        "usd": 12.105437,
+        "pricingAsOf": "2026-06-19T19:24:55.585Z"
       }
     },
     "merges": [
