@@ -3,8 +3,7 @@
     "version": "0.6",
     "created": "2026-06-19T18:54:56Z",
     "author": "overdeck/0.0.0",
-    "description": "Plan for PAN-1866: Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth",
-    "updated": "2026-06-19T19:07:26.096Z"
+    "description": "Plan for PAN-1866: Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth"
   },
   "plan": {
     "id": "pan-1866",
@@ -12,9 +11,9 @@
     "status": "proposed",
     "uid": "4483025a-1769-4581-bdc1-c29887190926",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 1,
     "created": "2026-06-19T18:54:56Z",
-    "updated": "2026-06-19T19:07:26.096Z",
+    "updated": "2026-06-19T18:54:56Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1866",
@@ -1100,10 +1099,7 @@
         "to": "backlog-operator-gate-ui",
         "type": "blocks"
       }
-    ],
-    "metadata": {
-      "canonicalFilename": "2026-06-19-PAN-1866-backlog-sequencer-ai-ranked-whole-backlog-dag-with-a-reproducible-markdown-source-of-truth.vbrief.json"
-    }
+    ]
   },
   "status": "proposed"
 }
