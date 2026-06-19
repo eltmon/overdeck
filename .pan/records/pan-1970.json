@@ -97,7 +97,7 @@
   ],
   "feedback": [],
   "created": "2026-06-19T17:59:04.545Z",
-  "updated": "2026-06-19T20:04:21.664Z",
+  "updated": "2026-06-19T20:11:19.830Z",
   "pipeline": {
     "issueId": "PAN-1970",
     "reviewStatus": "pending",
@@ -181,6 +181,23 @@
     "register-core.ac2": "completed",
     "register-core.ac3": "completed",
     "register-core.ac4": "completed",
-    "register-core.ac5": "completed"
+    "register-core.ac5": "completed",
+    "wire-new-project": "completed",
+    "wire-new-project.ac1": "completed",
+    "wire-new-project.ac2": "completed",
+    "wire-new-project.ac3": "completed",
+    "wire-new-project.ac4": "completed",
+    "new-project-modal": "completed",
+    "new-project-modal.ac1": "completed",
+    "new-project-modal.ac2": "completed",
+    "new-project-modal.ac3": "completed",
+    "new-project-modal.ac4": "completed",
+    "new-project-modal.ac5": "completed",
+    "api-projects-new": "completed",
+    "api-projects-new.ac1": "completed",
+    "api-projects-new.ac2": "completed",
+    "api-projects-new.ac3": "completed",
+    "api-projects-new.ac4": "completed",
+    "api-projects-new.ac5": "completed"
   }
 }
