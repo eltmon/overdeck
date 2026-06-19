@@ -620,10 +620,15 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
   }));
 
-  // PRD acceptance (PAN-862): tree shows ONLY issues that are tracker-active
-  // (in_progress / in_review / ready-for-merge) OR have live runtime resources
-  // (tmux session, docker container, open PR). A lingering feature/* branch or
-  // workspace directory alone is debris from a merged issue — not active work.
+  // PRD acceptance (PAN-862): the tree shows ONLY issues with real in-flight work.
+  // PAN-1966 (durable-signal membership): an active tracker LABEL is NOT sufficient
+  // on its own — labels drift (an issue can stay `in-progress`/`in-review` after its
+  // work landed, or carry a stale planning vBRIEF with no implementation). So a
+  // tracker-active state only qualifies when it is backed by a real implementation
+  // artifact (a feature branch); otherwise inclusion requires ready-for-merge or a
+  // live runtime resource (tmux / docker / open PR / remote agent). A branch or
+  // workspace dir alone (no active label, no live resource) is merged-issue debris
+  // and stays excluded.
   const isActiveTrackerState = (state: string | null): boolean =>
     state === 'in_progress' || state === 'in_review' || state === 'started';
 
@@ -637,7 +642,12 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
 
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
-    .filter((issue) => issue.readyForMerge || isActiveTrackerState(issue.trackerState) || isLiveResource(issue))
+    .filter(
+      (issue) =>
+        issue.readyForMerge
+        || isLiveResource(issue)
+        || (isActiveTrackerState(issue.trackerState) && issue.branch != null),
+    )
     .map((issue) => {
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
