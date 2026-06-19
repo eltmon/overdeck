@@ -7,7 +7,6 @@ import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
-import { getBacklogSequence } from '../../../lib/database/backlog-sequence-db.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
@@ -36,9 +35,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const projectRoot = process.cwd();
-        let rows = getBacklogSequence('overdeck');
+        let nodes: Array<Record<string, unknown>> = [];
         let edges: Array<{ from: string; to: string; type: string }> = [];
-        const rationaleMap = new Map<string, string>();
 
         const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
         if (existsSync(seqPath)) {
@@ -50,11 +48,11 @@ const getBacklogSequenceRoute = HttpRouter.add(
               to: e.to,
               type: e.type,
             }));
-            for (const n of parsed.doc.nodes) {
-              if (n.rationale) rationaleMap.set(n.issue.toUpperCase(), n.rationale);
-            }
-            if (rows.length === 0) {
-              rows = parsed.doc.nodes.map((n) => ({
+            nodes = parsed.doc.nodes.map((n) => {
+              const reviewStatus = getReviewStatusSync(n.issue.toUpperCase());
+              const inPipeline =
+                reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+              return {
                 issueId: n.issue,
                 rank: n.rank,
                 size: n.size,
@@ -65,21 +63,14 @@ const getBacklogSequenceRoute = HttpRouter.add(
                 why: n.why,
                 gate: n.gate,
                 planning: n.planning,
-                generatedAt: '',
-              }));
-            }
+                ...(n.rationale ? { rationale: n.rationale } : {}),
+                inPipeline,
+              };
+            });
           }
         }
 
-        const joined = rows.map((row) => {
-          const reviewStatus = getReviewStatusSync(row.issueId.toUpperCase());
-          const inPipeline =
-            reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
-          const rationale = rationaleMap.get(row.issueId.toUpperCase());
-          return { ...row, inPipeline, ...(rationale ? { rationale } : {}) };
-        });
-
-        return jsonResponse({ nodes: joined, edges });
+        return jsonResponse({ nodes, edges });
       },
       catch: (err) => new Error(String(err)),
     });
