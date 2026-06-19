@@ -29,6 +29,11 @@ vi.mock('../../../../lib/workspace-manager.js', () => ({
 vi.mock('../../../../lib/context-layers/index.js', () => ({
   ensureProjectLayer: vi.fn().mockReturnValue(false),
 }));
+// Treat TEST_HOME as the home directory so home-boundary checks work with temp dirs.
+vi.mock('node:os', async () => {
+  const real = await vi.importActual<typeof import('node:os')>('node:os');
+  return { ...real, homedir: () => TEST_HOME };
+});
 
 import { registerProjectFromPath, DuplicateProjectError } from '../../../../lib/project-registration.js';
 import { getProjectSync, PROJECTS_CONFIG_FILE } from '../../../../lib/projects.js';
@@ -41,8 +46,9 @@ async function simulateExisting(body: {
   path?: unknown;
   name?: unknown;
 }): Promise<{ status: number; json: Record<string, unknown> }> {
-  const { isAbsolute } = await import('node:path');
-  const { access } = await import('node:fs/promises');
+  const { isAbsolute, sep } = await import('node:path');
+  const { access, realpath } = await import('node:fs/promises');
+  const { homedir } = await import('node:os');
 
   const rawPath = body.path;
   if (typeof rawPath !== 'string' || !rawPath.trim()) {
@@ -54,9 +60,21 @@ async function simulateExisting(body: {
   try { await access(rawPath); }
   catch { return { status: 404, json: { error: `path does not exist: ${rawPath}` } }; }
 
+  // Home-boundary check (mirrors routes/projects.ts buildHomeGuard).
+  const home = homedir();
+  let ch: string;
+  try { ch = await realpath(home); } catch { ch = home; }
+  const withinHome = (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
+  let canonicalPath: string;
+  try { canonicalPath = await realpath(rawPath); }
+  catch { return { status: 404, json: { error: `path does not exist: ${rawPath}` } }; }
+  if (!withinHome(canonicalPath)) {
+    return { status: 400, json: { error: 'path is outside home directory' } };
+  }
+
   const nameOpt = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
   try {
-    const result = await registerProjectFromPath({ path: rawPath, name: nameOpt });
+    const result = await registerProjectFromPath({ path: canonicalPath, name: nameOpt });
     return { status: 200, json: { key: result.key, name: result.config.name, path: result.config.path } };
   } catch (err) {
     if (err instanceof DuplicateProjectError) {
@@ -70,8 +88,9 @@ async function simulateNew(body: {
   parentDir?: unknown;
   name?: unknown;
 }): Promise<{ status: number; json: Record<string, unknown> }> {
-  const { isAbsolute, join: pathJoin } = await import('node:path');
-  const { access, mkdir, readdir } = await import('node:fs/promises');
+  const { isAbsolute, join: pathJoin, sep } = await import('node:path');
+  const { access, mkdir, readdir, realpath } = await import('node:fs/promises');
+  const { homedir } = await import('node:os');
   const { exec } = await import('node:child_process');
   const { promisify } = await import('node:util');
   const execAsync = promisify(exec);
@@ -90,11 +109,29 @@ async function simulateNew(body: {
 
   const name = rawName.trim();
   const key = slugify(name);
-  const target = pathJoin(rawParent, slugify(name));
+
+  // Reject names whose slug contains no alphanumeric characters.
+  if (!key.replace(/-/g, '')) {
+    return { status: 400, json: { error: 'Name must contain at least one alphanumeric character' } };
+  }
 
   if (getProjectSync(key)) {
     return { status: 409, json: { error: `project key '${key}' is already registered` } };
   }
+
+  // Home-boundary check (mirrors routes/projects.ts buildHomeGuard).
+  const home = homedir();
+  let ch: string;
+  try { ch = await realpath(home); } catch { ch = home; }
+  const withinHome = (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
+  let canonicalParent: string;
+  try { canonicalParent = await realpath(rawParent); }
+  catch { return { status: 400, json: { error: 'parentDir does not exist' } }; }
+  if (!withinHome(canonicalParent)) {
+    return { status: 400, json: { error: 'parentDir is outside home directory' } };
+  }
+
+  const target = pathJoin(canonicalParent, key);
 
   let targetExists = false;
   try { await access(target); targetExists = true; } catch { /* ok */ }
@@ -226,5 +263,47 @@ describe("POST /api/projects mode='new'", () => {
       'utf-8',
     );
     expect(src).not.toMatch(/execSync/);
+  });
+
+  it('returns 400 when name contains no alphanumeric characters (empty slug)', async () => {
+    const parentDir = join(TEST_HOME, 'parent-slug');
+    mkdirSync(parentDir, { recursive: true });
+    const res = await simulateNew({ parentDir, name: '!!!' });
+    expect(res.status).toBe(400);
+    expect(res.json.error).toMatch(/alphanumeric/i);
+  });
+
+  it('returns 400 when parentDir is outside home directory', async () => {
+    // Use a real temp dir outside TEST_HOME as the "outside home" path.
+    const { tmpdir } = await import('node:os');
+    const outsideParent = join(tmpdir(), `outside-${process.pid}`);
+    mkdirSync(outsideParent, { recursive: true });
+    try {
+      const res = await simulateNew({ parentDir: outsideParent, name: 'my-app' });
+      // The route rejects because outsideParent is not under TEST_HOME (the mocked home).
+      expect(res.status).toBe(400);
+      expect(res.json.error).toMatch(/outside home/i);
+    } finally {
+      const { rmSync } = await import('node:fs');
+      rmSync(outsideParent, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── mode='existing' home-boundary tests ─────────────────────────────────────
+
+describe("POST /api/projects mode='existing' — home boundary", () => {
+  it('returns 400 when path is outside home directory', async () => {
+    const { tmpdir } = await import('node:os');
+    const outsideDir = join(tmpdir(), `outside-existing-${process.pid}`);
+    mkdirSync(outsideDir, { recursive: true });
+    try {
+      const res = await simulateExisting({ path: outsideDir });
+      expect(res.status).toBe(400);
+      expect(res.json.error).toMatch(/outside home/i);
+    } finally {
+      const { rmSync } = await import('node:fs');
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 });

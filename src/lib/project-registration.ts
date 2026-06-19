@@ -93,6 +93,13 @@ export async function registerProjectFromPath(
   const name = opts.name ?? (basename(fullPath) || 'unknown');
   const key = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
+  // Guard: a key that is empty or contains only hyphens cannot be meaningfully addressed.
+  if (!key.replace(/-/g, '')) {
+    throw new Error(
+      `Cannot register project: derived key '${key}' from name '${name}' contains no alphanumeric characters`,
+    );
+  }
+
   const existing = getProjectSync(key);
   if (existing) {
     throw new DuplicateProjectError(key, existing.path);
