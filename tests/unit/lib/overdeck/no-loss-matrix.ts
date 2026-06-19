@@ -314,6 +314,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/deacon/pause',                    kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.setDeaconPaused' },
   { surface: 'GET /api/version',                          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Build version probe; outside 8 remodel domains' },
   { surface: 'GET /api/registered-projects',              kind: 'http', disposition: 'READ',        door: 'ConfigResolver.listProjects' },
+  { surface: 'POST /api/projects',                        kind: 'http', disposition: 'WRITE',       door: 'ConfigWriter.registerProject (mode=existing) / createProject (mode=new)' },
+  { surface: 'GET /api/fs/list-dirs',                     kind: 'http', disposition: 'READ',        door: 'FilesystemResolver.listDirs (folder-browser for project registration)' },
   { surface: 'GET /api/confirmations',                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Confirmation prompts; outside 8 remodel domains' },
   { surface: 'POST /api/confirmations/:id/respond',       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Confirmation prompts; outside 8 remodel domains' },
   { surface: 'GET /api/skills',                           kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Skills index; outside 8 remodel domains' },
