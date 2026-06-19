@@ -1,0 +1,546 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-19T18:05:59.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1970: New-user: minimal New Project flow (add existing / new folder + git init -> register)",
+    "updated": "2026-06-19T18:10:32.578Z"
+  },
+  "plan": {
+    "id": "pan-1970",
+    "title": "New-user: minimal New Project flow (add existing / new folder + git init -> register)",
+    "status": "proposed",
+    "uid": "1a606b90-d9e9-4f1c-87f6-21f6c32b696a",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-19T18:05:59.000Z",
+    "updated": "2026-06-19T18:10:32.578Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1970",
+        "label": "PAN-1970",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1970.md",
+        "label": "PRD draft",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "onboarding",
+      "dashboard",
+      "projects",
+      "backend",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "Projects can only be registered via `pan project add <existing-path>` in a terminal (src/cli/commands/project.ts:85). That command requires the path to already exist and does not run `git init`. There is no dashboard endpoint to register a project, no server-side folder browser, and no 'create folder + git init' path. A brand-new user has no UI way to get their first project in.",
+      "Proposal": "Add a minimal dashboard 'New Project' flow with two modes. (1) Backend: factor the registration core out of projectAddCommand into a server-safe helper (src/lib/project-registration.ts) and add POST /api/projects (mode 'existing' | 'new') in the existing routes/projects.ts — 'new' mode does mkdir + async git init before registering. Add a home-clamped GET /api/fs/list-dirs folder browser in a new routes/fs.ts. (2) Frontend: a folder-picker subcomponent, a New Project modal (Add existing | New project toggle, name + parent-folder picker, live path preview, Start -> POST), and wiring of onNewProject() from the sidebar + Home that refetches the project lists and selects the new project. Register only via the single write door (registerProjectSync); git init is async only (PAN-70); the folder browser is clamped to the user's home.",
+      "NonGoals": "- Setup Agent, templates/archetypes, SetupRpcGroup, or `pan setup` (those are #654 / the full wizard).\n- Clone from GitHub/GitLab (a later release).\n- Tracker config, quality gates, or workspace-build config in the wizard — use minimal defaults, editable later in projects.yaml.\n- Browsing the filesystem outside the user's home directory (the folder browser is home-clamped).\n- Polyrepo detection/configuration UI — the CLI's polyrepo next-steps output stays CLI-only; the modal registers a single folder with minimal defaults.\n- Changing any `pan project add` CLI flag, help string, or output (the refactor is behavior-preserving / no-loss)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Folder browser GET /api/fs/list-dirs is hard-clamped to the user's home directory (default start = ~); paths escaping home are rejected (400).",
+        "rationale": "Simplest defensible reading of FR-2's loose 'not outside home unless explicitly navigated'; cleanly satisfies AC-4; safe default for a demo. This user's projects live under ~/Projects (within home), so home-clamp covers the demo. Browsing outside home is deferred (NonGoal)."
+      },
+      {
+        "summary": "Shared registration core lives in a new module src/lib/project-registration.ts (registerProjectFromPath), consumed by both projectAddCommand and POST /api/projects.",
+        "rationale": "Single-sources the write-door registration core (NFR-2) without bloating projects.ts, and keeps it server-safe (no chalk/console/execSync)."
+      },
+      {
+        "summary": "Registration core keeps the existing sync write door (registerProjectSync) + sync hook symlinks; only `git init` is async.",
+        "rationale": "registerProjectSync is the sanctioned single write door (NFR-2) and is sync by design; PAN-70/NFR-1 targets unbounded subprocess blocking, which only git init is."
+      },
+      {
+        "summary": "'new' mode rejects (dup key, non-empty target) BEFORE any mkdir/git init.",
+        "rationale": "Guarantees no partial write (AC-3): the only filesystem mutations happen after all validation passes."
+      },
+      {
+        "summary": "POST /api/projects added to existing routes/projects.ts; GET /api/fs/list-dirs added as new routes/fs.ts merged into server.ts makeRoutesLayer.",
+        "rationale": "projects.ts is the natural home for project registration; filesystem browsing is a distinct concern deserving its own module."
+      },
+      {
+        "summary": "Per-route auth: POST uses rejectUnsafeDashboardMutationRequest (CSRF), GET uses rejectUnauthorizedDashboardRequest.",
+        "rationale": "Auth in this server is per-route, not global (see settings.ts/issues.ts/discovered-sessions.ts). Matching the established gates satisfies 'auth-gated like other routes'."
+      },
+      {
+        "summary": "PAN-1970 ships a self-contained '+ New Project' trigger; if PAN-1969 already added one, reuse it and avoid duplicates.",
+        "rationale": "Keeps PAN-1970 independently shippable and demoable without hard-depending on PAN-1969 landing first."
+      },
+      {
+        "summary": "Modal uses the CSS-module overlay/dialog pattern (ForkModal / command-deck.module.css), with the folder picker as a separate subcomponent.",
+        "rationale": "Matches the CommandDeck convention where the New Project flow lives; the split keeps the picker independently testable."
+      }
+    ],
+    "items": [
+      {
+        "id": "register-core",
+        "title": "Extract server-safe registration core (registerProjectFromPath); CLI delegates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1970",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "api-projects-existing",
+            "api-projects-new"
+          ],
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/project-registration.ts exporting `registerProjectFromPath({ path, name? }): { key, config }`. It must: derive key via `name.toLowerCase().replace(/[^a-z0-9-]/g,'-')` (name defaults to the folder basename, matching project.ts:97-98); dup-check via getProjectSync (throw a clear duplicate error if already registered — NO second write); build the minimal ProjectConfig { name, path }; call registerProjectSync (the single write door); call ensureProjectLayer; call preTrustDirectory (same symbol projectAddCommand uses today, keep the non-fatal try/catch — H7); and install git hooks only when `.git` is present (move/share the installGitHooks logic from project.ts). The module must contain NO chalk/console and NO execSync (server-safe). Then refactor projectAddCommand (src/cli/commands/project.ts) to delegate its registration core to this helper while keeping ALL existing console output, next-steps guidance, and CLI flags identical (no-loss refactor — D9)."
+        },
+        "items": [
+          {
+            "id": "register-core.ac1",
+            "title": "registerProjectFromPath({path}) registers a project: getProjectSync(key) returns the minimal ProjectConfig {name, path} written through registerProjectSync, and the function returns { key, config }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-core.ac2",
+            "title": "Calling registerProjectFromPath with an already-registered key rejects with a clear duplicate error and performs no second projects.yaml write (getProjectSync still returns the original entry).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-core.ac3",
+            "title": "`pan project add <existing-path>` still produces an identical projects.yaml entry and still prints its next-steps output — existing CLI behavior is preserved (no-loss).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-core.ac4",
+            "title": "The module src/lib/project-registration.ts contains no `execSync`, no `chalk`, and no `console.` call — it is server-safe.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-core.ac5",
+            "title": "A unit test under tests/unit/lib/ registers a temp dir, asserts the entry via getProjectSync, and asserts the duplicate path throws without a second write.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-projects-existing",
+        "title": "POST /api/projects (mode='existing') in routes/projects.ts, CSRF-gated",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a `POST /api/projects` route to src/dashboard/server/routes/projects.ts via HttpRouter.add (merge it into projectsRouteLayer at the bottom). Read the JSON body with the existing readProjectJsonBody pattern (projects.ts:565). Gate it with rejectUnsafeDashboardMutationRequest(request) (CSRF, like settings.ts:811). For body { mode:'existing', path }: validate `path` is a non-empty absolute path that exists (400/404 otherwise); call registerProjectFromPath({ path }); return { key, name, path } as jsonResponse. Map the duplicate error to 409 with a clear message. Wrap in httpHandler."
+        },
+        "items": [
+          {
+            "id": "api-projects-existing.ac1",
+            "title": "POST /api/projects {mode:'existing', path} with a valid existing path returns 200 { key, name, path } and the project is registered (getProjectSync(key) is set).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-existing.ac2",
+            "title": "POST with a missing/nonexistent path returns a 400/404 error and registers nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-existing.ac3",
+            "title": "POST for an already-registered key returns 409 with a clear error and does not mutate projects.yaml.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-existing.ac4",
+            "title": "rejectUnsafeDashboardMutationRequest rejects a request lacking valid dashboard auth/CSRF before any registration occurs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-existing.ac5",
+            "title": "A route test in src/dashboard/server/routes/__tests__/ covers existing-mode success, missing-path error, and duplicate -> 409 (no write).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-projects-new",
+        "title": "Extend POST /api/projects with mode='new' (mkdir + async git init)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend the POST /api/projects handler with mode='new'. For body { mode:'new', parentDir, name }: derive key from name; dup-check and reject (409) BEFORE any fs change; compute target = join(parentDir, slug(name)); if target exists and is non-empty, reject (409) with no fs change; otherwise `mkdir -p` target (async fs/promises mkdir recursive) and run `git init` ASYNCHRONOUSLY via `execAsync = promisify(exec)` (like routes/resources.ts:29) or spawn — NEVER execSync (PAN-70); then call registerProjectFromPath({ path: target, name }) and return { key, name, path: target }. Sequencing per D3 guarantees no partial write (AC-3)."
+        },
+        "items": [
+          {
+            "id": "api-projects-new.ac1",
+            "title": "POST /api/projects {mode:'new', parentDir, name} creates <parentDir>/<slug(name)>, runs git init, registers key=slug(name), and returns 200 { key, name, path } with path === the created folder.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-new.ac2",
+            "title": "After a successful 'new' create, the target folder contains a .git directory (git init actually ran).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-new.ac3",
+            "title": "POST 'new' where the target exists and is non-empty returns 409 and makes no filesystem change and no registration (no partial write).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-new.ac4",
+            "title": "POST 'new' whose derived key duplicates an existing project returns 409 before any mkdir/git init runs (no orphan folder).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-projects-new.ac5",
+            "title": "A route test covers new-mode success (folder + .git + registered), non-empty-target -> 409 (no fs/registry change), and dup-key -> 409; and asserts no new `execSync` import was added to the route.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fs-list-dirs",
+        "title": "GET /api/fs/list-dirs folder browser (new routes/fs.ts), home-clamped + auth-gated",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/fs.ts exporting fsRouteLayer with `GET /api/fs/list-dirs?path=<abs>`. Gate with rejectUnauthorizedDashboardRequest(request) (like discovered-sessions.ts). Resolve the requested path; if absent default to homedir(); CLAMP to home — reject (400) any resolved path that escapes the user's home via `..` or an absolute path outside home (reuse the normalization shape from server.ts:234-246). List only immediate subdirectories with async fs/promises readdir({ withFileTypes:true }), filtering to directories, sorted by name; return jsonResponse({ path, parent, entries: {name,path}[] }) where parent is the containing dir (or null at home root). Import fsRouteLayer and merge it into makeRoutesLayer in server.ts."
+        },
+        "items": [
+          {
+            "id": "fs-list-dirs.ac1",
+            "title": "GET /api/fs/list-dirs?path=<dir under home> returns 200 { path, parent, entries } where entries lists only the immediate subdirectories as { name, path }, sorted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fs-list-dirs.ac2",
+            "title": "GET /api/fs/list-dirs with no path param defaults to and lists the user's home directory.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fs-list-dirs.ac3",
+            "title": "A path that resolves outside the user's home (e.g. ../../etc or an absolute /etc) is rejected (400) and never lists a directory outside home.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fs-list-dirs.ac4",
+            "title": "An unauthenticated request is rejected by rejectUnauthorizedDashboardRequest before any readdir; the route is merged into server.ts makeRoutesLayer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fs-list-dirs.ac5",
+            "title": "A route test covers: listing a temp dir under home, default-to-home, and the escape-home rejection (security).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "folder-picker",
+        "title": "Folder-picker subcomponent consuming GET /api/fs/list-dirs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create a FolderPicker React subcomponent (under src/dashboard/frontend/src/components/CommandDeck/ or a sibling) that fetches GET /api/fs/list-dirs via the cookie-auth fetchWithTimeout helper (src/lib/apiFetch.ts). It renders the current path, an up/parent affordance that navigates to `parent`, and the subdirectory list; clicking a directory refetches with that path; a Select action emits the chosen absolute path through an onSelect(path: string) prop. Follow the pan-style-guide (no pill badges, muted status text). Co-locate a Vitest test under __tests__/."
+        },
+        "items": [
+          {
+            "id": "folder-picker.ac1",
+            "title": "FolderPicker renders the subdirectory list and current path from GET /api/fs/list-dirs on mount.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "folder-picker.ac2",
+            "title": "Clicking a directory sends a new list-dirs request for that path and renders its subdirectories; the up affordance opens the returned parent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "folder-picker.ac3",
+            "title": "Selecting a folder emits the chosen absolute path via the onSelect prop exactly once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "folder-picker.ac4",
+            "title": "A co-located Vitest test (mocked fetch) covers initial render, navigate-into-dir refetch, and the onSelect emission.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "new-project-modal",
+        "title": "New Project modal (toggle + both modes + path preview + Start -> POST)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the NewProjectModal component using the CSS-module overlay/dialog pattern (matching ForkModal + command-deck.module.css: .forkHelpOverlay/.forkHelpDialog/.forkHeader/.forkFooter). It has a top toggle 'Add existing | New project'. Add existing: embeds the FolderPicker; Start -> POST /api/projects { mode:'existing', path } via fetchWithTimeout. New project: a name field + a parent-folder picker (default parent ~/Overdeck/) + a live preview rendering `<parent>/<slug(name)>` that updates as the name changes; Start -> POST { mode:'new', parentDir, name }. On a non-OK response, surface the server error message inline and keep the modal open. Expose props for isOpen/onClose and an onCreated(project) callback (used by the wiring bead). Co-locate a Vitest test."
+        },
+        "items": [
+          {
+            "id": "new-project-modal.ac1",
+            "title": "The modal renders an 'Add existing | New project' toggle; switching the toggle swaps between the folder-picker (existing) form and the name+parent (new) form.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-modal.ac2",
+            "title": "In 'New project' mode the live preview displays `<parent>/<slug(name)>` and updates as the name input changes (e.g. 'My App' -> <parent>/my-app).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-modal.ac3",
+            "title": "Clicking Start sends the correct POST body to /api/projects: { mode:'existing', path } in existing mode and { mode:'new', parentDir, name } in new mode.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-modal.ac4",
+            "title": "When the server returns an error response, the modal displays the error message inline and stays open (no crash, no navigation).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "new-project-modal.ac5",
+            "title": "A co-located Vitest test (mocked fetch) covers toggle switching, the new-mode slug preview, and the correct POST body per mode.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-new-project",
+        "title": "Wire onNewProject() to open the modal; on success refetch lists + select project",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:05:59.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1970",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement onNewProject() to open NewProjectModal and wire it from the sidebar PROJECTS header (Sidebar.tsx) and the Home Projects section (HomePage.tsx). If PAN-1969 already added a '+ New Project' trigger/stub, replace the stub body to open the modal and do NOT add a duplicate button; if absent, add a minimal '+ New Project' affordance (H1/D7). On NewProjectModal.onCreated: invalidate React Query keys ['command-deck-projects'] and ['registered-projects'] via useQueryClient().invalidateQueries so the new project appears in the sidebar + Home, then select/open it (setSelectedProjectKey(key) + usePanesStore.getState().ensureHome(key))."
+        },
+        "items": [
+          {
+            "id": "wire-new-project.ac1",
+            "title": "A single '+ New Project' affordance in the sidebar PROJECTS header (and Home Projects section) opens the New Project modal via onNewProject(); no duplicate trigger is rendered if PAN-1969 already added one.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-new-project.ac2",
+            "title": "On a successful create the app invalidates/refetches both ['command-deck-projects'] and ['registered-projects'] so the new project appears in the sidebar and Home without a reload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-new-project.ac3",
+            "title": "On a successful create the app opens the new project: it calls setSelectedProjectKey(key) and usePanesStore.ensureHome(key) with the new key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-new-project.ac4",
+            "title": "A Vitest test asserts the success path invalidates both query keys and selects the new project key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "register-core",
+        "to": "api-projects-existing",
+        "type": "blocks"
+      },
+      {
+        "from": "register-core",
+        "to": "api-projects-new",
+        "type": "blocks"
+      },
+      {
+        "from": "api-projects-existing",
+        "to": "api-projects-new",
+        "type": "blocks"
+      },
+      {
+        "from": "fs-list-dirs",
+        "to": "folder-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "folder-picker",
+        "to": "new-project-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "api-projects-existing",
+        "to": "new-project-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "api-projects-new",
+        "to": "new-project-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "new-project-modal",
+        "to": "wire-new-project",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-19-PAN-1970-new-user-minimal-new-project-flow-add-existing-new-folder-git-init-register.vbrief.json"
+    }
+  }
+}
