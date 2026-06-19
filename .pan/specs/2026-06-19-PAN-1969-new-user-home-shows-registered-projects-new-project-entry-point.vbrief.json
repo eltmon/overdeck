@@ -4,17 +4,17 @@
     "created": "2026-06-19T18:02:17.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1969: New-user: Home shows registered projects + '+ New Project' entry point",
-    "updated": "2026-06-19T18:07:35.536Z"
+    "updated": "2026-06-19T18:23:54.525Z"
   },
   "plan": {
     "id": "pan-1969",
     "title": "New-user: Home shows registered projects + '+ New Project' entry point",
-    "status": "proposed",
+    "status": "running",
     "uid": "cb5e447c-17f4-4254-a268-5794a550c6e3",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-06-19T18:02:17.000Z",
-    "updated": "2026-06-19T18:07:35.536Z",
+    "updated": "2026-06-19T18:23:54.525Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1969",
@@ -225,5 +225,5 @@
       "canonicalFilename": "2026-06-19-PAN-1969-new-user-home-shows-registered-projects-new-project-entry-point.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
