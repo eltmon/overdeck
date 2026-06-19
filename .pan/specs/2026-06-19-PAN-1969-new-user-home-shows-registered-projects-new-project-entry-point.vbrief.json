@@ -1,0 +1,229 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-19T18:02:17.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1969: New-user: Home shows registered projects + '+ New Project' entry point",
+    "updated": "2026-06-19T18:07:35.536Z"
+  },
+  "plan": {
+    "id": "pan-1969",
+    "title": "New-user: Home shows registered projects + '+ New Project' entry point",
+    "status": "proposed",
+    "uid": "cb5e447c-17f4-4254-a268-5794a550c6e3",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-19T18:02:17.000Z",
+    "updated": "2026-06-19T18:07:35.536Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1969",
+        "label": "PAN-1969",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-1969.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "onboarding",
+      "dashboard",
+      "ui"
+    ],
+    "narratives": {
+      "Problem": "A brand-new user lands on the Home 'System briefing' page (HomePage.tsx) with no visible projects and no obvious way to create one. Home never queries the project registry — it only renders memory-derived workspace cards (buildHomeWorkspaceCards), so with projects configured the Workspaces section shows 'No workspace status is available yet'. The Sidebar DOES list registered projects (fetchProjects, react-query key ['command-deck-projects']); Home just doesn't reuse it, and there is no '+ New Project' affordance anywhere.",
+      "Proposal": "Frontend-only. (1) Add a 'Projects' section to HomePage between the Activity Feed and the Workspaces section that reuses the exact same fetchProjects + ['command-deck-projects'] query the Sidebar uses (no new endpoint), lists every registered project, and click-through opens that project's Command Deck via App's existing handleSelectProject. (2) Add a '+ New Project' affordance on the Home Projects header and on the Sidebar PROJECTS header (convert the <p> label into a flex row + a <Plus size={13} /> button, mirroring the CommandDeck '+ New conversation' button). Both '+' affordances call a single App-level handleNewProject stub that, until PAN-1970 lands, shows a 'coming soon' toast and opens no flow. (3) Empty state: zero registered projects -> Home shows a friendly 'No projects yet — create your first one' prompt with the same '+ New Project' CTA.",
+      "NonGoals": "- Building the New Project flow / wizard itself (that is PAN-1970); both '+' buttons wire to a no-op-plus-toast stub until then.\n- Changing or removing the existing memory-derived 'Workspaces' cards on Home (buildHomeWorkspaceCards) — they stay as-is.\n- Adding any new backend endpoint — Home reuses the existing GET /api/registered-projects via fetchProjects and the ['command-deck-projects'] query.\n- Modifying the Knowledge Registry or summary-cards sections on Home.\n- Extracting a shared project-row component between Home and the Sidebar — the two surfaces share only the data query, not the row markup."
+    },
+    "autoDecisions": [
+      {
+        "summary": "onNewProject stub = no-op flow plus a 'coming soon' toast referencing PAN-1970, not a strictly silent no-op.",
+        "rationale": "PRD FR-4 says wire to a stub that no-ops with a TODO and do not block on PAN-1970. A strictly silent no-op would read as a broken button to the UAT/Playwright role. A one-line toast.info (sonner already imported at App.tsx:3) keeps the affordance observably wired and is trivially removed when PAN-1970 lands — honoring 'no flow built' while avoiding a false UAT failure."
+      },
+      {
+        "summary": "Reuse App.handleSelectProject (App.tsx:694) for Home project click-through instead of inventing a new navigation mechanism.",
+        "rationale": "It is the canonical project-deck-open handler already used by the Sidebar rail (App.tsx:1286); reusing it guarantees Home and Sidebar navigate identically and land on the project's home pane."
+      },
+      {
+        "summary": "Render Home project rows inline with Tailwind utility classes rather than extracting a shared row component with the Sidebar.",
+        "rationale": "Simplicity-first: the two surfaces share the data query (the real dedup win) but not the row chrome — the Sidebar row carries rail-specific active highlight, activity dot, and feature count. Premature extraction would over-couple two different visual languages for no payoff."
+      },
+      {
+        "summary": "All three beads set metadata.requiresInspection = false.",
+        "rationale": "Frontend-only, 3-bead change; the PRD is exhaustively prescriptive (exact files, lines, query key, handlers, mirror pattern). Every bead is independently unit-testable and a wrong implementation surfaces immediately at typecheck/lint/frontend-test/review — the inspect gate would only rubber-stamp mechanical diffs."
+      },
+      {
+        "summary": "Cover the FR-5 empty state with a Vitest unit test (mock fetch -> []), not live Playwright UAT.",
+        "rationale": "Zero registered projects cannot be reproduced on the live dev dashboard, which has projects configured; the unit test is the reliable mechanical check. UAT (if run) verifies the populated case plus the two '+' buttons in an isolated browser profile."
+      }
+    ],
+    "items": [
+      {
+        "id": "sidebar-new-project-button",
+        "title": "Add '+ New Project' button to the Sidebar PROJECTS header + shared App stub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-19T18:02:17.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1969",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Sidebar.tsx, convert the PROJECTS header <p> (lines 387-389) into a flex row holding the 'Projects' label plus a '+' button: a <Plus size={13} /> control (add Plus to the existing lucide-react import at the top of the file) with title/aria-label 'New project', mirroring the CommandDeck '+ New conversation' button at components/CommandDeck/index.tsx:1139-1147 (stopPropagation + accessible name). Add an optional onNewProject?: () => void prop to SidebarProps and call it from the button's onClick. In src/dashboard/frontend/src/App.tsx, define a single handleNewProject useCallback stub that calls toast.info('Project creation is coming soon', { description: 'Tracked in PAN-1970' }) (toast from 'sonner' is already imported at App.tsx:3), opens no flow, and pass it as onNewProject to <Sidebar> (the <Sidebar ...> render is around App.tsx:1281-1286). This handler is the single shared affordance reused by the Home beads. Add/extend the Sidebar Vitest test to cover the new button."
+        },
+        "items": [
+          {
+            "id": "sidebar-new-project-button.ac1",
+            "title": "Given the sidebar project rail, the PROJECTS header renders a '+' button (lucide Plus, size 13) with accessible name 'New project', laid out as a flex row beside the 'Projects' label (the former <p> at Sidebar.tsx:387).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-new-project-button.ac2",
+            "title": "When the sidebar PROJECTS header '+' is clicked, it invokes the onNewProject prop exactly once and calls stopPropagation so no project-rail selection fires.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-new-project-button.ac3",
+            "title": "App.tsx defines one handleNewProject stub that calls toast.info('Project creation is coming soon', { description: 'Tracked in PAN-1970' }), opens no flow, and is passed as onNewProject to <Sidebar>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-projects-section",
+        "title": "Add a 'Projects' section to Home that lists registered projects with click-through",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-19T18:02:17.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1969",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/HomePage.tsx, import fetchProjects from '../components/CommandDeck/projectsData' and add a new <section> placed between the <HomeActivityFeed .../> (HomePage.tsx:141) and the Workspaces <section> (HomePage.tsx:143). The section uses useQuery({ queryKey: ['command-deck-projects'], queryFn: fetchProjects }) — the EXACT key and fn the Sidebar uses (Sidebar.tsx:155-158) so react-query dedupes and no new endpoint is added (NFR-1). Render the returned projects as inline Tailwind-styled rows (do NOT extract a shared component with the Sidebar); each row's onClick calls onSelectProject?.(project.name). Add an optional onSelectProject?: (projectName: string) => void prop to HomePageProps and, in App.tsx, pass onSelectProject={handleSelectProject} to <HomePage> (render at App.tsx:1464). When the query returns zero projects, render a neutral muted 'No projects' placeholder (the friendly FR-5 empty-state + CTA is added by the home-new-project-affordance bead). Extend HomePage.test.tsx's fetch mock to answer /api/issues/resource-allocated and /api/registered-projects, and add tests for the list and the click-through. Follow pan-style-guide (no decorative color, no pill badges)."
+        },
+        "items": [
+          {
+            "id": "home-projects-section.ac1",
+            "title": "Given >=1 registered project, Home renders a 'Projects' section between the Activity Feed and Workspaces sections that lists every project returned by fetchProjects (the same set the sidebar shows).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-projects-section.ac2",
+            "title": "The Projects section calls useQuery with queryKey ['command-deck-projects'] and queryFn fetchProjects (imported from components/CommandDeck/projectsData) — the same key/fn as the Sidebar — so React Query dedupes and Home sends no new endpoint request beyond the shared one (NFR-1).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-projects-section.ac3",
+            "title": "Clicking a Home project row invokes the onSelectProject prop with that project's name; with App passing handleSelectProject, the click opens that project's Command Deck.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-projects-section.ac4",
+            "title": "When fetchProjects returns zero projects, the Projects section renders a neutral 'No projects' line and does not crash.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-new-project-affordance",
+        "title": "Add '+ New Project' button + friendly empty state to the Home Projects section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-19T18:02:17.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1969",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Building on the home-projects-section bead: in src/dashboard/frontend/src/pages/HomePage.tsx add an optional onNewProject?: () => void prop to HomePageProps. Add a '+ New Project' button to the Projects section header — a <Plus size={13} /> control (import Plus from 'lucide-react') styled with HomePage's existing token classes (border-border, text-muted-foreground, hover:text-foreground), accessible name 'New project' — that calls onNewProject. Upgrade the zero-projects branch from the neutral placeholder to the FR-5 empty state: the prompt 'No projects yet — create your first one' with a '+ New Project' CTA that also calls onNewProject. In src/dashboard/frontend/src/App.tsx, pass onNewProject={handleNewProject} (the stub created in the sidebar-new-project-button bead) to <HomePage> (render at App.tsx:1464) so the Home header button, the empty-state CTA, and the sidebar button all share one handler. Add Vitest tests for the header button, the empty state + CTA (mock fetch -> []), and that clicking each invokes onNewProject."
+        },
+        "items": [
+          {
+            "id": "home-new-project-affordance.ac1",
+            "title": "The Home Projects section header renders a '+ New Project' button (lucide Plus, size 13) that invokes the onNewProject prop exactly once when clicked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-new-project-affordance.ac2",
+            "title": "When fetchProjects returns zero projects, Home renders the prompt 'No projects yet — create your first one' with a '+ New Project' CTA that invokes onNewProject when clicked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-new-project-affordance.ac3",
+            "title": "App passes handleNewProject to <HomePage onNewProject>, so the Home header button, the empty-state CTA, and the sidebar PROJECTS '+' button all invoke the same single stub handler.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "sidebar-new-project-button",
+        "to": "home-new-project-affordance",
+        "type": "blocks"
+      },
+      {
+        "from": "home-projects-section",
+        "to": "home-new-project-affordance",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-19-PAN-1969-new-user-home-shows-registered-projects-new-project-entry-point.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
