@@ -2,7 +2,7 @@
   "issueId": "PAN-1866",
   "schemaVersion": 2,
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-19T18:48:04.418Z",
+  "updated": "2026-06-19T19:22:21.035Z",
   "pipeline": {
     "issueId": "PAN-1866",
     "reviewStatus": "pending",
@@ -19,5 +19,5 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "model": "claude-sonnet-4-6"
 }
