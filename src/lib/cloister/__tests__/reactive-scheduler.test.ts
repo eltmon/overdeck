@@ -48,6 +48,26 @@ vi.mock('../../agents.js', async () => {
   };
 });
 
+// countAgentsByStatus queries the real SQLite DB; mock it so tests are isolated
+// from real running-agent state (high counts gate out resumeAgent via workSlots=0).
+vi.mock('../../overdeck/agents.js', () => ({
+  countAgentsByStatus: vi.fn(() => ({})),
+  countAgentsByStatusRole: vi.fn(() => 0),
+  listAllAgentsSync: vi.fn(() => []),
+}));
+
+// Mock the concurrency module so real DB counts / system load don't gate resumeAgent.
+vi.mock('../concurrency.js', () => ({
+  getConcurrencyLimits: vi.fn(() => ({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9, exemptOperatorStarted: true })),
+  countRunningAgents: vi.fn(() => ({ work: 0, advancing: 0, total: 0 })),
+  workResumeSlotsAvailable: vi.fn(() => 6),
+  advancingResumeSlotsAvailable: vi.fn(() => 3),
+  tryReserveAdvancingSlot: vi.fn(() => false),
+  releaseAdvancingSlot: vi.fn(),
+  resetPatrolDispatchBudget: vi.fn(),
+  describeRunningAgents: vi.fn(() => ''),
+}));
+
 vi.mock('../../projects.js', () => ({
   resolveProjectFromIssue: vi.fn(() => ({
     projectKey: 'pan',
@@ -72,6 +92,14 @@ vi.mock('../test-agent-queue.js', () => ({
 
 vi.mock('../issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),
+}));
+
+// Ensure no-resume mode is always off in this test file so tests are not
+// affected by the OVERDECK_NO_RESUME env var being set in the shell.
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: vi.fn(() => ({ active: false, since: null })),
+  isNoResumeValueEnabled: vi.fn(() => false),
+  isNoResumeCliOptionEnabled: vi.fn(() => false),
 }));
 
 vi.mock('../../activity-logger.js', () => ({
@@ -352,10 +380,14 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('routes agent.stopped events to the deacon resume handler', async () => {
+    // Use a path that actually exists so existsSync(state.workspace) passes.
+    // deacon.ts imports from 'fs' (not 'node:fs'), so the node:fs mock above
+    // does not intercept this check; we need a real path.
+    const existingWorkspace = process.env.OVERDECK_HOME ?? '/tmp';
     vi.mocked(getAgentStateSync).mockReturnValue({
       id: 'agent-pan-503',
       issueId: 'PAN-503',
-      workspace: '/tmp/workspace',
+      workspace: existingWorkspace,
       harness: 'claude-code',
       role: 'work',
       model: 'claude-sonnet-4-6',
