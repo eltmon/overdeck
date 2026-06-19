@@ -3,6 +3,7 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
 import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
+import type { SequenceNode } from './backlog/types.js';
 
 export interface MergeQueueItem {
   issueId: string;
@@ -236,3 +237,44 @@ export const computeMergeQueue = (
       batchGroup: (conflictCount === 0 ? 'batch' : 'serialize') as 'batch' | 'serialize',
     }));
   });
+
+export interface SequencePickResult {
+  issueId: string;
+  rank: number;
+  gate: string;
+  planning: string;
+}
+
+const PARKED_LABELS = new Set(['needs-design', 'needs-discussion']);
+
+/**
+ * PAN-1866: Pick the highest-ranked eligible issue from a sequence node list.
+ *
+ * Eligibility rules:
+ * - gate must not be 'blocked'
+ * - not in-pipeline (active review/work/test)
+ * - no parked labels (needs-design, needs-discussion)
+ * - not in the optional exclusion set (e.g. already running agents)
+ *
+ * Returns null when no eligible issue is found.
+ */
+export function pickFromSequence(
+  nodes: ReadonlyArray<SequenceNode>,
+  opts?: {
+    excludeIssueIds?: ReadonlySet<string>;
+    issueLabels?: (issueId: string) => ReadonlyArray<string>;
+  },
+): SequencePickResult | null {
+  const sorted = [...nodes].sort((a, b) => a.rank - b.rank);
+  for (const node of sorted) {
+    if (node.gate === 'blocked') continue;
+    const reviewStatus = getReviewStatusSync(node.issue.toUpperCase());
+    const inPipeline = reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+    if (inPipeline) continue;
+    if (opts?.excludeIssueIds?.has(node.issue)) continue;
+    const labels = opts?.issueLabels?.(node.issue) ?? [];
+    if (labels.some((l) => PARKED_LABELS.has(l))) continue;
+    return { issueId: node.issue, rank: node.rank, gate: node.gate, planning: node.planning };
+  }
+  return null;
+}

@@ -718,6 +718,11 @@ export const ReadModelServiceLive = Layer.effect(
               } as any);
             }
           } catch { /* event store not ready yet */ }
+
+          // PAN-1866: debounced incremental sequencer pass on every backlog delta
+          import('../../lib/backlog/backlog-auto-trigger.js').then(({ triggerDebouncedIncrementalPass }) => {
+            triggerDebouncedIncrementalPass(process.cwd());
+          }).catch(() => {});
         });
       } catch {
         console.warn('[ReadModel] IssueDataService not available at bootstrap, starting with empty issues');

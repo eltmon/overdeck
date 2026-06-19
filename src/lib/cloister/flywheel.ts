@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +7,8 @@ import type { FlywheelRunId } from '@overdeck/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
+import { parseSequenceMd } from '../backlog/sequence-io.js';
+import { pickFromSequence } from '../flywheel-merge-order.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,
@@ -68,7 +71,31 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
       ? `Require UAT before merge: ${options.requireUatBeforeMerge}`
       : undefined,
   ].filter(Boolean).join('\n');
-  return configLines ? `\n\nRun configuration:\n${configLines}` : '';
+
+  let sequenceSection = '';
+  if (options.autoPickupBacklog) {
+    const seqPath = join(process.cwd(), '.pan', 'backlog', 'sequence.md');
+    if (existsSync(seqPath)) {
+      try {
+        const md = readFileSync(seqPath, 'utf-8');
+        const parsed = parseSequenceMd(md);
+        if (parsed.ok) {
+          const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
+            `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
+          );
+          const nextPick = pickFromSequence(parsed.doc.nodes);
+          const nextLine = nextPick
+            ? `Next eligible pick from sequence: ${nextPick.issueId} (rank ${nextPick.rank})`
+            : 'No eligible issue found in sequence';
+          sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked, use this order for pickup when auto_pickup_backlog=true):\n${top10.join('\n')}\n${nextLine}`;
+        }
+      } catch {
+        // sequence.md exists but couldn't be parsed — skip enrichment
+      }
+    }
+  }
+
+  return (configLines ? `\n\nRun configuration:\n${configLines}` : '') + sequenceSection;
 }
 
 function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): string {
