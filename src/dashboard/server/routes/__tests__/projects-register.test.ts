@@ -1,10 +1,10 @@
 /**
- * Tests for POST /api/projects (mode='existing') — PAN-1970
+ * Tests for POST /api/projects (mode='existing' and mode='new') — PAN-1970
  *
  * Tests the underlying helper logic rather than booting the full Effect server.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -33,20 +33,17 @@ vi.mock('../../../../lib/context-layers/index.js', () => ({
 import { registerProjectFromPath, DuplicateProjectError } from '../../../../lib/project-registration.js';
 import { getProjectSync, PROJECTS_CONFIG_FILE } from '../../../../lib/projects.js';
 
-// ─── Simulate the POST /api/projects route validation logic ─────────────────
-// We test the same code paths the route handler exercises without booting Effect.
+// ─── Shared simulation helpers ───────────────────────────────────────────────
 
-async function simulatePost(body: {
-  mode?: unknown;
+function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9-]/g, '-'); }
+
+async function simulateExisting(body: {
   path?: unknown;
   name?: unknown;
 }): Promise<{ status: number; json: Record<string, unknown> }> {
   const { isAbsolute } = await import('node:path');
   const { access } = await import('node:fs/promises');
 
-  if (body.mode !== 'existing') {
-    return { status: 400, json: { error: "mode must be 'existing'" } };
-  }
   const rawPath = body.path;
   if (typeof rawPath !== 'string' || !rawPath.trim()) {
     return { status: 400, json: { error: 'path is required' } };
@@ -54,11 +51,9 @@ async function simulatePost(body: {
   if (!isAbsolute(rawPath)) {
     return { status: 400, json: { error: 'path must be absolute' } };
   }
-  try {
-    await access(rawPath);
-  } catch {
-    return { status: 404, json: { error: `path does not exist: ${rawPath}` } };
-  }
+  try { await access(rawPath); }
+  catch { return { status: 404, json: { error: `path does not exist: ${rawPath}` } }; }
+
   const nameOpt = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
   try {
     const result = await registerProjectFromPath({ path: rawPath, name: nameOpt });
@@ -71,7 +66,60 @@ async function simulatePost(body: {
   }
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
+async function simulateNew(body: {
+  parentDir?: unknown;
+  name?: unknown;
+}): Promise<{ status: number; json: Record<string, unknown> }> {
+  const { isAbsolute, join: pathJoin } = await import('node:path');
+  const { access, mkdir, readdir } = await import('node:fs/promises');
+  const { exec } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execAsync = promisify(exec);
+
+  const rawName = body.name;
+  if (typeof rawName !== 'string' || !rawName.trim()) {
+    return { status: 400, json: { error: 'name is required for mode=new' } };
+  }
+  const rawParent = body.parentDir;
+  if (typeof rawParent !== 'string' || !rawParent.trim()) {
+    return { status: 400, json: { error: 'parentDir is required for mode=new' } };
+  }
+  if (!isAbsolute(rawParent)) {
+    return { status: 400, json: { error: 'parentDir must be absolute' } };
+  }
+
+  const name = rawName.trim();
+  const key = slugify(name);
+  const target = pathJoin(rawParent, slugify(name));
+
+  if (getProjectSync(key)) {
+    return { status: 409, json: { error: `project key '${key}' is already registered` } };
+  }
+
+  let targetExists = false;
+  try { await access(target); targetExists = true; } catch { /* ok */ }
+  if (targetExists) {
+    const entries = await readdir(target).catch(() => []);
+    if (entries.length > 0) {
+      return { status: 409, json: { error: `target directory already exists and is non-empty: ${target}` } };
+    }
+  }
+
+  await mkdir(target, { recursive: true });
+  await execAsync('git init', { cwd: target });
+
+  try {
+    const result = await registerProjectFromPath({ path: target, name });
+    return { status: 200, json: { key: result.key, name: result.config.name, path: result.config.path } };
+  } catch (err) {
+    if (err instanceof DuplicateProjectError) {
+      return { status: 409, json: { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath } };
+    }
+    throw err;
+  }
+}
+
+// ─── Setup ───────────────────────────────────────────────────────────────────
 
 let projDir: string;
 
@@ -86,64 +134,97 @@ afterEach(() => {
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
-describe('POST /api/projects (mode=existing) — logic', () => {
+// ─── mode='existing' tests ────────────────────────────────────────────────────
+
+describe("POST /api/projects mode='existing'", () => {
   it('registers a project and returns 200 { key, name, path }', async () => {
-    const res = await simulatePost({ mode: 'existing', path: projDir });
+    const res = await simulateExisting({ path: projDir });
     expect(res.status).toBe(200);
     expect(res.json.path).toBe(projDir);
     expect(typeof res.json.key).toBe('string');
-    expect(typeof res.json.name).toBe('string');
-
     const stored = getProjectSync(res.json.key as string);
-    expect(stored).not.toBeNull();
-    expect(stored!.path).toBe(projDir);
+    expect(stored?.path).toBe(projDir);
   });
 
   it('returns 400 when path is missing', async () => {
-    const res = await simulatePost({ mode: 'existing' });
+    const res = await simulateExisting({});
     expect(res.status).toBe(400);
-    expect(res.json.error).toMatch(/path is required/i);
-    // nothing registered
-    expect(getProjectSync('unknown')).toBeNull();
   });
 
   it('returns 404 when path does not exist', async () => {
-    const res = await simulatePost({ mode: 'existing', path: join(TEST_HOME, 'does-not-exist') });
+    const res = await simulateExisting({ path: join(TEST_HOME, 'no-such-dir') });
     expect(res.status).toBe(404);
-    expect(res.json.error).toMatch(/does not exist/i);
   });
 
-  it('returns 409 for a duplicate key and does not mutate projects.yaml', async () => {
-    // First registration succeeds
-    const res1 = await simulatePost({ mode: 'existing', path: projDir });
+  it('returns 409 for a duplicate key without mutating projects.yaml', async () => {
+    const res1 = await simulateExisting({ path: projDir });
     expect(res1.status).toBe(200);
 
-    // Second registration of the same name returns 409
-    const projDir2 = join(TEST_HOME, `proj-dup-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(projDir2, { recursive: true });
-    const res2 = await simulatePost({ mode: 'existing', path: projDir2, name: res1.json.name as string });
+    const dir2 = join(TEST_HOME, `proj2-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(dir2, { recursive: true });
+    const res2 = await simulateExisting({ path: dir2, name: res1.json.name as string });
     expect(res2.status).toBe(409);
-    expect(res2.json.key).toBe(res1.json.key);
+    expect(getProjectSync(res1.json.key as string)?.path).toBe(projDir);
+  });
+});
 
-    // Original entry is unchanged
-    const stored = getProjectSync(res1.json.key as string);
-    expect(stored!.path).toBe(projDir);
+// ─── mode='new' tests ─────────────────────────────────────────────────────────
+
+describe("POST /api/projects mode='new'", () => {
+  it('creates folder + .git + registers project, returns 200 { key, name, path }', async () => {
+    const parentDir = join(TEST_HOME, 'parent');
+    mkdirSync(parentDir, { recursive: true });
+    const name = 'my-new-app';
+
+    const res = await simulateNew({ parentDir, name });
+    expect(res.status).toBe(200);
+    expect(res.json.name).toBe(name);
+    expect(res.json.key).toBe('my-new-app');
+    const target = join(parentDir, 'my-new-app');
+    expect(res.json.path).toBe(target);
+
+    // git init actually ran
+    expect(existsSync(join(target, '.git'))).toBe(true);
+
+    // project is registered
+    expect(getProjectSync('my-new-app')?.path).toBe(target);
   });
 
-  it('returns 400 when mode is absent or wrong', async () => {
-    const r1 = await simulatePost({ mode: 'new', path: projDir });
-    expect(r1.status).toBe(400);
+  it('returns 409 for a non-empty existing target without any fs/registry change', async () => {
+    const parentDir = join(TEST_HOME, 'parent2');
+    mkdirSync(parentDir, { recursive: true });
+    const name = 'occupied';
+    const target = join(parentDir, 'occupied');
+    mkdirSync(target, { recursive: true });
+    writeFileSync(join(target, 'existing.txt'), 'content'); // non-empty
 
-    const r2 = await simulatePost({ path: projDir });
-    expect(r2.status).toBe(400);
+    const res = await simulateNew({ parentDir, name });
+    expect(res.status).toBe(409);
+    expect(res.json.error).toMatch(/non-empty/i);
+    // nothing registered
+    expect(getProjectSync('occupied')).toBeNull();
   });
 
-  it('writes the fs-helper.mjs-created tmp file to confirm access check', async () => {
-    // Confirm that a file (not a dir) still resolves — access only checks existence, not type
-    const file = join(TEST_HOME, 'a-file.txt');
-    writeFileSync(file, '');
-    const res = await simulatePost({ mode: 'existing', path: file });
-    // access() succeeds on files too; registerProjectFromPath handles from there
-    expect([200, 500]).toContain(res.status); // may fail downstream on non-dir readdir, that's OK
+  it('returns 409 for a dup key before any mkdir/git init (no orphan folder)', async () => {
+    const parentDir = join(TEST_HOME, 'parent3');
+    mkdirSync(parentDir, { recursive: true });
+    // Pre-register the key
+    const dirA = join(TEST_HOME, 'existing-app');
+    mkdirSync(dirA, { recursive: true });
+    await simulateExisting({ path: dirA, name: 'new-app' });
+
+    const res = await simulateNew({ parentDir, name: 'new-app' });
+    expect(res.status).toBe(409);
+    // No orphan folder was created
+    expect(existsSync(join(parentDir, 'new-app'))).toBe(false);
+  });
+
+  it('no execSync import in routes/projects.ts', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const src = await readFile(
+      new URL('../projects.ts', import.meta.url).pathname,
+      'utf-8',
+    );
+    expect(src).not.toMatch(/execSync/);
   });
 });
