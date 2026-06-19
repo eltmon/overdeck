@@ -167,17 +167,18 @@ function readServerCmdlineSync(pid: number): string {
  * scope (servers founded before this fix, or by manual tmux use). Never auto-
  * restart — the operator must decide when to migrate off the live founder.
  */
-function warnIfServerInTmuxSpawnScopeSync(): void {
+function warnIfServerInTmuxSpawnScopeSync(): boolean {
   const pid = findManagedServerPidSync();
-  if (pid === undefined) return;
+  if (pid === undefined) return false;
   const cgroup = readServerCgroupSync(pid);
-  if (!cgroup.includes('tmux-spawn-')) return;
+  if (!cgroup.includes('tmux-spawn-')) return false;
   console.warn(
     `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} lives in a per-spawn scope. ` +
       `Cgroup: ${cgroup.trim().replace(/\n/g, ' ')}. ` +
       `Killing the founding session/agent may destroy the entire shared server. ` +
       `Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
   );
+  return true;
 }
 
 /**
@@ -186,19 +187,20 @@ function warnIfServerInTmuxSpawnScopeSync(): void {
  * cmdline embeds the founding session name, so any cmdline-match teardown
  * (pkill -f, pgrep -f) can hit the server itself. Never auto-restart.
  */
-function warnIfServerCmdlineIsDirtySync(): void {
+function warnIfServerCmdlineIsDirtySync(): boolean {
   const pid = findManagedServerPidSync();
-  if (pid === undefined) return;
+  if (pid === undefined) return false;
   const cmdline = readServerCmdlineSync(pid);
   // A clean dedicated founding looks like `tmux -L overdeck -f ... start-server`.
   // Any `new-session` in the server argv means a client founded the server.
-  if (!cmdline.includes('new-session')) return;
+  if (!cmdline.includes('new-session')) return false;
   console.warn(
     `[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} has a dirty cmdline ` +
       `founded by a client new-session: ${cmdline.slice(0, 240)}. ` +
       `Conversation/agent teardown that matches cmdlines may destroy the entire shared server. ` +
       `Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`,
   );
+  return true;
 }
 
 /**
@@ -239,8 +241,9 @@ function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
   }
 }
 
-/** PAN-1798: surface the dirty-founding teardown hazard once per process, not per spawn. */
-let warnedManagedServerDirty = false;
+/** PAN-1798: surface dirty-founding teardown hazards once per process, not per spawn. */
+let warnedManagedServerTmuxSpawnScope = false;
+let warnedManagedServerDirtyCmdline = false;
 
 /**
  * PAN-1798: ensure the shared tmux server is running in a dedicated, long-lived
@@ -268,10 +271,11 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
     // even on a server founded by a stray client `new-session`.
     sanitizeManagedServerGlobalEnvSync(cleanEnv);
     // Surface the dirty-founding teardown hazard once per process (not per spawn).
-    if (!warnedManagedServerDirty) {
-      warnIfServerInTmuxSpawnScopeSync();
-      warnIfServerCmdlineIsDirtySync();
-      warnedManagedServerDirty = true;
+    if (!warnedManagedServerTmuxSpawnScope) {
+      warnedManagedServerTmuxSpawnScope = warnIfServerInTmuxSpawnScopeSync();
+    }
+    if (!warnedManagedServerDirtyCmdline) {
+      warnedManagedServerDirtyCmdline = warnIfServerCmdlineIsDirtySync();
     }
     return;
   }
