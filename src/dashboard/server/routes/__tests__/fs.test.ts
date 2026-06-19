@@ -6,30 +6,40 @@
  * the escape-home security rejection.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import { readdir } from 'node:fs/promises';
+import { readdir, realpath } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 
 // ─── Inline the route logic to test it without booting Effect ────────────────
-
-function isWithinHome(p: string, home: string): boolean {
-  return p === home || p.startsWith(home.endsWith(sep) ? home : `${home}${sep}`);
-}
+// Mirrors the implementation in routes/fs.ts — keep in sync.
 
 async function listDirsLogic(rawPath: string | null, home: string): Promise<
   | { ok: true; path: string; parent: string | null; entries: { name: string; path: string }[] }
   | { ok: false; status: number; error: string }
 > {
   const { normalize } = await import('node:path');
-  const target = rawPath ? resolve(normalize(rawPath)) : home;
 
-  if (!isWithinHome(target, home)) {
+  // Canonicalize home to resolve any symlinks in the home path itself.
+  let canonicalHome: string;
+  try { canonicalHome = await realpath(home); }
+  catch { canonicalHome = home; }
+
+  const isWithinHome = (p: string) =>
+    p === canonicalHome || p.startsWith(canonicalHome.endsWith(sep) ? canonicalHome : `${canonicalHome}${sep}`);
+
+  // Resolve and canonicalize the requested path (follows symlinks → detects escapes).
+  const rawResolved = rawPath ? resolve(normalize(rawPath)) : home;
+  let target: string;
+  try { target = await realpath(rawResolved); }
+  catch { return { ok: false, status: 400, error: 'Path does not exist' }; }
+
+  if (!isWithinHome(target)) {
     return { ok: false, status: 400, error: 'Path is outside home directory' };
   }
 
-  const parent = target === home ? null : resolve(target, '..');
+  const parent = target === canonicalHome ? null : resolve(target, '..');
 
   const dirents = await readdir(target, { withFileTypes: true });
   const entries = dirents
@@ -110,5 +120,24 @@ describe('GET /api/fs/list-dirs logic', () => {
     if (!result.ok) return;
     expect(result.path).toBe(subA);
     expect(result.parent).toBe(tmpHome);
+  });
+
+  it('rejects a symlink inside home that points outside home (symlink bypass regression)', async () => {
+    // Create a real directory outside the temp home to link to.
+    const outsideDir = join(tmpdir(), `fs-outside-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(outsideDir, { recursive: true });
+    try {
+      // Create a symlink inside tmpHome that points to the outside directory.
+      const linkInsideHome = join(tmpHome, 'escape-link');
+      symlinkSync(outsideDir, linkInsideHome);
+
+      const result = await listDirsLogic(linkInsideHome, tmpHome);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.status).toBe(400);
+      expect(result.error).toMatch(/outside home/i);
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 });

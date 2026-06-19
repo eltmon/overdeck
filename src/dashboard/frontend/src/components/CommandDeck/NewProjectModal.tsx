@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { X, FolderPlus } from 'lucide-react';
 import { fetchWithTimeout } from '../../lib/apiFetch.js';
 import { FolderPicker } from './FolderPicker.js';
@@ -26,8 +26,26 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
   const [selectedPath, setSelectedPath] = useState('');
   const [name, setName] = useState('');
   const [parentDir, setParentDir] = useState('');
+  const [overdeckDefault, setOverdeckDefault] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch home dir once on open to derive the ~/Overdeck default parent for new projects.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithTimeout('/api/fs/list-dirs', { credentials: 'include' });
+        if (cancelled || !res?.ok) return;
+        const data = await res.json() as { path: string };
+        const d = `${data.path}/Overdeck`;
+        setOverdeckDefault(d);
+        setParentDir((prev) => prev || d);
+      } catch { /* non-fatal — user can pick manually */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -149,7 +167,10 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
                 <p style={{ fontSize: 12, color: 'var(--muted-foreground)', margin: 0 }}>
                   Parent folder
                 </p>
-                <FolderPicker onSelect={(path) => setParentDir(path)} />
+                <FolderPicker
+                  onSelect={(path) => setParentDir(path)}
+                  initialPath={overdeckDefault || undefined}
+                />
               </div>
               {preview && (
                 <div

@@ -4,7 +4,7 @@
  *   GET /api/fs/list-dirs?path=<abs>   — list immediate subdirectories, home-clamped + auth-gated
  */
 
-import { readdir } from 'node:fs/promises';
+import { readdir, realpath } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve, normalize, sep } from 'node:path';
 
@@ -26,29 +26,39 @@ const listDirsRoute = HttpRouter.add(
     if (authError) return authError;
 
     const home = homedir();
-    const isWithinHome = (p: string) =>
-      p === home ||
-      p.startsWith(home.endsWith(sep) ? home : `${home}${sep}`);
-
     const params = new URL(req.url, 'http://localhost').searchParams;
     const rawPath = params.get('path');
-    const target = rawPath ? resolve(normalize(rawPath)) : home;
 
-    if (!isWithinHome(target)) {
-      return jsonResponse({ error: 'Path is outside home directory' }, { status: 400 });
-    }
+    return yield* Effect.promise(async () => {
+      // Canonicalize home to resolve any symlinks in the home path itself.
+      let canonicalHome: string;
+      try { canonicalHome = await realpath(home); }
+      catch { canonicalHome = home; }
 
-    const parent = target === home ? null : resolve(target, '..');
+      const isWithinHome = (p: string) =>
+        p === canonicalHome ||
+        p.startsWith(canonicalHome.endsWith(sep) ? canonicalHome : `${canonicalHome}${sep}`);
 
-    const entries = yield* Effect.promise(async () => {
+      // Resolve and canonicalize the requested path (follows symlinks → detects escapes).
+      const rawResolved = rawPath ? resolve(normalize(rawPath)) : home;
+      let target: string;
+      try { target = await realpath(rawResolved); }
+      catch { return jsonResponse({ error: 'Path does not exist' }, { status: 400 }); }
+
+      if (!isWithinHome(target)) {
+        return jsonResponse({ error: 'Path is outside home directory' }, { status: 400 });
+      }
+
+      const parent = target === canonicalHome ? null : resolve(target, '..');
+
       const dirents = await readdir(target, { withFileTypes: true });
-      return dirents
+      const entries = dirents
         .filter((d) => d.isDirectory())
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((d) => ({ name: d.name, path: resolve(target, d.name) }));
-    });
 
-    return jsonResponse({ path: target, parent, entries });
+      return jsonResponse({ path: target, parent, entries });
+    });
   })),
 );
 

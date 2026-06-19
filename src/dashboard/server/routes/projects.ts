@@ -6,8 +6,9 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET /api/projects/:projectKey/session-tree
  */
 
-import { access, readFile, readdir, mkdir, stat } from 'node:fs/promises';
-import { join, isAbsolute } from 'node:path';
+import { access, readFile, readdir, mkdir, stat, realpath } from 'node:fs/promises';
+import { join, isAbsolute, sep, resolve, normalize } from 'node:path';
+import { homedir } from 'node:os';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -605,6 +606,16 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
   })),
 );
 
+// ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──
+
+async function buildHomeGuard(): Promise<(p: string) => boolean> {
+  const home = homedir();
+  let ch: string;
+  try { ch = await realpath(home); }
+  catch { ch = home; }
+  return (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
+}
+
 // ─── Route: POST /api/projects ───────────────────────────────────────────────
 // PAN-1970: register a project in mode='existing' or create one in mode='new'.
 
@@ -639,8 +650,18 @@ const postProjectsRoute = HttpRouter.add(
       return yield* Effect.promise(async () => {
         try { await access(rawPath); }
         catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
+
+        // Canonicalize and enforce home-directory boundary (rejects symlink escapes).
+        const withinHome = await buildHomeGuard();
+        let canonicalPath: string;
+        try { canonicalPath = await realpath(rawPath); }
+        catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
+        if (!withinHome(canonicalPath)) {
+          return jsonResponse({ error: 'path is outside home directory' }, { status: 400 });
+        }
+
         try {
-          const result = await registerProjectFromPath({ path: rawPath, name: nameOpt });
+          const result = await registerProjectFromPath({ path: canonicalPath, name: nameOpt });
           return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
         } catch (err) {
           if (err instanceof DuplicateProjectError) {
@@ -671,7 +692,11 @@ const postProjectsRoute = HttpRouter.add(
 
       const name = rawName.trim();
       const key = slugify(name);
-      const target = join(rawParent, slugify(name));
+
+      // Reject names whose slug contains no alphanumeric characters (e.g., "!!!").
+      if (!key.replace(/-/g, '')) {
+        return jsonResponse({ error: 'Name must contain at least one alphanumeric character' }, { status: 400 });
+      }
 
       // Dup-check BEFORE any fs work.
       if (getProjectSync(key)) {
@@ -682,6 +707,17 @@ const postProjectsRoute = HttpRouter.add(
       }
 
       return yield* Effect.promise(async () => {
+        // Canonicalize parentDir and enforce home-directory boundary (rejects symlink escapes).
+        const withinHome = await buildHomeGuard();
+        let canonicalParent: string;
+        try { canonicalParent = await realpath(rawParent); }
+        catch { return jsonResponse({ error: 'parentDir does not exist' }, { status: 400 }); }
+        if (!withinHome(canonicalParent)) {
+          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
+        }
+
+        const target = join(canonicalParent, key);
+
         // If target exists and is non-empty, reject with no fs change.
         let targetExists = false;
         try {

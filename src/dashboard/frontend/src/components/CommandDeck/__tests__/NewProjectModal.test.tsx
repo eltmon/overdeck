@@ -98,8 +98,10 @@ describe('NewProjectModal', () => {
     fireEvent.click(screen.getByTestId('new-project-start'));
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledOnce();
-      const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+      // Mount also calls fetchWithTimeout for the home dir; filter for the /api/projects POST.
+      const projectCalls = mockFetch.mock.calls.filter(([url]) => url === '/api/projects');
+      expect(projectCalls).toHaveLength(1);
+      const [url, opts] = projectCalls[0] as [string, RequestInit];
       expect(url).toBe('/api/projects');
       const body = JSON.parse(opts.body as string);
       expect(body).toEqual({ mode: 'existing', path: '/mock/path' });
@@ -114,7 +116,7 @@ describe('NewProjectModal', () => {
 
     fireEvent.click(screen.getByTestId('new-project-tab-new'));
 
-    // Select parent dir → parentDir = '/mock/path'
+    // Select parent dir → parentDir = '/mock/path' (overrides the Overdeck default)
     fireEvent.click(screen.getByTestId('mock-folder-picker'));
     // Type name
     fireEvent.change(screen.getByTestId('new-project-name-input'), { target: { value: 'My App' } });
@@ -122,11 +124,33 @@ describe('NewProjectModal', () => {
     fireEvent.click(screen.getByTestId('new-project-start'));
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledOnce();
-      const [url, opts] = mockFetch.mock.calls[0] as [string, RequestInit];
+      // Mount also calls fetchWithTimeout for the home dir; filter for the /api/projects POST.
+      const projectCalls = mockFetch.mock.calls.filter(([url]) => url === '/api/projects');
+      expect(projectCalls).toHaveLength(1);
+      const [url, opts] = projectCalls[0] as [string, RequestInit];
       expect(url).toBe('/api/projects');
       const body = JSON.parse(opts.body as string);
       expect(body).toEqual({ mode: 'new', parentDir: '/mock/path', name: 'My App' });
+    });
+  });
+
+  it("new mode default parent is ~/Overdeck when home fetch succeeds", async () => {
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/fs/list-dirs') {
+        return Promise.resolve(makeOkResponse({ path: '/home/testuser', parent: null, entries: [] }));
+      }
+      return Promise.resolve(makeOkResponse({ key: 'bugs', name: 'Bugs', path: '/home/testuser/Overdeck/bugs' }));
+    });
+
+    render(<NewProjectModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('new-project-tab-new'));
+
+    // Type a name (without selecting a parent) — default parent should already be set
+    fireEvent.change(screen.getByTestId('new-project-name-input'), { target: { value: 'Bugs' } });
+
+    await waitFor(() => {
+      const preview = screen.getByTestId('new-project-preview');
+      expect(preview.textContent).toBe('/home/testuser/Overdeck/bugs');
     });
   });
 
