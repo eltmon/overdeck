@@ -77,7 +77,45 @@ vi.mock('../issue-closed.js', () => ({
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
+  emitActivityTts: vi.fn(),
+  emitActivityTtsSync: vi.fn(),
 }));
+
+vi.mock('../../persistent-logger.js', () => ({
+  logDeaconEvent: vi.fn(),
+  logDeaconEventSync: vi.fn(),
+  logAgentLifecycle: vi.fn(),
+  logAgentLifecycleSync: vi.fn(),
+}));
+
+vi.mock('../no-resume-mode.js', () => ({
+  getNoResumeMode: () => ({ active: false, since: null }),
+}));
+
+vi.mock('../concurrency.js', () => ({
+  workResumeSlotsAvailable: () => 1,
+  countRunningAgents: () => ({ work: 0, advancing: 0, total: 0 }),
+  getConcurrencyLimits: () => ({
+    maxWorkAgents: 6,
+    reservedAdvancingSlots: 3,
+    totalCeiling: 9,
+    exemptOperatorStarted: true,
+  }),
+  resetPatrolDispatchBudget: vi.fn(),
+  tryReserveAdvancingSlot: () => true,
+  releaseAdvancingSlot: vi.fn(),
+  describeRunningAgents: () => 'counts: work=0 advancing=0 total=0/9 | advancing=[] work=[]',
+}));
+
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    default: actual,
+    loadavg: () => [0.5, 0.5, 0.5],
+    cpus: () => Array.from({ length: 8 }, () => ({}) as ReturnType<typeof actual.cpus>[number]),
+  };
+});
 
 vi.mock('../../review-status.js', () => ({
   loadReviewStatuses: vi.fn(() => ({})),
@@ -153,9 +191,9 @@ vi.mock('../../tmux.js', async () => {
   };
   return {
   sessionExists: effectMock(false),
-  sessionExistsSync: effectMock(false),
+  sessionExistsSync: vi.fn(() => false),
   killSession: effectMock(undefined),
-  killSessionSync: effectMock(undefined),
+  killSessionSync: vi.fn(() => undefined),
   };
 });
 

@@ -554,7 +554,7 @@ export const ReadModelServiceLive = Layer.effect(
       };
 
       console.log(
-        `[ReadModel] Bootstrapped from overdeck.db: ` +
+        `[ReadModel] Bootstrapped from the Overdeck database: ` +
         `${Object.keys(agentsById).length} agents, ` +
         `${Object.keys(result.reviewStatusByIssueId).length} review statuses, ` +
         `${result.issuesEnumerated} in-flight issue(s), seq=${sequence}`,
