@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1970",
   "created": "2026-06-19T17:59:04.370Z",
-  "updated": "2026-06-19T19:15:04.790Z",
+  "updated": "2026-06-19T20:11:55.173Z",
   "gitState": {
     "branch": "feature/pan-1970",
     "sha": "8aabbadb68",
@@ -104,6 +104,11 @@
     },
     {
       "timestamp": "2026-06-19T19:15:04.788Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-06-19T20:11:55.172Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     }

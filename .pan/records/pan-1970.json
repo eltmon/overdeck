@@ -97,20 +97,20 @@
   ],
   "feedback": [],
   "created": "2026-06-19T17:59:04.545Z",
-  "updated": "2026-06-19T20:11:19.830Z",
+  "updated": "2026-06-19T20:17:15.940Z",
   "pipeline": {
     "issueId": "PAN-1970",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-19T20:04:21.654Z",
-    "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Acceptance criteria check FAILED — 14/33 AC incomplete:\n\n### Extend POST /api/projects with mode='new' (mkdir + async git init) (5/5 incomplete)\n  - [ ] POST /api/projects {mode:'new', parentDir, name} creates <parentDir>/<slug(name)>, runs git init, registers key=slug(name), and returns 200 { key, name, path } with path === the created folder.\n  - [ ] After a successful 'new' create, the target folder contains a .git directory (git init actually ran).\n  - [ ] POST 'new' where the target exists and is non-empty returns 409 and makes no filesystem change and no registration (no partial write).\n  - [ ] POST 'new' whose derived key duplicates an existing project returns 409 before any mkdir/git init runs (no orphan folder).\n  - [ ] A route test covers new-mode success (folder + .git + registered), non-empty-target -> 409 (no fs/registry change), and dup-key -> 409; and asserts no new `execSync` import was added to the route.\n\n### New Project modal (toggle + both modes + path preview + Start -> POST) (5/5 incomplete)\n  - [ ] The modal renders an 'Add existing | New project' toggle; switching the toggle swaps between the folder-picker (existing) form and the name+parent (new) form.\n  - [ ] In 'New project' mode the live preview displays `<parent>/<slug(name)>` and updates as the name input changes (e.g. 'My App' -> <parent>/my-app).\n  - [ ] Clicking Start sends the correct POST body to /api/projects: { mode:'existing', path } in existing mode and { mode:'new', parentDir, name } in new mode.\n  - [ ] When the server returns an error response, the modal displays the error message inline and stays open (no crash, no navigation).\n  - [ ] A co-located Vitest test (mocked fetch) covers toggle switching, the new-mode slug preview, and the correct POST body per mode.\n\n### Wire onNewProject() to open the modal; on success refetch lists + select project (4/4 incomplete)\n  - [ ] A single '+ New Project' affordance in the sidebar PROJECTS header (and Home Projects section) opens the New Project modal via onNewProject(); no duplicate trigger is rendered if PAN-1969 already added one.\n  - [ ] On a successful create the app invalidates/refetches both ['command-deck-projects'] and ['registered-projects'] so the new project appears in the sidebar and Home without a reload.\n  - [ ] On a successful create the app opens the new project: it calls setSelectedProjectKey(key) and usePanesStore.ensureHome(key) with the new key.\n  - [ ] A Vitest test asserts the success path invalidates both query keys and selects the new project key.",
+    "updatedAt": "2026-06-19T20:17:14.207Z",
+    "reviewNotes": "server-side home-directory boundary can be bypassed",
     "inspectNotes": "Inspection error for bead workspace-lvoqt: tmux session inspect-pan-1970-workspace-lvoqt exited before producing a verdict. No verdict was produced.",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/1974"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/1974",
+    "lastVerifiedCommit": "177f49b0231f3a7dfb56e622978b0b2e0ec12872"
   },
   "closeOut": {
     "usage": {
@@ -125,10 +125,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 364,
-            "output": 147591,
-            "cacheRead": 43936340,
-            "cacheWrite": 628423
+            "input": 421,
+            "output": 165553,
+            "cacheRead": 51598771,
+            "cacheWrite": 751902
           }
         }
       },
@@ -140,15 +140,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 364,
-          "output": 147591,
-          "cacheRead": 43936340,
-          "cacheWrite": 628423
+          "input": 421,
+          "output": 165553,
+          "cacheRead": 51598771,
+          "cacheWrite": 751902
         }
       },
       "costAtCloseOut": {
-        "usd": 17.898752,
-        "pricingAsOf": "2026-06-19T20:04:21.664Z"
+        "usd": 20.930128,
+        "pricingAsOf": "2026-06-19T20:17:14.234Z"
       }
     },
     "merges": [
