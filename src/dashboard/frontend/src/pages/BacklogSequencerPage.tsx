@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ListOrdered, RefreshCw } from 'lucide-react';
+import { ListOrdered, GitFork, RefreshCw } from 'lucide-react';
+import { BacklogDAG } from '../components/backlog/BacklogDAG';
 
 interface SequenceNode {
   issueId: string;
@@ -10,16 +12,27 @@ interface SequenceNode {
   condition: string;
   dependsOn: string[];
   why: string;
+  rationale?: string;
   gate: string;
   planning: string;
   inPipeline: boolean;
 }
 
-interface SequenceResponse {
-  nodes: SequenceNode[];
+interface SequenceEdge {
+  from: string;
+  to: string;
+  type: string;
 }
 
+interface SequenceResponse {
+  nodes: SequenceNode[];
+  edges: SequenceEdge[];
+}
+
+type View = 'list' | 'dag';
+
 export function BacklogSequencerPage() {
+  const [view, setView] = useState<View>('list');
   const { data, isLoading, error, refetch } = useQuery<SequenceResponse>({
     queryKey: ['backlog-sequence'],
     queryFn: async () => {
@@ -52,6 +65,23 @@ export function BacklogSequencerPage() {
         {nodes.length > 0 && (
           <span className="text-xs text-[var(--color-fg-muted)]">{nodes.length} issues</span>
         )}
+        {/* View toggle */}
+        <div className="ml-4 flex rounded overflow-hidden border border-[var(--color-border)]">
+          <button
+            onClick={() => setView('list')}
+            className={`px-2 py-1 text-xs flex items-center gap-1 ${view === 'list' ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+          >
+            <ListOrdered className="w-3 h-3" />
+            List
+          </button>
+          <button
+            onClick={() => setView('dag')}
+            className={`px-2 py-1 text-xs flex items-center gap-1 ${view === 'dag' ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+          >
+            <GitFork className="w-3 h-3" />
+            DAG
+          </button>
+        </div>
         <button
           onClick={() => refetch()}
           className="ml-auto p-1.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
@@ -61,7 +91,8 @@ export function BacklogSequencerPage() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
         {isLoading && (
           <div className="flex items-center justify-center h-32 text-[var(--color-fg-muted)] text-sm">
             Loading sequence…
@@ -79,57 +110,66 @@ export function BacklogSequencerPage() {
             <p className="text-xs">Run a sequencer pass to rank the open backlog.</p>
           </div>
         )}
-        {nodes.length > 0 && (
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-              <tr className="text-[var(--color-fg-muted)]">
-                <th className="text-right px-3 py-2 font-medium w-10">#</th>
-                <th className="text-left px-2 py-2 font-medium w-28">Issue</th>
-                <th className="text-left px-2 py-2 font-medium">Why</th>
-                <th className="text-center px-2 py-2 font-medium w-14">Size</th>
-                <th className="text-center px-2 py-2 font-medium w-20">Condition</th>
-                <th className="text-center px-2 py-2 font-medium w-16">Gate</th>
-                <th className="text-center px-2 py-2 font-medium w-14">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {nodes.map((node) => (
-                <tr
-                  key={node.issueId}
-                  className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-hover)] transition-colors"
-                >
-                  <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
-                    {node.rank}
-                  </td>
-                  <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
-                    {node.issueId}
-                    {node.inPipeline && (
-                      <span className="ml-1 text-[9px] text-green-400 align-top">▶</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-2 text-[var(--color-fg-muted)] max-w-xs truncate">
-                    {node.why}
-                  </td>
-                  <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
-                    {node.size}
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}>
-                      {node.condition}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
-                      {node.gate}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
-                    {node.score}
-                  </td>
+
+        {/* List view */}
+        {!isLoading && !error && nodes.length > 0 && view === 'list' && (
+          <div className="overflow-y-auto h-full">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
+                <tr className="text-[var(--color-fg-muted)]">
+                  <th className="text-right px-3 py-2 font-medium w-10">#</th>
+                  <th className="text-left px-2 py-2 font-medium w-28">Issue</th>
+                  <th className="text-left px-2 py-2 font-medium">Why</th>
+                  <th className="text-center px-2 py-2 font-medium w-14">Size</th>
+                  <th className="text-center px-2 py-2 font-medium w-20">Condition</th>
+                  <th className="text-center px-2 py-2 font-medium w-16">Gate</th>
+                  <th className="text-center px-2 py-2 font-medium w-14">Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {nodes.map((node) => (
+                  <tr
+                    key={node.issueId}
+                    className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-hover)] transition-colors"
+                  >
+                    <td className="text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums">
+                      {node.rank}
+                    </td>
+                    <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
+                      {node.issueId}
+                      {node.inPipeline && (
+                        <span className="ml-1 text-[9px] text-green-400 align-top">▶</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-[var(--color-fg-muted)] max-w-xs truncate">
+                      {node.why}
+                    </td>
+                    <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
+                      {node.size}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${conditionBadge(node.condition)}`}>
+                        {node.condition}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${gateBadge(node.gate)}`}>
+                        {node.gate}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
+                      {node.score}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* DAG view */}
+        {!isLoading && !error && nodes.length > 0 && view === 'dag' && data && (
+          <BacklogDAG data={data} className="w-full h-full" />
         )}
       </div>
     </div>

@@ -37,13 +37,23 @@ const getBacklogSequenceRoute = HttpRouter.add(
       try: () => {
         const projectRoot = process.cwd();
         let rows = getBacklogSequence('overdeck');
+        let edges: Array<{ from: string; to: string; type: string }> = [];
+        const rationaleMap = new Map<string, string>();
 
-        if (rows.length === 0) {
-          const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
-          if (existsSync(seqPath)) {
-            const md = readFileSync(seqPath, 'utf-8');
-            const parsed = parseSequenceMd(md);
-            if (parsed.ok) {
+        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+        if (existsSync(seqPath)) {
+          const md = readFileSync(seqPath, 'utf-8');
+          const parsed = parseSequenceMd(md);
+          if (parsed.ok) {
+            edges = parsed.doc.edges.map((e) => ({
+              from: e.from,
+              to: e.to,
+              type: e.type,
+            }));
+            for (const n of parsed.doc.nodes) {
+              if (n.rationale) rationaleMap.set(n.issue.toUpperCase(), n.rationale);
+            }
+            if (rows.length === 0) {
               rows = parsed.doc.nodes.map((n) => ({
                 issueId: n.issue,
                 rank: n.rank,
@@ -65,10 +75,11 @@ const getBacklogSequenceRoute = HttpRouter.add(
           const reviewStatus = getReviewStatusSync(row.issueId.toUpperCase());
           const inPipeline =
             reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
-          return { ...row, inPipeline };
+          const rationale = rationaleMap.get(row.issueId.toUpperCase());
+          return { ...row, inPipeline, ...(rationale ? { rationale } : {}) };
         });
 
-        return jsonResponse({ nodes: joined });
+        return jsonResponse({ nodes: joined, edges });
       },
       catch: (err) => new Error(String(err)),
     });
