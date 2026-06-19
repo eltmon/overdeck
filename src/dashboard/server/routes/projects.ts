@@ -14,6 +14,8 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
+import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { extractPrefixSync } from '../../../lib/issue-id.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -599,11 +601,66 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/projects ───────────────────────────────────────────────
+// PAN-1970: register an existing directory as a project (mode='existing').
+
+const postProjectsRoute = HttpRouter.add(
+  'POST',
+  '/api/projects',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
+    const body = (yield* readProjectJsonBody) as { mode?: unknown; path?: unknown; name?: unknown };
+
+    if (body.mode !== 'existing') {
+      return jsonResponse({ error: "mode must be 'existing'" }, { status: 400 });
+    }
+
+    const rawPath = body.path;
+    if (typeof rawPath !== 'string' || !rawPath.trim()) {
+      return jsonResponse({ error: 'path is required' }, { status: 400 });
+    }
+
+    const { isAbsolute } = await import('node:path');
+    const { access: fsAccess } = await import('node:fs/promises');
+
+    if (!isAbsolute(rawPath)) {
+      return jsonResponse({ error: 'path must be absolute' }, { status: 400 });
+    }
+
+    try {
+      await fsAccess(rawPath);
+    } catch {
+      return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 });
+    }
+
+    const nameOpt = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
+
+    return yield* Effect.promise(async () => {
+      try {
+        const result = await registerProjectFromPath({ path: rawPath, name: nameOpt });
+        return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
+      } catch (err) {
+        if (err instanceof DuplicateProjectError) {
+          return jsonResponse(
+            { error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath },
+            { status: 409 },
+          );
+        }
+        throw err;
+      }
+    });
+  })),
+);
+
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
+  postProjectsRoute,
 );
 
 export default projectsRouteLayer;
