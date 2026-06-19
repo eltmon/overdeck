@@ -37,7 +37,7 @@ const TEST_BLOCKED_STATUSES = new Set(['failed', 'dispatch_failed']);
 const MERGE_BLOCKED_STATUSES = new Set(['failed']);
 const VERIFICATION_BLOCKED_STATUSES = new Set(['failed']);
 
-type PipelineClassifierIssue = Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus'>;
+type PipelineClassifierIssue = Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels'>;
 type PipelineClassifierAgent = Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'>;
 
 function hasActiveWorkSession(feature: ProjectFeature): boolean {
@@ -82,6 +82,7 @@ function classifierIssue(feature: ProjectFeature, reviewStatus: ReviewStatusSnap
     hasPlan: feature.hasPlanning,
     planningComplete: feature.hasPlanning && !hasWorkSession(feature),
     mergeStatus: reviewStatus?.mergeStatus,
+    labels: [],
   };
 }
 

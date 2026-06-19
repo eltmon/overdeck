@@ -15,7 +15,10 @@ import TopBar from '../primitives/TopBar';
 import VerbBadge from '../primitives/VerbBadge';
 import { IssueActionMenu } from '../IssueActionMenu';
 
-const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'verifying', 'work', 'plan', 'todo'];
+// 'todo' (raw backlog) is intentionally excluded from the rendered phases — only
+// Definition-of-Ready issues surface, in the 'ready' lane (PAN-1966). Backlog is
+// still grouped (see groupedIssues) but never shown.
+const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'verifying', 'work', 'plan', 'ready'];
 const PHASE_FILTERS: Array<PipelineIssuePhase | 'all'> = ['all', ...PHASES];
 
 const PRIORITY_MAP: Record<number, IssueRowPriority> = {
@@ -177,6 +180,7 @@ function verbBadgeForPhase(phase: PipelineIssuePhase) {
   if (phase === 'verifying') return <VerbBadge variant="MERGED" />;
   if (phase === 'work') return <VerbBadge variant="WORK RUNNING" />;
   if (phase === 'plan') return <VerbBadge variant="PLANNING" />;
+  if (phase === 'ready') return <VerbBadge variant="READY" />;
   return <VerbBadge variant="QUEUED FOR PLAN" />;
 }
 
@@ -243,6 +247,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
     verifying: null,
     work: null,
     plan: null,
+    ready: null,
     todo: null,
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -294,6 +299,7 @@ export function PipelineView({ onSearchOpen, onTabChange }: PipelineViewProps = 
       verifying: [],
       work: [],
       plan: [],
+      ready: [],
       todo: [],
     };
 

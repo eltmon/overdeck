@@ -13,7 +13,8 @@ export type VerbBadgeVariant =
   | 'MERGE BLOCKED'
   | 'CI BLOCKED'
   | 'STUCK · Nh'
-  | 'QUEUED FOR PLAN';
+  | 'QUEUED FOR PLAN'
+  | 'READY';
 
 type StaticVerbBadgeVariant = Exclude<VerbBadgeVariant, 'STUCK · Nh'>;
 
@@ -85,6 +86,11 @@ const STATIC_VARIANTS = {
   'QUEUED FOR PLAN': {
     label: 'QUEUED FOR PLAN',
     className: 'bg-transparent border-border text-muted-foreground',
+    pulse: false,
+  },
+  READY: {
+    label: 'READY',
+    className: 'badge-bg-info badge-border-info text-info-foreground',
     pulse: false,
   },
 } satisfies Record<StaticVerbBadgeVariant, VerbBadgeConfig>;

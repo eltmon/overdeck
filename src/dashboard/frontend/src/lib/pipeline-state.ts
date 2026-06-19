@@ -1,6 +1,6 @@
 import type { Agent, Issue } from '../types';
 
-export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo' | 'verifying';
+export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
 
 type PipelineStateLike = {
   reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
@@ -113,8 +113,19 @@ export function isDeaconIgnored(status?: PipelineStateLike | null): boolean {
   return status?.deaconIgnored === true;
 }
 
+/**
+ * Definition of Ready (PAN-1966): an issue is deliberately "ready to work" when
+ * it carries a GitHub/GitLab `ready` label OR sits in a Linear `Todo` column
+ * (stateType 'unstarted'). A raw open/backlog issue is NOT ready — readiness is
+ * an explicit human act. Keeps backlog out of the pipeline view; only DoR-met,
+ * not-yet-started issues land in the Ready lane. See docs/PIPELINE-READY-AND-DONE.md.
+ */
+export function isPipelineReady(issue: Pick<Issue, 'labels' | 'stateType'>): boolean {
+  return (issue.labels?.includes('ready') ?? false) || issue.stateType === 'unstarted';
+}
+
 export function getPipelineIssuePhase(
-  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus'>,
+  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels'>,
   reviewStatus?: PipelineStateLike | null,
   agent?: Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null,
 ): PipelineIssuePhase {
@@ -174,5 +185,8 @@ export function getPipelineIssuePhase(
   if (derivedState === 'in_review') return 'review';
   if (derivedState === 'in_progress' || issue.stateType === 'started') return 'work';
   if (issue.hasPlan === true || issue.planningComplete === true) return 'plan';
+  // Definition of Ready: a `ready` label or Linear Todo → the Ready lane.
+  // Everything else is raw backlog ('todo'), which the pipeline view hides.
+  if (isPipelineReady(issue)) return 'ready';
   return 'todo';
 }
