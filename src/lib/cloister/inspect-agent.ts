@@ -247,6 +247,12 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
       issueId: context.issueId,
       workspace: context.workspace,
       role: 'work',
+      // The inspect launcher hardcodes `baseCommand: 'claude'` (above), so the
+      // agent always runs under claude-code — record it. `harness` is optional on
+      // AgentState but maps to a NOT NULL column; omitting it made the cache
+      // backfill skip the agent (invisible) or, pre-PAN-1972, crash the boot
+      // decode. PAN-1973.
+      harness: 'claude-code',
       model,
       status: 'starting',
       startedAt: new Date().toISOString(),
