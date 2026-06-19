@@ -1,37 +1,215 @@
 {
   "version": "1",
   "issueId": "PAN-1866",
-  "created": "2026-06-13T23:45:49.872Z",
-  "updated": "2026-06-14T00:02:47.000Z",
-  "gitState": { "branch": "feature/pan-1866", "sha": "502eb02b8", "dirty": false },
+  "created": "2026-06-19T18:48:04.302Z",
+  "updated": "2026-06-19T21:05:52.166Z",
+  "gitState": {
+    "branch": "feature/pan-1866",
+    "sha": "36308d7cea",
+    "dirty": true
+  },
   "decisions": [
-    { "id": "D1", "summary": "SCOPE SPLIT (operator-confirmed): this issue ships the Sequencer role, Backlog page, sequence.md source-of-truth, SQLite cache, in-pipeline pinning, the operator Ready/Block pickup gate, condition flags, and the AI-suggested planning-policy FIELD (store + AI-suggest + operator-edit + preserve-across-re-sequence + legacy-label read). The live-Flywheel surgery (consume-sequence as pickup order, stop self-ranking, eligibility filter, emergency-promote, planning-policy launch-routing) = D8/work-item-9 is DEFERRED to a follow-up issue.", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D2", "summary": "The Sequencer is a project-scoped, server-spawned special role mirroring the flywheel orchestrator: spawnRun + fixed agentId 'backlog-sequencer' + singleton gate + allowHost + workspace=process.cwd(). It is NOT a work agent (don't use Claude's Agent tool) and NOT a persistent tick-loop — it is ONE-SHOT per regenerate trigger (spawn -> produce candidate -> finalize -> exit).", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D3", "summary": "Preservation/pinning/gate/edge-provenance are enforced in CODE (reconcileSequence), never trusted to the LLM (consistent with the deterministic-synthesis principle, PAN-1864). The agent writes a candidate ranking (a SequenceDoc JSON); an internal `pan backlog finalize` command runs reconcileSequence(prior, candidate) -> writeSequence (renders md + queueAutoCommit) -> rebuild SQLite cache. This mirrors `pan plan finalize` exactly.", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D4", "summary": "Chunked map-reduce for creation/review (NFR-6) = code-side batch partitioning (planBatches(issues, batchSize)) + a running-shortlist agent loop over per-batch files; the agent never holds all 522 bodies in context. Incremental reads only the prior sequence.md + the changed bodies. The chunking LOGIC is unit-tested (N issues -> ceil(N/K) batches), independent of agent runtime behavior.", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D5", "summary": "Shared BacklogSequence node/edge/enum types live in @panctl/contracts (packages/contracts) so server (sequence-io, route) and frontend (DAG) share one schema. parseSequence/writeSequence/reconcileSequence/planBatches live in src/lib/backlog/sequence-io.ts.", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D6", "summary": "Cost/acceptance (operator-noted): the work agent verifies the Sequencer on fixtures + a small representative subset of issues; it does NOT run a full Opus creation pass over all 522 live issues during the work phase. The first real creation pass that commits the production sequence.md is operator-triggered post-merge (reversible; operator can trigger anytime).", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D7", "summary": "Enums (PRD §6): size{XS,S,M,L,XL}; importance{critical,high,medium,low}; score 0-100; condition{ok,needs-refinement,stale}; pass{creation,incremental,review}; edge type{unblocks,informs}; edge source{github-ref,operator,ai-inferred} + confidence 0-1; gate{auto,ready,blocked}; planningPolicy{skip,auto,interactive}.", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D8", "summary": "Tiers (operator-confirmed §15): Now/Next/Later/Someday are DERIVED from rank/score (not AI fields). Now = active agent capacity (maxAgents). Render budget: a tier view renders as a ReactFlow+dagre DAG up to ~150 nodes, else a virtualized ranked list; the pinned/in-pipeline set is ALWAYS shown in every tier view; Someday is a list by default.", "recordedAt": "2026-06-14T00:02:47.000Z" },
-    { "id": "D9", "summary": "Only the internal `pan backlog finalize` command ships (the deterministic write path). The user-facing `pan backlog sequence` CLI verb + bundled `/pan-backlog` skill (D6 'future' in the PRD) are DEFERRED — the v1 trigger is the page button -> POST /api/backlog/sequence/regenerate.", "recordedAt": "2026-06-14T00:02:47.000Z" }
+    {
+      "id": "D1",
+      "summary": "Source of truth = .pan/backlog/sequence.md (repo-tracked markdown, auto-committed via queueAutoCommit). SQLite backlog_sequence is a disposable cache, fully rebuildable from the md.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D2",
+      "summary": "The Sequencer runs as a tmux-hosted role agent via spawnRun(runId,'sequencer',{agentId:'sequencer-runner',...}), mirroring spawnFlywheelAgent (src/lib/cloister/flywheel.ts:117). There is NO direct-LLM-API path for role runs in this codebase; all roles are tmux Claude sessions.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Chunked map-reduce (NFR-6) is realized INSIDE the agent session: the backlog input gives a compact manifest + a batched body accessor; the prompt instructs the agent to read issue bodies in batches against a running shortlist, never inlining all 522 bodies in one prompt. Incremental reads only the prior sequence.md + changed bodies.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D4",
+      "summary": "New configurable role 'sequencer' (default workhorse:expensive -> claude-opus-4-8) added to Role union (agents.ts), DEFAULT_MODEL_REFS + DEFAULT_ROLES (config-yaml.ts), and the RolesPanel.tsx ROLES array; model resolved at spawn via determineModel({role:'sequencer'}) -> resolveModel -> derefWorkhorse.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Reuse the existing vBRIEF DAG stack (ReactFlow 11 + @dagrejs/dagre, TB layout) from PlanDAG.tsx for the new Backlog page; new IssueNode component, zero new viz dependency (NFR-2).",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D6",
+      "summary": "in-pipeline is computed server-side from review_status (non-pending) OR live workspace/branch/agent presence, mirroring derivePipelineState's inputs; derivePipelineState itself is a frontend helper and must NOT be imported into the server.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Operator pickup gate 'blocked' reuses the existing parked-label mechanism (BLOCKER_LABELS in src/lib/cloister/auto-merge-eligibility.ts) so the existing Flywheel skip honors it immediately; no parallel hold system.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D8",
+      "summary": "On-demand pass buttons (Creation/Incremental/Review) are the acceptance-critical MVP. The debounced delta auto-trigger + periodic review cadence is the lowest-priority bead (follow-up wire-up) and may land last per the PRD ('not a blocker').",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Three orthogonal per-issue axes replace needs-design/needs-discussion: planning policy {skip/auto/interactive} = how to plan; pickup gate {auto/ready/blocked} = whether/when the Flywheel may pick; condition {ok/needs-refinement/stale} = state of the issue itself. A legacy parked label reads as planning:interactive.",
+      "recordedAt": "2026-06-19T18:54:56Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "The Role union is at src/lib/agents.ts:63 (the PRD misstated config-yaml.ts). Adding 'sequencer' requires FOUR edits or typecheck/Settings break: (1) agents.ts Role union; (2) config-yaml.ts DEFAULT_MODEL_REFS + DEFAULT_ROLES (~L369/L387); (3) settings-api.ts ROLE_NAMES (L279); (4) RolesPanel.tsx ROLES array (L88-149).", "mitigation": "Edit all four sites in the role-registration bead; run npm run typecheck after." },
-    { "id": "H2", "summary": "derivePipelineState (src/dashboard/frontend/src/lib/issuePipelineState.ts) is FRONTEND-only. The backend route must NOT import it.", "mitigation": "Compute 'in-pipeline' server-side from ReviewStatus (src/lib/review-status.ts) + live agent state + workspace/branch existence." },
-    { "id": "H3", "summary": "No execSync in dashboard-server-reachable code (routes/services) — it freezes the event loop (PAN-70).", "mitigation": "Use promisified exec / spawn; defer SQLite reads off the event loop; sleep via await new Promise(setTimeout)." },
-    { "id": "H4", "summary": "Any debounce/backoff/delay test (e.g. queueAutoCommit debounce) must use fake timers.", "mitigation": "vi.useFakeTimers() + vi.advanceTimersByTimeAsync(); never real waits, never maxForks:1 masking." },
-    { "id": "H5", "summary": "NFR-5 footprint budget: naive triplicated rationale ~120k tokens at 522 issues — rejected.", "mitigation": "Store rationale ONCE: full paragraph only for the active top tier (~top 80), one-line `why` (<=140 chars) for everyone; markdown table is a compact index. Parser/writer bead asserts per-issue footprint stays in budget." },
-    { "id": "H6", "summary": "Do NOT conflate vBRIEF/beads INTRA-issue edges (PlanDAG.tsx, between an issue's own work items) with backlog CROSS-issue dependency edges (between issues). Separate graphs.", "mitigation": "Backlog edges live only in sequence.md (dependsOn + edges with source/confidence)." },
-    { "id": "H7", "summary": "PAN-1124 single-spec invariant is unaffected: sequence.md is a NEW artifact, not a spec.", "mitigation": "Never touch .pan/specs/ immutability; sequence.md rides the same .pan/ auto-commit but is independent." },
-    { "id": "H8", "summary": "GitHub has no native blocks/blocked-by (github.ts:342 getChildIssues returns []). Cross-issue edges come only from issue-body refs (#N / 'blocked by PAN-N'), operator-authored edges, and ai-inferred.", "mitigation": "Read-only: parse bodies for github-ref edges; never write deps back to GitHub. Each edge stores source + confidence; authoritative (github-ref/operator) overrides ai-inferred and conflicts are surfaced." },
-    { "id": "H9", "summary": "spawnSequencer must refuse to run inside a workspace devcontainer and must enforce a singleton gate (no concurrent passes corrupting sequence.md).", "mitigation": "Mirror isFlywheelDevcontainerRuntime() guard + an active-run gate like resolveLiveFlywheelRunId." },
-    { "id": "H10", "summary": "Because the Flywheel surgery (D8/#9) is deferred, the operator Block gate stays functional via the EXISTING parked-label skip: Block applies a BLOCKER_LABELS label (needs-design default; src/lib/cloister/auto-merge-eligibility.ts:10) which the current Flywheel already honors.", "mitigation": "The gate write endpoint applies/clears the parked label; do not depend on the deferred #9 integration for Block to bite." }
+    {
+      "id": "H1",
+      "summary": "NFR-6 context window: the full open backlog is ~370k tokens (522 issues x ~715 tok) and exceeds one context window. A Creation/Review pass that inlines all bodies in one prompt will blow the window.",
+      "mitigation": "collectOpenBacklog returns a compact manifest + a batched body accessor; roles/sequencer.md forbids inlining the whole backlog and mandates batched reads against a running shortlist; a chunking test asserts N bodies -> K batches, not 1."
+    },
+    {
+      "id": "H2",
+      "summary": "NFR-5 file-size budget: naive triplicated rationale (table + prose + JSON) reaches ~120k tokens for 522 issues.",
+      "mitigation": "Store rationale once: full paragraph only for the active top tier (~80), one-line why (<=140 chars) for the tail; writer enforces; a footprint test asserts <= ~65k tokens at 522 nodes."
+    },
+    {
+      "id": "H3",
+      "summary": "FR-14 Flywheel executor must keep the existing author/assignee security filter so it never picks an unsolicited third-party issue when reading from the sequence.",
+      "mitigation": "Reuse the existing security filter in flywheel.ts; explicit AC asserts a security-filtered issue is never selected; review.security verifies."
+    },
+    {
+      "id": "H4",
+      "summary": "Pinned in-pipeline issues must never be re-ranked/re-ordered/rewritten across re-sequences; only their live flags/condition refresh.",
+      "mitigation": "roles/sequencer.md instructs read-but-never-rewrite for the pinned set; incremental-preserve test asserts a pinned issue keeps rank/rationale when a sibling moves."
+    },
+    {
+      "id": "H5",
+      "summary": "Operator-owned fields (gate, planning) and operator-sourced edges must survive every re-sequence verbatim; an AI pass must not clobber them.",
+      "mitigation": "Parser/writer round-trip preserves them; sequencer prompt copies operator fields/edges verbatim and only re-derives github-ref / recomputes ai-inferred edges; round-trip + preserve tests."
+    },
+    {
+      "id": "H6",
+      "summary": "queueAutoCommit only commits when the current branch is main (auto-commit.ts checks branch==main). sequence.md is a main-side runtime artifact written by the sequencer agent, distinct from THIS feature's implementation which lands via the normal feature-branch review pipeline.",
+      "mitigation": "Follow the drafts.ts/specs.ts precedent (they queueAutoCommit and the debounced flush gates on main); do not assume sequence.md commits from inside a feature worktree."
+    },
+    {
+      "id": "H7",
+      "summary": "derivePipelineState lives in the frontend (issuePipelineState.ts); importing frontend code into the Effect server would break the build.",
+      "mitigation": "Compute in-pipeline server-side from review_status + workspace/agent signals; do not import the frontend helper into routes/backlog.ts."
+    },
+    {
+      "id": "H8",
+      "summary": "SQLite schema bump must be forward-only and additive; breaking earlier migrations or existing tables corrupts the cache DB for all projects.",
+      "mitigation": "CREATE TABLE IF NOT EXISTS in initSchema + an additive `if (currentVersion < 57)` migration block; bump SCHEMA_VERSION 56->57; drop-and-rebuild equivalence test."
+    }
   ],
   "resumePoint": null,
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-8",
   "sessionHistory": [
-    { "timestamp": "2026-06-13T23:45:49.872Z", "reason": "planning", "note": "Planning session started for PAN-1866: Backlog Sequencer", "agentModel": "agent:claude-opus-4-8" },
-    { "timestamp": "2026-06-14T00:02:47.000Z", "reason": "planning", "note": "Discovery complete. Verified PRD references against codebase (flywheel project-scoped-role precedent; tab/route/DAG/RolesPanel/schema/auto-commit patterns). Operator confirmed scope split: Flywheel-executor surgery (D8/#9) deferred to follow-up; this issue ships Sequencer + page + sequence.md + cache + pinning + gate + conditions + planning-policy-field. vBRIEF written with 19 beads.", "agentModel": "agent:claude-opus-4-8" }
+    {
+      "timestamp": "2026-06-19T18:54:56Z",
+      "reason": "planning",
+      "note": "Auto-planning session for PAN-1866 Backlog Sequencer. Verified all PRD codebase references; decomposed the 8 PRD work items into 19 beads; recorded spawn-mechanism and chunking decisions (D2/D3) as the main inferred architecture choices.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:15Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-19T20:15:05.498Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T20:15:05.527Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:23Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-19T20:23:26.914Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:25Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-19T20:25:48.394Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T20:25:48.424Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:37Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-19T20:37:29.938Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T20:37:29.965Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:39Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-19T20:39:38.048Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:56Z] verification-gate → FAILED — seq 5",
+      "timestamp": "2026-06-19T20:56:24.739Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T20:56:24.789Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T21:05Z] verification-gate → FAILED — seq 6",
+      "timestamp": "2026-06-19T21:05:52.118Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T21:05:52.166Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-19T20:23:26Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1866 (attempt 2/10):\n\nFailed check: frontend-typecheck\n\nVerification FAILED at frontend-typecheck (12457ms):\n\nship\" | \"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\n  Type '\"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\nsrc/components/Agents/FleetAgentsView.tsx(291,27): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/Agents/FleetAgentsView.tsx(291,54): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/primitives/AgentCard.tsx(47,3): error TS1360: Type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' does not satisfy the expected type 'Record<AgentCardRole, string>'.\n  Property 'sequencer' is missing in type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' but required in type 'Record<AgentCardRole, string>'.\nsrc/components/primitives/AgentCard.tsx(66,28): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n  Property 'sequencer' does not exist on type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1866 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1866 -m \"Fixed frontend-typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-19T20:25:48Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1866 (attempt 1/10):\n\nFailed check: lint\n\nVerification FAILED at lint (730ms):\n\n).pipe(\nsrc/lib/pan-dir/continue.ts:129:      Effect.mapError((cause) => new FsError({ path: tmp, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/continue.ts:131:    yield* fs.rename(tmp, continuePath).pipe(\nsrc/lib/pan-dir/continues.ts:53:    yield* fs.writeFileString(path, content).pipe(\nsrc/lib/pan-dir/continues.ts:54:      Effect.mapError((cause) => new FsError({ path, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/continues.ts:98:        .rename(path, join(deletedDir, `${issueId.toLowerCase()}-${Date.now()}.vbrief.json`))\nsrc/lib/pan-dir/feedback.ts:47:    yield* fs.writeFileString(path, content).pipe(\nsrc/lib/pan-dir/feedback.ts:48:      Effect.mapError((cause) => new FsError({ path, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/sessions.ts:25:      yield* fs.writeFileString(sessionsPath, current + line).pipe(\nsrc/lib/pan-dir/sessions.ts:26:        Effect.mapError((cause) => new FsError({ path: sessionsPath, operation: 'writeFileString', cause })),\nsrc/lib/pan-dir/sessions.ts:29:      yield* fs.writeFileString(sessionsPath, line).pipe(\nsrc/lib/pan-dir/sessions.ts:30:        Effect.mapError((cause) => new FsError({ path: sessionsPath, operation: 'writeFileString', cause })),\n\n> @overdeck/cli@0.21.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✗ overdeck boundary gate: 3 site(s) across 2 file(s) still on the OLD panopticon.db\n\nsrc/cli/index.ts:1030:      console.log(chalk.yellow('  [--seed-from-legacy] overdeck.db will be seeded from the legacy database (conversations + in-flight state)'));\nsrc/cli/index.ts:610:  .option('--seed-from-legacy', 'Seed a fresh overdeck.db from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty overdeck.db.')\nsrc/dashboard/server/read-model.ts:557:        `[ReadModel] Bootstrapped from overdeck.db: ` +\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1866 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1866 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-19T20:37:29Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1866 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (76371ms):\n\ntoHaveBeenCalledWith(expect.stringContaining('tmux…\n       |                     ^\n    193|     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID …\n    194|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/23]⎯\n\n FAIL  |root| src/lib/__tests__/tmux-server.test.ts > ensureOverdeckTmuxServerSync > warns when the live server has a dirty cmdline founded by new-session\nAssertionError: expected \"warn\" to be called with arguments: [ StringContaining \"dirty cmdline\" ]\n\nNumber of calls: 0\n\n ❯ src/lib/__tests__/tmux-server.test.ts:215:21\n    213|     ensureOverdeckTmuxServerSync({});\n    214|\n    215|     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('dirt…\n       |                     ^\n    216|     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID …\n    217|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/23]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/23]⎯\n\n FAIL  |root| src/lib/database/__tests__/pending-auto-merges-schema.test.ts > pending auto-merges schema > uses current schema version and creates pending_auto_merges on fresh init\nAssertionError: expected 57 to be 56 // Object.is equality\n\n- Expected\n+ Received\n\n- 56\n+ 57\n\n ❯ src/lib/database/__tests__/pending-auto-merges-schema.test.ts:29:28\n     27|     makeTestHome('pan-pending-auto-merges-fresh');\n     28|\n     29|     expect(SCHEMA_VERSION).toBe(56);\n       |                            ^\n     30|     const db = getDatabase();\n     31|     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VE…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/23]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1866 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1866 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 4,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-19T20:39:38Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1866 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (77877ms):\n\ntoHaveBeenCalledWith(expect.stringContaining('tmux…\n       |                     ^\n    193|     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID …\n    194|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/23]⎯\n\n FAIL  |root| src/lib/__tests__/tmux-server.test.ts > ensureOverdeckTmuxServerSync > warns when the live server has a dirty cmdline founded by new-session\nAssertionError: expected \"warn\" to be called with arguments: [ StringContaining \"dirty cmdline\" ]\n\nNumber of calls: 0\n\n ❯ src/lib/__tests__/tmux-server.test.ts:215:21\n    213|     ensureOverdeckTmuxServerSync({});\n    214|\n    215|     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('dirt…\n       |                     ^\n    216|     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('PID …\n    217|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/23]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/reactive-scheduler.test.ts > reactive Cloister scheduler > routes agent.stopped events to the deacon resume handler\nAssertionError: expected \"vi.fn()\" to be called with arguments: [ 'agent-pan-503' ]\n\nNumber of calls: 0\n\n ❯ src/lib/cloister/__tests__/reactive-scheduler.test.ts:379:25\n    377|     }));\n    378|\n    379|     expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503');\n       |                         ^\n    380|   });\n    381|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/23]⎯\n\n FAIL  |root| src/lib/database/__tests__/pending-auto-merges-schema.test.ts > pending auto-merges schema > uses current schema version and creates pending_auto_merges on fresh init\nAssertionError: expected 57 to be 56 // Object.is equality\n\n- Expected\n+ Received\n\n- 56\n+ 57\n\n ❯ src/lib/database/__tests__/pending-auto-merges-schema.test.ts:29:28\n     27|     makeTestHome('pan-pending-auto-merges-fresh');\n     28|\n     29|     expect(SCHEMA_VERSION).toBe(56);\n       |                            ^\n     30|     const db = getDatabase();\n     31|     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VE…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/23]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1866 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1866 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 5,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-19T20:56:24Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1866 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (78661ms):\n\n       ^\n    322|       ...(configuredRole?.sub ?? {}),\n    323|     };\n ❯ loadSettingsApi src/lib/settings-api.ts:634:12\n ❯ src/lib/__tests__/settings-api.test.ts:605:22\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/19]⎯\n\n FAIL  |root| src/lib/__tests__/settings-api.test.ts > saveSettingsApi > persists RTK agent settings without removing existing agent settings\nTypeError: Cannot read properties of undefined (reading 'sub')\n ❯ seededRoles src/lib/settings-api.ts:321:23\n    319|     const configuredRole = config.roles?.[role];\n    320|     const sub = {\n    321|       ...(defaultRole.sub ?? {}),\n       |                       ^\n    322|       ...(configuredRole?.sub ?? {}),\n    323|     };\n ❯ loadSettingsApi src/lib/settings-api.ts:634:12\n ❯ src/lib/__tests__/settings-api.test.ts:631:22\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/19]⎯\n\n FAIL  |root| src/lib/__tests__/settings-api.test.ts > saveSettingsApi > rejects untrusted tts daemon endpoint keys at runtime\nTypeError: Cannot read properties of undefined (reading 'sub')\n ❯ seededRoles src/lib/settings-api.ts:321:23\n    319|     const configuredRole = config.roles?.[role];\n    320|     const sub = {\n    321|       ...(defaultRole.sub ?? {}),\n       |                       ^\n    322|       ...(configuredRole?.sub ?? {}),\n    323|     };\n ❯ loadSettingsApi src/lib/settings-api.ts:634:12\n ❯ src/lib/__tests__/settings-api.test.ts:648:22\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/19]⎯\n\n FAIL  |root| src/lib/__tests__/settings-api.test.ts > saveSettingsApi > writes tts daemon settings without removing tts.summarizer\nTypeError: Cannot read properties of undefined (reading 'sub')\n ❯ seededRoles src/lib/settings-api.ts:321:23\n    319|     const configuredRole = config.roles?.[role];\n    320|     const sub = {\n    321|       ...(defaultRole.sub ?? {}),\n       |                       ^\n    322|       ...(configuredRole?.sub ?? {}),\n    323|     };\n ❯ loadSettingsApi src/lib/settings-api.ts:634:12\n ❯ src/lib/__tests__/settings-api.test.ts:664:22\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/19]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1866 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1866 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 6,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-06-19T21:05:52Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1866 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/index.ts\n  - src/dashboard/server/read-model.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1866 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
   ]
 }
