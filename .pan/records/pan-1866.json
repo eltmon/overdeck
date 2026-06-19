@@ -102,17 +102,17 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-19T20:15:19.448Z",
+  "updated": "2026-06-19T20:23:26.924Z",
   "pipeline": {
     "issueId": "PAN-1866",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-19T20:15:19.439Z",
+    "updatedAt": "2026-06-19T20:23:26.906Z",
     "reviewNotes": "Verification failed at frontend-typecheck",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (13402ms):\n\nsrc/components/Agents/FleetAgentsView.tsx(72,3): error TS2322: Type '\"plan\" | \"work\" | \"review\" | \"test\" | \"ship\" | \"flywheel\" | \"strike\" | \"sequencer\"' is not assignable to type 'AgentCardRole'.\n  Type '\"sequencer\"' is not assignable to type 'AgentCardRole'.\nsrc/components/Settings/RolesPanel.tsx(150,5): error TS2322: Type '\"sequencer\"' is not assignable to type 'RoleId'.\n",
+    "verificationNotes": "Verification FAILED at frontend-typecheck (12457ms):\n\nship\" | \"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\n  Type '\"sequencer\"' is not assignable to type '\"plan\" | \"work\" | \"review\" | \"ship\" | \"strike\" | \"stuck\"'.\nsrc/components/Agents/FleetAgentsView.tsx(291,27): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/Agents/FleetAgentsView.tsx(291,54): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\n  Property 'sequencer' does not exist on type '{ plan: number; work: number; strike: number; review: number; test: number; ship: number; flywheel: number; }'.\nsrc/components/primitives/AgentCard.tsx(47,3): error TS1360: Type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' does not satisfy the expected type 'Record<AgentCardRole, string>'.\n  Property 'sequencer' is missing in type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }' but required in type 'Record<AgentCardRole, string>'.\nsrc/components/primitives/AgentCard.tsx(66,28): error TS7053: Element implicitly has an 'any' type because expression of type 'AgentCardRole' can't be used to index type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n  Property 'sequencer' does not exist on type '{ plan: string; work: string; review: string; test: string; ship: string; flywheel: string; strike: string; }'.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975"
   },
   "closeOut": {
@@ -128,10 +128,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 339,
-            "output": 122368,
-            "cacheRead": 41284149,
-            "cacheWrite": 529714
+            "input": 353,
+            "output": 125424,
+            "cacheRead": 42118322,
+            "cacheWrite": 590466
           }
         }
       },
@@ -143,15 +143,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 339,
-          "output": 122368,
-          "cacheRead": 41284149,
-          "cacheWrite": 529714
+          "input": 353,
+          "output": 125424,
+          "cacheRead": 42118322,
+          "cacheWrite": 590466
         }
       },
       "costAtCloseOut": {
-        "usd": 27.813445,
-        "pricingAsOf": "2026-06-19T20:15:19.448Z"
+        "usd": 28.337397,
+        "pricingAsOf": "2026-06-19T20:23:26.924Z"
       }
     },
     "merges": [
