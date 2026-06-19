@@ -38,6 +38,7 @@ import { workspaceContextFile } from './context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from './briefing-freshness.js';
 import { logAgentLifecycleSync } from './persistent-logger.js';
 import { buildCompactRecoverySeedMessage } from './context-overflow.js';
+import { ALLOW_SESSION_ROTATION_ON_RESUME, sessionRotationRefused } from './session-rotation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync, writeBridgeTokenSync } from './bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken, writePtyToken } from './pty-token.js';
@@ -4342,6 +4343,20 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
       console.warn(`[agents] Resume succeeded for ${normalizedId} but message not delivered (ready signal timed out) — falling back to fresh launch`);
     }
 
+    // PAN-1980: session rotation is disabled — do NOT fresh-launch a new session
+    // as a fallback (that rotates the transcript and hides the resume failure).
+    // Leave the agent stopped and surface it; the feedback was already queued in
+    // the mail queue above, so it is not dropped.
+    if (!ALLOW_SESSION_ROTATION_ON_RESUME) {
+      const why = !resumeResult.success
+        ? `resume failed (${resumeResult.error})`
+        : 'resume succeeded but message delivery timed out';
+      const stopMsg = `Not restarting ${normalizedId} with a fresh session — ${why}; session rotation is disabled (PAN-1980). Agent left stopped; feedback queued in mail.`;
+      console.warn(`[agents] ${stopMsg}`);
+      emitActivityEntrySync({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${stopMsg}`, issueId: agentState.issueId });
+      return;
+    }
+
     const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
       const provider = getProviderForModelSync(agentState.model as ModelId);
@@ -4746,6 +4761,18 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       resumeDriftReasons.push(`legacy harness ${priorHarness}→${effectiveHarness} (PAN-1797 re-default)`);
     }
     const shouldResumeSavedSession = !compactSeed && resumeDriftReasons.length === 0;
+    // PAN-1980: refuse to rotate to a new session. A resume that would need a
+    // fresh session — compact/overflow recovery or model/harness drift — now
+    // errors and stops instead of starting a new transcript.
+    if (sessionRotationRefused({ compactSeed: Boolean(compactSeed), driftReasons: resumeDriftReasons })) {
+      const reason = compactSeed
+        ? 'context-overflow compaction would respawn a fresh session'
+        : `session drift (${resumeDriftReasons.join(', ')})`;
+      const errMsg = `Refusing to rotate ${normalizedId} to a new session — ${reason}; session rotation is disabled (PAN-1980). Agent left stopped.`;
+      logAgentLifecycleSync(normalizedId, `resumeAgent: ${errMsg}`);
+      emitActivityEntrySync({ source: 'work-agent', level: 'error', message: `${normalizedId}: ${errMsg}`, issueId: agentState.issueId });
+      return { success: false, error: errMsg };
+    }
     const freshSessionId = !shouldResumeSavedSession && effectiveHarness === 'claude-code'
       ? randomUUID()
       : undefined;
