@@ -1,9 +1,8 @@
 import chalk from 'chalk';
-import { existsSync, readFileSync, symlinkSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import {
   listProjectsSync,
-  registerProjectSync,
   unregisterProjectSync,
   getProjectSync,
   initializeProjectsConfigSync,
@@ -12,68 +11,7 @@ import {
   IssueRoutingRule,
   getIssuePrefix,
 } from '../../lib/projects.js';
-import { SYNC_SOURCES } from '../../lib/paths.js';
-import { ensureProjectLayer } from '../../lib/context-layers/index.js';
-
-// Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
-const BUNDLED_HOOKS_DIR = SYNC_SOURCES.gitHooks;
-
-/**
- * Install Overdeck git hooks in a directory
- * Returns number of hooks installed
- */
-function installGitHooks(gitDir: string): number {
-  const hooksTarget = join(gitDir, 'hooks');
-  let installed = 0;
-
-  // Create hooks directory if needed
-  if (!existsSync(hooksTarget)) {
-    mkdirSync(hooksTarget, { recursive: true });
-  }
-
-  // Check if bundled hooks exist
-  if (!existsSync(BUNDLED_HOOKS_DIR)) {
-    return 0;
-  }
-
-  try {
-    const hooks = readdirSync(BUNDLED_HOOKS_DIR).filter(f => {
-      const p = join(BUNDLED_HOOKS_DIR, f);
-      return existsSync(p) && statSync(p).isFile();
-    });
-
-    for (const hook of hooks) {
-      const source = join(BUNDLED_HOOKS_DIR, hook);
-      const target = join(hooksTarget, hook);
-
-      // Skip if already a symlink to our hook
-      if (existsSync(target)) {
-        try {
-          const { readlinkSync } = require('fs');
-          if (readlinkSync(target) === source) {
-            continue; // Already installed
-          }
-        } catch {
-          // Not a symlink, will be backed up
-        }
-      }
-
-      // Backup existing hook if present and not a symlink
-      if (existsSync(target)) {
-        const { renameSync } = require('fs');
-        renameSync(target, `${target}.backup`);
-      }
-
-      // Create symlink
-      symlinkSync(source, target);
-      installed++;
-    }
-  } catch (err) {
-    // Silent fail - hooks are optional
-  }
-
-  return installed;
-}
+import { registerProjectFromPath, installGitHooksInDir, DuplicateProjectError } from '../../lib/project-registration.js';
 
 interface AddOptions {
   name?: string;
@@ -97,15 +35,6 @@ export async function projectAddCommand(
   const name = options.name || fullPath.split('/').pop() || 'unknown';
   const key = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-  // Check if already registered
-  const existing = getProjectSync(key);
-  if (existing) {
-    console.log(chalk.yellow(`Project already registered with key: ${key}`));
-    console.log(chalk.dim(`Existing path: ${existing.path}`));
-    console.log(chalk.dim(`To update, first run: pan projects remove ${key}`));
-    return;
-  }
-
   // Try to detect Linear team from .pan/project.toml or package.json
   let linearTeam = options.linearTeam;
   if (!linearTeam) {
@@ -117,29 +46,33 @@ export async function projectAddCommand(
     }
   }
 
-  const projectConfig: ProjectConfig = {
-    name,
-    path: fullPath,
-  };
-
-  if (linearTeam) {
-    projectConfig.issue_prefix = linearTeam.toUpperCase();
+  let regResult: Awaited<ReturnType<typeof registerProjectFromPath>>;
+  try {
+    regResult = await registerProjectFromPath({ path: fullPath, name });
+  } catch (err) {
+    if (err instanceof DuplicateProjectError) {
+      console.log(chalk.yellow(`Project already registered with key: ${err.key}`));
+      console.log(chalk.dim(`Existing path: ${err.existingPath}`));
+      console.log(chalk.dim(`To update, first run: pan projects remove ${err.key}`));
+      return;
+    }
+    throw err;
   }
 
-  if (options.rallyProject) {
-    projectConfig.rally_project = options.rallyProject;
+  // Apply CLI-only extras (linearTeam, rallyProject) to the already-written entry.
+  if (linearTeam || options.rallyProject) {
+    const { registerProjectSync } = await import('../../lib/projects.js');
+    const updated: ProjectConfig = { ...regResult.config };
+    if (linearTeam) updated.issue_prefix = linearTeam.toUpperCase();
+    if (options.rallyProject) updated.rally_project = options.rallyProject;
+    registerProjectSync(regResult.key, updated);
+    regResult = { ...regResult, config: updated };
   }
-
-  registerProjectSync(key, projectConfig);
-
-  // PAN-1201: seed the project's context layer (.pan/context/project.md) so
-  // `pan sync` can render it into the project's CLAUDE.md.
-  const seededLayer = ensureProjectLayer(fullPath);
 
   console.log(chalk.green(`✓ Added project: ${name}`));
   console.log(chalk.dim(`  Key: ${key}`));
   console.log(chalk.dim(`  Path: ${fullPath}`));
-  if (seededLayer) {
+  if (regResult.seededContextLayer) {
     console.log(chalk.dim('  Context layer: .pan/context/project.md (commit this)'));
   }
   if (linearTeam) {
@@ -152,7 +85,6 @@ export async function projectAddCommand(
 
   // Check what the project has and guide them on next steps
   const hasDevcontainer = existsSync(join(fullPath, '.devcontainer'));
-  const hasInfra = existsSync(join(fullPath, 'infra'));
   const hasDevcontainerTemplate =
     existsSync(join(fullPath, 'infra', '.devcontainer-template')) ||
     existsSync(join(fullPath, '.devcontainer-template'));
@@ -162,7 +94,6 @@ export async function projectAddCommand(
   const subRepos: string[] = [];
 
   if (!hasRootGit) {
-    // No root .git - scan for subdirectory git repos
     const { readdirSync, statSync } = await import('fs');
     try {
       const entries = readdirSync(fullPath);
@@ -183,29 +114,18 @@ export async function projectAddCommand(
 
   const isPolyrepo = !hasRootGit && subRepos.length > 0;
 
-  // Pre-trust project directory in Claude Code to avoid the trust prompt for planning agents
-  try {
-    const { preTrustDirectory } = await import('../../lib/workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-    preTrustDirectory(fullPath);
-  } catch { /* non-fatal */ }
-
-  // Install git hooks (branch protection)
-  let hooksInstalled = 0;
-  if (hasRootGit) {
-    // Single repo - install in root
-    hooksInstalled = installGitHooks(join(fullPath, '.git'));
-    if (hooksInstalled > 0) {
-      console.log(chalk.green(`✓ Installed ${hooksInstalled} git hook(s) for branch protection`));
-    }
-  } else if (isPolyrepo) {
-    // Polyrepo - install in each sub-repo
+  // Install git hooks for polyrepo sub-repos (single-repo case handled by registerProjectFromPath).
+  let hooksInstalled = regResult.hooksInstalled;
+  if (isPolyrepo) {
     for (const repo of subRepos) {
-      const count = installGitHooks(join(fullPath, repo, '.git'));
-      hooksInstalled += count;
+      hooksInstalled += installGitHooksInDir(join(fullPath, repo, '.git'));
     }
-    if (hooksInstalled > 0) {
-      console.log(chalk.green(`✓ Installed git hooks in ${subRepos.length} repositories`));
-    }
+  }
+
+  if (hasRootGit && regResult.hooksInstalled > 0) {
+    console.log(chalk.green(`✓ Installed ${regResult.hooksInstalled} git hook(s) for branch protection`));
+  } else if (isPolyrepo && hooksInstalled > 0) {
+    console.log(chalk.green(`✓ Installed git hooks in ${subRepos.length} repositories`));
   }
   if (hooksInstalled > 0) {
     console.log(chalk.dim('  (Prevents agents from checking out branches in main project)'));
