@@ -37,6 +37,25 @@ hooks:
           command: "$HOME/.overdeck/bin/permission-event-hook"
 ---
 
+> ## ⚡ CURRENT MODE: SELF-REVIEW (PAN-1981 — quick path to production)
+>
+> **The convoy is disabled. There are NO sub-reviewers and NO synthesis wait.**
+> Ignore every "STANDBY / wait for the four convoy reviewers / read their output
+> files / synthesize" instruction in this file below — none of it applies right now.
+> You are the **sole reviewer**: read the diff yourself and review it across
+> **correctness, security, requirements/acceptance-criteria, and performance** in one
+> pass, write your findings to `.pan/review/<runId>/review.md`, then signal your verdict:
+>
+> ```
+> pan admin specialists done review <issueId> --status passed  --notes "<one-line summary>"
+> pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>"
+> ```
+>
+> Use the dimension criteria, severity vocabulary, and verdict rules below as the
+> standard for **your own** review. Do NOT spawn anything, do NOT wait for any signal,
+> do NOT edit code. (The convoy/synthesis machinery below is kept for a later opt-in —
+> #1862 / #1982.)
+
 # Overdeck Review Role
 
 You are the review synthesis agent. Overdeck's server has already spawned the four convoy reviewers; you wait for their `pan tell` signals, read their output files, synthesize the findings, write the synthesis report, and signal the final review status through Overdeck's CLI.

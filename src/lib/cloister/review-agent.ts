@@ -215,6 +215,75 @@ function buildReviewRolePrompt(opts: {
   const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
   console.log(`[review-agent] Synthesis prompt for ${opts.issueId}: ${sizeBytes} bytes`);
   return prompt;
+}
+
+// PAN-1981 (quick path to production): the review role agent reviews the diff
+// ITSELF — no convoy, no synthesis. `buildReviewRolePrompt` above (the synthesis
+// "stand by, wait for the convoy" prompt) is kept for when we restore the convoy
+// as an opt-in (#1982 fast-follow); for now the review agent gets this self-review
+// prompt instead. We will decide convoy-vs-self-review (and better per-harness
+// message transmission) in the fast-follow.
+function buildSelfReviewPrompt(opts: {
+  issueId: string;
+  workspace: string;
+  branch: string;
+  prUrl?: string;
+  runId: string;
+  reviewDir: string;
+  contextManifestPath?: string;
+  tier1Summary?: string;
+}): string {
+  const reviewReportPath = join(opts.reviewDir, 'review.md');
+  const prompt = [
+    `CODE REVIEW for ${opts.issueId} — you are the sole reviewer; review the change yourself.`,
+    '',
+    'Review the diff for this branch yourself, across ALL dimensions in one pass:',
+    'correctness/logic, security, requirements/acceptance-criteria, and performance.',
+    'Do NOT spawn or wait for any sub-reviewers — there is no convoy; you do the',
+    'whole review yourself and emit the verdict.',
+    '',
+    '── Review context ──',
+    `Issue: ${opts.issueId}`,
+    `Branch: ${opts.branch}`,
+    `Workspace: ${opts.workspace}`,
+    opts.prUrl ? `PR: ${opts.prUrl}` : `PR: (resolve via: gh pr view ${opts.branch})`,
+    `Run ID: ${opts.runId}`,
+    `Review directory: ${opts.reviewDir}`,
+    `Review output file: ${reviewReportPath}`,
+    '',
+    opts.tier1Summary
+      ? [
+          'Shared review context (risk-ranked changed files + acceptance criteria):',
+          '─────────────────────────────────────────────────────────────',
+          opts.tier1Summary,
+          '─────────────────────────────────────────────────────────────',
+          '',
+          opts.contextManifestPath ? `Full manifest: ${opts.contextManifestPath}` : '',
+        ].join('\n')
+      : opts.contextManifestPath
+        ? `Context manifest: ${opts.contextManifestPath}`
+        : 'Context manifest: (missing — inspect the diff directly: git diff origin/main...HEAD)',
+    '',
+    'How to review:',
+    '1. Read the diff — use the manifest risk ranking, `git diff` the high-risk files,',
+    '   and read the surrounding code as needed.',
+    '2. Evaluate correctness, security, requirements/AC, and performance. Use the',
+    '   severity + verdict vocabulary in roles/review.md.',
+    `3. Write your findings to ${reviewReportPath}.`,
+    '',
+    'Then signal the verdict with the Overdeck CLI (exactly one):',
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
+    '',
+    'After signaling the verdict, exit Claude Code cleanly so the tmux session ends:',
+    '  exit',
+    '',
+    'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
+  ].filter(Boolean).join('\n');
+
+  const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
+  console.log(`[review-agent] Self-review prompt for ${opts.issueId}: ${sizeBytes} bytes`);
+  return prompt;
 }async function spawnReviewSubRoleForIssuePromise(opts: {
   issueId: string;
   workspace: string;
@@ -469,7 +538,11 @@ function buildReviewRolePrompt(opts: {
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+    // PAN-1981 (quick path to production): self-review — the review agent reviews
+    // the diff itself. The convoy prompt builder + the four-reviewer spawn below
+    // are kept (commented out, not deleted) to restore later as an opt-in; #1982.
+    // const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+    const prompt = buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
@@ -487,9 +560,16 @@ function buildReviewRolePrompt(opts: {
     } catch (saveErr) {
       console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
     }
-    console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
-    emitActivityEntrySync({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+    console.log(`[review-agent] Review role (self-review) spawned for ${opts.issueId}: ${run.id}`);
+    emitActivityEntrySync({ source: 'review', level: 'info', message: `Self-review spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
+    // PAN-1981 (quick path to production): the convoy is DISABLED — the review
+    // agent self-reviews (see buildSelfReviewPrompt) and signals the verdict
+    // directly via `pan admin specialists done review`. The four-reviewer fan-out
+    // below is commented out, NOT deleted, to restore later as an opt-in. We'll
+    // decide convoy-vs-self-review policy (and better per-harness transmission) in
+    // the #1982 fast-follow; for now self-review is the only behavior.
+    /*
     const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
       const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
       const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
@@ -519,10 +599,11 @@ function buildReviewRolePrompt(opts: {
     if (failedReviewers.length > 0) {
       console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
     }
+    */
 
     return {
       success: true,
-      message: `Review role spawned: ${run.id}; convoy reviewers started: ${reviewerResults.length - failedReviewers.length}/${REVIEW_SUB_ROLES.length}`,
+      message: `Self-review spawned: ${run.id}`,
     };
   } catch (err) {
     console.error(`[review-agent] Failed to spawn review role for ${opts.issueId}:`, err);
