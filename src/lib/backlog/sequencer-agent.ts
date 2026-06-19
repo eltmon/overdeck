@@ -1,5 +1,48 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import type { AgentState } from '../agents.js';
+import { spawnRun, determineModel } from '../agents.js';
+import { collectOpenBacklog } from './backlog-input.js';
+import type { Issue } from '../tracker/interface.js';
 import type { PassMode } from './types.js';
 import type { CollectOpenBacklogResult } from './backlog-input.js';
+
+export const SEQUENCER_AGENT_ID = 'sequencer-runner';
+
+export type SpawnSequencerOptions = {
+  projectRoot?: string;
+  projectKey?: string;
+  model?: string;
+  workspace?: string;
+  batchSize?: number;
+  issues?: Issue[];
+};
+
+export async function spawnSequencerAgent(
+  pass: PassMode | 'auto',
+  opts: SpawnSequencerOptions = {},
+): Promise<AgentState> {
+  const projectRoot = opts.projectRoot ?? process.cwd();
+  const projectKey = opts.projectKey ?? 'overdeck';
+  const batchSize = opts.batchSize ?? 20;
+
+  const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+  const resolvedPass: PassMode =
+    pass !== 'auto' ? pass : existsSync(seqPath) ? 'incremental' : 'creation';
+
+  const input = await collectOpenBacklog(projectRoot, opts.issues ?? []);
+  const model = determineModel({ role: 'sequencer', model: opts.model });
+  const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
+
+  return spawnRun(SEQUENCER_AGENT_ID, 'sequencer', {
+    agentId: SEQUENCER_AGENT_ID,
+    workspace: opts.workspace ?? projectRoot,
+    prompt,
+    model,
+    allowHost: true,
+    registerConversation: true,
+  });
+}
 
 export type SequencerPromptInput = {
   projectRoot: string;
