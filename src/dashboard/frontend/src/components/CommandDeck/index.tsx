@@ -494,12 +494,12 @@ export function CommandDeck({
     messageId: string;
     messageIndex: number;
     nonce: number;
-  }) => {
+  }, viewMode?: ViewMode) => {
     const store = usePanesStore.getState();
     store.ensureHome(projectKey);
     const panes = store.panesByWorkspace[projectKey] ?? [];
     const existing = panes.find((p) => p.paneType === 'agent' && p.conversationId === name);
-    const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name });
+    const paneId = existing ? existing.paneId : store.addPane(projectKey, { paneType: 'agent', label, conversationId: name, ...(viewMode ? { viewMode } : {}) });
     store.setActivePane(projectKey, paneId);
     if (target) {
       usePanesStore.getState().updatePane(projectKey, paneId, {
@@ -989,7 +989,7 @@ export function CommandDeck({
   // agent tab in the current project's deck. Returns the new conversation's
   // name so the deck's launch components can focus the tab.
   const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness, message?: string): Promise<string | undefined> => {
+    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
       try {
         const payload: Record<string, unknown> = {
           model: sidebarModel,
@@ -1011,7 +1011,7 @@ export function CommandDeck({
         setSelectedConversation(conv.name);
         if (convsCollapsed) setConvsCollapsed(false);
         const deckKey = projectKey ?? selectedProject;
-        if (deckKey) openConversationTabIn(deckKey, conv.name, conv.title ?? 'Agent');
+        if (deckKey) openConversationTabIn(deckKey, conv.name, conv.title ?? 'Agent', undefined, viewMode);
         if (onConvIdChange) {
           const newId = String(conv.id);
           onConvIdChange(newId);
@@ -1042,11 +1042,11 @@ export function CommandDeck({
   // a project conversation for the chosen agent and return its name so the deck
   // can open/focus an agent tab on it.
   const createDeckConversation = useCallback(
-    (agentId: string, message?: string): Promise<string | undefined> => {
+    (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
       const harness: Harness = agentId === 'codex' ? 'pi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
-      return createConversationForProject(projectKey, harness, message);
+      return createConversationForProject(projectKey, harness, message, viewMode);
     },
     [createConversationForProject, selectedProject],
   );

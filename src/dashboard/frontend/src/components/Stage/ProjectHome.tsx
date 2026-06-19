@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { ViewMode } from '../chat/ConversationPanel'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
 import { WorkspaceHeader } from './HomePane/WorkspaceHeader'
@@ -25,7 +26,7 @@ export interface ProjectHomeProps {
   conversations?: Conversation[]
   /** Create a conversation for this project, returning the new conversation's
    * name so the deck can open an agent tab on it. */
-  onCreateConversation?: (agentId: string, message?: string) => Promise<string | undefined>
+  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<string | undefined>
   /** Project issues/features — when present, the project cockpit (hero metrics,
    * stuck callout, pipeline swimlanes, cost cards) renders as the primary body
    * (S4). Absent during load / for the no-project deck → sparse fallback. */
@@ -88,7 +89,7 @@ export function ProjectHome({
 
   const onAgentSelected = async (id: string, message?: string) => {
     writeLastUsedAgent(api.deckKey, id)
-    const conversationName = await onCreateConversation?.(id, message)
+    const conversationName = await onCreateConversation?.(id, message, 'terminal')
     if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
   }
 
