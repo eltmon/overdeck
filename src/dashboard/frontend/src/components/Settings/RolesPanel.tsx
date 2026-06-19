@@ -4,7 +4,7 @@ import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as In
 import { toast } from 'sonner';
 import { PROVIDER_BRANDS } from '../shared/branding';
 
-type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
+type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
 type Harness = 'claude-code' | 'pi' | 'codex';
