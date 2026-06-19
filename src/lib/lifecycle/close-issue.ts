@@ -8,7 +8,7 @@
  * Operations:
  *   1. Transition issue to closed state
  *   2. Add 'closed-out' label
- *   3. Remove workflow labels (in-progress, in-review, needs-close-out)
+ *   3. Remove all current-phase workflow labels (WORKFLOW_LABELS)
  *   4. Add completion comment
  */
 
@@ -25,7 +25,17 @@ const execAsync = promisify(exec);
 
 const CLOSED_OUT_LABEL = 'closed-out';
 const CLOSED_OUT_COLOR = '1d4ed8';
-const WORKFLOW_LABELS = ['in-progress', 'in-review', 'needs-close-out', 'verifying-on-main'];
+/**
+ * Canonical set of current-phase pipeline labels. A closed/done issue is in no
+ * phase, so close paths strip ALL of these. Single source of truth — close-out
+ * imports this rather than keeping its own (previously divergent, missing
+ * `planned`) list, which had left ~82 closed issues falsely labelled in-review/
+ * in-progress/planned.
+ */
+export const WORKFLOW_LABELS = [
+  'in-progress', 'in-review', 'planned', 'in-planning',
+  'needs-close-out', 'verifying-on-main', 'ready-for-merge',
+];
 
 /** Options for close-issue */
 export interface CloseIssueOptions {
