@@ -97,7 +97,7 @@
   ],
   "feedback": [],
   "created": "2026-06-19T17:59:04.545Z",
-  "updated": "2026-06-19T19:16:28.875Z",
+  "updated": "2026-06-19T19:24:01.073Z",
   "pipeline": {
     "issueId": "PAN-1970",
     "reviewStatus": "failed",
@@ -157,5 +157,30 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-4-6"
+  "model": "claude-sonnet-4-6",
+  "statusOverrides": {
+    "folder-picker": "completed",
+    "folder-picker.ac1": "completed",
+    "folder-picker.ac2": "completed",
+    "folder-picker.ac3": "completed",
+    "folder-picker.ac4": "completed",
+    "api-projects-existing": "completed",
+    "api-projects-existing.ac1": "completed",
+    "api-projects-existing.ac2": "completed",
+    "api-projects-existing.ac3": "completed",
+    "api-projects-existing.ac4": "completed",
+    "api-projects-existing.ac5": "completed",
+    "fs-list-dirs": "completed",
+    "fs-list-dirs.ac1": "completed",
+    "fs-list-dirs.ac2": "completed",
+    "fs-list-dirs.ac3": "completed",
+    "fs-list-dirs.ac4": "completed",
+    "fs-list-dirs.ac5": "completed",
+    "register-core": "completed",
+    "register-core.ac1": "completed",
+    "register-core.ac2": "completed",
+    "register-core.ac3": "completed",
+    "register-core.ac4": "completed",
+    "register-core.ac5": "completed"
+  }
 }
