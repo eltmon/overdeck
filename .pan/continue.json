@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "issueId": "PAN-1866",
+  "created": "2026-06-19T18:48:04.302Z",
+  "updated": "2026-06-19T18:54:56Z",
+  "gitState": { "branch": "feature/pan-1866", "sha": "36308d7cea", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Source of truth = .pan/backlog/sequence.md (repo-tracked markdown, auto-committed via queueAutoCommit). SQLite backlog_sequence is a disposable cache, fully rebuildable from the md.", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D2", "summary": "The Sequencer runs as a tmux-hosted role agent via spawnRun(runId,'sequencer',{agentId:'sequencer-runner',...}), mirroring spawnFlywheelAgent (src/lib/cloister/flywheel.ts:117). There is NO direct-LLM-API path for role runs in this codebase; all roles are tmux Claude sessions.", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D3", "summary": "Chunked map-reduce (NFR-6) is realized INSIDE the agent session: the backlog input gives a compact manifest + a batched body accessor; the prompt instructs the agent to read issue bodies in batches against a running shortlist, never inlining all 522 bodies in one prompt. Incremental reads only the prior sequence.md + changed bodies.", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D4", "summary": "New configurable role 'sequencer' (default workhorse:expensive -> claude-opus-4-8) added to Role union (agents.ts), DEFAULT_MODEL_REFS + DEFAULT_ROLES (config-yaml.ts), and the RolesPanel.tsx ROLES array; model resolved at spawn via determineModel({role:'sequencer'}) -> resolveModel -> derefWorkhorse.", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D5", "summary": "Reuse the existing vBRIEF DAG stack (ReactFlow 11 + @dagrejs/dagre, TB layout) from PlanDAG.tsx for the new Backlog page; new IssueNode component, zero new viz dependency (NFR-2).", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D6", "summary": "in-pipeline is computed server-side from review_status (non-pending) OR live workspace/branch/agent presence, mirroring derivePipelineState's inputs; derivePipelineState itself is a frontend helper and must NOT be imported into the server.", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D7", "summary": "Operator pickup gate 'blocked' reuses the existing parked-label mechanism (BLOCKER_LABELS in src/lib/cloister/auto-merge-eligibility.ts) so the existing Flywheel skip honors it immediately; no parallel hold system.", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D8", "summary": "On-demand pass buttons (Creation/Incremental/Review) are the acceptance-critical MVP. The debounced delta auto-trigger + periodic review cadence is the lowest-priority bead (follow-up wire-up) and may land last per the PRD ('not a blocker').", "recordedAt": "2026-06-19T18:54:56Z" },
+    { "id": "D9", "summary": "Three orthogonal per-issue axes replace needs-design/needs-discussion: planning policy {skip/auto/interactive} = how to plan; pickup gate {auto/ready/blocked} = whether/when the Flywheel may pick; condition {ok/needs-refinement/stale} = state of the issue itself. A legacy parked label reads as planning:interactive.", "recordedAt": "2026-06-19T18:54:56Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "NFR-6 context window: the full open backlog is ~370k tokens (522 issues x ~715 tok) and exceeds one context window. A Creation/Review pass that inlines all bodies in one prompt will blow the window.", "mitigation": "collectOpenBacklog returns a compact manifest + a batched body accessor; roles/sequencer.md forbids inlining the whole backlog and mandates batched reads against a running shortlist; a chunking test asserts N bodies -> K batches, not 1." },
+    { "id": "H2", "summary": "NFR-5 file-size budget: naive triplicated rationale (table + prose + JSON) reaches ~120k tokens for 522 issues.", "mitigation": "Store rationale once: full paragraph only for the active top tier (~80), one-line why (<=140 chars) for the tail; writer enforces; a footprint test asserts <= ~65k tokens at 522 nodes." },
+    { "id": "H3", "summary": "FR-14 Flywheel executor must keep the existing author/assignee security filter so it never picks an unsolicited third-party issue when reading from the sequence.", "mitigation": "Reuse the existing security filter in flywheel.ts; explicit AC asserts a security-filtered issue is never selected; review.security verifies." },
+    { "id": "H4", "summary": "Pinned in-pipeline issues must never be re-ranked/re-ordered/rewritten across re-sequences; only their live flags/condition refresh.", "mitigation": "roles/sequencer.md instructs read-but-never-rewrite for the pinned set; incremental-preserve test asserts a pinned issue keeps rank/rationale when a sibling moves." },
+    { "id": "H5", "summary": "Operator-owned fields (gate, planning) and operator-sourced edges must survive every re-sequence verbatim; an AI pass must not clobber them.", "mitigation": "Parser/writer round-trip preserves them; sequencer prompt copies operator fields/edges verbatim and only re-derives github-ref / recomputes ai-inferred edges; round-trip + preserve tests." },
+    { "id": "H6", "summary": "queueAutoCommit only commits when the current branch is main (auto-commit.ts checks branch==main). sequence.md is a main-side runtime artifact written by the sequencer agent, distinct from THIS feature's implementation which lands via the normal feature-branch review pipeline.", "mitigation": "Follow the drafts.ts/specs.ts precedent (they queueAutoCommit and the debounced flush gates on main); do not assume sequence.md commits from inside a feature worktree." },
+    { "id": "H7", "summary": "derivePipelineState lives in the frontend (issuePipelineState.ts); importing frontend code into the Effect server would break the build.", "mitigation": "Compute in-pipeline server-side from review_status + workspace/agent signals; do not import the frontend helper into routes/backlog.ts." },
+    { "id": "H8", "summary": "SQLite schema bump must be forward-only and additive; breaking earlier migrations or existing tables corrupts the cache DB for all projects.", "mitigation": "CREATE TABLE IF NOT EXISTS in initSchema + an additive `if (currentVersion < 57)` migration block; bump SCHEMA_VERSION 56->57; drop-and-rebuild equivalence test." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    { "timestamp": "2026-06-19T18:54:56Z", "reason": "planning", "note": "Auto-planning session for PAN-1866 Backlog Sequencer. Verified all PRD codebase references; decomposed the 8 PRD work items into 19 beads; recorded spawn-mechanism and chunking decisions (D2/D3) as the main inferred architecture choices.", "agentModel": "agent:claude-opus-4-8" }
+  ]
+}
