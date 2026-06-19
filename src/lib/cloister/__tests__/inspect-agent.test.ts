@@ -165,6 +165,9 @@ describe('spawnInspectAgent', () => {
       issueId: 'PAN-1613',
       workspace: '/workspace',
       role: 'work',
+      // PAN-1973: harness must be persisted (NOT NULL in the agents table) or the
+      // cache backfill skips the row / pre-PAN-1972 crashed the boot decode.
+      harness: 'claude-code',
       status: 'starting',
       inspectSubRole: 'inspect',
     }));
