@@ -31,7 +31,7 @@ vi.mock('../../../../src/lib/lifecycle/types.js', () => ({
 }));
 
 import { Effect } from 'effect';
-import { closeIssue as closeIssueProgram } from '../../../../src/lib/lifecycle/close-issue.js';
+import { closeIssue as closeIssueProgram, WORKFLOW_LABELS } from '../../../../src/lib/lifecycle/close-issue.js';
 
 const closeIssue = (...args: Parameters<typeof closeIssueProgram>) =>
   Effect.runPromise(closeIssueProgram(...args));
@@ -173,5 +173,17 @@ describe('close-issue', () => {
       const closeResult = results.find(r => r.step === 'close-issue:transition');
       expect(closeResult).toBeUndefined();
     });
+  });
+});
+
+describe('WORKFLOW_LABELS — canonical current-phase labels stripped on close', () => {
+  it('includes every current-phase label so all close paths clear them', () => {
+    for (const label of ['in-progress', 'in-review', 'planned', 'in-planning', 'verifying-on-main', 'ready-for-merge', 'needs-close-out']) {
+      expect(WORKFLOW_LABELS).toContain(label);
+    }
+  });
+
+  it("includes 'planned' (regression: its absence left ~82 closed issues falsely labelled)", () => {
+    expect(WORKFLOW_LABELS).toContain('planned');
   });
 });

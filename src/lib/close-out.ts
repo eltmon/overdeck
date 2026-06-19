@@ -22,6 +22,7 @@ import { findPrdAtStatusSync, canonicalPrdSubdirSync } from './prd-locations.js'
 import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
 import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
+import { WORKFLOW_LABELS } from './lifecycle/close-issue.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 
 const execAsync = promisify(exec);
@@ -448,8 +449,8 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
         `gh issue edit ${ctx.number} --repo ${ctx.owner}/${ctx.repo} --add-label "${CLOSED_OUT_LABEL}"`,
         { encoding: 'utf-8' }
       );
-      // Remove workflow labels and migration label
-      for (const label of ['in-progress', 'in-review', 'needs-close-out']) {
+      // Remove all current-phase workflow labels (single source: WORKFLOW_LABELS)
+      for (const label of WORKFLOW_LABELS) {
         await execAsync(
           `gh issue edit ${ctx.number} --repo ${ctx.owner}/${ctx.repo} --remove-label "${label}" 2>/dev/null || true`,
           { encoding: 'utf-8' }
