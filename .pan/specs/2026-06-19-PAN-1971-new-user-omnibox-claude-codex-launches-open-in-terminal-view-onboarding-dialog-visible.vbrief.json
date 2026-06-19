@@ -1,0 +1,175 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.6",
+    "created": "2026-06-19T18:06:55.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1971: New-user: omnibox Claude/Codex launches open in terminal view (onboarding dialog visible)",
+    "updated": "2026-06-19T18:12:09.638Z"
+  },
+  "plan": {
+    "id": "pan-1971",
+    "title": "New-user: omnibox Claude/Codex launches open in terminal view (onboarding dialog visible)",
+    "status": "proposed",
+    "uid": "2ace2773-c328-4fcd-adb6-75ec4f410b62",
+    "author": "agent:claude-opus-4-8",
+    "sequence": 2,
+    "created": "2026-06-19T18:06:55.000Z",
+    "updated": "2026-06-19T18:12:09.638Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1971",
+        "label": "PAN-1971",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/.pan/drafts/PAN-1971.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "onboarding",
+      "dashboard",
+      "command-deck"
+    ],
+    "narratives": {
+      "Problem": "Launching 'Ask Claude Code' / 'Ask Codex' from the Home omnibox opens the new agent session in conversation view (parsed message UI), which hides the raw TUI. Claude Code (and likely Codex) show an initial onboarding/auth dialog that only renders in the raw PTY, so a brand-new user lands on a screen with nothing actionable and gets stuck. The pane is created with viewMode undefined, which AgentPane.tsx:26 resolves to 'conversation'.",
+      "Proposal": "Thread an optional `viewMode: ViewMode` ('conversation' | 'terminal') param through the CommandDeck agent-create chain so omnibox agent launches create the pane already in terminal (raw xterm PTY) view. createDeckConversation(agentId, message?, viewMode?) -> createConversationForProject(projectKey?, harness?, message?, viewMode?) -> openConversationTabIn(projectKey, name, label, target?, viewMode?) -> store.addPane({ paneType:'agent', label, conversationId, viewMode }). The two omnibox consumers (ProjectHome.onAgentSelected, IssueOverview.onAgentSelected) pass 'terminal'; every other onCreateConversation caller passes nothing and stays conversation view. AgentPane.tsx:26 already renders XTerminal when pane.viewMode === 'terminal' (no change there); PaneSpec already includes viewMode (no panesStore change). Frontend-only, ~3 files.",
+      "NonGoals": "- Do NOT change the default for the Stage '+ New conversation' menu (Stage/index.tsx:316), handleNewConversation / handleNewProjectConversation, deep-link conversation opens, or opening existing conversations from the sidebar / conversation list — these all remain conversation view.\n- Do NOT add any 'is the agent already onboarded?' detection — omnibox agent launches always open in terminal (simplest, correct for new users, harmless for existing users who can toggle back).\n- Do NOT change any backend / server / packages/contracts code (NFR-1).\n- Do NOT modify panesStore persistence, AgentPane rendering, or the ConversationPanel conversation/terminal toggle — the toggle + per-pane persistence already exist.\n- Do NOT change the omnibox 'Run command' (terminal) or 'Web' actions."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope terminal-view precisely to the omnibox agent path by threading an optional viewMode param in from the two onAgentSelected consumers, rather than hardcoding 'terminal' inside createDeckConversation.",
+        "rationale": "createDeckConversation is the onCreateConversation callback for BOTH the omnibox and the Stage '+ New conversation' menu (Stage/index.tsx:316). Hardcoding terminal there would open '+ New conversation' (and any future caller) in terminal view, violating FR-3. Threading the origin in from the consumer satisfies FR-1 and FR-3 simultaneously."
+      },
+      {
+        "summary": "Create the pane already in terminal view via openConversationTabIn (the create-site), instead of post-hoc updating it via openOrFocusAgentPane.",
+        "rationale": "openConversationTabIn runs first (synchronously, inside createConversationForProject) and creates the agent pane; the consumer's api.openOrFocusAgentPane runs after the await and only focuses the existing pane. Setting viewMode at creation avoids a brief conversation->terminal flash and an extra updatePane write. The deckKeys are guaranteed equal (Stage is mounted with deckKey={selectedProject} only when selectedProject is truthy), so openConversationTabIn always creates the same pane openOrFocusAgentPane focuses."
+      },
+      {
+        "summary": "Pass viewMode as a third optional positional param (viewMode?: ViewMode) rather than an options object.",
+        "rationale": "Matches the existing positional signatures of onCreateConversation / createConversationForProject / openConversationTabIn; backward-compatible (existing 1-2 arg callers are unaffected; StageProps.onCreateConversation's 2-arg type still accepts the wider function)."
+      },
+      {
+        "summary": "Split into an implementation bead and a separate Vitest regression bead.",
+        "rationale": "Both are independently reviewable and mergeable; the test bead pins FR-1 and FR-3 against future regressions (especially the H2 ordering invariant). The test depends on the impl, so the impl blocks the test."
+      }
+    ],
+    "items": [
+      {
+        "id": "wire-terminal-viewmode",
+        "title": "Thread viewMode through the CommandDeck agent-create chain so omnibox launches open in terminal view",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-06-19T18:06:55.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1971",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx, add an optional `viewMode?: ViewMode` parameter (import `type ViewMode` from '../chat/ConversationPanel'; ViewMode = 'conversation' | 'terminal') and thread it through three inline callbacks: (1) `createDeckConversation` (~963) gains `viewMode?` and forwards it to createConversationForProject; (2) `createConversationForProject` (~910) gains `viewMode?` and forwards it to its `openConversationTabIn(deckKey, conv.name, conv.title ?? 'Agent', undefined, viewMode)` call (~933); (3) `openConversationTabIn` (~487) gains a trailing `viewMode?` param and includes it in the create branch: `store.addPane(projectKey, { paneType: 'agent', label, conversationId: name, ...(viewMode ? { viewMode } : {}) })` (~496). Then in src/dashboard/frontend/src/components/Stage/ProjectHome.tsx and src/dashboard/frontend/src/components/Stage/IssueOverview.tsx, widen the `onCreateConversation?` prop type to `(agentId: string, message?: string, viewMode?: ViewMode) => Promise<string | undefined>` and change each `onAgentSelected` to call `await onCreateConversation?.(id, message, 'terminal')`. Leave the Stage '+ New conversation' menu (Stage/index.tsx:316), handleNewConversation/handleNewProjectConversation, deep-link, and open-existing paths unchanged (no viewMode => conversation). Do NOT touch panesStore.ts, AgentPane.tsx, or ConversationPanel.tsx. Run npm run typecheck and npm run lint."
+        },
+        "items": [
+          {
+            "id": "wire-terminal-viewmode.ac1",
+            "title": "Given a brand-new project Home, when the user selects 'Ask Claude Code' (or 'Ask Codex') from the omnibox, the opened agent pane renders the terminal (raw xterm PTY) view — the created WorkspacePane has viewMode === 'terminal' — so any onboarding/auth TUI dialog is visible and interactive, not the parsed conversation view.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-viewmode.ac2",
+            "title": "Given a non-omnibox creation path — the Stage '+ New conversation' menu, or opening an existing conversation from the sidebar/conversation list — the resulting agent pane defaults to conversation view (viewMode is not 'terminal').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-viewmode.ac3",
+            "title": "The pane's existing conversation/terminal toggle still switches views and the choice persists per pane across re-selecting the pane (FR-2 behavior preserved, not regressed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-viewmode.ac4",
+            "title": "Given the final diff, git diff --name-only shows only frontend files under src/dashboard/frontend (CommandDeck/index.tsx, Stage/ProjectHome.tsx, Stage/IssueOverview.tsx, plus the test file from the other bead); panesStore.ts, AgentPane.tsx, ConversationPanel.tsx, and every server/contracts file are absent from the diff, and npm run typecheck and npm run lint show no new errors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-omnibox-terminal-view",
+        "title": "Add Vitest coverage that omnibox agent launches open in terminal view and non-omnibox opens do not",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-06-19T18:06:55.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1971",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx (model: existing test at line 19 that fires the omnibox Enter and asserts onCreateConversation/openOrFocusAgentPane calls) to assert the omnibox agent launch forwards viewMode 'terminal'. Add an analogous assertion for IssueOverview (new IssueOverview.test.tsx or a case in an existing Stage test) since both consumers must pass 'terminal'. Add a negative assertion that a non-omnibox create path does NOT forward 'terminal' — e.g. a Stage test where the '+ New conversation' action (Stage/index.tsx:316) calls onCreateConversation with no viewMode. Tests are frontend Vitest + @testing-library/react. Run npm test (frontend) and confirm the new tests pass."
+        },
+        "items": [
+          {
+            "id": "test-omnibox-terminal-view.ac1",
+            "title": "A Vitest test renders ProjectHome, fires the omnibox Enter for an agent, and asserts onCreateConversation is invoked with the third argument 'terminal' (so the omnibox agent launch produces a terminal-view pane). The IssueOverview omnibox path is asserted equivalently.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-omnibox-terminal-view.ac2",
+            "title": "A Vitest test asserts a non-omnibox creation path (e.g. the Stage '+ New conversation' menu) invokes onCreateConversation without viewMode 'terminal', so that pane defaults to conversation view (FR-3 guard).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-omnibox-terminal-view.ac3",
+            "title": "Running npm test (frontend Vitest) produces no new failures, and the suite now covers both the omnibox->terminal and the non-omnibox->conversation cases added in this bead.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wire-terminal-viewmode",
+        "to": "test-omnibox-terminal-view",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-06-19-PAN-1971-new-user-omnibox-claude-codex-launches-open-in-terminal-view-onboarding-dialog-visible.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
