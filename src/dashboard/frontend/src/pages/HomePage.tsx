@@ -34,6 +34,8 @@ interface SummaryCardView {
 
 interface HomePageProps {
   onOpenWorkspaceHome?: (issueId: string) => void;
+  /** PAN-1970: open the New Project modal. */
+  onNewProject?: () => void;
   now?: Date;
 }
 
@@ -83,7 +85,7 @@ async function fetchMetricsSummary(): Promise<MetricsSummaryResponse> {
   return response.json() as Promise<MetricsSummaryResponse>;
 }
 
-export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
+export function HomePage({ onOpenWorkspaceHome, onNewProject, now }: HomePageProps = {}) {
   const registryQuery = useQuery({
     queryKey: ['feature-registry'],
     queryFn: fetchFeatureRegistry,
@@ -200,6 +202,24 @@ export function HomePage({ onOpenWorkspaceHome, now }: HomePageProps = {}) {
             )}
           </div>
         </section>
+
+        {onNewProject && (
+          <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="home-projects-title">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 id="home-projects-title" className="text-lg font-semibold text-foreground">Projects</h2>
+                <p className="text-sm text-muted-foreground">Register a local directory as a project.</p>
+              </div>
+              <button
+                data-testid="home-new-project"
+                onClick={onNewProject}
+                className="rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+              >
+                + New project
+              </button>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

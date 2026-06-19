@@ -131,9 +131,11 @@ interface SidebarProps {
   selectedProject?: string | null;
   /** PAN-1561: open a project's deck from the rail. */
   onSelectProject?: (projectName: string) => void;
+  /** PAN-1970: open the New Project modal. */
+  onNewProject?: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
@@ -384,9 +386,22 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           {/* ─── Projects ─── */}
           {!collapsed ? (
             <div className="mb-1" data-testid="sidebar-projects">
-              <p className="px-3 text-[10px] font-medium uppercase tracking-widest text-muted-foreground mt-4 mb-1">
-                Projects
-              </p>
+              <div className="flex items-center justify-between px-3 mt-4 mb-1">
+                <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
+                  Projects
+                </p>
+                {onNewProject && (
+                  <button
+                    data-testid="sidebar-new-project"
+                    onClick={onNewProject}
+                    title="New project"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', lineHeight: 1 }}
+                  >
+                    +
+                  </button>
+                )}
+              </div>
               {projects.length === 0 ? (
                 <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No projects</p>
               ) : (
