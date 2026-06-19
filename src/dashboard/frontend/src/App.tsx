@@ -32,6 +32,7 @@ import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { FlywheelPage } from './pages/FlywheelPage';
 import { FlywheelConversationPane } from './components/flywheel/FlywheelConversationPane';
 import { HomePage } from './pages/HomePage';
+import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
@@ -474,6 +475,17 @@ export default function App() {
 
   const queryClient = useQueryClient();
   const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
+
+  // PAN-1970: New Project modal
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const handleNewProject = useCallback(() => setIsNewProjectModalOpen(true), []);
+  const handleProjectCreated = useCallback((project: CreatedProject) => {
+    void queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
+    void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
+    setSelectedProjectKey(project.key);
+    setActiveTabState('command-deck');
+    usePanesStore.getState().ensureHome(project.key);
+  }, [queryClient]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 
   useEffect(() => {
@@ -1274,6 +1286,13 @@ export default function App() {
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
+      {/* PAN-1970: New Project modal */}
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
+        onCreated={handleProjectCreated}
+      />
+
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
@@ -1284,6 +1303,7 @@ export default function App() {
         onSearchOpen={() => setIsSearchOpen(true)}
         selectedProject={selectedProjectKey}
         onSelectProject={handleSelectProject}
+        onNewProject={handleNewProject}
       />
 
       {/* Main content area */}
@@ -1461,7 +1481,7 @@ export default function App() {
         >
           {activeTab === 'home' && (
             <div className="w-full h-full overflow-hidden">
-              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} />
+              <HomePage onOpenWorkspaceHome={handleOpenWorkspaceHome} onNewProject={handleNewProject} />
             </div>
           )}
           {activeTab === 'command-deck' && (

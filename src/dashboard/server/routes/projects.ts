@@ -6,8 +6,8 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET /api/projects/:projectKey/session-tree
  */
 
-import { access, readFile, readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, readFile, readdir, mkdir, stat } from 'node:fs/promises';
+import { join, isAbsolute } from 'node:path';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -623,9 +623,6 @@ const postProjectsRoute = HttpRouter.add(
       name?: unknown;
     };
 
-    const { isAbsolute, join: pathJoin } = await import('node:path');
-    const { access: fsAccess, mkdir, readdir } = await import('node:fs/promises');
-
     function slugify(s: string) { return s.toLowerCase().replace(/[^a-z0-9-]/g, '-'); }
 
     // ── mode='existing' ──────────────────────────────────────────────────────
@@ -638,13 +635,10 @@ const postProjectsRoute = HttpRouter.add(
       if (!isAbsolute(rawPath)) {
         return jsonResponse({ error: 'path must be absolute' }, { status: 400 });
       }
-      try {
-        await fsAccess(rawPath);
-      } catch {
-        return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 });
-      }
       const nameOpt = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : undefined;
       return yield* Effect.promise(async () => {
+        try { await access(rawPath); }
+        catch { return jsonResponse({ error: `path does not exist: ${rawPath}` }, { status: 404 }); }
         try {
           const result = await registerProjectFromPath({ path: rawPath, name: nameOpt });
           return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
@@ -677,7 +671,7 @@ const postProjectsRoute = HttpRouter.add(
 
       const name = rawName.trim();
       const key = slugify(name);
-      const target = pathJoin(rawParent, slugify(name));
+      const target = join(rawParent, slugify(name));
 
       // Dup-check BEFORE any fs work.
       if (getProjectSync(key)) {
@@ -691,7 +685,7 @@ const postProjectsRoute = HttpRouter.add(
         // If target exists and is non-empty, reject with no fs change.
         let targetExists = false;
         try {
-          await fsAccess(target);
+          await access(target);
           targetExists = true;
         } catch { /* target doesn't exist yet */ }
 
