@@ -5,45 +5,38 @@
  * promotes the vBRIEF to proposed on main, syncs beads, and transitions
  * the issue to "Planned".
  *
- * Delegates to POST /api/issues/:id/complete-planning on the dashboard server.
+ * Delegates to promotePlanning() (POST /api/issues/:id/complete-planning),
+ * which now carries backoff retries and the auto-start handoff so a Done-retry
+ * after a transient finalize failure still re-fires the work-agent auto-start
+ * when the planning agent was launched with --auto-start (PAN-1972).
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { getDashboardApiUrlSync } from '../../lib/config.js';
-
-const DASHBOARD_URL = getDashboardApiUrlSync();
-
-interface CompletePlanningResponse {
-  success: boolean;
-  message?: string;
-  error?: string;
-}
+import { promotePlanning, readAutoSpawnOnFinalize } from './plan-finalize.js';
 
 export async function planDoneCommand(id: string): Promise<void> {
   const issueId = id.toUpperCase();
   const spinner = ora(`Completing planning for ${issueId}...`).start();
 
-  try {
-    const response = await fetch(`${DASHBOARD_URL}/api/issues/${issueId}/complete-planning`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+  // Re-fire auto-start on the retry path: if the planning agent was launched
+  // with --auto-start, a `pan plan done` retry must carry that intent too, or a
+  // once-failed finalize can never relaunch the work agent (PAN-1972).
+  const autoSpawn = readAutoSpawnOnFinalize(issueId);
+  const result = await promotePlanning(issueId, autoSpawn);
 
-    const result = await response.json() as CompletePlanningResponse;
-
-    if (!response.ok) {
-      spinner.fail(chalk.red(`Failed: ${result.error || 'Unknown error'}`));
-      process.exit(1);
-    }
-
-    spinner.succeed(chalk.green(`✓ Planning complete for ${issueId}`));
-    if (result.message) {
-      console.log(chalk.dim(`  ${result.message}`));
-    }
-  } catch (error: any) {
-    spinner.fail(chalk.red(`Failed to reach dashboard: ${error.message}`));
-    console.error(chalk.dim(`Make sure the dashboard is running: pan up`));
+  if (!result.success) {
+    spinner.fail(chalk.red(`Failed: ${result.error || 'Unknown error'}`));
     process.exit(1);
+  }
+
+  spinner.succeed(chalk.green(`✓ Planning complete for ${issueId}`));
+  if (result.message) {
+    console.log(chalk.dim(`  ${result.message}`));
+  }
+  if (result.workAgentSpawned) {
+    console.log(chalk.dim(`  Work agent started${result.workAgentMessage ? ` — ${result.workAgentMessage}` : ''}`));
+  } else if (result.workAgentSkipReason) {
+    console.log(chalk.dim(`  Work agent not started: ${result.workAgentSkipReason}`));
   }
 }

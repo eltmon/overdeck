@@ -79,7 +79,7 @@ function findWorkspaceRoot(start: string): string | null {
   }
 }
 
-function readAutoSpawnOnFinalize(issueId: string): boolean {
+export function readAutoSpawnOnFinalize(issueId: string): boolean {
   const overdeckHome = process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
   const flagFile = join(overdeckHome, 'agents', `planning-${issueId.toLowerCase()}`, 'auto-spawn-on-finalize.json');
   try {
@@ -296,62 +296,91 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
  * until after the response is flushed so callers running inside the planning
  * tmux session still see this response.
  */
+// PAN-1972: the complete-planning POST carries the whole finalize handoff —
+// promote spec, commit, transition, AND the `--auto-start` stamp. If it lands
+// while the dashboard is momentarily down (e.g. mid-restart), a single fetch
+// fails and the work agent never auto-starts. Retry with exponential backoff.
+const PROMOTE_MAX_ATTEMPTS = 5;
+const PROMOTE_BASE_DELAY_MS = 1_000;
+// Retry only on transient gateway/unavailable statuses (dashboard up but not
+// ready). A real 4xx or app-500 is deterministic and may have partially
+// executed — do not blindly retry it.
+const PROMOTE_RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+function promoteBackoffMs(completedAttempts: number): number {
+  return PROMOTE_BASE_DELAY_MS * 2 ** completedAttempts; // 1s, 2s, 4s, 8s
+}
+
+const promoteFailure = (error: string): PromotePlanningResult => ({
+  success: false, message: null, error,
+  workAgentSpawned: false, workAgentMessage: null, workAgentError: null, workAgentSkipReason: null,
+});
+
 export async function promotePlanning(issueId: string, autoSpawn = false): Promise<PromotePlanningResult> {
-  try {
-    const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90_000);
-    let response: Response;
+  const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
+  let lastError = 'complete-planning failed';
+
+  for (let attempt = 0; attempt < PROMOTE_MAX_ATTEMPTS; attempt++) {
+    const hasMoreAttempts = attempt < PROMOTE_MAX_ATTEMPTS - 1;
     try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
-        body: JSON.stringify(autoSpawn ? { autoSpawn: true } : {}),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
-    const text = await response.text();
-    let parsed: any = null;
-    try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
-    if (!response.ok) {
-      const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90_000);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Origin: getDashboardApiUrlSync() },
+          body: JSON.stringify(autoSpawn ? { autoSpawn: true } : {}),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+      const text = await response.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { /* non-JSON */ }
+      if (!response.ok) {
+        const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
+        lastError = String(err);
+        if (PROMOTE_RETRYABLE_STATUS.has(response.status) && hasMoreAttempts) {
+          const delay = promoteBackoffMs(attempt);
+          console.error(chalk.dim(`complete-planning HTTP ${response.status}; retrying in ${delay / 1000}s (attempt ${attempt + 1}/${PROMOTE_MAX_ATTEMPTS})…`));
+          await new Promise<void>((r) => setTimeout(r, delay));
+          continue;
+        }
+        return promoteFailure(lastError);
+      }
+      const workAgentSpawned = parsed?.workAgentSpawned === true;
+      const workAgentSkipReason = typeof parsed?.workAgentSkipReason === 'string' ? parsed.workAgentSkipReason : null;
+      const workAgentSession = typeof parsed?.workAgentSession === 'string' ? parsed.workAgentSession : null;
+      const workAgentError = typeof parsed?.workAgentError === 'string' ? parsed.workAgentError : null;
       return {
-        success: false,
-        message: null,
-        error: String(err),
-        workAgentSpawned: false,
-        workAgentMessage: null,
-        workAgentError: null,
-        workAgentSkipReason: null,
+        success: true,
+        message: parsed?.message ?? null,
+        error: null,
+        workAgentSpawned,
+        workAgentMessage: workAgentSession ? `Session: ${workAgentSession}` : (workAgentSkipReason ? `Skip reason: ${workAgentSkipReason}` : null),
+        workAgentError,
+        workAgentSkipReason,
       };
+    } catch (err: any) {
+      // A thrown fetch is a connection-level failure (dashboard unreachable /
+      // ECONNREFUSED): the request never reached the server, so retrying is
+      // safe. An AbortError is our own 90s timeout — the request may have
+      // landed and partially executed, so do NOT retry that one.
+      const isTimeout = err?.name === 'AbortError';
+      const message = err?.message ? String(err.message) : String(err);
+      lastError = isTimeout ? 'complete-planning timed out after 90s' : `Dashboard unreachable: ${message}`;
+      if (!isTimeout && hasMoreAttempts) {
+        const delay = promoteBackoffMs(attempt);
+        console.error(chalk.dim(`complete-planning unreachable (${message}); retrying in ${delay / 1000}s (attempt ${attempt + 1}/${PROMOTE_MAX_ATTEMPTS})…`));
+        await new Promise<void>((r) => setTimeout(r, delay));
+        continue;
+      }
+      return promoteFailure(lastError);
     }
-    const workAgentSpawned = parsed?.workAgentSpawned === true;
-    const workAgentSkipReason = typeof parsed?.workAgentSkipReason === 'string' ? parsed.workAgentSkipReason : null;
-    const workAgentSession = typeof parsed?.workAgentSession === 'string' ? parsed.workAgentSession : null;
-    const workAgentError = typeof parsed?.workAgentError === 'string' ? parsed.workAgentError : null;
-    return {
-      success: true,
-      message: parsed?.message ?? null,
-      error: null,
-      workAgentSpawned,
-      workAgentMessage: workAgentSession ? `Session: ${workAgentSession}` : (workAgentSkipReason ? `Skip reason: ${workAgentSkipReason}` : null),
-      workAgentError,
-      workAgentSkipReason,
-    };
-  } catch (err: any) {
-    const message = err?.message ? String(err.message) : String(err);
-    return {
-      success: false,
-      message: null,
-      error: `Dashboard unreachable: ${message}`,
-      workAgentSpawned: false,
-      workAgentMessage: null,
-      workAgentError: null,
-      workAgentSkipReason: null,
-    };
   }
+  return promoteFailure(lastError);
 }
 
 /**

@@ -40,9 +40,13 @@ const POLL_INTERVAL_MS = 10_000;
 // not be marked ended — the session is still spawning in the background.
 const SPAWN_GRACE_PERIOD_MS = 30_000;
 
-// Specialist roles that always get a conversation row at spawn (post-fix).
-// Used to decide whether a missing-row tmux session is a backfill candidate.
-const SPECIALIST_ROLES = new Set(['review', 'test', 'ship']);
+// Roles whose live `agent-*` tmux session must own a conversation row so the
+// dashboard can map the session to its JSONL transcript. `work` is included
+// (PAN-1972): a `pan start`-spawned work agent does NOT pass
+// `registerConversation` (only the flywheel does), so without backfill it has
+// no row and the work tab renders "No conversation data available for this
+// session." review/test/ship get rows at spawn; this is the self-healing net.
+const BACKFILL_ROLES = new Set(['work', 'review', 'test', 'ship']);
 
 // Tmux session prefixes that are NOT specialist agents and must be left alone
 // by the backfill pass even if they happen to be missing a row.
@@ -169,7 +173,7 @@ async function backfillOrphanedSpecialistConversations(aliveSessions: string[]):
       continue;
     }
 
-    if (!state.role || !SPECIALIST_ROLES.has(state.role)) continue;
+    if (!state.role || !BACKFILL_ROLES.has(state.role)) continue;
     if (!state.workspace) continue;
 
     let claudeSessionId: string | undefined;
