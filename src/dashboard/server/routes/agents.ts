@@ -93,6 +93,7 @@ import {
   setAgentDeliveryMethod,
   normalizeAgentId,
   listAgentStates,
+  wipeAgentStateDirs,
 } from '../../../lib/agents.js';
 import { stopWorkspaceDocker } from '../../../lib/workspace-manager.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
@@ -159,6 +160,88 @@ export function buildPanStartArgs(input: {
     ...(input.harness ? ['--harness', input.harness] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
   ];
+}
+
+/**
+ * PAN-1985: detached-spawn helper for `pan <args>`, shared between the
+ * standard work-spawn route and the restart-fresh route. Opens a spawn.log
+ * inside the agent dir (creating the dir if missing — the dir may have been
+ * just wiped), spawns `pan` detached with stdio to that log, and resolves
+ * with an activity id once the child closes with code 0. Throws an Error
+ * with the log contents attached on non-zero exit.
+ */
+export async function spawnPanCommandDetached(input: {
+  agentSessionName: string;
+  issueId: string;
+  role: string;
+  workspacePath: string;
+  args: string[];
+  cwd?: string;
+}): Promise<string> {
+  const { agentSessionName, issueId, role, workspacePath, args } = input;
+  const cwd = input.cwd ?? workspacePath;
+  const activityId = `activity-${Date.now()}`;
+  const agentDir = join(homedir(), '.overdeck', 'agents', agentSessionName);
+  await mkdir(agentDir, { recursive: true });
+  const spawnLogPath = join(agentDir, 'spawn.log');
+  const spawnLogHandle = await open(spawnLogPath, 'a');
+  const child = spawn('pan', args, {
+    cwd,
+    detached: true,
+    stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
+  });
+  child.once('spawn', () => {
+    void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
+      issueId,
+      role,
+      workspacePath,
+      activityId,
+      pid: child.pid,
+      args,
+      cwd,
+      spawnLogPath,
+    }).catch(() => undefined);
+  });
+  try {
+    const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+      child.once('error', (error) => {
+        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
+          issueId,
+          role,
+          workspacePath,
+          activityId,
+          error: error.message,
+          args,
+          cwd,
+          spawnLogPath,
+        }).catch(() => undefined);
+        reject(error);
+      });
+      child.once('close', (code, signal) => {
+        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
+          issueId,
+          role,
+          workspacePath,
+          activityId,
+          code,
+          signal,
+          args,
+          cwd,
+          spawnLogPath,
+        }).catch(() => undefined);
+        resolve({ code, signal });
+      });
+    });
+    if (result.code !== 0) {
+      const output = await readFile(spawnLogPath, 'utf-8').catch(() => '');
+      const error = new Error(output.trim() || `pan ${args.join(' ')} exited with code ${result.code ?? 'null'}`);
+      Object.assign(error, { activityId, spawnLogPath, code: result.code, signal: result.signal, output });
+      throw error;
+    }
+    return activityId;
+  } finally {
+    await spawnLogHandle.close();
+  }
 }
 type StartAgentPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
@@ -2195,6 +2278,181 @@ const postAgentRestartRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/agents/:id/restart-fresh ────────────────────────────────
+//
+// PAN-1985: wipe the work agent's state directory under ~/.overdeck/agents/,
+// then optionally spawn a fresh work agent with a new harness/model. This is
+// the deliberate operator override path — for harness/model switches (the
+// Claude-session JSONL can't be resumed under a different harness) and for
+// "I want a clean work run" recovery. The NORMAL review flow continues the
+// same session across re-dispatches (PAN-1862); this route is the escape
+// hatch that pays the re-research cost.
+//
+// Modes (driven by request body):
+//   { spawn: true,  model, harness }  — wipe + respawn a new work agent with
+//                                       the chosen harness/model
+//   { spawn: false }                   — wipe only; user clicks Start afterwards
+//                                       (this is the backend of the new
+//                                       'completeWorkReset' issue action)
+//
+// Refuses (409) if a live tmux session is alive — same gate as reset-session.
+// Workspace, vBRIEF, beads, .pan/continue.json, .pan/feedback/, the branch,
+// and the commit history are all left untouched. The new agent (whether
+// auto-spawned or manually started) reads .pan/continue.json + branch state
+// to pick up where the prior run left off.
+
+const postAgentRestartFreshRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/restart-fresh',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const body = yield* readJsonBody;
+
+    const { spawn: spawnFlag, model: rawModel, harness } = body as {
+      spawn?: boolean;
+      model?: string;
+      harness?: 'claude-code' | 'pi' | 'codex';
+    };
+    const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
+
+    let newModel: string | undefined;
+    if (wantsSpawn && rawModel) {
+      try {
+        newModel = requireModelOverrideSync(rawModel);
+      } catch (err) {
+        return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+      }
+    }
+
+    const agentState = yield* getAgentState(id);
+    if (!agentState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+    const issueId = agentState.issueId ?? id.replace(/^agent-/, '').toUpperCase();
+
+    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    if (lifecycle.hasLiveTmuxSession) {
+      return jsonResponse({
+        error: `Agent ${id} has a live tmux session. Run 'pan kill ${issueId}' first, then retry.`,
+        lifecycle,
+      }, { status: 409 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_fresh_requested', {
+      wantsSpawn,
+      model: newModel,
+      harness,
+      issueId,
+    }));
+
+    // Kill any zombie tmux session (shouldn't happen with the gate above, but
+    // belt-and-suspenders) before wiping state.
+    yield* killSession(id).pipe(Effect.catch(() => Effect.void));
+
+    // Wipe the work agent dir only — leave specialist dirs (review, etc.)
+    // alone. The new agent will read .pan/continue.json to pick up.
+    const wipeResult = yield* Effect.promise(() => wipeAgentStateDirs(issueId));
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_fresh_wiped', {
+      removed: wipeResult.removed,
+      path: wipeResult.path,
+    }));
+
+    if (!wantsSpawn) {
+      invalidateAgentsCache();
+      return jsonResponse({
+        success: true,
+        spawn: false,
+        agentId: id,
+        issueId,
+        removed: wipeResult.removed,
+        hint: 'Agent dir wiped. Click Start agent to respawn with a fresh session.',
+      });
+    }
+
+    // Auto-spawn path: dispatch to the existing /api/agents spawn flow.
+    // We don't go through HTTP — we call the spawn primitives directly so
+    // the caller gets a single 200 with both wipe and spawn confirmed.
+    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-4-6';
+    let effectiveHarness: 'claude-code' | 'pi' | 'codex' | null = null;
+    if (harness) {
+      const harnessDecision = yield* Effect.promise(async () =>
+        canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
+      );
+      effectiveHarness = harnessDecision.allowed ? harness : 'claude-code';
+    }
+
+    const agentSessionName = `agent-${issueId.toLowerCase()}`;
+    const projectPath = agentState.workspace
+      ? dirname(agentState.workspace)
+      : undefined;
+    const projectConfig = resolveProjectFromIssueSync(issueId);
+    const projectRoot = projectConfig?.projectPath ?? projectPath ?? process.cwd();
+    const workspacePath = agentState.workspace ?? join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+    const args = buildPanStartArgs({
+      issueId,
+      model: spawnModel,
+      harness: effectiveHarness,
+    });
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_requested', {
+      args,
+      model: spawnModel,
+      harness: effectiveHarness,
+    }));
+
+    // Spawn detached `pan start` — same pattern the existing POST /api/agents
+    // route uses, minus the HTTP hop. We deliberately write a placeholder
+    // state.json (matching the existing spawn flow) so the dashboard
+    // transitions the agent from "stopped" to "starting" within one refresh.
+    saveAgentStateSync({
+      id: agentSessionName,
+      issueId,
+      workspace: workspacePath,
+      harness: effectiveHarness ?? 'claude-code',
+      role: 'work',
+      model: 'pending-work-spawn',
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+    });
+
+    try {
+      yield* Effect.promise(() => spawnPanCommandDetached({
+        agentSessionName,
+        issueId,
+        role: 'work',
+        workspacePath,
+        args,
+        cwd: workspacePath,
+      }));
+    } catch (err: any) {
+      return jsonResponse({
+        success: false,
+        error: `Agent dir wiped but spawn failed: ${err?.message ?? String(err)}`,
+        wiped: wipeResult.removed,
+      }, { status: 500 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_requested_complete', {
+      model: spawnModel,
+      harness: effectiveHarness,
+    }));
+
+    invalidateAgentsCache();
+    return jsonResponse({
+      success: true,
+      spawn: true,
+      agentId: id,
+      issueId,
+      removed: wipeResult.removed,
+      spawnedModel: spawnModel,
+      spawnedHarness: effectiveHarness,
+      hint: 'Fresh work agent spawned. It will read .pan/continue.json and the branch state to continue.',
+    });
+  })),
+);
+
 // ─── Route: GET /api/agents/:id/cloister-health ──────────────────────────────
 
 const getAgentCloisterHealthRoute = HttpRouter.add(
@@ -3117,70 +3375,14 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     // Spawn pan start command
-    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
-      const activityId = `activity-${Date.now()}`;
-      const agentDir = join(homedir(), '.overdeck', 'agents', agentSessionName);
-      await mkdir(agentDir, { recursive: true });
-      const spawnLogPath = join(agentDir, 'spawn.log');
-      const spawnLogHandle = await open(spawnLogPath, 'a');
-      const child = spawn('pan', args, {
-        cwd: cwd || workspacePath,
-        detached: true,
-        stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
-      });
-      child.once('spawn', () => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          pid: child.pid,
-          args,
-          cwd: cwd || workspacePath,
-          spawnLogPath,
-        }).catch(() => undefined);
-      });
-      try {
-        const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-          child.once('error', (error) => {
-            void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
-              issueId,
-              role,
-              workspacePath,
-              activityId,
-              error: error.message,
-              args,
-              cwd: cwd || workspacePath,
-              spawnLogPath,
-            }).catch(() => undefined);
-            reject(error);
-          });
-          child.once('close', (code, signal) => {
-            void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
-              issueId,
-              role,
-              workspacePath,
-              activityId,
-              code,
-              signal,
-              args,
-              cwd: cwd || workspacePath,
-              spawnLogPath,
-            }).catch(() => undefined);
-            resolve({ code, signal });
-          });
-        });
-        if (result.code !== 0) {
-          const output = await readFile(spawnLogPath, 'utf-8').catch(() => '');
-          const error = new Error(output.trim() || `pan ${args.join(' ')} exited with code ${result.code ?? 'null'}`);
-          Object.assign(error, { activityId, spawnLogPath, code: result.code, signal: result.signal, output });
-          throw error;
-        }
-        return activityId;
-      } finally {
-        await spawnLogHandle.close();
-      }
-    };
+    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => spawnPanCommandDetached({
+      agentSessionName,
+      issueId,
+      role,
+      workspacePath,
+      args,
+      cwd,
+    });
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
     const updateIssueStatus = async () => {
@@ -3875,6 +4077,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentHasSessionRoute,
   postAgentResetSessionRoute,
   postAgentSwitchModelRoute,
+  postAgentRestartFreshRoute,
   postAgentDeliveryMethodRoute,
 );
 

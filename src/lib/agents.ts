@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
-import { mkdir, readFile, readdir, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
+import { mkdir, readFile, readdir, rm, stat as statAsync, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname, basename } from 'path';
 import { homedir } from 'os';
@@ -963,6 +963,56 @@ export function getAgentDir(agentId: string): string {
 
 export function getAgentStateFilePath(agentId: string): string {
   return getRollbackAgentStatePath(agentId);
+}
+
+/**
+ * PAN-1985: wipe agent state directories for an issue, optionally scoped to
+ * a role prefix. Used by the restart-fresh and review-restart paths to clean
+ * state before respawning — the new agent then reads `.pan/continue.json`,
+ * the vBRIEF, the beads, and the branch to pick up where the prior run left
+ * off. Refuses to run against an empty or unsafe id.
+ *
+ * - `rolePrefix` omitted: wipes only the work agent dir (`agent-<id>`).
+ *   Specialist dirs (review, test, ship, etc.) are left alone.
+ * - `rolePrefix` set (e.g. 'review'): wipes the role parent dir
+ *   (`agent-<id>-<prefix>`) AND any sub-roles (`agent-<id>-<prefix>-<anything>`),
+ *   leaving the work agent dir alone.
+ *
+ * Refuses to operate on the root `AGENTS_DIR` itself or on paths that escape
+ * it; the `validateAgentId` guard below enforces a conservative id grammar.
+ */
+export async function wipeAgentStateDirs(
+  issueId: string,
+  opts: { rolePrefix?: string } = {},
+): Promise<{ removed: string[]; path: string }> {
+  if (!issueId || !/^[A-Za-z]+-\d+$/.test(issueId)) {
+    throw new Error(`wipeAgentStateDirs: invalid issueId "${issueId}"`);
+  }
+  if (opts.rolePrefix !== undefined && !/^[a-z][a-z0-9-]*$/.test(opts.rolePrefix)) {
+    throw new Error(`wipeAgentStateDirs: invalid rolePrefix "${opts.rolePrefix}"`);
+  }
+  const issueLower = issueId.toLowerCase();
+  const dirPath = join(AGENTS_DIR, `agent-${issueLower}${opts.rolePrefix ? `-${opts.rolePrefix}` : ''}`);
+  let entries: string[];
+  try {
+    entries = await readdir(AGENTS_DIR);
+  } catch {
+    return { removed: [], path: dirPath };
+  }
+  let targets: string[];
+  if (opts.rolePrefix) {
+    const base = `agent-${issueLower}-${opts.rolePrefix}`;
+    targets = entries.filter((name) => name === base || name.startsWith(`${base}-`));
+  } else {
+    const work = `agent-${issueLower}`;
+    targets = entries.filter((name) => name === work);
+  }
+  for (const name of targets) {
+    try {
+      await rm(join(AGENTS_DIR, name), { recursive: true, force: true });
+    } catch { /* non-fatal — best-effort wipe */ }
+  }
+  return { removed: targets, path: dirPath };
 }
 
 function isRole(value: unknown): value is Role {
