@@ -7,6 +7,7 @@ import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
+import { applyIssueParkedLabel } from '../../../lib/backlog/label-ops.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
@@ -155,6 +156,10 @@ const postBacklogGateRoute = HttpRouter.add(
 
       node.gate = gate as 'auto' | 'ready' | 'blocked';
       writeSequenceMd(projectRoot, doc);
+
+      if (gate === 'blocked') {
+        await applyIssueParkedLabel(issueId);
+      }
 
       return jsonResponse({ status: 'ok', issueId, gate });
     });

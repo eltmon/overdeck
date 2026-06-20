@@ -133,10 +133,20 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
           const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline });
-          const nextLine = nextPick
-            ? `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`
-            : 'No eligible issue found in sequence — fall back to normal priority';
-          sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked):\n${top10.join('\n')}\n${nextLine}\n\nIMPORTANT: auto_pickup_backlog=true. You MUST pick the "MUST start next" issue above as your next startup target. Do NOT apply your own P0-P3/oldest-first ranking while a sequence is available.`;
+          let nextLine: string;
+          let pickInstruction: string;
+          if (!nextPick) {
+            nextLine = 'No eligible issue found in sequence — fall back to normal priority';
+            pickInstruction = '';
+          } else if (nextPick.planning === 'interactive') {
+            // FR-17: interactive planning requires operator presence — must NOT be auto-started
+            nextLine = `NEEDS OPERATOR ACTION: ${nextPick.issueId} (rank ${nextPick.rank}) has planning=interactive — do NOT auto-start; operator must run 'pan plan ${nextPick.issueId}'`;
+            pickInstruction = `\n\nIMPORTANT: auto_pickup_backlog=true. The top-ranked issue requires interactive planning and MUST NOT be auto-started. Surface it to the operator for manual 'pan plan' invocation instead of auto-picking it.`;
+          } else {
+            nextLine = `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`;
+            pickInstruction = `\n\nIMPORTANT: auto_pickup_backlog=true. You MUST pick the "MUST start next" issue above as your next startup target. Do NOT apply your own P0-P3/oldest-first ranking while a sequence is available.`;
+          }
+          sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked):\n${top10.join('\n')}\n${nextLine}${pickInstruction}`;
         }
       } catch {
         // sequence.md exists but couldn't be parsed — skip enrichment
