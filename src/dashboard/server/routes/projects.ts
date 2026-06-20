@@ -7,7 +7,7 @@ import { jsonResponse } from "../http-helpers.js";
  */
 
 import { access, readFile, readdir, mkdir, stat, realpath } from 'node:fs/promises';
-import { join, isAbsolute, sep, resolve, normalize } from 'node:path';
+import { join, isAbsolute, sep, resolve, normalize, dirname, relative } from 'node:path';
 import { homedir } from 'node:os';
 
 import { Effect, Layer } from 'effect';
@@ -708,10 +708,28 @@ const postProjectsRoute = HttpRouter.add(
 
       return yield* Effect.promise(async () => {
         // Canonicalize parentDir and enforce home-directory boundary (rejects symlink escapes).
+        // parentDir need not exist yet — the default ~/Overdeck home for new projects is
+        // created on demand. Climb to the nearest existing ancestor, canonicalize THAT (so a
+        // symlinked ancestor pointing outside home is still rejected), then re-anchor the
+        // requested parent onto it; mkdir -p below creates the full chain. Because `probe` is
+        // always an ancestor of `rawParentResolved`, the re-anchored suffix can never contain
+        // '..', so the home-boundary check cannot be escaped by a non-existent tail.
         const withinHome = await buildHomeGuard();
-        let canonicalParent: string;
-        try { canonicalParent = await realpath(rawParent); }
-        catch { return jsonResponse({ error: 'parentDir does not exist' }, { status: 400 }); }
+        const rawParentResolved = resolve(normalize(rawParent));
+        let probe = rawParentResolved;
+        let existingAncestor: string | null = null;
+        for (;;) {
+          try { existingAncestor = await realpath(probe); break; }
+          catch { /* probe doesn't exist — climb toward the filesystem root */ }
+          const up = dirname(probe);
+          if (up === probe) break; // reached the root without finding an existing dir
+          probe = up;
+        }
+        if (!existingAncestor || !withinHome(existingAncestor)) {
+          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
+        }
+        const suffix = relative(probe, rawParentResolved);
+        const canonicalParent = suffix ? resolve(existingAncestor, suffix) : existingAncestor;
         if (!withinHome(canonicalParent)) {
           return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
         }

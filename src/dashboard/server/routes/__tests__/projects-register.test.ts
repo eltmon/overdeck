@@ -88,7 +88,7 @@ async function simulateNew(body: {
   parentDir?: unknown;
   name?: unknown;
 }): Promise<{ status: number; json: Record<string, unknown> }> {
-  const { isAbsolute, join: pathJoin, sep } = await import('node:path');
+  const { isAbsolute, join: pathJoin, sep, resolve, normalize, dirname, relative } = await import('node:path');
   const { access, mkdir, readdir, realpath } = await import('node:fs/promises');
   const { homedir } = await import('node:os');
   const { exec } = await import('node:child_process');
@@ -120,13 +120,27 @@ async function simulateNew(body: {
   }
 
   // Home-boundary check (mirrors routes/projects.ts buildHomeGuard).
+  // parentDir need not exist yet — climb to the nearest existing ancestor,
+  // canonicalize it, then re-anchor the requested parent; mkdir -p creates the chain.
   const home = homedir();
   let ch: string;
   try { ch = await realpath(home); } catch { ch = home; }
   const withinHome = (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
-  let canonicalParent: string;
-  try { canonicalParent = await realpath(rawParent); }
-  catch { return { status: 400, json: { error: 'parentDir does not exist' } }; }
+  const rawParentResolved = resolve(normalize(rawParent));
+  let probe = rawParentResolved;
+  let existingAncestor: string | null = null;
+  for (;;) {
+    try { existingAncestor = await realpath(probe); break; }
+    catch { /* climb */ }
+    const up = dirname(probe);
+    if (up === probe) break;
+    probe = up;
+  }
+  if (!existingAncestor || !withinHome(existingAncestor)) {
+    return { status: 400, json: { error: 'parentDir is outside home directory' } };
+  }
+  const suffix = relative(probe, rawParentResolved);
+  const canonicalParent = suffix ? resolve(existingAncestor, suffix) : existingAncestor;
   if (!withinHome(canonicalParent)) {
     return { status: 400, json: { error: 'parentDir is outside home directory' } };
   }
@@ -225,6 +239,34 @@ describe("POST /api/projects mode='new'", () => {
 
     // project is registered
     expect(getProjectSync('my-new-app')?.path).toBe(target);
+  });
+
+  it('creates a non-existent in-home parent (mkdir -p) — the ~/Overdeck default', async () => {
+    // Parent does NOT exist yet (mirrors the default ~/Overdeck home).
+    const parentDir = join(TEST_HOME, 'Overdeck');
+    expect(existsSync(parentDir)).toBe(false);
+    const name = 'fresh-app';
+
+    const res = await simulateNew({ parentDir, name });
+    expect(res.status).toBe(200);
+    const target = join(parentDir, 'fresh-app');
+    expect(res.json.path).toBe(target);
+    // Both the parent chain and the project folder were created.
+    expect(existsSync(parentDir)).toBe(true);
+    expect(existsSync(join(target, '.git'))).toBe(true);
+    expect(getProjectSync('fresh-app')?.path).toBe(target);
+  });
+
+  it('rejects a non-existent parent whose nearest existing ancestor is outside home', async () => {
+    // A path under /tmp (outside the mocked TEST_HOME) that does not exist: the
+    // climb must land on an existing ancestor outside home and reject — never
+    // create anything outside home.
+    const { tmpdir } = await import('node:os');
+    const outsideParent = join(tmpdir(), `outside-nonexist-${process.pid}`, 'deep', 'nope');
+    const res = await simulateNew({ parentDir: outsideParent, name: 'escape-app' });
+    expect(res.status).toBe(400);
+    expect(res.json.error).toMatch(/outside home/i);
+    expect(existsSync(outsideParent)).toBe(false);
   });
 
   it('returns 409 for a non-empty existing target without any fs/registry change', async () => {

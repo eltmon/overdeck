@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, FolderPlus } from 'lucide-react';
 import { fetchWithTimeout } from '../../lib/apiFetch.js';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport.js';
 import { FolderPicker } from './FolderPicker.js';
 import styles from './styles/command-deck.module.css';
 
@@ -26,11 +27,13 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
   const [selectedPath, setSelectedPath] = useState('');
   const [name, setName] = useState('');
   const [parentDir, setParentDir] = useState('');
-  const [overdeckDefault, setOverdeckDefault] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch home dir once on open to derive the ~/Overdeck default parent for new projects.
+  // Fetch home dir once on open to derive the ~/Overdeck default creation target
+  // for new projects. ~/Overdeck need not exist yet — the server creates it on
+  // submit (mkdir -p). The FolderPicker still browses home (an existing dir), so
+  // seeding ~/Overdeck here is only the default target shown in the preview.
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
@@ -39,9 +42,7 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
         const res = await fetchWithTimeout('/api/fs/list-dirs', { credentials: 'include' });
         if (cancelled || !res?.ok) return;
         const data = await res.json() as { path: string };
-        const d = `${data.path}/Overdeck`;
-        setOverdeckDefault(d);
-        setParentDir((prev) => prev || d);
+        setParentDir((prev) => prev || `${data.path}/Overdeck`);
       } catch { /* non-fatal — user can pick manually */ }
     })();
     return () => { cancelled = true; };
@@ -67,7 +68,7 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
       const res = await fetchWithTimeout('/api/projects', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -169,7 +170,6 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
                 </p>
                 <FolderPicker
                   onSelect={(path) => setParentDir(path)}
-                  initialPath={overdeckDefault || undefined}
                 />
               </div>
               {preview && (

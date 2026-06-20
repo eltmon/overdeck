@@ -11,6 +11,15 @@ vi.mock('../../../lib/apiFetch.js', () => ({
   fetchWithTimeout: vi.fn(),
 }));
 
+// The modal attaches the dashboard CSRF header via dashboardMutationJsonHeaders().
+// Mock it so the POST carries the header without booting the real session mint.
+vi.mock('../../../lib/wsTransport.js', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({
+    'Content-Type': 'application/json',
+    'x-overdeck-csrf-token': 'test-csrf',
+  })),
+}));
+
 // FolderPicker renders a simple button. Exactly one is visible at a time
 // (only the active mode's picker is mounted), so a single testid is sufficient.
 vi.mock('../FolderPicker.js', () => ({
@@ -103,6 +112,8 @@ describe('NewProjectModal', () => {
       expect(projectCalls).toHaveLength(1);
       const [url, opts] = projectCalls[0] as [string, RequestInit];
       expect(url).toBe('/api/projects');
+      // CSRF header must be attached (regression: PAN-1970 modal POSTed without it → 403).
+      expect((opts.headers as Record<string, string>)['x-overdeck-csrf-token']).toBe('test-csrf');
       const body = JSON.parse(opts.body as string);
       expect(body).toEqual({ mode: 'existing', path: '/mock/path' });
       expect(onCreated).toHaveBeenCalledWith({ key: 'proj', name: 'proj', path: '/mock/path' });
