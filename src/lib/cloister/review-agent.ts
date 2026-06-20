@@ -504,7 +504,7 @@ function buildSelfReviewPrompt(opts: {
   }
 
   try {
-    const { spawnRun, saveAgentState, getAgentState } = await import('../agents.js');
+    const { spawnRun, saveAgentState, getAgentState, getAgentStateSync, getLatestSessionIdSync, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
     const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
@@ -544,6 +544,37 @@ function buildSelfReviewPrompt(opts: {
     // are kept (commented out, not deleted) to restore later as an opt-in; #1982.
     // const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
     const prompt = buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+
+    // PAN-1862: RESUME the saved review session by default. The review agent keeps the prior
+    // review's context (the files it read, the findings it raised), so a re-review checks the
+    // fix instead of re-researching the entire diff from scratch — the token-cost problem this
+    // was set out to fix. Fresh-spawn ONLY when the harness/model actually changed (it's a
+    // different agent then) or there is no resumable saved session. The resume delivery is
+    // resilient (supervisor → tmux fallback, PAN-1988).
+    const reviewAgentId = `agent-${opts.issueId.toLowerCase()}-review`;
+    const savedReview = getAgentStateSync(reviewAgentId);
+    const reviewModelChanged = !!opts.model && !!savedReview?.model && opts.model !== savedReview.model;
+    const reviewHarnessChanged = !!opts.harness && !!savedReview?.harness && opts.harness !== savedReview.harness;
+    const canResumeReview = !!savedReview && !!getLatestSessionIdSync(reviewAgentId) && !reviewModelChanged && !reviewHarnessChanged;
+    if (canResumeReview) {
+      console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
+      const resumeResult = await resumeAgent(reviewAgentId, prompt);
+      if (resumeResult.success) {
+        try {
+          // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
+          const resumed = getAgentStateSync(reviewAgentId);
+          if (resumed) { resumed.reviewRunId = runId; await Effect.runPromise(saveAgentState(resumed)); }
+        } catch { /* non-fatal */ }
+        return { success: true, message: `Review resumed (session preserved): ${reviewAgentId}` };
+      }
+      console.warn(`[review-agent] Review resume failed for ${reviewAgentId}; falling back to a fresh session: ${resumeResult.error}`);
+    }
+    // Fresh review: wipe any stale review state (harness/model changed, or the resume above
+    // failed) so the new session does not inherit a mismatched saved session id.
+    if (savedReview || getLatestSessionIdSync(reviewAgentId)) {
+      try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
+      catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
+    }
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,

@@ -1565,13 +1565,10 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     );
     const killResult = yield* killAllReviewerSessions(project, issueId);
 
-    // PAN-1985: wipe the review agent dirs so the respawned review starts
-    // with a fresh state.json + session id. Leaves the work agent dir
-    // (and any other non-review specialists) alone.
-    const { wipeAgentStateDirs } = yield* Effect.promise(
-      () => import('../../../lib/agents.js'),
-    );
-    const wipeResult = yield* Effect.promise(() => wipeAgentStateDirs(issueId, { rolePrefix: 'review' }));
+    // PAN-1862: do NOT wipe here. The review session (state.json + saved session id) is preserved
+    // so spawnReviewRoleForIssue can RESUME it — keeping the prior review's context so a restart
+    // with the same model checks the fix instead of re-researching the whole diff. It wipes +
+    // fresh-spawns internally ONLY when the harness/model actually changed.
 
     // Resolve workspace info for re-dispatch
     const projectConfig = resolveProjectFromIssueSync(issueId);
@@ -1613,7 +1610,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
         gated: true,
         message: result.message,
         killed: killResult.killed,
-        wiped: wipeResult.removed,
+        wiped: [],
         model: model ?? undefined,
         harness: harness ?? undefined,
       }, { status: 409 });
