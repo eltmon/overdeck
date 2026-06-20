@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Header restyle — spec (item #3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --primary:oklch(.488 .217 264); --primary-foreground:#fff;
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --warning:#f59e0b; --warning-foreground:#b45309;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-cost:#06b6d4; --signal-cost-foreground:#0e7490;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .wrap{max-width:1080px;margin:26px auto;padding:0 22px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:22px}
+  .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+  .lbl .pill2{font-size:9px;border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  .lbl .bad{color:var(--destructive-foreground)} .lbl .ok{color:var(--success-foreground)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:18px}
+  .crumb{font-size:11px;color:color-mix(in srgb,var(--muted-foreground) 80%,transparent)} .crumb b{color:var(--muted-foreground);font-weight:500}
+  .iid{font-family:var(--mono);font-size:13px}
+  .ititle{font-size:16px;margin:0;line-height:1.3;font-weight:500}
+  .pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:var(--radius-sm);font-size:11px;border:1px solid transparent}
+  .pill.ok{background:color-mix(in srgb,var(--success) 8%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent);color:var(--success-foreground)}
+  .pill.bad{background:color-mix(in srgb,var(--destructive) 8%,transparent);border-color:color-mix(in srgb,var(--destructive) 32%,transparent);color:var(--destructive-foreground)}
+
+  /* ───── BEFORE (today) ───── */
+  .before{padding:14px 16px;border-radius:18px}
+  .before .top{display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px}
+  .before .stat{border:1px solid var(--border);border-radius:12px;padding:6px 10px;text-align:right}
+  .before .stat .k{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .before .stat .v{font-size:12px;margin-top:2px}
+  .before .stats{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .before .mergebtn{background:var(--success);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:500}
+  .before .actbtn{border:1px solid var(--border);background:var(--card);border-radius:8px;padding:8px 12px;font-size:12px}
+  .before .sublabel{margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:color-mix(in srgb,var(--muted-foreground) 70%,transparent)}
+  .before .titlerow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:6px}
+
+  /* ───── AFTER (restyled) ───── */
+  .after{padding:16px 18px;border-radius:20px}
+  .after .crumb{margin-bottom:2px}
+  .after .row{display:flex;gap:18px;align-items:flex-start}
+  .after .left{min-width:0;flex:1}
+  .after .titlerow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:6px}
+  .after .right{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:flex-end}
+  .after .facts{display:flex;align-items:flex-start;gap:18px}
+  .after .f{display:flex;flex-direction:column;gap:1px}
+  .after .f .k{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .after .f .v{font-size:12.5px}
+  .after .f .v.cost{color:var(--signal-cost-foreground);font-variant-numeric:tabular-nums}
+  .after .acts{display:flex;align-items:center;gap:8px}
+  .after .merge{background:var(--primary);color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:12px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+  .after .merge.gated{background:color-mix(in srgb,var(--muted-foreground) 12%,var(--card));color:var(--muted-foreground)}
+  .after .actbtn{border:1px solid var(--border);background:var(--card);border-radius:9px;padding:8px 12px;font-size:12px}
+  .after .divider{height:1px;background:var(--border);margin:14px 0 0}
+
+  .notes{border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-top:22px;background:var(--card)}
+  .notes h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .notes li{font-size:12.5px;margin:6px 0} .notes code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+  .placeholder{margin-top:14px;border:1px dashed var(--border);border-radius:12px;padding:10px 12px;font-size:11.5px;color:var(--muted-foreground);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Header restyle — item #3</h1>
+  <div class="sub">Just the top band: breadcrumb · id + title + phase · facts · Merge · Actions. The pipeline bar (#4) and gates row (#5) are separate items — shown only as a dashed placeholder here.</div>
+
+  <div class="lbl"><span class="pill2 bad">before</span> today — bordered stat boxes float mid-height; "Issue Cockpit · Mission Control" noise; green merge; crammed</div>
+  <div class="card before">
+    <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+    <div class="top">
+      <div style="min-width:0">
+        <div class="titlerow">
+          <span class="iid">PAN-1866</span>
+          <h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1>
+          <span class="pill ok">Ready</span>
+        </div>
+        <div class="sublabel">Issue Cockpit · Mission Control</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Branch</div><div class="v mono">feature/pan-1866</div></div>
+        <div class="stat"><div class="k">PR / CI</div><div class="v">#1975 · 5/5 ✓</div></div>
+        <div class="stat"><div class="k">Cost</div><div class="v">$93.55</div></div>
+        <button class="mergebtn">MERGE</button>
+        <button class="actbtn">⌘ Actions ▾</button>
+      </div>
+    </div>
+    <div class="placeholder">▦ pipeline bar (#4) · gates row (#5)</div>
+  </div>
+
+  <div class="lbl"><span class="pill2 ok">after</span> restyled — quiet inline facts (cost in cyan), no sublabel, top-aligned cluster, primary Merge, tighter</div>
+  <div class="card after">
+    <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+    <div class="row">
+      <div class="left">
+        <div class="titlerow">
+          <span class="iid">PAN-1866</span>
+          <h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1>
+          <span class="pill ok">✓ Ready</span>
+        </div>
+      </div>
+      <div class="right">
+        <div class="facts">
+          <div class="f"><span class="k">Branch</span><span class="v mono">feature/pan-1866</span></div>
+          <div class="f"><span class="k">PR / CI</span><span class="v">#1975 · 5/5</span></div>
+          <div class="f"><span class="k">Cost</span><span class="v cost">$93.55</span></div>
+        </div>
+        <div class="acts">
+          <button class="merge">Merge</button>
+          <button class="actbtn">⌘ Actions ▾</button>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="placeholder" style="margin-top:14px">▦ pipeline bar (#4) · gates row (#5) — unchanged in this item</div>
+  </div>
+
+  <!-- gated variant -->
+  <div class="lbl"><span class="pill2">after · gated</span> when merge is blocked, the CTA states why (and the phase pill goes red)</div>
+  <div class="card after">
+    <div class="crumb"><b>panopticon-cli</b> / Issues</div>
+    <div class="row">
+      <div class="left">
+        <div class="titlerow">
+          <span class="iid">PAN-1866</span>
+          <h1 class="ititle">Backlog Sequencer — AI-ranked whole-backlog DAG with a reproducible markdown source of truth</h1>
+          <span class="pill bad">⛔ Blocked</span>
+        </div>
+      </div>
+      <div class="right">
+        <div class="facts">
+          <div class="f"><span class="k">Branch</span><span class="v mono">feature/pan-1866</span></div>
+          <div class="f"><span class="k">PR / CI</span><span class="v">#1975 · 4/5</span></div>
+          <div class="f"><span class="k">Cost</span><span class="v cost">$67.72</span></div>
+        </div>
+        <div class="acts">
+          <button class="merge gated">⛔ Merge — blocked by review</button>
+          <button class="actbtn">⌘ Actions ▾</button>
+        </div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="placeholder" style="margin-top:14px">▦ pipeline bar (#4) · gates row (#5)</div>
+  </div>
+
+  <div class="notes">
+    <h3>What changes in #3</h3>
+    <ul>
+      <li><b>Stat boxes → quiet inline facts.</b> Branch / PR·CI / Cost as label-over-value, top-aligned next to the title (no bordered boxes floating mid-height). Cost is the one signal color (<code>cyan</code> = money).</li>
+      <li><b>Drop "Issue Cockpit · Mission Control".</b> The breadcrumb + id already say where you are.</li>
+      <li><b>Merge becomes the primary CTA</b> (blue) when ready; when gated it's muted and states the reason inline. (Green was reading as "done", not "do this".)</li>
+      <li><b>Phase pill</b> stays the single status chip by the title.</li>
+      <li><b>Tighter vertical rhythm</b>; a hairline divider separates the identity band from the pipeline/gates below.</li>
+      <li><b>Out of scope here:</b> pipeline-bar colors (#4) and gates-row colors (#5) — next items.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>
