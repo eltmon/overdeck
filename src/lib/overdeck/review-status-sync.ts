@@ -215,16 +215,16 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.testStatus,
       s.mergeStatus ?? null,
       s.inspectStatus ?? null,
-      s.inspectNotes ?? null,
+      null, // inspect_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       isoToMs(s.inspectStartedAt),
       s.inspectBeadId ?? null,
       s.verificationStatus ?? null,
-      s.verificationNotes ?? null,
+      null, // verification_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       s.verificationCycleCount ?? null,
       s.verificationMaxCycles ?? null,
-      s.reviewNotes ?? null,
-      s.testNotes ?? null,
-      s.mergeNotes ?? null,
+      null, // review_notes — PAN-1988: feedback text lives in the journal, not the DB cache
+      null, // test_notes — PAN-1988: journal-only
+      null, // merge_notes — PAN-1988: journal-only
       isoToMs(s.updatedAt) ?? Date.now(),
       s.readyForMerge ? 1 : 0,
       s.autoRequeueCount ?? null,

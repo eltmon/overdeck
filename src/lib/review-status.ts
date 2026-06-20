@@ -11,11 +11,9 @@ import {
   getReviewStatusesFromDb,
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
-  setDeaconIgnored as dbSetDeaconIgnored,
-  setAutoMerge as dbSetAutoMerge,
 } from './overdeck/review-status-sync.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
-import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync } from './overdeck/review-status-record-sync.js';
+import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -122,6 +120,26 @@ export function verificationSatisfied(status: Pick<ReviewStatus, 'verificationSt
   return status.verificationStatus !== 'failed';
 }
 
+/**
+ * PAN-1988: the merge-gate predicate (review passed, test passed/skipped, verification not
+ * failed, UAT ok, merge not started). Extracted so both setReviewStatusSync and the
+ * journal→DB reconcile in getReviewStatusSync derive readyForMerge identically.
+ */
+function reviewGatesPassedSync(
+  s: Pick<ReviewStatus, 'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'>,
+): boolean {
+  return (
+    s.reviewStatus === 'passed' &&
+    (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
+    verificationSatisfied(s) &&
+    (s.uatStatus === undefined || s.uatStatus === 'passed') &&
+    (s.mergeStatus === 'pending' ||
+      s.mergeStatus === 'queued' ||
+      s.mergeStatus === undefined ||
+      s.mergeStatus === null)
+  );
+}
+
 export interface MergeGateEligibility {
   eligible: boolean;
   reason?: string;
@@ -215,9 +233,14 @@ export function setReviewStatusSync(
 
   // Read only the single row we're updating (avoids TOCTOU: bulk read-modify-write
   // races when two concurrent calls for different issue IDs run concurrently).
-  // If `existing` is provided (e.g. from mutateBlockers), skip the DB read to
+  // If `existing` is provided (e.g. from mutateBlockers), skip the read to
   // avoid double-read on the webhook ingestion path (PAN-905).
-  const status: ReviewStatus = existing ?? getReviewStatusFromDbSync(issueId) ?? {
+  // PAN-1988: the merge base goes through getReviewStatusSync (journal-reconciled +
+  // notes-enriched), NOT the raw DB read. Otherwise a partial update (e.g. a testStatus
+  // change carrying no review notes) would merge against a DB row whose notes/flags lag
+  // the journal and silently erase the journal's feedback. The reconcile inside
+  // getReviewStatusSync never re-enters setReviewStatusSync, so there is no recursion.
+  const status: ReviewStatus = existing ?? getReviewStatusSync(issueId) ?? {
     issueId,
     reviewStatus: 'pending' as const,
     testStatus: 'pending' as const,
@@ -278,20 +301,11 @@ export function setReviewStatusSync(
   // merge starts; mergeStatus then leaves pending/queued so the derive agrees).
   // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
-  const gatesPassed =
-    merged.reviewStatus === 'passed' &&
-    (merged.testStatus === 'passed' || merged.testStatus === 'skipped') &&
-    verificationSatisfied(merged) &&
-    (merged.uatStatus === undefined || merged.uatStatus === 'passed') &&
-    (merged.mergeStatus === 'pending' ||
-      merged.mergeStatus === 'queued' ||
-      merged.mergeStatus === undefined ||
-      merged.mergeStatus === null);
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
-        : gatesPassed);
+        : reviewGatesPassedSync(merged));
 
   const updated: ReviewStatus = normalizeReviewStatusSync({
     ...merged,
@@ -333,15 +347,24 @@ export function setReviewStatusSync(
     })();
   }
 
-  // Single-row upsert — atomic, no TOCTOU risk. SQLite remains authoritative
-  // for live runtime pipeline state. Do not mirror this into canonical vBRIEF
-  // specs: PAN-1124 makes .pan/specs immutable after planning except plan.status.
-  dbUpsert(updated);
-
-  // PAN-1908: project durable review_status verdicts into the infra repo's
-  // per-issue permanent record. Fire-and-forget so the SQLite write path stays
-  // synchronous and fast; queueAutoCommit debounces bursts into one commit.
+  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the
+  // SQLite row is a rebuildable cache. Write the journal FIRST — it is workspace-local
+  // (<workspace>/.pan/records/<issue>.json), so it succeeds even for a sandboxed agent
+  // (codex workspace-write) that cannot reach ~/.overdeck. Fire-and-forget; queueAutoCommit
+  // debounces bursts into one commit. Do NOT mirror into canonical vBRIEF specs (PAN-1124).
   updateIssueRecordForReviewStatusSync(issueId, updated);
+
+  // The DB cache write is best-effort. A sandboxed agent's write throws SQLITE_READONLY, but
+  // the verdict is already durable in the journal above, and the host reconciles the cache on
+  // read (getReviewStatusSync's journal→DB reconcile). Tolerating this is what removes the
+  // sandbox-escalation "smoke and mirrors" — the agent never has to break out of its jail to
+  // record a verdict.
+  try {
+    dbUpsert(updated);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[review-status] DB cache write skipped for ${issueId} (${msg}); journal holds the verdict, host will reconcile on read.`);
+  }
 
   notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
 
@@ -465,11 +488,51 @@ export function setReviewStatusSync(
 }
 
 export function getReviewStatusSync(issueId: string): ReviewStatus | null {
-  const status = getReviewStatusFromDbSync(issueId);
-  if (!status) return null;
-  // PAN-1988: the DB holds queryable status flags; feedback TEXT is sourced from the
-  // durable per-issue journal. Overlay the notes from the record so readers are transparent.
-  return enrichReviewNotesFromRecordSync(issueId, status);
+  const dbStatus = getReviewStatusFromDbSync(issueId);
+  const journal = readJournalStatusSync(issueId);
+
+  // No journal record → the DB is all we have. (Pre-PAN-1908 issues, or issues whose
+  // workspace/record hasn't been created yet.)
+  if (!journal) return dbStatus ?? null;
+
+  // PAN-1988 — journal is the source of truth; DB is a rebuildable cache. If the journal is
+  // NEWER than the DB row, an agent recorded its verdict to the journal but the DB write
+  // lagged or was blocked (a sandboxed agent that can't write ~/.overdeck). Reconcile the
+  // cache from the journal. Whatever process reads next performs this; the host (non-sandboxed)
+  // write succeeds, a sandboxed reader's reconcile is a best-effort no-op.
+  const journalNewer = !dbStatus || (dbStatus.updatedAt ?? '') < journal.updatedAt;
+  if (journalNewer) {
+    const merged: ReviewStatus = {
+      ...(dbStatus ?? {
+        issueId,
+        reviewStatus: 'pending' as const,
+        testStatus: 'pending' as const,
+        updatedAt: journal.updatedAt,
+        readyForMerge: false,
+      }),
+    };
+    // Apply ONLY the journal fields that are actually present. The journal carries the durable
+    // verdict; DB-only/ephemeral fields it does not store (stuck/stuckReason, transient counters)
+    // must NOT be clobbered with `undefined`. This keeps every reconcile a strict overlay.
+    for (const [key, value] of Object.entries(journal.durable)) {
+      if (value !== undefined) (merged as unknown as Record<string, unknown>)[key] = value;
+    }
+    merged.issueId = issueId;
+    merged.updatedAt = journal.updatedAt;
+    const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+    merged.readyForMerge = hasBlockers ? false : reviewGatesPassedSync(merged);
+    const reconciled = normalizeReviewStatusSync(merged);
+    try {
+      dbUpsert(reconciled);
+    } catch {
+      // Read-only DB (a sandboxed reader) — the host reconciles when it reads. Non-fatal.
+    }
+    return reconciled;
+  }
+
+  // DB is current → overlay the feedback TEXT from the journal (it is no longer stored in the
+  // DB; the row holds only the queryable status flags).
+  return enrichReviewNotesFromRecordSync(issueId, dbStatus!);
 }
 
 
@@ -605,6 +668,11 @@ export function clearReviewStatus(issueId: string): void {
  * @param reason  - Short reason code (e.g. "main_diverged")
  * @param details - Optional structured details (e.g. {localSha, remoteSha})
  */
+// PAN-1988: `stuck` is EPHEMERAL runtime state (set when patrol detects a wedged workspace),
+// NOT a durable verdict — projectPipeline deliberately does not journal it, and it is rebuilt
+// from runtime on a cache rebuild. So markWorkspaceStuck/clearWorkspaceStuck write the DB cache
+// directly and do not go through the journal door. The getReviewStatusSync journal→DB reconcile
+// preserves it (a strict overlay that never clobbers DB-only fields the journal doesn't carry).
 export function markWorkspaceStuck(
   issueId: string,
   reason: string,
@@ -647,10 +715,16 @@ export function setDeaconIgnored(
   reason?: string,
 ): void {
   try {
-    dbSetDeaconIgnored(issueId, ignored, reason);
+    // PAN-1988: route through the single write door. deaconIgnored is a DURABLE field that
+    // projectPipeline journals — a DB-only write (the old dbSetDeaconIgnored) lands in the
+    // cache but not the journal, so it vanishes on a cache rebuild. setReviewStatusSync writes
+    // both (and emits the status_changed event), keeping DB and journal in sync.
+    setReviewStatusSync(issueId, {
+      deaconIgnored: ignored,
+      deaconIgnoredAt: ignored ? new Date().toISOString() : undefined,
+      deaconIgnoredReason: ignored ? reason : undefined,
+    });
     console.log(`[review-status] deaconIgnored=${ignored} for ${issueId}${reason ? ` (${reason})` : ''}`);
-    const updated = getReviewStatusSync(issueId);
-    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to set deaconIgnored for ${issueId}:`, err);
   }
@@ -663,10 +737,12 @@ export function setDeaconIgnored(
  */
 export function setAutoMerge(issueId: string, autoMerge: boolean | null): void {
   try {
-    dbSetAutoMerge(issueId, autoMerge);
+    // PAN-1988: route through the single write door. autoMerge is a DURABLE field journaled by
+    // projectPipeline; a DB-only write would be lost on cache rebuild. `null` clears it back to
+    // the project default (stored as undefined). setReviewStatusSync writes DB + journal and
+    // emits the status_changed event.
+    setReviewStatusSync(issueId, { autoMerge: autoMerge === null ? undefined : autoMerge });
     console.log(`[review-status] autoMerge=${autoMerge === null ? 'default' : autoMerge} for ${issueId}`);
-    const updated = getReviewStatusSync(issueId);
-    if (updated) notifyPipelineSync({ type: 'status_changed', issueId, status: updated });
   } catch (err) {
     console.error(`[review-status] Failed to set autoMerge for ${issueId}:`, err);
   }
