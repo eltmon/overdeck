@@ -30,10 +30,10 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch home dir once on open to derive the ~/Overdeck default creation target
-  // for new projects. ~/Overdeck need not exist yet — the server creates it on
+  // Fetch home dir once on open to derive the ~/Projects default creation target
+  // for new projects. ~/Projects need not exist yet — the server creates it on
   // submit (mkdir -p). The FolderPicker still browses home (an existing dir), so
-  // seeding ~/Overdeck here is only the default target shown in the preview.
+  // seeding ~/Projects here is only the default target shown in the preview.
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
@@ -42,7 +42,7 @@ export function NewProjectModal({ isOpen, onClose, onCreated }: NewProjectModalP
         const res = await fetchWithTimeout('/api/fs/list-dirs', { credentials: 'include' });
         if (cancelled || !res?.ok) return;
         const data = await res.json() as { path: string };
-        setParentDir((prev) => prev || `${data.path}/Overdeck`);
+        setParentDir((prev) => prev || `${data.path}/Projects`);
       } catch { /* non-fatal — user can pick manually */ }
     })();
     return () => { cancelled = true; };

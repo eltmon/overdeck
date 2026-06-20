@@ -708,7 +708,7 @@ const postProjectsRoute = HttpRouter.add(
 
       return yield* Effect.promise(async () => {
         // Canonicalize parentDir and enforce home-directory boundary (rejects symlink escapes).
-        // parentDir need not exist yet — the default ~/Overdeck home for new projects is
+        // parentDir need not exist yet — the default ~/Projects home for new projects is
         // created on demand. Climb to the nearest existing ancestor, canonicalize THAT (so a
         // symlinked ancestor pointing outside home is still rejected), then re-anchor the
         // requested parent onto it; mkdir -p below creates the full chain. Because `probe` is

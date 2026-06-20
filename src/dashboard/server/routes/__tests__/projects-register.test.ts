@@ -241,9 +241,9 @@ describe("POST /api/projects mode='new'", () => {
     expect(getProjectSync('my-new-app')?.path).toBe(target);
   });
 
-  it('creates a non-existent in-home parent (mkdir -p) — the ~/Overdeck default', async () => {
-    // Parent does NOT exist yet (mirrors the default ~/Overdeck home).
-    const parentDir = join(TEST_HOME, 'Overdeck');
+  it('creates a non-existent in-home parent (mkdir -p) — the ~/Projects default', async () => {
+    // Parent does NOT exist yet (mirrors the default ~/Projects home on a fresh machine).
+    const parentDir = join(TEST_HOME, 'Projects');
     expect(existsSync(parentDir)).toBe(false);
     const name = 'fresh-app';
 

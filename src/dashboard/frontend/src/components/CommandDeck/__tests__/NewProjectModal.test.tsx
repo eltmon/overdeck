@@ -127,7 +127,7 @@ describe('NewProjectModal', () => {
 
     fireEvent.click(screen.getByTestId('new-project-tab-new'));
 
-    // Select parent dir → parentDir = '/mock/path' (overrides the Overdeck default)
+    // Select parent dir → parentDir = '/mock/path' (overrides the ~/Projects default)
     fireEvent.click(screen.getByTestId('mock-folder-picker'));
     // Type name
     fireEvent.change(screen.getByTestId('new-project-name-input'), { target: { value: 'My App' } });
@@ -145,12 +145,12 @@ describe('NewProjectModal', () => {
     });
   });
 
-  it("new mode default parent is ~/Overdeck when home fetch succeeds", async () => {
+  it("new mode default parent is ~/Projects when home fetch succeeds", async () => {
     mockFetch.mockImplementation((url: string) => {
       if (url === '/api/fs/list-dirs') {
         return Promise.resolve(makeOkResponse({ path: '/home/testuser', parent: null, entries: [] }));
       }
-      return Promise.resolve(makeOkResponse({ key: 'bugs', name: 'Bugs', path: '/home/testuser/Overdeck/bugs' }));
+      return Promise.resolve(makeOkResponse({ key: 'bugs', name: 'Bugs', path: '/home/testuser/Projects/bugs' }));
     });
 
     render(<NewProjectModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
@@ -161,7 +161,7 @@ describe('NewProjectModal', () => {
 
     await waitFor(() => {
       const preview = screen.getByTestId('new-project-preview');
-      expect(preview.textContent).toBe('/home/testuser/Overdeck/bugs');
+      expect(preview.textContent).toBe('/home/testuser/Projects/bugs');
     });
   });
 
