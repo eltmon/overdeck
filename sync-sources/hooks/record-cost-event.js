@@ -28250,9 +28250,10 @@ const MODEL_CAPABILITIES = {
 		model: "glm-5.2",
 		provider: "zai",
 		displayName: "GLM-5.2",
-		costPer1MTokens: 2,
-		contextWindow: 128e3,
+		costPer1MTokens: 2.9,
+		contextWindow: 1e6,
 		effortLevels: ["high", "max"],
+		supportsImages: false,
 		skills: {
 			"code-generation": 85,
 			"code-review": 83,
@@ -28272,8 +28273,9 @@ const MODEL_CAPABILITIES = {
 		model: "glm-5.1",
 		provider: "zai",
 		displayName: "GLM-5.1",
-		costPer1MTokens: 2,
-		contextWindow: 128e3,
+		costPer1MTokens: 2.9,
+		contextWindow: 2e5,
+		supportsImages: false,
 		skills: {
 			"code-generation": 82,
 			"code-review": 80,
@@ -28686,6 +28688,7 @@ const DEFAULT_ROLES = {
 	test: { model: "workhorse:mid" },
 	ship: { model: "workhorse:mid" },
 	strike: { model: "workhorse:expensive" },
+	sequencer: { model: "workhorse:expensive" },
 	flywheel: {
 		model: "claude-opus-4-8",
 		effort: "high",
