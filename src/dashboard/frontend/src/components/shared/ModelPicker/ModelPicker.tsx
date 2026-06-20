@@ -427,32 +427,21 @@ function pickModelForHarness(
 
 export function ModelHarnessPicker({
   model,
-  harness,
   onModelChange,
-  onHarnessChange,
   groups,
-  harnessPolicy,
   modelLabel = 'Model',
 }: {
   model: string;
-  harness: Harness;
+  // Provider-default-only (PAN-1984): the harness is derived from the model's provider and
+  // is no longer user-selectable. `harness` / `onHarnessChange` / `harnessPolicy` remain in
+  // the prop type for call-site compatibility but are ignored — no harness selector is
+  // rendered. The backend (resolveHarness) resolves the harness from the chosen model.
+  harness?: Harness;
   onModelChange: (model: string) => void;
-  onHarnessChange: (harness: Harness) => void;
+  onHarnessChange?: (harness: Harness) => void;
   groups: ModelGroup[];
   harnessPolicy?: HarnessPolicyDecisions;
   modelLabel?: string;
 }) {
-  return (
-    <>
-      <HarnessSelect
-        value={harness}
-        onChange={onHarnessChange}
-        modelId={model}
-        onModelChange={onModelChange}
-        groups={groups}
-        harnessPolicy={harnessPolicy}
-      />
-      <ModelSelect value={model} onChange={onModelChange} groups={groups} label={modelLabel} />
-    </>
-  );
+  return <ModelSelect value={model} onChange={onModelChange} groups={groups} label={modelLabel} />;
 }

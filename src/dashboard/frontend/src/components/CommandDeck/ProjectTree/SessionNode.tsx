@@ -28,7 +28,7 @@ import {
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@overdeck/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
-import { canUsePickerHarness, HARNESS_OPTIONS, useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
+import { useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
@@ -417,7 +417,6 @@ function RestartModelSubmenu({
   currentHarness,
   currentModel,
   groups,
-  harnessPolicy,
   label,
   onRestart,
 }: {
@@ -452,43 +451,27 @@ function RestartModelSubmenu({
           <span className="ml-2 shrink-0 text-[10px] opacity-50">uses {defaultLabel}</span>
         </ContextMenuItem>
         <ContextMenuSeparator />
-        {HARNESS_OPTIONS.map((harness) => (
-          <ContextMenuSub key={harness.id}>
-            <ContextMenuSubTrigger>{harness.label}</ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              <ContextMenuItem onSelect={() => onRestart(undefined, harness.id)}>
-                <span className="flex-1">Default model</span>
-                <span className="ml-2 shrink-0 text-[10px] opacity-50">uses {defaultLabel}</span>
+        {/* Provider-default-only (PAN-1984): the operator picks a MODEL; the harness is
+            derived from the model's provider server-side. No harness layer. */}
+        {groups.map((group) => (
+          <div key={group.provider}>
+            <ContextMenuLabel>{group.label}</ContextMenuLabel>
+            {group.models.map((m) => (
+              <ContextMenuItem
+                key={m.id}
+                onSelect={() => onRestart(m.id)}
+              >
+                <span
+                  className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
+                >
+                  {m.label}
+                </span>
+                {m.costDisplay && (
+                  <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                )}
               </ContextMenuItem>
-              {groups.map((group) => (
-                <div key={`${harness.id}-${group.provider}`}>
-                  <ContextMenuLabel>{group.label}</ContextMenuLabel>
-                  {group.models.map((m) => {
-                    const decision = canUsePickerHarness(harness.id, m.id, harnessPolicy);
-                    return (
-                      <ContextMenuItem
-                        key={`${harness.id}-${m.id}`}
-                        disabled={!decision.allowed}
-                        onSelect={() => onRestart(m.id, harness.id)}
-                      >
-                        <span
-                          className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
-                        >
-                          {m.label}
-                        </span>
-                        {!decision.allowed && (
-                          <span className="ml-2 shrink-0 text-[10px] opacity-50">ToS gated</span>
-                        )}
-                        {decision.allowed && m.costDisplay && (
-                          <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
-                        )}
-                      </ContextMenuItem>
-                    );
-                  })}
-                </div>
-              ))}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
+            ))}
+          </div>
         ))}
       </ContextMenuSubContent>
     </ContextMenuSub>
