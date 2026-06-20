@@ -102,21 +102,21 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T19:24:56.897Z",
+  "updated": "2026-06-20T20:02:14.961Z",
   "pipeline": {
     "issueId": "PAN-1866",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
-    "verificationStatus": "passed",
+    "reviewStatus": "blocked",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T19:24:55.855Z",
-    "reviewNotes": "No blocking findings; numeric SequenceDoc version contract is committed and validated",
+    "updatedAt": "2026-06-20T20:02:06.865Z",
+    "reviewNotes": ".beads/issues.jsonl has a blank JSONL record at EOF; git diff --check fails",
     "testNotes": "Lint failure: src/dashboard/server/routes/backlog.ts:12 imports getBacklogSequenceForRoot directly from database layer instead of through Overdeck door (src/lib/overdeck/*). This violates PAN-1908 single-source-of-truth boundary. Test failures: 15 tests failed (7051 passed). Key issues: (1) review-agent convoy tests failing due to spawnRun not returning success, (2) no-loss-matrix missing 2 HTTP routes (POST /api/agents/:id/restart-fresh, POST /api/review/:issueId/purge) that must be enumerated in the audit matrix, (3) 5 tests in done.test.ts timing out (5s limit). Gates run: npm run typecheck (PASS), npm run lint (FAIL on boundary), npm test (15 failures).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
     "reviewedAtCommit": "70377fa28d0ddc40ba8de7fe005fa3a18f670145",
-    "reviewRequestedAt": "2026-06-20T17:05:33.466Z"
+    "reviewRequestedAt": "2026-06-20T19:59:32.050Z"
   },
   "closeOut": {
     "usage": {
@@ -155,10 +155,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1143,
-            "output": 396927,
-            "cacheRead": 130299650,
-            "cacheWrite": 3501585
+            "input": 1315,
+            "output": 493884,
+            "cacheRead": 151171088,
+            "cacheWrite": 3899669
           }
         }
       },
@@ -176,15 +176,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1157,
-          "output": 406941,
-          "cacheRead": 131368207,
-          "cacheWrite": 3605172
+          "input": 1329,
+          "output": 503898,
+          "cacheRead": 152239645,
+          "cacheWrite": 4003256
         }
       },
       "costAtCloseOut": {
-        "usd": 70.92799224,
-        "pricingAsOf": "2026-06-20T19:24:55.886Z"
+        "usd": 80.13710824,
+        "pricingAsOf": "2026-06-20T20:02:06.886Z"
       }
     },
     "merges": [
