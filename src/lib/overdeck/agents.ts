@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -795,6 +795,46 @@ export interface BackfillAgentsSyncResult {
  *
  * Replaces database/agent-backfill.ts backfillAgentsAutoSync for the overdeck layer.
  */
+/**
+ * All agent ids matching a prefix — unions the overdeck.db rows and the on-disk state
+ * dirs, so it catches both row-only and dir-only orphans (the two can drift apart).
+ * Used to enumerate an issue's review fleet, e.g. listAgentIdsByPrefixSync('agent-pan-1866-review').
+ */
+export function listAgentIdsByPrefixSync(prefix: string): string[] {
+  const ids = new Set<string>();
+  try {
+    const rows = getOverdeckDatabaseSync()
+      .prepare(`SELECT id FROM agents WHERE id LIKE ?`)
+      .all(`${prefix}%`) as Array<{ id: string }>;
+    for (const r of rows) ids.add(r.id);
+  } catch { /* agents table missing */ }
+  try {
+    for (const name of readdirSync(join(getOverdeckHome(), 'agents'))) {
+      if (name.startsWith(prefix)) ids.add(name);
+    }
+  } catch { /* agents dir missing */ }
+  return [...ids];
+}
+
+/**
+ * Canonical full removal of a single agent. Drops the overdeck.db row (this module IS
+ * the agents write door) AND removes the on-disk state dir ~/.overdeck/agents/<id>/.
+ * NEVER touches Claude JSONL transcripts — those live under ~/.claude/projects, not the
+ * agent dir. Tmux teardown is the caller's responsibility (kept separate so this stays
+ * sync + dependency-free).
+ *
+ * Fills the gap that let orphan ghost rows accumulate: backfillAgentsSync only upserts,
+ * and the deacon's cleanup rmSync'd dirs but left the rows behind.
+ */
+export function removeAgentSync(agentId: string): void {
+  try {
+    getOverdeckDatabaseSync().prepare(`DELETE FROM agents WHERE id = ?`).run(agentId);
+  } catch { /* agents table missing */ }
+  try {
+    rmSync(join(getOverdeckHome(), 'agents', agentId), { recursive: true, force: true });
+  } catch { /* state dir already gone */ }
+}
+
 export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
   const db = getOverdeckDatabaseSync();
   const agentsDir = join(getOverdeckHome(), 'agents');

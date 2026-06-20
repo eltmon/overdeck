@@ -43,6 +43,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
+import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
@@ -780,3 +781,36 @@ export const killAllReviewerSessions = (
  */
 export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
   Effect.promise(() => killAllReviewSessionsPromise());
+
+/**
+ * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
+ * prior cycle? Quick-review — the current hardcoded mode — only ever creates the single
+ * `agent-<id>-review` parent, so any `agent-<id>-review-<subRole>` is a stale ghost
+ * (e.g. PAN-1866's `-correctness/-security/-performance/-requirements` from an old run).
+ *
+ * Seam for when extended review returns: this becomes a reviewRunId-mismatch check — a
+ * sub-reviewer is stale only when its run differs from the active review run.
+ */
+export function isReviewStaleSync(issueId: string): boolean {
+  return listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review-`).length > 0;
+}
+
+/**
+ * Tear down an issue's entire review fleet — the `agent-<id>-review` parent plus any
+ * extended-mode sub-reviewers. Kills every review tmux session, then removes each agent
+ * via the canonical removeAgentSync (overdeck.db row + state dir, never the JSONL
+ * transcript). Does NOT reset review_status — the caller composes that (see the
+ * POST /api/review/:id/purge route). Returns what was killed and removed.
+ */
+export async function purgeReviewAgentsForIssue(
+  projectKey: string | undefined,
+  issueId: string,
+): Promise<{ killed: string[]; removed: string[] }> {
+  const killResult = await killAllReviewerSessionsPromise(projectKey, issueId);
+  const removed: string[] = [];
+  for (const agentId of listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review`)) {
+    removeAgentSync(agentId);
+    removed.push(agentId);
+  }
+  return { killed: killResult.killed, removed };
+}

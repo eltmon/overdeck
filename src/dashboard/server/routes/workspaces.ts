@@ -4516,6 +4516,57 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/review/:issueId/purge ────────────────────────────────
+//
+// COMPLETE review reset. Tears down the issue's entire review fleet — the
+// agent-<id>-review parent PLUS any leftover extended-review (convoy) sub-reviewers
+// (-correctness/-security/-performance/-requirements) — by killing their tmux sessions
+// and removing each agent via removeAgentSync (overdeck.db row + state dir, never the
+// JSONL transcript), then resets review_status (the pipeline verdict block re-derives
+// from it). Use this to clear stale review ghosts left by a prior cycle so a fresh
+// review runs clean. Destructive to review-agent state only; confirmed via a dialog.
+
+const postWorkspaceReviewPurgeRoute = HttpRouter.add(
+  'POST',
+  '/api/review/:issueId/purge',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    }
+
+    const { purgeReviewAgentsForIssue } = yield* Effect.promise(
+      () => import('../../../lib/cloister/review-agent.js'),
+    );
+    const projectKey = resolveProjectFromIssueSync(issueId)?.projectKey;
+    const purge = yield* Effect.promise(() => purgeReviewAgentsForIssue(projectKey, issueId));
+
+    // Reset review_status (pipeline verdict block re-derives from it). Only meaningful
+    // when the workspace still exists; ghost removal above runs regardless.
+    const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+    let reviewStatusReset = false;
+    if (workspaceInfo.exists) {
+      processResetReviewPipeline(issueId, true);
+      reviewStatusReset = true;
+    }
+
+    console.log(
+      `[review-purge] ${issueId}: removed=[${purge.removed.join(', ')}] ` +
+        `killed=[${purge.killed.join(', ')}] reviewStatusReset=${reviewStatusReset}`,
+    );
+
+    return jsonResponse({
+      success: true,
+      issueId,
+      removed: purge.removed,
+      killed: purge.killed,
+      reviewStatusReset,
+      message: `Purged ${purge.removed.length} review agent(s) for ${issueId}.`,
+    });
+  })),
+);
+
 // ─── Route: POST /api/review/:issueId/abort ────────────────────────────────
 //
 // Kill all running reviewer tmux sessions for an issue and reset reviewStatus
@@ -6472,6 +6523,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceReviewRoute,
   postWorkspaceRequestReviewRoute,
   postWorkspaceResetReviewRoute,
+  postWorkspaceReviewPurgeRoute,
   postWorkspaceAbortReviewRoute,
   postWorkspaceUnstickRoute,
   postWorkspaceDeaconIgnoreRoute,
