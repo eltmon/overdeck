@@ -492,6 +492,17 @@ export function setReviewStatusSync(
     void emitReactiveLifecycleEvent('test.passed', issueId);
   }
 
+  // PAN-1988: test FAILED → hand it straight back to the work agent (host-side). The dead-end
+  // requeue that does this is deacon-only, so without this a failure strands until the (possibly
+  // frozen) deacon nudges. Fires once per transition into failed — both the agent's direct POST and
+  // the host's .pan/test/result.json recovery flow through this same transition.
+  if (
+    (update.testStatus === 'failed' || update.testStatus === 'dispatch_failed') &&
+    status.testStatus !== 'failed' && status.testStatus !== 'dispatch_failed'
+  ) {
+    void deliverTestFailureToWorkAgentHostSide(issueId, updated);
+  }
+
   return updated;
 }
 
@@ -572,6 +583,81 @@ async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<
   }
 }
 
+// ── PAN-1988 host-owned TEST-stage recovery ───────────────────────────────────
+// The test stage had NO reactive path. Recovering an unsignaled verdict (the agent — often Haiku —
+// writes .pan/test/result.json then idles without POSTing) AND the test=failed → work-agent requeue
+// both lived ONLY in deacon patrols (checkCompletedButUnsignaledTests + the dead-end requeue). With
+// the deacon frozen, a finished test agent stranded the issue at test=testing forever. The host now
+// (a) recovers the written verdict on read and (b) hands a failure back to the work agent — symmetric
+// with the review stage. Recovery only acts on a WRITTEN artifact; it never guesses pass/fail.
+const testVerdictRecoveryAt = new Map<string, number>();
+const TEST_VERDICT_RECOVERY_THROTTLE_MS = 60_000;
+
+function maybeRecoverTestVerdictHostSide(issueId: string, status: ReviewStatus): void {
+  if (status.reviewStatus !== 'passed') return; // tests only run after review approves
+  if (status.mergeStatus === 'merged' || status.readyForMerge) return;
+  // Only act while the verdict is UNSIGNALED — once test resolves (passed/failed) the write path
+  // owns the transition (test.passed → ship; test failed → deliverTestFailureToWorkAgentHostSide).
+  if (status.testStatus !== 'testing' && status.testStatus !== 'pending' && status.testStatus !== 'dispatch_failed') return;
+  const last = testVerdictRecoveryAt.get(issueId) ?? 0;
+  if (Date.now() - last < TEST_VERDICT_RECOVERY_THROTTLE_MS) return;
+  testVerdictRecoveryAt.set(issueId, Date.now());
+  void recoverTestVerdictHostSide(issueId);
+}
+
+async function recoverTestVerdictHostSide(issueId: string): Promise<void> {
+  try {
+    const { resolveProjectFromIssueSync } = await import('./projects.js');
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return;
+    const { existsSync } = await import('fs');
+    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspace)) return;
+    const { readTestVerdictArtifact } = await import('./cloister/test-verdict.js');
+    const artifact = readTestVerdictArtifact(workspace);
+    if (!artifact) return; // no WRITTEN verdict — never guess; the agent/deacon owns the write-nudge
+    // Record the recovered verdict. setReviewStatusSync emits test.passed (→ ship) for a pass and
+    // fires the work-agent handoff (below) on a fail, via its test-transition logic.
+    setReviewStatusSync(issueId, {
+      testStatus: artifact.status,
+      testNotes: artifact.notes ?? `Recovered from .pan/test/result.json (${artifact.status}) — the test agent wrote the verdict but never signaled`,
+    });
+    console.log(`[review-status] recovered unsignaled test verdict for ${issueId}: ${artifact.status} (host-side, from .pan/test/result.json)`);
+  } catch (err) {
+    console.warn(`[review-status] host-side test verdict recovery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: ReviewStatus): Promise<void> {
+  try {
+    const { resolveProjectFromIssueSync } = await import('./projects.js');
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const workspace = resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined;
+    const notes = status.testNotes;
+    let feedbackPath: string | undefined;
+    try {
+      const { writeFeedbackFile } = await import('./cloister/feedback-writer.js');
+      const r = await Effect.runPromise(writeFeedbackFile({
+        issueId,
+        workspacePath: workspace,
+        specialist: 'test-agent',
+        outcome: 'failed',
+        summary: `Tests FAILED for ${issueId}`,
+        markdownBody: `# Test failure\n\n${notes ?? 'The test gate reported failures. See .pan/test/result.json and re-run the project test suite.'}\n\n## Required\nFix the failing tests, commit and push, then re-run \`pan done ${issueId}\`.`,
+      }));
+      if (r.success) feedbackPath = r.filePath;
+    } catch { /* non-fatal — the message below still carries the summary */ }
+
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const message = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\n${feedbackPath ? `MUST READ: ${feedbackPath}\n\n` : ''}${notes ? `${notes.slice(0, 400)}\n\n` : ''}Fix the failing tests, commit and push, then re-run pan done ${issueId}. Do NOT stop at the prompt.`;
+    const { messageAgent } = await import('./agents.js');
+    await messageAgent(agentId, message);
+    console.log(`[review-status] delivered test failure to the work agent for ${issueId} (host-side)`);
+  } catch (err) {
+    console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   const dbStatus = getReviewStatusFromDbSync(issueId);
   const journal = readJournalStatusSync(issueId);
@@ -647,6 +733,7 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
     }
 
     maybeAutoDispatchReviewHostSide(issueId, reconciled);
+    maybeRecoverTestVerdictHostSide(issueId, reconciled);
     return reconciled;
   }
 
@@ -654,6 +741,7 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   // DB; the row holds only the queryable status flags).
   const enriched = enrichReviewNotesFromRecordSync(issueId, dbStatus!);
   maybeAutoDispatchReviewHostSide(issueId, enriched);
+  maybeRecoverTestVerdictHostSide(issueId, enriched);
   return enriched;
 }
 
