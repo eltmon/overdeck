@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 vi.mock('../../pan-dir/auto-commit.js', () => ({ queueAutoCommit: vi.fn() }));
+vi.mock('../../review-status.js', () => ({ getReviewStatusSync: vi.fn().mockReturnValue(null) }));
 
 import { writeSequenceMd, parseSequenceMd } from '../sequence-io.js';
+import { getReviewStatusSync } from '../../review-status.js';
 import type { SequenceDoc } from '../types.js';
 
 const SAMPLE_DOC: SequenceDoc = {
@@ -28,6 +30,7 @@ describe('writeSequenceMd + parseSequenceMd round-trip', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'sequence-test-'));
+    vi.mocked(getReviewStatusSync).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -83,5 +86,136 @@ describe('writeSequenceMd + parseSequenceMd round-trip', () => {
     const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');
     // 65k tokens ~ 260k chars (4 chars/token). Using a generous 300k as proxy.
     expect(md.length).toBeLessThan(300_000);
+  });
+});
+
+describe('writeSequenceMd – merge-preservation (FR-13, FR-15, FR-16, FR-17)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'sequence-merge-test-'));
+    vi.mocked(getReviewStatusSync).mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  function makeDoc(overrides: Partial<SequenceDoc>): SequenceDoc {
+    return { ...SAMPLE_DOC, ...overrides };
+  }
+
+  it('preserves operator-set gate (ready/blocked) across re-sequence', () => {
+    // Write initial doc with operator-set gates
+    const initial = makeDoc({
+      nodes: [
+        { issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'First.', gate: 'blocked', planning: 'auto' },
+        { issue: 'PAN-2', rank: 2, size: 'S', importance: 'medium', score: 70, condition: 'ok', dependsOn: [], why: 'Second.', gate: 'ready', planning: 'auto' },
+      ],
+    });
+    writeSequenceMd(tmpDir, initial);
+
+    // Re-sequence: AI resets gates back to auto
+    const resequenced = makeDoc({
+      nodes: [
+        { issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'First.', gate: 'auto', planning: 'auto' },
+        { issue: 'PAN-2', rank: 2, size: 'S', importance: 'medium', score: 70, condition: 'ok', dependsOn: [], why: 'Second.', gate: 'auto', planning: 'auto' },
+      ],
+    });
+    writeSequenceMd(tmpDir, resequenced);
+
+    const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');
+    const result = parseSequenceMd(md);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const byIssue = new Map(result.doc.nodes.map((n) => [n.issue, n]));
+    expect(byIssue.get('PAN-1')?.gate).toBe('blocked');
+    expect(byIssue.get('PAN-2')?.gate).toBe('ready');
+  });
+
+  it('preserves operator-set planning policy across re-sequence', () => {
+    const initial = makeDoc({
+      nodes: [
+        { issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'First.', gate: 'auto', planning: 'interactive' },
+      ],
+    });
+    writeSequenceMd(tmpDir, initial);
+
+    const resequenced = makeDoc({
+      nodes: [
+        { issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'First.', gate: 'auto', planning: 'auto' },
+      ],
+    });
+    writeSequenceMd(tmpDir, resequenced);
+
+    const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');
+    const result = parseSequenceMd(md);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.doc.nodes[0].planning).toBe('interactive');
+  });
+
+  it('pins in-pipeline issue rank/why/rationale when workspace dir exists', () => {
+    // Create workspace dir to mark PAN-1 as in-pipeline
+    mkdirSync(join(tmpDir, 'workspaces', 'feature-pan-1'), { recursive: true });
+
+    const initial = makeDoc({
+      nodes: [
+        { issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'Original why.', gate: 'auto', planning: 'auto', rationale: 'Original rationale.' },
+        { issue: 'PAN-2', rank: 2, size: 'S', importance: 'medium', score: 50, condition: 'ok', dependsOn: [], why: 'Not pinned.', gate: 'auto', planning: 'auto' },
+      ],
+    });
+    writeSequenceMd(tmpDir, initial);
+
+    // Re-sequence tries to change rank/why for PAN-1 (in-pipeline)
+    const resequenced = makeDoc({
+      nodes: [
+        { issue: 'PAN-2', rank: 1, size: 'S', importance: 'medium', score: 60, condition: 'ok', dependsOn: [], why: 'Moved up.', gate: 'auto', planning: 'auto' },
+        { issue: 'PAN-1', rank: 2, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'Changed why.', gate: 'auto', planning: 'auto', rationale: 'Changed rationale.' },
+      ],
+    });
+    writeSequenceMd(tmpDir, resequenced);
+
+    const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');
+    const result = parseSequenceMd(md);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const pan1 = result.doc.nodes.find((n) => n.issue === 'PAN-1');
+    expect(pan1?.rank).toBe(1);
+    expect(pan1?.why).toBe('Original why.');
+    expect(pan1?.rationale).toBe('Original rationale.');
+  });
+
+  it('preserves operator edges and drops ai-inferred duplicates replaced by re-sequence', () => {
+    const initial = makeDoc({
+      nodes: [{ issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'First.', gate: 'auto', planning: 'auto' }],
+      edges: [
+        { from: 'PAN-1', to: 'PAN-2', type: 'unblocks', source: 'operator', confidence: 1 },
+        { from: 'PAN-2', to: 'PAN-3', type: 'informs', source: 'ai-inferred', confidence: 0.7 },
+      ],
+    });
+    writeSequenceMd(tmpDir, initial);
+
+    // Re-sequence provides new ai-inferred edges but no operator edge
+    const resequenced = makeDoc({
+      nodes: [{ issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 90, condition: 'ok', dependsOn: [], why: 'First.', gate: 'auto', planning: 'auto' }],
+      edges: [
+        { from: 'PAN-3', to: 'PAN-4', type: 'informs', source: 'ai-inferred', confidence: 0.5 },
+      ],
+    });
+    writeSequenceMd(tmpDir, resequenced);
+
+    const md = readFileSync(join(tmpDir, '.pan/backlog/sequence.md'), 'utf-8');
+    const result = parseSequenceMd(md);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const operatorEdges = result.doc.edges.filter((e) => e.source === 'operator');
+    expect(operatorEdges).toHaveLength(1);
+    expect(operatorEdges[0].from).toBe('PAN-1');
+    // New ai-inferred edge is present
+    expect(result.doc.edges.some((e) => e.from === 'PAN-3')).toBe(true);
+    // Old ai-inferred edge from initial is not preserved
+    expect(result.doc.edges.some((e) => e.from === 'PAN-2' && e.source === 'ai-inferred')).toBe(false);
   });
 });
