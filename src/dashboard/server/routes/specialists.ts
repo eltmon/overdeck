@@ -1538,7 +1538,17 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/specialists/:project/:issueId/review/restart ───────────
-// Kills all reviewer tmux sessions + coordinator, then dispatches a fresh review.
+// Kills all reviewer tmux sessions + coordinator, wipes the review agent
+// state directories (PAN-1985), then dispatches a fresh review through the
+// role primitive. The new review starts with a fresh `state.json` and a new
+// session id because the old dirs are gone.
+//
+// Convoy view vs Quick Review view is purely a presentation concern (the
+// menu label is "Restart All" vs "Restart"); the route behavior is the
+// same for both. Wipe+respawn is the deliberate override path for harness/
+// model switches — the NORMAL review flow continues the same session
+// across re-dispatches (PAN-1862), and this endpoint is the escape hatch
+// that pays the re-research cost.
 
 const postProjectReviewRestartRoute = HttpRouter.add(
   'POST',
@@ -1554,6 +1564,14 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       () => import('../../../lib/cloister/review-agent.js'),
     );
     const killResult = yield* killAllReviewerSessions(project, issueId);
+
+    // PAN-1985: wipe the review agent dirs so the respawned review starts
+    // with a fresh state.json + session id. Leaves the work agent dir
+    // (and any other non-review specialists) alone.
+    const { wipeAgentStateDirs } = yield* Effect.promise(
+      () => import('../../../lib/agents.js'),
+    );
+    const wipeResult = yield* Effect.promise(() => wipeAgentStateDirs(issueId, { rolePrefix: 'review' }));
 
     // Resolve workspace info for re-dispatch
     const projectConfig = resolveProjectFromIssueSync(issueId);
@@ -1595,6 +1613,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
         gated: true,
         message: result.message,
         killed: killResult.killed,
+        wiped: wipeResult.removed,
         model: model ?? undefined,
         harness: harness ?? undefined,
       }, { status: 409 });
@@ -1604,6 +1623,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       success: result.success,
       message: result.message,
       killed: killResult.killed,
+      wiped: wipeResult.removed,
       model: model ?? undefined,
       harness: harness ?? undefined,
     });
