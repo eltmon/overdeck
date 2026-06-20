@@ -27,7 +27,6 @@ import {
 import { initEventStore } from '../../event-store.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
 import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
-import { resetDatabase } from '../../../../lib/database/index.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import {
   DASHBOARD_CSRF_HEADER,
@@ -239,7 +238,7 @@ describe('flywheel stats payload helper', () => {
     const overdeckHome = join(tmpdir(), `pan-flywheel-stats-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(overdeckHome, { recursive: true });
     process.env.OVERDECK_HOME = overdeckHome;
-    resetDatabase();
+    closeOverdeckDatabaseSync();
     try {
       const store = await initEventStore();
       const appendRun = (issueId: string, minute: number, failedReview = false) => {
@@ -276,7 +275,6 @@ describe('flywheel stats payload helper', () => {
       expect(stats.criteria.c6_timeConsistency).toMatchObject({ sampleSize: 3, dataSufficient: true });
       expect(stats.criteria.c7_flake).toMatchObject({ sampleSize: 1, value: 0, dataSufficient: true });
     } finally {
-      resetDatabase();
       closeOverdeckDatabaseSync();
       delete process.env.OVERDECK_HOME;
       rmSync(overdeckHome, { recursive: true, force: true });
@@ -295,7 +293,6 @@ describe('flywheel config routes', () => {
   });
 
   afterEach(() => {
-    resetDatabase();
     closeOverdeckDatabaseSync();
     delete process.env.OVERDECK_HOME;
     rmSync(overdeckHome, { recursive: true, force: true });
@@ -396,7 +393,6 @@ describe('flywheel auto-merge routes', () => {
   });
 
   afterEach(() => {
-    resetDatabase();
     closeOverdeckDatabaseSync();
     delete process.env.OVERDECK_HOME;
     rmSync(overdeckHome, { recursive: true, force: true });
@@ -790,12 +786,10 @@ describe('flywheel run payload helpers', () => {
   beforeEach(async () => {
     overdeckHome = await mkdtemp(join(tmpdir(), 'pan-flywheel-routes-'));
     process.env.OVERDECK_HOME = overdeckHome;
-    resetDatabase();
     closeOverdeckDatabaseSync();
   });
 
   afterEach(async () => {
-    resetDatabase();
     closeOverdeckDatabaseSync();
     delete process.env.OVERDECK_HOME;
     await rm(overdeckHome, { recursive: true, force: true });

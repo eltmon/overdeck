@@ -1,10 +1,16 @@
 /**
- * PAN-653: Persistent stuck state schema tests.
+ * PAN-653: Persistent stuck state — live coverage through the overdeck door.
  *
- * Verifies:
- * AC1: review_status table has stuck, stuck_reason, stuck_at, stuck_details columns
- * AC2: markWorkspaceStuck / clearWorkspaceStuck helpers roundtrip through SQLite
- * AC3: Migration is idempotent (re-running does not error if columns already exist)
+ * Verifies (all against overdeck.db via overdeck/review-status-sync.js):
+ * - markWorkspaceStuck / clearWorkspaceStuck roundtrip the stuck flag
+ * - inspect-status metadata persists across a read
+ * - stuck state is not clobbered by an unrelated review-status upsert
+ * - the dashboard event-store opener creates overdeck.db with its core tables
+ *
+ * The legacy panopticon.db column/migration/workspace-schema assertions were
+ * removed when the dead src/lib/database cluster was deleted (PAN-1979) — that
+ * schema no longer exists; the overdeck schema is exercised by the roundtrips
+ * below.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
@@ -14,8 +20,6 @@ import { tmpdir } from 'os';
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { resetDatabase } = await import('../index.js');
-  resetDatabase();
   const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
   closeOverdeckDatabaseSync();
 }
@@ -32,45 +36,7 @@ afterEach(async () => {
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
-describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
-  it('review_status table has stuck columns after fresh init', async () => {
-    const { getDatabase } = await import('../index.js');
-    const db = getDatabase();
-
-    // Verify the columns exist by querying PRAGMA table_info
-    const columns = db
-      .prepare(`PRAGMA table_info(review_status)`)
-      .all() as Array<{ name: string; type: string; dflt_value: string | null }>;
-
-    const colNames = columns.map((c) => c.name);
-    expect(colNames).toContain('stuck');
-    expect(colNames).toContain('stuck_reason');
-    expect(colNames).toContain('stuck_at');
-    expect(colNames).toContain('stuck_details');
-
-    // stuck has DEFAULT 0
-    const stuckCol = columns.find((c) => c.name === 'stuck');
-    expect(stuckCol?.dflt_value).toBe('0');
-  });
-
-  it('workspace discovered-session schema initializer creates all PAN-457 tables', async () => {
-    const { openDatabase } = await import('../driver.js');
-    const { initWorkspaceDiscoveredSessionsSchema } = await import('../schema.js');
-    const db = openDatabase(join(TEST_HOME, 'workspace.db'));
-    try {
-      initWorkspaceDiscoveredSessionsSchema(db);
-      const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')`).all() as Array<{ name: string }>;
-      const names = tables.map((t) => t.name);
-      expect(names).toContain('discovered_sessions');
-      expect(names).toContain('sessions_fts');
-      expect(names).toContain('session_embeddings');
-      const indexes = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'index'`).all() as Array<{ name: string }>;
-      expect(indexes.map((index) => index.name)).toContain('idx_discovered_session_id');
-    } finally {
-      db.close();
-    }
-  });
-
+describe('stuck state (PAN-653)', { timeout: 30_000 }, () => {
   it('dashboard startup database opener (event-store) opens overdeck.db with events and discovered_sessions', async () => {
     const { openEventDb } = await import('../../../dashboard/server/event-store.js');
     const db = await openEventDb();
@@ -81,17 +47,7 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
   });
 
   it('inspect status metadata persists across a read', async () => {
-    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../review-status-db.js');
-    const { getDatabase } = await import('../index.js');
-    const db = getDatabase();
-    const columns = db
-      .prepare(`PRAGMA table_info(review_status)`)
-      .all() as Array<{ name: string }>;
-    const colNames = columns.map((c) => c.name);
-    expect(colNames).toContain('inspect_status');
-    expect(colNames).toContain('inspect_notes');
-    expect(colNames).toContain('inspect_started_at');
-    expect(colNames).toContain('inspect_bead_id');
+    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../../overdeck/review-status-sync.js');
 
     upsertReviewStatusSync({
       issueId: 'PAN-1616',
@@ -107,13 +63,13 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
 
     const row = getReviewStatusFromDbSync('pan-1616');
     expect(row?.inspectStatus).toBe('error');
-    expect(row?.inspectNotes).toBe('Inspection timed out');
     expect(row?.inspectStartedAt).toBe('2026-06-05T19:00:00.000Z');
     expect(row?.inspectBeadId).toBe('workspace-sposy');
+    // PAN-1988: free-text *_notes are journal-only and intentionally NOT cached
+    // in the DB, so they do not round-trip through the door.
+    expect(row?.inspectNotes).toBeUndefined();
   });
 
-  // PAN-1938: markWorkspaceStuck/clearWorkspaceStuck write to overdeck.db via
-  // overdeck/review-status-sync.js — read back from the same door.
   it('markWorkspaceStuck persists across a read', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
     const { getReviewStatusFromDbSync } = await import('../../overdeck/review-status-sync.js');
@@ -142,33 +98,12 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
     expect(row?.stuckAt).toBeUndefined();
   });
 
-  it('migration is idempotent: re-running ALTER TABLE does not error', async () => {
-    const { getDatabase } = await import('../index.js');
-    const db = getDatabase();
-
-    // Run the v17→v18 migration statements a second time — they should silently no-op
-    expect(() => {
-      try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`); } catch { /* idempotent */ }
-      try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`); } catch { /* idempotent */ }
-      try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`); } catch { /* idempotent */ }
-      try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch { /* idempotent */ }
-    }).not.toThrow();
-
-    // Columns still work after idempotent re-run
-    const cols = db
-      .prepare(`PRAGMA table_info(review_status)`)
-      .all() as Array<{ name: string }>;
-    expect(cols.map((c) => c.name)).toContain('stuck');
-  });
-
-  it('stuck state survives upsert without overwriting other fields', async () => {
+  it('stuck state survives an unrelated review-status upsert', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
-    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../review-status-db.js');
+    const { upsertReviewStatusSync, getReviewStatusFromDbSync } = await import('../../overdeck/review-status-sync.js');
 
-    // Mark stuck first
     markWorkspaceStuck('PAN-200', 'main_diverged', { localSha: 'aaa', remoteSha: 'bbb' });
 
-    // Normal upsert via setReviewStatus (e.g. review status update) that doesn't include stuck field
     upsertReviewStatusSync({
       issueId: 'PAN-200',
       reviewStatus: 'passed',
@@ -177,10 +112,6 @@ describe('stuck state schema (PAN-653)', { timeout: 30_000 }, () => {
       readyForMerge: false,
     });
 
-    // stuck should still be set because upsertReviewStatus now includes the column
-    // (it will write stuck=false since the ReviewStatus object doesn't have it)
-    // This test verifies the DB round-trip integrity, not that stuck survives arbitrary upserts
-    // (for that, callers must use markWorkspaceStuck separately)
     const row = getReviewStatusFromDbSync('PAN-200');
     expect(row).not.toBeNull();
     expect(row?.reviewStatus).toBe('passed');

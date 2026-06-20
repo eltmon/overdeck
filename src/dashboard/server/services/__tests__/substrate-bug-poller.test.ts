@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EventStore } from '../../event-store.js';
-import type { FlywheelSubstrateBug, FlywheelSubstrateBugFiledBy } from '../../../../lib/database/flywheel-substrate-bugs-db.js';
+import type { FlywheelSubstrateBug, FlywheelSubstrateBugFiledBy } from '../../../../lib/overdeck/flywheel-substrate-bugs.js';
 import {
   createSubstrateBugPoller,
   extractClosingIssueNumbers,

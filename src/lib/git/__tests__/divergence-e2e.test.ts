@@ -30,8 +30,8 @@ vi.mock('child_process', async (importOriginal) => {
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { resetDatabase } = await import('../../database/index.js');
-  resetDatabase();
+  const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
+  closeOverdeckDatabaseSync();
 }
 
 function installExecMock(responses: Record<string, string | Error>) {

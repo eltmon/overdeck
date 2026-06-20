@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetDatabase } from '../../database/index.js';
 import { getPendingAutoMergePayload, postAutoMergeSchedulePayload, deleteAutoMergePayload } from '../../../dashboard/server/routes/flywheel.js';
 import { tickAutoMergeExecutor } from '../../../dashboard/server/services/auto-merge-executor.js';
 import {
@@ -8,7 +7,7 @@ import {
   type OverdeckTestDb,
 } from '../../../../tests/helpers/overdeck-test-db.js';
 import { getOverdeckDatabaseSync } from '../../overdeck/infra.js';
-import type { PendingAutoMerge } from '../../database/pending-auto-merges-db.js';
+import type { PendingAutoMerge } from '../../overdeck/merge-types.js';
 
 interface RawMergeRow {
   id: number; issue_id: string; pr_url: string; project_key: string; forge: string;
@@ -99,7 +98,6 @@ describe('auto-merge schedule/cancel/executor integration', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(START);
-    resetDatabase();
     odb = setupOverdeckTestDb();
     // Seed the issue row that pending_auto_merges FK requires
     odb.raw().prepare(
@@ -108,7 +106,6 @@ describe('auto-merge schedule/cancel/executor integration', () => {
   });
 
   afterEach(() => {
-    resetDatabase();
     teardownOverdeckTestDb(odb);
     vi.useRealTimers();
   });

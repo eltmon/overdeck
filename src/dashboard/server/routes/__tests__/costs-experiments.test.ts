@@ -11,15 +11,15 @@ import { jsonResponse } from '../../http-helpers.js';
 
 type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
 
-// Mock getCavemanExperimentData so tests don't require a real DB
-vi.mock('../../../../lib/database/cost-events-db.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../lib/database/cost-events-db.js')>();
-  return { ...actual, getCavemanExperimentData: vi.fn() };
+// Mock getCavemanExperimentDataSync so tests don't require a real DB
+vi.mock('../../../../lib/overdeck/cost-sync.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/overdeck/cost-sync.js')>();
+  return { ...actual, getCavemanExperimentDataSync: vi.fn() };
 });
 
-import { getCavemanExperimentData } from '../../../../lib/database/cost-events-db.js';
+import { getCavemanExperimentDataSync } from '../../../../lib/overdeck/cost-sync.js';
 
-const mockGetExperimentData = vi.mocked(getCavemanExperimentData);
+const mockGetExperimentData = vi.mocked(getCavemanExperimentDataSync);
 
 /** Run an Effect route handler and extract status + JSON body */
 async function runRoute(
@@ -34,7 +34,7 @@ async function runRoute(
 /** Replicate the exact handler logic from costs.ts for testability */
 function makeExperimentsHandler() {
   return Effect.try({
-    try: () => jsonResponse({ experiments: getCavemanExperimentData() }),
+    try: () => jsonResponse({ experiments: getCavemanExperimentDataSync() }),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   });
 }

@@ -5,7 +5,7 @@ import {
   stopAutoMergeExecutor,
   tickAutoMergeExecutor,
 } from '../auto-merge-executor.js';
-import type { PendingAutoMerge } from '../../../../lib/database/pending-auto-merges-db.js';
+import type { PendingAutoMerge } from '../../../../lib/overdeck/merge-types.js';
 
 const NOW = new Date('2026-05-25T10:00:00.000Z');
 

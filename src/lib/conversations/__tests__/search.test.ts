@@ -190,8 +190,8 @@ describe('searchSessions', () => {
   });
 
   it('since=yesterday with recent sessions finds them', async () => {
-    const { resetDatabase } = await import('../../database/index.js');
-    resetDatabase();
+    const { closeOverdeckDatabaseSync } = await import('../../overdeck/infra.js');
+    closeOverdeckDatabaseSync();
     const now = new Date();
     const recentTs = new Date(now.getTime() - 3600_000).toISOString(); // 1 hour ago
     upsertDiscoveredSession({

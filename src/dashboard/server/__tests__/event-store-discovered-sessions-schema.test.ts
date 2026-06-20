@@ -23,8 +23,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   teardownOverdeckTestDb(odb);
-  const { resetDatabase } = await import('../../../lib/database/index.js');
-  resetDatabase();
+  const { closeOverdeckDatabaseSync } = await import('../../../lib/overdeck/infra.js');
+  closeOverdeckDatabaseSync();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 

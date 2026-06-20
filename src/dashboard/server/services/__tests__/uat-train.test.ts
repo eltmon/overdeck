@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getUatGenerationsPayload } from '../uat-train.js';
-import type { UatGeneration } from '../../../../lib/database/uat-generations-db.js';
+import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
 
 const mocks = vi.hoisted(() => ({
   readCurrentFlywheelStatusForDashboard: vi.fn(),

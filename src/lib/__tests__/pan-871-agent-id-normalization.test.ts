@@ -75,13 +75,6 @@ vi.mock('../tracker/factory.js', () => ({ createTrackerFromConfig: vi.fn(), crea
 vi.mock('../projects.js', () => ({ findProjectByPath: vi.fn(), findProjectByPathSync: vi.fn(), getIssuePrefix: vi.fn(), resolveProjectFromIssueSync: vi.fn(() => null), getProjectSync: vi.fn(() => null) }));
 vi.mock('../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));
 vi.mock('../persistent-logger.js', () => ({ logAgentLifecycle: vi.fn() }));
-vi.mock('../database/agents-db.js', () => ({
-  getAgent: vi.fn(() => undefined),
-  upsertAgent: vi.fn(),
-  listAllAgents: vi.fn(() => []),
-  countAgentsByRole: vi.fn(() => 0),
-  countAgentsByStatusRole: vi.fn(() => 0),
-}));
 vi.mock('../github-app.js', () => ({ isGitHubAppConfigured: vi.fn(() => false), generateInstallationToken: vi.fn(), configureWorkspaceForBot: vi.fn() }));
 vi.mock('../workspace-manager.js', () => ({ preTrustDirectory: vi.fn() }));
 // The production code checks overdeck first; return null so getAgentStateSync
@@ -99,7 +92,6 @@ vi.mock('../paths.js', async (importOriginal) => ({
 }));
 
 import { getAgentStateSync, listRunningAgentsSync, resolveAgentTargetSync } from '../agents.js';
-import { listAllAgents } from '../database/agents-db.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 
 describe('agent ID normalization (PAN-871)', () => {
