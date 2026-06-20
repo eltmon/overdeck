@@ -150,6 +150,44 @@ describe('parseSequenceJson', () => {
     expect(parseSequenceJson({ ...VALID_DOC, edges: [{ ...VALID_EDGE, source: 'manual' }] }).ok).toBe(false);
   });
 
+  it('rejects score below 0', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, score: -1 }] }).ok).toBe(false);
+  });
+
+  it('rejects score above 100', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, score: 101 }] }).ok).toBe(false);
+  });
+
+  it('accepts score at boundary values 0 and 100', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, score: 0 }] }).ok).toBe(true);
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, score: 100 }] }).ok).toBe(true);
+  });
+
+  it('rejects dependsOn with non-string elements', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, dependsOn: [123] }] }).ok).toBe(false);
+  });
+
+  it('accepts dependsOn as empty array', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, dependsOn: [] }] }).ok).toBe(true);
+  });
+
+  it('accepts dependsOn as string array', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, nodes: [{ ...VALID_NODE, dependsOn: ['PAN-2', 'PAN-3'] }] }).ok).toBe(true);
+  });
+
+  it('rejects confidence below 0', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, edges: [{ ...VALID_EDGE, confidence: -0.1 }] }).ok).toBe(false);
+  });
+
+  it('rejects confidence above 1', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, edges: [{ ...VALID_EDGE, confidence: 1.1 }] }).ok).toBe(false);
+  });
+
+  it('accepts confidence at boundary values 0 and 1', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, edges: [{ ...VALID_EDGE, confidence: 0 }] }).ok).toBe(true);
+    expect(parseSequenceJson({ ...VALID_DOC, edges: [{ ...VALID_EDGE, confidence: 1 }] }).ok).toBe(true);
+  });
+
   it('rejects a node whose why exceeds 140 characters', () => {
     const longWhy = 'x'.repeat(141);
     const doc = { ...VALID_DOC, nodes: [{ ...VALID_NODE, why: longWhy }] };

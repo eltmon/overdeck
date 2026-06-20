@@ -62,9 +62,9 @@ function validateNode(n: Record<string, unknown>, i: number): { ok: true; node: 
   if (typeof n.rank !== 'number') return err(`nodes[${i}].rank missing`);
   if (typeof n.size !== 'string' || !NODE_SIZES.has(n.size)) return err(`nodes[${i}].size invalid: ${n.size}`);
   if (typeof n.importance !== 'string' || !NODE_IMPORTANCES.has(n.importance)) return err(`nodes[${i}].importance invalid: ${n.importance}`);
-  if (typeof n.score !== 'number') return err(`nodes[${i}].score missing`);
+  if (typeof n.score !== 'number' || n.score < 0 || n.score > 100) return err(`nodes[${i}].score must be 0-100: ${n.score}`);
   if (typeof n.condition !== 'string' || !NODE_CONDITIONS.has(n.condition)) return err(`nodes[${i}].condition invalid: ${n.condition}`);
-  if (!Array.isArray(n.dependsOn)) return err(`nodes[${i}].dependsOn missing`);
+  if (!Array.isArray(n.dependsOn) || !n.dependsOn.every((d) => typeof d === 'string')) return err(`nodes[${i}].dependsOn must be string[]`);
   if (typeof n.why !== 'string') return err(`nodes[${i}].why missing`);
   if (n.why.length > 140) return err(`nodes[${i}].why exceeds 140 chars`);
   if (typeof n.gate !== 'string' || !NODE_GATES.has(n.gate)) return err(`nodes[${i}].gate invalid: ${n.gate}`);
@@ -93,7 +93,7 @@ function validateEdge(e: Record<string, unknown>, i: number): { ok: true; edge: 
   if (typeof e.to !== 'string') return err(`edges[${i}].to missing`);
   if (typeof e.type !== 'string' || !EDGE_TYPES.has(e.type)) return err(`edges[${i}].type invalid: ${e.type}`);
   if (typeof e.source !== 'string' || !EDGE_SOURCES.has(e.source)) return err(`edges[${i}].source invalid: ${e.source}`);
-  if (typeof e.confidence !== 'number') return err(`edges[${i}].confidence missing`);
+  if (typeof e.confidence !== 'number' || e.confidence < 0 || e.confidence > 1) return err(`edges[${i}].confidence must be 0-1: ${e.confidence}`);
   return { ok: true, edge: { from: e.from, to: e.to, type: e.type as EdgeType, source: e.source as EdgeSource, confidence: e.confidence } };
 }
 

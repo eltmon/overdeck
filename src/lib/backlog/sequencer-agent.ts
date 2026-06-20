@@ -83,8 +83,8 @@ This is a CREATION pass — there is no prior sequence.md. You must rank the ent
 This is an INCREMENTAL pass — a prior sequence.md exists at ${hasPrior ? priorSequencePath : '(not found)'}. Preserve existing ranks, scores, conditions, operator-owned fields, and operator-sourced edges VERBATIM unless a delta justifies a change.
 
 Rules:
-- Read bodies ONLY for issues that changed since the prior run. Batch these (${batchSize} at a time).
-- A delta justifies a change when: body changed materially, new cross-references appeared, a dependency was closed/merged, or condition changed.
+- An issue changed since the prior run if its manifest \`updatedAt\` is LATER than the prior sequence \`generatedAt\` (${hasPrior ? priorSequence!.generatedAt : 'N/A'}). Read bodies ONLY for those issues. Batch these (${batchSize} at a time).
+- A delta justifies a rank change when: body changed materially, new cross-references appeared, a dependency was closed/merged, or condition changed.
 - For each changed issue: set a rationale field (one sentence) explaining why the rank changed.
 - Re-derive github-ref edges. Recompute ai-inferred edges as advisory. Preserve operator edges verbatim.
 - Preserve operator-owned gate and planning fields verbatim.

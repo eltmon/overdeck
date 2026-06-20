@@ -11,6 +11,7 @@ const MANIFEST_ENTRY = {
   inPipeline: false,
   hasPrd: false,
   ready: false,
+  updatedAt: '2026-06-19T12:00:00Z',
 };
 
 const EMPTY_INPUT: CollectOpenBacklogResult = {
@@ -39,11 +40,14 @@ describe('buildSequencerPrompt', () => {
     expect(prompt).toContain('operator-sourced edges VERBATIM');
   });
 
-  it('incremental pass contains read-only-changed-issues instruction', () => {
+  it('incremental pass instructs agent to use updatedAt to identify changed issues', () => {
     const prompt = buildSequencerPrompt('incremental', {
       projectRoot: '/tmp/proj', projectKey: 'overdeck', input: INPUT_WITH_PRIOR,
     });
-    expect(prompt).toContain('Read bodies ONLY for issues that changed');
+    expect(prompt).toContain('updatedAt');
+    expect(prompt).toContain('generatedAt');
+    expect(prompt).toContain('2026-06-18T00:00:00Z');
+    expect(prompt).toContain('Read bodies ONLY for those issues');
   });
 
   it('creation pass instructs batched body reads and forbids inlining', () => {

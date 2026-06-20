@@ -67,6 +67,33 @@ export function rebuildBacklogSequenceFromMd(projectRoot: string): void {
   upsertBacklogSequence(projectKey, result.doc);
 }
 
+export function getBacklogSequenceForRoot(projectRoot: string): {
+  nodes: ReturnType<typeof getBacklogSequence>;
+  edges: Array<{ from: string; to: string; type: string }>;
+} {
+  const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+
+  if (existsSync(seqPath)) {
+    const md = readFileSync(seqPath, 'utf-8');
+    const result = parseSequenceMd(md);
+    if (result.ok) {
+      const projectKey = result.doc.project;
+      upsertBacklogSequence(projectKey, result.doc);
+      return {
+        nodes: getBacklogSequence(projectKey),
+        edges: result.doc.edges.map((e) => ({ from: e.from, to: e.to, type: e.type })),
+      };
+    }
+  }
+
+  // MD absent or unparseable — fall back to any cached project
+  const row = getDatabase()
+    .prepare('SELECT DISTINCT project_key FROM backlog_sequence LIMIT 1')
+    .get() as { project_key: string } | undefined;
+  if (!row) return { nodes: [], edges: [] };
+  return { nodes: getBacklogSequence(row.project_key), edges: [] };
+}
+
 export function getBacklogSequence(projectKey: string): Array<{
   issueId: string;
   rank: number;

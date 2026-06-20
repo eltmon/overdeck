@@ -126,6 +126,12 @@ describe('collectOpenBacklog', () => {
     expect(result.manifest[0].ready).toBe(true);
   });
 
+  it('includes updatedAt in each manifest entry', async () => {
+    const updatedAt = '2026-06-20T10:00:00.000Z';
+    const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1', updatedAt })]);
+    expect(result.manifest[0].updatedAt).toBe(updatedAt);
+  });
+
   it('returns a batched body accessor (not a single concatenation)', async () => {
     const issues = Array.from({ length: 10 }, (_, i) =>
       makeIssue({ id: String(i), ref: `PAN-${i + 1}`, description: `Body ${i + 1}` })

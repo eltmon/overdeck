@@ -14,6 +14,7 @@ export type BacklogManifestEntry = {
   inPipeline: boolean;
   hasPrd: boolean;
   ready: boolean;
+  updatedAt: string;
 };
 
 export type BatchedBodyAccessor = {
@@ -92,6 +93,7 @@ export async function collectOpenBacklog(
       inPipeline,
       hasPrd,
       ready,
+      updatedAt: issue.updatedAt,
     };
   });
 

@@ -1,14 +1,15 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
+import { writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
 import { applyIssueParkedLabel } from '../../../lib/backlog/label-ops.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
+import { getBacklogSequenceForRoot } from '../../../lib/database/backlog-sequence-db.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 import type { Issue } from '../../../lib/tracker/interface.js';
@@ -32,61 +33,53 @@ const getBacklogSequenceRoute = HttpRouter.add(
     return yield* Effect.try({
       try: () => {
         const projectRoot = process.cwd();
-        let nodes: Array<Record<string, unknown>> = [];
-        let edges: Array<{ from: string; to: string; type: string }> = [];
 
-        const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
-        if (existsSync(seqPath)) {
-          const md = readFileSync(seqPath, 'utf-8');
-          const parsed = parseSequenceMd(md);
-          if (parsed.ok) {
-            // Build per-issue hasPrd and ready lookup sets once
-            const draftsDir = join(projectRoot, '.pan', 'drafts');
-            const prdFiles = existsSync(draftsDir)
-              ? new Set(readdirSync(draftsDir).map((f) => f.replace(/\.md$/, '').toUpperCase()))
-              : new Set<string>();
+        // Read nodes from cache (primary path), seeding it from sequence.md if needed.
+        // Falls back to stale cache rows when sequence.md is absent/unparseable.
+        const { nodes: cachedNodes, edges } = getBacklogSequenceForRoot(projectRoot);
 
-            const specsDir = join(projectRoot, '.pan', 'specs');
-            const specIssues = new Set<string>();
-            if (existsSync(specsDir)) {
-              for (const f of readdirSync(specsDir)) {
-                // spec filename: <YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json
-                const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
-                if (match) specIssues.add(match[1]!.toUpperCase());
-              }
-            }
+        if (cachedNodes.length === 0) {
+          return jsonResponse({ nodes: [], edges: [] });
+        }
 
-            edges = parsed.doc.edges.map((e) => ({
-              from: e.from,
-              to: e.to,
-              type: e.type,
-            }));
-            nodes = parsed.doc.nodes.map((n) => {
-              const issueUpper = n.issue.toUpperCase();
-              const reviewStatus = getReviewStatusSync(issueUpper);
-              const inPipeline =
-                reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
-              const hasPrd = prdFiles.has(issueUpper);
-              const ready = specIssues.has(issueUpper);
-              return {
-                issueId: n.issue,
-                rank: n.rank,
-                size: n.size,
-                importance: n.importance,
-                score: n.score,
-                condition: n.condition,
-                dependsOn: n.dependsOn,
-                why: n.why,
-                gate: n.gate,
-                planning: n.planning,
-                ...(n.rationale ? { rationale: n.rationale } : {}),
-                inPipeline,
-                hasPrd,
-                ready,
-              };
-            });
+        // Enrich cached rows with live per-issue status (not stored in the cache)
+        const draftsDir = join(projectRoot, '.pan', 'drafts');
+        const prdFiles = existsSync(draftsDir)
+          ? new Set(readdirSync(draftsDir).map((f) => f.replace(/\.md$/, '').toUpperCase()))
+          : new Set<string>();
+
+        const specsDir = join(projectRoot, '.pan', 'specs');
+        const specIssues = new Set<string>();
+        if (existsSync(specsDir)) {
+          for (const f of readdirSync(specsDir)) {
+            const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+            if (match) specIssues.add(match[1]!.toUpperCase());
           }
         }
+
+        const nodes = cachedNodes.map((r) => {
+          const issueUpper = r.issueId.toUpperCase();
+          const reviewStatus = getReviewStatusSync(issueUpper);
+          const inPipeline =
+            reviewStatus !== null && reviewStatus.reviewStatus !== 'pending';
+          const hasPrd = prdFiles.has(issueUpper);
+          const ready = specIssues.has(issueUpper);
+          return {
+            issueId: r.issueId,
+            rank: r.rank,
+            size: r.size,
+            importance: r.importance,
+            score: r.score,
+            condition: r.condition,
+            dependsOn: r.dependsOn,
+            why: r.why,
+            gate: r.gate,
+            planning: r.planning,
+            inPipeline,
+            hasPrd,
+            ready,
+          };
+        });
 
         return jsonResponse({ nodes, edges });
       },
