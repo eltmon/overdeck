@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -107,10 +107,25 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
             return assigneeName === 'eltmon';
           };
 
+          const projectRoot = process.cwd();
+          const specsDir = join(projectRoot, '.pan', 'specs');
+          const issuesWithSpecs = new Set<string>();
+          if (existsSync(specsDir)) {
+            for (const f of readdirSync(specsDir)) {
+              const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+              if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
+            }
+          }
+          const isReadyOrHasPrd = (issueId: string): boolean => {
+            const id = issueId.toUpperCase();
+            if (issuesWithSpecs.has(id)) return true;
+            return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
+          };
+
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue });
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd });
           const nextLine = nextPick
             ? `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`
             : 'No eligible issue found in sequence — fall back to normal priority';

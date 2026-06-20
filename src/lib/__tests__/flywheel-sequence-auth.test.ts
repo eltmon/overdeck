@@ -23,6 +23,45 @@ function makeNode(issue: string, rank: number, overrides: Partial<SequenceNode> 
   };
 }
 
+describe('pickFromSequence – ready-or-PRD eligibility gate (FR-14)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('skips rank-1 authorized unparked issue with neither PRD nor spec, picks rank-2 which has a PRD', () => {
+    const nodes = [
+      makeNode('PAN-NO-PRD', 1),
+      makeNode('PAN-HAS-PRD', 2),
+    ];
+    const result = pickFromSequence(nodes, {
+      isAuthorizedIssue: () => true,
+      isReadyOrHasPrd: (id) => id === 'PAN-HAS-PRD',
+    });
+    expect(result?.issueId).toBe('PAN-HAS-PRD');
+  });
+
+  it('returns null when all issues lack PRD and spec', () => {
+    const nodes = [makeNode('PAN-1', 1), makeNode('PAN-2', 2)];
+    const result = pickFromSequence(nodes, {
+      isAuthorizedIssue: () => true,
+      isReadyOrHasPrd: () => false,
+    });
+    expect(result).toBeNull();
+  });
+
+  it('selects rank-1 when it has a spec (ready=true)', () => {
+    const nodes = [makeNode('PAN-READY', 1), makeNode('PAN-2', 2)];
+    const result = pickFromSequence(nodes, {
+      isReadyOrHasPrd: (id) => id === 'PAN-READY',
+    });
+    expect(result?.issueId).toBe('PAN-READY');
+  });
+
+  it('backwards-compatible: no isReadyOrHasPrd passes all issues regardless of PRD/spec', () => {
+    const nodes = [makeNode('PAN-NO-ANYTHING', 1)];
+    const result = pickFromSequence(nodes);
+    expect(result?.issueId).toBe('PAN-NO-ANYTHING');
+  });
+});
+
 describe('pickFromSequence – author/assignee safety gate', () => {
   beforeEach(() => vi.clearAllMocks());
 
