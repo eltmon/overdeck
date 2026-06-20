@@ -72,8 +72,8 @@ export function isMergeTrainEnabled(): boolean {
 
 // ── PendingAutoMerge ──────────────────────────────────────────────────────────
 
-export type { PendingAutoMergeStatus } from '../database/pending-auto-merges-db.js';
-export type { PendingAutoMerge } from '../database/pending-auto-merges-db.js';
+export type { PendingAutoMergeStatus } from './merge-types.js';
+export type { PendingAutoMerge } from './merge-types.js';
 
 // Local row shape for overdeck pending_auto_merges (snake_case, integer ms)
 interface OverdeckPendingAutoMergeRow {
@@ -91,7 +91,7 @@ interface OverdeckPendingAutoMergeRow {
   cancelled_by: string | null;
 }
 
-import type { PendingAutoMerge } from '../database/pending-auto-merges-db.js';
+import type { PendingAutoMerge } from './merge-types.js';
 
 function rowToPendingAutoMerge(row: OverdeckPendingAutoMergeRow): PendingAutoMerge {
   return {
@@ -312,7 +312,7 @@ export type {
   UatGenerationHeldOut,
   UatGenerationResolution,
   UatGenerationStatus,
-} from '../database/uat-generations-db.js';
+} from './merge-types.js';
 
 import type {
   UatGeneration,
@@ -320,7 +320,7 @@ import type {
   UatGenerationHeldOut,
   UatGenerationResolution,
   UatGenerationStatus,
-} from '../database/uat-generations-db.js';
+} from './merge-types.js';
 
 // overdeck row shapes
 interface OverdeckUatGenerationRow {

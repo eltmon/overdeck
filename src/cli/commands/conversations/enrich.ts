@@ -54,7 +54,7 @@ export async function enrichAction(
 
   // Apply --workspace / --since filters if no explicit session IDs
   if (!sessionIds && (workspace || since || limit !== undefined)) {
-    const { findDiscoveredSessions } = await import('../../../lib/database/discovered-sessions-db.js');
+    const { findDiscoveredSessions } = await import('../../../lib/overdeck/discovered-sessions.js');
     const { parseRelativeTime } = await import('../../../lib/conversations/search.js');
     const sessions = findDiscoveredSessions({
       workspacePath: workspace,
