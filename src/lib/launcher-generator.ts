@@ -595,6 +595,21 @@ function systemPromptFiles(config: LauncherConfig): string[] {
 }
 
 function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const cmd = computeCodexCommandTokens(config, useExec);
+  // PAN-1988 — log the resolved codex invocation so a "resume started over instead of continuing"
+  // regression is one `grep '[codex-launcher]'` away: it shows the mode, the resume id we were
+  // handed, and whether `resume <id>` actually made it into the command for that mode. This is the
+  // log that would have caught the work-tui branch silently dropping resumeSessionId.
+  const flat = cmd.join(' ').replace(/\s+/g, ' ');
+  const applied = /(^|\s)resume(\s|$)/.test(flat) ? 'YES' : 'no';
+  console.log(
+    `[codex-launcher] agent=${config.overdeckEnv?.agentId ?? '?'} mode=${config.codexMode ?? 'exec'} ` +
+    `resumeSessionId=${config.resumeSessionId ?? '(none)'} resumeApplied=${applied} cmd=${flat.slice(0, 200)}`,
+  );
+  return cmd;
+}
+
+function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): string[] {
   const codexMode = config.codexMode ?? 'exec';
 
   // TUI / conversation mode: interactive terminal, optionally under the PTY
@@ -623,8 +638,18 @@ function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
     // 'tui'), which relies entirely on the seeded config.toml. Only `-m`
     // (per-agent model) is passed here.
     const tokens: string[] = ['codex'];
+    // PAN-1988: apply the resume id so a re-dispatched work/review agent CONTINUES its codex thread
+    // (keeping the prior round's context) instead of opening a fresh TUI session. `codex resume
+    // <id>` mirrors the 'tui' branch — the bug was that work-tui dropped resumeSessionId entirely,
+    // so every re-review started over and re-researched the whole diff.
+    if (config.resumeSessionId) {
+      tokens.push('resume');
+    }
     if (config.model) {
       tokens.push('-m', shellQuoteModelIdSync(config.model));
+    }
+    if (config.resumeSessionId) {
+      tokens.push(shellQuote(config.resumeSessionId));
     }
     const cmd = wrapWithSupervisor(config, tokens.join(' '));
     return [useExec ? `exec ${cmd}` : cmd];

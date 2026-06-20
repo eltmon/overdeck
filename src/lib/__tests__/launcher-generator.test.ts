@@ -930,6 +930,20 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).not.toMatch(/-s workspace-write/);
   });
 
+  it('codex work-tui mode RESUMES the thread when resumeSessionId is set (PAN-1988)', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      model: 'codex-4o',
+      codexMode: 'work-tui',
+      resumeSessionId: '019ee5e7-thread-abc',
+    });
+    // The work-tui branch MUST apply `codex resume <id>`. Dropping it (the original bug) made every
+    // re-dispatch open a FRESH codex session and re-research the whole diff, losing prior context.
+    expect(script).toMatch(/^exec codex resume -m 'codex-4o' '019ee5e7-thread-abc'$/m);
+  });
+
   it('codex work-tui mode can be wrapped by the PTY supervisor', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
