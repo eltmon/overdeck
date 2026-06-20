@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agents &amp; steps — focused spec (item #2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --warning-foreground:#b45309; --signal-review:#a855f7; --signal-review-foreground:#7e22ce;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--info);position:relative;display:inline-block}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid color-mix(in srgb,var(--info) 60%,transparent);animation:ring 1.6s ease-out infinite}
+  @keyframes ring{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+
+  .wrap{max-width:1120px;margin:24px auto;padding:0 20px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:20px;max-width:760px}
+  .row{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+  .statelabel{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin-bottom:8px}
+
+  /* the lane */
+  .lane{width:248px;border-radius:18px;background:color-mix(in srgb,var(--card-2) 70%,var(--card));border:1px solid var(--border);padding:8px}
+  .lane-h{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);padding:8px 8px 4px;display:flex;gap:6px} .lane-h .n{margin-left:auto}
+  .trow{display:flex;align-items:center;gap:8px;padding:8px;border-radius:11px;position:relative;border:1px solid transparent;cursor:pointer}
+  .trow:hover{background:var(--accent)} .trow.sel{background:var(--card);border-color:var(--border)}
+  .trow .car{width:11px;text-align:center;font-size:10px;color:var(--muted-foreground)}
+  .trow .ic{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .ic.work{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .ic.review{color:var(--signal-review-foreground);border-color:color-mix(in srgb,var(--signal-review) 32%,transparent);background:color-mix(in srgb,var(--signal-review) 8%,transparent)}
+  .ic.ver{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .trow .nm{font-size:12.5px} .trow .md{font-size:10px;color:var(--muted-foreground);font-family:var(--mono);margin-left:6px}
+  .trow .rt{margin-left:auto;font-size:10px;color:var(--muted-foreground);white-space:nowrap}
+  .trow .sub{display:block;font-size:10px;color:var(--muted-foreground);margin-top:1px}
+  .trow.child{margin-left:18px} .trow.child::after{content:"";position:absolute;left:-9px;top:50%;width:8px;height:1px;background:var(--border)}
+  .verdict{width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-size:9px;color:#fff;flex:none}
+  .verdict.ok{background:var(--success)} .verdict.bad{background:var(--destructive)} .verdict.run{background:var(--info)}
+  .rolebadge{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:9px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .runtxt{color:var(--info-foreground)} .oktxt{color:var(--success-foreground)} .badtxt{color:var(--destructive-foreground)}
+  .resnote{margin-top:10px;border-top:1px dashed var(--border);padding:8px;font-size:10.5px;color:var(--muted-foreground)}
+
+  .notes{border:1px solid var(--border);border-radius:14px;padding:14px 16px;max-width:560px;background:var(--card)}
+  .notes h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+  .notes li{font-size:12.5px;margin:6px 0} .notes code{font-family:var(--mono);font-size:11.5px;background:var(--accent);padding:1px 5px;border-radius:5px}
+  .q{border:1px solid color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 5%,var(--card));border-radius:14px;padding:14px 16px;max-width:560px;margin-top:14px}
+  .q h3{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--info-foreground)}
+  .q li{font-size:12.5px;margin:8px 0}
+  .tag{display:inline-block;font-size:9px;text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--muted-foreground);margin-left:4px}
+  .tag.real{color:var(--success-foreground);border-color:color-mix(in srgb,var(--success) 32%,transparent)}
+  .tag.needs{color:var(--warning-foreground);border-color:color-mix(in srgb,#f59e0b 32%,transparent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Agents &amp; steps — item #2 spec (left lane)</h1>
+  <div class="sub">Replaces the chip-heavy tree with clean one-line rows. Convoy nesting kept (Review → reviewers + verdicts). Verification folded in as a <b>step</b>. Built honest to the data: verification is an <b>aggregate</b> status — no live <code>N/60</code> test count exists yet (that needs backend). Clicking the Test agent shows its live terminal output, which <i>is</i> available.</div>
+
+  <div class="row">
+    <!-- STATE A: work running -->
+    <div>
+      <div class="statelabel">A · work running</div>
+      <div class="lane">
+        <div class="lane-h">Agents &amp; steps <span class="n">5</span></div>
+        <div class="trow"><span class="car"></span><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="md">opus</span><span class="rt">2d</span></div>
+        <div class="trow sel"><span class="car"></span><span class="ic work">▷</span><span class="nm">Work</span><span class="md">sonnet-4-6</span><span class="rt runtxt">running</span></div>
+        <div class="trow"><span class="car">▸</span><span class="ic review">◉</span><span class="nm">Review</span><span class="rt">idle</span></div>
+        <div class="trow"><span class="car"></span><span class="ic ver">▷</span><span class="nm">Verification</span><span class="rt">not run</span></div>
+        <div class="trow"><span class="car"></span><span class="rolebadge">T</span><span class="nm">Test</span><span class="rt">not run</span></div>
+        <div class="resnote">▸ Resources · 3 containers · 1 PR · 2 branches <span class="muted">(stays for now → Stack drawer in item #8)</span></div>
+      </div>
+    </div>
+
+    <!-- STATE B: review convoy returned, verification running -->
+    <div>
+      <div class="statelabel">B · convoy done · verification running</div>
+      <div class="lane">
+        <div class="lane-h">Agents &amp; steps <span class="n">5</span></div>
+        <div class="trow"><span class="car"></span><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="md">opus</span></div>
+        <div class="trow"><span class="car"></span><span class="ic work">▷</span><span class="nm">Work</span><span class="md">sonnet-4-6</span><span class="rt oktxt">done</span></div>
+        <div class="trow"><span class="car">▾</span><span class="ic review">◉</span><span class="nm">Review</span><span class="sub">convoy · 1 changes-req</span><span class="rt">41m</span></div>
+        <div class="trow child"><span class="verdict ok">✓</span><span class="rolebadge">Co</span><span class="nm">Correctness</span><span class="md">gpt-5.5</span></div>
+        <div class="trow child"><span class="verdict ok">✓</span><span class="rolebadge">Se</span><span class="nm">Security</span><span class="md">gpt-5.5</span></div>
+        <div class="trow child"><span class="verdict bad">✕</span><span class="rolebadge">Re</span><span class="nm">Requirements</span><span class="md">gpt-5.5</span></div>
+        <div class="trow sel"><span class="car"></span><span class="ic ver">▷</span><span class="nm">Verification</span><span class="sub runtxt">build gate running…</span></div>
+        <div class="trow"><span class="car"></span><span class="rolebadge">T</span><span class="nm">Test</span><span class="rt runtxt">running</span></div>
+        <div class="resnote">▸ Resources · 3 containers · 1 PR · 2 branches</div>
+      </div>
+    </div>
+
+    <!-- STATE C: verification failed -->
+    <div>
+      <div class="statelabel">C · verification failed</div>
+      <div class="lane">
+        <div class="lane-h">Agents &amp; steps <span class="n">5</span></div>
+        <div class="trow"><span class="car"></span><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="md">opus</span></div>
+        <div class="trow"><span class="car"></span><span class="ic work">▷</span><span class="nm">Work</span><span class="md">sonnet-4-6</span><span class="rt oktxt">done</span></div>
+        <div class="trow"><span class="car">▸</span><span class="ic review">◉</span><span class="nm">Review</span><span class="sub oktxt">convoy · passed</span></div>
+        <div class="trow sel"><span class="car">▾</span><span class="ic ver" style="color:var(--destructive-foreground);border-color:color-mix(in srgb,var(--destructive) 32%,transparent);background:color-mix(in srgb,var(--destructive) 8%,transparent)">✕</span><span class="nm">Verification</span><span class="sub badtxt">failed at lint</span></div>
+        <div class="trow child"><span class="verdict ok">✓</span><span class="nm" style="font-size:12px">Typecheck</span><span class="rt oktxt">passed</span></div>
+        <div class="trow child"><span class="verdict bad">✕</span><span class="nm" style="font-size:12px">Lint</span><span class="rt badtxt">failed</span></div>
+        <div class="trow child"><span class="verdict" style="background:transparent;border:1.5px solid var(--muted-foreground);color:var(--muted-foreground)">○</span><span class="nm" style="font-size:12px">Test</span><span class="rt">pending</span></div>
+        <div class="trow"><span class="car"></span><span class="rolebadge">T</span><span class="nm">Test</span><span class="rt">not run</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:20px;align-items:flex-start">
+  <div class="notes">
+    <h3>What's real vs what needs backend</h3>
+    <ul>
+      <li><span class="tag real">real</span> Agent rows (Plan/Work/Review/Test) — sessions from the activity API: model, status, last-heard, duration.</li>
+      <li><span class="tag real">real</span> Convoy nesting + per-reviewer verdict (✓ approved / ✕ changes-requested) — from <code>roundMetadata</code>.</li>
+      <li><span class="tag real">real</span> Verification <b>aggregate</b> status (running/passed/failed) and, <b>on failure</b>, which gate (typecheck/lint/test) — parsed from <code>verificationNotes</code>.</li>
+      <li><span class="tag real">real</span> Click the <b>Test</b> agent → its <b>terminal</b> shows the live test output (the run scrolls there).</li>
+      <li><span class="tag needs">needs backend</span> A live <code>34/60</code> test count + independent per-gate "running" states while verification is in flight. Today all three quality gates share one status until it finishes.</li>
+    </ul>
+  </div>
+
+  <div class="q">
+    <h3>Decisions before I implement</h3>
+    <ul>
+      <li><b>1. New <code>AgentsLane</code> component</b> (cockpit-specific, clean rows) rather than reworking the shared <code>ProjectNode</code> — same approach as the rail, low blast-radius. OK?</li>
+      <li><b>2. Verification as a step row</b> showing aggregate status; expands (on failure) to typecheck/lint/test. Clicking it opens the Review &amp; Verification detail. OK — and accept <b>no live N/60 count</b> in v1?</li>
+      <li><b>3. The live test count / per-gate progress</b> → file as its own backend item on PAN-1991 (instrument the verification gate runner)? Or skip it?</li>
+      <li><b>4. Resources</b> — leave the existing <code>▸ Resources</code> section under the lane for now; move it into the Stack drawer when we do item #8. OK?</li>
+    </ul>
+  </div>
+  </div>
+</div>
+</body>
+</html>

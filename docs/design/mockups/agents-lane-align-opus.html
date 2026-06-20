@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agents lane — alignment options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --radius:.625rem; --radius-sm:calc(var(--radius) - 4px);
+    --background:#fff; --foreground:#1f2937; --card:#fff; --card-2:#f7f8fa; --accent:color-mix(in srgb, black 4%, transparent);
+    --muted-foreground:#6b7280; --border:color-mix(in srgb, black 8%, transparent);
+    --destructive:#ef4444; --destructive-foreground:#b91c1c;
+    --info:#3b82f6; --info-foreground:#1d4ed8; --success:#10b981; --success-foreground:#047857;
+    --signal-review:#a855f7; --signal-review-foreground:#7e22ce;
+    --mono:"DM Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-weight:500;font-size:13px;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono)} .muted{color:var(--muted-foreground)}
+  .wrap{max-width:980px;margin:26px auto;padding:0 20px}
+  h1{font-size:16px;margin:0 0 4px} .sub{color:var(--muted-foreground);font-size:12.5px;margin-bottom:22px}
+  .row{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+  .statelabel{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted-foreground);margin-bottom:8px}
+  .lane{width:248px;border-radius:18px;background:color-mix(in srgb,var(--card-2) 70%,var(--card));border:1px solid var(--border);padding:7px}
+  .lane-h{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);padding:8px 8px 6px;display:flex;gap:6px} .lane-h .n{margin-left:auto}
+
+  /* shared icon/verdict — UNIFORM 18px slot so names always align */
+  .ic{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:10px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .ic.work{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .ic.review{color:var(--signal-review-foreground);border-color:color-mix(in srgb,var(--signal-review) 32%,transparent);background:color-mix(in srgb,var(--signal-review) 8%,transparent)}
+  .ic.ver{color:var(--info-foreground);border-color:color-mix(in srgb,var(--info) 32%,transparent);background:color-mix(in srgb,var(--info) 8%,transparent)}
+  .ic.ok{color:#fff;background:var(--success);border-color:var(--success)}
+  .ic.bad{color:#fff;background:var(--destructive);border-color:var(--destructive)}
+  .car{width:10px;text-align:center;font-size:9px;color:var(--muted-foreground);flex:none}
+  .rolebadge{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;font-size:8.5px;flex:none;border:1px solid var(--border);color:var(--muted-foreground)}
+  .verdict{width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-size:8px;color:#fff;flex:none}
+  .verdict.ok{background:var(--success)} .verdict.bad{background:var(--destructive)}
+  .runtxt{color:var(--info-foreground)} .oktxt{color:var(--success-foreground)} .badtxt{color:var(--destructive-foreground)}
+
+  /* ───────── Variant A — single line, columnar (model right-aligned) ───────── */
+  .A .trow{display:grid;grid-template-columns:10px 18px minmax(0,1fr) auto;column-gap:8px;align-items:center;padding:7px 8px;border-radius:10px;cursor:pointer}
+  .A .trow:hover{background:var(--accent)} .A .trow.sel{background:var(--card);border:1px solid var(--border);padding:6px 7px}
+  .A .nm{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .A .meta{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+  .A .md{font-family:var(--mono);font-size:10px;color:var(--muted-foreground)}
+  .A .stt{font-size:10px;min-width:42px;text-align:right}
+  .A .trow.child{grid-template-columns:10px 18px minmax(0,1fr) auto;}
+  .A .indent{margin-left:16px}
+
+  /* ───────── Variant B — two line (model on its own aligned subline) ───────── */
+  .B .trow{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border-radius:10px;cursor:pointer}
+  .B .trow:hover{background:var(--accent)} .B .trow.sel{background:var(--card);border:1px solid var(--border);padding:6px 7px}
+  .B .car{margin-top:3px}
+  .B .ic,.B .verdict,.B .rolebadge{margin-top:1px}
+  .B .body{flex:1;min-width:0}
+  .B .l1{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .B .nm{font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .B .stt{font-size:10px;white-space:nowrap}
+  .B .l2{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+  .B .md{font-family:var(--mono);font-size:10px;color:var(--muted-foreground)}
+  .B .tm{font-size:10px;color:var(--muted-foreground)}
+  .B .indent{margin-left:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Agents &amp; steps — alignment options</h1>
+  <div class="sub">Both fix the three problems: uniform 18px icon slot (names align), models in a real column, statuses aligned. Pick the density.</div>
+
+  <div class="row">
+    <!-- Variant A -->
+    <div class="A">
+      <div class="statelabel">A · single line — model right-aligned column</div>
+      <div class="lane">
+        <div class="lane-h">Agents &amp; steps <span class="n">5</span></div>
+        <div class="trow"><span class="car"></span><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="meta"><span class="md">opus</span><span class="stt muted">done</span></span></div>
+        <div class="trow sel"><span class="car"></span><span class="ic work">▷</span><span class="nm">Work</span><span class="meta"><span class="md">sonnet-4-6</span><span class="stt runtxt">running</span></span></div>
+        <div class="trow"><span class="car">▾</span><span class="ic review">◉</span><span class="nm">Review</span><span class="meta"><span class="md">gpt-5.5</span><span class="stt">41m</span></span></div>
+        <div class="trow child indent"><span class="car"></span><span class="rolebadge">Co</span><span class="nm">Correctness</span><span class="meta"><span class="md">gpt-5.5</span><span class="stt oktxt">✓</span></span></div>
+        <div class="trow child indent"><span class="car"></span><span class="rolebadge">Re</span><span class="nm">Requirements</span><span class="meta"><span class="md">gpt-5.5</span><span class="stt badtxt">✕</span></span></div>
+        <div class="trow"><span class="car"></span><span class="ic ver">▷</span><span class="nm">Verification</span><span class="meta"><span class="md muted">build gate</span><span class="stt runtxt">run…</span></span></div>
+        <div class="trow"><span class="car"></span><span class="rolebadge">T</span><span class="nm">Test</span><span class="meta"><span class="md muted">haiku-4-5</span><span class="stt">idle</span></span></div>
+      </div>
+    </div>
+
+    <!-- Variant B -->
+    <div class="B">
+      <div class="statelabel">B · two line — model on aligned subline</div>
+      <div class="lane">
+        <div class="lane-h">Agents &amp; steps <span class="n">5</span></div>
+        <div class="trow"><span class="car"></span><span class="verdict ok">✓</span><div class="body"><div class="l1"><span class="nm">Plan</span><span class="stt muted">done</span></div><div class="l2"><span class="md">opus</span><span class="tm">2d</span></div></div></div>
+        <div class="trow sel"><span class="car"></span><span class="ic work">▷</span><div class="body"><div class="l1"><span class="nm">Work</span><span class="stt runtxt">running</span></div><div class="l2"><span class="md">sonnet-4-6</span><span class="tm">just now · 25h</span></div></div></div>
+        <div class="trow"><span class="car">▾</span><span class="ic review">◉</span><div class="body"><div class="l1"><span class="nm">Review</span><span class="stt">41m</span></div><div class="l2"><span class="md">gpt-5.5</span><span class="tm">convoy · 1 changes-req</span></div></div></div>
+        <div class="trow indent"><span class="car"></span><span class="rolebadge">Co</span><div class="body"><div class="l1"><span class="nm">Correctness</span><span class="stt oktxt">approved</span></div><div class="l2"><span class="md">gpt-5.5</span></div></div></div>
+        <div class="trow indent"><span class="car"></span><span class="rolebadge">Re</span><div class="body"><div class="l1"><span class="nm">Requirements</span><span class="stt badtxt">changes</span></div><div class="l2"><span class="md">gpt-5.5</span></div></div></div>
+        <div class="trow"><span class="car"></span><span class="ic ver">▷</span><div class="body"><div class="l1"><span class="nm">Verification</span><span class="stt runtxt">running</span></div><div class="l2"><span class="md muted">build gate</span><span class="tm">typecheck · lint · test</span></div></div></div>
+        <div class="trow"><span class="car"></span><span class="rolebadge">T</span><div class="body"><div class="l1"><span class="nm">Test</span><span class="stt">idle</span></div><div class="l2"><span class="md">haiku-4-5</span><span class="tm">not run</span></div></div></div>
+      </div>
+    </div>
+
+    <!-- reference: today (ragged) -->
+    <div class="A">
+      <div class="statelabel">✕ today (ragged) — for contrast</div>
+      <div class="lane">
+        <div class="lane-h">Issue tree</div>
+        <div class="trow" style="display:flex;gap:7px"><span class="verdict ok">✓</span><span class="nm">Plan</span><span class="md" style="margin-left:6px">opus</span></div>
+        <div class="trow" style="display:flex;gap:7px"><span class="ic work" style="width:18px">▷</span><span class="nm">Work</span><span class="md" style="margin-left:6px">sonnet-4-6</span><span style="margin-left:auto" class="stt runtxt">running</span></div>
+        <div class="trow" style="display:flex;gap:7px"><span class="ic review">◉</span><span class="nm">Review</span><span class="md" style="margin-left:6px">gpt-5.5</span></div>
+        <div class="trow" style="display:flex;gap:7px"><span class="rolebadge">T</span><span class="nm">Test</span><span class="md" style="margin-left:6px">haiku-4-5</span><span style="margin-left:auto" class="stt">waiting</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
