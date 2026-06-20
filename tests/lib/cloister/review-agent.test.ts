@@ -78,6 +78,8 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   saveAgentStateProgram: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   spawnRun: mockSpawnRun,
+  getLatestSessionIdSync: vi.fn().mockReturnValue(null),
+  resumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
@@ -491,7 +493,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     );
 
     const spawnMatch = agentSrc.match(
-      /const run = await spawnRun\(opts\.issueId, 'review'[\s\S]*?Review role \(synthesis\) spawned/,
+      /const run = await spawnRun\(opts\.issueId, 'review'[\s\S]*?Review role \(self-review\) spawned/,
     );
     expect(spawnMatch).not.toBeNull();
     const spawnBlock = spawnMatch![0];

@@ -634,4 +634,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/backlog/sequence/regenerate',      kind: 'http', disposition: 'WRITE',      door: 'backlog route spawns sequencer agent via spawnSequencerAgent (PAN-1866)' },
   { surface: 'POST /api/backlog/sequence/gate',            kind: 'http', disposition: 'WRITE',      door: 'backlog route writes operator gate field to sequence.md via writeSequenceMd; applies parked label when gate=blocked (PAN-1866)' },
   { surface: 'POST /api/backlog/sequence/planning',        kind: 'http', disposition: 'WRITE',      door: 'backlog route writes operator planning field to sequence.md via writeSequenceMd (PAN-1866)' },
+
+  // Pre-existing routes discovered during PAN-1866 audit (were missing from matrix)
+  { surface: 'POST /api/agents/:id/restart-fresh',         kind: 'http', disposition: 'WRITE',      door: 'agents route wipes work-agent state and re-spawns on new harness/model; deliberate operator override for harness switch' },
+  { surface: 'POST /api/review/:issueId/purge',            kind: 'http', disposition: 'WRITE',      door: 'workspaces route purges all review agents for an issue and resets review status' },
 ];

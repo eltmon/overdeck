@@ -9,7 +9,7 @@ import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
 import { applyIssueParkedLabel } from '../../../lib/backlog/label-ops.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
-import { getBacklogSequenceForRoot } from '../../../lib/database/backlog-sequence-db.js';
+import { getBacklogSequenceForRoot } from '../../../lib/overdeck/backlog.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 import type { Issue } from '../../../lib/tracker/interface.js';
