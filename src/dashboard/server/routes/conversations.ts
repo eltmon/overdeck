@@ -749,11 +749,15 @@ async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promi
 }
 
 async function resolveSessionFile(conv: Conversation): Promise<string | null> {
-  // Pi conversations write their own JSONL into the agent's session dir,
-  // not into ~/.claude/projects/<dir>/<id>.jsonl. The path uses a per-run
-  // timestamped filename, so we resolve by globbing the directory.
+  // Pi writes its own JSONL transcript under the per-agent dir using a per-run
+  // timestamped filename (not into ~/.claude/projects/<dir>/<id>.jsonl). Pi
+  // *conversations* write into the agent's `sessions/` subdir, but Pi *work and
+  // review* agents write into the agent-dir ROOT (PAN-1908) — so we must check
+  // both. resolvePiSessionPath is the canonical resolver shared with the non-DB
+  // specialist fallback below; it checks both locations and skips the
+  // cost-events.jsonl / activity.jsonl sidecars.
   if (conv.harness === 'pi') {
-    return resolvePiSessionFile(conv.tmuxSession);
+    return resolvePiSessionPath(conv.tmuxSession);
   }
   // Codex conversations write rollout JSONL under per-agent CODEX_HOME/sessions/.
   // The thread-id stored in codex-thread-id is the session identifier.
@@ -772,25 +776,6 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
     return sessionFilePath(conv.cwd, sessionId);
   }
   return null;
-}
-
-/**
- * Return the most-recently-written Pi JSONL session file for a conversation,
- * or null if Pi hasn't created one yet (TUI just started, or session reset).
- * The dashboard chat panel uses this to render Pi conversation history.
- */
-async function resolvePiSessionFile(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(getOverdeckHome(), 'agents', tmuxSession, 'sessions');
-  if (!existsSync(sessionDir)) return null;
-  try {
-    const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
-    if (entries.length === 0) return null;
-    // Filenames are `<iso-timestamp>_<session-id>.jsonl` — newest sorts last.
-    entries.sort();
-    return join(sessionDir, entries[entries.length - 1]!);
-  } catch {
-    return null;
-  }
 }
 
 /**
