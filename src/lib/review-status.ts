@@ -370,7 +370,7 @@ export function setReviewStatusSync(
       const retryCount = updated.reviewRetryCount ?? 0;
       reviewMsg = retryCount > 0
         ? `${issueId} — review re-dispatched (retry ${retryCount})`
-        : `${issueId} — review started (4 parallel reviewers)`;
+        : `${issueId} — review started`;
     }
     const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       reviewing: { level: 'info',    msg: reviewMsg, tts: `${issueId} review started` },

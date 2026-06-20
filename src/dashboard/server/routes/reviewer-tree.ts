@@ -19,6 +19,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { getAgentStateSync } from '../../../lib/agents.js';
+import { isExtendedReviewEnabled } from '../../../lib/cloister/review-agent.js';
 
 import { Effect } from 'effect';
 import type { AgentStatus, SessionNodePresence } from '@overdeck/contracts';
@@ -313,6 +314,13 @@ export async function readSynthesisRounds(
 export async function buildReviewerNodes(
   opts: BuildReviewerNodesOptions,
 ): Promise<ReviewerNode[]> {
+  // Quick review (the only live mode, PAN-1981) never has sub-reviewers — surface
+  // convoy lanes ONLY when extended review actually runs. Otherwise any
+  // agent-<id>-review-<subRole> record is a ghost from a prior convoy run and would
+  // render as a dead phantom lane under the issue. Single seam shared with the spawn
+  // side: isExtendedReviewEnabled() (review-agent.ts). Flip it to revive lanes.
+  if (!isExtendedReviewEnabled()) return [];
+
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.overdeck', 'agents');
 
   // PAN-915 — current-round output dir disambiguates "zombie session from prior

@@ -796,6 +796,22 @@ export function isReviewStaleSync(issueId: string): boolean {
 }
 
 /**
+ * Is EXTENDED (convoy) review enabled? Quick review — the single parent `agent-<id>-review`
+ * reviews the whole diff itself — is the only live mode (PAN-1981); the convoy spawn +
+ * synthesis machinery is parked (commented out in spawnReviewRoleForIssuePromise).
+ *
+ * This is the SINGLE seam that turns convoy back on. While it returns false:
+ *   - no sub-reviewer lanes are surfaced in the issue tree (buildReviewerNodes returns []),
+ *   - review messages must not claim "N parallel reviewers".
+ * Any `agent-<id>-review-<subRole>` record while this is false is a ghost from a prior
+ * convoy run, not a live lane. When extended review returns, flip this (and later wire it
+ * to a per-issue config flag) — restoring lanes and multi-reviewer messaging in lockstep.
+ */
+export function isExtendedReviewEnabled(): boolean {
+  return false;
+}
+
+/**
  * Tear down an issue's entire review fleet — the `agent-<id>-review` parent plus any
  * extended-mode sub-reviewers. Kills every review tmux session, then removes each agent
  * via the canonical removeAgentSync (overdeck.db row + state dir, never the JSONL

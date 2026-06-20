@@ -367,7 +367,7 @@ describe('SessionNode', () => {
     expect(screen.getAllByText('Restart review')).toHaveLength(2);
   });
 
-  it('keeps the review coordinator restart label as Restart all', () => {
+  it('labels the review coordinator restart as Restart review (quick review has no convoy to "restart all")', () => {
     render(
       <SessionNode
         issueId="PAN-1381"
@@ -380,7 +380,7 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('Restart all')).toBeInTheDocument();
+    expect(screen.getByText('Restart review')).toBeInTheDocument();
   });
 
   it('uses Start for ended test and ship nodes and Restart for live test and ship nodes', () => {

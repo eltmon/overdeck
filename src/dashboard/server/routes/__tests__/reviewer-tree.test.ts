@@ -16,6 +16,17 @@ vi.mock('../../../../lib/agents.js', () => ({
   getAgentStateSync: vi.fn(() => null),
 }));
 
+// buildReviewerNodes is gated by isExtendedReviewEnabled() (PAN-1981): convoy lanes
+// are only built when extended review is on. Default the mock to TRUE so the existing
+// node-building tests exercise the (parked-but-preserved) convoy logic; the gate's
+// false-path has its own dedicated test below.
+const { isExtendedReviewEnabledMock } = vi.hoisted(() => ({
+  isExtendedReviewEnabledMock: vi.fn(() => true),
+}));
+vi.mock('../../../../lib/cloister/review-agent.js', () => ({
+  isExtendedReviewEnabled: isExtendedReviewEnabledMock,
+}));
+
 const PROJECT_KEY = 'overdeck';
 const ISSUE_ID = 'pan-830';
 const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
@@ -24,6 +35,7 @@ let testDir: string;
 let agentsDir: string;
 
 beforeEach(async () => {
+  isExtendedReviewEnabledMock.mockReturnValue(true);
   testDir = join(tmpdir(), `pan-reviewer-tree-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   agentsDir = join(testDir, 'overdeck', 'agents');
   await mkdir(agentsDir, { recursive: true });
@@ -148,6 +160,20 @@ describe('readReviewerRounds (PAN-830)', () => {
 });
 
 describe('buildReviewerNodes (PAN-830)', () => {
+  it('returns [] when extended (convoy) review is disabled — quick mode hides phantom lanes (PAN-1981)', async () => {
+    isExtendedReviewEnabledMock.mockReturnValue(false);
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set(),
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'completed',
+      agentsDirOverride: agentsDir,
+    });
+    expect(nodes).toEqual([]);
+  });
+
   it('returns exactly four convoy nodes without a synthesis child', async () => {
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,

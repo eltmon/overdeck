@@ -595,7 +595,7 @@ export function SessionNode({
   const durationLabel = formatDuration(session.duration);
 
   const restartLabel = session.type === 'review'
-    ? 'Restart all'
+    ? 'Restart review'
     : session.type === 'reviewer'
       ? 'Restart review'
       : !isLive ? 'Start' : undefined;
