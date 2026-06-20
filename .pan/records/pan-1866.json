@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T16:57:01.388Z",
+  "updated": "2026-06-20T17:05:22.326Z",
   "pipeline": {
     "issueId": "PAN-1866",
     "reviewStatus": "blocked",
@@ -110,12 +110,12 @@
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T16:56:55.902Z",
-    "reviewNotes": "operator gate/planning endpoints reference missing imports",
+    "updatedAt": "2026-06-20T17:05:22.307Z",
+    "reviewNotes": "Schema fix is only in the dirty working tree; PR HEAD still lacks it",
     "verificationNotes": "Verification FAILED at test (89466ms):\n\n/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > tallies dry runs without writing\nAssertionError: expected { issueId: 'PAN-1922', …(4) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"issueId\": \"PAN-1922\",\n  \"readyForMerge\": true,\n  \"reviewStatus\": \"passed\",\n  \"testStatus\": \"passed\",\n  \"updatedAt\": \"2026-06-15T00:00:00.000Z\",\n}\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:310:45\n    309|\n    310|     expect(result.restored).toBe(1);\n    311|     expect(getReviewStatusFromDbSync('PAN-1922')).toBeNull();\n       |        ^\n    312|   });\n    313|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > inherits host override from the completed work agent for synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:118:28\n    116|     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));\n    117|     mocks.getReviewStatus.mockReturnValue(undefined);\n    118|     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefin…\n       |                            ^\n    119|     mocks.formatTier1Summary.mockReturnValue('shared review context');\n    120|     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > threads explicit model and harness overrides to synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:141:28\n    142|   });\n    143|\n    144|   it('threads explicit model and harness overrides to synthesis and re…\n       |              ^\n    145|     const result = await Effect.runPromise(spawnReviewRoleForIssue({\n    146|       issueId: 'PAN-1194',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/19]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
     "reviewedAtCommit": "5cc2b088a35f215cfeac1ac9e0b2e2d45bf6bdc9",
-    "reviewRequestedAt": "2026-06-20T16:53:08.654Z"
+    "reviewRequestedAt": "2026-06-20T16:58:41.241Z"
   },
   "closeOut": {
     "usage": {
@@ -146,10 +146,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1081,
-            "output": 385587,
-            "cacheRead": 122372836,
-            "cacheWrite": 3140311
+            "input": 1131,
+            "output": 394875,
+            "cacheRead": 129196294,
+            "cacheWrite": 3424314
           }
         }
       },
@@ -167,15 +167,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1095,
-          "output": 395601,
-          "cacheRead": 123441393,
-          "cacheWrite": 3243898
+          "input": 1145,
+          "output": 404889,
+          "cacheRead": 130264851,
+          "cacheWrite": 3527901
         }
       },
       "costAtCloseOut": {
-        "usd": 66.74186424,
-        "pricingAsOf": "2026-06-20T16:56:55.921Z"
+        "usd": 69.99338224,
+        "pricingAsOf": "2026-06-20T17:05:22.326Z"
       }
     },
     "merges": [
@@ -183,8 +183,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "harness": "codex",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "backlog-operator-gate-ui": "completed",
     "backlog-operator-gate-ui.ac1": "completed",
