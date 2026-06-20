@@ -433,8 +433,10 @@ describe('ConversationPanel rename flow', () => {
 
   // Detach affordance — a header button next to Copy link that opens the
   // conversation in a new browser window. Same target as the ⋮ pop-out item
-  // and the drag-off-to-detach in the PaneBar.
-  it('exposes a Detach button that opens /conv/<id> in a new window', () => {
+  // and the drag-off-to-detach in the PaneBar. All three detach entry points
+  // land on /popout/conversation/<id>, a bare conversation view (no sidebar
+  // or awareness rail) so the detached window focuses on the one chat.
+  it('exposes a Detach button that opens /popout/conversation/<id> in a new window', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     renderPanel();
 
@@ -442,7 +444,21 @@ describe('ConversationPanel rename flow', () => {
     expect(detach).toBeInTheDocument();
     fireEvent.click(detach);
 
-    expect(openSpy).toHaveBeenCalledWith('/conv/1', '_blank', expect.stringContaining('popup=yes'));
+    expect(openSpy).toHaveBeenCalledWith('/popout/conversation/1', '_blank', expect.stringContaining('popup=yes'));
+    openSpy.mockRestore();
+  });
+
+  it('passes ?view=terminal to the popout when in terminal mode', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderPanel({ ...mockConversation, sessionAlive: true }, { viewMode: 'terminal' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Detach conversation' }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      '/popout/conversation/1?view=terminal',
+      '_blank',
+      expect.stringContaining('popup=yes'),
+    );
     openSpy.mockRestore();
   });
 

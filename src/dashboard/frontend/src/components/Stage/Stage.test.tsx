@@ -109,9 +109,10 @@ describe('Stage', () => {
   })
 
   // Drag-to-detach (PAN-1591 ↔ detach affordance): dragging a conversation tab
-  // off the bar (no drop zone accepts it) opens a new window at /conv/<id>.
-  // The Stage resolves conversation.name → numeric id before opening.
-  it('dragging a conversation tab off the bar opens /conv/<id> in a new window', () => {
+  // off the bar (no drop zone accepts it) opens a new window at the bare
+  // conversation popout (/popout/conversation/<id>). The Stage resolves
+  // conversation.name → numeric id before opening.
+  it('dragging a conversation tab off the bar opens /popout/conversation/<id> in a new window', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     // Seed a conversation the agent pane can resolve. id=42 is the numeric
     // deep-link target the Stage will use.
@@ -126,7 +127,7 @@ describe('Stage', () => {
     expect(agentTab).toBeTruthy()
     fireEvent.dragEnd(agentTab!, { dataTransfer: { dropEffect: 'none' } })
 
-    expect(openSpy).toHaveBeenCalledWith('/conv/42', '_blank', expect.stringContaining('popup=yes'))
+    expect(openSpy).toHaveBeenCalledWith('/popout/conversation/42', '_blank', expect.stringContaining('popup=yes'))
     openSpy.mockRestore()
   })
 })

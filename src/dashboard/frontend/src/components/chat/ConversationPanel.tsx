@@ -552,10 +552,15 @@ export function ConversationPanel({
   // Open the conversation in a new browser window — the "detach" affordance
   // matching the ⋮ → "Pop out to window" menu item, lifted into the header so
   // it's discoverable next to Copy link. Mirrors Stage's drag-off-to-detach so
-  // both entry points land on the same /conv/<id> deep-link.
+  // both entry points land on the same /popout/conversation/<id> route — a bare
+  // conversation view with no dashboard chrome (sidebar, awareness rail, etc.).
   const handleDetach = useCallback(() => {
-    window.open(`/conv/${conversation.id}`, '_blank', 'popup=yes,width=920,height=1040');
-  }, [conversation.id]);
+    const params = new URLSearchParams();
+    if (viewMode === 'terminal') params.set('view', 'terminal');
+    const query = params.toString();
+    const url = `/popout/conversation/${conversation.id}${query ? `?${query}` : ''}`;
+    window.open(url, '_blank', 'popup=yes,width=920,height=1040');
+  }, [conversation.id, viewMode]);
 
   const openHandoffDoc = useCallback(() => {
     window.open(`/api/conversations/${encodeURIComponent(conversation.name)}/handoff-doc`, '_blank', 'noopener,noreferrer');

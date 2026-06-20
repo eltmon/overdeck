@@ -186,7 +186,7 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 <button
                   role="menuitem"
                   className={styles.headerMenuItem}
-                  onClick={() => { window.open(`/conv/${conversation.id}`, '_blank', 'popup=yes,width=920,height=1040'); onClose(); }}
+                  onClick={() => { window.open(`/popout/conversation/${conversation.id}`, '_blank', 'popup=yes,width=920,height=1040'); onClose(); }}
                 >
                   <ExternalLink size={14} />
                   Pop out to window
