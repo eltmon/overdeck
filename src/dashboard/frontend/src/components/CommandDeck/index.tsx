@@ -26,6 +26,7 @@ import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 import { getDirectRestartRequest } from '../../lib/restartRouting';
+import { useConfirm } from '../DialogProvider';
 import { WS_METHODS } from '@overdeck/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
@@ -389,6 +390,11 @@ export function CommandDeck({
   // panes to the issue's workspace agent (PAN-1561).
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
 
+  // PAN-1985: confirmation for the destructive harness/model switch paths on
+  // work and review sessions. Resumed sessions (no model/harness change) skip
+  // the dialog.
+  const confirm = useConfirm();
+
   // Map aggregated costs per issue for the project tree sidebar and project overview.
   const { issueCosts, issueCostDetails } = useMemo(() => {
     const costs: Record<string, number> = {};
@@ -716,8 +722,54 @@ export function CommandDeck({
           tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
         )?.[0];
 
+      // PAN-1985: detect whether this picker click is actually changing the
+      // work agent's harness or model, so we can route to the wipe+respawn
+      // path instead of the cheap resume path. Same-harness, no-model
+      // selections ("Default role config") keep the resume-first behavior;
+      // any explicit harness or model change goes through the destructive
+      // restart-fresh route after a typed confirmation.
+      const isWorkSession = !sessionType || sessionType === 'work';
+      const currentAgent = isWorkSession
+        ? (agents as unknown as Agent[]).find((a) => a.id === sessionId)
+        : undefined;
+      const currentHarness = currentAgent?.harness ?? undefined;
+      const currentModel = currentAgent?.model ?? undefined;
+      const harnessIsChanging = isWorkSession
+        && harness !== undefined
+        && harness !== currentHarness
+        && currentHarness !== undefined;
+      const modelIsChanging = isWorkSession
+        && model !== undefined
+        && model !== currentModel
+        && currentModel !== undefined
+        && !harnessIsChanging; // harness change implies model change too
+      const isDestructiveWorkChange = harnessIsChanging || modelIsChanging;
+      const isDestructiveReview = sessionType === 'review' || sessionType === 'reviewer';
+
+      if (isDestructiveWorkChange || isDestructiveReview) {
+        const confirmTitle = isDestructiveReview
+          ? 'Restart review with new harness/model'
+          : 'Restart work agent with new harness/model';
+        const reviewMessage = `This will delete the review agent's state for ${issueId} (sessions, activity, logs) and start a fresh review run with the chosen harness/model.\n\nThe workspace, vBRIEF, beads, and commit history are kept. The review will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model or force-restarting the review.`;
+        const workMessage = `This will delete the work agent's state for ${issueId} (sessions, activity, logs) and start a fresh ${harness ?? currentHarness ?? ''} + ${model ?? currentModel ?? ''} agent.\n\nThe workspace, vBRIEF, beads, and commit history are kept. The new agent will read .pan/continue.json and the branch to continue. The agent will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model.`;
+        const confirmed = await confirm({
+          title: confirmTitle,
+          message: isDestructiveReview ? reviewMessage : workMessage,
+          confirmLabel: isDestructiveReview ? 'Restart review' : 'Restart work agent',
+          variant: 'destructive',
+        });
+        if (!confirmed) {
+          toast.info('Restart canceled');
+          return;
+        }
+      }
+
       const directRestartRequest = getDirectRestartRequest({ projectKey, issueId, sessionId, sessionType, role, model, harness });
-      if (directRestartRequest) {
+      if (directRestartRequest && !isDestructiveWorkChange) {
+        // Note: isDestructiveWorkChange is false here because it's a work
+        // session, but we still gate the direct path to avoid double-routing
+        // in the rare case a future change makes getDirectRestartRequest
+        // return for work sessions too.
         const res = await fetch(directRestartRequest.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -726,6 +778,35 @@ export function CommandDeck({
         const data = await res.json().catch(() => ({})) as { error?: string };
         if (!res.ok) throw new Error(data.error || directRestartRequest.errorMessage);
         toast.success(directRestartRequest.successMessage);
+        await refreshDashboardState(queryClient);
+        return;
+      }
+
+      // PAN-1985: destructive work-agent change. Wipe the work agent dir and
+      // respawn a fresh agent with the chosen harness/model. The user has
+      // already confirmed; do not fall through to the cheap resume path.
+      if (isDestructiveWorkChange) {
+        const restartFreshRes = await fetch(`/api/agents/${sessionId}/restart-fresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            spawn: true,
+            ...(model ? { model } : {}),
+            ...(harness ? { harness } : {}),
+          }),
+        });
+        const restartFreshData = await restartFreshRes.json().catch(() => ({})) as {
+          success?: boolean;
+          error?: string;
+          spawnedModel?: string;
+          spawnedHarness?: string;
+        };
+        if (!restartFreshRes.ok) {
+          throw new Error(restartFreshData.error || 'Failed to restart agent with new harness/model');
+        }
+        toast.success(
+          `Agent restarted: ${restartFreshData.spawnedHarness ?? harness} + ${restartFreshData.spawnedModel ?? model}`,
+        );
         await refreshDashboardState(queryClient);
         return;
       }
@@ -809,7 +890,7 @@ export function CommandDeck({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to restart session');
     }
-  }, [queryClient, projectsWithSessions, sessionTreeMap]);
+  }, [queryClient, projectsWithSessions, sessionTreeMap, confirm, agents]);
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
