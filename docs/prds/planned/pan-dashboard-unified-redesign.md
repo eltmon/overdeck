@@ -1,7 +1,7 @@
 # Overdeck Dashboard — Unified Redesign
 
 > **Status:** Design complete · Awaiting PAN issue · Author: Opus 4.7 pass · 2026-05-16
-> **Mockups (canonical):** [`docs/design/mockups/system-map-opus.html`](../../design/mockups/system-map-opus.html) (entry point — links to all five surface mocks)
+> **Mockups (canonical):** [`design/style-guide/mockups/system-map.html`](../../../design/style-guide/mockups/system-map.html) (entry point — links to all five surface mocks)
 > **Style guide:** [`design/style-guide/STYLE-GUIDE.md`](../../../design/style-guide/STYLE-GUIDE.md)
 
 ---
@@ -87,12 +87,12 @@ System
 
 | Surface | Mockup file | Notes |
 |---|---|---|
-| Pipeline | [`pipeline-cross-project-opus.html`](../../design/mockups/pipeline-cross-project-opus.html) | Default landing |
-| Board | [`board-opus.html`](../../design/mockups/board-opus.html) | Replaces today's kanban |
-| Command Deck | [`pipeline-command-deck-opus.html`](../../design/mockups/pipeline-command-deck-opus.html) | Tree + drilldown |
-| Agents | [`agents-opus.html`](../../design/mockups/agents-opus.html) | Replaces `AgentList` + `GodView` grid |
-| Issue Detail | [`issue-detail-opus.html`](../../design/mockups/issue-detail-opus.html) | Shared slide-out shell |
-| System map | [`system-map-opus.html`](../../design/mockups/system-map-opus.html) | Documents the whole IA |
+| Pipeline | [`pipeline.html`](../../../design/style-guide/mockups/pipeline.html) | Default landing |
+| Board | [`board.html`](../../../design/style-guide/mockups/board.html) | Replaces today's kanban |
+| Command Deck | [`command-deck.html`](../../../design/style-guide/mockups/command-deck.html) | Tree + drilldown |
+| Agents | [`agents.html`](../../../design/style-guide/mockups/agents.html) | Replaces `AgentList` + `GodView` grid |
+| Issue Detail | [`issue-detail.html`](../../../design/style-guide/mockups/issue-detail.html) | Shared slide-out shell |
+| System map | [`system-map.html`](../../../design/style-guide/mockups/system-map.html) | Documents the whole IA |
 
 The mocks are the binding visual spec. Where this PRD and a mock disagree, the **mock wins for visual layout**; the **PRD wins for behavior and data contracts**.
 

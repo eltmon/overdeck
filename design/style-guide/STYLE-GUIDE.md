@@ -9,7 +9,7 @@
 
 This is the canonical reference for all Overdeck dashboard UI decisions. Every new feature and every existing component must conform to this guide. If something isn't covered here, look at T3Code's implementation first, then ask.
 
-**Visual reference:** [`docs/design/mockups/system-map-opus.html`](../../docs/design/mockups/system-map-opus.html) — the PAN-1148 unified-redesign system map. Section **05 · Color discipline** renders the signal-color table below as live swatches with where-used examples; sections 03 (shared primitives) and 02 (the five surfaces) show the components of this guide composed in context. The written counterpart of section 05 is [`docs/prds/planned/pan-dashboard-unified-redesign.md`](../../docs/prds/planned/pan-dashboard-unified-redesign.md) §4.5 "Color & Style Discipline". Conformance is exercised by `tests/e2e/styleguide-conformance.spec.ts`.
+**Visual reference:** [`design/style-guide/mockups/system-map.html`](mockups/system-map.html) — the PAN-1148 unified-redesign system map. Section **05 · Color discipline** renders the signal-color table below as live swatches with where-used examples; sections 03 (shared primitives) and 02 (the five surfaces) show the components of this guide composed in context. The written counterpart of section 05 is [`docs/prds/planned/pan-dashboard-unified-redesign.md`](../../docs/prds/planned/pan-dashboard-unified-redesign.md) §4.5 "Color & Style Discipline". Conformance is exercised by `tests/e2e/styleguide-conformance.spec.ts`.
 
 ---
 

@@ -1,5 +1,5 @@
 /* Shared design tokens + primitives for the Opus pipeline redesign.
-   Imported by every *-opus.html mock so they stay visually unified. */
+   Imported by every mock so they stay visually unified. */
 
 /* Scoped to html:not(.light) so this dark-by-default mockup theme does not
    override the Mintlify docs site when it sets class="light" on <html>. */

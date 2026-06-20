@@ -29,7 +29,7 @@ allowed-tools:
 1. **The law:** `design/style-guide/STYLE-GUIDE.md` (v1.2) — typography canon,
    color system, surfaces, radius/spacing scales, component specs, forbidden
    patterns. Everything below is a distillation; when in doubt, the guide wins.
-2. **Visual reference:** `docs/design/mockups/system-map-opus.html` — open in a
+2. **Visual reference:** `design/style-guide/mockups/system-map.html` — open in a
    browser. Section **05 · Color discipline** is the signal-color table as live
    swatches; sections 02–03 show the surfaces and shared primitives composed.
 3. **Written tightening:** `docs/prds/planned/pan-dashboard-unified-redesign.md`
