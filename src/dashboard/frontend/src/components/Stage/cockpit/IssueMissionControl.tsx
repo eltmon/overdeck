@@ -23,11 +23,12 @@ import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
-import { ProjectNode, type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
+import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import type { PaneType } from '../../../lib/panesStore'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
+import { AgentsLane } from './AgentsLane'
 import { BeadsRail } from './BeadsRail'
 import { ReviewVerificationCard } from './ReviewVerificationCard'
 import { StatusHistoryTab } from './StatusHistoryTab'
@@ -594,20 +595,18 @@ function IssueTreeLane({
   issueId,
   title,
   projectName,
-  selectedIssue,
   selectedSessionId,
-  onSelectIssue,
   onSelectSession,
   onSessionsChange,
+  onOpenVerification,
 }: {
   issueId: string
   title: string
   projectName?: string
-  selectedIssue: boolean
   selectedSessionId: string | null
-  onSelectIssue: () => void
   onSelectSession: (session: SessionNode) => void
   onSessionsChange: (sessions: readonly SessionNode[]) => void
+  onOpenVerification: () => void
 }) {
   const review = useReviewStatusQuery(issueId)
   const activity = useActivityQuery(issueId)
@@ -705,18 +704,14 @@ function IssueTreeLane({
           </button>
         </div>
       ) : null}
-      <ProjectNode
-        name={projectName ?? 'Project'}
-        features={[feature]}
-        selectedFeature={selectedIssue ? issueId : null}
-        selectedProject={projectName ?? 'Project'}
-        onSelectFeature={onSelectIssue}
+      <AgentsLane
+        issueId={issueId}
+        sessions={renderedSessions}
+        feature={feature}
+        branch={feature.branch || `feature/${issueId.toLowerCase()}`}
         selectedSessionId={selectedSessionId}
-        onSelectSession={(_, sessionId) => {
-          const session = renderedSessions.find((candidate) => candidate.sessionId === sessionId)
-          if (session) onSelectSession(session)
-        }}
-        filter="all"
+        onSelectSession={onSelectSession}
+        onOpenVerification={onOpenVerification}
       />
     </aside>
   )
@@ -1091,11 +1086,10 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           issueId={issueId}
           title={title}
           projectName={projectName}
-          selectedIssue={treeContext === 'issue'}
           selectedSessionId={selectedTreeSession?.sessionId ?? null}
-          onSelectIssue={selectIssueFromTree}
           onSelectSession={selectSessionFromTree}
           onSessionsChange={recordTreeSessions}
+          onOpenVerification={() => selectTab('review')}
         />
         <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
           <nav className="flex flex-wrap gap-1 border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">

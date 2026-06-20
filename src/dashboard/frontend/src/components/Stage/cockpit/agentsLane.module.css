@@ -1,0 +1,72 @@
+/* AgentsLane (PAN-1991 item #2) — the cockpit's left lane: clean two-line agent
+ * rows + convoy nesting + Verification as a step. Cockpit-only; the shared
+ * ProjectNode (and the Command Deck sidebar tree it renders) is untouched.
+ *
+ * Two-line row: line 1 = name + status (right); line 2 = model (mono, left,
+ * forms a column) + sub/time (right). Uniform 18px icon tile so names align. */
+
+.header {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted-foreground); padding: 8px 8px 6px; display: flex; gap: 6px;
+}
+.header .n { margin-left: auto; }
+
+.row {
+  display: flex; gap: 8px; align-items: flex-start; width: 100%;
+  text-align: left; padding: 7px 7px; border-radius: 10px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  font: inherit; color: inherit;
+}
+.row:hover { background: var(--accent); }
+.row.sel { background: var(--card); border-color: var(--border); }
+.row.child { margin-left: 16px; }
+
+.caret { width: 10px; flex: none; margin-top: 3px; color: var(--muted-foreground); display: grid; place-items: center; }
+.caretBtn { background: none; border: none; padding: 0; cursor: pointer; color: inherit; display: grid; place-items: center; }
+
+.tile {
+  width: 18px; height: 18px; border-radius: 6px; flex: none; margin-top: 1px;
+  display: grid; place-items: center; border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.tile svg { width: 11px; height: 11px; }
+.tile.work { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+.tile.review { color: var(--signal-review-foreground); border-color: color-mix(in srgb, var(--signal-review) 32%, transparent); background: color-mix(in srgb, var(--signal-review) 8%, transparent); }
+.tile.ver { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
+.tile.ok { color: #fff; background: var(--success); border-color: var(--success); }
+.tile.bad { color: #fff; background: var(--destructive); border-color: var(--destructive); }
+.tile.pending { color: var(--muted-foreground); }
+
+.body { flex: 1; min-width: 0; }
+.l1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { font-size: 10px; white-space: nowrap; flex: none; }
+.status.info { color: var(--info-foreground); }
+.status.ok { color: var(--success-foreground); }
+.status.bad { color: var(--destructive-foreground); }
+.status.muted { color: var(--muted-foreground); }
+.l2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.model { font-family: var(--mono); font-size: 10px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 10px; color: var(--muted-foreground); white-space: nowrap; flex: none; }
+
+.pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--info); position: relative; display: inline-block; }
+.pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--info) 60%, transparent); animation: agentsLanePulse 1.6s ease-out infinite; }
+@keyframes agentsLanePulse { 0% { transform: scale(0.6); opacity: 0.9; } 100% { transform: scale(1.7); opacity: 0; } }
+
+/* resources summary (compact; full actions live in the sidebar + arrive in the Stack drawer, item #8) */
+.resources { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 4px; }
+.resToggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px;
+  border-radius: 9px; border: none; background: none; cursor: pointer;
+  font: inherit; color: var(--muted-foreground); font-size: 11px;
+}
+.resToggle:hover { background: var(--accent); }
+.resToggle .sum { margin-left: auto; font-size: 10px; }
+.resList { padding: 2px 6px 6px; }
+.resRow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 11px; color: var(--foreground); }
+.resRow .ri { width: 13px; height: 13px; flex: none; color: var(--muted-foreground); }
+.resRow .rmeta { margin-left: auto; font-size: 10px; color: var(--muted-foreground); font-family: var(--mono); }
+.resRow .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.resRow .dot.ok { background: var(--success); }
+.resRow .dot.off { background: var(--muted-foreground); }
+.resSub { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); padding: 7px 6px 2px; }
