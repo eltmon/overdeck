@@ -88,8 +88,8 @@ async function simulateNew(body: {
   parentDir?: unknown;
   name?: unknown;
 }): Promise<{ status: number; json: Record<string, unknown> }> {
-  const { isAbsolute, join: pathJoin, sep } = await import('node:path');
-  const { access, mkdir, readdir, realpath } = await import('node:fs/promises');
+  const { isAbsolute, join: pathJoin, sep, resolve: pathResolve, normalize: pathNormalize } = await import('node:path');
+  const { mkdir, readdir, realpath, lstat } = await import('node:fs/promises');
   const { homedir } = await import('node:os');
   const { exec } = await import('node:child_process');
   const { promisify } = await import('node:util');
@@ -119,34 +119,61 @@ async function simulateNew(body: {
     return { status: 409, json: { error: `project key '${key}' is already registered` } };
   }
 
-  // Home-boundary check (mirrors routes/projects.ts buildHomeGuard).
+  // Lexical pre-check on parentDir before any fs writes (handles non-existent parents safely).
+  const rawParentLexical = pathResolve(pathNormalize(rawParent));
+  const homeLex = pathResolve(pathNormalize(homedir()));
+  const lexicallyWithinHome =
+    rawParentLexical === homeLex ||
+    rawParentLexical.startsWith(homeLex.endsWith(sep) ? homeLex : `${homeLex}${sep}`);
+  if (!lexicallyWithinHome) {
+    return { status: 400, json: { error: 'parentDir is outside home directory' } };
+  }
+
+  // Create parentDir if it doesn't exist (supports ~/Overdeck default on fresh machines).
+  await mkdir(rawParent, { recursive: true });
+
+  // Home-boundary check (mirrors routes/projects.ts buildHomeGuard — rejects symlink escapes).
   const home = homedir();
   let ch: string;
   try { ch = await realpath(home); } catch { ch = home; }
   const withinHome = (p: string) => p === ch || p.startsWith(ch.endsWith(sep) ? ch : `${ch}${sep}`);
   let canonicalParent: string;
   try { canonicalParent = await realpath(rawParent); }
-  catch { return { status: 400, json: { error: 'parentDir does not exist' } }; }
+  catch { return { status: 500, json: { error: 'parentDir could not be resolved' } }; }
   if (!withinHome(canonicalParent)) {
     return { status: 400, json: { error: 'parentDir is outside home directory' } };
   }
 
   const target = pathJoin(canonicalParent, key);
 
-  let targetExists = false;
-  try { await access(target); targetExists = true; } catch { /* ok */ }
-  if (targetExists) {
+  // Inspect target before mkdir: reject symlinks; reject non-empty existing directories.
+  try {
+    const targetStat = await lstat(target);
+    if (targetStat.isSymbolicLink()) {
+      return { status: 400, json: { error: `target path is a symlink: ${target}` } };
+    }
     const entries = await readdir(target).catch(() => []);
     if (entries.length > 0) {
       return { status: 409, json: { error: `target directory already exists and is non-empty: ${target}` } };
     }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    // ENOENT means target doesn't exist yet — proceed.
   }
 
+  // Create target and verify canonical path is within home (catches symlink components in path).
   await mkdir(target, { recursive: true });
-  await execAsync('git init', { cwd: target });
+  let canonicalTarget: string;
+  try { canonicalTarget = await realpath(target); }
+  catch { return { status: 500, json: { error: 'target path could not be resolved after creation' } }; }
+  if (!withinHome(canonicalTarget)) {
+    return { status: 400, json: { error: 'target path resolves outside home directory' } };
+  }
+
+  await execAsync('git init', { cwd: canonicalTarget });
 
   try {
-    const result = await registerProjectFromPath({ path: target, name });
+    const result = await registerProjectFromPath({ path: canonicalTarget, name });
     return { status: 200, json: { key: result.key, name: result.config.name, path: result.config.path } };
   } catch (err) {
     if (err instanceof DuplicateProjectError) {
@@ -286,6 +313,41 @@ describe("POST /api/projects mode='new'", () => {
     } finally {
       const { rmSync } = await import('node:fs');
       rmSync(outsideParent, { recursive: true, force: true });
+    }
+  });
+
+  it('creates ~/Overdeck parent automatically when it does not yet exist', async () => {
+    // The default new-project flow targets ~/Overdeck which may not exist on a fresh machine.
+    const missingParent = join(TEST_HOME, 'Overdeck');
+    // Ensure it doesn't exist before the call.
+    const { rmSync: rm } = await import('node:fs');
+    rm(missingParent, { recursive: true, force: true });
+    expect(existsSync(missingParent)).toBe(false);
+
+    const res = await simulateNew({ parentDir: missingParent, name: 'bugs' });
+    expect(res.status).toBe(200);
+    expect(res.json.key).toBe('bugs');
+    expect(res.json.path).toBe(join(missingParent, 'bugs'));
+    expect(existsSync(join(missingParent, 'bugs', '.git'))).toBe(true);
+  });
+
+  it('rejects a target that is a symlink pointing outside home (symlink target escape regression)', async () => {
+    const { symlinkSync, mkdirSync: mkd } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const outsideDir = join(tmpdir(), `mode-new-outside-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    mkd(outsideDir, { recursive: true });
+    const parentDir = join(TEST_HOME, 'parent-symlink');
+    mkdirSync(parentDir, { recursive: true });
+    const linkTarget = join(parentDir, 'escape');
+    symlinkSync(outsideDir, linkTarget);
+    try {
+      // With name='escape', key='escape', target = join(parentDir, 'escape') → a symlink outside home.
+      const res = await simulateNew({ parentDir, name: 'escape' });
+      expect(res.status).toBe(400);
+      expect(res.json.error).toMatch(/symlink/i);
+    } finally {
+      const { rmSync: rs } = await import('node:fs');
+      rs(outsideDir, { recursive: true, force: true });
     }
   });
 });

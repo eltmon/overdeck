@@ -707,25 +707,37 @@ const postProjectsRoute = HttpRouter.add(
       }
 
       return yield* Effect.promise(async () => {
-        // Canonicalize parentDir and enforce home-directory boundary (rejects symlink escapes).
+        // Lexical pre-check on parentDir before any fs writes (handles non-existent parents safely).
+        const rawParentLexical = resolve(normalize(rawParent));
+        const homeLex = resolve(normalize(homedir()));
+        const lexicallyWithinHome =
+          rawParentLexical === homeLex ||
+          rawParentLexical.startsWith(homeLex.endsWith(sep) ? homeLex : `${homeLex}${sep}`);
+        if (!lexicallyWithinHome) {
+          return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
+        }
+
+        // Create parentDir if it doesn't exist (supports ~/Overdeck default on fresh machines).
+        await mkdir(rawParent, { recursive: true });
+
+        // Canonicalize and enforce home-directory boundary (rejects symlink escapes in parent).
         const withinHome = await buildHomeGuard();
         let canonicalParent: string;
         try { canonicalParent = await realpath(rawParent); }
-        catch { return jsonResponse({ error: 'parentDir does not exist' }, { status: 400 }); }
+        catch { return jsonResponse({ error: 'parentDir could not be resolved' }, { status: 500 }); }
         if (!withinHome(canonicalParent)) {
           return jsonResponse({ error: 'parentDir is outside home directory' }, { status: 400 });
         }
 
         const target = join(canonicalParent, key);
 
-        // If target exists and is non-empty, reject with no fs change.
-        let targetExists = false;
+        // Inspect target before mkdir: reject symlinks (would let git-init escape home).
         try {
-          await access(target);
-          targetExists = true;
-        } catch { /* target doesn't exist yet */ }
-
-        if (targetExists) {
+          const targetStat = await import('node:fs/promises').then(m => m.lstat(target));
+          if (targetStat.isSymbolicLink()) {
+            return jsonResponse({ error: `target path is a symlink: ${target}` }, { status: 400 });
+          }
+          // Target exists and is a real directory — reject if non-empty.
           const entries = await readdir(target).catch(() => []);
           if (entries.length > 0) {
             return jsonResponse(
@@ -733,14 +745,24 @@ const postProjectsRoute = HttpRouter.add(
               { status: 409 },
             );
           }
+        } catch (e) {
+          if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+          // ENOENT means target doesn't exist yet — proceed.
         }
 
-        // Create directory and git-init.
+        // Create directory and verify the canonical target is within home (catches symlink components).
         await mkdir(target, { recursive: true });
-        await execAsync('git init', { cwd: target });
+        let canonicalTarget: string;
+        try { canonicalTarget = await realpath(target); }
+        catch { return jsonResponse({ error: 'target path could not be resolved after creation' }, { status: 500 }); }
+        if (!withinHome(canonicalTarget)) {
+          return jsonResponse({ error: 'target path resolves outside home directory' }, { status: 400 });
+        }
+
+        await execAsync('git init', { cwd: canonicalTarget });
 
         try {
-          const result = await registerProjectFromPath({ path: target, name });
+          const result = await registerProjectFromPath({ path: canonicalTarget, name });
           return jsonResponse({ key: result.key, name: result.config.name, path: result.config.path });
         } catch (err) {
           if (err instanceof DuplicateProjectError) {
