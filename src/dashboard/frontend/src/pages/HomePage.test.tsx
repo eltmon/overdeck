@@ -80,6 +80,27 @@ function resetDashboardStore() {
   });
 }
 
+/** URL-routed fetch stub for Home. Every Home query gets a valid response by
+ *  default (empty project list, empty registry, zero cost); per-test overrides
+ *  swap in specific bodies or error Responses. PAN-1969 added the
+ *  `command-deck-projects` query, so a catch-all stub no longer suffices. */
+function homeFetchStub(overrides: Record<string, unknown> = {}): typeof fetch {
+  const routes: Record<string, unknown> = {
+    '/api/registry/features': { entries: [] },
+    '/api/metrics/summary': { today: { totalCost: 0 } },
+    '/api/issues/resource-allocated': [],
+    '/api/registered-projects': [],
+    ...overrides,
+  };
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const match = routes[url];
+    if (match instanceof Response) return match;
+    if (match !== undefined) return Response.json(match);
+    return Response.json({ entries: [] });
+  }) as unknown as typeof fetch;
+}
+
 function renderHomePage(props: Parameters<typeof HomePage>[0] = {}) {
   const client = new QueryClient({
     defaultOptions: {
@@ -112,11 +133,7 @@ function summaryCard(label: string): HTMLElement {
 
 describe('HomePage', () => {
   it('renders header summary cards from live read-model and metrics state', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === '/api/metrics/summary') return Response.json({ today: { totalCost: 12.345 } });
-      return Response.json({ entries: [] });
-    }));
+    vi.stubGlobal('fetch', homeFetchStub({ '/api/metrics/summary': { today: { totalCost: 12.345 } } }));
     useDashboardStore.setState({
       agentsById: {
         running: makeAgent({ id: 'running', status: 'running' }),
@@ -145,11 +162,7 @@ describe('HomePage', () => {
   });
 
   it('renders cost as unavailable when metrics summary is absent', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === '/api/metrics/summary') return new Response(null, { status: 500 });
-      return Response.json({ entries: [] });
-    }));
+    vi.stubGlobal('fetch', homeFetchStub({ '/api/metrics/summary': new Response(null, { status: 500 }) }));
 
     renderHomePage();
 
@@ -158,7 +171,7 @@ describe('HomePage', () => {
   });
 
   it('renders workspace status cards from read-model memory state', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    vi.stubGlobal('fetch', homeFetchStub());
     const onOpenWorkspaceHome = vi.fn();
     useDashboardStore.setState({
       issuesRaw: [{ identifier: 'PAN-1204', title: 'Build Home', description: 'Render Home workspace list' }],
@@ -182,7 +195,7 @@ describe('HomePage', () => {
   });
 
   it('shows a workspace empty state when memory state is absent', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    vi.stubGlobal('fetch', homeFetchStub());
     useDashboardStore.setState({
       agentsById: { 'agent-stopped': { id: 'agent-stopped', issueId: 'PAN-999', status: 'stopped' } },
     });
@@ -194,7 +207,7 @@ describe('HomePage', () => {
   });
 
   it('renders actionable observations in PRD time buckets newest-first', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    vi.stubGlobal('fetch', homeFetchStub());
     useDashboardStore.setState({
       observationsByIssueId: {
         'PAN-1204': [
@@ -226,7 +239,7 @@ describe('HomePage', () => {
   });
 
   it('renders activity observation identity, summary, narrative, files, and tags', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    vi.stubGlobal('fetch', homeFetchStub());
     useDashboardStore.setState({
       observationsByIssueId: {
         'PAN-1204': [makeObservation({
@@ -255,7 +268,7 @@ describe('HomePage', () => {
   });
 
   it('shows an activity empty state when no actionable observations exist', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    vi.stubGlobal('fetch', homeFetchStub());
 
     renderHomePage();
 
@@ -264,7 +277,7 @@ describe('HomePage', () => {
   });
 
   it('renders Knowledge Registry rows from the dashboard API', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [makeEntry()] })));
+    vi.stubGlobal('fetch', homeFetchStub({ '/api/registry/features': { entries: [makeEntry()] } }));
 
     renderHomePage();
 
@@ -278,7 +291,7 @@ describe('HomePage', () => {
   });
 
   it('points users to registry tagging when no features are registered', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ entries: [] })));
+    vi.stubGlobal('fetch', homeFetchStub());
 
     renderHomePage();
 
@@ -288,15 +301,52 @@ describe('HomePage', () => {
   });
 
   it('localizes registry loading errors to the registry card', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === '/api/registry/features') return new Response(null, { status: 500 });
-      return Response.json({ today: { totalCost: 0 } });
-    }));
+    vi.stubGlobal('fetch', homeFetchStub({ '/api/registry/features': new Response(null, { status: 500 }) }));
 
     renderHomePage();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Knowledge Registry could not be loaded. The rest of Home is still available.');
     expect(screen.getByText('System briefing')).toBeInTheDocument();
+  });
+
+  it('lists registered projects and opens the project deck on click (PAN-1969)', async () => {
+    vi.stubGlobal('fetch', homeFetchStub({
+      '/api/registered-projects': [{ key: 'overdeck', name: 'overdeck', path: '/home/eltmon/Projects/overdeck' }],
+    }));
+    const onSelectProject = vi.fn();
+
+    renderHomePage({ onSelectProject });
+
+    const projectButton = await screen.findByTestId('home-project-overdeck');
+    expect(projectButton).toHaveTextContent('overdeck');
+
+    fireEvent.click(projectButton);
+    expect(onSelectProject).toHaveBeenCalledWith('overdeck');
+  });
+
+  it('shows a no-projects empty state with a new-project CTA (PAN-1969)', async () => {
+    vi.stubGlobal('fetch', homeFetchStub());
+    const onNewProject = vi.fn();
+
+    renderHomePage({ onNewProject });
+
+    const empty = await screen.findByTestId('home-projects-empty');
+    expect(empty).toHaveTextContent('No projects yet.');
+    expect(empty).toHaveTextContent('Create your first project to get started.');
+
+    fireEvent.click(screen.getByTestId('home-new-project-empty'));
+    expect(onNewProject).toHaveBeenCalled();
+  });
+
+  it('localizes project loading errors to the projects section (PAN-1969)', async () => {
+    vi.stubGlobal('fetch', homeFetchStub({
+      '/api/issues/resource-allocated': new Response(null, { status: 500 }),
+    }));
+
+    renderHomePage();
+
+    const section = await screen.findByTestId('home-projects');
+    const alert = await within(section).findByRole('alert');
+    expect(alert).toHaveTextContent('Projects could not be loaded. The rest of Home is still available.');
   });
 });

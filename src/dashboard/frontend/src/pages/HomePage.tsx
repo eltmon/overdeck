@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AgentSnapshot, FeatureRegistryEntry, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
+import { fetchProjects, type ProjectData } from '../components/CommandDeck/projectsData';
 import { useDashboardStore } from '../lib/store';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
@@ -36,6 +37,8 @@ interface HomePageProps {
   onOpenWorkspaceHome?: (issueId: string) => void;
   /** PAN-1970: open the New Project modal. */
   onNewProject?: () => void;
+  /** PAN-1969: open a registered project's deck (same path as the sidebar). */
+  onSelectProject?: (projectName: string) => void;
   now?: Date;
 }
 
@@ -85,7 +88,7 @@ async function fetchMetricsSummary(): Promise<MetricsSummaryResponse> {
   return response.json() as Promise<MetricsSummaryResponse>;
 }
 
-export function HomePage({ onOpenWorkspaceHome, onNewProject, now }: HomePageProps = {}) {
+export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, now }: HomePageProps = {}) {
   const registryQuery = useQuery({
     queryKey: ['feature-registry'],
     queryFn: fetchFeatureRegistry,
@@ -98,6 +101,13 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, now }: HomePagePro
     staleTime: 30_000,
     retry: false,
   });
+  const projectsQuery = useQuery({
+    queryKey: ['command-deck-projects'],
+    queryFn: fetchProjects,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const projects: ProjectData[] = projectsQuery.data ?? [];
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
   const statusByIssueId = useDashboardStore((state) => state.statusByIssueId);
   const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
@@ -203,13 +213,13 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, now }: HomePagePro
           </div>
         </section>
 
-        {onNewProject && (
-          <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="home-projects-title">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 id="home-projects-title" className="text-lg font-semibold text-foreground">Projects</h2>
-                <p className="text-sm text-muted-foreground">Register a local directory as a project.</p>
-              </div>
+        <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="home-projects-title" data-testid="home-projects">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 id="home-projects-title" className="text-lg font-semibold text-foreground">Projects</h2>
+              <p className="text-sm text-muted-foreground">Your registered projects — click one to open its deck.</p>
+            </div>
+            {onNewProject && (
               <button
                 data-testid="home-new-project"
                 onClick={onNewProject}
@@ -217,9 +227,58 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, now }: HomePagePro
               >
                 + New project
               </button>
-            </div>
-          </section>
-        )}
+            )}
+          </div>
+
+          <div className="mt-4">
+            {projectsQuery.isLoading ? (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">Loading projects…</div>
+            ) : projectsQuery.isError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive" role="alert">
+                Projects could not be loaded. The rest of Home is still available.
+              </div>
+            ) : projects.length > 0 ? (
+              <ul className="divide-y divide-border rounded-lg border border-border">
+                {projects.map((project) => {
+                  const hasActivity = project.features.length > 0;
+                  return (
+                    <li key={project.path}>
+                      <button
+                        data-testid={`home-project-${project.name}`}
+                        onClick={() => onSelectProject?.(project.name)}
+                        title={project.path}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                      >
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${hasActivity ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{project.name}</span>
+                        {hasActivity && (
+                          <span className="ml-auto text-xs text-muted-foreground">{project.features.length}</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div data-testid="home-projects-empty" className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">No projects yet.</p>
+                <p className="mt-1">Create your first project to get started.</p>
+                {onNewProject && (
+                  <button
+                    data-testid="home-new-project-empty"
+                    onClick={onNewProject}
+                    className="mt-3 rounded-lg border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+                  >
+                    + New project
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
