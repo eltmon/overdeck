@@ -49,6 +49,7 @@ import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.j
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
+import { reviewResumeDecision } from './review-resume-decision.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import { getAgentStateSync } from '../agents.js';
@@ -298,7 +299,7 @@ function buildSelfReviewPrompt(opts: {
   allowHost?: boolean;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentState, spawnRun } = await import('../agents.js');
+    const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -330,6 +331,40 @@ function buildSelfReviewPrompt(opts: {
       contextManifestPath: opts.contextManifestPath,
       tier1Summary,
     }));
+
+    // PAN-1862: convoy sub-reviewers RESUME by default too — same rule as quick review. Each
+    // lane keeps its prior round's context so a re-review checks the fix instead of re-reading
+    // the whole diff. Fresh-spawn only on a harness/model change or when no session exists.
+    const reviewerAgent = reviewerAgentId(opts.issueId, opts.subRole);
+    const savedReviewer = getAgentStateSync(reviewerAgent);
+    const canResumeReviewer = reviewResumeDecision({
+      requestedModel: opts.model ?? model,
+      requestedHarness: opts.harness,
+      savedModel: savedReviewer?.model,
+      savedHarness: savedReviewer?.harness,
+      hasSavedState: !!savedReviewer,
+      hasSavedSession: !!getLatestSessionIdSync(reviewerAgent),
+    });
+    if (canResumeReviewer) {
+      console.log(`[review-agent] Resuming convoy sub-reviewer ${opts.subRole} for ${opts.issueId} — preserving context (PAN-1862)`);
+      const resumeResult = await resumeAgent(reviewerAgent, prompt);
+      if (resumeResult.success) {
+        try {
+          const resumed = getAgentStateSync(reviewerAgent);
+          if (resumed) {
+            resumed.reviewSubRole = opts.subRole;
+            resumed.reviewRunId = opts.runId;
+            resumed.reviewOutputPath = outputPath;
+            resumed.reviewSynthesisAgentId = synthesisAgentId;
+            resumed.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
+            await Effect.runPromise(saveAgentState(resumed));
+          }
+        } catch { /* non-fatal */ }
+        return { success: true, message: `Review ${opts.subRole} resumed (session preserved): ${reviewerAgent}`, sessionId: reviewerAgent };
+      }
+      console.warn(`[review-agent] Convoy sub-reviewer ${opts.subRole} resume failed; falling back to a fresh session: ${resumeResult.error}`);
+    }
+
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       subRole: opts.subRole,
@@ -553,9 +588,14 @@ function buildSelfReviewPrompt(opts: {
     // resilient (supervisor → tmux fallback, PAN-1988).
     const reviewAgentId = `agent-${opts.issueId.toLowerCase()}-review`;
     const savedReview = getAgentStateSync(reviewAgentId);
-    const reviewModelChanged = !!opts.model && !!savedReview?.model && opts.model !== savedReview.model;
-    const reviewHarnessChanged = !!opts.harness && !!savedReview?.harness && opts.harness !== savedReview.harness;
-    const canResumeReview = !!savedReview && !!getLatestSessionIdSync(reviewAgentId) && !reviewModelChanged && !reviewHarnessChanged;
+    const canResumeReview = reviewResumeDecision({
+      requestedModel: opts.model,
+      requestedHarness: opts.harness,
+      savedModel: savedReview?.model,
+      savedHarness: savedReview?.harness,
+      hasSavedState: !!savedReview,
+      hasSavedSession: !!getLatestSessionIdSync(reviewAgentId),
+    });
     if (canResumeReview) {
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
       const resumeResult = await resumeAgent(reviewAgentId, prompt);
@@ -812,6 +852,10 @@ export const killAllReviewerSessions = (
  */
 export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
   Effect.promise(() => killAllReviewSessionsPromise());
+
+// PAN-1862 resume-vs-fresh decision lives in its own pure module (review-resume-decision.ts) so
+// it is unit-testable without importing this heavy file. Re-exported for external callers.
+export { reviewResumeDecision } from './review-resume-decision.js';
 
 /**
  * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
