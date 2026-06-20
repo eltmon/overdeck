@@ -111,6 +111,7 @@ export default function DrawerActiveAgent() {
       const endpoint = isEffectivelyLive
         ? `/api/agents/${activeAgent.id}/tell`
         : `/api/agents/${activeAgent.id}/resume`;
+      console.log(`[drawer/active-agent] send to ${activeAgent.id} status=${activeAgent.status} endpoint=${endpoint} messageLength=${text.length}`);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,12 +119,43 @@ export default function DrawerActiveAgent() {
       });
       if (!response.ok) {
         const body = await response.text();
-        console.error('Send failed:', body);
+        console.warn(`[drawer/active-agent] send ${response.status} ${endpoint}: ${body.slice(0, 300)}`);
+        return false;
       }
-      return response.ok;
+      const data = await response.json().catch(() => ({})) as { messageDelivered?: boolean; hint?: string };
+      console.log(`[drawer/active-agent] send 200 ${endpoint}: messageDelivered=${data.messageDelivered}`);
+      return true;
     } catch (error) {
-      console.error('Send failed:', error);
+      console.error('[drawer/active-agent] send error:', error);
       return false;
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // PAN-1985 follow-up: a dedicated Resume button for stopped agents. Sends
+  // a default continue message via /resume so the operator doesn't have to
+  // type a message just to wake the agent up. The backend's auto-resume
+  // (PAN-367 / PAN-705) handles the rest. Shown only for non-live agents
+  // where the composer would otherwise require a typed message.
+  const isEffectivelyLive = activeAgent.status === 'running' || activeAgent.status === 'starting';
+  const sendResume = async () => {
+    if (sending) return false;
+    setSending(true);
+    try {
+      console.log(`[drawer/active-agent] resume click for ${activeAgent.id} status=${activeAgent.status}`);
+      const response = await fetch(`/api/agents/${activeAgent.id}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Resumed from drawer' }),
+      });
+      const data = await response.json().catch(() => ({})) as { messageDelivered?: boolean; hint?: string; error?: string };
+      if (!response.ok) {
+        console.warn(`[drawer/active-agent] resume ${response.status}: ${data.error ?? 'unknown error'}`);
+        return false;
+      }
+      console.log(`[drawer/active-agent] resume 200: messageDelivered=${data.messageDelivered}`);
+      return true;
     } finally {
       setSending(false);
     }
@@ -150,7 +182,19 @@ export default function DrawerActiveAgent() {
         )) : <div className="italic text-muted-foreground">No recent stream output</div>}
       </div>
 
-      <AgentTellForm className="mt-[12px] flex gap-[8px]" sending={sending} onSend={sendTell} />
+      {!isEffectivelyLive && (
+        <button
+          type="button"
+          data-testid="drawer-resume-button"
+          className="mt-[10px] w-full rounded-[var(--radius-sm)] border border-primary/30 bg-primary/10 px-[12px] py-[8px] text-[12px] font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={() => void sendResume()}
+          disabled={sending}
+          title="Send a continue message to wake the agent. The backend will auto-resume the saved session and deliver the message in one round trip."
+        >
+          {sending ? 'Resuming…' : '▶ Resume agent'}
+        </button>
+      )}
+      <AgentTellForm className="mt-[10px] flex gap-[8px]" sending={sending} onSend={sendTell} />
     </section>
   );
 }

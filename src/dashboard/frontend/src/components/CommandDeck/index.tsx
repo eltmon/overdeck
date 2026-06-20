@@ -680,12 +680,21 @@ export function CommandDeck({
 
   const handleResumeSession = useCallback(async (sessionId: string) => {
     try {
+      console.log(`[command-deck] handleResumeSession ${sessionId}`);
       const res = await fetch(`/api/agents/${sessionId}/resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: 'Resumed from dashboard' }),
       });
-      if (!res.ok) throw new Error('Failed to resume session');
+      const data = await res.json().catch(() => ({})) as { messageDelivered?: boolean; error?: string };
+      if (!res.ok) {
+        console.warn(`[command-deck] handleResumeSession ${sessionId} failed: ${res.status} ${data.error ?? 'no body'}`);
+        throw new Error(data.error || 'Failed to resume session');
+      }
+      console.log(`[command-deck] handleResumeSession ${sessionId} ok: messageDelivered=${data.messageDelivered}`);
+      toast.success(data.messageDelivered === false
+        ? 'Agent resumed; message queued in mail (PTY echo-confirm timed out)'
+        : 'Agent resumed');
       await refreshDashboardState(queryClient);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to resume session');

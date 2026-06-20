@@ -1980,12 +1980,18 @@ const postAgentResumeRoute = HttpRouter.add(
     try {
       resumeModel = normalizeModelOverrideSync(model);
     } catch (err) {
+      console.warn(`[agents/resume] ${id} model validation failed: ${err instanceof Error ? err.message : String(err)}`);
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
+    // PAN-1985 follow-up: structured log at the route entry so the operator
+    // can trace every resume attempt in the server console / pty-supervisor
+    // log even when the front-end's toast is missed.
+    console.log(`[agents/resume] ${id} requested: model=${resumeModel ?? 'unchanged'} harness=${harness ?? 'unchanged'} hasMessage=${!!message} compact=${compact === true}`);
     const eventStore = yield* EventStoreService;
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
     const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
+    console.log(`[agents/resume] ${id} lifecycle: canResume=${lifecycleBefore.canResumeSession} hasSavedSession=${lifecycleBefore.hasSavedSession} hasLiveTmux=${lifecycleBefore.hasLiveTmuxSession} isCrashed=${lifecycleBefore.isCrashed} isStopped=${lifecycleBefore.isStopped}`);
     // PAN-1675: a compact-resume targets a context-wedged agent that is usually
     // still 'running' (a live but stuck session), which the normal gate rejects.
     // Allow it through for compact === true — resumeAgent summarizes the wedged
@@ -1993,6 +1999,7 @@ const postAgentResumeRoute = HttpRouter.add(
     // the summary (PAN-1781; its own canResume handles the running case).
     // Non-compact resumes keep the strict gate.
     if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck && compact !== true) {
+      console.warn(`[agents/resume] ${id} rejected: ${lifecycleBefore.reason}`);
       return jsonResponse({
         error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,
         lifecycle: lifecycleBefore,
@@ -2008,7 +2015,9 @@ const postAgentResumeRoute = HttpRouter.add(
     const resumeOpts = resumeModel || harness || compact === true
       ? { ...(resumeModel ? { model: resumeModel } : {}), ...(harness ? { harness } : {}), ...(compact === true ? { compact: true } : {}) }
       : undefined;
+    console.log(`[agents/resume] ${id} dispatching resumeAgent() with opts=${JSON.stringify(resumeOpts)}`);
     const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));
+    console.log(`[agents/resume] ${id} resumeAgent returned: success=${result.success} messageDelivered=${result.messageDelivered} error=${result.error ?? 'none'}`);
     if (result.success) {
       // PAN-1908: write-through projection — agents-row upsert + lifecycle event
       // append in one SQLite transaction so the read model transitions agent
@@ -2037,14 +2046,24 @@ const postAgentResumeRoute = HttpRouter.add(
       }
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_succeeded', {
         hasMessage: !!message,
+        messageDelivered: result.messageDelivered !== false,
       }));
       invalidateAgentsCache();
-      // Return both the pre-action and post-action lifecycle so consumers can
-      // see why the resume was allowed (before) and the new running state (after)
-      // without confusion about "canResumeSession:false" in the same payload.
+      // PAN-1985 follow-up: the messageDelivered flag distinguishes "agent is
+      // resumed and your message landed in its composer" from "agent is
+      // resumed but your message did NOT land in its composer (PTY supervisor
+      // echo-confirm timed out, harness/session.id mismatch, etc.)". The
+      // former gets a 'delivered' toast; the latter gets a clear 'queued in
+      // mail' warning so the operator can intervene if needed.
+      const delivered = result.messageDelivered !== false;
+      console.log(`[agents/resume] ${id} returning: success=${true} delivered=${delivered}`);
       return jsonResponse({
         success: true,
         resumed: true,
+        messageDelivered: delivered,
+        hint: delivered
+          ? 'Continue prompt delivered to the agent.'
+          : 'The continue prompt was queued in the agent mail/ folder because the live delivery path did not confirm in time. The agent will read it on its next session start.',
         lifecycle: { before: lifecycleBefore, after: yield* getWorkAgentLifecycleState(id) },
       });
     } else {
