@@ -102,21 +102,21 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T20:02:14.961Z",
+  "updated": "2026-06-20T20:12:09.404Z",
   "pipeline": {
     "issueId": "PAN-1866",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T20:02:06.865Z",
-    "reviewNotes": ".beads/issues.jsonl has a blank JSONL record at EOF; git diff --check fails",
-    "testNotes": "Lint failure: src/dashboard/server/routes/backlog.ts:12 imports getBacklogSequenceForRoot directly from database layer instead of through Overdeck door (src/lib/overdeck/*). This violates PAN-1908 single-source-of-truth boundary. Test failures: 15 tests failed (7051 passed). Key issues: (1) review-agent convoy tests failing due to spawnRun not returning success, (2) no-loss-matrix missing 2 HTTP routes (POST /api/agents/:id/restart-fresh, POST /api/review/:issueId/purge) that must be enumerated in the audit matrix, (3) 5 tests in done.test.ts timing out (5s limit). Gates run: npm run typecheck (PASS), npm run lint (FAIL on boundary), npm test (15 failures).",
+    "updatedAt": "2026-06-20T20:12:09.365Z",
+    "reviewNotes": "Previous JSONL EOF blocker fixed; diff check, typecheck, lint, and focused tests pass",
+    "testNotes": "Test suite failures: 1 test failed out of 7126 tests. npm run typecheck: PASSED. npm run lint: PASSED. npm test: 1 FAILED. Failing test: 'tests/integration/post-review-rebase-scenario.test.ts > PAN-1215 post-review-rebase scenario > clears stale verificationStatus when review override signals passed'. Root cause: Test mock for '../../src/lib/projects.js' is incomplete — missing 'getProjectSync' export which is required by updateIssueRecordForReviewStatusSync() when writing journal records. The test initializes setReviewStatusSync() which calls updateIssueRecordForReviewStatusSync(), which dynamically imports getProjectSync from projects.js. The mock only exports resolveProjectFromIssue/resolveProjectFromIssueSync but not getProjectSync, causing a vitest '[vitest] No \"getProjectSync\" export is defined' error. The verificationNotes field value exists in the update object but the journal write fails before the value is persisted, so getReviewStatusSync() returns undefined for verificationNotes. This blocks the test assertion at line 304: expect(after?.verificationNotes).toContain('PAN-1215'). The fix requires adding getProjectSync to the test mock.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
-    "reviewedAtCommit": "70377fa28d0ddc40ba8de7fe005fa3a18f670145",
-    "reviewRequestedAt": "2026-06-20T19:59:32.050Z"
+    "reviewedAtCommit": "cfc0d21656f3a98460970e90929e5fccc43c96b2",
+    "reviewRequestedAt": "2026-06-20T20:02:57.536Z"
   },
   "closeOut": {
     "usage": {
@@ -147,27 +147,27 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 32,
-            "output": 2385,
-            "cacheRead": 1122852,
-            "cacheWrite": 127022
+            "input": 64,
+            "output": 8887,
+            "cacheRead": 4852766,
+            "cacheWrite": 271233
           }
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1315,
-            "output": 493884,
-            "cacheRead": 151171088,
-            "cacheWrite": 3899669
+            "input": 1331,
+            "output": 495276,
+            "cacheRead": 152410357,
+            "cacheWrite": 4111737
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2552,
-          "output": 2452,
-          "cacheRead": 1122980,
-          "cacheWrite": 127022
+          "input": 2584,
+          "output": 8954,
+          "cacheRead": 4852894,
+          "cacheWrite": 271233
         },
         "anthropic/claude-opus-4-8": {
           "input": 19322,
@@ -176,15 +176,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1329,
-          "output": 503898,
-          "cacheRead": 152239645,
-          "cacheWrite": 4003256
+          "input": 1345,
+          "output": 505290,
+          "cacheRead": 153478914,
+          "cacheWrite": 4215324
         }
       },
       "costAtCloseOut": {
-        "usd": 80.13710824,
-        "pricingAsOf": "2026-06-20T20:02:06.886Z"
+        "usd": 81.91086924,
+        "pricingAsOf": "2026-06-20T20:12:09.404Z"
       }
     },
     "merges": [
@@ -193,7 +193,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-4-6",
+  "model": "claude-haiku-4-5",
   "statusOverrides": {
     "backlog-operator-gate-ui": "completed",
     "backlog-operator-gate-ui.ac1": "completed",
