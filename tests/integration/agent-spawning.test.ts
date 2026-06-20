@@ -51,6 +51,9 @@ const runtimeMirrorMocks = vi.hoisted(() => ({
 
 const configMocks = vi.hoisted(() => ({
   roleOverrides: {} as Record<string, any>,
+  // Provider-default-only (PAN-1984): harness is derived from the model's provider.
+  // Tests set a per-provider default here to drive the resolved harness (e.g. pi).
+  providerHarnesses: {} as Record<string, any>,
 }));
 
 vi.mock('../../src/lib/transcript-landing.js', () => ({
@@ -185,6 +188,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
       openrouterFavorites: [],
       workhorses: { ...actual.DEFAULT_WORKHORSES },
       roles: { ...actual.DEFAULT_ROLES, ...configMocks.roleOverrides },
+      providerHarnesses: { ...configMocks.providerHarnesses },
       overrides: {},
       geminiThinkingLevel: 3,
       trackerKeys: {},
@@ -309,6 +313,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     transcriptLandingMocks.snapshotCounts = undefined;
     runtimeMirrorMocks.snapshots.clear();
     configMocks.roleOverrides = {};
+    configMocks.providerHarnesses = {};
     resetHarnessResolveCachesForTests();
     vi.clearAllMocks();
     const tmux = await import('../../src/lib/tmux.js');
@@ -631,10 +636,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const tmux = await import('../../src/lib/tmux.js');
       const agentId = 'agent-pan-resume-pi-continue';
       writeResumableWorkAgent(agentId, true);
-      const statePath = join(getAgentDir(agentId), 'state.json');
-      const state = JSON.parse(readFileSync(statePath, 'utf8'));
-      state.harness = 'pi';
-      writeFileSync(statePath, JSON.stringify(state));
+      // Provider-default-only (PAN-1984): a Pi work agent is one whose model's provider
+      // resolves to pi. Drive that through the per-provider default rather than a
+      // (now-ignored) explicit state.harness. The mid workhorse is an Anthropic model,
+      // and the session origin is pi so there is no resume drift.
+      configMocks.providerHarnesses = { anthropic: 'pi' };
       setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
       vi.mocked(tmux.createSession).mockImplementationOnce((createdAgentId: string) => Effect.sync(() => {
         const agentDir = getAgentDir(createdAgentId);
@@ -689,36 +695,30 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).toContain(`--resume '${agentId}-session'`);
     });
 
-    it('resumeAgent drops --resume when the requested model differs from session origin', async () => {
-      const tmux = await import('../../src/lib/tmux.js');
+    it('refuses to rotate the session when the requested model differs from session origin (PAN-1980)', async () => {
       const agentId = 'agent-pan-resume-model-drift';
       writeResumableWorkAgent(agentId, true);
       setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'claude-code');
 
       const result = await resumeAgent(agentId, undefined, { model: 'claude-haiku-4-5' });
 
-      expect(result).toEqual({ success: true, messageDelivered: true });
-      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
-      expect(launcher).not.toContain('--resume');
-      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
-      expect(freshSessionId).not.toBe(`${agentId}-session`);
-      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
-      expect(tmux.sendKeys).toHaveBeenCalledWith(agentId, expect.stringContaining('Read .pan/continue.json'));
+      // PAN-1980: session rotation is disabled — model drift no longer spins up a fresh
+      // session; resume refuses and leaves the agent stopped rather than rotating.
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('session rotation is disabled (PAN-1980)');
     });
 
-    it('resumeAgent drops --resume when the requested harness differs from session origin', async () => {
+    it('refuses to rotate the session when the resolved harness differs from session origin (PAN-1980)', async () => {
       const agentId = 'agent-pan-resume-harness-drift';
       writeResumableWorkAgent(agentId, true);
+      // Origin harness is pi, but provider-default-only (PAN-1984) resolves the agent's
+      // Anthropic model to claude-code — so the resolved harness drifts from the origin.
       setRuntimeOrigin(agentId, DEFAULT_WORKHORSES.mid, 'pi');
 
-      const result = await resumeAgent(agentId, undefined, { harness: 'claude-code' });
+      const result = await resumeAgent(agentId);
 
-      expect(result).toEqual({ success: true, messageDelivered: true });
-      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
-      expect(launcher).not.toContain('--resume');
-      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
-      expect(freshSessionId).not.toBe(`${agentId}-session`);
-      expect(launcher).toContain(`--session-id '${freshSessionId}'`);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('session rotation is disabled (PAN-1980)');
     });
 
     it('resumeAgent keeps --resume for legacy sessions with no origin metadata', async () => {
@@ -749,13 +749,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       const result = await resumeAgent(agentId);
 
-      expect(result).toEqual({ success: true, messageDelivered: true });
-      const launcher = readFileSync(join(getAgentDir(agentId), 'launcher.sh'), 'utf8');
-      expect(launcher).not.toContain('--resume');
-      const freshSessionId = readFileSync(join(getAgentDir(agentId), 'session.id'), 'utf8').trim();
-      expect(freshSessionId).not.toBe(`${agentId}-session`);
-      // Harness was re-defaulted to the model's provider default, not pinned to
-      // the stale stored value.
+      // PAN-1980: rotation is refused on drift, so resume does not relaunch a fresh session...
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('session rotation is disabled (PAN-1980)');
+      // ...but the stale stored harness is still re-defaulted to the model's provider
+      // default (PAN-1797) rather than pinned to the stored 'pi'.
       expect(getAgentStateSync(agentId)?.harness).toBe('claude-code');
     });
 
@@ -1050,9 +1048,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       chmodSync(fakePi, 0o755);
       process.env.PATH = `${binDir}:${originalPath ?? ''}`;
       resetHarnessResolveCachesForTests();
-      configMocks.roleOverrides = {
-        test: { ...DEFAULT_ROLES.test, harness: 'pi' },
-      };
+      // Provider-default-only (PAN-1984): drive the test role onto Pi via the per-provider
+      // default (its model is Anthropic), not a per-role harness override.
+      configMocks.providerHarnesses = { anthropic: 'pi' };
       vi.mocked(tmux.createSession).mockImplementationOnce((agentId: string) => Effect.sync(() => {
         const agentDir = join(testAgentsDir, agentId);
         mkdirSync(agentDir, { recursive: true });
@@ -1085,34 +1083,33 @@ describe('PAN-1048 role primitive — agent spawning', () => {
   });
 
   describe('harness policy gate at the spawn entry points', () => {
-    it('rejects explicit pi for spawnRun review when canUseHarness denies the combo', async () => {
+    it('rejects spawnRun review when the resolved provider-default harness is policy-denied', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
-      vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
-        allowed: false,
-        reason: 'Pi cannot run Anthropic models with subscription auth',
-      });
+      // Provider-default-only (PAN-1984): there is no explicit harness to pass — the gate
+      // runs on the resolved harness. Deny it and its claude-code fallback (two checks) so
+      // resolution throws and the spawn entry point rejects.
+      vi.mocked(harnessPolicy.canUseHarnessSync)
+        .mockReturnValueOnce({ allowed: false, reason: 'harness denied by policy' })
+        .mockReturnValueOnce({ allowed: false, reason: 'harness denied by policy' });
 
       await expect(spawnRun('PAN-PI-1', 'review', {
         workspace: testWorkspace,
-        harness: 'pi',
-      })).rejects.toThrow('Pi cannot run Anthropic models with subscription auth');
+      })).rejects.toThrow('harness denied by policy');
 
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });
 
-    it('rejects explicit pi for spawnAgent work when canUseHarness denies the combo', async () => {
+    it('rejects spawnAgent work when the resolved provider-default harness is policy-denied', async () => {
       const harnessPolicy = await import('../../src/lib/harness-policy.js');
-      vi.mocked(harnessPolicy.canUseHarnessSync).mockReturnValueOnce({
-        allowed: false,
-        reason: 'Pi cannot run Anthropic models with subscription auth',
-      });
+      vi.mocked(harnessPolicy.canUseHarnessSync)
+        .mockReturnValueOnce({ allowed: false, reason: 'harness denied by policy' })
+        .mockReturnValueOnce({ allowed: false, reason: 'harness denied by policy' });
 
       await expect(spawnAgent({
         issueId: 'PAN-PI-2',
         workspace: testWorkspace,
         role: 'work',
-        harness: 'pi',
-      })).rejects.toThrow('Pi cannot run Anthropic models with subscription auth');
+      })).rejects.toThrow('harness denied by policy');
 
       expect(harnessPolicy.canUseHarnessSync).toHaveBeenCalled();
     });

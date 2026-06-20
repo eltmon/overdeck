@@ -62,14 +62,20 @@ function logBuiltInDefaultNotice(provider: string, harness: RuntimeName): void {
 export async function resolveHarness(input: ResolveHarnessInput): Promise<RuntimeName> {
   const provider = getProviderForModelSync(input.model).name;
   const { config } = loadYamlConfig();
-  const roleHarness = input.role ? config.roles?.[input.role]?.harness : undefined;
+  // Harness is PROVIDER-DEFAULT-ONLY (PAN-1984). It is derived solely from the model's
+  // provider — the per-provider default (Settings → Providers) else the built-in default.
+  // We no longer honor a per-spawn explicit override or a per-role harness:
+  // `input.explicit` / `input.role` are accepted for signature compatibility but
+  // INTENTIONALLY IGNORED. This removes the entire class of harness↔model mismatch bugs
+  // (e.g. Pi+GPT-5.5 selected when Codex is GPT-5.5's real provider default) and the
+  // stale-harness-on-resume bug — a provider/config change now always flows through
+  // instead of a frozen state.json harness winning forever.
   const providerHarness = config.providerHarnesses?.[provider];
   const builtInHarness = getBuiltInDefaultHarness(provider);
 
-  const winner = input.explicit ?? roleHarness ?? providerHarness ?? builtInHarness ?? 'claude-code';
-  const winnerIsExplicit = input.explicit !== undefined;
+  const winner = providerHarness ?? builtInHarness ?? 'claude-code';
 
-  if (!input.explicit && !roleHarness && !providerHarness) {
+  if (!providerHarness) {
     logBuiltInDefaultNotice(provider, winner);
   }
 
@@ -81,10 +87,6 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
 
   const decision = canUseHarnessSync(winner, input.model, authMode);
   if (!decision.allowed) {
-    if (winnerIsExplicit) {
-      throw new HarnessResolutionError(decision.reason ?? `Harness ${winner} is not allowed for ${input.model}`);
-    }
-
     // PAN-1871 — only fall back to claude-code when it is the model's NATIVE
     // harness (Anthropic). For CLIProxy-routed models (kimi, gpt-5.5, …) the
     // provider default is pi/codex; claude-code would route them through
@@ -107,13 +109,13 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
 
   if (!(await hasHarnessBinary(winner))) {
     const binary = BINARY_BY_HARNESS[winner];
-    // PAN-1871 — never silently fall back to claude-code from (a) an
-    // explicitly-requested harness, or (b) a non-native (CLIProxy) model whose
-    // own binary is missing at spawn. Silently routing kimi onto claude-code is
-    // what leaked PAN-1845. Fail loudly so the cause is visible and recoverable.
-    if (winnerIsExplicit || (builtInHarness && builtInHarness !== 'claude-code')) {
+    // PAN-1871 — never silently fall back to claude-code from a non-native
+    // (CLIProxy) model whose own binary is missing at spawn. Silently routing
+    // kimi onto claude-code is what leaked PAN-1845. Fail loudly so the cause is
+    // visible and recoverable.
+    if (builtInHarness && builtInHarness !== 'claude-code') {
       throw new HarnessResolutionError(
-        `Harness ${winner} (${winnerIsExplicit ? 'explicitly requested' : `provider default for ${input.model}`}) has no installed ${binary} binary at spawn — refusing to silently fall back to claude-code. Install ${binary} (check its PATH) and retry.`,
+        `Harness ${winner} (provider default for ${input.model}) has no installed ${binary} binary at spawn — refusing to silently fall back to claude-code. Install ${binary} (check its PATH) and retry.`,
       );
     }
     console.warn(`harness ${winner} requested for ${provider}, but ${binary} is not installed — falling back to native claude-code`);
