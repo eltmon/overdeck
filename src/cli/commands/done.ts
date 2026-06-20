@@ -557,9 +557,12 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
 
-    // Atomically initialize review status in SQLite so the pipeline
-    // can proceed even if the dashboard is offline. The HTTP trigger below is
-    // an optimization — deacon will pick this up if it fails.
+    // Atomically initialize review status AND record the durable "review requested" intent so the
+    // pipeline can proceed even if the dashboard is offline. PAN-1988 auto-heal: `reviewRequestedAt`
+    // is journaled (always writable, even sandboxed) BEFORE the HTTP trigger below. If that trigger
+    // never lands (dashboard reloading, dropped event, frozen deacon), the host notices the
+    // un-serviced request on the next status read and dispatches review (reconcile-on-read). The
+    // HTTP trigger is the fast path; this intent is the durable backstop.
     setReviewStatusSync(issueId, {
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -568,6 +571,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       verificationStatus: 'pending',
       verificationCycleCount: 0,
       autoRequeueCount: 0,
+      reviewRequestedAt: new Date().toISOString(),
     });
 
     await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
@@ -623,64 +627,79 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       };
 
-      const dashboardRunning = await checkDashboard();
-
-      if (dashboardRunning) {
-        console.log(chalk.dim('Auto-triggering review & test...'));
-
-        const postJson = async (path: string): Promise<any> => {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 5000);
+      const postJson = async (path: string): Promise<any> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        try {
+          const res = await fetch(`${dashboardUrl}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
           try {
-            const res = await fetch(`${dashboardUrl}${path}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({}),
-              signal: controller.signal,
-            });
-            clearTimeout(timer);
-            try {
-              return await res.json();
-            } catch {
-              return { success: false, error: 'Invalid response' };
+            return await res.json();
+          } catch {
+            return { success: false, error: 'Invalid response' };
+          }
+        } catch (err: any) {
+          clearTimeout(timer);
+          throw err;
+        }
+      };
+
+      // PAN-1988: aggressively retry reaching the dashboard — a mid-reload restart is the most
+      // common reason this trigger is dropped, which strands the issue. Up to 10 attempts with
+      // exponential backoff (0.5s → capped 8s, ~47s total). The durable `reviewRequestedAt` intent
+      // recorded above means even total failure here is recovered by the host's reconcile-on-read;
+      // this retry just makes the fast path resilient to a transient restart.
+      const MAX_ATTEMPTS = 10;
+      let triggered = false;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (await checkDashboard()) {
+          console.log(chalk.dim(`Auto-triggering review & test${attempt > 1 ? ` (attempt ${attempt}/${MAX_ATTEMPTS})` : ''}...`));
+          let result = await postJson(`/api/review/${issueId}/trigger`);
+
+          // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
+          // This is the normal flow when a work agent fixes review issues and re-signals done.
+          if (!result.success && (result.alreadyMerged || result.alreadyReviewed)) {
+            const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
+            console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
+            const resetResult = await postJson(`/api/review/${issueId}/reset`);
+            if (resetResult.success) {
+              console.log(chalk.green(`  ✓ Specialist states reset`));
+              result = await postJson(`/api/review/${issueId}/trigger`);
+            } else {
+              console.log(chalk.red(`  ✗ Failed to reset: ${resetResult.error || resetResult.message || 'Unknown error'}`));
             }
-          } catch (err: any) {
-            clearTimeout(timer);
-            throw err;
           }
-        };
 
-        let result = await postJson(`/api/review/${issueId}/trigger`);
-
-        // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
-        // This is the normal flow when a work agent fixes review issues and re-signals done.
-        if (!result.success && (result.alreadyMerged || result.alreadyReviewed)) {
-          const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
-          console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
-
-          const resetResult = await postJson(`/api/review/${issueId}/reset`);
-          if (resetResult.success) {
-            console.log(chalk.green(`  ✓ Specialist states reset`));
-            // Retry review
-            result = await postJson(`/api/review/${issueId}/trigger`);
-          } else {
-            console.log(chalk.red(`  ✗ Failed to reset: ${resetResult.error || resetResult.message || 'Unknown error'}`));
+          // The dashboard responded (success OR a real verdict like alreadyReviewed) — this is not a
+          // transient outage, so stop retrying regardless of the verdict.
+          triggered = true;
+          if (result.success) {
+            console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
+          } else if (!result.alreadyMerged) {
+            console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
+            if (result.alreadyReviewed) {
+              console.log(chalk.dim(`    Manual review needed - click "Review and Test" in dashboard`));
+            }
           }
+          break;
         }
 
-        if (result.success) {
-          console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
-        } else if (!result.alreadyMerged) {
-          // Don't fail the command if review trigger fails - just inform
-          // (alreadyMerged case already logged above)
-          console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
-          if (result.alreadyReviewed) {
-            console.log(chalk.dim(`    Manual review needed - click "Review and Test" in dashboard`));
-          }
+        // Dashboard unreachable (likely mid-reload) — back off and retry.
+        if (attempt < MAX_ATTEMPTS) {
+          const delayMs = Math.min(8_000, 500 * 2 ** (attempt - 1));
+          console.log(chalk.dim(`  Dashboard not reachable (attempt ${attempt}/${MAX_ATTEMPTS}) — retrying in ${Math.round(delayMs / 1000) || 1}s...`));
+          await new Promise((r) => setTimeout(r, delayMs));
         }
-      } else {
-        console.log(chalk.dim('  Dashboard not running - skipping auto-review'));
-        console.log(chalk.dim('  Start dashboard with: pan up'));
+      }
+
+      if (!triggered) {
+        console.log(chalk.yellow(`  ⚠ Dashboard unreachable after ${MAX_ATTEMPTS} attempts.`));
+        console.log(chalk.dim(`    Review intent is recorded durably — it will auto-dispatch when the dashboard next reads ${issueId}'s status. No action needed.`));
       }
     } catch (error: any) {
       // Don't fail the done command if auto-review fails

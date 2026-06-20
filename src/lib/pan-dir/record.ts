@@ -76,6 +76,8 @@ export interface PanIssuePipelineRecord {
   prHeadSha?: string;
   reviewedAtCommit?: string;
   lastVerifiedCommit?: string;
+  /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
+  reviewRequestedAt?: string;
   autoMerge?: boolean;
   deaconIgnored?: boolean;
   deaconIgnoredAt?: string;

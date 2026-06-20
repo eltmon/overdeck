@@ -103,6 +103,7 @@ function projectPipeline(issueId: string, status: ReviewStatus | null): PanIssue
     prHeadSha: status.prHeadSha,
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
+    reviewRequestedAt: status.reviewRequestedAt,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,
     deaconIgnoredAt: status.deaconIgnoredAt,

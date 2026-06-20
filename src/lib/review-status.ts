@@ -14,6 +14,7 @@ import {
 } from './overdeck/review-status-sync.js';
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
+import { needsReviewDispatch } from './review-dispatch-decision.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -91,6 +92,13 @@ export interface ReviewStatus {
   stuckDetails?: string;
   /** PAN-699: timestamp when review agents were dispatched (deacon timeout detection) */
   reviewSpawnedAt?: string;
+  /**
+   * PAN-1988 auto-heal: durable JOURNAL intent set by `pan done` BEFORE it reaches the dashboard.
+   * "The work agent finished and wants review." When this is newer than {@link reviewSpawnedAt}
+   * and nothing is reviewing, the host reconciles on read and dispatches review — surviving a
+   * dashboard reload, a dropped event, or a frozen deacon. Journal-only (not a DB column).
+   */
+  reviewRequestedAt?: string;
   /** PAN-1765: timestamp when a conflict-resolution work agent was dispatched. */
   conflictResolutionDispatchedAt?: string;
   /** PAN-699: number of test-agent dispatch retries (circuit breaker) */
@@ -511,6 +519,59 @@ async function deliverReviewVerdictFeedbackHostSide(issueId: string, status: Rev
   }
 }
 
+// PAN-1988 auto-heal — throttle so the reconcile-on-read does not spam dispatch attempts for a
+// genuinely-gated issue (one whose dispatch keeps deferring on a merge conflict). Date.now() is
+// available in normal lib code (only workflow scripts forbid it).
+const reviewDispatchAttemptAt = new Map<string, number>();
+const REVIEW_AUTO_DISPATCH_THROTTLE_MS = 30_000;
+
+/**
+ * PAN-1988 auto-heal — the host re-dispatches review from the durable journal intent. When the
+ * work agent's `pan done` recorded a `reviewRequestedAt` but the reactive dashboard trigger never
+ * landed (dashboard reloading, dropped event, frozen deacon), the next status read notices the
+ * un-serviced request and dispatches review here. {@link needsReviewDispatch} gates it,
+ * spawnReviewRoleForIssue is idempotent (it skips a live review), and a 30s throttle bounds retries
+ * for a gated issue. Fire-and-forget; in a sandboxed reader the dispatch is a best-effort no-op.
+ */
+function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus): void {
+  if (!needsReviewDispatch({
+    reviewRequestedAt: status.reviewRequestedAt,
+    reviewSpawnedAt: status.reviewSpawnedAt,
+    reviewStatus: status.reviewStatus,
+    mergeStatus: status.mergeStatus,
+  })) return;
+  const last = reviewDispatchAttemptAt.get(issueId) ?? 0;
+  if (Date.now() - last < REVIEW_AUTO_DISPATCH_THROTTLE_MS) return;
+  reviewDispatchAttemptAt.set(issueId, Date.now());
+  void dispatchReviewHostSide(issueId, status.prUrl);
+}
+
+async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
+  try {
+    const { resolveProjectFromIssueSync } = await import('./projects.js');
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) return;
+    const { existsSync } = await import('fs');
+    const workspace = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspace)) return;
+    let branch = `feature/${issueId.toLowerCase()}`;
+    try {
+      const { promisify } = await import('util');
+      const { exec } = await import('child_process');
+      const execAsync = promisify(exec);
+      const { stdout } = await execAsync('git branch --show-current', { cwd: workspace, encoding: 'utf-8' });
+      branch = stdout.trim() || branch;
+    } catch { /* non-fatal — fall back to the conventional branch name */ }
+    const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch, ...(prUrl ? { prUrl } : {}) }));
+    if (result.success) {
+      console.log(`[review-status] auto-dispatched review for ${issueId} from durable journal intent (host-side)`);
+    }
+  } catch (err) {
+    console.warn(`[review-status] host-side review auto-dispatch for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   const dbStatus = getReviewStatusFromDbSync(issueId);
   const journal = readJournalStatusSync(issueId);
@@ -565,12 +626,15 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
     if (nowBlocked && !wasBlocked) {
       void deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
     }
+    maybeAutoDispatchReviewHostSide(issueId, reconciled);
     return reconciled;
   }
 
   // DB is current → overlay the feedback TEXT from the journal (it is no longer stored in the
   // DB; the row holds only the queryable status flags).
-  return enrichReviewNotesFromRecordSync(issueId, dbStatus!);
+  const enriched = enrichReviewNotesFromRecordSync(issueId, dbStatus!);
+  maybeAutoDispatchReviewHostSide(issueId, enriched);
+  return enriched;
 }
 
 

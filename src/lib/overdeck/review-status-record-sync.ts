@@ -38,6 +38,9 @@ export function enrichReviewNotesFromRecordSync(issueId: string, status: ReviewS
     mergeNotes: pipeline.mergeNotes ?? status.mergeNotes,
     inspectNotes: pipeline.inspectNotes ?? status.inspectNotes,
     verificationNotes: pipeline.verificationNotes ?? status.verificationNotes,
+    // PAN-1988 auto-heal: the durable review-request intent is journal-only — overlay it on every
+    // read so the merge base preserves it through partial updates and the dispatch reconcile sees it.
+    reviewRequestedAt: pipeline.reviewRequestedAt ?? status.reviewRequestedAt,
   };
 }
 
@@ -74,6 +77,7 @@ export function readJournalStatusSync(
       prHeadSha: p.prHeadSha,
       reviewedAtCommit: p.reviewedAtCommit,
       lastVerifiedCommit: p.lastVerifiedCommit,
+      reviewRequestedAt: p.reviewRequestedAt,
       autoMerge: p.autoMerge,
       deaconIgnored: p.deaconIgnored,
       deaconIgnoredAt: p.deaconIgnoredAt,
