@@ -28,6 +28,7 @@ export type IssueActionKey =
   | 'requestReview'
   | 'restartReview'
   | 'recoverReview'
+  | 'purgeReview'
   | 'stopAgent'
   | 'pause'
   | 'unpause'
@@ -163,6 +164,11 @@ const canRestartReview = (state: IssueActionState) => {
   return review?.reviewStatus === 'reviewing' || review?.reviewStatus === 'blocked' || review?.reviewStatus === 'failed' || review?.testStatus === 'testing' || review?.testStatus === 'failed' || review?.testStatus === 'dispatch_failed' || review?.mergeStatus === 'merging' || review?.mergeStatus === 'failed';
 };
 const hasReviewFailure = (state: IssueActionState) => isReviewPipelineStuck(state.reviewStatus ?? null);
+// Complete review reset is available whenever review is in a restartable/stuck/failed
+// state — the "something's wrong with review, nuke all of it" gate. The stale-ghost case
+// (clean-looking review but leftover convoy sub-reviewers) is surfaced separately by the
+// Issues-view stale warning, which carries its own purge button.
+const canPurgeReview = (state: IssueActionState) => canRestartReview(state) || hasReviewFailure(state);
 const canRecoverAgent = (state: IssueActionState) => state.agent?.status === 'stopped' || state.agent?.status === 'stuck' || state.agent?.status === 'failed' || state.agent?.status === 'dead' || state.agent?.status === 'error';
 const hasPrTarget = (state: IssueActionState) => state.hasPr === true || !!state.prUrl || !!state.workspace?.mrUrl || state.reviewStatus?.readyForMerge === true;
 const canCloseOut = (state: IssueActionState) => {
@@ -213,6 +219,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'requestReview', label: 'Request review', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },
   { key: 'restartReview', label: 'Restart review', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'review' },
   { key: 'recoverReview', label: 'Recover review', panVerb: 'review reset', endpoint: '/api/review/:id/reset', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'review' },
+  { key: 'purgeReview', label: 'Complete review reset', panVerb: null, endpoint: '/api/review/:id/purge', enabledWhen: canPurgeReview, phasePrimary: [], kind: 'destructive', group: 'review' },
   { key: 'stopAgent', label: 'Stop agent', panVerb: 'kill', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'safe', group: 'agent' },
   { key: 'pause', label: 'Pause agent', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasLiveAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'unpause', label: 'Unpause agent', panVerb: 'unpause', endpoint: '/api/agents/:agentId/unpause', enabledWhen: isPaused, phasePrimary: [], kind: 'safe', group: 'agent' },

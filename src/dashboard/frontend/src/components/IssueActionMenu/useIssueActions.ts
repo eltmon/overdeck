@@ -189,6 +189,8 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'restartFromPlan':
     case 'restartAgent':
       return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
+    case 'purgeReview':
+      return `Complete review reset for ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:
       return `${action.label} for ${issueId}?`;
   }
