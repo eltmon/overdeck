@@ -1,1 +1,4 @@
-{"status":"passed","notes":"Verification gates: npm run typecheck ✔, npm run lint ✔, npm test ✔ (617 test files passed, 6496 tests passed). No UAT required per spec (implementation-only change: conflict-gate module + review-agent + deacon patrol + schema migration). All acceptance criteria completed via statusOverrides in continue.json."}
+{
+  "status": "failed",
+  "notes": "Lint failure: src/dashboard/server/routes/backlog.ts:12 imports getBacklogSequenceForRoot directly from database layer instead of through Overdeck door (src/lib/overdeck/*). This violates PAN-1908 single-source-of-truth boundary. Test failures: 15 tests failed (7051 passed). Key issues: (1) review-agent convoy tests failing due to spawnRun not returning success, (2) no-loss-matrix missing 2 HTTP routes (POST /api/agents/:id/restart-fresh, POST /api/review/:issueId/purge) that must be enumerated in the audit matrix, (3) 5 tests in done.test.ts timing out (5s limit). Gates run: npm run typecheck (PASS), npm run lint (FAIL on boundary), npm test (15 failures)."
+}

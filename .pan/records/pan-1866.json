@@ -102,20 +102,21 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T17:05:22.326Z",
+  "updated": "2026-06-20T19:24:56.897Z",
   "pipeline": {
     "issueId": "PAN-1866",
-    "reviewStatus": "blocked",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T17:05:22.307Z",
-    "reviewNotes": "Schema fix is only in the dirty working tree; PR HEAD still lacks it",
-    "verificationNotes": "Verification FAILED at test (89466ms):\n\n/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > tallies dry runs without writing\nAssertionError: expected { issueId: 'PAN-1922', …(4) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"issueId\": \"PAN-1922\",\n  \"readyForMerge\": true,\n  \"reviewStatus\": \"passed\",\n  \"testStatus\": \"passed\",\n  \"updatedAt\": \"2026-06-15T00:00:00.000Z\",\n}\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:310:45\n    309|\n    310|     expect(result.restored).toBe(1);\n    311|     expect(getReviewStatusFromDbSync('PAN-1922')).toBeNull();\n       |        ^\n    312|   });\n    313|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > inherits host override from the completed work agent for synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:118:28\n    116|     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));\n    117|     mocks.getReviewStatus.mockReturnValue(undefined);\n    118|     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefin…\n       |                            ^\n    119|     mocks.formatTier1Summary.mockReturnValue('shared review context');\n    120|     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > threads explicit model and harness overrides to synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:141:28\n    142|   });\n    143|\n    144|   it('threads explicit model and harness overrides to synthesis and re…\n       |              ^\n    145|     const result = await Effect.runPromise(spawnReviewRoleForIssue({\n    146|       issueId: 'PAN-1194',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/19]⎯\n\n",
+    "updatedAt": "2026-06-20T19:24:55.855Z",
+    "reviewNotes": "No blocking findings; numeric SequenceDoc version contract is committed and validated",
+    "testNotes": "Lint failure: src/dashboard/server/routes/backlog.ts:12 imports getBacklogSequenceForRoot directly from database layer instead of through Overdeck door (src/lib/overdeck/*). This violates PAN-1908 single-source-of-truth boundary. Test failures: 15 tests failed (7051 passed). Key issues: (1) review-agent convoy tests failing due to spawnRun not returning success, (2) no-loss-matrix missing 2 HTTP routes (POST /api/agents/:id/restart-fresh, POST /api/review/:issueId/purge) that must be enumerated in the audit matrix, (3) 5 tests in done.test.ts timing out (5s limit). Gates run: npm run typecheck (PASS), npm run lint (FAIL on boundary), npm test (15 failures).",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
-    "reviewedAtCommit": "5cc2b088a35f215cfeac1ac9e0b2e2d45bf6bdc9",
-    "reviewRequestedAt": "2026-06-20T16:58:41.241Z"
+    "reviewedAtCommit": "70377fa28d0ddc40ba8de7fe005fa3a18f670145",
+    "reviewRequestedAt": "2026-06-20T17:05:33.466Z"
   },
   "closeOut": {
     "usage": {
@@ -144,21 +145,29 @@
             "cacheWrite": 103587
           }
         },
+        "test": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 32,
+            "output": 2385,
+            "cacheRead": 1122852,
+            "cacheWrite": 127022
+          }
+        },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1131,
-            "output": 394875,
-            "cacheRead": 129196294,
-            "cacheWrite": 3424314
+            "input": 1143,
+            "output": 396927,
+            "cacheRead": 130299650,
+            "cacheWrite": 3501585
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2520,
-          "output": 67,
-          "cacheRead": 128,
-          "cacheWrite": 0
+          "input": 2552,
+          "output": 2452,
+          "cacheRead": 1122980,
+          "cacheWrite": 127022
         },
         "anthropic/claude-opus-4-8": {
           "input": 19322,
@@ -167,15 +176,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1145,
-          "output": 404889,
-          "cacheRead": 130264851,
-          "cacheWrite": 3527901
+          "input": 1157,
+          "output": 406941,
+          "cacheRead": 131368207,
+          "cacheWrite": 3605172
         }
       },
       "costAtCloseOut": {
-        "usd": 69.99338224,
-        "pricingAsOf": "2026-06-20T17:05:22.326Z"
+        "usd": 70.92799224,
+        "pricingAsOf": "2026-06-20T19:24:55.886Z"
       }
     },
     "merges": [
@@ -183,8 +192,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "backlog-operator-gate-ui": "completed",
     "backlog-operator-gate-ui.ac1": "completed",
