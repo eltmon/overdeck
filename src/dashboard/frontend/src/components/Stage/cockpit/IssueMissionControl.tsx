@@ -670,12 +670,38 @@ function IssueTreeLane({
   const feature = projectFeature.data ?? fallbackFeature
   const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
 
+  // Stale-review detection (PAN-1866): quick review — the current hardcoded mode —
+  // produces a single `review` parent and NO `reviewer` sub-sessions. So any reviewer
+  // session is a leftover extended-review (convoy) ghost from a previous cycle that will
+  // tangle a restart. Surface a warning that offers the complete review reset.
+  // (When extended review returns this becomes a reviewRunId-mismatch check.)
+  const staleReviewers = useMemo(
+    () => renderedSessions.filter((session) => session.type === 'reviewer'),
+    [renderedSessions],
+  )
+
   useEffect(() => {
     onSessionsChange(renderedSessions)
   }, [onSessionsChange, renderedSessions])
 
   return (
     <aside className="min-w-0 rounded-[20px] border border-border bg-card/50 p-2" aria-label="Issue tree">
+      {staleReviewers.length > 0 ? (
+        <div className="mb-2 rounded-[var(--radius-sm)] border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px]" role="alert">
+          <div className="font-semibold text-amber-600 dark:text-amber-400">⚠ Stale review state</div>
+          <div className="mt-0.5 text-muted-foreground">
+            {staleReviewers.length} leftover review agent{staleReviewers.length === 1 ? '' : 's'} from a previous
+            cycle (extended-review sub-reviewers). A fresh review can&rsquo;t run cleanly until they&rsquo;re cleared.
+          </div>
+          <button
+            type="button"
+            className="mt-1.5 rounded-[var(--radius-sm)] border border-destructive/50 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => actions.all.find((view) => view.action.key === 'purgeReview')?.invoke()}
+          >
+            Complete review reset
+          </button>
+        </div>
+      ) : null}
       <ProjectNode
         name={projectName ?? 'Project'}
         features={[feature]}
