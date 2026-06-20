@@ -138,7 +138,6 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Test model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Ship model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Flywheel model')).toHaveValue('claude-opus-4-7');
-    expect(screen.getByLabelText('Flywheel harness')).toHaveValue('');
     expect(screen.getByLabelText('Flywheel effort')).toHaveValue('high');
     expect(screen.getByLabelText('Flywheel max agents')).toHaveValue(8);
     expect(screen.getByLabelText('Flywheel scope')).toHaveValue('pan-only');
@@ -156,62 +155,17 @@ describe('RolesPanel', () => {
     expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Anthropic is not configured');
   });
 
-  it('renders a provider-default harness select for every top-level role', async () => {
+  it('does not render a per-role harness select — harness is provider-default-only (PAN-1984)', async () => {
     renderPanel();
 
     await screen.findAllByTestId('role-card');
+    // Harness is derived from each role's model provider; the per-role harness chooser was
+    // removed so the operator can no longer pick a harness that the backend would ignore.
     for (const role of ['Plan', 'Work', 'Strike', 'Review', 'Test', 'Ship', 'Flywheel']) {
-      const select = screen.getByLabelText(`${role} harness`);
-      expect(select).toHaveValue('');
-      expect(within(select).getByRole('option', { name: 'Provider default' })).toHaveValue('');
-      expect(within(select).getByRole('option', { name: 'Claude Code' })).toHaveValue('claude-code');
-      expect(within(select).getByRole('option', { name: 'Pi' })).toHaveValue('pi');
-      expect(within(select).getByRole('option', { name: 'Codex' })).toHaveValue('codex');
+      expect(screen.queryByLabelText(`${role} harness`)).toBeNull();
     }
-    expect(screen.getAllByLabelText('Claude Code logo')).toHaveLength(7);
-  });
-
-  it('persists explicit role harness overrides', async () => {
-    const user = userEvent.setup();
-    renderPanel();
-
-    await screen.findByLabelText('Work harness');
-    await user.selectOptions(screen.getByLabelText('Work harness'), 'pi');
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Work harness')).toHaveValue('pi');
-    });
-    expect(screen.getByLabelText('Pi logo')).toBeInTheDocument();
-
-    const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
-      url.toString() === '/api/settings' && init?.method === 'PUT'
-    ));
-    const body = JSON.parse(putCall?.[1]?.body as string);
-    expect(body.roles.work.harness).toBe('pi');
-    expect(body.roles.work.model).toBe('workhorse:mid');
-  });
-
-  it('clears role harness overrides when Provider default is selected', async () => {
-    const user = userEvent.setup();
-    const settingsWithHarness = structuredClone(settingsPayload);
-    settingsWithHarness.roles.plan = { ...settingsWithHarness.roles.plan, harness: 'codex' };
-    installFetchMock({ settings: settingsWithHarness });
-    renderPanel();
-
-    await screen.findByLabelText('Plan harness');
-    expect(screen.getByLabelText('Plan harness')).toHaveValue('codex');
-    await user.selectOptions(screen.getByLabelText('Plan harness'), '');
-
-    await waitFor(() => {
-      expect(screen.getByLabelText('Plan harness')).toHaveValue('');
-    });
-
-    const putCall = vi.mocked(global.fetch).mock.calls.findLast(([url, init]) => (
-      url.toString() === '/api/settings' && init?.method === 'PUT'
-    ));
-    const body = JSON.parse(putCall?.[1]?.body as string);
-    expect(body.roles.plan.harness).toBeNull();
-    expect(body.roles.plan.model).toBe('workhorse:expensive');
+    // The model chooser for each role remains.
+    expect(screen.getByLabelText('Work model')).toBeInTheDocument();
   });
 
   it('expands work and review cards to show configured sub-role defaults', async () => {

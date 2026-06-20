@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bug, ChevronDown, ClipboardCheck, Code, DraftingCompass, Infinity as InfinityIcon, Loader2, Rocket, Users, Zap, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import { HARNESS_BRANDS, HarnessLogo, PROVIDER_BRANDS } from '../shared/branding';
+import { PROVIDER_BRANDS } from '../shared/branding';
 
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
@@ -372,47 +372,6 @@ function ModelPicker({ label, value, workhorses, providerGroups, providers, clau
   );
 }
 
-function RoleHarnessSelect({
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value?: Harness;
-  disabled: boolean;
-  onChange: (value: Harness | null) => void;
-}) {
-  const logoHarness = value ?? 'claude-code';
-  const logoLabel = value ? HARNESS_BRANDS[value].label : 'Provider default';
-
-  return (
-    <label className="space-y-1.5">
-      <span className="text-xs font-medium text-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-popover"
-          title={`${logoLabel} harness`}
-        >
-          <HarnessLogo harness={logoHarness} className="h-4 w-4" />
-        </span>
-        <select
-          aria-label={label}
-          value={value ?? ''}
-          onChange={(event) => onChange(event.target.value ? event.target.value as Harness : null)}
-          disabled={disabled}
-          className="min-w-0 flex-1 px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-        >
-          <option value="">Provider default</option>
-          <option value="claude-code">Claude Code</option>
-          <option value="pi">Pi</option>
-          <option value="codex">Codex</option>
-        </select>
-      </div>
-    </label>
-  );
-}
-
 function getFlywheelConfig(settings: SettingsResponse | undefined): Pick<RoleConfig, 'harness'> & Required<Pick<RoleConfig, 'effort' | 'maxAgents' | 'scope'>> {
   return {
     ...DEFAULT_FLYWHEEL_CONFIG,
@@ -537,12 +496,6 @@ export function RolesPanel() {
                         claudeAuth={claudeAuthQuery.data}
                         disabled={saveMutation.isPending}
                         onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
-                      />
-                      <RoleHarnessSelect
-                        label={`${role.name} harness`}
-                        value={settings?.roles?.[role.id]?.harness}
-                        disabled={saveMutation.isPending}
-                        onChange={(harness) => saveMutation.mutate({ role: role.id, patch: { harness } })}
                       />
                     </div>
                   </div>
