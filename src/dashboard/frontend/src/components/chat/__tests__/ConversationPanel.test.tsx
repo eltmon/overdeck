@@ -430,4 +430,24 @@ describe('ConversationPanel rename flow', () => {
 
     expect(onViewModeChange).toHaveBeenCalledWith('conversation');
   });
+
+  // Detach affordance — a header button next to Copy link that opens the
+  // conversation in a new browser window. Same target as the ⋮ pop-out item
+  // and the drag-off-to-detach in the PaneBar.
+  it('exposes a Detach button that opens /conv/<id> in a new window', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderPanel();
+
+    const detach = screen.getByRole('button', { name: 'Detach conversation' });
+    expect(detach).toBeInTheDocument();
+    fireEvent.click(detach);
+
+    expect(openSpy).toHaveBeenCalledWith('/conv/1', '_blank', expect.stringContaining('popup=yes'));
+    openSpy.mockRestore();
+  });
+
+  it('hides the Detach button when the panel is embedded', () => {
+    renderPanel(mockConversation, { embedded: true });
+    expect(screen.queryByRole('button', { name: 'Detach conversation' })).toBeNull();
+  });
 });

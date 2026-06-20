@@ -107,4 +107,26 @@ describe('Stage', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: /New terminal/ }))
     expect(screen.getByTestId('terminal-drawer')).toBeTruthy()
   })
+
+  // Drag-to-detach (PAN-1591 ↔ detach affordance): dragging a conversation tab
+  // off the bar (no drop zone accepts it) opens a new window at /conv/<id>.
+  // The Stage resolves conversation.name → numeric id before opening.
+  it('dragging a conversation tab off the bar opens /conv/<id> in a new window', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    // Seed a conversation the agent pane can resolve. id=42 is the numeric
+    // deep-link target the Stage will use.
+    const conversations = [
+      { name: 'conv-1', id: 42, status: 'ended', cwd: '', tmuxSession: 'sess-1', issueId: null, createdAt: '2024-01-01', endedAt: null, lastAttachedAt: null, sessionAlive: false, title: 'Detached' },
+    ]
+    usePanesStore.getState().ensureHome(DECK)
+    usePanesStore.getState().addPane(DECK, { paneType: 'agent', label: 'Agent', conversationId: 'conv-1' })
+    renderStage(<Stage deckKey={DECK} renderHome={renderHome} renderIssue={renderIssue} conversations={conversations} />)
+
+    const agentTab = screen.getAllByRole('tab').find((t) => t.textContent?.includes('Detached'))
+    expect(agentTab).toBeTruthy()
+    fireEvent.dragEnd(agentTab!, { dataTransfer: { dropEffect: 'none' } })
+
+    expect(openSpy).toHaveBeenCalledWith('/conv/42', '_blank', expect.stringContaining('popup=yes'))
+    openSpy.mockRestore()
+  })
 })

@@ -1,0 +1,160 @@
+{
+  "version": "1",
+  "issueId": "PAN-1970",
+  "created": "2026-06-19T17:59:04.370Z",
+  "updated": "2026-06-20T00:00:12.233Z",
+  "gitState": {
+    "branch": "feature/pan-1970",
+    "sha": "8aabbadb68",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Extract the registration core out of projectAddCommand into a new server-safe module src/lib/project-registration.ts exporting registerProjectFromPath({path,name?}) -> {key,config}. Both the CLI (projectAddCommand) and the new POST /api/projects route consume it. No chalk/console/execSync in the helper.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Registration core may keep the existing SYNC write door (registerProjectSync) and sync hook symlinks (bounded one-shot, sanctioned by NFR-2). ONLY the `git init` subprocess must be async (execAsync/spawn) per NFR-1/PAN-70 — PAN-70 targets unbounded subprocess blocking, which only git init is here.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "'new' mode ordering for no-partial-write (AC-3): derive key -> dup-check (reject before ANY fs change) -> compute target <parentDir>/<slug(name)> -> reject if target exists & non-empty -> mkdir -p -> async git init -> registerProjectFromPath. slug = name.toLowerCase().replace(/[^a-z0-9-]/g,'-') (matches project.ts:98).",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "GET /api/fs/list-dirs is HOME-CLAMPED: default start path = user's home (~); any resolved path that escapes home (via .. or an absolute path outside home) is rejected (400) and never listed. Mirror the static-route normalization in server.ts:234-246. Browsing outside home is a NonGoal for this minimal flow.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Route placement: POST /api/projects goes into the EXISTING src/dashboard/server/routes/projects.ts (Effect HttpRouter.add, merged in projectsRouteLayer). The folder browser GET /api/fs/list-dirs goes into a NEW src/dashboard/server/routes/fs.ts, imported + merged into makeRoutesLayer in server.ts.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Per-route auth (NOT global): POST /api/projects must call rejectUnsafeDashboardMutationRequest(request) (CSRF/mutation gate, like settings.ts:811 / issues.ts); GET /api/fs/list-dirs must call rejectUnauthorizedDashboardRequest(request) (read gate, like discovered-sessions.ts). Async exec pattern = `const execAsync = promisify(exec)` as in routes/resources.ts:29.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "PAN-1969 coordination: the wiring bead implements onNewProject() to open the modal AND ensures a '+ New Project' affordance exists in the sidebar PROJECTS header + Home Projects section. If PAN-1969 already added the trigger/stub, replace the stub body and do NOT add a duplicate button. Keeps PAN-1970 independently shippable/demoable even if PAN-1969 has not merged.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Frontend modal uses the CSS-module overlay/dialog pattern matching ForkModal + command-deck.module.css (.forkHelpOverlay/.forkHelpDialog/.forkHeader/.forkFooter), not inline Tailwind. Folder picker is its own subcomponent so it is independently testable. API calls use the cookie-auth fetchWithTimeout helper (src/lib/apiFetch.ts); after success invalidate React Query keys ['command-deck-projects'] and ['registered-projects'] and select the new project (setSelectedProjectKey + usePanesStore.ensureHome).",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "'Add existing' accepts any folder (git repo or not) — registration does not require .git; git hooks install only when .git is present (preserves projectAddCommand behavior today). No-loss refactor: `pan project add` keeps identical resulting projects.yaml entry + console next-steps output.",
+      "recordedAt": "2026-06-19T18:05:59.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Cross-issue coordination with PAN-1969 (onNewProject handler + '+ New Project' button). PAN-1969 may or may not be merged when this work runs (only PRDs exist on main as of 8aabbadb68).",
+      "mitigation": "Wiring bead detects an existing onNewProject/stub + trigger and reuses it; only adds the button if absent. Never render two '+ New Project' triggers."
+    },
+    {
+      "id": "H2",
+      "summary": "Path traversal in GET /api/fs/list-dirs — a naive readdir of an attacker-supplied ?path= could list arbitrary host directories.",
+      "mitigation": "Resolve + clamp to home; reject `..` escapes and absolute paths outside home (D4). Dedicated security test is a required AC (AC-4). Reuse the normalization shape from server.ts:234-246."
+    },
+    {
+      "id": "H3",
+      "summary": "Partial write on failure — creating the folder / git init and THEN failing registration would leave an orphan dir or a half-registered project.",
+      "mitigation": "Sequence per D3: all rejections (dup key, non-empty target) happen before any mkdir/git init. AC-3 test asserts no projects.yaml mutation on the rejection paths."
+    },
+    {
+      "id": "H4",
+      "summary": "git init via execSync would freeze the dashboard event loop (PAN-70).",
+      "mitigation": "Use execAsync (promisify(exec)) or spawn, like routes/resources.ts. AC asserts no new execSync import in server code (NFR-1)."
+    },
+    {
+      "id": "H5",
+      "summary": "Bypassing the single write door — writing projects.yaml directly would violate NFR-2 / single-source-of-truth.",
+      "mitigation": "Register ONLY via registerProjectSync (through registerProjectFromPath). Do not add any new projects.yaml writer. AC-6."
+    },
+    {
+      "id": "H6",
+      "summary": "Skills <-> CLI lockstep — changing pan project add flags/help would require updating skills/pan-* in the same commit (lint-skills.sh fails CI on drift).",
+      "mitigation": "The refactor must keep the projectAddCommand CLI surface (flags + help strings) identical (D9). If any help text changes, update the matching skill in the same commit."
+    },
+    {
+      "id": "H7",
+      "summary": "preTrustDirectory has both preTrustDirectorySync (workspace-manager.ts:1100) and preTrustDirectory (1581) exports; projectAddCommand dynamically imports preTrustDirectory.",
+      "mitigation": "Helper calls the SAME symbol projectAddCommand uses today (preTrustDirectory). Verify the export at implementation time; keep the existing non-fatal try/catch around it."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-8",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-19T18:05:59.000Z",
+      "reason": "planning",
+      "note": "Auto-planning session for PAN-1970: minimal New Project dashboard flow (add existing / new folder + git init -> register). 8 beads across shared registration core, POST /api/projects (existing+new), GET /api/fs/list-dirs, folder picker, modal, and wiring.",
+      "agentModel": "agent:claude-opus-4-8"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T19:16Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-06-19T19:16:14.722Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T19:16:14.770Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T19:27Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-06-19T19:27:25.303Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T19:28Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-06-19T19:28:40.023Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:04Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-06-19T20:04:21.661Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-19T20:17Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-19T20:17:15.026Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-19T20:17:15.936Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-06-20T00:00Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-06-20T00:00:11.314Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-06-20T00:00:12.233Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-06-20T00:00:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1970\n\n# Review Synthesis — PAN-1970 — 2026-06-19T16:22:00-04:00\n\n## Verdict: CHANGES REQUESTED — server-side home-directory boundary can be bypassed\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/context.json\n- Branch: feature/pan-1970\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970\n- HEAD reviewed: 177f49b0231f3a7dfb56e622978b0b2e0ec12872\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/security.md | 2 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] Symlink bypass allows browsing directories outside home — `src/dashboard/server/routes/fs.ts:35`\n`GET /api/fs/list-dirs` performs the home clamp with lexical `resolve(normalize(rawPath))` string comparison against `homedir()`, then calls `readdir(target)`. A symlink inside the user's home that points outside home still passes the string-prefix check, and `readdir` follows the symlink. This violates the explicit home-clamp non-goal and can disclose directory names outside the allowed tree.\n\nFix by canonicalizing both the home root and requested path with `realpath` before the boundary check, rejecting missing/non-directory targets cleanly, and adding a regression test with a symlink under a temp home pointing outside that temp home.\n\n### [security] Project registration endpoint can write to and pre-trust arbitrary absolute paths — `src/dashboard/server/routes/projects.ts:635`\n`POST /api/projects` accepts any absolute `path` for `mode='existing'` and any absolute `parentDir` for `mode='new'`, without enforcing the folder browser's home-directory boundary. A direct dashboard API caller can register, create, `git init`, and pre-trust directories outside `$HOME` wherever the server process has permission.\n\nFix by moving canonical home-boundary validation into shared server-side validation used by both `GET /api/fs/list-dirs` and `POST /api/projects`. Existing projects should canonicalize and require the target directory to remain under canonical `$HOME`; new projects should canonicalize the parent and final target and reject symlink escapes before filesystem writes.\n\n### [correctness] Empty-slug project names register the parent directory under an empty key — `src/dashboard/server/routes/projects.ts:672`\nThe new-project route only checks `rawName.trim()`, then derives `key = slugify(name)` and `target = join(rawParent, slugify(name))`. Names such as `!!!` pass the required-name check but slugify to `\"\"`; `join(parentDir, \"\")` resolves to the parent directory, causing `git init` and registration to target the parent under an empty project key. `registerProjectFromPath` repeats the same empty-key behavior.\n\nFix by validating the derived slug/key before filesystem work and by rejecting empty derived keys in the shared registration core so both the dashboard route and refactored CLI cannot write invalid project registry entries.\n\n### [requirements] New Project mode lacks the required `~/Overdeck` default parent — `src/dashboard/frontend/src/components/CommandDeck/NewProjectModal.tsx:28`\nFR-4 and AC-1 require New Project mode to default the parent folder to `~/Overdeck`, preview `<parent>/<slug>`, and support the reference flow where entering `Bugs` creates `~/Overdeck/bugs`. The modal initializes `parentDir` to an empty string, renders `FolderPicker` without `initialPath`, suppresses the preview until a parent is manually selected, and disables Start while `parentDir` is empty.\n\nFix by initializing New Project mode with `~/Overdeck` as the concrete default parent, wiring that into the picker/preview state, and adding a modal test covering the default-parent flow.\n\n## Non-blocking Findings\n\n### [performance] Add a limit/pagination contract to folder browsing — `src/dashboard/server/routes/fs.ts:43`\n`GET /api/fs/list-dirs` scans, filters, sorts, returns, and renders every immediate child directory. This can become slow in very large home subdirectories. Consider a server-side limit with `truncated` metadata, cursor/search pagination, or a bounded UI rendering contract.\n\n### [performance] Avoid full-file TLDR log reads on each cost hook invocation — `sync-sources/hooks/record-cost-event.js:30339`\n`captureTldrMetricsSync()` uses byte checkpoints but still reads the whole TLDR log before slicing from the checkpoint. Long-lived workspaces with large TLDR logs will pay increasing hook cost. Consider reading only the delta from the checkpoint offset or rotating/compacting the TLDR metrics logs.\n\n### [requirements] Stub UI manifest finding is mitigated\nThe manifest flagged `const [pending, setPending] = useState(false)` as suspected tab/mode state. The requirements reviewer confirmed the actual mode state is `useState<Mode>('existing')`, `switchMode()` writes it, and both exposed modes submit real `/api/projects` requests.\n\n## Clean Sub-roles\nNone. All sub-roles reported either blocking or advisory findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1970/.pan/review/agent-pan-1970-review-177f49b0/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1970 -m \"Fixed review issues\"`"
+    }
+  ]
+}

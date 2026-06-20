@@ -549,6 +549,14 @@ export function ConversationPanel({
     });
   }, [conversation.id, viewMode]);
 
+  // Open the conversation in a new browser window — the "detach" affordance
+  // matching the ⋮ → "Pop out to window" menu item, lifted into the header so
+  // it's discoverable next to Copy link. Mirrors Stage's drag-off-to-detach so
+  // both entry points land on the same /conv/<id> deep-link.
+  const handleDetach = useCallback(() => {
+    window.open(`/conv/${conversation.id}`, '_blank', 'popup=yes,width=920,height=1040');
+  }, [conversation.id]);
+
   const openHandoffDoc = useCallback(() => {
     window.open(`/api/conversations/${encodeURIComponent(conversation.name)}/handoff-doc`, '_blank', 'noopener,noreferrer');
   }, [conversation.name]);
@@ -686,6 +694,18 @@ export function ConversationPanel({
                 aria-label="Copy link to conversation"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+
+              {/* Detach — open the conversation in a new browser window. Same
+                  target as the ⋮ → "Pop out to window" item, exposed here so
+                  the action is discoverable next to Copy link. */}
+              <button
+                className={styles.copyLinkButton}
+                onClick={handleDetach}
+                title="Detach conversation"
+                aria-label="Detach conversation"
+              >
+                <ExternalLink size={14} />
               </button>
 
               {/* Overflow menu — long-tail / prefs / config / destructive */}

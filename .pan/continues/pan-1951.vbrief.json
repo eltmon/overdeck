@@ -1,0 +1,84 @@
+{
+  "version": "1",
+  "issueId": "PAN-1951",
+  "created": "2026-06-17T11:48:47.975Z",
+  "updated": "2026-06-17T12:30:00.000Z",
+  "gitState": { "branch": "feature/pan-1951", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Session name changes from per-bead (inspect-<issue>-<beadSlug>) to per-issue (inspect-<issueLower>). Per-issue is the persistent identity across all bead inspections.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Inspector uses print-mode (-p flag via launcher promptFile) not interactive mode. Claude exits after each bead; remain-on-exit on keeps the tmux pane open. Resume is via --resume <savedClaudeSessionId> -p continuationPrompt on the next bead — no deliverAgentMessage needed.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Continuation prompt = short bead brief only (bead description + diff scope + verdict signaling). Full Jidoka/constraint-compliance instructions survive in JSONL history. No full-prompt re-issue on resume.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Context budget = never hard-reset. Claude's built-in compaction handles context growth over a long issue. No inspectionCount threshold.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Model guard: if resolveModel() returns a different model than the sessionModel stored in runtime.json, force a cold spawn (new randomUUID(), full prompt). Same-model = warm resume.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "BLOCKED retry uses warm resume — the inspector session that issued the BLOCKED verdict retains its reasoning, improving re-inspection accuracy.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Deacon crash watchdog must check isPaneDead in addition to sessionExists. remain-on-exit on keeps sessions alive after exit, so sessionExists alone can no longer distinguish a running inspector from a finished one.",
+      "recordedAt": "2026-06-17T12:30:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Implementation checkpoint: does 'claude --resume <uuid> \"$prompt\"' correctly deliver the continuation prompt as the next user turn? The launcher generator supports resumeSessionId + promptFile together (verified at launcher-generator.ts:531-554), but empirical verification in a real session is required.",
+      "mitigation": "Work agent should test: run claude --resume <some-uuid> 'test message' against an existing session and confirm the message is received as a new turn. If not, fallback: launch with --resume only (no -p) then deliver via deliverAgentMessage tmux path."
+    },
+    {
+      "id": "H2",
+      "summary": "The per-issue agentDir (inspect-<issueLower>/) is shared across all bead inspections. launcher.sh and task-prompt.md are overwritten per bead. This is safe because each bead is sequential, but if two beads were somehow dispatched concurrently, the files would race.",
+      "mitigation": "Concurrent dispatch cannot happen in normal pipeline operation (work agent waits for verdict before proceeding). Document this assumption as a non-goal for concurrency safety."
+    },
+    {
+      "id": "H3",
+      "summary": "The killSession call at the start of spawnInspectAgentPromise will kill the remain-on-exit dead pane, then create a fresh tmux session. This is correct — but if killSession fails silently and createSession fails because the session name is taken, the spawn will fail.",
+      "mitigation": "The existing .catch(() => {}) on killSession is intentional (session may not exist). createSession already errors on duplicate names; the Error will propagate and return { success: false }. The work agent handles this and retries."
+    },
+    {
+      "id": "H4",
+      "summary": "getAgentRuntimeStateSync reads from the in-process mirror (empty in fresh CLI processes). When pan inspect is invoked from the CLI (not the dashboard server), the mirror is empty and the function returns null — forcing a cold spawn even when runtime.json has saved state.",
+      "mitigation": "Check if getAgentRuntimeStateSync is reliable in CLI context. If not, use getAgentRuntimeStateSync's underlying file-read path (patchRuntimeJson reads from disk). Alternatively: read runtime.json directly with readFileSync as a fallback. The work agent should verify this during implementation."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-sonnet-4-6",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-06-17T11:48:47.975Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1951: Inspector agent should resume a warm session instead of cold-spawning a new one per bead",
+      "agentModel": "agent:claude-sonnet-4-6"
+    },
+    {
+      "timestamp": "2026-06-17T12:30:00.000Z",
+      "reason": "planning-complete",
+      "note": "vBRIEF written. 6 beads: per-issue-session-naming, inspect-remain-on-exit, inspect-continuation-prompt, inspect-state-persistence (all simple/parallel), inspect-resume-dispatch (complex, requiresInspection), deacon-inspect-liveness (simple). Key decisions: print-mode + remain-on-exit + --resume approach; short continuation prompt; no context budget reset; model guard on sessionModel mismatch.",
+      "agentModel": "agent:claude-sonnet-4-6"
+    }
+  ],
+  "feedback": []
+}

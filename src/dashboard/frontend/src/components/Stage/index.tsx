@@ -302,6 +302,21 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
     [conversations],
   )
 
+  // Detach a conversation tab into its own browser window — same target as
+  // the in-pane detach icon and the ⋮ → "Pop out to window" menu item. The
+  // PaneBar invokes this when a tab drag ends outside any split drop zone.
+  const handleTabDetach = useCallback(
+    (_paneId: string, conversationId: string) => {
+      const conv = conversations.find((c) => c.name === conversationId)
+      // Resolve numeric id; conversation.name is the stable key, .id is the
+      // numeric row used by /conv/<id> deep-links.
+      const numericId = (conv as unknown as { id?: number } | undefined)?.id
+      const targetId = numericId ?? conversationId
+      window.open(`/conv/${targetId}`, '_blank', 'popup=yes,width=920,height=1040')
+    },
+    [conversations],
+  )
+
   // PAN-1561: the "+" opens a menu of what to create, so it's explicit rather
   // than guessing. Fallback (⌘T / no menu) toggles the terminal drawer.
   const handleAddPane = useCallback(() => toggleTerminal(), [toggleTerminal])
@@ -518,6 +533,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         onPaneContextMenu={handlePaneContextMenu}
         onTabDragStart={setDraggingPaneId}
         onTabDragEnd={() => setDraggingPaneId(null)}
+        onTabDetach={handleTabDetach}
       />
       <div className={styles.paneArea}>
         {effectiveLayout && (

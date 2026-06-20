@@ -37,6 +37,10 @@ export interface PaneBarProps {
   /** Drag a tab → host shows pane drop zones for split-by-drag (PAN-1591). */
   onTabDragStart?: (paneId: PaneId) => void
   onTabDragEnd?: () => void
+  /** Drag a tab off the bar without landing on a drop zone → detach it. Only
+   *  fires for agent panes that carry a `conversationId`. Mirrors the in-pane
+   *  detach icon and the ⋮ → "Pop out to window" menu item. */
+  onTabDetach?: (paneId: PaneId, conversationId: string) => void
 }
 
 /**
@@ -45,7 +49,7 @@ export interface PaneBarProps {
  * ⌘N hint for the first nine panes, and exposes close (×, non-HOME only) and
  * add (+) affordances via callbacks.
  */
-export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd }: PaneBarProps) {
+export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, onClose, onAdd, newActions, onPaneContextMenu, onTabDragStart, onTabDragEnd, onTabDetach }: PaneBarProps) {
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const addBtnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -157,7 +161,24 @@ export const PaneBar = memo(function PaneBar({ panes, activePaneId, onSelect, on
               e.dataTransfer.setData('application/x-pane-id', pane.paneId)
               onTabDragStart?.(pane.paneId)
             }}
-            onDragEnd={() => onTabDragEnd?.()}
+            onDragEnd={(e) => {
+              onTabDragEnd?.()
+              // Detach: the drag ended without landing on a registered drop
+              // zone (the pane layout's split overlays). dropEffect === 'none'
+              // is the browser's signal that no target accepted the drag —
+              // same affordance as Chrome/Firefox tab dragging. Only agent
+              // panes backed by a conversation can be detached; session-backed
+              // agent panes (work/review specialists) and other pane types
+              // don't have a standalone window to open into.
+              if (
+                onTabDetach &&
+                pane.paneType === 'agent' &&
+                pane.conversationId &&
+                e.dataTransfer.dropEffect === 'none'
+              ) {
+                onTabDetach(pane.paneId, pane.conversationId)
+              }
+            }}
             onClick={() => onSelect(pane.paneId)}
             onAuxClick={(e) => {
               // Middle-click closes the tab (standard browser/editor convention).

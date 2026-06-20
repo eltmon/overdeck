@@ -29781,10 +29781,11 @@ function readServerCmdlineSync(pid) {
 */
 function warnIfServerInTmuxSpawnScopeSync() {
 	const pid = findManagedServerPidSync();
-	if (pid === void 0) return;
+	if (pid === void 0) return false;
 	const cgroup = readServerCgroupSync(pid);
-	if (!cgroup.includes("tmux-spawn-")) return;
+	if (!cgroup.includes("tmux-spawn-")) return false;
 	console.warn(`[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} lives in a per-spawn scope. Cgroup: ${cgroup.trim().replace(/\n/g, " ")}. Killing the founding session/agent may destroy the entire shared server. Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`);
+	return true;
 }
 /**
 * PAN-1798: warn if the live shared server was founded implicitly by a client
@@ -29794,10 +29795,11 @@ function warnIfServerInTmuxSpawnScopeSync() {
 */
 function warnIfServerCmdlineIsDirtySync() {
 	const pid = findManagedServerPidSync();
-	if (pid === void 0) return;
+	if (pid === void 0) return false;
 	const cmdline = readServerCmdlineSync(pid);
-	if (!cmdline.includes("new-session")) return;
+	if (!cmdline.includes("new-session")) return false;
 	console.warn(`[tmux] WARNING (PAN-1798): shared tmux server PID ${pid} has a dirty cmdline founded by a client new-session: ${cmdline.slice(0, 240)}. Conversation/agent teardown that matches cmdlines may destroy the entire shared server. Restart Overdeck to migrate to the dedicated unit '${MANAGED_TMUX_SERVER_UNIT}'.`);
+	return true;
 }
 /**
 * PAN-1798: a tmux server founded implicitly by a client `new-session` (e.g. a
@@ -29846,8 +29848,9 @@ function sanitizeManagedServerGlobalEnvSync(cleanEnv) {
 		], { stdio: "ignore" });
 	} catch {}
 }
-/** PAN-1798: surface the dirty-founding teardown hazard once per process, not per spawn. */
-let warnedManagedServerDirty = false;
+/** PAN-1798: surface dirty-founding teardown hazards once per process, not per spawn. */
+let warnedManagedServerTmuxSpawnScope = false;
+let warnedManagedServerDirtyCmdline = false;
 /**
 * PAN-1798: ensure the shared tmux server is running in a dedicated, long-lived
 * systemd user service — never inside an agent/conversation spawn scope. The
@@ -29863,11 +29866,8 @@ function ensureOverdeckTmuxServerSync(cleanEnv) {
 	}
 	if (isManagedServerAliveSync()) {
 		sanitizeManagedServerGlobalEnvSync(cleanEnv);
-		if (!warnedManagedServerDirty) {
-			warnIfServerInTmuxSpawnScopeSync();
-			warnIfServerCmdlineIsDirtySync();
-			warnedManagedServerDirty = true;
-		}
+		if (!warnedManagedServerTmuxSpawnScope) warnedManagedServerTmuxSpawnScope = warnIfServerInTmuxSpawnScopeSync();
+		if (!warnedManagedServerDirtyCmdline) warnedManagedServerDirtyCmdline = warnIfServerCmdlineIsDirtySync();
 		return;
 	}
 	const args = [
