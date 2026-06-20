@@ -540,7 +540,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     description: cmd.description,
     icon: ChevronRight,
     group: `Commands · ${cmd.group}`,
-    keywords: ['pan', cmd.group, ...(cmd.keywords ?? [])],
+    // `pan` is canonical; `overdeck`/`ovr` are brand aliases so typing either surfaces the catalog.
+    keywords: ['pan', 'overdeck', 'ovr', cmd.group, ...(cmd.keywords ?? [])],
     onSelect: () => {
       void copyToClipboard(cmd.name).then((ok) => {
         if (ok) toast.success(`Copied: ${cmd.name}`);

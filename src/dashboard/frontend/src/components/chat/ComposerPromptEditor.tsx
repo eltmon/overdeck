@@ -358,13 +358,24 @@ interface SlashMenuProps {
   anchorRect: DOMRect | null;
 }
 
+// `pan` is the canonical CLI verb; `ovr` and `overdeck` are brand aliases.
+// Typing either (optionally followed by a verb) surfaces the same `pan …`
+// entries, so "/ovr sync" matches the "pan sync" command.
+const BRAND_ALIASES = ['overdeck', 'ovr'];
+
 function filterCommands(commands: SlashCommand[], filter: string): SlashCommand[] {
   const normalizedFilter = filter.toLowerCase();
-  return commands.filter(
-    (cmd) =>
-      cmd.label.toLowerCase().includes(normalizedFilter) ||
-      cmd.description.toLowerCase().includes(normalizedFilter),
+  const alias = BRAND_ALIASES.find(
+    (a) => normalizedFilter === a || normalizedFilter.startsWith(`${a} `),
   );
+  const aliasFilter = alias ? `pan${normalizedFilter.slice(alias.length)}` : null;
+  return commands.filter((cmd) => {
+    const haystack = `${cmd.label} ${cmd.description}`.toLowerCase();
+    return (
+      haystack.includes(normalizedFilter) ||
+      (aliasFilter !== null && haystack.includes(aliasFilter))
+    );
+  });
 }
 
 function renderHighlightedText(text: string, filter: string, className: string) {
