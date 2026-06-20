@@ -907,18 +907,45 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
-    // --fresh: drop the saved session pointer (non-destructive — JSONL transcripts
-    // are never touched) so the start below opens a brand-new Claude session. This
-    // is the one-step "restart fresh" path, e.g. switching a stopped agent's model
-    // where the saved session can't resume under different provider routing. Skip
-    // silently when there's no prior agent state (nothing to clear); resetSession
-    // refuses (and exits with guidance) if the agent is still running.
-    if (options.fresh && getAgentStateSync(`agent-${id.toLowerCase()}`)) {
-      const { resetSessionCommand } = await import('./reset-session.js');
-      await resetSessionCommand(id);
+    // --fresh: wipe the work agent's state directory under
+    // ~/.overdeck/agents/agent-<id>/ (PAN-1985) so the start below opens a
+    // brand-new session against a clean dir. The new agent reads
+    // .pan/continue.json, the vBRIEF, the beads, and the branch state to
+    // pick up where the prior run left off.
+    //
+    // Operator note: --fresh is the deliberate override for harness/model
+    // switches (where the saved Claude session cannot be resumed under a
+    // different harness) and for "I want a clean work run" recovery. The
+    // NORMAL review flow continues the same session across re-dispatches
+    // (PAN-1862); --fresh is the escape hatch that pays the re-research
+    // cost. Workspace, vBRIEF, beads, .pan/continue.json, .pan/feedback/,
+    // branch, and commit history are all left untouched.
+    //
+    // Refuses if a live tmux session is alive (the wipe would race with it).
+    // For the narrow "just clear the four session tracking files" reset, use
+    // `pan reset-session <id>` directly — it's intentionally non-destructive
+    // and is used by the harness-policy subsystem as a building block.
+    if (options.fresh) {
+      const agentIdForFresh = `agent-${id.toLowerCase()}`;
+      const priorState = getAgentStateSync(agentIdForFresh);
+      if (priorState) {
+        const { sessionExistsSync } = await import('../../lib/tmux.js');
+        if (sessionExistsSync(agentIdForFresh)) {
+          console.error(chalk.red(`Agent ${agentIdForFresh} has a live tmux session. Run 'pan kill ${id}' first, then retry --fresh.`));
+          process.exit(1);
+        }
+        const { wipeAgentStateDirs } = await import('../../lib/agents.js');
+        const wipeResult = await wipeAgentStateDirs(id);
+        console.log(chalk.dim(`  --fresh: wiped ${wipeResult.removed.length} agent state director${wipeResult.removed.length === 1 ? 'y' : 'ies'} for ${id} (path: ${wipeResult.path})`));
+      }
+      // No prior state → nothing to wipe; fall through to the normal start
+      // path (which will create the agent dir fresh).
     }
 
-    // Refuse fresh start when a resumable session already exists.
+    // Refuse fresh start when a resumable session still exists after the
+    // --fresh wipe. (The wipe above should have cleared it, but guard
+    // belt-and-suspenders.) Users must choose resume, `pan start --fresh`,
+    // or reset-session explicitly.
     // Users must choose resume, `pan start --fresh`, or reset-session explicitly.
     try {
       assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
