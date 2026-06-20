@@ -760,8 +760,16 @@ async function resolveSessionFile(conv: Conversation): Promise<string | null> {
   if (conv.harness === 'codex') {
     return resolveCodexRolloutPath(conv.tmuxSession);
   }
-  if (conv.claudeSessionId) {
-    return sessionFilePath(conv.cwd, conv.claudeSessionId);
+  // claude-code: a work/conversation agent can be re-spawned or rotated onto a
+  // NEW Claude session (fresh start, compact recovery, model/harness drift).
+  // conv.claudeSessionId is captured once and goes stale, pinning the panel to an
+  // OLD transcript while the terminal shows the live one. Resolve the agent's
+  // freshest live session (the same session.id → sessions.json mtime lookup the
+  // work-agent transcript resolver uses), falling back to the recorded id.
+  const freshest = await resolveClaudeSessionId(conv.tmuxSession);
+  const sessionId = freshest ?? conv.claudeSessionId;
+  if (sessionId) {
+    return sessionFilePath(conv.cwd, sessionId);
   }
   return null;
 }
