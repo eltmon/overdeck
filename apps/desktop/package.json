@@ -2,6 +2,9 @@
   "name": "@overdeck/desktop",
   "version": "0.21.0",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "dist-electron/main.js",
   "productName": "Overdeck",
   "repository": {
