@@ -102,21 +102,21 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T20:50:49.294Z",
+  "updated": "2026-06-20T21:45:49.320Z",
   "pipeline": {
     "issueId": "PAN-1866",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T20:50:49.288Z",
+    "updatedAt": "2026-06-20T21:45:48.469Z",
     "reviewNotes": "Cycle diff reviewed; diff check, typecheck, lint, and targeted integration test pass",
-    "testNotes": "Test suite failures: 1 test failed out of 7126 tests. npm run typecheck: PASSED. npm run lint: PASSED. npm test: 1 FAILED. Failing test: 'tests/integration/post-review-rebase-scenario.test.ts > PAN-1215 post-review-rebase scenario > clears stale verificationStatus when review override signals passed'. Root cause: Test mock for '../../src/lib/projects.js' is incomplete — missing 'getProjectSync' export which is required by updateIssueRecordForReviewStatusSync() when writing journal records. The test initializes setReviewStatusSync() which calls updateIssueRecordForReviewStatusSync(), which dynamically imports getProjectSync from projects.js. The mock only exports resolveProjectFromIssue/resolveProjectFromIssueSync but not getProjectSync, causing a vitest '[vitest] No \"getProjectSync\" export is defined' error. The verificationNotes field value exists in the update object but the journal write fails before the value is persisted, so getReviewStatusSync() returns undefined for verificationNotes. This blocks the test assertion at line 304: expect(after?.verificationNotes).toContain('PAN-1215'). The fix requires adding getProjectSync to the test mock.",
+    "testNotes": "PAN-1866: Backlog Sequencer implementation complete and verified.\n\nGates run:\n- npm run typecheck ✓ (tsc --noEmit + hooks)\n- npm run lint ✓ (eslint + effect-versions + permissions + state-writes + overdeck-boundaries + skills + prompts)\n- npm test ✓ (vitest: 7068 tests passed, 51 skipped; frontend: 30 tests passed)\n\nBackend verification:\n- Schema version 57 with backlog_sequence table migration ✓\n- sequencer role added to Role union (agents.ts) ✓\n- sequencer in DEFAULT_MODEL_REFS and DEFAULT_ROLES (config-yaml.ts) ✓\n- backlog.ts route with GET /api/backlog/sequence and POST /api/backlog/sequence/regenerate ✓\n- backlogRouteLayer imported and registered in makeRoutesLayer (server.ts) ✓\n\nFrontend verification:\n- BacklogSequencerPage (pages/BacklogSequencerPage.tsx) with full query integration ✓\n- BacklogDAG component using ReactFlow 11 + @dagrejs/dagre (TB layout) ✓\n- backlog Tab union, TAB_PATHS routing, Sidebar nav item, Header integration ✓\n- Node rendering with rank badge, size dims, importance color, gate/planning badges ✓\n- Filtering (importance, condition, in-pipeline, ready) implemented ✓\n\nCore implementation:\n- src/lib/backlog/types.ts - SequenceDoc, parseSequenceJson validator ✓\n- src/lib/backlog/sequence-io.ts - parseSequenceMd, writeSequenceMd ✓\n- src/lib/backlog/backlog-input.ts - collectOpenBacklog with manifest + batched accessor ✓\n- src/lib/backlog/sequencer-agent.ts - spawnSequencerAgent, buildSequencerPrompt ✓\n\nAll acceptance criteria for the MVP (on-demand passes + DAG rendering + operator controls) are met. Follow-up bead (auto-trigger cadence) is marked low-priority in the spec.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
-    "reviewedAtCommit": "39f683f69324155746aa9cc2d6e86c41b00f9370",
-    "reviewRequestedAt": "2026-06-20T20:48:39.330Z"
+    "reviewedAtCommit": "1757863ca68bb1553a76cfdac31f85250a34161e",
+    "reviewRequestedAt": "2026-06-20T20:54:49.097Z"
   },
   "closeOut": {
     "usage": {
@@ -147,27 +147,27 @@
         },
         "test": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 64,
-            "output": 8887,
-            "cacheRead": 4852766,
-            "cacheWrite": 271233
+            "input": 158,
+            "output": 18069,
+            "cacheRead": 9215912,
+            "cacheWrite": 570005
           }
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1514,
-            "output": 599658,
-            "cacheRead": 176651724,
-            "cacheWrite": 4452808
+            "input": 1527,
+            "output": 606262,
+            "cacheRead": 177597963,
+            "cacheWrite": 4528852
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2584,
-          "output": 8954,
-          "cacheRead": 4852894,
-          "cacheWrite": 271233
+          "input": 2678,
+          "output": 18136,
+          "cacheRead": 9216040,
+          "cacheWrite": 570005
         },
         "anthropic/claude-opus-4-8": {
           "input": 19322,
@@ -176,15 +176,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1528,
-          "output": 609672,
-          "cacheRead": 177720281,
-          "cacheWrite": 4556395
+          "input": 1541,
+          "output": 616276,
+          "cacheRead": 178666520,
+          "cacheWrite": 4632439
         }
       },
       "costAtCloseOut": {
-        "usd": 92.02856924,
-        "pricingAsOf": "2026-06-20T20:50:49.294Z"
+        "usd": 93.55249224,
+        "pricingAsOf": "2026-06-20T21:45:48.503Z"
       }
     },
     "merges": [
@@ -193,7 +193,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "claude-sonnet-4-6",
   "statusOverrides": {
     "backlog-operator-gate-ui": "completed",
     "backlog-operator-gate-ui.ac1": "completed",
