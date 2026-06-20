@@ -487,6 +487,30 @@ export function setReviewStatusSync(
   return updated;
 }
 
+/**
+ * PAN-1988 — deliver review feedback to the work agent from the HOST when a blocked/failed
+ * verdict is reconciled from the journal. Dynamic import to avoid a static import cycle
+ * (review-verdict-feedback → review-status). Fully best-effort: in a sandboxed agent process the
+ * delivery fails (host paths blocked) and is swallowed; the host process performs the real
+ * notification. Never throws into the read path.
+ */
+async function deliverReviewVerdictFeedbackHostSide(issueId: string, status: ReviewStatus): Promise<void> {
+  try {
+    const { deliverReviewVerdictFeedback } = await import('./cloister/review-verdict-feedback.js');
+    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+      issueId,
+      verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
+      notes: status.reviewNotes,
+      prUrl: status.prUrl,
+    }));
+    if (result.agentMessageSent) {
+      console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
+    }
+  } catch (err) {
+    console.warn(`[review-status] host-side review feedback delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export function getReviewStatusSync(issueId: string): ReviewStatus | null {
   const dbStatus = getReviewStatusFromDbSync(issueId);
   const journal = readJournalStatusSync(issueId);
@@ -526,6 +550,20 @@ export function getReviewStatusSync(issueId: string): ReviewStatus | null {
       dbUpsert(reconciled);
     } catch {
       // Read-only DB (a sandboxed reader) — the host reconciles when it reads. Non-fatal.
+    }
+
+    // PAN-1988 — host-owned review FEEDBACK delivery. A sandboxed review agent records its
+    // verdict to the journal but cannot notify the work agent (the work agent's tmux/mail and
+    // the network are outside its jail — "side effects failed due restricted network / readonly
+    // host paths"). When the HOST reconciles a NEW blocked/failed review verdict, it delivers the
+    // feedback here. Fires exactly once per verdict: the reconcile only runs while the journal is
+    // newer than the DB, and the dbUpsert above makes the DB catch up, so the next read does not
+    // re-fire. In a sandboxed agent process the delivery is a best-effort no-op (host paths
+    // blocked); the host's read performs the real delivery. Fire-and-forget.
+    const wasBlocked = dbStatus?.reviewStatus === 'blocked' || dbStatus?.reviewStatus === 'failed';
+    const nowBlocked = reconciled.reviewStatus === 'blocked' || reconciled.reviewStatus === 'failed';
+    if (nowBlocked && !wasBlocked) {
+      void deliverReviewVerdictFeedbackHostSide(issueId, reconciled);
     }
     return reconciled;
   }

@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Effect } from 'effect';
 import type { ReviewStatus } from '../review-status.js';
+
+const feedback = vi.hoisted(() => ({ deliver: vi.fn(() => Effect.succeed({ agentMessageSent: true, prCommentPosted: false })) }));
+vi.mock('../cloister/review-verdict-feedback.js', () => ({ deliverReviewVerdictFeedback: feedback.deliver }));
 
 // Mock the DB cache layer and the journal layer so we can drive getReviewStatusSync /
 // setReviewStatusSync deterministically without touching SQLite or the filesystem.
@@ -79,6 +83,35 @@ describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
 
     expect(result?.reviewNotes).toBe('note');
     expect(db.upsert).not.toHaveBeenCalled(); // no reconcile write
+  });
+
+  it('delivers feedback to the work agent host-side when reconciling a NEW blocked verdict', async () => {
+    // DB was 'reviewing' (review in progress); journal now carries the fresh 'blocked' verdict.
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'reviewing', updatedAt: '2026-06-20T07:00:00.000Z' }));
+    journal.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-06-20T07:22:21.788Z',
+      durable: { reviewStatus: 'blocked', testStatus: 'pending', reviewNotes: 'empty-backlog spawn' },
+    });
+
+    getReviewStatusSync('PAN-1866');
+    await new Promise((r) => setTimeout(r, 0)); // let the fire-and-forget delivery run
+
+    expect(feedback.deliver).toHaveBeenCalledTimes(1);
+    expect(feedback.deliver.mock.calls[0][0]).toMatchObject({ issueId: 'PAN-1866', verdict: 'blocked', notes: 'empty-backlog spawn' });
+  });
+
+  it('does NOT re-deliver feedback when the verdict was already blocked (no transition)', async () => {
+    // DB already 'blocked'; journal newer (e.g. a later unrelated field) but still 'blocked'.
+    db.getFromDb.mockReturnValue(dbRow({ reviewStatus: 'blocked', updatedAt: '2026-06-20T07:00:00.000Z' }));
+    journal.readJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-06-20T07:30:00.000Z',
+      durable: { reviewStatus: 'blocked', testStatus: 'failed' },
+    });
+
+    getReviewStatusSync('PAN-1866');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(feedback.deliver).not.toHaveBeenCalled();
   });
 
   it('tolerates a read-only DB during reconcile (sandboxed reader) without throwing', () => {
