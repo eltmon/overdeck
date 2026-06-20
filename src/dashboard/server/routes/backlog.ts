@@ -1,7 +1,5 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { promisify } from 'node:util';
-import { exec } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -13,10 +11,6 @@ import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { spawnSequencerAgent } from '../../../lib/backlog/sequencer-agent.js';
 import type { PassMode } from '../../../lib/backlog/types.js';
 import type { Issue } from '../../../lib/tracker/interface.js';
-
-const execAsync = promisify(exec);
-
-const PARKED_LABEL = 'needs-design';
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -161,16 +155,6 @@ const postBacklogGateRoute = HttpRouter.add(
 
       node.gate = gate as 'auto' | 'ready' | 'blocked';
       writeSequenceMd(projectRoot, doc);
-
-      if (gate === 'blocked') {
-        const issueNum = issueId.replace(/^[A-Z]+-/, '');
-        if (/^\d+$/.test(issueNum)) {
-          await execAsync(
-            `gh issue edit ${issueNum} --add-label "${PARKED_LABEL}" 2>/dev/null || true`,
-            { cwd: projectRoot },
-          );
-        }
-      }
 
       return jsonResponse({ status: 'ok', issueId, gate });
     });
