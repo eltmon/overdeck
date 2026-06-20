@@ -195,7 +195,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     runtimeState: runtime,
     agentStatus,
     canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
-    canResumeSession: !isRunning && hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: !isRunning && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
