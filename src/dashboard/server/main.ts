@@ -38,7 +38,7 @@ import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
-import { getOverdeckHome, getLegacyHome } from '../../lib/paths.js';
+import { getOverdeckHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
@@ -55,7 +55,6 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Layer } from 'effect';
 import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
-import { makeCutoverEffect } from '../../lib/overdeck/cutover.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
@@ -633,61 +632,19 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
   }
 }
 
-// ── Overdeck boot: create overdeck.db if needed; optional legacy seed ─────────
-//
-// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). The
-// legacy seed (copy conversations + reconstruct in-flight agents/issues from
-// panopticon.db) is OPT-IN via `pan up --seed-from-legacy` (PAN-1960).
-// panopticon.db is NEVER written — it stays as the rollback backup.
+// ── Overdeck boot: create overdeck.db if needed ──────────────────────────────
+// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
+// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
 await (async () => {
   try {
     const overdeckDbPath = getOverdeckDatabasePath();
-    const legacyDbPath = join(getLegacyHome(), 'panopticon.db');
-
     if (!existsSync(overdeckDbPath)) {
       createOverdeckDatabase({ dbPath: overdeckDbPath });
       console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
     }
-
-    // PAN-1960: the legacy seed is opt-in. A normal boot leaves overdeck.db
-    // empty; enable the import on demand with `pan up --seed-from-legacy`.
-    if (process.env.OVERDECK_SEED_FROM_LEGACY !== '1') {
-      console.log('[overdeck] Overdeck seed skipped — empty DB (pass `pan up --seed-from-legacy` to import legacy conversations + in-flight state)');
-      return;
-    }
-
-    if (!existsSync(legacyDbPath)) {
-      console.log('[overdeck] No panopticon.db found; skipping overdeck seed');
-      return;
-    }
-
-    // Use live tmux agent sessions to determine which issues are actively running.
-    // This is the gate-clean source: sessions named `agent-<prefix>-<n>` exist
-    // only while the agent process is live, so they are a more reliable signal
-    // than the panopticon.db agents table (which is the old DB we are moving
-    // away from) and correctly return an empty set on fresh-overdeck boots.
-    const openIssueIds = new Set(
-      getAgentSessionsSync()
-        .map((s) => {
-          const m = /^agent-([a-z]+)-(\d+)$/.exec(s.name);
-          return m ? `${m[1].toUpperCase()}-${m[2]}` : null;
-        })
-        .filter((id): id is string => id !== null),
-    );
-
-    const cutoverLayer = Layer.mergeAll(ProjectsLive, RecordsLive, TmuxLive);
-    const result = await Effect.runPromise(
-      makeCutoverEffect({ legacyDbPath, sources: { openIssueIds } }).pipe(
-        Effect.provide(cutoverLayer),
-      ),
-    );
-    console.log(
-      `[overdeck] Overdeck seed: ${result.conversationsExported} convs, ` +
-        `${result.agentsUpserted} agents, ${result.issuesUpserted} issues`,
-    );
   } catch (err) {
     // Non-fatal: dashboard continues with whatever data is in overdeck.db.
-    console.warn('[overdeck] Overdeck boot seed failed (non-fatal):', err);
+    console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
   }
 })();
 
