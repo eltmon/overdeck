@@ -132,8 +132,10 @@ export function generateTlsConfigSync(): boolean {
     return false;
   }
 
-  // Use the pan.localhost cert as default, fall back to first cert
-  const defaultCert = certPairs.find(p => p.certFile.includes('pan.localhost')) || certPairs[0];
+  // Use the configured domain cert as default, fall back to first cert
+  const config = loadConfigSync();
+  const domain = config.traefik?.domain || 'pan.localhost';
+  const defaultCert = certPairs.find(p => p.certFile.includes(domain)) || certPairs[0];
 
   // Build YAML content
   let yaml = '# Auto-generated TLS configuration — do not edit manually\n';
