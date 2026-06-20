@@ -826,11 +826,19 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'glm-5.2',
     provider: 'zai',
     displayName: 'GLM-5.2',
-    costPer1MTokens: 2.0,
-    contextWindow: 128000,
+    // $1.4 in / $4.4 out → avg $2.9 (docs.z.ai/guides/overview/pricing). PAN-1956.
+    costPer1MTokens: 2.9,
+    // 1M input context per Z.AI docs (docs.z.ai/guides/llm/glm-5.2 spec table:
+    // "Context Length: 1M", "Maximum Output Tokens: 128K"). PAN-1956 — the prior
+    // 128000 was the max *output* limit misread as the input context window.
+    contextWindow: 1000000,
     // GLM-5.2 exposes only two reasoning efforts (high and max); lower/xhigh
     // levels are rejected by the role effort validator.
     effortLevels: ['high', 'max'],
+    // Text-only: Z.AI's spec table lists Input/Output Modalities as "Text", and
+    // vision lives in a separate model line (GLM-5V-Turbo, GLM-4.6V, GLM-OCR) —
+    // same text-only profile as the GLM-5.1 predecessor (PAN-1685 audit).
+    supportsImages: false,
     skills: {
       'code-generation': 85,
       'code-review': 83,
@@ -851,8 +859,16 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     model: 'glm-5.1',
     provider: 'zai',
     displayName: 'GLM-5.1',
-    costPer1MTokens: 2.0,
-    contextWindow: 128000,
+    // $1.4 in / $4.4 out → avg $2.9 (docs.z.ai/guides/overview/pricing). PAN-1956.
+    costPer1MTokens: 2.9,
+    // 200K input context per Z.AI docs (docs.z.ai/guides/llm/glm-5.1 spec table:
+    // "Context Length: 200K", "Maximum Output Tokens: 128K"). PAN-1956 — the prior
+    // 128000 was the max *output* limit misread as the input context window.
+    contextWindow: 200000,
+    // Text-only: Z.AI's spec table lists Input/Output Modalities as "Text", and
+    // vision lives in a separate model line (GLM-5V-Turbo, GLM-4.6V, GLM-OCR).
+    // Confirmed in docs/research/glm-5.1-work-type-fit.md (PAN-1685 audit).
+    supportsImages: false,
     skills: {
       'code-generation': 82,
       'code-review': 80,

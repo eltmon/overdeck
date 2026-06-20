@@ -12,7 +12,7 @@ import {
   getAvailableModelsSync,
 } from '../../src/lib/model-fallback.js';
 import { ModelId } from '../../src/lib/settings.js';
-import { hasModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync } from '../../src/lib/model-capabilities.js';
+import { hasModelCapabilitySync, getModelEffortLevelsSync, modelSupportsEffortSync, MODEL_CAPABILITIES, modelSupportsImagesSync } from '../../src/lib/model-capabilities.js';
 
 describe('model-fallback', () => {
   // Spy on console.warn to test warning logs
@@ -524,6 +524,46 @@ describe('model-fallback', () => {
       expect(modelSupportsEffortSync('glm-5.2', 'low')).toBe(false);
       expect(modelSupportsEffortSync('glm-5.2', 'medium')).toBe(false);
       expect(modelSupportsEffortSync('glm-5.2', 'xhigh')).toBe(false);
+    });
+
+    // PAN-1956: contextWindow must reflect the 1M *input* context, not the 128K
+    // max *output* token limit. 128000 was the output cap misread as input.
+    it('glm-5.2 contextWindow is 1M input context (PAN-1956)', () => {
+      expect(MODEL_CAPABILITIES['glm-5.2'].contextWindow).toBe(1000000);
+      expect(MODEL_CAPABILITIES['glm-5.2'].contextWindow).not.toBe(128000);
+    });
+
+    // PAN-1956 / PAN-1685: GLM-5.2 is text-only per Z.AI's spec table
+    // (Input Modalities: Text); vision is a separate model line (GLM-5V-Turbo).
+    it('glm-5.2 is text-only (supportsImages false)', () => {
+      expect(MODEL_CAPABILITIES['glm-5.2'].supportsImages).toBe(false);
+      expect(modelSupportsImagesSync('glm-5.2')).toBe(false);
+    });
+
+    // PAN-1956 (GLM-5.1, same bug pattern as GLM-5.2): contextWindow must reflect
+    // the 200K *input* context, not the 128K max *output* token limit.
+    it('glm-5.1 contextWindow is 200K input context (PAN-1956)', () => {
+      expect(MODEL_CAPABILITIES['glm-5.1'].contextWindow).toBe(200000);
+      expect(MODEL_CAPABILITIES['glm-5.1'].contextWindow).not.toBe(128000);
+    });
+
+    // PAN-1956 / PAN-1685: GLM-5.1 is text-only per Z.AI's spec table and its
+    // own research artifact (docs/research/glm-5.1-work-type-fit.md).
+    it('glm-5.1 is text-only (supportsImages false)', () => {
+      expect(MODEL_CAPABILITIES['glm-5.1'].supportsImages).toBe(false);
+      expect(modelSupportsImagesSync('glm-5.1')).toBe(false);
+    });
+
+    // PAN-1956: costPer1MTokens is the documented avg of input/output
+    // ($1.4 in / $4.4 out → $2.9 per docs.z.ai/guides/overview/pricing).
+    it('glm-5.2 costPer1MTokens reflects verified Z.AI pricing (PAN-1956)', () => {
+      expect(MODEL_CAPABILITIES['glm-5.2'].costPer1MTokens).toBe(2.9);
+      expect(MODEL_CAPABILITIES['glm-5.2'].costPer1MTokens).not.toBe(2);
+    });
+
+    it('glm-5.1 costPer1MTokens reflects verified Z.AI pricing (PAN-1956)', () => {
+      expect(MODEL_CAPABILITIES['glm-5.1'].costPer1MTokens).toBe(2.9);
+      expect(MODEL_CAPABILITIES['glm-5.1'].costPer1MTokens).not.toBe(2);
     });
 
     it('claude-opus-4-7 is recognized as anthropic provider', () => {

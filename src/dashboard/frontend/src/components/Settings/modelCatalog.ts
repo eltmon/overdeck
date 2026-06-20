@@ -82,8 +82,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-5.2' as ModelId, name: 'GLM-5.2', icon: Network, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 128K context, high/max effort, strong agentic coding' },
-      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Previous Z.AI flagship, 128K context, strong agentic coding' },
+      { id: 'glm-5.2' as ModelId, name: 'GLM-5.2', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 1M context, high/max effort, strong agentic coding. Text-only (vision is a separate model line).' },
+      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', costPer1MTokens: 2.9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Previous Z.AI flagship, 200K context, strong agentic coding. Text-only (vision is a separate model line).' },
     ],
   },
   minimax: {
