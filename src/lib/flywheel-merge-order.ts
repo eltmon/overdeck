@@ -263,6 +263,9 @@ export function pickFromSequence(
   opts?: {
     excludeIssueIds?: ReadonlySet<string>;
     issueLabels?: (issueId: string) => ReadonlyArray<string>;
+    /** Flywheel author/assignee safety gate. Return false to skip an issue. When
+     *  absent every issue passes (backward-compatible default). */
+    isAuthorizedIssue?: (issueId: string) => boolean;
   },
 ): SequencePickResult | null {
   const sorted = [...nodes].sort((a, b) => a.rank - b.rank);
@@ -274,6 +277,7 @@ export function pickFromSequence(
     if (opts?.excludeIssueIds?.has(node.issue)) continue;
     const labels = opts?.issueLabels?.(node.issue) ?? [];
     if (labels.some((l) => PARKED_LABELS.has(l))) continue;
+    if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) continue;
     return { issueId: node.issue, rank: node.rank, gate: node.gate, planning: node.planning };
   }
   return null;

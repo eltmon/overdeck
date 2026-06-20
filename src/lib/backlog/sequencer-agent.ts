@@ -30,7 +30,18 @@ export async function spawnSequencerAgent(
   const resolvedPass: PassMode =
     pass !== 'auto' ? pass : existsSync(seqPath) ? 'incremental' : 'creation';
 
-  const input = await collectOpenBacklog(projectRoot, opts.issues ?? []);
+  let issues = opts.issues;
+  if (!issues) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
+        typeof import('../../dashboard/server/services/issue-service-singleton.js');
+      issues = getSharedIssueService().getIssues() as Issue[];
+    } catch {
+      issues = [];
+    }
+  }
+  const input = await collectOpenBacklog(projectRoot, issues);
   const model = determineModel({ role: 'sequencer', model: opts.model });
   const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
 
@@ -66,7 +77,7 @@ This is a CREATION pass — there is no prior sequence.md. You must rank the ent
 1. Read all issue bodies in batches of ${batchSize}. NEVER request all bodies at once — do NOT inline the entire backlog in a single prompt or tool call. Read batch 0, update your running shortlist, then batch 1, and so on.
 2. Assign rank, size, importance, score, condition, gate, and planning to every issue.
 3. Derive the dependency DAG from GitHub cross-references and your analysis.
-4. Write the result via writeSequenceMd (or \`pan backlog write-sequence\`).
+4. Write the result via \`pan backlog write-sequence\` (see Output section below — do NOT write the file directly).
 `,
     incremental: `
 This is an INCREMENTAL pass — a prior sequence.md exists at ${hasPrior ? priorSequencePath : '(not found)'}. Preserve existing ranks, scores, conditions, operator-owned fields, and operator-sourced edges VERBATIM unless a delta justifies a change.
@@ -109,15 +120,20 @@ Derive NUMBER from the manifest id (e.g. PAN-42 → 42). Do NOT fetch all bodies
 
 ## Output
 
-After completing your analysis, write the result to ${projectRoot}/.pan/backlog/sequence.md.
+After completing your analysis, write the SequenceDoc JSON to a temp file and submit it via:
 
-The file format is: a human-readable markdown table section, then a machine-readable fenced JSON block marked with:
-  <!-- machine-readable; do not hand-edit below this line -->
-  \`\`\`json
-  <SequenceDoc JSON>
-  \`\`\`
+  pan backlog write-sequence /tmp/sequence-result.json
 
-Use the Write tool to write the complete file in this format.
+The \`pan backlog write-sequence\` command validates the JSON, writes the formatted
+\`.pan/backlog/sequence.md\`, and queues an auto-commit — so DO NOT write the file
+directly with the Write tool. Always go through this command.
+
+The SequenceDoc JSON must conform to the schema:
+  { version, project, generatedAt (ISO), model, pass, openCount, nodes[], edges[] }
+
+where each node has: issue, rank, size (XS/S/M/L/XL), importance (critical/high/medium/low),
+score (0-100), condition (ok/needs-refinement/stale), dependsOn (string[]), why (≤140 chars),
+rationale (optional), gate (auto/ready/blocked), planning (skip/auto/interactive).
 
 Do not ask for operator input. If an issue is ambiguous, assign condition=needs-refinement and move on.
 `;

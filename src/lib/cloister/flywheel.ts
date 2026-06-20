@@ -80,23 +80,37 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
         const md = readFileSync(seqPath, 'utf-8');
         const parsed = parseSequenceMd(md);
         if (parsed.ok) {
-          // Build issue→labels map from the shared issue service (lazy-require avoids
+          // Build issue lookups from the shared issue service (lazy-require avoids
           // circular module load during CLI startup).
-          const issueLabelsLookup = (issueId: string): string[] => {
+          type IssueRow = { ref?: string; identifier?: string; labels?: string[]; author?: string; assignee?: { name?: string } | string };
+          const getIssueRows = (): IssueRow[] => {
             try {
               // eslint-disable-next-line @typescript-eslint/no-require-imports
               const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
                 typeof import('../../dashboard/server/services/issue-service-singleton.js');
-              const issue = (getSharedIssueService().getIssues() as Array<{ ref: string; labels?: string[] }>)
-                .find((i) => i.ref === issueId);
-              return issue?.labels ?? [];
+              return getSharedIssueService().getIssues() as IssueRow[];
             } catch { return []; }
+          };
+          const issueRowMap = new Map<string, IssueRow>(
+            getIssueRows().map((i) => [i.ref ?? i.identifier ?? '', i]),
+          );
+
+          const issueLabelsLookup = (issueId: string): string[] =>
+            issueRowMap.get(issueId)?.labels ?? [];
+
+          const AUTHORIZED_AUTHORS = new Set(['eltmon', 'panopticon-agent[bot]']);
+          const isAuthorizedIssue = (issueId: string): boolean => {
+            const row = issueRowMap.get(issueId);
+            if (!row) return false; // unknown issue — skip (safe default)
+            if (row.author && AUTHORIZED_AUTHORS.has(row.author)) return true;
+            const assigneeName = typeof row.assignee === 'string' ? row.assignee : row.assignee?.name;
+            return assigneeName === 'eltmon';
           };
 
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup });
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue });
           const nextLine = nextPick
             ? `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`
             : 'No eligible issue found in sequence — fall back to normal priority';

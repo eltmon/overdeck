@@ -112,7 +112,13 @@ Assign a condition to every issue:
 
 ## Output
 
-After completing your analysis, write the result by calling the `writeSequenceMd` function (or its CLI equivalent `pan backlog write-sequence`). The function handles:
+After completing your analysis, write the SequenceDoc JSON to a temp file and submit it via:
+
+```
+pan backlog write-sequence /tmp/sequence-result.json
+```
+
+**Do NOT write `.pan/backlog/sequence.md` directly.** `pan backlog write-sequence` validates the JSON, renders the human-readable table, writes the file, and queues the auto-commit — bypassing it skips FR-1/NFR-3. The command handles:
 - The human-readable header, ranked table, and rationale section.
 - The machine-readable fenced JSON block below the `<!-- machine-readable; do not hand-edit below this line -->` marker.
 - Auto-commit via `queueAutoCommit`.

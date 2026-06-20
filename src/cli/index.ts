@@ -366,6 +366,36 @@ review
 
 // PAN-1048 R5: `pan review run` removed (see import note above).
 
+// pan backlog — sequence writer surface
+const backlog = program
+  .command('backlog')
+  .description('Backlog sequencer management');
+
+backlog
+  .command('write-sequence <file>')
+  .description('Validate a SequenceDoc JSON file and write it to .pan/backlog/sequence.md (triggers auto-commit)')
+  .option('--project-root <path>', 'Project root (default: cwd)')
+  .action(async (file: string, opts: { projectRoot?: string }) => {
+    const { readFileSync } = await import('node:fs');
+    const { parseSequenceJson } = await import('../lib/backlog/types.js');
+    const { writeSequenceMd } = await import('../lib/backlog/sequence-io.js');
+    const projectRoot = opts.projectRoot ?? process.cwd();
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(file, 'utf-8'));
+    } catch (e: any) {
+      console.error(chalk.red(`Error: could not read ${file}: ${e.message}`));
+      process.exit(1);
+    }
+    const result = parseSequenceJson(raw);
+    if (!result.ok) {
+      console.error(chalk.red(`Validation error: ${result.error}`));
+      process.exit(1);
+    }
+    writeSequenceMd(projectRoot, result.doc);
+    console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
+  });
+
 // pan plan finalize <id>
 const planCmd = program
   .command('plan')

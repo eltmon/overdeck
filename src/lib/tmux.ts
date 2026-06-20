@@ -247,7 +247,8 @@ let warnedManagedServerDirtyCmdline = false;
 
 /** @internal Reset the per-process dirty-server warn guard. Only for use in tests. */
 export function _resetWarnedManagedServerDirtyForTest(): void {
-  warnedManagedServerDirty = false;
+  warnedManagedServerDirtyCmdline = false;
+  warnedManagedServerTmuxSpawnScope = false;
 }
 
 /**
