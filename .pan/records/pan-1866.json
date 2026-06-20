@@ -102,7 +102,7 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T15:29:47.945Z",
+  "updated": "2026-06-20T15:38:27.991Z",
   "pipeline": {
     "issueId": "PAN-1866",
     "reviewStatus": "blocked",
@@ -110,12 +110,12 @@
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T15:29:38.832Z",
-    "reviewNotes": "sequence pickup still ignores ready-or-PRD eligibility",
+    "updatedAt": "2026-06-20T15:38:22.642Z",
+    "reviewNotes": "Backlog mutation routes bypass dashboard mutation guard",
     "verificationNotes": "Verification FAILED at test (89466ms):\n\n/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > tallies dry runs without writing\nAssertionError: expected { issueId: 'PAN-1922', …(4) } to be null\n\n- Expected:\nnull\n\n+ Received:\n{\n  \"issueId\": \"PAN-1922\",\n  \"readyForMerge\": true,\n  \"reviewStatus\": \"passed\",\n  \"testStatus\": \"passed\",\n  \"updatedAt\": \"2026-06-15T00:00:00.000Z\",\n}\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:310:45\n    309|\n    310|     expect(result.restored).toBe(1);\n    311|     expect(getReviewStatusFromDbSync('PAN-1922')).toBeNull();\n       |        ^\n    312|   });\n    313|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > inherits host override from the completed work agent for synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:118:28\n    116|     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));\n    117|     mocks.getReviewStatus.mockReturnValue(undefined);\n    118|     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefin…\n       |                            ^\n    119|     mocks.formatTier1Summary.mockReturnValue('shared review context');\n    120|     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/19]⎯\n\n FAIL  |root| src/lib/cloister/__tests__/review-agent.test.ts > spawnReviewRoleForIssue > threads explicit model and harness overrides to synthesis and reviewer spawns\nAssertionError: expected false to be true // Object.is equality\n\n- Expected\n+ Received\n\n- true\n+ false\n\n ❯ src/lib/cloister/__tests__/review-agent.test.ts:141:28\n    142|   });\n    143|\n    144|   it('threads explicit model and harness overrides to synthesis and re…\n       |              ^\n    145|     const result = await Effect.runPromise(spawnReviewRoleForIssue({\n    146|       issueId: 'PAN-1194',\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/19]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
     "reviewedAtCommit": "5cc2b088a35f215cfeac1ac9e0b2e2d45bf6bdc9",
-    "reviewRequestedAt": "2026-06-20T15:26:38.012Z"
+    "reviewRequestedAt": "2026-06-20T15:35:07.797Z"
   },
   "closeOut": {
     "usage": {
@@ -146,10 +146,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 769,
-            "output": 269627,
-            "cacheRead": 87478725,
-            "cacheWrite": 1625281
+            "input": 797,
+            "output": 279128,
+            "cacheRead": 90060696,
+            "cacheWrite": 1861883
           }
         }
       },
@@ -167,15 +167,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 783,
-          "output": 279641,
-          "cacheRead": 88547282,
-          "cacheWrite": 1728868
+          "input": 811,
+          "output": 289142,
+          "cacheRead": 91129253,
+          "cacheWrite": 1965470
         }
       },
       "costAtCloseOut": {
-        "usd": 48.85192624,
-        "pricingAsOf": "2026-06-20T15:29:38.850Z"
+        "usd": 50.65637624,
+        "pricingAsOf": "2026-06-20T15:38:22.663Z"
       }
     },
     "merges": [
