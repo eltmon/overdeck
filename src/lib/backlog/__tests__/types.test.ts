@@ -23,7 +23,7 @@ const VALID_EDGE = {
 };
 
 const VALID_DOC = {
-  version: '1',
+  version: 1,
   project: 'overdeck',
   generatedAt: '2026-06-19T00:00:00Z',
   model: 'claude-opus-4-8',
@@ -40,6 +40,15 @@ describe('parseSequenceJson', () => {
     if (result.ok) {
       expect(result.doc.nodes[0].issue).toBe('PAN-1');
     }
+  });
+
+  it('accepts version as a number (PRD contract)', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, version: 1 }).ok).toBe(true);
+    expect(parseSequenceJson({ ...VALID_DOC, version: 2 }).ok).toBe(true);
+  });
+
+  it('rejects version as a string', () => {
+    expect(parseSequenceJson({ ...VALID_DOC, version: '1' }).ok).toBe(false);
   });
 
   it('rejects a node missing issue', () => {

@@ -147,7 +147,7 @@ describe('collectOpenBacklog', () => {
 
   it('loads prior sequence.md when present', async () => {
     const doc = {
-      version: '1', project: 'overdeck', generatedAt: new Date().toISOString(),
+      version: 1, project: 'overdeck', generatedAt: new Date().toISOString(),
       model: 'claude-opus-4-8', pass: 'creation', openCount: 1,
       nodes: [{
         issue: 'PAN-1', rank: 1, size: 'S', importance: 'high', score: 80,

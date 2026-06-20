@@ -11,7 +11,7 @@ import { getReviewStatusSync } from '../../review-status.js';
 import type { SequenceDoc } from '../types.js';
 
 const SAMPLE_DOC: SequenceDoc = {
-  version: '1',
+  version: 1,
   project: 'overdeck',
   generatedAt: '2026-06-19T00:00:00Z',
   model: 'claude-opus-4-8',

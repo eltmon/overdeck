@@ -23,7 +23,7 @@ const EMPTY_INPUT: CollectOpenBacklogResult = {
 const INPUT_WITH_PRIOR: CollectOpenBacklogResult = {
   ...EMPTY_INPUT,
   priorSequence: {
-    version: '1', project: 'overdeck', generatedAt: '2026-06-18T00:00:00Z',
+    version: 1, project: 'overdeck', generatedAt: '2026-06-18T00:00:00Z',
     model: 'claude-opus-4-8', pass: 'creation', openCount: 1,
     nodes: [{ issue: 'PAN-1', rank: 1, size: 'M', importance: 'high', score: 80, condition: 'ok', dependsOn: [], why: 'Core.', gate: 'auto', planning: 'auto' }],
     edges: [],

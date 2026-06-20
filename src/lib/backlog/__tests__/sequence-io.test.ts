@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseSequenceMd } from '../sequence-io.js';
 
 const VALID_DOC = {
-  version: '1',
+  version: 1,
   project: 'overdeck',
   generatedAt: '2026-06-19T00:00:00Z',
   model: 'claude-opus-4-8',

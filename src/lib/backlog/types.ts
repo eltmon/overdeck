@@ -30,7 +30,7 @@ export type SequenceEdge = {
 };
 
 export type SequenceDoc = {
-  version: string;
+  version: number;
   project: string;
   generatedAt: string;
   model: string;
@@ -101,7 +101,7 @@ export function parseSequenceJson(value: unknown): SequenceParseResult {
   if (typeof value !== 'object' || value === null) return err('value must be an object');
   const v = value as Record<string, unknown>;
 
-  if (typeof v.version !== 'string') return err('version missing');
+  if (typeof v.version !== 'number') return err('version missing');
   if (typeof v.project !== 'string') return err('project missing');
   if (typeof v.generatedAt !== 'string') return err('generatedAt missing');
   if (typeof v.model !== 'string') return err('model missing');

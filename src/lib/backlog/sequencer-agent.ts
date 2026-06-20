@@ -129,7 +129,7 @@ The \`pan backlog write-sequence\` command validates the JSON, writes the format
 directly with the Write tool. Always go through this command.
 
 The SequenceDoc JSON must conform to the schema:
-  { version, project, generatedAt (ISO), model, pass, openCount, nodes[], edges[] }
+  { version (number, e.g. 1), project, generatedAt (ISO), model, pass, openCount, nodes[], edges[] }
 
 where each node has: issue, rank, size (XS/S/M/L/XL), importance (critical/high/medium/low),
 score (0-100), condition (ok/needs-refinement/stale), dependsOn (string[]), why (≤140 chars),
