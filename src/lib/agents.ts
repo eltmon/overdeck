@@ -1440,6 +1440,21 @@ export async function setAgentDeliveryMethod(
 }
 
 /**
+ * PAN-1988: resume / feedback / continue delivery must be RESILIENT. When an agent is pinned to
+ * the strict 'supervisor' transport — which throws with NO fallback when its echo-confirmation
+ * fails (the recurring "input echo confirmation failed" that left review feedback undelivered to
+ * the work agent every round) — deliver via 'auto' instead, so a supervisor failure falls back to
+ * the proven tmux paste-buffer and the message still lands. Other explicit methods
+ * ('tmux'/'channels'/'auto') are preserved. The strict 'supervisor' contract itself (PAN-1769) is
+ * intentionally left intact in deliverAgentMessage for callers that opt into it directly.
+ */
+function resilientDeliveryMethod(
+  method: 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined,
+): 'auto' | 'supervisor' | 'channels' | 'tmux' | undefined {
+  return method === 'supervisor' ? 'auto' : method;
+}
+
+/**
  * Resolve OVERDECK_HOME — same fallback semantics as overdeck-bridge.
  */
 function overdeckHomeForSockets(): string {
@@ -4504,7 +4519,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
             sessionId: fallbackSessionId,
             message: resumeMessage.message,
             caller: 'resumeAgent:resume-prompt',
-            deliveryMethod: agentState.deliveryMethod,
+            deliveryMethod: resilientDeliveryMethod(agentState.deliveryMethod),
           });
           delivered = delivery.delivered;
           if (!delivery.delivered) {
@@ -4514,7 +4529,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
           console.error(`[agents] Fallback-restarted ${normalizedId} but no session id was recorded — feedback in mail queue`);
         }
       } else {
-        const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
+        const delivery = await deliverAgentMessage(normalizedId, resumeMessage.message, 'resumeAgent:resume-prompt', resilientDeliveryMethod(agentState.deliveryMethod));
         delivered = delivery.ok;
       }
       if (delivered) {
@@ -4575,7 +4590,7 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
-  const deliveryMethod = agentState?.deliveryMethod;
+  const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
   await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
 
   // Also save to mail queue
@@ -4910,7 +4925,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
       }
     } else if (effectiveHarness === 'codex') {
-      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:codex-continue', agentState.deliveryMethod);
+      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:codex-continue', resilientDeliveryMethod(agentState.deliveryMethod));
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       if (!delivery.ok) {
@@ -4922,7 +4937,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // its SessionStart hook fires, and the saved sessionId points at the
       // archived or mismatched session. deliverInitialPromptWithRetry waits for
       // the ready signal internally.
-      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:compact-seed', agentState.deliveryMethod);
+      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:compact-seed', resilientDeliveryMethod(agentState.deliveryMethod));
       messageDelivered = delivery.ok;
       if (!delivery.ok) {
         console.error(`[resumeAgent] Fresh-session continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
@@ -4937,7 +4952,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
           sessionId,
           message: effectiveMessage,
           caller: 'resumeAgent:auto-continue',
-          deliveryMethod: agentState.deliveryMethod,
+          deliveryMethod: resilientDeliveryMethod(agentState.deliveryMethod),
         });
         messageDelivered = delivery.delivered;
         if (delivery.delivered && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
@@ -5116,7 +5131,7 @@ export async function restartAgent(
       if (ready) {
         await new Promise(r => setTimeout(r, 500));
         if (effectiveHarness === 'codex') {
-          await deliverAgentMessage(normalizedId, prompt, 'restartAgent:continue-prompt', agentState.deliveryMethod);
+          await deliverAgentMessage(normalizedId, prompt, 'restartAgent:continue-prompt', resilientDeliveryMethod(agentState.deliveryMethod));
         } else {
           await Effect.runPromise(sendKeys(normalizedId, prompt));
         }
