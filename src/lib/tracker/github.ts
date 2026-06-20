@@ -355,6 +355,7 @@ export class GitHubTracker implements IssueTracker {
       description: ghIssue.body ?? '',
       state: this.mapStateFromGitHub(ghIssue.state, labels),
       labels,
+      author: ghIssue.user?.login,
       assignee: ghIssue.assignee?.login,
       url: ghIssue.html_url,
       tracker: 'github',

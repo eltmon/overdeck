@@ -76,9 +76,9 @@ function initializeMemoryFtsSchema(db: SqliteDatabase): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       scope TEXT NOT NULL,
       scope_id TEXT NOT NULL,
-      from_timestamp TEXT NOT NULL,
+      from_timestamp INTEGER NOT NULL,
       reason TEXT,
-      created_at TEXT NOT NULL
+      created_at INTEGER NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_reset_markers_scope

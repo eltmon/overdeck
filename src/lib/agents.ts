@@ -66,7 +66,7 @@ const missingRoleDefinitionWarnings = new Set<string>();
 const toAgentFsError = (operation: string, path: string, cause: unknown): FsError =>
   new FsError({ operation, path, cause });
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer';
 
 type FlywheelSpawnEnv = {
   OVERDECK_FLYWHEEL_RUN_ID?: string;
@@ -1017,7 +1017,7 @@ export async function wipeAgentStateDirs(
 }
 
 function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike';
+  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer';
 }
 
 function cleanAgentState(raw: AgentState): AgentState {

@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   spawnRun: vi.fn(),
   saveAgentStateProgram: vi.fn(),
   getAgentStateProgram: vi.fn(),
+  getAgentStateSync: vi.fn(),
+  getLatestSessionIdSync: vi.fn(),
+  resumeAgent: vi.fn(),
+  wipeAgentStateDirs: vi.fn(),
   listSessionNames: vi.fn(),
   isPaneDead: vi.fn(),
   killSession: vi.fn(),
@@ -33,6 +37,10 @@ vi.mock('../../agents.js', () => ({
   saveAgentStateProgram: mocks.saveAgentStateProgram,
   getAgentState: mocks.getAgentStateProgram,
   getAgentStateProgram: mocks.getAgentStateProgram,
+  getAgentStateSync: mocks.getAgentStateSync,
+  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
+  resumeAgent: mocks.resumeAgent,
+  wipeAgentStateDirs: mocks.wipeAgentStateDirs,
   messageAgent: vi.fn(),
 }));
 
@@ -101,6 +109,10 @@ describe('spawnReviewRoleForIssue', () => {
     }));
     mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
     mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
+    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.resumeAgent.mockResolvedValue({ success: false, reason: 'no session' });
+    mocks.wipeAgentStateDirs.mockResolvedValue(undefined);
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
@@ -108,7 +120,7 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
   });
 
-  it('inherits host override from the completed work agent for synthesis and reviewer spawns', async () => {
+  it('inherits host override from the completed work agent for the review spawn', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
       workspace: '/tmp/pan-review-host-override',
@@ -122,14 +134,9 @@ describe('spawnReviewRoleForIssue', () => {
       'review',
       expect.objectContaining({ allowHost: true, workspace: '/tmp/pan-review-host-override' }),
     );
-    expect(mocks.spawnRun).toHaveBeenCalledWith(
-      'PAN-1194',
-      'review',
-      expect.objectContaining({ allowHost: true, subRole: 'security' }),
-    );
   });
 
-  it('threads explicit model and harness overrides to synthesis and reviewer spawns', async () => {
+  it('threads explicit model and harness overrides to the review spawn', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
       workspace: '/tmp/pan-review-harness',
@@ -143,11 +150,6 @@ describe('spawnReviewRoleForIssue', () => {
       'PAN-1194',
       'review',
       expect.objectContaining({ model: 'gpt-5.5', harness: 'pi', workspace: '/tmp/pan-review-harness' }),
-    );
-    expect(mocks.spawnRun).toHaveBeenCalledWith(
-      'PAN-1194',
-      'review',
-      expect.objectContaining({ model: 'gpt-5.5', harness: 'pi', subRole: 'security' }),
     );
   });
 });

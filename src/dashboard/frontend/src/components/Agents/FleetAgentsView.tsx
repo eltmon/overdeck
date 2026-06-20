@@ -23,6 +23,7 @@ const ROLE_ORDER = {
   test: 4,
   ship: 5,
   flywheel: 6,
+  sequencer: 7,
 } satisfies Record<AgentCardRole, number>;
 
 const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'stalled', 'starting', 'running', 'failed', 'error', 'unknown']);
@@ -155,6 +156,7 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
   const role = agentRole(agent);
   if (role === 'test') return 'review';
   if (role === 'flywheel') return 'work';
+  if (role === 'sequencer') return 'work';
   if (role === 'strike') return 'strike';
   return role;
 }

@@ -4,7 +4,7 @@ import {
   Eye, Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield,
+  Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
@@ -85,6 +85,7 @@ const MORE_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
+      { id: 'backlog' as Tab, label: 'Backlog', icon: ListOrdered },
       { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch },

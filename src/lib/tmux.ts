@@ -245,6 +245,12 @@ function sanitizeManagedServerGlobalEnvSync(cleanEnv: NodeJS.ProcessEnv): void {
 let warnedManagedServerTmuxSpawnScope = false;
 let warnedManagedServerDirtyCmdline = false;
 
+/** @internal Reset the per-process dirty-server warn guard. Only for use in tests. */
+export function _resetWarnedManagedServerDirtyForTest(): void {
+  warnedManagedServerDirtyCmdline = false;
+  warnedManagedServerTmuxSpawnScope = false;
+}
+
 /**
  * PAN-1798: ensure the shared tmux server is running in a dedicated, long-lived
  * systemd user service — never inside an agent/conversation spawn scope. The

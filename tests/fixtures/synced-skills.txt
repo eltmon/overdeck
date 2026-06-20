@@ -18,6 +18,8 @@ incident-response
 knowledge-capture
 myn-standards
 onboard-codebase
+overdeck
+ovr
 pan
 pan-admin-cloister
 pan-admin-config

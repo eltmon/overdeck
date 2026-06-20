@@ -87,6 +87,7 @@ import {
   type RestoreVerdictsResult,
 } from '../../../../src/lib/pan-dir/verdict-restore.js';
 import { getReviewStatusSync } from '../../../../src/lib/review-status.js';
+import { getReviewStatusFromDbSync } from '../../../../src/lib/overdeck/review-status-sync.js';
 
 describe('restoreReviewStatusFromRecords', () => {
   let projectRoot: string;
@@ -307,7 +308,7 @@ describe('restoreReviewStatusFromRecords', () => {
     });
 
     expect(result.restored).toBe(1);
-    expect(getReviewStatusSync('PAN-1922')).toBeNull();
+    expect(getReviewStatusFromDbSync('PAN-1922')).toBeNull();
   });
 
   it('no-loss audit: every review_status column is accounted for', () => {

@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../agents.js', async () => {
   const { Effect } = await import('effect');
@@ -211,8 +211,12 @@ import {
 } from '../service.js';
 
 describe('reactive Cloister scheduler', () => {
+  let savedNoResume: string | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    savedNoResume = process.env.OVERDECK_NO_RESUME;
+    delete process.env.OVERDECK_NO_RESUME;
     vi.mocked(listRunningAgentsSync).mockReturnValue([]);
     vi.mocked(listRunningAgents).mockResolvedValue([]);
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-503-review' } as any);
@@ -222,6 +226,12 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(isIssueClosed).mockResolvedValue(false);
     vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
     mockHeadSha = 'newhead1';
+  });
+
+  afterEach(() => {
+    if (savedNoResume !== undefined) {
+      process.env.OVERDECK_NO_RESUME = savedNoResume;
+    }
   });
 
   it('maps issue lifecycle states to roles', () => {

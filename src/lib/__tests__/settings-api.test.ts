@@ -24,6 +24,7 @@ vi.mock('../config-yaml.js', () => ({
     ship: 'workhorse:mid',
     flywheel: 'claude-opus-4-7',
     strike: 'workhorse:expensive',
+    sequencer: 'workhorse:expensive',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -37,6 +38,7 @@ vi.mock('../config-yaml.js', () => ({
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
     strike: { model: 'workhorse:expensive' },
+    sequencer: { model: 'workhorse:expensive' },
     flywheel: { model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   ROLE_EFFORTS: ['low', 'medium', 'high', 'xhigh', 'max'],

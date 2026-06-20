@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -6,6 +7,8 @@ import type { FlywheelRunId } from '@overdeck/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
+import { parseSequenceMd } from '../backlog/sequence-io.js';
+import { pickFromSequence } from '../flywheel-merge-order.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,
@@ -68,7 +71,90 @@ function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions): str
       ? `Require UAT before merge: ${options.requireUatBeforeMerge}`
       : undefined,
   ].filter(Boolean).join('\n');
-  return configLines ? `\n\nRun configuration:\n${configLines}` : '';
+
+  let sequenceSection = '';
+  if (options.autoPickupBacklog) {
+    const seqPath = join(process.cwd(), '.pan', 'backlog', 'sequence.md');
+    if (existsSync(seqPath)) {
+      try {
+        const md = readFileSync(seqPath, 'utf-8');
+        const parsed = parseSequenceMd(md);
+        if (parsed.ok) {
+          // Build issue lookups from the shared issue service (lazy-require avoids
+          // circular module load during CLI startup).
+          type IssueRow = { ref?: string; identifier?: string; labels?: string[]; author?: string; assignee?: { name?: string } | string };
+          const getIssueRows = (): IssueRow[] => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
+                typeof import('../../dashboard/server/services/issue-service-singleton.js');
+              return getSharedIssueService().getIssues() as IssueRow[];
+            } catch { return []; }
+          };
+          const issueRowMap = new Map<string, IssueRow>(
+            getIssueRows().map((i) => [i.ref ?? i.identifier ?? '', i]),
+          );
+
+          const issueLabelsLookup = (issueId: string): string[] =>
+            issueRowMap.get(issueId)?.labels ?? [];
+
+          const AUTHORIZED_AUTHORS = new Set(['eltmon', 'panopticon-agent[bot]']);
+          const isAuthorizedIssue = (issueId: string): boolean => {
+            const row = issueRowMap.get(issueId);
+            if (!row) return false; // unknown issue — skip (safe default)
+            if (row.author && AUTHORIZED_AUTHORS.has(row.author)) return true;
+            const assigneeName = typeof row.assignee === 'string' ? row.assignee : row.assignee?.name;
+            return assigneeName === 'eltmon';
+          };
+
+          const projectRoot = process.cwd();
+          const specsDir = join(projectRoot, '.pan', 'specs');
+          const workspacesDir = join(projectRoot, 'workspaces');
+          const issuesWithSpecs = new Set<string>();
+          if (existsSync(specsDir)) {
+            for (const f of readdirSync(specsDir)) {
+              const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
+              if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
+            }
+          }
+          const isReadyOrHasPrd = (issueId: string): boolean => {
+            const id = issueId.toUpperCase();
+            // ready = spec AND beads exist in the workspace
+            if (issuesWithSpecs.has(id) &&
+                existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`, '.beads', 'issues.jsonl'))) {
+              return true;
+            }
+            return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
+          };
+          const isInPipeline = (issueId: string): boolean =>
+            existsSync(join(workspacesDir, `feature-${issueId.toLowerCase()}`));
+
+          const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
+            `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
+          );
+          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline });
+          let nextLine: string;
+          let pickInstruction: string;
+          if (!nextPick) {
+            nextLine = 'No eligible issue found in sequence — fall back to normal priority';
+            pickInstruction = '';
+          } else if (nextPick.planning === 'interactive') {
+            // FR-17: interactive planning requires operator presence — must NOT be auto-started
+            nextLine = `NEEDS OPERATOR ACTION: ${nextPick.issueId} (rank ${nextPick.rank}) has planning=interactive — do NOT auto-start; operator must run 'pan plan ${nextPick.issueId}'`;
+            pickInstruction = `\n\nIMPORTANT: auto_pickup_backlog=true. The top-ranked issue requires interactive planning and MUST NOT be auto-started. Surface it to the operator for manual 'pan plan' invocation instead of auto-picking it.`;
+          } else {
+            nextLine = `MUST start next: ${nextPick.issueId} (rank ${nextPick.rank}, planning=${nextPick.planning})`;
+            pickInstruction = `\n\nIMPORTANT: auto_pickup_backlog=true. You MUST pick the "MUST start next" issue above as your next startup target. Do NOT apply your own P0-P3/oldest-first ranking while a sequence is available.`;
+          }
+          sequenceSection = `\n\nBacklog sequence (${parsed.doc.nodes.length} issues ranked):\n${top10.join('\n')}\n${nextLine}${pickInstruction}`;
+        }
+      } catch {
+        // sequence.md exists but couldn't be parsed — skip enrichment
+      }
+    }
+  }
+
+  return (configLines ? `\n\nRun configuration:\n${configLines}` : '') + sequenceSection;
 }
 
 function defaultFlywheelPrompt(runId: string, options: FlywheelLifecycleOptions, briefContent?: string): string {

@@ -143,6 +143,12 @@ vi.mock('../../../src/lib/workspace/rebuild-stack.js', () => ({
   }),
 }));
 
+vi.mock('../../../src/lib/cloister/no-resume-mode.js', () => ({
+  isNoResumeValueEnabled: vi.fn(() => false),
+  isNoResumeCliOptionEnabled: vi.fn(() => false),
+  getNoResumeMode: vi.fn(() => ({ active: false, since: null })),
+}));
+
 // Import after mocks are in place
 import { checkOrphanedReviewStatuses, checkPendingTestDispatch } from '../../../src/lib/cloister/deacon.js';
 
