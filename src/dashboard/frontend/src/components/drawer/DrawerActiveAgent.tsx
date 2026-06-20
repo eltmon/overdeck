@@ -100,18 +100,29 @@ export default function DrawerActiveAgent() {
 
     setSending(true);
     try {
-      const response = await fetch(`/api/agents/${activeAgent.id}/tell`, {
+      // PAN-1985 follow-up: route through /resume for non-live agents so the
+      // backend can re-attach to the saved session and deliver the message
+      // in one round trip. /tell assumes a live tmux; for stopped/crashed
+      // agents (work agent voluntarily stopped, review completed and
+      // killed by specialists/done, etc.) /tell 502s on the echo-confirm.
+      // /resume handles the spawn-or-revive + delivery internally and
+      // returns a 200 with a delivery status.
+      const isEffectivelyLive = activeAgent.status === 'running' || activeAgent.status === 'starting';
+      const endpoint = isEffectivelyLive
+        ? `/api/agents/${activeAgent.id}/tell`
+        : `/api/agents/${activeAgent.id}/resume`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
       });
       if (!response.ok) {
         const body = await response.text();
-        console.error('Tell failed:', body);
+        console.error('Send failed:', body);
       }
       return response.ok;
     } catch (error) {
-      console.error('Tell failed:', error);
+      console.error('Send failed:', error);
       return false;
     } finally {
       setSending(false);

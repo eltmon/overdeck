@@ -187,6 +187,30 @@ describe('SessionNode paused gate (PAN-1779)', () => {
     // stopped session — they're distinct labels for distinct states.
     expect(screen.queryByText('Resume')).toBeNull();
   });
+
+  // PAN-1985 follow-up: a completed review session whose tmux was killed by
+  // specialists/done (PAN-846) leaves status='running' but presence='ended'
+  // (the state is stale, the tmux is gone). The 'Resume session' item must
+  // still appear so the operator can re-engage the review with a follow-up
+  // message. The condition is `!isLive` (presence !== active/idle/suspended),
+  // not `status === 'stopped'`, to cover this case.
+  it('exposes a Resume session right-click item for completed reviews (status=running, presence=ended)', () => {
+    const onResumeSession = vi.fn();
+    render(
+      <SessionNode
+        session={makeSession({
+          sessionId: 'agent-pan-1-review',
+          type: 'review',
+          role: 'review',
+          status: 'running',
+          presence: 'ended',
+        })}
+        issueId="PAN-1"
+        onResumeSession={onResumeSession}
+      />,
+    );
+    expect(screen.getByText('Resume session')).toBeInTheDocument();
+  });
 });
 
 describe('SessionNode', () => {
