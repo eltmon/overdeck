@@ -14,7 +14,8 @@ export type VerbBadgeVariant =
   | 'CI BLOCKED'
   | 'STUCK · Nh'
   | 'QUEUED FOR PLAN'
-  | 'READY';
+  | 'READY'
+  | 'STOPPED';
 
 type StaticVerbBadgeVariant = Exclude<VerbBadgeVariant, 'STUCK · Nh'>;
 
@@ -91,6 +92,13 @@ const STATIC_VARIANTS = {
   READY: {
     label: 'READY',
     className: 'badge-bg-info badge-border-info text-info-foreground',
+    pulse: false,
+  },
+  STOPPED: {
+    label: 'STOPPED',
+    // PAN-1985: distinct neutral tone so a stopped-but-resumable agent
+    // reads differently from WORK RUNNING (which would be misleading).
+    className: 'bg-transparent border-muted-foreground/40 text-muted-foreground',
     pulse: false,
   },
 } satisfies Record<StaticVerbBadgeVariant, VerbBadgeConfig>;

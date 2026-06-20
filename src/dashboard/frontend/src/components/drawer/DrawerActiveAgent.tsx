@@ -11,7 +11,15 @@ import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
 
 function isActiveAgent(agent: Agent) {
-  return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed';
+  // PAN-1985 follow-up: include stopped agents so the composer stays accessible
+  // for re-engaging an agent that finished. The AgentTellForm's POST to
+  // /api/agents/:id/tell routes through messageAgent() which auto-resumes
+  // a stopped agent with the saved session id (PAN-367 / PAN-705) — so
+  // typing a message and hitting send is the same one-step "resume + tell"
+  // path that conversations use. Exclude terminal states (dead/failed)
+  // because there's no recoverable session for those.
+  if (agent.status === 'dead' || agent.status === 'failed') return false;
+  return true;
 }
 
 function stuckHours(agent: Agent, now: Date) {
@@ -27,6 +35,7 @@ function verbBadgeForAgent(agent: Agent): VerbBadgeProps {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, new Date()), className: 'text-[9px]' };
   }
   if (isAwaitingInput(agent)) return { variant: 'INPUT', className: 'text-[9px]' };
+  if (agent.status === 'stopped') return { variant: 'STOPPED', className: 'text-[9px]' };
   if (agent.role === 'plan') return { variant: 'PLANNING', className: 'text-[9px]' };
   if (agent.role === 'review' || agent.role === 'test') return { variant: 'REVIEW RUNNING', className: 'text-[9px]' };
   if (agent.role === 'ship') return { variant: 'SHIP RUNNING', className: 'text-[9px]' };
@@ -117,7 +126,9 @@ export default function DrawerActiveAgent() {
             <h3 className="truncate font-mono text-[13px] font-semibold leading-none text-foreground">{activeAgent.id}</h3>
             <VerbBadge {...verbBadgeForAgent(activeAgent)} />
           </div>
-          <div className="mt-[6px] text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Active Agent</div>
+          <div className="mt-[6px] text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+            {activeAgent.status === 'stopped' ? 'Stopped Agent — send a message to resume' : 'Active Agent'}
+          </div>
         </div>
         <div className="shrink-0 text-right font-mono text-[10px] leading-none text-muted-foreground">{meta}</div>
       </div>

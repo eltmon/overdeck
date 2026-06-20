@@ -164,6 +164,29 @@ describe('SessionNode paused gate (PAN-1779)', () => {
     expect(screen.queryByTestId('session-unpause')).toBeNull();
     expect(screen.queryByTestId('session-paused-reason')).toBeNull();
   });
+
+  // PAN-1985 follow-up: a stopped work session gets a 'Resume session' menu
+  // item so the operator can re-engage the agent without going through the
+  // restart picker (which is destructive — wipes the dir). The session menu
+  // opens via Radix, so the test renders the SessionNode directly and
+  // inspects the right-click menu structure via the ContextMenuRoot trigger.
+  it('exposes a Resume session right-click item for stopped work sessions (PAN-1985)', () => {
+    const onResumeSession = vi.fn();
+    render(
+      <SessionNode
+        session={makeSession({ sessionId: 'agent-pan-1', status: 'stopped', presence: 'ended', role: 'work' })}
+        issueId="PAN-1"
+        onResumeSession={onResumeSession}
+      />,
+    );
+    // The 'Resume session' label is rendered into the ContextMenuContent.
+    // Radix renders the menu content even before open; we just confirm the
+    // menu item is present in the DOM with the expected label.
+    expect(screen.getByText('Resume session')).toBeInTheDocument();
+    // The live 'Resume' (for suspended agents) must NOT be present for a
+    // stopped session — they're distinct labels for distinct states.
+    expect(screen.queryByText('Resume')).toBeNull();
+  });
 });
 
 describe('SessionNode', () => {

@@ -537,10 +537,16 @@ export function SessionNode({
 
   const canPause = session.presence === 'active' && onPauseSession;
   const canResume = session.presence === 'suspended' && onResumeSession;
+  // PAN-1985 follow-up: a stopped agent whose tmux is still alive can be
+  // re-engaged by sending a continue message — onResumeSession already calls
+  // /api/agents/:id/resume which auto-resumes the saved session and delivers
+  // the message. This gives the operator a right-click "Resume session" that
+  // pairs with the drawer composer's new stopped-agent support.
+  const canResumeStopped = session.status === 'stopped' && onResumeSession;
   const canStop = isLive && !!onStopSession;
   const canRestart = onRestartSession && issueId != null;
   const canDeepWipe = onDeepWipe && issueId != null;
-  const hasLifecycleActions = canPause || canResume || canStop || canRestart;
+  const hasLifecycleActions = canPause || canResume || canStop || canRestart || canResumeStopped;
 
   const handleStop = useCallback(() => {
     setIsStopping(true);
@@ -675,6 +681,11 @@ export function SessionNode({
         {canResume && (
           <ContextMenuItem onSelect={() => onResumeSession!(session.sessionId)}>
             Resume
+          </ContextMenuItem>
+        )}
+        {canResumeStopped && (
+          <ContextMenuItem onSelect={() => onResumeSession!(session.sessionId)}>
+            Resume session
           </ContextMenuItem>
         )}
         {isPaused && onUnpauseSession && (
