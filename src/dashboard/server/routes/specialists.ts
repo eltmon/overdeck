@@ -1620,7 +1620,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       success: result.success,
       message: result.message,
       killed: killResult.killed,
-      wiped: wipeResult.removed,
+      wiped: [],
       model: model ?? undefined,
       harness: harness ?? undefined,
     });
