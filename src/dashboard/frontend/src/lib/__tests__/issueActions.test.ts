@@ -52,6 +52,7 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'createWorkspace',
   'copySettings',
   'resetSession',
+  'completeWorkReset',
   'restartFromPlan',
   'restartAgent',
   'reviewTest',
@@ -140,6 +141,10 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('resetIssue').panVerb).toBeNull();
     expect(action('restartFromPlan').panVerb).toBeNull();
     expect(action('restartAgent').panVerb).toBeNull();
+    expect(action('completeWorkReset').panVerb).toBeNull();
+    expect(action('completeWorkReset').kind).toBe('destructive');
+    expect(action('completeWorkReset').group).toBe('danger');
+    expect(action('completeWorkReset').endpoint).toBe('/api/agents/:agentId/restart-fresh');
     expect(action('reviewTest').panVerb).toBe('review request');
   });
 

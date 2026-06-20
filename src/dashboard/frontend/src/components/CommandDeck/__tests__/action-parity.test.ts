@@ -16,6 +16,7 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   Cancel: 'cancel',
   'Resume session': 'resumeSession',
   'Reset session': 'resetSession',
+  'Complete work reset': 'completeWorkReset',
   'Restart agent': 'restartAgent',
   'Restart from plan': 'restartFromPlan',
   'Reset issue': 'resetIssue',
