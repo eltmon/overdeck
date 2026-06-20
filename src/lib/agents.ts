@@ -11,6 +11,7 @@ import { resolveBareNumericIdSync } from './issue-id.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, bypassPrefixForAgentFlagSync } from './claude-permissions.js';
 import { createSessionSync, createSession, killSessionSync, killSession, sendKeys, sendRawKeystroke, sessionExistsSync, sessionExists, listSessions, listSessionsSync, capturePaneSync, capturePane, listPaneValuesSync, listPaneValues, setOption, exactPaneTarget } from './tmux.js';
 import { initHookSync, checkHookSync, generateFixedPointPromptSync } from './hooks.js';
+import { findLatestRollout, extractThreadIdFromRollout } from './runtimes/codex.js';
 import { startWorkSync, completeWorkSync, getAgentCVSync } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId, ComplexityLevel } from './settings.js';
@@ -2563,8 +2564,42 @@ export function getSessionId(agentId: string): string | null {
  * Checks session.id first (written by suspend), then sessions.json (written by heartbeat hook),
  * then runtime.json claudeSessionId field.
  */
+/**
+ * PAN-1988 — for a codex agent, resolve its REAL resumable thread id. codex writes a placeholder
+ * UUID into `session.id` at spawn; the resumable id is the codex thread, recorded in the rollout.
+ * Prefer the explicitly-captured `codex-thread-id`, then fall back to the freshest rollout on disk
+ * (always current — codex writes a new rollout per resume, so this self-heals across resume cycles
+ * without depending on the capture poll landing). Returns null for non-codex agents.
+ */
+function resolveCodexThreadIdSync(agentId: string): string | null {
+  const agentDir = getAgentDir(agentId);
+  const codexHome = join(agentDir, 'codex-home');
+  if (!existsSync(codexHome)) return null; // not a codex agent
+  try {
+    const threadIdPath = join(agentDir, 'codex-thread-id');
+    if (existsSync(threadIdPath)) {
+      const id = readFileSync(threadIdPath, 'utf-8').trim();
+      if (id) return id;
+    }
+  } catch { /* non-fatal */ }
+  try {
+    const rollout = findLatestRollout(codexHome);
+    if (rollout) {
+      const id = extractThreadIdFromRollout(rollout);
+      if (id) return id;
+    }
+  } catch { /* non-fatal */ }
+  return null;
+}
+
 export function getLatestSessionIdSync(agentId: string): string | null {
-  // 1. session.id (written by auto-suspend)
+  // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
+  //    returning it would make resumeAgent target a non-existent thread and codex would drift into
+  //    a fresh rollout, losing conversation history (PAN-1988). The freshest rollout is the truth.
+  const codexThreadId = resolveCodexThreadIdSync(agentId);
+  if (codexThreadId) return codexThreadId;
+
+  // 1. session.id (written by auto-suspend) — the real id for claude-code.
   const fromSessionFile = getSessionId(agentId);
   if (fromSessionFile) return fromSessionFile;
 
