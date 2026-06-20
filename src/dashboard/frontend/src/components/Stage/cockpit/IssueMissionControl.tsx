@@ -117,16 +117,19 @@ const GROUP_ORDER: IssueActionGroup[] = [
 ]
 
 // Explicit, literal Tailwind classes — interpolated utilities get purged.
+// PAN-1991 #4: active = blue (a machine is working), not purple (purple is
+// reserved for review/ship/planning specialist activity). done = emerald,
+// failed = red, ahead = neutral track.
 const PROGRESS_BAR_CLASS: Record<PipelineState, string> = {
   done: 'bg-success',
-  active: 'bg-signal-review animate-pulse',
+  active: 'bg-info animate-pulse',
   fail: 'bg-destructive',
-  todo: 'bg-muted',
+  todo: 'bg-muted-foreground/20',
 }
 
 const PROGRESS_TICK_CLASS: Record<PipelineState, string> = {
   done: 'border-success/50 bg-success/15 text-success-foreground',
-  active: 'border-signal-review/50 bg-signal-review/15 text-signal-review-foreground',
+  active: 'border-info/50 bg-info/15 text-info-foreground',
   fail: 'border-destructive/50 bg-destructive/15 text-destructive-foreground',
   todo: 'border-border bg-muted/30 text-muted-foreground',
 }
@@ -354,7 +357,7 @@ function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | und
   )
 }
 
-function PipelineProgressBar({ issueId }: { issueId: string }) {
+function PipelineProgressBar({ issueId, onPhase }: { issueId: string; onPhase: (phase: PipelinePhaseKey) => void }) {
   const review = useReviewStatusQuery(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
   const activity = useActivityQuery(issueId)
@@ -362,30 +365,35 @@ function PipelineProgressBar({ issueId }: { issueId: string }) {
   const work = activity.data?.sections.find((section) => section.type === 'work')
   const states = computePipelineStates({ hasPlan: actions.state.hasPlan, rs: review.data, ci: ci.data, work })
   const summary = ci.data?.summary
-  const segments: Array<{ label: string; sub?: string; state: PipelineState }> = [
-    { label: 'Plan', sub: states.plan === 'done' ? 'approved' : undefined, state: states.plan },
-    { label: 'Work', sub: states.work === 'done' ? 'done' : states.work === 'active' ? 'running' : undefined, state: states.work },
-    { label: 'Review', sub: review.data?.reviewStatus, state: states.review },
-    { label: 'Test', sub: review.data?.testStatus, state: states.test },
-    { label: 'CI/CD', sub: summary?.total ? `${summary.passed}/${summary.total}` : undefined, state: states.ci },
-    { label: 'Ship', sub: review.data?.mergeStatus && review.data.mergeStatus !== 'pending' ? review.data.mergeStatus : undefined, state: states.ship },
-    { label: 'Merge', sub: states.merge === 'active' ? 'ready' : undefined, state: states.merge },
+  const segments: Array<{ key: PipelinePhaseKey; label: string; sub?: string; state: PipelineState }> = [
+    { key: 'plan', label: 'Plan', sub: states.plan === 'done' ? 'approved' : undefined, state: states.plan },
+    { key: 'work', label: 'Work', sub: states.work === 'done' ? 'done' : states.work === 'active' ? 'running' : undefined, state: states.work },
+    { key: 'review', label: 'Review', sub: review.data?.reviewStatus, state: states.review },
+    { key: 'test', label: 'Test', sub: review.data?.testStatus, state: states.test },
+    { key: 'ci', label: 'CI/CD', sub: summary?.total ? `${summary.passed}/${summary.total}` : undefined, state: states.ci },
+    { key: 'ship', label: 'Ship', sub: review.data?.mergeStatus && review.data.mergeStatus !== 'pending' ? review.data.mergeStatus : undefined, state: states.ship },
+    { key: 'merge', label: 'Merge', sub: states.merge === 'active' ? 'ready' : undefined, state: states.merge },
   ]
   return (
     <div className="flex items-stretch gap-1.5" data-testid="cockpit-pipeline-progress">
       {segments.map((seg) => (
-        <div key={seg.label} className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <button
+          key={seg.key}
+          type="button"
+          onClick={() => onPhase(seg.key)}
+          className="flex min-w-0 flex-1 flex-col gap-1.5 rounded-[8px] p-1 text-left transition-colors hover:bg-accent"
+        >
           <div className="flex items-center gap-1.5">
             <span className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-full border text-[9px] ${PROGRESS_TICK_CLASS[seg.state]}`}>
               {pipelineGlyph(seg.state)}
             </span>
             <span className="min-w-0 truncate text-[10.5px] text-muted-foreground">
-              <span className="font-semibold text-foreground">{seg.label}</span>
+              <span className="font-medium text-foreground">{seg.label}</span>
               {seg.sub ? ` ${seg.sub}` : ''}
             </span>
           </div>
           <div className={`h-[5px] rounded-full ${PROGRESS_BAR_CLASS[seg.state]}`} />
-        </div>
+        </button>
       ))}
     </div>
   )
@@ -1041,6 +1049,19 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setTreeContext(null)
     setActiveTab(null)
   }
+  // PAN-1991 #4: clicking a pipeline phase opens that phase's info.
+  const handlePhaseClick = (phase: PipelinePhaseKey) => {
+    if (phase === 'work') {
+      const workSession = treeSessions.find((s) => s.type === 'work')
+      if (workSession) { selectSessionFromTree(workSession); return }
+      selectTab('overview'); return
+    }
+    if (phase === 'plan') { selectTab('plan'); return }
+    if (phase === 'review') { selectTab('review'); return }
+    if (phase === 'test') { selectTab('test'); return }
+    if (phase === 'ci') { selectTab('ci'); return }
+    selectTab('overview') // ship / merge — until the Ship & Merge view (later item)
+  }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
     setTreeSessions(sessions)
     setSelectedTreeSession((current) => {
@@ -1083,7 +1104,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             </div>
           </div>
         </div>
-        <div className="mt-4 border-t border-border pt-4"><PipelineProgressBar issueId={issueId} /></div>
+        <div className="mt-4 border-t border-border pt-4"><PipelineProgressBar issueId={issueId} onPhase={handlePhaseClick} /></div>
         <div className="mt-3"><GatesRow issueId={issueId} /></div>
       </header>
 
