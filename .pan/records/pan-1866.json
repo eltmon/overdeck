@@ -102,21 +102,21 @@
   ],
   "feedback": [],
   "created": "2026-06-19T18:48:04.418Z",
-  "updated": "2026-06-20T20:12:09.404Z",
+  "updated": "2026-06-20T20:50:49.294Z",
   "pipeline": {
     "issueId": "PAN-1866",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-20T20:12:09.365Z",
-    "reviewNotes": "Previous JSONL EOF blocker fixed; diff check, typecheck, lint, and focused tests pass",
+    "updatedAt": "2026-06-20T20:50:49.288Z",
+    "reviewNotes": "Cycle diff reviewed; diff check, typecheck, lint, and targeted integration test pass",
     "testNotes": "Test suite failures: 1 test failed out of 7126 tests. npm run typecheck: PASSED. npm run lint: PASSED. npm test: 1 FAILED. Failing test: 'tests/integration/post-review-rebase-scenario.test.ts > PAN-1215 post-review-rebase scenario > clears stale verificationStatus when review override signals passed'. Root cause: Test mock for '../../src/lib/projects.js' is incomplete — missing 'getProjectSync' export which is required by updateIssueRecordForReviewStatusSync() when writing journal records. The test initializes setReviewStatusSync() which calls updateIssueRecordForReviewStatusSync(), which dynamically imports getProjectSync from projects.js. The mock only exports resolveProjectFromIssue/resolveProjectFromIssueSync but not getProjectSync, causing a vitest '[vitest] No \"getProjectSync\" export is defined' error. The verificationNotes field value exists in the update object but the journal write fails before the value is persisted, so getReviewStatusSync() returns undefined for verificationNotes. This blocks the test assertion at line 304: expect(after?.verificationNotes).toContain('PAN-1215'). The fix requires adding getProjectSync to the test mock.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1975",
-    "reviewedAtCommit": "cfc0d21656f3a98460970e90929e5fccc43c96b2",
-    "reviewRequestedAt": "2026-06-20T20:02:57.536Z"
+    "reviewedAtCommit": "39f683f69324155746aa9cc2d6e86c41b00f9370",
+    "reviewRequestedAt": "2026-06-20T20:48:39.330Z"
   },
   "closeOut": {
     "usage": {
@@ -155,10 +155,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-4-6": {
-            "input": 1331,
-            "output": 495276,
-            "cacheRead": 152410357,
-            "cacheWrite": 4111737
+            "input": 1514,
+            "output": 599658,
+            "cacheRead": 176651724,
+            "cacheWrite": 4452808
           }
         }
       },
@@ -176,15 +176,15 @@
           "cacheWrite": 666437
         },
         "anthropic/claude-sonnet-4-6": {
-          "input": 1345,
-          "output": 505290,
-          "cacheRead": 153478914,
-          "cacheWrite": 4215324
+          "input": 1528,
+          "output": 609672,
+          "cacheRead": 177720281,
+          "cacheWrite": 4556395
         }
       },
       "costAtCloseOut": {
-        "usd": 81.91086924,
-        "pricingAsOf": "2026-06-20T20:12:09.404Z"
+        "usd": 92.02856924,
+        "pricingAsOf": "2026-06-20T20:50:49.294Z"
       }
     },
     "merges": [
