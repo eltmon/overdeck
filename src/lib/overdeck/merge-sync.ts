@@ -13,10 +13,10 @@
  *   - Types re-exported match OLD shapes exactly (ISO string dates, etc.)
  *     so cloister consumers need no structural changes.
  *
- * NOTE: The overdeck door (control-settings.ts) uses key 'merge_train_enabled'
- * (no prefix), while the old panopticon.db used 'flywheel.merge_train_enabled'.
- * This sync module uses the old key to match data written during cutover.
- * PAN-1938: Track this mismatch — the door key is likely a bug.
+ * NOTE: The merge-train flag key is 'flywheel.merge_train_enabled' everywhere —
+ * this module, the control-settings.ts door, and the legacy panopticon.db all
+ * agree. (The control-settings door briefly used an unprefixed 'merge_train_enabled'
+ * during cutover; that mismatch was fixed under PAN-1979.)
  */
 
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -62,9 +62,8 @@ export function isFlywheelGloballyPaused(): boolean {
 /**
  * Drop-in for isMergeTrainEnabled() from app-settings.ts.
  *
- * NOTE: overdeck control-settings.ts door uses 'merge_train_enabled' (no prefix),
- * but old panopticon.db used 'flywheel.merge_train_enabled'. We use the old key
- * here to read data written at cutover time.
+ * Reads 'flywheel.merge_train_enabled' — the single canonical key shared by the
+ * control-settings.ts door and the merge-train engine (unified in PAN-1979).
  */
 export function isMergeTrainEnabled(): boolean {
   return readFlag('flywheel.merge_train_enabled');

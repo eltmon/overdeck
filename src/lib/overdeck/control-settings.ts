@@ -32,7 +32,7 @@ const issuePolicy = sqliteTable('issue_policy', {
 export const FlywheelConfig = Schema.Struct({
   autoPickupBacklog: Schema.Boolean,      // flywheel.auto_pickup_backlog (app_settings)
   requireUatBeforeMerge: Schema.Boolean,  // flywheel.require_uat_before_merge — default TRUE
-  mergeTrainEnabled: Schema.Boolean,      // merge_train_enabled
+  mergeTrainEnabled: Schema.Boolean,      // flywheel.merge_train_enabled
 });
 export type FlywheelConfig = typeof FlywheelConfig.Type;
 
@@ -102,7 +102,7 @@ export const SettingsResolverLive = Layer.effect(
       Effect.promise(async () => ({
         autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
         requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
-        mergeTrainEnabled: await readFlag('merge_train_enabled', false),
+        mergeTrainEnabled: await readFlag('flywheel.merge_train_enabled', false),
       }));
 
     const getFlywheelRuntime = () =>
@@ -177,7 +177,7 @@ export const SettingsWriterLive = Layer.effect(
     const readFlywheelConfig = async (): Promise<FlywheelConfig> => ({
       autoPickupBacklog: await readFlag('flywheel.auto_pickup_backlog', false),
       requireUatBeforeMerge: await readFlag('flywheel.require_uat_before_merge', true),
-      mergeTrainEnabled: await readFlag('merge_train_enabled', false),
+      mergeTrainEnabled: await readFlag('flywheel.merge_train_enabled', false),
     });
 
     const readPolicy = async (id: IssueId): Promise<IssuePolicy> => {
@@ -204,7 +204,7 @@ export const SettingsWriterLive = Layer.effect(
           if (patch.requireUatBeforeMerge !== undefined)
             await setFlag('flywheel.require_uat_before_merge', patch.requireUatBeforeMerge);
           if (patch.mergeTrainEnabled !== undefined)
-            await setFlag('merge_train_enabled', patch.mergeTrainEnabled);
+            await setFlag('flywheel.merge_train_enabled', patch.mergeTrainEnabled);
         });
         const next = yield* Effect.promise(readFlywheelConfig);
         yield* bus.emit({ type: 'settings.flywheel_config', payload: next });
